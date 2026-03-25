@@ -2681,7 +2681,7 @@ describe("EagerAssociationTest", () => {
     const gen = await HabtmEagerCategory.create({ name: "General" });
 
     // p1 has 2 categories, p2 has 1, p3 has 0
-    const { CollectionProxy } = await import("../associations.js");
+    const { CollectionProxy } = await import("./collection-proxy.js");
     const habtmEagerAssoc = (HabtmEagerPost as any)._associations.find(
       (a: any) => a.name === "habtmEagerCategories",
     )!;
@@ -2845,7 +2845,7 @@ describe("EagerAssociationTest", () => {
     const post = await HabtmInhPost.create({ title: "STI Post" });
     const special = await HabtmInhSpecialCategory.create({ name: "Special" });
 
-    const { CollectionProxy } = await import("../associations.js");
+    const { CollectionProxy } = await import("./collection-proxy.js");
     const habtmInhAssoc = (HabtmInhPost as any)._associations.find(
       (a: any) => a.name === "habtmInhSpecialCategories",
     )!;
@@ -3372,7 +3372,7 @@ describe("EagerAssociationTest", () => {
     await MaHabtmPost.create({ title: "P1", ma_habtm_author_id: author.id });
     const cat = await MaHabtmCategory.create({ name: "General" });
 
-    const { CollectionProxy } = await import("../associations.js");
+    const { CollectionProxy } = await import("./collection-proxy.js");
     const maHabtmAssoc = (MaHabtmAuthor as any)._associations.find(
       (a: any) => a.name === "maHabtmCategories",
     )!;
@@ -3616,7 +3616,7 @@ describe("EagerAssociationTest", () => {
     const cat1 = await PciCategory.create({ name: "Tech" });
     const cat2 = await PciCategory.create({ name: "General" });
 
-    const { CollectionProxy } = await import("../associations.js");
+    const { CollectionProxy } = await import("./collection-proxy.js");
     const pciAssoc = (PciPost as any)._associations.find((a: any) => a.name === "pciCategories")!;
     const proxy = new CollectionProxy(post, "pciCategories", pciAssoc);
     await proxy.push(cat1, cat2);
@@ -3676,7 +3676,7 @@ describe("EagerAssociationTest", () => {
     const cat1 = await PcihCategory.create({ name: "Tech" });
     const cat2 = await PcihCategory.create({ name: "General" });
 
-    const { CollectionProxy } = await import("../associations.js");
+    const { CollectionProxy } = await import("./collection-proxy.js");
     const pcihAssoc = (PcihPost as any)._associations.find(
       (a: any) => a.name === "pcihCategories",
     )!;

@@ -15,12 +15,12 @@ export {
   loadHasMany,
   loadHasManyThrough,
   processDependentAssociations,
-  CollectionProxy,
   association,
   loadHabtm,
   updateCounterCaches,
   touchBelongsToParents,
 } from "./associations.js";
+export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationOptions } from "./associations.js";
 export {
   Transaction,

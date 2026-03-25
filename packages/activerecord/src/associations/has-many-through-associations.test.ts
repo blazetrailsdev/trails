@@ -8,11 +8,11 @@ import type { DatabaseAdapter } from "../adapter.js";
 import {
   Associations,
   association,
-  CollectionProxy,
   loadHasMany,
   loadHasManyThrough,
   processDependentAssociations,
 } from "../associations.js";
+import { CollectionProxy } from "./collection-proxy.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();

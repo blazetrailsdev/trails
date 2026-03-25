@@ -1589,7 +1589,7 @@ describe("NestedThroughAssociationsTest", () => {
   it.skip("has many through with sti on nested through reflection", () => {});
 
   it("nested has many through writers should raise error", async () => {
-    const { CollectionProxy } = await import("../associations.js");
+    const { CollectionProxy } = await import("./collection-proxy.js");
 
     class NwrAuthor extends Base {
       static {
@@ -1666,7 +1666,7 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("nested has one through writers should raise error", async () => {
-    const { CollectionProxy } = await import("../associations.js");
+    const { CollectionProxy } = await import("./collection-proxy.js");
 
     class NhoAuthor extends Base {
       static {
