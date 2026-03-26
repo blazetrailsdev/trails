@@ -116,3 +116,15 @@ export function hasSecurePassword(
     });
   }
 }
+
+/**
+ * Module mixed into the model instance when hasSecurePassword is called.
+ *
+ * Mirrors: ActiveModel::SecurePassword::InstanceMethodsOnActivation
+ */
+export class InstanceMethodsOnActivation {
+  readonly attribute: string;
+  constructor(attribute: string) {
+    this.attribute = attribute;
+  }
+}

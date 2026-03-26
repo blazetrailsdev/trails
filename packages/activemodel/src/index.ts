@@ -8,9 +8,9 @@ export {
   ActiveModelRangeError,
 } from "./errors.js";
 export { NestedError } from "./nested-error.js";
-export { ValidationError } from "./validations.js";
+export { ValidationError, ValidationContext } from "./validations.js";
 export { Validator, EachValidator, BlockValidator } from "./validator.js";
-export { MissingAttributeError } from "./attribute-methods.js";
+export { MissingAttributeError, AttributeMethodPattern } from "./attribute-methods.js";
 export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 export {
   AttributeMutationTracker,
@@ -19,7 +19,11 @@ export {
 } from "./attribute-mutation-tracker.js";
 export { Attribute, FromDatabase, FromUser, WithCastValue } from "./attribute.js";
 export { UserProvidedDefault } from "./attribute/user-provided-default.js";
-export { AttributeSet } from "./attribute-set/builder.js";
+export { AttributeSet, LazyAttributeSet, LazyAttributeHash } from "./attribute-set/builder.js";
+export { YAMLEncoder } from "./attribute-set/yaml-encoder.js";
+export { Railtie } from "./railtie.js";
+export { WithValidator } from "./validations/with.js";
+export { AcceptsMultiparameterTime } from "./type/helpers/accepts-multiparameter-time.js";
 export type { ValidatorContract } from "./validator.js";
 export { ModelName } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";
@@ -39,7 +43,7 @@ export { DecimalType } from "./type/decimal.js";
 export { BigIntegerType } from "./type/big-integer.js";
 export { ImmutableStringType } from "./type/immutable-string.js";
 export { ValueType } from "./type/value.js";
-export { BinaryType } from "./type/binary.js";
+export { BinaryType, Data as BinaryData } from "./type/binary.js";
 export { TimeType } from "./type/time.js";
 export { UuidType } from "./type/uuid.js";
 export { JsonType } from "./type/json.js";
@@ -82,4 +86,8 @@ export const Types = {
   ArrayType: ArrayTypeImpl,
 };
 
-export { hasSecurePassword, SecurePassword } from "./secure-password.js";
+export {
+  hasSecurePassword,
+  SecurePassword,
+  InstanceMethodsOnActivation,
+} from "./secure-password.js";

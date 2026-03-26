@@ -242,3 +242,88 @@ export class Builder {
     return new AttributeSet(attrs);
   }
 }
+
+/**
+ * Lazy variant of AttributeSet. Currently delegates to the base implementation.
+ *
+ * Mirrors: ActiveModel::LazyAttributeSet
+ */
+export class LazyAttributeSet extends AttributeSet {}
+
+/**
+ * Lazy hash of attribute objects, materializes on demand.
+ *
+ * Mirrors: ActiveModel::LazyAttributeHash
+ */
+export class LazyAttributeHash {
+  private delegate: Map<string, Attribute> = new Map();
+  private types: Map<string, Type>;
+  private values: Record<string, unknown>;
+
+  constructor(types: Map<string, Type>, values: Record<string, unknown>) {
+    this.types = types;
+    this.values = values;
+  }
+
+  get(name: string): Attribute {
+    if (this.delegate.has(name)) return this.delegate.get(name)!;
+    return this.assignDefault(name);
+  }
+
+  set(name: string, attr: Attribute): void {
+    this.delegate.set(name, attr);
+  }
+
+  has(name: string): boolean {
+    return (
+      this.delegate.has(name) ||
+      Object.prototype.hasOwnProperty.call(this.values, name) ||
+      this.types.has(name)
+    );
+  }
+
+  keys(): string[] {
+    const allKeys = new Set([
+      ...this.delegate.keys(),
+      ...Object.keys(this.values),
+      ...this.types.keys(),
+    ]);
+    return [...allKeys];
+  }
+
+  deepDup(): LazyAttributeHash {
+    const copy = new LazyAttributeHash(this.types, { ...this.values });
+    const cache = new Map<Attribute, Attribute>();
+    for (const [name, attr] of this.delegate) {
+      copy.delegate.set(name, LazyAttributeHash.cloneAttr(attr, cache));
+    }
+    return copy;
+  }
+
+  private static cloneAttr(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
+    const existing = cache.get(attr);
+    if (existing) return existing;
+    const cloned = Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
+    cache.set(attr, cloned);
+    const orig = attr.getOriginalAttribute();
+    if (orig) {
+      cloned.setOriginalAttribute(LazyAttributeHash.cloneAttr(orig, cache));
+    }
+    return cloned;
+  }
+
+  private assignDefault(name: string): Attribute {
+    const type = this.types.get(name);
+    if (Object.prototype.hasOwnProperty.call(this.values, name) && type) {
+      const attr = Attribute.fromDatabase(name, this.values[name], type);
+      this.delegate.set(name, attr);
+      return attr;
+    }
+    if (type) {
+      const attr = Attribute.uninitialized(name, type);
+      this.delegate.set(name, attr);
+      return attr;
+    }
+    return Attribute.null(name);
+  }
+}

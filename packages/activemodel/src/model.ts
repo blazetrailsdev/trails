@@ -1,5 +1,5 @@
 import { Errors, StrictValidationFailed } from "./errors.js";
-import { ValidationError } from "./validations.js";
+import { ValidationError, ValidationContext } from "./validations.js";
 import { humanize, underscore } from "@rails-ts/activesupport";
 import { I18n } from "./i18n.js";
 import { typeRegistry } from "./type/registry.js";
@@ -10,6 +10,8 @@ import { ModelName } from "./naming.js";
 import { DirtyTracker } from "./dirty.js";
 import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from "./callbacks.js";
 import { serializableHash, SerializeOptions } from "./serialization.js";
+import { BlockValidator } from "./validator.js";
+import { AttributeMethodPattern } from "./attribute-methods.js";
 import type {
   ValidatorContract as Validator,
   ConditionalOptions,
@@ -62,6 +64,7 @@ export class Model {
   // -- Class-level registries --
   static includeRootInJson: boolean | string = false;
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
+  static _attributeMethodPatterns: AttributeMethodPattern[] = [];
   static _validations: ValidationEntry[] = [];
   static _customValidations: CustomValidationEntry[] = [];
   static _callbackChain: CallbackChain = new CallbackChain();
@@ -376,11 +379,9 @@ export class Model {
     fn: (record: AnyRecord, attribute: string, value: unknown) => void,
     options: ConditionalOptions = {},
   ): void {
+    const validator = new BlockValidator({ attributes, ...options }, fn);
     this.validate((record: AnyRecord) => {
-      for (const attr of attributes) {
-        const value = record.readAttribute(attr);
-        fn(record, attr, value);
-      }
+      validator.validate(record);
     }, options);
   }
 
@@ -973,10 +974,11 @@ export class Model {
 
   _validationContext: string | null = null;
 
-  isValid(context?: string): boolean {
+  isValid(context?: string | ValidationContext): boolean {
     this.errors.clear();
     const ctor = this.constructor as typeof Model;
-    const effectiveContext = context ?? this._validationContext;
+    const contextStr = context instanceof ValidationContext ? context.name : context;
+    const effectiveContext = contextStr ?? this._validationContext;
 
     // Run before_validation callbacks
     if (!ctor._callbackChain.runBeforeSync("validation", this)) return false;
@@ -1022,7 +1024,7 @@ export class Model {
    *
    * Mirrors: ActiveModel::Validations#validate
    */
-  validate(context?: string): this {
+  validate(context?: string | ValidationContext): this {
     this.isValid(context);
     return this;
   }
