@@ -4,10 +4,10 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler
  */
 
-import { ConnectionPool } from "./connection-pool/queue.js";
+import { ConnectionPool } from "./connection-pool.js";
 import { DatabaseConfig } from "../../database-configurations/database-config.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
-import { DatabaseConfigurations } from "../../database-configurations/connection-url-resolver.js";
+import { DatabaseConfigurations } from "../../database-configurations.js";
 import type { DatabaseAdapter } from "../../adapter.js";
 
 export class ConnectionHandler {

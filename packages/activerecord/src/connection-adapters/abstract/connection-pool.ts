@@ -4,8 +4,8 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool
  */
 
-import type { DatabaseAdapter } from "../../../adapter.js";
-import type { DatabaseConfig } from "../../../database-configurations/database-config.js";
+import type { DatabaseAdapter } from "../../adapter.js";
+import type { DatabaseConfig } from "../../database-configurations/database-config.js";
 
 export class ConnectionPool {
   readonly dbConfig: DatabaseConfig;

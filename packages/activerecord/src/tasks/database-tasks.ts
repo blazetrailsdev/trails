@@ -5,7 +5,7 @@
  */
 
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { DatabaseConfigurations } from "../database-configurations/connection-url-resolver.js";
+import { DatabaseConfigurations } from "../database-configurations.js";
 
 export class DatabaseTasks {
   static get env(): string {

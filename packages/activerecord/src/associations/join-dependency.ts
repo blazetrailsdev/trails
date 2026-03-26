@@ -10,14 +10,14 @@
  * attribute hashes and instantiated into the correct model.
  */
 
-import type { Base } from "../../base.js";
+import type { Base } from "../base.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,
   singularize as _singularize,
 } from "@rails-ts/activesupport";
-import { modelRegistry } from "../../associations.js";
-import { getInheritanceColumn, isStiSubclass } from "../../sti.js";
+import { modelRegistry } from "../associations.js";
+import { getInheritanceColumn, isStiSubclass } from "../sti.js";
 
 export interface JoinNode {
   tableIndex: number;

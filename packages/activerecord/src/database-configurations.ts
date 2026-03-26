@@ -2,9 +2,9 @@ import {
   DatabaseConfig,
   type DatabaseConfigOptions,
   _setDefaultEnvGetter,
-} from "./database-config.js";
-import { HashConfig } from "./hash-config.js";
-import { UrlConfig } from "./url-config.js";
+} from "./database-configurations/database-config.js";
+import { HashConfig } from "./database-configurations/hash-config.js";
+import { UrlConfig } from "./database-configurations/url-config.js";
 
 type RawConfigurations = Record<
   string,

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
-import { DatabaseConfigurations } from "./database-configurations/connection-url-resolver.js";
+import { DatabaseConfigurations } from "./database-configurations.js";
 
 describe("DatabaseConfigurationsTest", () => {
   beforeEach(() => {

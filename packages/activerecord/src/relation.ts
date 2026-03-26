@@ -1667,7 +1667,7 @@ export class Relation<T extends Base> {
       return;
     }
 
-    const { JoinDependency } = await import("./associations/join-dependency/join-association.js");
+    const { JoinDependency } = await import("./associations/join-dependency.js");
     const jd = new JoinDependency(this._modelClass);
 
     const fallbackAssocs: string[] = [];
