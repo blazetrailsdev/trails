@@ -210,6 +210,15 @@ Each type is self-contained: inherit from ActiveModel type, override `cast`/`ser
 
 ---
 
+## Known architectural gaps
+
+- **ScopeRegistry needs AsyncLocalStorage**: `ScopeRegistry` uses a process-global
+  WeakMap, which means concurrent async scoping blocks on the same model can race.
+  Rails uses thread-local storage for `current_scope`; the TS equivalent is
+  `AsyncLocalStorage`. This matters for server contexts with concurrent requests.
+
+---
+
 ## Strategy for moving the number
 
 The fastest way to improve api:compare is:

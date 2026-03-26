@@ -15,6 +15,9 @@ import {
 } from "./errors.js";
 import { encrypts as _encrypts, getEncryptor } from "./encryption.js";
 import { Association as AssociationInstance } from "./associations/association.js";
+import { ScopeRegistry } from "./scoping.js";
+import { Default as DefaultScoping } from "./scoping/default.js";
+import { Named as NamedScoping } from "./scoping/named.js";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import { BelongsToAssociation } from "./associations/belongs-to-association.js";
 import { BelongsToPolymorphicAssociation } from "./associations/belongs-to-polymorphic-association.js";
@@ -811,11 +814,13 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.unscoped
    */
   static unscoped(): any {
-    if (!_RelationCtor) {
-      throw new Error("Relation not loaded. Import relation.ts first.");
-    }
-    const rel = new _RelationCtor(this);
-    return _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
+    return DefaultScoping.unscoped(this, () => {
+      if (!_RelationCtor) {
+        throw new Error("Relation not loaded. Import relation.ts first.");
+      }
+      const rel = new _RelationCtor(this);
+      return _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
+    });
   }
 
   /** @internal Like all() but skips currentScope — used by the preloader. */
@@ -827,11 +832,10 @@ export class Base extends Model {
     if (!_RelationCtor) {
       throw new Error("Relation not loaded. Import relation.ts first.");
     }
-    let rel = new _RelationCtor(this);
-    rel = _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
-    if (this._defaultScope) {
-      rel = this._defaultScope(rel);
-    }
+    let rel = DefaultScoping.buildDefaultScope(this, () => {
+      const r = new _RelationCtor!(this);
+      return _wrapWithScopeProxy ? _wrapWithScopeProxy(r) : r;
+    });
     if (isStiSubclass(this)) {
       const col = getInheritanceColumn(getStiBase(this));
       if (col) {
@@ -858,31 +862,10 @@ export class Base extends Model {
     fn: (rel: any, ...args: any[]) => any,
     extension?: Record<string, Function>,
   ): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_scopes")) {
-      this._scopes = new Map(this._scopes);
-    }
-    this._scopes.set(name, fn);
-
-    if (extension) {
-      if (!Object.prototype.hasOwnProperty.call(this, "_scopeExtensions")) {
-        this._scopeExtensions = new Map(this._scopeExtensions);
-      }
-      this._scopeExtensions.set(name, extension);
-    }
-
-    // Define a static method on the class that delegates to all().scopeName()
-    Object.defineProperty(this, name, {
-      value: function (...args: any[]) {
-        return (this as typeof Base).all()[name](...args);
-      },
-      writable: true,
-      configurable: true,
-    });
+    NamedScoping.defineScope(this, name, fn, extension);
   }
 
   // -- Scoping --
-
-  private static _currentScope: any | null = null;
 
   /**
    * Execute a block with the given relation as the current scope.
@@ -890,12 +873,12 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Relation#scoping
    */
   static async scoping<R>(rel: any, fn: () => R | Promise<R>): Promise<R> {
-    const prev = this._currentScope;
-    this._currentScope = rel;
+    const prev = ScopeRegistry.currentScope(this);
+    ScopeRegistry.setCurrentScope(this, rel);
     try {
       return await fn();
     } finally {
-      this._currentScope = prev;
+      ScopeRegistry.setCurrentScope(this, prev);
     }
   }
 
@@ -905,7 +888,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.current_scope
    */
   static get currentScope(): any | null {
-    return this._currentScope;
+    return ScopeRegistry.currentScope(this);
   }
 
   // -- Finders (class methods) --
@@ -1108,8 +1091,9 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.all
    */
   static all(): any {
-    if (this._currentScope) {
-      return this._currentScope._clone();
+    const scope = this.currentScope;
+    if (scope) {
+      return scope._clone();
     }
     return this._buildDefaultRelation();
   }
@@ -1653,8 +1637,9 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.create
    */
   private static _mergeCurrentScopeAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
-    if (this._currentScope) {
-      const scopeAttrs = this._currentScope.scopeForCreate?.() ?? {};
+    const scope = this.currentScope;
+    if (scope) {
+      const scopeAttrs = scope.scopeForCreate?.() ?? {};
       return { ...scopeAttrs, ...attrs };
     }
     return attrs;
