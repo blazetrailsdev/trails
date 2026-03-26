@@ -5,6 +5,7 @@ import {
   type ColumnOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 import { detectAdapterName } from "./adapter-name.js";
+import { quoteDefaultExpression } from "./quoting.js";
 
 interface RecordedOperation {
   method: string;
@@ -943,11 +944,7 @@ export abstract class Migration {
   }
 
   private _defaultClause(defaultValue: unknown): string {
-    if (defaultValue === undefined) return "";
-    if (defaultValue === null) return " DEFAULT NULL";
-    if (typeof defaultValue === "boolean") return ` DEFAULT ${defaultValue ? "TRUE" : "FALSE"}`;
-    if (typeof defaultValue === "number") return ` DEFAULT ${defaultValue}`;
-    return ` DEFAULT '${String(defaultValue).replace(/'/g, "''")}'`;
+    return quoteDefaultExpression(defaultValue);
   }
 }
 
