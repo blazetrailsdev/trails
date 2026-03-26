@@ -304,4 +304,27 @@ describe("PostgresTest", () => {
       expect(sql).toContain("ILIKE");
     });
   });
+
+  describe("array quoting", () => {
+    it("quotes array values as PG array literals", () => {
+      const node = users.get("tags").eq(["a", "b"]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain('\'{"a","b"}\'');
+    });
+
+    it("quotes nested arrays", () => {
+      const node = users.get("tags").eq([
+        [1, 2],
+        [3, 4],
+      ]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("'{{1,2},{3,4}}'");
+    });
+
+    it("escapes single quotes in array elements", () => {
+      const node = users.get("tags").eq(["O'Reilly"]);
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("'{\"O''Reilly\"}'");
+    });
+  });
 });

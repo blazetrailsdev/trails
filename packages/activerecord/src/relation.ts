@@ -1,6 +1,6 @@
 import { Table, SelectManager, Nodes, Visitors } from "@rails-ts/arel";
 import type { Base } from "./base.js";
-import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
+import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
 import { RecordNotFound, SoleRecordExceeded } from "./errors.js";
 import { modelRegistry } from "./associations.js";
 import { getInheritanceColumn, isStiSubclass } from "./sti.js";
@@ -2544,16 +2544,9 @@ export class Relation<T extends Base> {
     const columns = Object.keys(mergedRecords[0]);
     const colList = columns.map((c) => `"${c}"`).join(", ");
 
+    const arrayCols = this._arrayColumnSet(columns);
     const valueRows = mergedRecords.map((row) => {
-      const vals = columns.map((c) => {
-        const v = row[c];
-        if (v === null || v === undefined) return "NULL";
-        if (typeof v === "number") return String(v);
-        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-        if (v instanceof Date) return `'${v.toISOString()}'`;
-        if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'`;
-        return `'${String(v).replace(/'/g, "''")}'`;
-      });
+      const vals = columns.map((c) => quoteSqlValue(row[c], arrayCols.has(c)));
       return `(${vals.join(", ")})`;
     });
 
@@ -2598,16 +2591,9 @@ export class Relation<T extends Base> {
     const columns = Object.keys(mergedRecords[0]);
     const colList = columns.map((c) => `"${c}"`).join(", ");
 
+    const upsertArrayCols = this._arrayColumnSet(columns);
     const valueRows = mergedRecords.map((row) => {
-      const vals = columns.map((c) => {
-        const v = row[c];
-        if (v === null || v === undefined) return "NULL";
-        if (typeof v === "number") return String(v);
-        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-        if (v instanceof Date) return `'${v.toISOString()}'`;
-        if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'`;
-        return `'${String(v).replace(/'/g, "''")}'`;
-      });
+      const vals = columns.map((c) => quoteSqlValue(row[c], upsertArrayCols.has(c)));
       return `(${vals.join(", ")})`;
     });
 
@@ -2657,6 +2643,15 @@ export class Relation<T extends Base> {
     }
 
     return this._modelClass.adapter.executeMutation(sql);
+  }
+
+  private _arrayColumnSet(columns: string[]): Set<string> {
+    return new Set(
+      columns.filter((c) => {
+        const def = this._modelClass._attributeDefinitions.get(c);
+        return def?.type?.name === "array";
+      }),
+    );
   }
 
   /**

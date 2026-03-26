@@ -1,5 +1,5 @@
 import { Model } from "@rails-ts/activemodel";
-import { Table } from "@rails-ts/arel";
+import { Table, quoteArrayLiteral } from "@rails-ts/arel";
 import { pluralize, underscore } from "@rails-ts/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import { NameError, SubclassNotFound } from "./errors.js";
@@ -22,6 +22,20 @@ import { HasOneAssociation } from "./associations/has-one-association.js";
 import { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
 import { HasManyAssociation } from "./associations/has-many-association.js";
 import { HasManyThroughAssociation } from "./associations/has-many-through-association.js";
+
+/** @internal */
+export function quoteSqlValue(v: unknown, asArray = false): string {
+  if (v === null || v === undefined) return "NULL";
+  if (typeof v === "number") return String(v);
+  if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+  if (v instanceof Date) return `'${v.toISOString()}'`;
+  if (asArray && Array.isArray(v)) {
+    const arrayLiteral = quoteArrayLiteral(v);
+    return `'${arrayLiteral.replace(/'/g, "''")}'`;
+  }
+  if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'`;
+  return `'${String(v).replace(/'/g, "''")}'`;
+}
 
 // Late-bound Relation constructor to break circular dependency.
 // Set by relation.ts when it loads.
@@ -2409,14 +2423,11 @@ export class Base extends Model {
     }
 
     const colList = columns.map((c) => `"${c}"`).join(", ");
-    const valList = values
-      .map((v) => {
-        if (v === null) return "NULL";
-        if (typeof v === "number") return String(v);
-        if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-        if (v instanceof Date) return `'${v.toISOString()}'`;
-        if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'`;
-        return `'${String(v).replace(/'/g, "''")}'`;
+    const valList = columns
+      .map((c, i) => {
+        const def = ctor._attributeDefinitions.get(c);
+        const isArray = def?.type?.name === "array";
+        return quoteSqlValue(values[i], isArray);
       })
       .join(", ");
 
@@ -2464,13 +2475,9 @@ export class Base extends Model {
     const setClause = Object.keys(changedAttrs)
       .map((key) => {
         const val = this.readAttribute(key);
-        if (val === null) return `"${key}" = NULL`;
-        if (typeof val === "number") return `"${key}" = ${val}`;
-        if (typeof val === "boolean") return `"${key}" = ${val ? "TRUE" : "FALSE"}`;
-        if (val instanceof Date) return `"${key}" = '${val.toISOString()}'`;
-        if (typeof val === "object")
-          return `"${key}" = '${JSON.stringify(val).replace(/'/g, "''")}'`;
-        return `"${key}" = '${String(val).replace(/'/g, "''")}'`;
+        const def = ctor._attributeDefinitions.get(key);
+        const isArray = def?.type?.name === "array";
+        return `"${key}" = ${quoteSqlValue(val, isArray)}`;
       })
       .join(", ");
 

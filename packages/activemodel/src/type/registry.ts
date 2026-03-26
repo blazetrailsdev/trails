@@ -12,6 +12,7 @@ import { BigIntegerType } from "./big-integer.js";
 import { ImmutableStringType } from "./immutable-string.js";
 import { BinaryType } from "./binary.js";
 import { TimeType } from "./time.js";
+import { ArrayType } from "./array.js";
 
 export class TypeRegistry {
   private types = new Map<string, () => Type>();
@@ -31,6 +32,7 @@ export class TypeRegistry {
     this.register("value", () => new ValueType());
     this.register("binary", () => new BinaryType());
     this.register("time", () => new TimeType());
+    this.register("array", () => new ArrayType());
   }
 
   register(name: string, factory: () => Type): void {

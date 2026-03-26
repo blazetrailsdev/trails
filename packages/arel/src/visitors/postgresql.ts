@@ -2,6 +2,7 @@ import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
+import { quoteArrayLiteral } from "../quote-array.js";
 
 /**
  * PostgreSQL visitor — extends generic ToSql with PostgreSQL-specific features.
@@ -46,6 +47,14 @@ export class PostgreSQL extends ToSql {
 
   protected override visitNotRegexp(node: Nodes.NotRegexp): SQLString {
     return this.visitBinaryOp(node, node.caseSensitive ? "!~" : "!~*");
+  }
+
+  protected override quote(value: unknown): string {
+    if (Array.isArray(value)) {
+      const literal = quoteArrayLiteral(value);
+      return `'${literal.replace(/'/g, "''")}'`;
+    }
+    return super.quote(value);
   }
 }
 

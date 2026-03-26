@@ -43,6 +43,7 @@ export { BinaryType } from "./type/binary.js";
 export { TimeType } from "./type/time.js";
 export { UuidType } from "./type/uuid.js";
 export { JsonType } from "./type/json.js";
+export { ArrayType } from "./type/array.js";
 
 import { StringType } from "./type/string.js";
 import { IntegerType } from "./type/integer.js";
@@ -58,6 +59,7 @@ import { BinaryType } from "./type/binary.js";
 import { TimeType } from "./type/time.js";
 import { UuidType } from "./type/uuid.js";
 import { JsonType } from "./type/json.js";
+import { ArrayType as ArrayTypeImpl } from "./type/array.js";
 import { typeRegistry } from "./type/registry.js";
 
 export const Types = {
@@ -77,6 +79,7 @@ export const Types = {
   TimeType,
   UuidType,
   JsonType,
+  ArrayType: ArrayTypeImpl,
 };
 
 export { hasSecurePassword, SecurePassword } from "./secure-password.js";
