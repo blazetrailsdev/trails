@@ -345,3 +345,6 @@ function propagateErrors(parent: Base, child: Base, assocName: string): void {
 
 // Register validateAssociations with Base to break circular dependency
 _setValidateAssociationsFn(validateAssociations);
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface AutosaveAssociation {}

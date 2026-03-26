@@ -90,3 +90,6 @@ export async function savepoint<T>(
     throw error;
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Transactions {}

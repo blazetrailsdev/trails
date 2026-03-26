@@ -14,7 +14,7 @@ import { Associations } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { markForDestruction, isMarkedForDestruction } from "./autosave.js";
+import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {

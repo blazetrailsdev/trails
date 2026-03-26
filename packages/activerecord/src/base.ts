@@ -2235,7 +2235,7 @@ export class Base extends Model {
 
     // Check if we have autosave associations — if so, wrap in transaction
     // so failures in autosave roll back the parent's INSERT/UPDATE.
-    const { autosaveBelongsTo, autosaveChildren } = await import("./autosave.js");
+    const { autosaveBelongsTo, autosaveChildren } = await import("./autosave-association.js");
     const associations: any[] = (ctor as any)._associations ?? [];
     const hasAutosave = associations.some((a: any) => a.options?.autosave);
 

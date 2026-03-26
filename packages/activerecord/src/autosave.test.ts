@@ -6,7 +6,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { markForDestruction, isMarkedForDestruction, isDestroyable } from "./autosave.js";
+import {
+  markForDestruction,
+  isMarkedForDestruction,
+  isDestroyable,
+} from "./autosave-association.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();

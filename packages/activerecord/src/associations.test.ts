@@ -31,7 +31,7 @@ import {
   setBelongsTo,
 } from "./associations.js";
 
-import { markForDestruction, isMarkedForDestruction } from "./autosave.js";
+import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { createFixtures } from "./test-fixtures.js";
 
 function freshAdapter(): DatabaseAdapter {

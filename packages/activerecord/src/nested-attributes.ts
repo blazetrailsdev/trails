@@ -237,3 +237,6 @@ async function processNestedAttributes(record: Base): Promise<void> {
 
   (record as any)._pendingNestedAttributes = null;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface NestedAttributes {}
