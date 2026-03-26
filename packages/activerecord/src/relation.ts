@@ -3294,6 +3294,16 @@ export class Relation<T extends Base> {
   }
 
   private async _preloadAssociationsForRecords(records: T[], assocNames: string[]): Promise<void> {
+    const { Preloader } = await import("./associations/preloader.js");
+    const preloader = new Preloader(
+      records as unknown as import("./base.js").Base[],
+      assocNames,
+      (recs, assocs) => this._doPreloadAssociations(recs as unknown as T[], assocs),
+    );
+    await preloader.call();
+  }
+
+  private async _doPreloadAssociations(records: T[], assocNames: string[]): Promise<void> {
     const modelClass = this._modelClass as any;
     const associations: any[] = modelClass._associations ?? [];
 

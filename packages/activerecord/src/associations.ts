@@ -9,6 +9,10 @@ import {
 } from "./associations/errors.js";
 import { underscore, singularize, pluralize, camelize } from "@rails-ts/activesupport";
 import { getInheritanceColumn, findStiClass } from "./sti.js";
+import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
+import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
+import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
+import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 
 /**
  * Association options.
@@ -180,16 +184,7 @@ export class Associations {
    * Mirrors: ActiveRecord::Associations::ClassMethods#belongs_to
    */
   static belongsTo(name: string, options: AssociationOptions = {}): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_associations")) {
-      this._associations = [...(this._associations ?? [])];
-    }
-    this._associations.push({ type: "belongsTo", name, options });
-
-    // If required: true (or optional: false), add presence validation on the FK
-    if (options.required || options.optional === false) {
-      const foreignKey = options.foreignKey ?? `${underscore(name)}_id`;
-      (this as any).validates(foreignKey, { presence: true });
-    }
+    BelongsToBuilder.build(this, name, options as Record<string, unknown>);
   }
 
   /**
@@ -198,13 +193,7 @@ export class Associations {
    * Mirrors: ActiveRecord::Associations::ClassMethods#has_one
    */
   static hasOne(name: string, options: AssociationOptions = {}): void {
-    if (options.counterCache) {
-      throw new Error("has_one associations do not support counter_cache");
-    }
-    if (!Object.prototype.hasOwnProperty.call(this, "_associations")) {
-      this._associations = [...(this._associations ?? [])];
-    }
-    this._associations.push({ type: "hasOne", name, options });
+    HasOneBuilder.build(this, name, options as Record<string, unknown>);
   }
 
   /**
@@ -213,10 +202,7 @@ export class Associations {
    * Mirrors: ActiveRecord::Associations::ClassMethods#has_many
    */
   static hasMany(name: string, options: AssociationOptions = {}): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_associations")) {
-      this._associations = [...(this._associations ?? [])];
-    }
-    this._associations.push({ type: "hasMany", name, options });
+    HasManyBuilder.build(this, name, options as Record<string, unknown>);
   }
 
   /**
@@ -233,57 +219,22 @@ export class Associations {
     name: string,
     options: AssociationOptions & { joinTable?: string } = {},
   ): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_associations")) {
-      this._associations = [...(this._associations ?? [])];
-    }
-
-    const lhsModel = this as unknown as typeof Base;
-    const targetClassName = options.className ?? camelize(singularize(name));
-    const joinTableName = options.joinTable ?? defaultJoinTableName(lhsModel, name);
-    const ownerFk = singleFk(options.foreignKey, `${underscore(lhsModel.name)}_id`);
-    const targetFk = `${underscore(singularize(name))}_id`;
-
-    // Create anonymous join model (like Rails' HABTM_Projects, registered as Developer::HABTM_Projects)
-    const joinModelName = `HABTM_${camelize(name)}`;
-    const registryKey = `${lhsModel.name}::${joinModelName}`;
-    const sourceName = singularize(name);
-    const JoinModel = createHabtmJoinModel(
-      lhsModel,
-      joinModelName,
-      joinTableName,
-      ownerFk,
-      targetFk,
-      targetClassName,
-      sourceName,
-    );
-
-    modelRegistry.set(registryKey, JoinModel);
-
-    // Middle reflection: has_many pointing at the join model
-    // Rails: [lhs_model.name.downcase.pluralize, association_name].sort.join("_")
-    const middleName = [pluralize(underscore(lhsModel.name).toLowerCase()), name].sort().join("_");
-    this._associations.push({
-      type: "hasMany",
-      name: middleName,
-      options: {
-        className: registryKey,
-        foreignKey: ownerFk,
-        dependent: "delete",
-      },
+    HabtmBuilder.build(this, name, options as Record<string, unknown>, {
+      defaultJoinTableName,
+      singleFk,
+      createHabtmJoinModel,
+      modelRegistry,
     });
+  }
+}
 
-    // Store the HABTM definition with through info so CollectionProxy
-    // routes through the through-association code paths
-    this._associations.push({
-      type: "hasAndBelongsToMany",
-      name,
-      options: {
-        ...options,
-        joinTable: joinTableName,
-        through: middleName,
-        source: options.source ?? singularize(name),
-      },
-    });
+/**
+ * Sync loaded result to the association instance if one exists.
+ */
+function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
+  const instances = (record as any)._associationInstances as Map<string, any> | undefined;
+  if (instances?.has(assocName)) {
+    instances.get(assocName)!.setTarget(result);
   }
 }
 
@@ -351,6 +302,7 @@ export async function loadBelongsTo(
       (result as any)._cachedAssociations = (result as any)._cachedAssociations ?? new Map();
       (result as any)._cachedAssociations.set(options.inverseOf, record);
     }
+    syncToAssociationInstance(record, assocName, result);
     return result;
   }
 
@@ -365,6 +317,7 @@ export async function loadBelongsTo(
     (result as any)._cachedAssociations.set(options.inverseOf, record);
   }
 
+  syncToAssociationInstance(record, assocName, result);
   return result;
 }
 
@@ -439,6 +392,7 @@ export async function loadHasOne(
       (result as any)._cachedAssociations = (result as any)._cachedAssociations ?? new Map();
       (result as any)._cachedAssociations.set(options.inverseOf, record);
     }
+    syncToAssociationInstance(record, assocName, result);
     return result;
   }
 
@@ -460,6 +414,7 @@ export async function loadHasOne(
     (result as any)._cachedAssociations.set(options.inverseOf, record);
   }
 
+  syncToAssociationInstance(record, assocName, result);
   return result;
 }
 
@@ -598,6 +553,7 @@ export async function loadHasMany(
         (child as any)._cachedAssociations.set(options.inverseOf, record);
       }
     }
+    syncToAssociationInstance(record, assocName, results);
     return results;
   }
 
@@ -619,6 +575,7 @@ export async function loadHasMany(
     }
   }
 
+  syncToAssociationInstance(record, assocName, results);
   return results;
 }
 
