@@ -9,13 +9,17 @@ export class ControllerGenerator extends GeneratorBase {
     const className = classify(name) + (name.endsWith("Controller") ? "" : "Controller");
     const fileName = dasherize(name.replace(/Controller$/i, "")) + "-controller";
 
+    const ext = this.ext();
+    const ts = this.isTypeScript();
+    const returnType = ts ? ": Promise<void>" : "";
+
     // Controller file
     const actionMethods = actions
-      .map((a) => `  async ${a}(): Promise<void> {\n    // TODO: implement\n  }`)
+      .map((a) => `  async ${a}()${returnType} {\n    // TODO: implement\n  }`)
       .join("\n\n");
 
     this.createFile(
-      `src/app/controllers/${fileName}.ts`,
+      `src/app/controllers/${fileName}${ext}`,
       `import { ActionController } from "@rails-ts/actionpack";
 
 export class ${className} extends ActionController.Base {
@@ -30,7 +34,7 @@ ${actionMethods}
       .join("\n\n");
 
     this.createFile(
-      `test/controllers/${fileName}.test.ts`,
+      `test/controllers/${fileName}.test${ext}`,
       `import { describe, it, expect } from "vitest";
 import { ${className} } from "../../src/app/controllers/${fileName}.js";
 
@@ -41,14 +45,19 @@ ${actionTests}
     );
 
     // Append routes
-    if (actions.length > 0 && this.fileExists("src/config/routes.ts")) {
+    const routesFile = this.fileExists("src/config/routes.ts")
+      ? "src/config/routes.ts"
+      : this.fileExists("src/config/routes.js")
+        ? "src/config/routes.js"
+        : null;
+    if (actions.length > 0 && routesFile) {
       const routeLines = actions
         .map((a) => {
           const resource = dasherize(name.replace(/Controller$/i, ""));
           return `  router.get("/${resource}/${a}", "${resource}#${a}");`;
         })
         .join("\n");
-      this.insertIntoFile("src/config/routes.ts", "// routes", routeLines + "\n");
+      this.insertIntoFile(routesFile, "// routes", routeLines + "\n");
     }
 
     return this.getCreatedFiles();

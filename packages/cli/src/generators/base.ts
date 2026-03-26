@@ -22,6 +22,14 @@ export abstract class GeneratorBase {
     this.output = options.output;
   }
 
+  protected isTypeScript(): boolean {
+    return fs.existsSync(path.join(this.cwd, "tsconfig.json"));
+  }
+
+  protected ext(): string {
+    return this.isTypeScript() ? ".ts" : ".js";
+  }
+
   protected createFile(relativePath: string, content: string): void {
     const fullPath = path.join(this.cwd, relativePath);
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });

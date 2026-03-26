@@ -9,6 +9,7 @@ let lines: string[];
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-test-"));
+  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
 });
 
@@ -180,5 +181,45 @@ describe("ModelGeneratorTest", () => {
     expect(fs.existsSync(path.join(tmpDir, "src/app/models/blog-post.ts"))).toBe(true);
     const content = fs.readFileSync(path.join(tmpDir, "src/app/models/blog-post.ts"), "utf-8");
     expect(content).toContain("class BlogPost extends Base");
+  });
+});
+
+describe("ModelGenerator (JavaScript project)", () => {
+  let jsTmpDir: string;
+  let jsLines: string[];
+
+  beforeEach(() => {
+    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-js-test-"));
+    jsLines = [];
+  });
+
+  afterEach(() => {
+    fs.rmSync(jsTmpDir, { recursive: true, force: true });
+  });
+
+  function makeJsGen() {
+    return new ModelGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
+  }
+
+  it("generates .js model and test files", () => {
+    const gen = makeJsGen();
+    const files = gen.run("User", ["name:string"]);
+    expect(files).toContain("src/app/models/user.js");
+    expect(files).toContain("test/models/user.test.js");
+  });
+
+  it("generates .js migration file", () => {
+    const gen = makeJsGen();
+    const files = gen.run("User", ["name:string"]);
+    const migFile = files.find((f) => f.startsWith("db/migrations/"));
+    expect(migFile).toMatch(/\.js$/);
+  });
+
+  it("uses ESM imports and exports in model", () => {
+    const gen = makeJsGen();
+    gen.run("User", ["name:string"]);
+    const content = fs.readFileSync(path.join(jsTmpDir, "src/app/models/user.js"), "utf-8");
+    expect(content).toContain('import { Base } from "@rails-ts/activerecord"');
+    expect(content).toContain("export class User");
   });
 });

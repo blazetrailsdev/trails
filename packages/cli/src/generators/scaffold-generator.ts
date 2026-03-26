@@ -29,14 +29,16 @@ export class ScaffoldGenerator extends GeneratorBase {
     const controllerClassName = classify(resourceName) + "Controller";
     const controllerFileName = dasherize(resourceName) + "-controller";
 
+    const ext = this.ext();
+
     this.createFile(
-      `src/app/controllers/${controllerFileName}.ts`,
+      `src/app/controllers/${controllerFileName}${ext}`,
       this.controllerSource(controllerClassName, className, singular, resourceName),
     );
 
     // Controller test
     this.createFile(
-      `test/controllers/${controllerFileName}.test.ts`,
+      `test/controllers/${controllerFileName}.test${ext}`,
       this.controllerTestSource(controllerClassName, controllerFileName),
     );
 
@@ -69,12 +71,13 @@ export class ScaffoldGenerator extends GeneratorBase {
     }
 
     // Add RESTful routes
-    if (this.fileExists("src/config/routes.ts")) {
-      this.insertIntoFile(
-        "src/config/routes.ts",
-        "// routes",
-        `  router.resources("${resourceName}");\n`,
-      );
+    const routesFile = this.fileExists("src/config/routes.ts")
+      ? "src/config/routes.ts"
+      : this.fileExists("src/config/routes.js")
+        ? "src/config/routes.js"
+        : null;
+    if (routesFile) {
+      this.insertIntoFile(routesFile, "// routes", `  router.resources("${resourceName}");\n`);
     }
 
     return this.getCreatedFiles();
@@ -86,44 +89,47 @@ export class ScaffoldGenerator extends GeneratorBase {
     singular: string,
     plural: string,
   ): string {
+    const ts = this.isTypeScript();
+    const returnType = ts ? ": Promise<void>" : "";
+
     return `import { ActionController } from "@rails-ts/actionpack";
 
 export class ${controllerClassName} extends ActionController.Base {
-  async index(): Promise<void> {
+  async index()${returnType} {
     // const ${plural} = await ${modelClassName}.all();
-    const ${plural}: any[] = [];
+    const ${plural}${ts ? ": any[]" : ""} = [];
     this.render({ action: "index", locals: { ${plural} } });
   }
 
-  async show(): Promise<void> {
+  async show()${returnType} {
     // const ${singular} = await ${modelClassName}.find(this.params.get("id"));
     const ${singular} = { id: this.params.get("id") };
     this.render({ action: "show", locals: { ${singular} } });
   }
 
-  async new_(): Promise<void> {
+  async new_()${returnType} {
     const ${singular} = {};
     this.render({ action: "new", locals: { ${singular} } });
   }
 
-  async create(): Promise<void> {
+  async create()${returnType} {
     // const ${singular} = await ${modelClassName}.create(this.params.get("${singular}"));
     this.redirectTo("/${plural}");
   }
 
-  async edit(): Promise<void> {
+  async edit()${returnType} {
     // const ${singular} = await ${modelClassName}.find(this.params.get("id"));
     const ${singular} = { id: this.params.get("id") };
     this.render({ action: "edit", locals: { ${singular} } });
   }
 
-  async update(): Promise<void> {
+  async update()${returnType} {
     // const ${singular} = await ${modelClassName}.find(this.params.get("id"));
     // await ${singular}.update(this.params.get("${singular}"));
     this.redirectTo("/${plural}/" + this.params.get("id"));
   }
 
-  async destroy(): Promise<void> {
+  async destroy()${returnType} {
     // const ${singular} = await ${modelClassName}.find(this.params.get("id"));
     // await ${singular}.destroy();
     this.redirectTo("/${plural}");

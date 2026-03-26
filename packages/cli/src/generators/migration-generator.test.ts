@@ -9,6 +9,8 @@ let lines: string[];
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-test-"));
+  // Create tsconfig.json so generators produce TypeScript output by default
+  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
 });
 
@@ -171,5 +173,69 @@ describe("MigrationGeneratorTest", () => {
     const content = readMigration(files);
     expect(content).toContain('t.references("user", { foreignKey: true, index: false })');
     expect(content).toContain('addIndex("posts", "user_id", { unique: true })');
+  });
+});
+
+describe("MigrationGeneratorTest (JavaScript project)", () => {
+  let jsTmpDir: string;
+  let jsLines: string[];
+
+  beforeEach(() => {
+    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-js-test-"));
+    // No tsconfig.json — this is a JS project
+    jsLines = [];
+  });
+
+  afterEach(() => {
+    fs.rmSync(jsTmpDir, { recursive: true, force: true });
+  });
+
+  function makeJsGen() {
+    return new MigrationGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
+  }
+
+  function readJsMigration(files: string[]): string {
+    return fs.readFileSync(path.join(jsTmpDir, files[0]), "utf-8");
+  }
+
+  it("generates .js file extension", () => {
+    const gen = makeJsGen();
+    const files = gen.run("CreateUsers", []);
+    expect(files[0]).toMatch(/\.js$/);
+    expect(files[0]).not.toMatch(/\.ts$/);
+  });
+
+  it("uses ESM imports", () => {
+    const gen = makeJsGen();
+    const files = gen.run("CreateUsers", []);
+    const content = readJsMigration(files);
+    expect(content).toContain('import { Migration } from "@rails-ts/activerecord"');
+    expect(content).not.toContain("require(");
+  });
+
+  it("uses export class", () => {
+    const gen = makeJsGen();
+    const files = gen.run("CreateUsers", []);
+    const content = readJsMigration(files);
+    expect(content).toContain("export class CreateUsers");
+    expect(content).not.toContain("module.exports");
+  });
+
+  it("omits TypeScript return type annotations", () => {
+    const gen = makeJsGen();
+    const files = gen.run("CreateUsers", []);
+    const content = readJsMigration(files);
+    expect(content).not.toContain("Promise<void>");
+    expect(content).toContain("async up()");
+    expect(content).toContain("async down()");
+  });
+
+  it("preserves migration body for JS output", () => {
+    const gen = makeJsGen();
+    const files = gen.run("CreateBooks", ["title:string", "body:text"]);
+    const content = readJsMigration(files);
+    expect(content).toContain('createTable("books"');
+    expect(content).toContain('t.string("title")');
+    expect(content).toContain('t.text("body")');
   });
 });

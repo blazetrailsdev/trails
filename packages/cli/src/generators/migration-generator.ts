@@ -109,7 +109,10 @@ export class MigrationGenerator extends GeneratorBase {
     const className = classify(name);
     const body = this.inferBody(name, className, columns, timestamps);
     const timestamp = migrationTimestamp();
-    const filename = `db/migrations/${timestamp}-${dasherize(name)}.ts`;
+    const ext = this.ext();
+    const filename = `db/migrations/${timestamp}-${dasherize(name)}${ext}`;
+    const ts = this.isTypeScript();
+    const returnType = ts ? ": Promise<void>" : "";
 
     this.createFile(
       filename,
@@ -118,11 +121,11 @@ export class MigrationGenerator extends GeneratorBase {
 export class ${className} extends Migration {
   static version = "${timestamp}";
 
-  async up(): Promise<void> {
+  async up()${returnType} {
 ${body.up}
   }
 
-  async down(): Promise<void> {
+  async down()${returnType} {
 ${body.down}
   }
 }

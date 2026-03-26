@@ -46,8 +46,10 @@ export class ModelGenerator extends GeneratorBase {
       .join("\n");
     const staticBlock = attrLines ? `\n  static {\n${attrLines}\n  }\n` : "";
 
+    const ext = this.ext();
+
     this.createFile(
-      `src/app/models/${fileName}.ts`,
+      `src/app/models/${fileName}${ext}`,
       `import { Base } from "@rails-ts/activerecord";
 
 export class ${className} extends Base {${staticBlock}}
@@ -57,7 +59,7 @@ export class ${className} extends Base {${staticBlock}}
     // Test file
     if (test) {
       this.createFile(
-        `test/models/${fileName}.test.ts`,
+        `test/models/${fileName}.test${ext}`,
         `import { describe, it, expect } from "vitest";
 import { ${className} } from "../../src/app/models/${fileName}.js";
 

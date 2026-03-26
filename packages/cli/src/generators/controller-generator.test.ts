@@ -9,6 +9,7 @@ let lines: string[];
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-test-"));
+  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
 });
 
@@ -71,5 +72,52 @@ describe("ControllerGenerator", () => {
     const gen = makeGen();
     gen.run("Posts", ["index"]);
     expect(lines.filter((l) => l.includes("create")).length).toBe(2);
+  });
+});
+
+describe("ControllerGenerator (JavaScript project)", () => {
+  let jsTmpDir: string;
+  let jsLines: string[];
+
+  beforeEach(() => {
+    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-js-test-"));
+    jsLines = [];
+  });
+
+  afterEach(() => {
+    fs.rmSync(jsTmpDir, { recursive: true, force: true });
+  });
+
+  function makeJsGen() {
+    return new ControllerGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
+  }
+
+  it("generates .js controller and test files", () => {
+    const gen = makeJsGen();
+    const files = gen.run("Posts", ["index"]);
+    expect(files).toContain("src/app/controllers/posts-controller.js");
+    expect(files).toContain("test/controllers/posts-controller.test.js");
+  });
+
+  it("omits TypeScript return type annotations", () => {
+    const gen = makeJsGen();
+    gen.run("Posts", ["index"]);
+    const content = fs.readFileSync(
+      path.join(jsTmpDir, "src/app/controllers/posts-controller.js"),
+      "utf-8",
+    );
+    expect(content).not.toContain("Promise<void>");
+    expect(content).toContain("async index()");
+  });
+
+  it("uses ESM imports and exports", () => {
+    const gen = makeJsGen();
+    gen.run("Posts", ["index"]);
+    const content = fs.readFileSync(
+      path.join(jsTmpDir, "src/app/controllers/posts-controller.js"),
+      "utf-8",
+    );
+    expect(content).toContain('import { ActionController } from "@rails-ts/actionpack"');
+    expect(content).toContain("export class PostsController");
   });
 });

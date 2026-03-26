@@ -9,6 +9,7 @@ let lines: string[];
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-test-"));
+  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
 });
 
@@ -96,5 +97,46 @@ describe("ScaffoldGenerator", () => {
     expect(fs.existsSync(path.join(tmpDir, "src/app/views/layouts/application.html.ejs"))).toBe(
       true,
     );
+  });
+});
+
+describe("ScaffoldGenerator (JavaScript project)", () => {
+  let jsTmpDir: string;
+  let jsLines: string[];
+
+  beforeEach(() => {
+    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-js-test-"));
+    jsLines = [];
+  });
+
+  afterEach(() => {
+    fs.rmSync(jsTmpDir, { recursive: true, force: true });
+  });
+
+  it("generates .js controller and test files", () => {
+    const gen = new ScaffoldGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
+    const files = gen.run("Post", ["title:string"]);
+    expect(files).toContain("src/app/controllers/posts-controller.js");
+    expect(files).toContain("test/controllers/posts-controller.test.js");
+  });
+
+  it("generates .js model and migration files", () => {
+    const gen = new ScaffoldGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
+    const files = gen.run("Post", ["title:string"]);
+    expect(files).toContain("src/app/models/post.js");
+    const migFile = files.find((f) => f.startsWith("db/migrations/"));
+    expect(migFile).toMatch(/\.js$/);
+  });
+
+  it("omits TypeScript annotations in controller", () => {
+    const gen = new ScaffoldGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
+    gen.run("Post", ["title:string"]);
+    const content = fs.readFileSync(
+      path.join(jsTmpDir, "src/app/controllers/posts-controller.js"),
+      "utf-8",
+    );
+    expect(content).not.toContain("Promise<void>");
+    expect(content).not.toContain(": any[]");
+    expect(content).toContain("export class PostsController");
   });
 });
