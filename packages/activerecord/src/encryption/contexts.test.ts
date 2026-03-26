@@ -6,7 +6,7 @@ import {
   getEncryptionContext,
   isEncryptionDisabled,
   isProtectedMode,
-} from "./contexts.js";
+} from "./context.js";
 
 describe("ActiveRecord::Encryption::ContextsTest", () => {
   it(".with_encryption_context lets you override properties", () => {

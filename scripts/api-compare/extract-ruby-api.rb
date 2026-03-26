@@ -179,8 +179,7 @@ class ApiExtractor
       names.each do |name|
         class_fqn = fqn_prefix.empty? ? name : "#{fqn_prefix}::#{name}"
         @classes[class_fqn] ||= new_class_info(name, class_fqn)
-        @classes[class_fqn][:superclass] = superclass
-        @classes[class_fqn][:file] = @current_file
+        @classes[class_fqn][:superclass] = superclass if superclass
       end
     end
   end
@@ -747,7 +746,7 @@ def run
     next unless File.directory?(pkg_dir)
 
     extractor = ApiExtractor.new
-    rb_files = Dir.glob(File.join(pkg_dir, "**", "*.rb"))
+    rb_files = Dir.glob(File.join(pkg_dir, "**", "*.rb")).sort
 
     puts "Processing #{pkg_name}: #{rb_files.length} files..."
 

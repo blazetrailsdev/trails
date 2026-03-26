@@ -18,4 +18,4 @@ export { Scheme } from "./scheme.js";
 export type { SchemeOptions } from "./scheme.js";
 export { Config } from "./config.js";
 export type { Compressor } from "./config.js";
-export * from "./contexts.js";
+export * from "./context.js";
