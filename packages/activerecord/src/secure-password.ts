@@ -118,6 +118,3 @@ export function hasSecurePassword(
 }
 
 export { hashPassword as _hashPassword, verifyPassword as _verifyPassword };
-
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface SecurePassword {}

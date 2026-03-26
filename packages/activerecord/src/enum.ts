@@ -175,6 +175,3 @@ export function castEnumValue(
   }
   return null;
 }
-
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Enum {}

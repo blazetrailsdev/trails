@@ -58,6 +58,3 @@ export function hasSecureToken(
     configurable: true,
   });
 }
-
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface SecureToken {}
