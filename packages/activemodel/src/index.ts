@@ -19,7 +19,8 @@ export {
 } from "./attribute-mutation-tracker.js";
 export { Attribute, FromDatabase, FromUser, WithCastValue } from "./attribute.js";
 export { UserProvidedDefault } from "./attribute/user-provided-default.js";
-export { AttributeSet, LazyAttributeSet, LazyAttributeHash } from "./attribute-set/builder.js";
+export { AttributeSet } from "./attribute-set.js";
+export { LazyAttributeSet, LazyAttributeHash } from "./attribute-set/builder.js";
 export { YAMLEncoder } from "./attribute-set/yaml-encoder.js";
 export { Railtie } from "./railtie.js";
 export { WithValidator } from "./validations/with.js";

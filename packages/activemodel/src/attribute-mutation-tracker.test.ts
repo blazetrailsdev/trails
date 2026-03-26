@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Attribute } from "./attribute.js";
-import { AttributeSet } from "./attribute-set/builder.js";
+import { AttributeSet } from "./attribute-set.js";
 import {
   AttributeMutationTracker,
   ForcedMutationTracker,

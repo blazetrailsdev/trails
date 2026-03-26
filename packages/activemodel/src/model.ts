@@ -5,7 +5,7 @@ import { I18n } from "./i18n.js";
 import { typeRegistry } from "./type/registry.js";
 import { Type } from "./type/value.js";
 import { Attribute } from "./attribute.js";
-import { AttributeSet } from "./attribute-set/builder.js";
+import { AttributeSet } from "./attribute-set.js";
 import { ModelName } from "./naming.js";
 import { DirtyTracker } from "./dirty.js";
 import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from "./callbacks.js";

@@ -1,4 +1,4 @@
-import { AttributeSet } from "./attribute-set/builder.js";
+import { AttributeSet } from "./attribute-set.js";
 
 function cloneValue(value: unknown): unknown {
   if (value === null || typeof value !== "object") return value;

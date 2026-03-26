@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { YAMLEncoder } from "./yaml-encoder.js";
-import { AttributeSet } from "./builder.js";
+import { AttributeSet } from "../attribute-set.js";
 import { Attribute } from "../attribute.js";
 import { typeRegistry } from "../type/registry.js";
 

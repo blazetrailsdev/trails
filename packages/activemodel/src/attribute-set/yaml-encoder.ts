@@ -1,5 +1,5 @@
 import YAML from "yaml";
-import { AttributeSet } from "./builder.js";
+import { AttributeSet } from "../attribute-set.js";
 
 /**
  * Encodes and decodes an AttributeSet to/from YAML.

@@ -1,4 +1,4 @@
-import { AttributeSet } from "./attribute-set/builder.js";
+import { AttributeSet } from "./attribute-set.js";
 
 function resolveValue(value: unknown): unknown {
   return AttributeSet.resolveSnapshotValue(value);
