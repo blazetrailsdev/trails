@@ -35,7 +35,7 @@ export class Relation<T extends Base> {
   private _rawOrderClauses: string[] = [];
   private _limitValue: number | null = null;
   private _offsetValue: number | null = null;
-  private _selectColumns: string[] | null = null;
+  private _selectColumns: (string | Nodes.SqlLiteral)[] | null = null;
   private _isDistinct = false;
   private _distinctOnColumns: string[] = [];
   private _groupColumns: string[] = [];
@@ -534,13 +534,13 @@ export class Relation<T extends Base> {
    *   select(record => record.active)   // block form (returns array)
    */
   select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...columns: string[]): Relation<T>;
+  select(...columns: (string | Nodes.SqlLiteral)[]): Relation<T>;
   select(...args: any[]): Relation<T> | Promise<T[]> {
     if (args.length === 1 && typeof args[0] === "function") {
       return this.toArray().then((records) => records.filter(args[0]));
     }
     const rel = this._clone();
-    rel._selectColumns = args as string[];
+    rel._selectColumns = args.map((a: any) => (a instanceof Nodes.SqlLiteral ? a : String(a)));
     return rel;
   }
 
@@ -549,9 +549,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#reselect
    */
-  reselect(...columns: string[]): Relation<T> {
+  reselect(...columns: (string | Nodes.SqlLiteral)[]): Relation<T> {
     const rel = this._clone();
-    rel._selectColumns = columns;
+    rel._selectColumns = columns.map((c) => (c instanceof Nodes.SqlLiteral ? c : String(c)));
     return rel;
   }
 
@@ -740,7 +740,10 @@ export class Relation<T extends Base> {
       parts.push(`.offset(${this._offsetValue})`);
     }
     if (this._selectColumns !== null) {
-      parts.push(`.select(${JSON.stringify(this._selectColumns)})`);
+      const cols = this._selectColumns.map((c) =>
+        c instanceof Nodes.SqlLiteral ? `sql(${JSON.stringify(c.value)})` : JSON.stringify(c),
+      );
+      parts.push(`.select(${cols.join(", ")})`);
     }
     if (this._isDistinct) {
       parts.push(`.distinct`);
@@ -2580,7 +2583,7 @@ export class Relation<T extends Base> {
     options?: {
       uniqueBy?: string | string[];
       updateOnly?: string | string[];
-      onDuplicate?: unknown;
+      onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
     },
   ): Promise<number> {
     if (options?.onDuplicate !== undefined && options?.updateOnly !== undefined) {
@@ -2622,8 +2625,16 @@ export class Relation<T extends Base> {
         const conflictTarget = `ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")})`;
         sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO NOTHING`;
       }
+    } else if (options?.onDuplicate instanceof Nodes.SqlLiteral) {
+      // Custom SQL via Arel.sql() — matches Rails' on_duplicate: Arel.sql("...")
+      if (isMysql) {
+        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ON DUPLICATE KEY UPDATE ${options.onDuplicate.value}`;
+      } else {
+        const conflictTarget = `ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")})`;
+        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO UPDATE SET ${options.onDuplicate.value}`;
+      }
     } else {
-      // updateOnly restricts which columns get updated on conflict
+      // Default upsert or updateOnly
       let updateCols: string[];
       if (options?.updateOnly) {
         const only = Array.isArray(options.updateOnly) ? options.updateOnly : [options.updateOnly];
@@ -2632,18 +2643,19 @@ export class Relation<T extends Base> {
         updateCols = columns.filter((c) => !uniqueCols.includes(c));
       }
 
+      let updateClause: string;
       if (isMysql) {
-        const updateClause =
+        updateClause =
           updateCols.length > 0
             ? updateCols.map((c) => `"${c}" = VALUES("${c}")`).join(", ")
             : `"${columns[0]}" = VALUES("${columns[0]}")`;
         sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ON DUPLICATE KEY UPDATE ${updateClause}`;
       } else {
-        const conflictTarget = `ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")})`;
-        const updateClause =
+        updateClause =
           updateCols.length > 0
             ? updateCols.map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ")
             : `"${columns[0]}" = EXCLUDED."${columns[0]}"`;
+        const conflictTarget = `ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")})`;
         sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO UPDATE SET ${updateClause}`;
       }
     }
@@ -2706,7 +2718,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#select_values
    */
-  get selectValues(): string[] {
+  get selectValues(): (string | Nodes.SqlLiteral)[] {
     return this._selectColumns ?? [];
   }
 
@@ -2919,6 +2931,7 @@ export class Relation<T extends Base> {
   private _buildProjections(table: Table): any[] {
     if (this._selectColumns) {
       return this._selectColumns.map((c) => {
+        if (c instanceof Nodes.SqlLiteral) return c;
         if (/[(*\s]/.test(c)) return new Nodes.SqlLiteral(c);
         return table.get(c);
       });

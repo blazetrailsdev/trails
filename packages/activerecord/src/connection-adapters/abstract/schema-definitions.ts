@@ -14,6 +14,8 @@ export type ColumnType =
   | "datetime"
   | "timestamp"
   | "binary"
+  | "json"
+  | "jsonb"
   | "primary_key";
 
 interface ColumnDefinition {
@@ -132,6 +134,16 @@ export class TableDefinition {
     return this;
   }
 
+  json(name: string, options: ColumnOptions = {}): this {
+    this.columns.push({ name, type: "json", options });
+    return this;
+  }
+
+  jsonb(name: string, options: ColumnOptions = {}): this {
+    this.columns.push({ name, type: "jsonb", options });
+    return this;
+  }
+
   timestamps(): this {
     this.datetime("created_at", { null: false });
     this.datetime("updated_at", { null: false });
@@ -205,6 +217,12 @@ export class TableDefinition {
           break;
         case "binary":
           parts.push(this._adapterName === "postgres" ? "BYTEA" : "BLOB");
+          break;
+        case "json":
+          parts.push("JSON");
+          break;
+        case "jsonb":
+          parts.push(this._adapterName === "postgres" ? "JSONB" : "JSON");
           break;
       }
 

@@ -936,6 +936,10 @@ export abstract class Migration {
         return this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
       case "binary":
         return this._adapterName === "postgres" ? "BYTEA" : "BLOB";
+      case "json":
+        return "JSON";
+      case "jsonb":
+        return this._adapterName === "postgres" ? "JSONB" : "JSON";
       case "primary_key":
         if (this._adapterName === "postgres") return "SERIAL PRIMARY KEY";
         if (this._adapterName === "mysql") return "INT AUTO_INCREMENT PRIMARY KEY";
