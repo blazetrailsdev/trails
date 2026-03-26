@@ -306,8 +306,8 @@ describe("WhereTest", () => {
         this.adapter = adapter;
       }
     }
-    // where() with no args returns a clone (chainable)
-    const sql = (Post.where as any)().toSql();
+    // where(null) returns a clone (chainable), matching Rails where(nil)
+    const sql = (Post as any).where(null).toSql();
     expect(sql).toContain("FROM");
   });
   it("where with range condition", () => {
