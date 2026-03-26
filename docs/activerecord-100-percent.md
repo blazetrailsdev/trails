@@ -1,10 +1,10 @@
 # ActiveRecord: Road to 100%
 
-Current state: **61.4%** (5,150 / 8,385 tests). 2,997 skipped, 340 of 342 Rails test files matched. API: 7.9% (47/597 classes).
+Current state: **61.7%** tests (5,172 / 8,385). **11.1%** API (66/597 classes/modules). 5 misplaced.
 
 ```bash
 pnpm run test:compare -- --package activerecord
-pnpm run api:compare
+pnpm run api:compare -- --package activerecord
 ```
 
 ## How to work on this
@@ -15,180 +15,209 @@ and submit a PR.
 
 **Before starting**: read the Rails source for the feature you're implementing.
 The test names tell you what behavior to implement, but the Rails source tells
-you how. Key Rails files:
+you how.
 
-- `activerecord/lib/active_record/relation/query_methods.rb` — where/joins/group/order
-- `activerecord/lib/active_record/associations/` — association loading, preloading
-- `activerecord/lib/active_record/autosave_association.rb` — autosave lifecycle
-- `activerecord/lib/active_record/transactions.rb` — transaction wrapping
-- `activerecord/lib/active_record/connection_adapters/` — adapter internals
-
-**Measuring progress**: run `pnpm run test:compare -- --package activerecord`
-to see current skip counts per file.
+**Measuring progress**: `api:compare` counts classes/modules matched by name
+and file path against the Rails source. Creating the class in the right file
+is what moves the number.
 
 ---
 
-## Workstream 1: Autosave & transactions (39 skipped)
+## Misplaced (5 — fix these first)
 
-File: `autosave-association.test.ts` — 137 passing, 39 skipped
+These exist but are in the wrong file path:
 
-Remaining work:
+| Current location                  | Expected location                              | Class/Module                                            |
+| --------------------------------- | ---------------------------------------------- | ------------------------------------------------------- |
+| `quoting.ts`                      | `connection-adapters/abstract/quoting.ts`      | Quoting                                                 |
+| `enum.ts`                         | `connection-adapters/postgresql/oid/enum.ts`   | Enum (PG OID class, name collision with AR Enum module) |
+| `adapters/postgresql/hstore.ts`   | `connection-adapters/postgresql/oid/hstore.ts` | Hstore                                                  |
+| `adapters/postgresql/uuid.ts`     | `connection-adapters/postgresql/oid/uuid.ts`   | Uuid                                                    |
+| `encryption/cipher/aes256-gcm.ts` | `encryption.ts`                                | Cipher                                                  |
 
-- In-memory state revert on transaction rollback (~7 tests) — `rememberTransactionRecordState` / `restoreTransactionRecordState`
-- Nested attribute processing inside the save transaction (~5 tests)
-- Double-save / inverse callbacks (~4 tests)
-- CPK autosave (~3 tests)
-- Store in two relations (~3 tests)
-- `save!` raising RecordInvalid, callback cancelling (~2 tests)
-- `validate: false` at depth (~1 test)
-- Various edge cases (~14 tests)
-
-Related: `nested-attributes.test.ts` (106 passing, 19 skipped)
-
----
-
-## Workstream 2: Query & relation layer (~200 skipped across files)
-
-### 2A. Association-aware `where` (where.test.ts — 27 passing, 35 skipped)
-
-Passing an association name as a key in `where()` should JOIN the association
-table and apply conditions there. Handle polymorphic where.
-
-Rails source: `predicate_builder/association_query_handler.rb`
-
-### 2B. Where-chain (where-chain.test.ts — 27 passing, 27 skipped)
-
-`where.associated()` / `where.missing()` with scopes and enum value translation.
-
-### 2C. Async relation loading (load-async.test.ts — 7 passing, 31 skipped)
-
-`loadAsync()` on Relation — kicks off query immediately, access results later.
-
-### 2D. Relation scoping (scoping/relation-scoping.test.ts — 33 passing, 28 skipped)
-
-Joins within scoping blocks, annotation preservation, STI scoping.
-
-### 2E. Strict loading (strict-loading.test.ts — 24 passing, 30 skipped)
-
-`strictLoadingMode: :n_plus_one_only` — only raises on N+1 queries. HABTM strict loading.
-
-### 2F. Reflection (reflection.test.ts — 35 passing, 32 skipped)
-
-Through scope chain, HABTM reflection, `sourceReflection` / `throughReflection` accessors.
+The Enum collision is tricky — our `enum.ts` has the AR Enum module (functions),
+but Rails also has a PG OID Enum class. The extractor matches the PG one first.
+Hstore/Uuid are just `adapters/` vs `connection-adapters/` path differences.
 
 ---
 
-## Workstream 3: Associations depth (200+ skipped across files)
+## Workstream 1: Core modules (114 missing across top-level files)
 
-### 3A. Eager loading (eager.test.ts — 112 passing, 66 skipped)
+These are the ~40 modules that Rails mixes into Base. Many already have
+implementations in our `base.ts` or standalone files — they just need the
+class/module exported from the right file path.
 
-Polymorphic preloading, nested eager load, strict loading during eager load.
+### High-value targets (3+ classes each)
 
-### 3B. Has-many through (has-many-through-associations.test.ts — 128 passing, 38 skipped)
+| Rails file               | Missing | Notes                                                           |
+| ------------------------ | ------- | --------------------------------------------------------------- |
+| `statement_cache.rb`     | 7       | StatementCache, BindManager, etc.                               |
+| `store.rb`               | 6       | Store, IndifferentCoder, etc.                                   |
+| `readonly_attributes.rb` | 4       | ReadonlyAttributes + internal classes                           |
+| `message_pack.rb`        | 4       | MessagePack encoder/decoder                                     |
+| `future_result.rb`       | 4       | FutureResult, EventBuffer, etc.                                 |
+| `fixtures.rb`            | 4       | FixtureSet + helpers                                            |
+| `token_for.rb`           | 3       | TokenFor, TokenDefinition, etc.                                 |
+| `signed_id.rb`           | 3       | SignedId + related                                              |
+| `normalization.rb`       | 3       | Normalization + related                                         |
+| `dynamic_matchers.rb`    | 3       | DynamicMatchers + Method/FindBy                                 |
+| `core.rb`                | 3       | Core + InspectionMask + related                                 |
+| `attribute_methods.rb`   | 3       | AttributeMethods + LazyAttributeSet + GeneratedAttributeMethods |
 
-Through source type, nested through, scope on through.
+### Medium targets (2 classes each)
 
-### 3C. HABTM (has-and-belongs-to-many-associations.test.ts — 52 passing, 43 skipped)
+`timestamp.rb`, `suppressor.rb`, `schema_migration.rb`, `sanitization.rb`,
+`result.rb`, `query_logs_formatter.rb`, `persistence.rb`, `no_touching.rb`,
+`model_schema.rb`, `insert_all.rb`, `inheritance.rb`, `counter_cache.rb`,
+`callbacks.rb`, `autosave_association.rb`
 
-Join table operations, eager loading, destroy behavior.
+### Already partially matched
 
-### 3D. Has-one (has-one-associations.test.ts — 64 passing, 28 skipped)
-
-Replace, build, autosave on has_one.
-
-### 3E. Inverse associations (inverse-associations.test.ts — 58 passing, 35 skipped)
-
-Automatic inverse detection, polymorphic inverse, nested inverse.
-
-### 3F. Join model (join-model.test.ts — 63 passing, 41 skipped)
-
-Polymorphic join, conditions on join, eager loading through join.
-
-### 3G. Associations core (associations.test.ts — 273 passing, 51 skipped)
-
-Edge cases across all association types.
-
----
-
-## Workstream 4: PostgreSQL types & adapter (~220 skipped)
-
-Each type is self-contained. Pattern: create type class with `cast`/`serialize`/`deserialize`, register in PG adapter type map. Requires `PG_TEST_URL` env var.
-
-| Type                    | File                            | Skipped |
-| ----------------------- | ------------------------------- | ------- |
-| Range                   | `adapters/postgresql/range`     | 36      |
-| PG schema introspection | `adapters/postgres-adapter`     | 35      |
-| PG adapter internals    | `adapters/postgres-adapter`     | 31      |
-| UUID                    | `adapters/postgresql/uuid`      | 29      |
-| Geometric               | `adapters/postgresql/geometric` | 28      |
-| HStore                  | `adapters/postgresql/hstore`    | 24      |
-| Array                   | extend adapter                  | 22      |
-| PG connection           | `adapters/postgres-adapter`     | 15      |
+| Rails file                | OK  | Missing | Notes                                                       |
+| ------------------------- | --- | ------- | ----------------------------------------------------------- |
+| `base.rb`                 | 1/1 | 0       | Done                                                        |
+| `autosave_association.rb` | 1/2 | 1       | AutosaveAssociation module detected, missing internal class |
+| `associations.rb`         | 1/2 | 1       | Builder module missing                                      |
+| `validations.rb`          | 1/2 | 1       | RecordInvalid matched, Validations module missing           |
+| `transactions.rb`         | 1/2 | 1       | Transactions module detected, missing internal class        |
 
 ---
 
-## Workstream 5: Schema & migrations (~106 skipped)
+## Workstream 2: Connection adapters (100 missing)
 
-### 5A. Schema dumper (schema-dumper.test.ts — 8 passing, 59 skipped)
+The largest gap. Rails has deep adapter internals with many classes.
 
-Timestamps, type-specific column options, `force: :cascade`, index dumping, constraints, defaults.
+### Abstract adapter layer (high value)
 
-### 5B. Migration completeness (migration.test.ts — 48 passing, 42 skipped)
+| Rails file                       | Missing | Notes                                                     |
+| -------------------------------- | ------- | --------------------------------------------------------- |
+| `abstract/transaction.rb`        | 10      | Transaction, SavepointTransaction, NullTransaction, etc.  |
+| `abstract/connection_pool.rb`    | 6       | Queue, Reaper, BiasableQueue, etc.                        |
+| `abstract/query_cache.rb`        | 3       | QueryCache, Store, etc.                                   |
+| `abstract/schema_definitions.rb` | 4       | Already have 2 matched (TableDefinition, IndexDefinition) |
+| `abstract/connection_handler.rb` | 1       | Already have 1 matched                                    |
 
-Advisory locking, version tracking, reversible blocks, `revert`.
+### PostgreSQL adapter (28 missing across OID types)
 
-### 5C. Migrator (migrator.test.ts — 30 passing, 5 skipped)
+Each OID type is a small self-contained class: `cast()`, `serialize()`,
+`deserialize()`, register in type map.
 
-Multi-path discovery, version ordering, duplicate detection.
+Missing OID types: Array, BitVarying, Bit, Bytea, Cidr, DateTime, Date,
+Decimal, Inet, Interval, Jsonb, LegacyPoint, MacAddr, Money, Oid,
+Point, Range, SpecializedString, Timestamp, TimestampWithTimeZone, Uuid,
+Vector, Xml
 
----
+Also missing: PostgreSQL Column, DatabaseStatements, Quoting,
+SchemaCreation, SchemaDefinitions, SchemaStatements, TypeMetadata
 
-## Workstream 6: Insert-all & serialization (~93 skipped)
+### MySQL adapter (18 missing)
 
-### 6A. Insert-all (insert-all.test.ts — 28 passing, 45 skipped)
+Column, DatabaseStatements, Quoting, SchemaCreation, SchemaDefinitions,
+SchemaStatements, TypeMetadata, plus MySQL2 adapter specifics.
 
-`RETURNING`, automatic timestamps, adapter-specific SQL.
+### SQLite3 adapter (7 missing)
 
-### 6B. Collection cache key (collection-cache-key.test.ts — 30 skipped)
-
-`Relation#cacheKey` / `cacheKeyWithVersion`.
-
-### 6C. Serialized attributes (serialized-attribute.test.ts — 31 passing, 18 skipped)
-
-JSON/YAML coders, default values, dirty tracking.
-
----
-
-## Workstream 7: Base & core (53 skipped)
-
-File: `base.test.ts` — 133 passing, 53 skipped
-
-Abstract class resolution, table name customization, ignored columns, `computeType`, class hierarchy edge cases.
+Column, DatabaseStatements, Quoting, SchemaStatements, etc.
 
 ---
 
-## Workstream 8: Query cache (36 skipped)
+## Workstream 3: Associations (32 missing)
 
-File: `query-cache.test.ts` — 31 passing, 36 skipped
+| Area                | Missing | Notes                                                                                      |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| Builder classes     | 7       | Association, BelongsTo, CollectionAssociation, HABTM, HasMany, HasOne, SingularAssociation |
+| Association classes | 7       | BelongsToAssociation, HasManyAssociation, etc.                                             |
+| Preloader           | 5       | Preloader, Association, Batch, Branch, ThroughAssociation                                  |
+| Errors              | 15      | We have 6/21 matched                                                                       |
+| JoinDependency      | 2       | JoinAssociation, JoinBase (JoinPart matched)                                               |
+| Other               | 4       | AliasTracker, AssociationScope, DisableJoins, NestedError                                  |
 
-Cache invalidation on INSERT/UPDATE/DELETE within transactions.
+The Builder classes are the biggest win — Rails uses a builder pattern to
+configure associations. We inline this in `associations.ts`.
 
 ---
 
-## Lower priority (isolated, can be done anytime)
+## Workstream 4: Relation layer (28 missing)
 
-| Feature                   | Skip | Notes                                             |
-| ------------------------- | ---- | ------------------------------------------------- |
-| Fixtures                  | 111  | Transactional fixtures, ERB, association fixtures |
-| Encryption ORM            | 51   | Wire encryption into attribute read/write         |
-| Connection pool           | 41   | Async checkout, reaping, flushing                 |
-| Trilogy/MySQL adapter     | 51   | Only if targeting MySQL                           |
-| Unsafe raw SQL            | 37   | `disallowRawSql!` allowlist checks                |
-| Multiparameter attributes | 37   | Date form params — Rails HTML form concern        |
-| Hash/URL config           | 74   | Config resolution edge cases                      |
-| Integration tests         | 33   | Cross-cutting — will pass as features land        |
+All missing — no classes matched yet.
 
-## Quick wins (independent, can be done anytime)
+| Rails file                  | Classes | Notes                                     |
+| --------------------------- | ------- | ----------------------------------------- |
+| `relation.rb`               | 7       | Relation + WhereClause, FromClause, etc.  |
+| `relation/query_methods.rb` | 4       | QueryMethods + WhereChain, etc.           |
+| `relation/calculations.rb`  | 2       | Calculations module                       |
+| `relation/delegation.rb`    | 2       | Delegation module                         |
+| `relation/batches.rb`       | 2       | Batches module                            |
+| Other relation files        | 11      | FinderMethods, SpawnMethods, Merger, etc. |
 
-- **`Relation#with` (CTE support)** — relation/with.test.ts has 16 skipped. CTE infrastructure already exists.
-- **Instrumentation** — instrumentation.test.ts has 18 skipped.
+We have a Relation class in `relation.ts` but it's not split into the
+sub-modules Rails uses. Moving/extracting to match Rails file structure
+would pick these up.
+
+---
+
+## Workstream 5: Encryption (15 missing)
+
+| Rails file                   | Missing | Notes                                               |
+| ---------------------------- | ------- | --------------------------------------------------- |
+| `encryption.rb`              | 1       | Top-level Encryption module (Cipher misplaced here) |
+| `encryption/encryptor.rb`    | 2       | Encryptor + related                                 |
+| `encryption/key_provider.rb` | 2       | KeyProvider + DerivedSecretKeyProvider              |
+| Other encryption files       | 10      | Config, Context, Scheme, Properties, etc.           |
+
+Already have 16 OK in encryption — good foundation to build on.
+
+---
+
+## Workstream 6: Migration & schema (23 missing)
+
+| Rails file                      | Missing | Notes                                           |
+| ------------------------------- | ------- | ----------------------------------------------- |
+| `migration.rb`                  | 7       | Migration + CheckPending, Compatibility modules |
+| `migration/command_recorder.rb` | 2       | CommandRecorder + StraightReversible            |
+| `migration/compatibility.rb`    | 6       | V7.2, V7.1, V7.0, etc.                          |
+| `schema.rb`                     | 1       | Schema class                                    |
+| `schema_dumper.rb`              | 3       | SchemaDumper + related                          |
+| Other                           | 4       | JoinTable, DefaultStrategy, etc.                |
+
+---
+
+## Workstream 7: Types (16 missing)
+
+| Rails file                          | Missing | Notes                                                 |
+| ----------------------------------- | ------- | ----------------------------------------------------- |
+| `type/adapter_specific_registry.rb` | 4       | Registration, TypeConflict, etc.                      |
+| `type/time.rb`                      | 2       | Time + related                                        |
+| Other type files                    | 10      | Date, DateTime, JSON, Serialized, Text, TypeMap, etc. |
+
+Each type is self-contained: inherit from ActiveModel type, override `cast`/`serialize`.
+
+---
+
+## Workstream 8: Smaller areas
+
+| Area                        | Missing | Notes                                                                                                 |
+| --------------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| `attribute_methods/*`       | 13      | Dirty, Read, Write, Query, PrimaryKey, BeforeTypeCast, Serialization, TimeZoneConversion, CompositePK |
+| `validations/*`             | 7       | Absence, Associated, Length, Numericality, Presence, Uniqueness                                       |
+| `scoping/*`                 | 5       | Default, Named, ScopeRegistry                                                                         |
+| `database_configurations/*` | 1       | Almost done — 3/4 matched                                                                             |
+| `locking/*`                 | 4       | Optimistic, Pessimistic                                                                               |
+| `coders/*`                  | 4       | ColumnSerializer, JSON, YamlColumn                                                                    |
+| `middleware/*`              | 4       | DatabaseSelector, ShardSelector                                                                       |
+| `fixture_set/*`             | 7       | Fixture loading internals                                                                             |
+| `testing/*`                 | 2       | TestFixtures, TestDatabases                                                                           |
+
+---
+
+## Strategy for moving the number
+
+The fastest way to improve api:compare is:
+
+1. **Fix misplaced (5)** — move existing classes to correct file paths
+2. **Export missing modules from files that already exist** — many modules
+   are implemented but not exported as a class/module from the right path
+3. **Create stub files for areas with many small classes** — OID types,
+   association builders, relation sub-modules
+4. **Split large files** — `relation.ts` and `base.ts` contain logic that
+   Rails splits across many files/modules
