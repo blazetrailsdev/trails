@@ -470,7 +470,7 @@ describe("Base features (Rails-guided) - core", () => {
         this.attribute("name", "string");
       }
     }
-    expect(() => NoAdapter.adapter).toThrow("No adapter configured");
+    expect(() => NoAdapter.adapter).toThrow("No database configuration found");
   });
 
   it("arelTable returns Table with correct name", () => {
@@ -826,7 +826,7 @@ describe("Base (extended)", () => {
   describe("adapter", () => {
     it("throws when no adapter is set", () => {
       class Orphan extends Base {}
-      expect(() => Orphan.adapter).toThrow("No adapter configured");
+      expect(() => Orphan.adapter).toThrow("No database configuration found");
     });
   });
 });

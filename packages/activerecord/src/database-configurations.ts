@@ -80,6 +80,64 @@ export class DatabaseConfigurations {
     customHandlers.delete(key);
   }
 
+  /**
+   * Build a DatabaseConfigurations from the current environment.
+   *
+   * If `DATABASE_URL` is set and no raw config is provided, it synthesizes
+   * a configuration for the current environment from the URL. This mirrors
+   * how Rails' DatabaseConfigurations handles DATABASE_URL.
+   */
+  static fromEnv(raw: RawConfigurations = {}): DatabaseConfigurations {
+    const instance = new DatabaseConfigurations([]);
+    instance._configurations = instance._buildConfigs(instance._mergeDatabaseUrl(raw));
+    return instance;
+  }
+
+  /**
+   * Merge DATABASE_URL into the raw configurations.
+   *
+   * When DATABASE_URL is set:
+   * - If raw configs exist, the URL is merged into each environment's
+   *   primary config (the URL takes precedence).
+   * - If no raw configs exist, a config is synthesized for the current env.
+   *
+   * Mirrors: ActiveRecord::DatabaseConfigurations#build_url_hash
+   */
+  private _mergeDatabaseUrl(raw: RawConfigurations): RawConfigurations {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) return raw;
+
+    const hasConfigs = Object.keys(raw).length > 0;
+
+    if (!hasConfigs) {
+      const env = process.env.NODE_ENV || DatabaseConfigurations._defaultEnv;
+      return { [env]: { url: databaseUrl } };
+    }
+
+    const merged: RawConfigurations = {};
+    for (const [envName, envConfig] of Object.entries(raw)) {
+      if (typeof envConfig !== "object" || envConfig === null) {
+        merged[envName] = envConfig;
+        continue;
+      }
+
+      if (this._isThreeLevelConfig(envConfig)) {
+        // Three-level: merge URL into the "primary" entry only
+        const nested = { ...envConfig } as Record<string, DatabaseConfigOptions>;
+        if (nested.primary) {
+          nested.primary = { ...nested.primary, url: databaseUrl };
+        } else {
+          // Add a primary entry if one doesn't exist
+          nested.primary = { url: databaseUrl };
+        }
+        merged[envName] = nested;
+      } else {
+        merged[envName] = { ...envConfig, url: databaseUrl } as DatabaseConfigOptions;
+      }
+    }
+    return merged;
+  }
+
   private _buildConfigs(raw: RawConfigurations): DatabaseConfig[] {
     const configs: DatabaseConfig[] = [];
 

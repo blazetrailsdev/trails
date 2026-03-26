@@ -15,6 +15,41 @@ import {
 } from "./errors.js";
 import { encrypts as _encrypts, getEncryptor } from "./encryption.js";
 import { Association as AssociationInstance } from "./associations/association.js";
+import { DatabaseConfigurations } from "./database-configurations.js";
+import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
+import { HashConfig } from "./database-configurations/hash-config.js";
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
+import { pathToFileURL } from "url";
+
+type AdapterConstructor = new (config: any) => DatabaseAdapter;
+
+const _adapterCache: Record<string, AdapterConstructor> = {};
+
+async function _loadAdapter(name: string): Promise<AdapterConstructor> {
+  if (_adapterCache[name]) return _adapterCache[name];
+  switch (name) {
+    case "postgresql": {
+      const mod = await import("./adapters/postgres-adapter.js");
+      _adapterCache[name] = mod.PostgresAdapter;
+      return mod.PostgresAdapter;
+    }
+    case "mysql": {
+      const mod = await import("./adapters/mysql-adapter.js");
+      _adapterCache[name] = mod.MysqlAdapter;
+      return mod.MysqlAdapter;
+    }
+    case "sqlite": {
+      const mod = await import("./adapters/sqlite-adapter.js");
+      _adapterCache[name] = mod.SqliteAdapter;
+      return mod.SqliteAdapter;
+    }
+    default:
+      throw new Error(
+        `Unknown database adapter "${name}". Supported adapters: postgresql, mysql, sqlite`,
+      );
+  }
+}
 import { ScopeRegistry } from "./scoping.js";
 import { Default as DefaultScoping } from "./scoping/default.js";
 import { Named as NamedScoping } from "./scoping/named.js";
@@ -95,6 +130,8 @@ export class Base extends Model {
   static _tableName: string | null = null;
   static _primaryKey: string | string[] = "id";
   static _adapter: DatabaseAdapter | null = null;
+  static _connectionHandler: ConnectionHandler = new ConnectionHandler();
+  static _configPath: string | null = null;
   static _abstractClass = false;
   static _tableNamePrefix = "";
   static _tableNameSuffix = "";
@@ -317,19 +354,299 @@ export class Base extends Model {
 
   /**
    * Set the database adapter for this model class.
+   *
+   * This is a convenience setter that bypasses the ConnectionHandler/ConnectionPool
+   * infrastructure. Prefer `establishConnection` for production use.
    */
   static set adapter(adapter: DatabaseAdapter) {
     this._adapter = adapter;
     if (_onAdapterSet) _onAdapterSet(this);
   }
 
+  /**
+   * Get the database connection for this model.
+   *
+   * Returns the adapter from either:
+   * 1. Directly assigned adapter (via `Model.adapter = ...`)
+   * 2. Connection checked out from ConnectionHandler pool
+   *    (set up by `await establishConnection()`)
+   *
+   * Throws if no connection has been established.
+   *
+   * Mirrors: ActiveRecord::Base.connection
+   */
   static get adapter(): DatabaseAdapter {
-    if (!this._adapter) {
+    // Fast path: directly assigned adapter (used by tests and simple setups)
+    if (this._adapter) return this._adapter;
+
+    // Check for a model-specific pool first
+    const modelPool = this._connectionHandler.retrieveConnectionPool(this.name);
+    if (modelPool) {
+      this._adapter = modelPool.checkout();
+      if (_onAdapterSet) _onAdapterSet(this);
+      return this._adapter;
+    }
+
+    // Fall back to the shared primary pool — cache on Base so all subclasses
+    // share one connection instead of checking out per-model connections
+    const primaryPool = this._connectionHandler.retrieveConnectionPool("primary");
+    if (primaryPool) {
+      if (!Base._adapter) {
+        Base._adapter = primaryPool.checkout();
+        if (_onAdapterSet) _onAdapterSet(Base);
+      }
+      return Base._adapter;
+    }
+
+    throw new Error(
+      `No database configuration found for ${this.name}. ` +
+        `Call await ${this.name}.establishConnection() or set ${this.name}.adapter directly`,
+    );
+  }
+
+  static get connectionHandler(): ConnectionHandler {
+    return this._connectionHandler;
+  }
+
+  /**
+   * Establish a database connection from a URL, config object, or config file.
+   *
+   * Accepts:
+   * - A URL string: `Base.establishConnection("postgres://localhost/mydb")`
+   * - A config object: `Base.establishConnection({ adapter: "postgresql", url: "..." })`
+   * - No arguments: loads from `config/database.json` for NODE_ENV, or DATABASE_URL
+   *
+   * Creates a ConnectionPool managed by the ConnectionHandler, mirroring how
+   * Rails wires establish_connection → ConnectionHandler → ConnectionPool.
+   *
+   * Mirrors: ActiveRecord::Base.establish_connection
+   */
+  static async establishConnection(
+    config?:
+      | string
+      | {
+          adapter?: string;
+          url?: string;
+          database?: string;
+          host?: string;
+          port?: number;
+          username?: string;
+          password?: string;
+          [key: string]: unknown;
+        },
+  ): Promise<void> {
+    this._adapter = null;
+    Base._adapter = null;
+
+    if (config === undefined) {
+      await this._autoConnect();
+      return;
+    }
+
+    const resolved = this._resolveConfig(config);
+    await this._establishWithConfig(resolved.adapterName, resolved.url, resolved.config);
+  }
+
+  private static async _establishWithConfig(
+    adapterName: string,
+    url: string,
+    config?: Record<string, unknown>,
+  ): Promise<void> {
+    const normalized = this._normalizeAdapterName(adapterName);
+    const AdapterClass = await _loadAdapter(normalized);
+
+    // Build the argument for the adapter constructor:
+    // - sqlite: always a filename/path
+    // - postgres/mysql: URL string if available, otherwise config object
+    let adapterArg: unknown;
+    if (normalized === "sqlite") {
+      adapterArg = this._parseSqliteUrl(url || (config?.database as string) || ":memory:");
+    } else if (url) {
+      adapterArg = url;
+    } else if (config) {
+      // Pass through the full config, stripping internal keys and
+      // mapping Rails-style username -> driver-style user
+      const { adapter: _a, url: _u, username, ...rest } = config;
+      const adapterConfig: Record<string, unknown> = { ...rest };
+      if (adapterConfig.user === undefined && username !== undefined) {
+        adapterConfig.user = username;
+      }
+      if (adapterConfig.host === undefined) {
+        adapterConfig.host = "localhost";
+      }
+      adapterArg = adapterConfig;
+    } else {
+      adapterArg = url;
+    }
+
+    const dbConfig = new HashConfig(
+      process.env.NODE_ENV || DatabaseConfigurations.defaultEnv,
+      "primary",
+      { adapter: adapterName, url, ...config },
+    );
+
+    this._connectionHandler.establishConnection(dbConfig, {
+      owner: "primary",
+      adapterFactory: () => new AdapterClass(adapterArg),
+    });
+  }
+
+  /**
+   * Auto-connect by loading database configuration.
+   *
+   * Loads config/database.json if present, with DATABASE_URL merged in
+   * by DatabaseConfigurations (matching how Rails merges DATABASE_URL
+   * into database.yml). Resolves the config for the current NODE_ENV
+   * and establishes the connection through ConnectionHandler.
+   */
+  private static async _autoConnect(): Promise<void> {
+    const raw = await this._loadConfigFile();
+    const configs = DatabaseConfigurations.fromEnv(raw);
+    const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
+    const primaryConfigs = configs.configsFor({ envName: env, name: "primary" });
+    const dbConfig = primaryConfigs[0] ?? configs.findDbConfig(env);
+
+    if (!dbConfig) {
       throw new Error(
-        `No adapter configured for ${this.name}. Set ${this.name}.adapter = yourAdapter`,
+        `No database configuration found for ${this.name}. ` +
+          `Add config/database.json, set DATABASE_URL, or call ${this.name}.establishConnection(url)`,
       );
     }
-    return this._adapter;
+
+    const url = dbConfig.configuration.url || "";
+    const adapterName = dbConfig.adapter || (url ? this._adapterNameFromUrl(url) : undefined);
+    if (!adapterName) {
+      throw new Error(
+        `Database configuration for "${env}" must include an adapter name or a URL. ` +
+          `Add config/database.json, set DATABASE_URL, or call ${this.name}.establishConnection(url)`,
+      );
+    }
+    await this._establishWithConfig(
+      adapterName,
+      url,
+      dbConfig.configuration as Record<string, unknown>,
+    );
+  }
+
+  private static _resolveConfig(
+    config: string | { adapter?: string; url?: string; database?: string; [key: string]: unknown },
+  ): { adapterName: string; url: string; config?: Record<string, unknown> } {
+    let url: string;
+    let adapterName: string | undefined;
+    let fullConfig: Record<string, unknown> | undefined;
+
+    if (typeof config === "string") {
+      url = config;
+    } else {
+      adapterName = config.adapter;
+      url = config.url || "";
+      fullConfig = config as Record<string, unknown>;
+    }
+
+    if (!adapterName && !url && !fullConfig?.database) {
+      throw new Error("Database configuration must include a url, database, or adapter name");
+    }
+
+    if (!adapterName) {
+      adapterName = this._adapterNameFromUrl(url || (fullConfig?.database as string) || "");
+    }
+
+    return { adapterName, url, config: fullConfig };
+  }
+
+  private static async _loadConfigFile(): Promise<Record<string, any>> {
+    // If a specific config path is set (e.g. in tests), use it directly
+    if (this._configPath) {
+      return this._loadJsonConfig(this._configPath);
+    }
+
+    const cwd = process.cwd();
+
+    // Try TS/JS config files first (matching the CLI's loadDatabaseConfig)
+    const tsCandidates = [
+      resolve(cwd, "config", "database.ts"),
+      resolve(cwd, "config", "database.js"),
+      resolve(cwd, "src", "config", "database.ts"),
+      resolve(cwd, "src", "config", "database.js"),
+    ];
+
+    for (const candidate of tsCandidates) {
+      if (existsSync(candidate)) {
+        try {
+          const mod = await import(pathToFileURL(candidate).href);
+          return mod.default ?? mod;
+        } catch (error: unknown) {
+          throw new Error(
+            `Failed to load database config at ${candidate}: ${(error as Error).message}`,
+            { cause: error },
+          );
+        }
+      }
+    }
+
+    // Fall back to JSON config
+    return this._loadJsonConfig(resolve(cwd, "config", "database.json"));
+  }
+
+  private static _loadJsonConfig(configPath: string): Record<string, any> {
+    try {
+      return JSON.parse(readFileSync(configPath, "utf-8"));
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return {};
+      }
+      throw new Error(
+        `Failed to load database config at ${configPath}: ${(error as Error).message}`,
+        { cause: error },
+      );
+    }
+  }
+
+  private static _normalizeAdapterName(name: string): string {
+    switch (name) {
+      case "postgresql":
+      case "postgres":
+        return "postgresql";
+      case "mysql":
+      case "mysql2":
+        return "mysql";
+      case "sqlite":
+      case "sqlite3":
+        return "sqlite";
+      default:
+        return name;
+    }
+  }
+
+  private static _parseSqliteUrl(url: string): string {
+    if (url.startsWith("sqlite3://") || url.startsWith("sqlite://")) {
+      const stripped = url.replace(/^sqlite3?:\/\//, "");
+      return stripped || ":memory:";
+    }
+    return url;
+  }
+
+  private static _adapterNameFromUrl(url: string): string {
+    if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
+      return "postgresql";
+    }
+    if (url.startsWith("mysql://") || url.startsWith("mysql2://")) {
+      return "mysql";
+    }
+    if (
+      url.startsWith("sqlite://") ||
+      url.startsWith("sqlite3://") ||
+      url.endsWith(".sqlite3") ||
+      url.endsWith(".db") ||
+      url === ":memory:"
+    ) {
+      return "sqlite";
+    }
+    throw new Error(
+      `Cannot detect database adapter from URL "${url}". ` +
+        `Use a URL starting with postgres://, mysql://, or sqlite://, ` +
+        `or pass { adapter: "postgresql", url: "..." }`,
+    );
   }
 
   /**
