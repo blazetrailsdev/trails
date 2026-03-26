@@ -10,10 +10,10 @@ The goal is to be **100% API compatible with Rails**, matching behavior **test f
 
 | Package                   | Rails Equivalent                                                        | Tests     | API       | Description                                                |
 | ------------------------- | ----------------------------------------------------------------------- | --------- | --------- | ---------------------------------------------------------- |
-| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **61%**   | **5.5%**  | ORM — persistence, querying, associations, migrations      |
-| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **75%**   | **5.8%**  | Core utilities, inflection, caching, notifications         |
+| `@rails-ts/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **61.7%** | **17.3%** | ORM — persistence, querying, associations, migrations      |
+| `@rails-ts/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **75%**   | **6.7%**  | Core utilities, inflection, caching, notifications         |
 | `@rails-ts/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **99.4%** | **100%**  | SQL AST builder and query generation                       |
-| `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.5%** | **39.4%** | Attributes, validations, callbacks, dirty tracking, i18n   |
+| `@rails-ts/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.5%** | **59.6%** | Attributes, validations, callbacks, dirty tracking, i18n   |
 | `@rails-ts/rack`          | [Rack](https://rack.github.io/)                                         | **98.8%** | —         | Modular web server interface, request/response, middleware |
 
 **ActionPack** — started but not the current priority:
@@ -25,7 +25,7 @@ The goal is to be **100% API compatible with Rails**, matching behavior **test f
 
 **Tests** = `test:compare` — matches our test names against the Rails test suite. **API** = `api:compare` — tracks class/module existence and file placement against Rails source. Rack doesn't have API comparison yet (it's not a Rails gem).
 
-**59.5%** overall test coverage — 10,102 of 16,982 tests matched. CI runs both comparisons on every push.
+**52.6%** overall test coverage — 10,195 of 19,393 tests matched. CI runs both comparisons on every push.
 
 ## Quick Example
 
@@ -106,7 +106,7 @@ pnpm run api:compare
 pnpm run test:stubs
 ```
 
-CI runs `test:compare` on every push to ensure we don't regress.
+CI runs `test:compare` and `api:compare` on every push to ensure we don't regress.
 
 ### Database Adapters
 

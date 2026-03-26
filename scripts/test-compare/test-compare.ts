@@ -21,7 +21,7 @@
  * activesupport, rack, railties). Using --package overrides this and always shows detail.
  *
  * Usage:
- *   npx tsx scripts/test-compare/convention-compare.ts [--missing] [--json] [--package activesupport]
+ *   npx tsx scripts/test-compare/test-compare.ts [--missing] [--json] [--package activesupport]
  */
 
 import * as fs from "fs";
