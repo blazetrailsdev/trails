@@ -10,6 +10,16 @@ export {
 export { NestedError } from "./nested-error.js";
 export { ValidationError } from "./validations.js";
 export { Validator, EachValidator, BlockValidator } from "./validator.js";
+export { MissingAttributeError } from "./attribute-methods.js";
+export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
+export {
+  AttributeMutationTracker,
+  ForcedMutationTracker,
+  NullMutationTracker,
+} from "./attribute-mutation-tracker.js";
+export { Attribute, FromDatabase, FromUser, WithCastValue } from "./attribute.js";
+export { UserProvidedDefault } from "./attribute/user-provided-default.js";
+export { AttributeSet } from "./attribute-set/builder.js";
 export type { ValidatorContract } from "./validator.js";
 export { ModelName } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";

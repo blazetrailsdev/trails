@@ -1,5 +1,6 @@
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
+import { MissingAttributeError } from "./attribute-methods.js";
 
 /**
  * Wraps a single attribute value with its type, tracking the original
@@ -236,11 +237,11 @@ export class Null extends Attribute {
   }
 
   withValueFromDatabase(_value: unknown): Attribute {
-    throw new Error(`can't write unknown attribute \`${this.name}\``);
+    throw new MissingAttributeError(`can't write unknown attribute \`${this.name}\``);
   }
 
   withValueFromUser(_value: unknown): Attribute {
-    throw new Error(`can't write unknown attribute \`${this.name}\``);
+    throw new MissingAttributeError(`can't write unknown attribute \`${this.name}\``);
   }
 }
 
