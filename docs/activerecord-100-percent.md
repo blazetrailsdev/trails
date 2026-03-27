@@ -230,3 +230,13 @@ The fastest way to improve api:compare is:
    association builders, relation sub-modules
 4. **Split large files** — `relation.ts` and `base.ts` contain logic that
    Rails splits across many files/modules
+5. **Extract SchemaStatements from Migration** — DDL methods like
+   `addForeignKey`, `addCheckConstraint`, `createTable`, `addColumn`, etc.
+   currently live directly on the `Migration` class. In Rails, these live on
+   `ActiveRecord::ConnectionAdapters::SchemaStatements`, which is mixed into
+   the connection adapter. `Migration` then delegates to `connection` (the
+   adapter). This refactor would move DDL methods into a `SchemaStatements`
+   module wired into the adapter, and have `Migration` delegate to
+   `this.adapter`. This aligns with the Rails architecture and unblocks
+   per-adapter DDL overrides (e.g. SQLite doesn't support `ALTER TABLE ADD
+CONSTRAINT`, Postgres supports `NOT VALID`, etc.).
