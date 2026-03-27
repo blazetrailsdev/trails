@@ -1,4 +1,4 @@
-import { quoteIdentifier, quoteTableName, quoteDefaultExpression } from "../../quoting.js";
+import { quoteIdentifier, quoteTableName, quoteDefaultExpression } from "./quoting.js";
 
 /**
  * Column type mapping.
@@ -124,6 +124,109 @@ export class IndexDefinition {
     this.columns = columns;
     this.where = where;
     this.orders = orders;
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ColumnMethods
+ *
+ * Interface for column type methods shared between TableDefinition and Table.
+ */
+export interface ColumnMethods {
+  string(name: string, options?: ColumnOptions): unknown;
+  text(name: string, options?: ColumnOptions): unknown;
+  integer(name: string, options?: ColumnOptions): unknown;
+  bigint(name: string, options?: ColumnOptions): unknown;
+  float(name: string, options?: ColumnOptions): unknown;
+  decimal(name: string, options?: ColumnOptions): unknown;
+  boolean(name: string, options?: ColumnOptions): unknown;
+  date(name: string, options?: ColumnOptions): unknown;
+  datetime(name: string, options?: ColumnOptions): unknown;
+  timestamp(name: string, options?: ColumnOptions): unknown;
+  binary(name: string, options?: ColumnOptions): unknown;
+  json(name: string, options?: ColumnOptions): unknown;
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ReferenceDefinition
+ */
+export class ReferenceDefinition {
+  readonly name: string;
+  readonly polymorphic: boolean;
+  readonly index: boolean;
+  readonly foreignKey: boolean;
+  readonly type: ColumnType;
+  readonly options: ColumnOptions;
+
+  constructor(
+    name: string,
+    options: ColumnOptions & {
+      polymorphic?: boolean;
+      foreignKey?: boolean;
+      index?: boolean;
+      type?: ColumnType;
+    } = {},
+  ) {
+    this.name = name;
+    this.polymorphic = options.polymorphic ?? false;
+    this.index = options.index !== false;
+    this.foreignKey = options.foreignKey ?? false;
+    this.type = options.type ?? "integer";
+    const { polymorphic: _, foreignKey: _fk, index: _idx, type: _t, ...rest } = options;
+    this.options = rest;
+  }
+
+  addTo(table: TableDefinition): void {
+    const method = this.type as keyof ColumnMethods;
+    (table[method] as (name: string, options?: ColumnOptions) => unknown)(
+      `${this.name}_id`,
+      this.options,
+    );
+    if (this.polymorphic) {
+      table.string(`${this.name}_type`, this.options);
+    }
+    if (this.index) {
+      const columns = this.polymorphic
+        ? [`${this.name}_type`, `${this.name}_id`]
+        : [`${this.name}_id`];
+      table.index(columns);
+    }
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::AlterTable
+ */
+export class AlterTable {
+  readonly name: string;
+  readonly adds: AddColumnDefinition[] = [];
+  readonly foreignKeyAdds: ForeignKeyDefinition[] = [];
+  readonly foreignKeyDrops: string[] = [];
+  readonly checkConstraintAdds: CheckConstraintDefinition[] = [];
+  readonly checkConstraintDrops: string[] = [];
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  addColumn(name: string, type: ColumnType, options: ColumnOptions = {}): void {
+    this.adds.push(new AddColumnDefinition(new ColumnDefinition(name, type, options)));
+  }
+
+  addForeignKey(fk: ForeignKeyDefinition): void {
+    this.foreignKeyAdds.push(fk);
+  }
+
+  dropForeignKey(name: string): void {
+    this.foreignKeyDrops.push(name);
+  }
+
+  addCheckConstraint(constraint: CheckConstraintDefinition): void {
+    this.checkConstraintAdds.push(constraint);
+  }
+
+  dropCheckConstraint(name: string): void {
+    this.checkConstraintDrops.push(name);
   }
 }
 

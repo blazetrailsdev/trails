@@ -7,6 +7,113 @@
 import type { DatabaseAdapter } from "../../adapter.js";
 import type { DatabaseConfig } from "../../database-configurations/database-config.js";
 
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::AbstractPool
+ */
+export interface AbstractPool {
+  get schema_cache(): unknown;
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::NullPool::NullConfig
+ */
+export class NullConfig {
+  get schema_cache(): null {
+    return null;
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::NullPool
+ */
+export class NullPool implements AbstractPool {
+  readonly config = new NullConfig();
+
+  static readonly NullConfig = NullConfig;
+
+  get schema_cache(): null {
+    return null;
+  }
+
+  checkout(): never {
+    throw new Error("NullPool does not support checkout");
+  }
+
+  checkin(_conn: DatabaseAdapter): void {}
+
+  disconnect(): void {}
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::WeakThreadKeyMap
+ */
+export class WeakThreadKeyMap<V> {
+  private _map = new Map<number, V>();
+
+  get(key: number): V | undefined {
+    return this._map.get(key);
+  }
+
+  set(key: number, value: V): void {
+    this._map.set(key, value);
+  }
+
+  delete(key: number): boolean {
+    return this._map.delete(key);
+  }
+
+  clear(): void {
+    this._map.clear();
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Lease
+ */
+export class Lease {
+  private _connection: DatabaseAdapter | null = null;
+
+  get connection(): DatabaseAdapter | null {
+    return this._connection;
+  }
+
+  take(conn: DatabaseAdapter): void {
+    this._connection = conn;
+  }
+
+  clear(): void {
+    this._connection = null;
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::LeaseRegistry
+ */
+export class LeaseRegistry {
+  private _leases = new Map<string, Lease>();
+
+  getOrCreate(key: string): Lease {
+    let lease = this._leases.get(key);
+    if (!lease) {
+      lease = new Lease();
+      this._leases.set(key, lease);
+    }
+    return lease;
+  }
+
+  clear(): void {
+    this._leases.clear();
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::ExecutorHooks
+ */
+export interface ExecutorHooks {
+  toRun(): void;
+  toComplete(): void;
+}
+
 export class ConnectionPool {
   readonly dbConfig: DatabaseConfig;
   readonly size: number;

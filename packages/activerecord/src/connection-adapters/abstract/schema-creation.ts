@@ -18,7 +18,7 @@ import {
   CheckConstraintDefinition,
   TableDefinition,
 } from "./schema-definitions.js";
-import { quoteIdentifier, quoteTableName, quoteDefaultExpression } from "../../quoting.js";
+import { quoteIdentifier, quoteTableName, quoteDefaultExpression } from "./quoting.js";
 
 type Definition =
   | TableDefinition

@@ -10,6 +10,21 @@ import { HashConfig } from "../../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../../database-configurations.js";
 import type { DatabaseAdapter } from "../../adapter.js";
 
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler::ConnectionDescriptor
+ */
+export class ConnectionDescriptor {
+  constructor(
+    readonly name: string,
+    readonly role: string,
+    readonly shard: string,
+  ) {}
+
+  get poolKey(): string {
+    return `${this.name}:${this.role}:${this.shard}`;
+  }
+}
+
 export class ConnectionHandler {
   private _pools = new Map<string, ConnectionPool>();
 

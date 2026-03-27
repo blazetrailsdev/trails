@@ -24,7 +24,7 @@ import {
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { detectAdapterName } from "../../adapter-name.js";
-import { quoteIdentifier, quoteDefaultExpression } from "../../quoting.js";
+import { quoteIdentifier, quoteDefaultExpression } from "./quoting.js";
 
 export class SchemaStatements {
   private _schemaCreation?: SchemaCreation;

@@ -8,7 +8,7 @@ import {
 } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { detectAdapterName } from "./adapter-name.js";
-import { quoteIdentifier, quoteTableName } from "./quoting.js";
+import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 
 export type {
   ReferentialAction,

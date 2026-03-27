@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "./adapter.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { detectAdapterName } from "./adapter-name.js";
-import { quoteIdentifier, quoteTableName } from "./quoting.js";
+import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 
 /**
  * Schema — defines database schema declaratively.

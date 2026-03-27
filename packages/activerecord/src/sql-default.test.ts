@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { quote, quoteDefaultExpression } from "./quoting.js";
+import { quote, quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import { Nodes } from "@blazetrails/arel";
 
 describe("quote", () => {
