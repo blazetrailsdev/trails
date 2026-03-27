@@ -133,12 +133,25 @@ export class SchemaStatements {
   async addIndex(
     tableName: string,
     columns: string | string[],
-    options: { unique?: boolean; name?: string } = {},
+    options: {
+      unique?: boolean;
+      name?: string;
+      where?: string;
+      order?: Record<string, string>;
+      ifNotExists?: boolean;
+    } = {},
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
     const indexName = options.name ?? this.indexName(tableName, { column: cols });
-    const indexDef = new IndexDefinition(tableName, indexName, options.unique ?? false, cols);
-    const createDef = new CreateIndexDefinition(indexDef);
+    const indexDef = new IndexDefinition(
+      tableName,
+      indexName,
+      options.unique ?? false,
+      cols,
+      options.where,
+      options.order ?? {},
+    );
+    const createDef = new CreateIndexDefinition(indexDef, options.ifNotExists ?? false);
     await this.adapter.executeMutation(this.schemaCreation.accept(createDef));
   }
 

@@ -107,12 +107,23 @@ export class IndexDefinition {
   readonly name: string;
   readonly unique: boolean;
   readonly columns: string[];
+  readonly where?: string;
+  readonly orders: Record<string, string>;
 
-  constructor(table: string, name: string, unique: boolean = false, columns: string[] = []) {
+  constructor(
+    table: string,
+    name: string,
+    unique: boolean = false,
+    columns: string[] = [],
+    where?: string,
+    orders: Record<string, string> = {},
+  ) {
     this.table = table;
     this.name = name;
     this.unique = unique;
     this.columns = columns;
+    this.where = where;
+    this.orders = orders;
   }
 }
 

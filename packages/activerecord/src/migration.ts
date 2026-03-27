@@ -8,6 +8,7 @@ import {
 } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { detectAdapterName } from "./adapter-name.js";
+import { quoteIdentifier, quoteTableName } from "./quoting.js";
 
 export type {
   ReferentialAction,
@@ -240,7 +241,13 @@ export abstract class Migration {
   async addIndex(
     tableName: string,
     columns: string | string[],
-    options: { unique?: boolean; name?: string } = {},
+    options: {
+      unique?: boolean;
+      name?: string;
+      where?: string;
+      order?: Record<string, string>;
+      ifNotExists?: boolean;
+    } = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addIndex", args: [tableName, columns, options] });
@@ -885,16 +892,33 @@ export class MigrationContext {
   async addIndex(
     table: string,
     columns: string | string[],
-    options?: { unique?: boolean; name?: string },
+    options?: {
+      unique?: boolean;
+      name?: string;
+      where?: string;
+      order?: Record<string, string>;
+      ifNotExists?: boolean;
+    },
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
     const unique = options?.unique ?? false;
     const indexName = options?.name ?? `index_${table}_on_${cols.join("_and_")}`;
+    const an = this._adapterName;
     const uniqueStr = unique ? "UNIQUE " : "";
-    const colsStr = cols.map((c) => `"${c}"`).join(", ");
-    await this.adapter.executeMutation(
-      `CREATE ${uniqueStr}INDEX "${indexName}" ON "${table}" (${colsStr})`,
-    );
+    const ifNotExistsStr = options?.ifNotExists ? "IF NOT EXISTS " : "";
+    const colsStr = cols
+      .map((c) => {
+        let col = quoteIdentifier(c, an);
+        if (an !== "mysql") {
+          const ord = options?.order?.[c];
+          if (ord) col += ` ${ord.toUpperCase()}`;
+        }
+        return col;
+      })
+      .join(", ");
+    let sql = `CREATE ${uniqueStr}INDEX ${ifNotExistsStr}${quoteIdentifier(indexName, an)} ON ${quoteTableName(table, an)} (${colsStr})`;
+    if (an !== "mysql" && options?.where) sql += ` WHERE ${options.where}`;
+    await this.adapter.executeMutation(sql);
     if (!this._indexes.has(table)) this._indexes.set(table, []);
     this._indexes.get(table)!.push({ columns: cols, unique, name: indexName });
   }
