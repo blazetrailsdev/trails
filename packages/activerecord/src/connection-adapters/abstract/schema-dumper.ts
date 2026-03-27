@@ -91,6 +91,8 @@ const SQL_TYPE_MAP: Record<string, DslMapping> = {
   oid: { dslType: "oid" },
   serial: { dslType: "serial" },
   bigserial: { dslType: "bigserial" },
+  character: { dslType: "char" },
+  bpchar: { dslType: "char" },
   // SQLite types
   blob: { dslType: "binary" },
   "integer primary key autoincrement": { dslType: "integer" },
@@ -108,6 +110,7 @@ const KNOWN_DSL_TYPES = new Set([
   "datetime",
   "timestamp",
   "binary",
+  "char",
 ]);
 
 function sqlTypeToDsl(sqlType: string): DslMapping {
@@ -123,31 +126,37 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
     if (varcharMatch) {
       result = { dslType: "string", extraOpts: { limit: Number(varcharMatch[1]) } };
     } else {
-      const numericMatch = baseType.match(/^(?:numeric|decimal)\((\d+),\s*(\d+)\)$/);
-      if (numericMatch) {
+      const charMatch = baseType.match(/^(?:character|char|bpchar)\((\d+)\)$/);
+      const numericMatch = !charMatch
+        ? baseType.match(/^(?:numeric|decimal)\((\d+),\s*(\d+)\)$/)
+        : null;
+      const tsMatch =
+        !charMatch && !numericMatch
+          ? baseType.match(/^timestamp(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/)
+          : null;
+      const timeMatch =
+        !charMatch && !numericMatch && !tsMatch
+          ? baseType.match(/^time(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/)
+          : null;
+
+      if (charMatch) {
+        result = { dslType: "char", extraOpts: { limit: Number(charMatch[1]) } };
+      } else if (numericMatch) {
         result = {
           dslType: "decimal",
           extraOpts: { precision: Number(numericMatch[1]), scale: Number(numericMatch[2]) },
         };
+      } else if (tsMatch) {
+        result =
+          tsMatch[2].startsWith("with ") || tsMatch[2] === "with time zone"
+            ? { dslType: "timestamptz" }
+            : { dslType: "datetime" };
+      } else if (timeMatch) {
+        result = { dslType: "time" };
+      } else if (KNOWN_DSL_TYPES.has(baseType)) {
+        result = { dslType: baseType };
       } else {
-        // Handle precision-bearing timestamp/time types: timestamp(3) without time zone
-        const tsMatch = baseType.match(/^timestamp(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/);
-        if (tsMatch) {
-          result =
-            tsMatch[2].startsWith("with ") || tsMatch[2] === "with time zone"
-              ? { dslType: "timestamptz" }
-              : { dslType: "datetime" };
-        } else if (baseType.match(/^time(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/)) {
-          result = { dslType: "time" };
-        } else {
-          // If it's already a known DSL type name, pass it through
-          if (KNOWN_DSL_TYPES.has(baseType)) {
-            result = { dslType: baseType };
-          } else {
-            // Unknown types (enums, domains, etc.)
-            result = { dslType: "enum", extraOpts: { enum_type: baseType } };
-          }
-        }
+        result = { dslType: "enum", extraOpts: { enum_type: baseType } };
       }
     }
   }

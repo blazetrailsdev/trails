@@ -7,6 +7,7 @@ export type ColumnType =
   | "string"
   | "text"
   | "integer"
+  | "bigint"
   | "float"
   | "decimal"
   | "boolean"
@@ -16,6 +17,7 @@ export type ColumnType =
   | "binary"
   | "json"
   | "jsonb"
+  | "char"
   | "primary_key";
 
 export type ReferentialAction = "cascade" | "nullify" | "restrict" | "no_action";
@@ -94,6 +96,7 @@ export interface ColumnOptions {
   index?: boolean;
   unique?: boolean;
   primaryKey?: boolean;
+  array?: boolean;
 }
 
 /**
@@ -149,7 +152,12 @@ export class TableDefinition {
   }
 
   integer(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "integer", options });
+    this.columns.push(new ColumnDefinition(name, "integer", options));
+    return this;
+  }
+
+  bigint(name: string, options: ColumnOptions = {}): this {
+    this.columns.push(new ColumnDefinition(name, "bigint", options));
     return this;
   }
 
@@ -198,6 +206,16 @@ export class TableDefinition {
 
   jsonb(name: string, options: ColumnOptions = {}): this {
     this.columns.push(new ColumnDefinition(name, "jsonb", options));
+    return this;
+  }
+
+  char(name: string, options: ColumnOptions = {}): this {
+    this.columns.push(new ColumnDefinition(name, "char", options));
+    return this;
+  }
+
+  array(name: string, type: ColumnType, options: ColumnOptions = {}): this {
+    this.columns.push(new ColumnDefinition(name, type, { ...options, array: true }));
     return this;
   }
 
@@ -281,6 +299,21 @@ export class TableDefinition {
         case "jsonb":
           parts.push(this._adapterName === "postgres" ? "JSONB" : "JSON");
           break;
+        case "bigint":
+          parts.push("BIGINT");
+          break;
+        case "char":
+          parts.push(`CHAR(${col.options.limit ?? 1})`);
+          break;
+      }
+
+      if (col.options.array && col.type !== "primary_key") {
+        if (this._adapterName !== "postgres") {
+          throw new Error("Array columns are only supported on PostgreSQL");
+        }
+        // Append [] to the last part (the type)
+        const lastIdx = parts.length - 1;
+        parts[lastIdx] = parts[lastIdx] + "[]";
       }
 
       if (col.options.null === false && col.type !== "primary_key") {
@@ -333,6 +366,15 @@ export class Table {
   }
   async datetime(name: string, options: ColumnOptions = {}): Promise<void> {
     await this._schema.addColumn(this._tableName, name, "datetime", options);
+  }
+  async bigint(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "bigint", options);
+  }
+  async char(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "char", options);
+  }
+  async array(name: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, type, { ...options, array: true });
   }
   async remove(name: string): Promise<void> {
     await this._schema.removeColumn(this._tableName, name);

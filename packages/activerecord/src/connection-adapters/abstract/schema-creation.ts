@@ -115,35 +115,65 @@ export class SchemaCreation {
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
+    let sql: string;
     switch (type) {
       case "string":
-        return `VARCHAR(${options.limit ?? 255})`;
+        sql = `VARCHAR(${options.limit ?? 255})`;
+        break;
       case "text":
-        return "TEXT";
+        sql = "TEXT";
+        break;
       case "integer":
-        return "INTEGER";
+        sql = "INTEGER";
+        break;
+      case "bigint":
+        sql = "BIGINT";
+        break;
       case "float":
-        return this.adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
+        sql = this.adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
+        break;
       case "decimal":
-        return `DECIMAL(${options.precision ?? 10}, ${options.scale ?? 0})`;
+        sql = `DECIMAL(${options.precision ?? 10}, ${options.scale ?? 0})`;
+        break;
       case "boolean":
-        return "BOOLEAN";
+        sql = "BOOLEAN";
+        break;
       case "date":
-        return "DATE";
+        sql = "DATE";
+        break;
       case "datetime":
       case "timestamp":
-        return this.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
+        sql = this.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
+        break;
       case "binary":
-        return this.adapterName === "postgres" ? "BYTEA" : "BLOB";
+        sql = this.adapterName === "postgres" ? "BYTEA" : "BLOB";
+        break;
       case "json":
-        return "JSON";
+        sql = "JSON";
+        break;
       case "jsonb":
-        return this.adapterName === "postgres" ? "JSONB" : "JSON";
+        sql = this.adapterName === "postgres" ? "JSONB" : "JSON";
+        break;
+      case "char":
+        sql = `CHAR(${options.limit ?? 1})`;
+        break;
       case "primary_key":
-        if (this.adapterName === "postgres") return "SERIAL PRIMARY KEY";
-        if (this.adapterName === "mysql") return "INT AUTO_INCREMENT PRIMARY KEY";
-        return "INTEGER PRIMARY KEY AUTOINCREMENT";
+        if (this.adapterName === "postgres") sql = "SERIAL PRIMARY KEY";
+        else if (this.adapterName === "mysql") sql = "INT AUTO_INCREMENT PRIMARY KEY";
+        else sql = "INTEGER PRIMARY KEY AUTOINCREMENT";
+        break;
+      default:
+        throw new Error(`Unknown column type: ${String(type)}`);
     }
+
+    if (options.array && type !== "primary_key") {
+      if (this.adapterName !== "postgres") {
+        throw new Error("Array columns are only supported on PostgreSQL");
+      }
+      sql += "[]";
+    }
+
+    return sql;
   }
 
   actionSql(action: string, dependency: ReferentialAction): string {

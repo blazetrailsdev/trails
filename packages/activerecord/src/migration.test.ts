@@ -408,6 +408,62 @@ describe("Migrations", () => {
       const sql = td.toSql();
       expect(sql).toContain('"slug" VARCHAR(100)');
     });
+
+    it("supports bigint columns", () => {
+      const td = new TableDefinition("counters");
+      td.bigint("value");
+
+      const sql = td.toSql();
+      expect(sql).toContain('"value" BIGINT');
+    });
+
+    it("supports char columns with limit", () => {
+      const td = new TableDefinition("games");
+      td.char("board", { limit: 9 });
+
+      const sql = td.toSql();
+      expect(sql).toContain('"board" CHAR(9)');
+    });
+
+    it("supports char columns with default limit of 1", () => {
+      const td = new TableDefinition("flags");
+      td.char("status");
+
+      const sql = td.toSql();
+      expect(sql).toContain('"status" CHAR(1)');
+    });
+
+    it("supports array columns on postgres", () => {
+      const td = new TableDefinition("routes", { adapterName: "postgres" });
+      td.array("transports", "text");
+
+      const sql = td.toSql();
+      expect(sql).toContain('"transports" TEXT[]');
+    });
+
+    it("throws for array columns on sqlite", () => {
+      const td = new TableDefinition("routes", { adapterName: "sqlite" });
+      td.array("transports", "text");
+
+      expect(() => td.toSql()).toThrow(/only supported on PostgreSQL/);
+    });
+
+    it("throws for array columns on mysql", () => {
+      const td = new TableDefinition("routes", { adapterName: "mysql" });
+      td.array("transports", "text");
+
+      expect(() => td.toSql()).toThrow(/only supported on PostgreSQL/);
+    });
+
+    it("supports array: true flag on any column type", () => {
+      const td = new TableDefinition("posts", { adapterName: "postgres" });
+      td.text("tags", { array: true });
+      td.integer("scores", { array: true });
+
+      const sql = td.toSql();
+      expect(sql).toContain('"tags" TEXT[]');
+      expect(sql).toContain('"scores" INTEGER[]');
+    });
   });
 
   describe("Migration class", () => {
