@@ -1746,29 +1746,29 @@ describe("MigrationTest", () => {
   }); // CopyMigrationsTest
 });
 
-describe("addCheckConstraint / removeCheckConstraint", () => {
-  function mockMigration(): { migration: Migration; sql: string[] } {
-    const sql: string[] = [];
-    const migration = new (class extends Migration {
-      static version = "20240101000000";
-      async change() {}
-    })();
-    (migration as any).adapter = {
-      execute: async () => [],
-      executeMutation: async (s: string) => {
-        sql.push(s);
-        return 0;
-      },
-      beginTransaction: async () => {},
-      commit: async () => {},
-      rollback: async () => {},
-      createSavepoint: async () => {},
-      releaseSavepoint: async () => {},
-      rollbackToSavepoint: async () => {},
-    };
-    return { migration, sql };
-  }
+function mockMigration(): { migration: Migration; sql: string[] } {
+  const sql: string[] = [];
+  const migration = new (class extends Migration {
+    static version = "20240101000000";
+    async change() {}
+  })();
+  (migration as any).adapter = {
+    execute: async () => [],
+    executeMutation: async (s: string) => {
+      sql.push(s);
+      return 0;
+    },
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    createSavepoint: async () => {},
+    releaseSavepoint: async () => {},
+    rollbackToSavepoint: async () => {},
+  };
+  return { migration, sql };
+}
 
+describe("addCheckConstraint / removeCheckConstraint", () => {
   it("generates ADD CONSTRAINT CHECK SQL", async () => {
     const { migration, sql } = mockMigration();
     await migration.addCheckConstraint("games", "status IN ('active', 'waiting')", {
@@ -1831,5 +1831,53 @@ describe("addCheckConstraint / removeCheckConstraint", () => {
     await expect(migration.removeCheckConstraint("games")).rejects.toThrow(
       /requires either an expression or/,
     );
+  });
+});
+
+describe("addForeignKey with referential actions", () => {
+  it("generates correct SQL with ON DELETE CASCADE", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addForeignKey("chess_moves", "games", {
+      column: "game_id",
+      onDelete: "cascade",
+    });
+    expect(sql[0]).toContain("ON DELETE CASCADE");
+    expect(sql[0]).not.toContain("ON UPDATE");
+  });
+
+  it("generates correct SQL with ON UPDATE SET NULL", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addForeignKey("children", "parents", {
+      column: "parent_id",
+      onUpdate: "nullify",
+    });
+    expect(sql[0]).toContain("ON UPDATE SET NULL");
+  });
+
+  it("generates correct SQL with both actions", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addForeignKey("books", "authors", {
+      column: "author_id",
+      onDelete: "cascade",
+      onUpdate: "restrict",
+    });
+    expect(sql[0]).toContain("ON DELETE CASCADE");
+    expect(sql[0]).toContain("ON UPDATE RESTRICT");
+  });
+
+  it("generates ON DELETE NO ACTION", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addForeignKey("posts", "users", {
+      column: "user_id",
+      onDelete: "no_action",
+    });
+    expect(sql[0]).toContain("ON DELETE NO ACTION");
+  });
+
+  it("omits referential actions when not specified", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addForeignKey("players", "teams", { column: "team_id" });
+    expect(sql[0]).not.toContain("ON DELETE");
+    expect(sql[0]).not.toContain("ON UPDATE");
   });
 });

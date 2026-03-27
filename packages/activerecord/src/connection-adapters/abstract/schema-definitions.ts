@@ -53,6 +53,14 @@ export class CreateIndexDefinition {
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition
  */
+export interface AddForeignKeyOptions {
+  column?: string;
+  primaryKey?: string;
+  name?: string;
+  onDelete?: ReferentialAction;
+  onUpdate?: ReferentialAction;
+}
+
 export class ForeignKeyDefinition {
   constructor(
     readonly fromTable: string,

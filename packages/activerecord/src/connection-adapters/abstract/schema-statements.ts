@@ -18,6 +18,7 @@ import {
   CreateIndexDefinition,
   ForeignKeyDefinition,
   CheckConstraintDefinition,
+  type AddForeignKeyOptions,
   type ColumnType,
   type ColumnOptions,
 } from "./schema-definitions.js";
@@ -315,12 +316,20 @@ export class SchemaStatements {
   async addForeignKey(
     fromTable: string,
     toTable: string,
-    options: { column?: string; primaryKey?: string; name?: string } = {},
+    options: AddForeignKeyOptions = {},
   ): Promise<void> {
     const column = options.column ?? `${toTable.replace(/s$/, "")}_id`;
     const pk = options.primaryKey ?? "id";
     const name = options.name ?? `fk_${fromTable}_${column}`;
-    const fkDef = new ForeignKeyDefinition(fromTable, toTable, column, pk, name);
+    const fkDef = new ForeignKeyDefinition(
+      fromTable,
+      toTable,
+      column,
+      pk,
+      name,
+      options.onDelete,
+      options.onUpdate,
+    );
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(fromTable)} ADD ${this.schemaCreation.accept(fkDef)}`,
     );

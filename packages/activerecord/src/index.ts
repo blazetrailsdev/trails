@@ -16,6 +16,7 @@ export type {
   ColumnType,
   ColumnOptions,
   ReferentialAction,
+  AddForeignKeyOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 export { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 export { Schema } from "./schema.js";

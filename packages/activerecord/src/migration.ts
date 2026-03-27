@@ -4,9 +4,15 @@ import {
   Table,
   type ColumnType,
   type ColumnOptions,
+  type AddForeignKeyOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { detectAdapterName } from "./adapter-name.js";
+
+export type {
+  ReferentialAction,
+  AddForeignKeyOptions,
+} from "./connection-adapters/abstract/schema-definitions.js";
 
 interface RecordedOperation {
   method: string;
@@ -349,7 +355,7 @@ export abstract class Migration {
   async addForeignKey(
     fromTable: string,
     toTable: string,
-    options: { column?: string; primaryKey?: string; name?: string } = {},
+    options: AddForeignKeyOptions = {},
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addForeignKey", args: [fromTable, toTable, options] });
