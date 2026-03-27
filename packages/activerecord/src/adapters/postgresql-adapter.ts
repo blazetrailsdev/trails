@@ -1,5 +1,5 @@
 import pg from "pg";
-import { singularize, underscore } from "@rails-ts/activesupport";
+import { singularize, underscore } from "@blazetrails/activesupport";
 import { splitQuotedIdentifier } from "./postgresql/utils.js";
 import type { DatabaseAdapter } from "../adapter.js";
 

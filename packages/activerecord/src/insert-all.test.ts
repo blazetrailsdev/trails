@@ -285,7 +285,7 @@ describe("InsertAllTest", () => {
   it("insert_all with raw sql on_duplicate", async () => {
     const Book = makeBookWithAdapter();
     const book = await Book.create({ title: "Existing", author: "Original" });
-    const { sql } = await import("@rails-ts/arel");
+    const { sql } = await import("@blazetrails/arel");
     const isMysql = !!process.env.MYSQL_TEST_URL;
     const expr = isMysql ? sql("`author` = VALUES(`author`)") : sql('"author" = EXCLUDED."author"');
     await Book.upsertAll([{ id: book.id, title: "Existing", author: "Updated" }], {
@@ -437,7 +437,7 @@ describe("InsertAllTest", () => {
   it("insert_all with on_duplicate raw sql", async () => {
     const Book = makeBookWithAdapter();
     const existing = await Book.create({ title: "Existing", author: "A" });
-    const { sql } = await import("@rails-ts/arel");
+    const { sql } = await import("@blazetrails/arel");
     const isMysql = !!process.env.MYSQL_TEST_URL;
     const expr = isMysql ? sql("`author` = VALUES(`author`)") : sql('"author" = EXCLUDED."author"');
     await Book.upsertAll([{ id: existing.id, title: "Existing", author: "B" }], {
@@ -537,7 +537,7 @@ describe("InsertAllTest", () => {
   it("upsert all updates using provided sql", async () => {
     const Book = makeBookWithAdapter();
     const book = await Book.create({ title: "Original", author: "Alice" });
-    const { sql } = await import("@rails-ts/arel");
+    const { sql } = await import("@blazetrails/arel");
     const isMysql = !!process.env.MYSQL_TEST_URL;
     const expr = isMysql ? sql("`author` = VALUES(`author`)") : sql('"author" = EXCLUDED."author"');
     await Book.upsertAll([{ id: book.id, title: "Original", author: "Bob" }], {
@@ -551,7 +551,7 @@ describe("InsertAllTest", () => {
   it("upsert all updates using provided sql and unique by", async () => {
     const Book = makeBookWithAdapter();
     const book = await Book.create({ title: "Original", author: "Alice", status: 0 });
-    const { sql } = await import("@rails-ts/arel");
+    const { sql } = await import("@blazetrails/arel");
     const isMysql = !!process.env.MYSQL_TEST_URL;
     const expr = isMysql ? sql("`author` = VALUES(`author`)") : sql('"author" = EXCLUDED."author"');
     await Book.upsertAll([{ id: book.id, title: "Original", author: "Bob", status: 1 }], {

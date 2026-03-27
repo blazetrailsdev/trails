@@ -9,8 +9,8 @@ import { AbstractController } from "./abstract-controller.js";
 import { Request } from "../actiondispatch/request.js";
 import { Response } from "../actiondispatch/response.js";
 import { Parameters } from "../actiondispatch/parameters.js";
-import type { RackResponse } from "@rails-ts/rack";
-import { bodyFromString } from "@rails-ts/rack";
+import type { RackResponse } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 
 const STATUS_CODES: Record<string, number> = {
   ok: 200,

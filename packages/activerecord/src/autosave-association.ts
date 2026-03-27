@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
 import { _setValidateAssociationsFn } from "./base.js";
 import type { AssociationDefinition } from "./associations.js";
-import { underscore } from "@rails-ts/activesupport";
+import { underscore } from "@blazetrails/activesupport";
 
 const MARKED_FOR_DESTRUCTION = Symbol("markedForDestruction");
 

@@ -128,7 +128,7 @@ describe("serializableHash with include", () => {
     };
     (author as any)._preloadedAssociations = new Map([["posts", [fakePost]]]);
 
-    const { serializableHash } = await import("@rails-ts/activemodel");
+    const { serializableHash } = await import("@blazetrails/activemodel");
     const hash = serializableHash(author, { include: ["posts"] });
     expect(hash.name).toBe("Alice");
     expect(Array.isArray(hash.posts)).toBe(true);

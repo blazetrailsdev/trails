@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { OrderedOptions, InheritableOptions } from "@rails-ts/activesupport";
+import { OrderedOptions, InheritableOptions } from "@blazetrails/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 

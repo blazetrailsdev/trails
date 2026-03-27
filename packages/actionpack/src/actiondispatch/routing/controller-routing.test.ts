@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "./route-set.js";
-import type { RackEnv } from "@rails-ts/rack";
+import type { RackEnv } from "@blazetrails/rack";
 
 // ==========================================================================
 // Controller routing integration tests

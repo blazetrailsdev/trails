@@ -4,8 +4,8 @@ import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadDatabaseConfig, connectAdapter, type DatabaseConfig } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
-import { Migrator, SchemaDumper } from "@rails-ts/activerecord";
-import type { DatabaseAdapter } from "@rails-ts/activerecord";
+import { Migrator, SchemaDumper } from "@blazetrails/activerecord";
+import type { DatabaseAdapter } from "@blazetrails/activerecord";
 import { AdapterSchemaSource } from "../schema-source.js";
 
 // --- Helpers ---
@@ -210,7 +210,7 @@ export function dbCommand(): Command {
     .description("Run database seeds")
     .action(async () => {
       await withAdapter(async (adapter) => {
-        const { Base } = await import("@rails-ts/activerecord");
+        const { Base } = await import("@blazetrails/activerecord");
         Base.adapter = adapter;
         await runSeed();
       });
@@ -270,7 +270,7 @@ export function dbCommand(): Command {
       await runCreate();
       await withAdapter(async (adapter) => {
         await runMigrate(adapter);
-        const { Base } = await import("@rails-ts/activerecord");
+        const { Base } = await import("@blazetrails/activerecord");
         Base.adapter = adapter;
         await runSeed();
       });
@@ -283,7 +283,7 @@ export function dbCommand(): Command {
       await runCreate();
       await withAdapter(async (adapter) => {
         await runMigrate(adapter);
-        const { Base } = await import("@rails-ts/activerecord");
+        const { Base } = await import("@blazetrails/activerecord");
         Base.adapter = adapter;
         await runSeed();
       });
@@ -319,7 +319,7 @@ export function dbCommand(): Command {
       }
 
       await withAdapter(async (adapter) => {
-        const { MigrationContext } = await import("@rails-ts/activerecord");
+        const { MigrationContext } = await import("@blazetrails/activerecord");
         const ctx = new MigrationContext(adapter);
         let mod: any;
         try {

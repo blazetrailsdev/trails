@@ -12,7 +12,7 @@
  * rendered content to wrap.
  *
  * Usage:
- *   import { EjsHandler } from "@rails-ts/actionpack/actionview/ejs-handler";
+ *   import { EjsHandler } from "@blazetrails/actionpack/actionview/ejs-handler";
  *   TemplateHandlerRegistry.register(new EjsHandler());
  */
 

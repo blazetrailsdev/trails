@@ -36,11 +36,11 @@ export class AppGenerator extends GeneratorBase {
             "db:migrate": "rails-ts db migrate",
           },
           dependencies: {
-            "@rails-ts/activerecord": "*",
-            "@rails-ts/activesupport": "*",
-            "@rails-ts/rack": "*",
-            "@rails-ts/actionpack": "*",
-            "@rails-ts/cli": "*",
+            "@blazetrails/activerecord": "*",
+            "@blazetrails/activesupport": "*",
+            "@blazetrails/rack": "*",
+            "@blazetrails/actionpack": "*",
+            "@blazetrails/cli": "*",
             ...this.dbDependency(options.database),
           },
           devDependencies: {
@@ -135,7 +135,7 @@ export function drawRoutes(router: any): void {
     // Application controller
     this.createFile(
       "src/app/controllers/application-controller.ts",
-      `import { ActionController } from "@rails-ts/actionpack";
+      `import { ActionController } from "@blazetrails/actionpack";
 
 export class ApplicationController extends ActionController.Base {
   // Base controller — all controllers inherit from this.

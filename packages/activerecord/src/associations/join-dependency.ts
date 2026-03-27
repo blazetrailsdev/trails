@@ -15,7 +15,7 @@ import {
   underscore as _toUnderscore,
   camelize as _camelize,
   singularize as _singularize,
-} from "@rails-ts/activesupport";
+} from "@blazetrails/activesupport";
 import { modelRegistry } from "../associations.js";
 import { getInheritanceColumn, isStiSubclass } from "../sti.js";
 

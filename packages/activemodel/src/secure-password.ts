@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { humanize } from "@rails-ts/activesupport";
+import { humanize } from "@blazetrails/activesupport";
 import { Model } from "./model.js";
 
 const MIN_COST = 4;

@@ -20,7 +20,7 @@ export class ControllerGenerator extends GeneratorBase {
 
     this.createFile(
       `src/app/controllers/${fileName}${ext}`,
-      `import { ActionController } from "@rails-ts/actionpack";
+      `import { ActionController } from "@blazetrails/actionpack";
 
 export class ${className} extends ActionController.Base {
 ${actionMethods}

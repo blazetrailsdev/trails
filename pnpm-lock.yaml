@@ -19,6 +19,9 @@ importers:
       pg:
         specifier: ^8.19.0
         version: 8.20.0
+      yaml:
+        specifier: ^2.8.3
+        version: 2.8.3
     devDependencies:
       "@eslint/js":
         specifier: ^10.0.1
@@ -62,13 +65,13 @@ importers:
 
   packages/actionpack:
     dependencies:
-      "@rails-ts/rack":
+      "@blazetrails/rack":
         specifier: workspace:*
         version: link:../rack
 
   packages/activemodel:
     dependencies:
-      "@rails-ts/activesupport":
+      "@blazetrails/activesupport":
         specifier: workspace:*
         version: link:../activesupport
       bcryptjs:
@@ -80,13 +83,13 @@ importers:
 
   packages/activerecord:
     dependencies:
-      "@rails-ts/activemodel":
+      "@blazetrails/activemodel":
         specifier: workspace:*
         version: link:../activemodel
-      "@rails-ts/activesupport":
+      "@blazetrails/activesupport":
         specifier: workspace:*
         version: link:../activesupport
-      "@rails-ts/arel":
+      "@blazetrails/arel":
         specifier: workspace:*
         version: link:../arel
 
@@ -96,16 +99,16 @@ importers:
 
   packages/cli:
     dependencies:
-      "@rails-ts/actionpack":
+      "@blazetrails/actionpack":
         specifier: workspace:*
         version: link:../actionpack
-      "@rails-ts/activerecord":
+      "@blazetrails/activerecord":
         specifier: workspace:*
         version: link:../activerecord
-      "@rails-ts/activesupport":
+      "@blazetrails/activesupport":
         specifier: workspace:*
         version: link:../activesupport
-      "@rails-ts/rack":
+      "@blazetrails/rack":
         specifier: workspace:*
         version: link:../rack
 

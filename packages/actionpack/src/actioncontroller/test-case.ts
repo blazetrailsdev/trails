@@ -9,7 +9,7 @@
  *
  * Usage with Vitest:
  *
- *   import { TestCase } from "@rails-ts/actionpack/actioncontroller/test-case";
+ *   import { TestCase } from "@blazetrails/actionpack/actioncontroller/test-case";
  *
  *   class PostsController extends Base {
  *     async index() { this.render({ json: [{ id: 1 }] }); }

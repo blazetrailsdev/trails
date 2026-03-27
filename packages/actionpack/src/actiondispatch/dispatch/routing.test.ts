@@ -3,7 +3,7 @@ import { RouteSet } from "../routing/route-set.js";
 import { Route } from "../routing/route.js";
 import { escapePath, escapeSegment, escapeFragment, unescapeUri } from "../routing/utils.js";
 import { RoutesInspector } from "../routing/inspector.js";
-import { bodyToString } from "@rails-ts/rack";
+import { bodyToString } from "@blazetrails/rack";
 
 // ==========================================================================
 // Journey::Route tests (journey/route_test.rb)

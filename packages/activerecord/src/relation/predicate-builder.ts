@@ -1,4 +1,4 @@
-import { Table, Nodes } from "@rails-ts/arel";
+import { Table, Nodes } from "@blazetrails/arel";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 
 /**

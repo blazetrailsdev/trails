@@ -1,4 +1,4 @@
-import { humanize } from "@rails-ts/activesupport";
+import { humanize } from "@blazetrails/activesupport";
 import { I18n } from "./i18n.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

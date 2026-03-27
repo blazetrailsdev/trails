@@ -92,7 +92,7 @@ export class ScaffoldGenerator extends GeneratorBase {
     const ts = this.isTypeScript();
     const returnType = ts ? ": Promise<void>" : "";
 
-    return `import { ActionController } from "@rails-ts/actionpack";
+    return `import { ActionController } from "@blazetrails/actionpack";
 
 export class ${controllerClassName} extends ActionController.Base {
   async index()${returnType} {

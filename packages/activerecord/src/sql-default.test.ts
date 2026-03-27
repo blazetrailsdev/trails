@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { quote, quoteDefaultExpression } from "./quoting.js";
-import { Nodes } from "@rails-ts/arel";
+import { Nodes } from "@blazetrails/arel";
 
 describe("quote", () => {
   it("returns NULL for null", () => {

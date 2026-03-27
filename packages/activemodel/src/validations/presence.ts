@@ -5,7 +5,7 @@ import type {
   ValidatorContract as Validator,
 } from "../validator.js";
 import { shouldValidate } from "../validator.js";
-import { isBlank } from "@rails-ts/activesupport";
+import { isBlank } from "@blazetrails/activesupport";
 
 export interface PresenceOptions extends ConditionalOptions {
   message?: string | ((record: AnyRecord) => string);

@@ -45,7 +45,7 @@ describe("AppGenerator", () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(tmpDir, "my-app/package.json"), "utf-8"));
     expect(pkg.name).toBe("my-app");
     expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
-    expect(pkg.dependencies["@rails-ts/activerecord"]).toBeDefined();
+    expect(pkg.dependencies["@blazetrails/activerecord"]).toBeDefined();
   });
 
   it("configures postgres database", async () => {

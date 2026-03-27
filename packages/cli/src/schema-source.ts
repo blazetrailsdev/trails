@@ -1,5 +1,5 @@
-import type { DatabaseAdapter } from "@rails-ts/activerecord";
-import type { SchemaSource, ColumnInfo, IndexInfo } from "@rails-ts/activerecord";
+import type { DatabaseAdapter } from "@blazetrails/activerecord";
+import type { SchemaSource, ColumnInfo, IndexInfo } from "@blazetrails/activerecord";
 
 /** Escape a SQLite identifier (double internal quotes). */
 function sqliteId(name: string): string {
@@ -9,7 +9,7 @@ function sqliteId(name: string): string {
 /** Detect adapter type via instanceof (falls back to constructor name for subclasses). */
 async function detectAdapter(adapter: DatabaseAdapter): Promise<"sqlite" | "postgres" | "mysql"> {
   const { SQLite3Adapter, PostgreSQLAdapter, Mysql2Adapter } =
-    await import("@rails-ts/activerecord");
+    await import("@blazetrails/activerecord");
   if (adapter instanceof PostgreSQLAdapter) return "postgres";
   if (adapter instanceof Mysql2Adapter) return "mysql";
   if (adapter instanceof SQLite3Adapter) return "sqlite";

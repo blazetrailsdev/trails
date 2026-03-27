@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { Table as ArelTable } from "@rails-ts/arel";
+import { Table as ArelTable } from "@blazetrails/arel";
 import { CollectionProxy } from "./associations/collection-proxy.js";
 import { StrictLoadingViolationError } from "./errors.js";
 import {
@@ -7,7 +7,7 @@ import {
   InverseOfAssociationNotFoundError,
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./associations/errors.js";
-import { underscore, singularize, pluralize, camelize } from "@rails-ts/activesupport";
+import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { getInheritanceColumn, findStiClass } from "./sti.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";

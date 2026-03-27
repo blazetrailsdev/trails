@@ -7,7 +7,7 @@
  *
  * Usage with Vitest:
  *
- *   import { IntegrationTest } from "@rails-ts/actionpack/actioncontroller/integration-test";
+ *   import { IntegrationTest } from "@blazetrails/actionpack/actioncontroller/integration-test";
  *
  *   describe("Posts API", () => {
  *     const app = new IntegrationTest();

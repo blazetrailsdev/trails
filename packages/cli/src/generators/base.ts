@@ -5,7 +5,7 @@ import {
   camelize as _camelize,
   tableize as _tableize,
   dasherize as _dasherize,
-} from "@rails-ts/activesupport";
+} from "@blazetrails/activesupport";
 
 export interface GeneratorOptions {
   cwd: string;

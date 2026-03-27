@@ -1,5 +1,5 @@
 import type { Errors } from "./errors.js";
-import { isBlank, underscore } from "@rails-ts/activesupport";
+import { isBlank, underscore } from "@blazetrails/activesupport";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyRecord = any;

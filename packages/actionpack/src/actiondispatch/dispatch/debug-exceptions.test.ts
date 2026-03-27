@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DebugExceptions, type Logger } from "../middleware/debug-exceptions.js";
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString, bodyToString } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString, bodyToString } from "@blazetrails/rack";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [
   200,

@@ -4,8 +4,8 @@
  * Middleware that serves static files from a directory.
  */
 
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 import * as fs from "fs";
 import * as path from "path";
 

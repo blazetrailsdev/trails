@@ -6,7 +6,7 @@
  *
  * To add a new template engine:
  *
- *   import { TemplateHandler, TemplateHandlerRegistry } from "@rails-ts/actionpack/actionview";
+ *   import { TemplateHandler, TemplateHandlerRegistry } from "@blazetrails/actionpack/actionview";
  *
  *   class ReactHandler implements TemplateHandler {
  *     extensions = ["tsx", "jsx"];

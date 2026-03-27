@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { underscore, pluralize, singularize } from "@rails-ts/activesupport";
+import { underscore, pluralize, singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
 
 /**

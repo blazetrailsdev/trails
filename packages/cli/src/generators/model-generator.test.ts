@@ -32,7 +32,7 @@ describe("ModelGeneratorTest", () => {
     const gen = makeGen();
     gen.run("User", []);
     const content = fs.readFileSync(path.join(tmpDir, "src/app/models/user.ts"), "utf-8");
-    expect(content).toContain('import { Base } from "@rails-ts/activerecord"');
+    expect(content).toContain('import { Base } from "@blazetrails/activerecord"');
     expect(content).toContain("class User extends Base");
   });
 
@@ -219,7 +219,7 @@ describe("ModelGenerator (JavaScript project)", () => {
     const gen = makeJsGen();
     gen.run("User", ["name:string"]);
     const content = fs.readFileSync(path.join(jsTmpDir, "src/app/models/user.js"), "utf-8");
-    expect(content).toContain('import { Base } from "@rails-ts/activerecord"');
+    expect(content).toContain('import { Base } from "@blazetrails/activerecord"');
     expect(content).toContain("export class User");
   });
 });

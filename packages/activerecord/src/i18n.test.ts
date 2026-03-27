@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
-import { I18n } from "@rails-ts/activemodel";
+import { I18n } from "@blazetrails/activemodel";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 

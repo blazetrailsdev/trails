@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveModel::Name
  */
-import { underscore, pluralize, humanize } from "@rails-ts/activesupport";
+import { underscore, pluralize, humanize } from "@blazetrails/activesupport";
 import { I18n } from "./i18n.js";
 
 interface ModelLike {

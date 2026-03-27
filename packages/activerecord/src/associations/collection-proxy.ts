@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
-import { Table as ArelTable } from "@rails-ts/arel";
-import { underscore, singularize, pluralize, camelize } from "@rails-ts/activesupport";
+import { Table as ArelTable } from "@blazetrails/arel";
+import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { StrictLoadingViolationError } from "../errors.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,

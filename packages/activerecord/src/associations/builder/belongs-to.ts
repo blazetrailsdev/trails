@@ -1,4 +1,4 @@
-import { underscore } from "@rails-ts/activesupport";
+import { underscore } from "@blazetrails/activesupport";
 import { SingularAssociation } from "./singular-association.js";
 
 /**

@@ -1,4 +1,4 @@
-import { underscore, singularize, pluralize, camelize } from "@rails-ts/activesupport";
+import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 
 /**
  * Builder for has_and_belongs_to_many associations. Internally creates

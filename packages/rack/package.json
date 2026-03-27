@@ -1,5 +1,5 @@
 {
-  "name": "@rails-ts/rack",
+  "name": "@blazetrails/rack",
   "version": "0.1.0",
   "description": "Modular web server interface, mirroring Ruby's Rack",
   "type": "module",

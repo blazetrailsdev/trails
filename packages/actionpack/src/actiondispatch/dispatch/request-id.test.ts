@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { RequestId } from "../middleware/request-id.js";
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 
 const echoApp = async (env: RackEnv): Promise<RackResponse> => [
   200,

@@ -117,7 +117,7 @@ describe("ControllerGenerator (JavaScript project)", () => {
       path.join(jsTmpDir, "src/app/controllers/posts-controller.js"),
       "utf-8",
     );
-    expect(content).toContain('import { ActionController } from "@rails-ts/actionpack"');
+    expect(content).toContain('import { ActionController } from "@blazetrails/actionpack"');
     expect(content).toContain("export class PostsController");
   });
 });

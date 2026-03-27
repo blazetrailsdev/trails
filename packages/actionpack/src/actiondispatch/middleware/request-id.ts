@@ -5,7 +5,7 @@
  */
 
 import { randomUUID } from "crypto";
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 

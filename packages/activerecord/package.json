@@ -1,7 +1,7 @@
 {
-  "name": "@rails-ts/activerecord",
+  "name": "@blazetrails/activerecord",
   "version": "0.1.0",
-  "description": "ORM layer mirroring Ruby's ActiveRecord, built on @rails-ts/arel and @rails-ts/activemodel",
+  "description": "ORM layer mirroring Ruby's ActiveRecord, built on @blazetrails/arel and @blazetrails/activemodel",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,9 +9,9 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@rails-ts/activesupport": "workspace:*",
-    "@rails-ts/arel": "workspace:*",
-    "@rails-ts/activemodel": "workspace:*"
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/arel": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*"
   },
   "files": [
     "dist"

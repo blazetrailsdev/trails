@@ -116,7 +116,7 @@ export class MigrationGenerator extends GeneratorBase {
 
     this.createFile(
       filename,
-      `import { Migration } from "@rails-ts/activerecord";
+      `import { Migration } from "@blazetrails/activerecord";
 
 export class ${className} extends Migration {
   static version = "${timestamp}";

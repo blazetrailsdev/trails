@@ -209,7 +209,7 @@ describe("MigrationGeneratorTest (JavaScript project)", () => {
     const gen = makeJsGen();
     const files = gen.run("CreateUsers", []);
     const content = readJsMigration(files);
-    expect(content).toContain('import { Migration } from "@rails-ts/activerecord"');
+    expect(content).toContain('import { Migration } from "@blazetrails/activerecord"');
     expect(content).not.toContain("require(");
   });
 

@@ -1,6 +1,6 @@
 import { Errors, StrictValidationFailed } from "./errors.js";
 import { ValidationError, ValidationContext } from "./validations.js";
-import { humanize, underscore } from "@rails-ts/activesupport";
+import { humanize, underscore } from "@blazetrails/activesupport";
 import { I18n } from "./i18n.js";
 import { typeRegistry } from "./type/registry.js";
 import { Type } from "./type/value.js";

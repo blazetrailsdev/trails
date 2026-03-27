@@ -9,8 +9,8 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { pathToFileURL } from "node:url";
 
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 import {
   RouteSet,
   Mapper,
@@ -18,7 +18,7 @@ import {
   Response,
   ActionController,
   ActionView,
-} from "@rails-ts/actionpack";
+} from "@blazetrails/actionpack";
 
 export interface ApplicationOptions {
   cwd: string;

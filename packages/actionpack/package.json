@@ -1,5 +1,5 @@
 {
-  "name": "@rails-ts/actionpack",
+  "name": "@blazetrails/actionpack",
   "version": "0.1.0",
   "description": "ActionController and ActionDispatch — mirroring Rails ActionPack",
   "type": "module",
@@ -13,6 +13,6 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@rails-ts/rack": "workspace:*"
+    "@blazetrails/rack": "workspace:*"
   }
 }

@@ -1554,7 +1554,7 @@ describe("WhereTest Arel nodes", () => {
   });
 
   it("where accepts an Arel node", async () => {
-    const { Table } = await import("@rails-ts/arel");
+    const { Table } = await import("@blazetrails/arel");
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1572,7 +1572,7 @@ describe("WhereTest Arel nodes", () => {
   });
 
   it("where accepts an Arel In node with subquery", async () => {
-    const { Table } = await import("@rails-ts/arel");
+    const { Table } = await import("@blazetrails/arel");
     class Author extends Base {
       static {
         this.attribute("name", "string");

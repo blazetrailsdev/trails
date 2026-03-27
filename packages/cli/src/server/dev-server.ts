@@ -1,6 +1,6 @@
 import * as http from "node:http";
-import { bodyToString } from "@rails-ts/rack";
-import type { RackEnv } from "@rails-ts/rack";
+import { bodyToString } from "@blazetrails/rack";
+import type { RackEnv } from "@blazetrails/rack";
 import { Application } from "./application.js";
 
 export interface DevServerOptions {

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 
-import { Notifications } from "@rails-ts/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 

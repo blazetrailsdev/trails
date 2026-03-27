@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createProgram } from "../cli.js";
 import { loadDatabaseConfig, connectAdapter, resolveEnv } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
-import { Migrator } from "@rails-ts/activerecord";
+import { Migrator } from "@blazetrails/activerecord";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -244,12 +244,12 @@ describe("full migration flow", () => {
   });
 
   it("migrate, status, rollback with SQLite", async () => {
-    const { SQLite3Adapter } = await import("@rails-ts/activerecord");
+    const { SQLite3Adapter } = await import("@blazetrails/activerecord");
     adapter = new SQLite3Adapter(":memory:");
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-posts.ts"),
-      `import { Migration } from "@rails-ts/activerecord";
+      `import { Migration } from "@blazetrails/activerecord";
 export class CreatePosts extends Migration {
   async up() {
     await this.createTable("posts", (t) => {
@@ -302,7 +302,7 @@ export class CreatePosts extends Migration {
 describe("schema dump and load", () => {
   it("dumps schema from SQLite and loads it into a fresh database", async () => {
     const { SQLite3Adapter, SchemaDumper, MigrationContext } =
-      await import("@rails-ts/activerecord");
+      await import("@blazetrails/activerecord");
     const { AdapterSchemaSource } = await import("../schema-source.js");
 
     const sourceAdapter = new SQLite3Adapter(":memory:");

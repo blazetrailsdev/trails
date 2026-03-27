@@ -8,8 +8,8 @@
  * - Rack-compatible call() for dispatching
  */
 
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 import { Mapper } from "./mapper.js";
 import type { MatchedRoute } from "./route.js";
 import { Route } from "./route.js";

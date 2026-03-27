@@ -4,7 +4,7 @@
  * An ordered list of middleware with insertion/removal operations.
  */
 
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 type MiddlewareFactory = new (

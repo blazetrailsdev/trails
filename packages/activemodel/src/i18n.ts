@@ -1,4 +1,4 @@
-import { deepDup, deepMergeInPlace } from "@rails-ts/activesupport";
+import { deepDup, deepMergeInPlace } from "@blazetrails/activesupport";
 
 type TranslationValue = string | { one?: string; other?: string } | TranslationTree;
 interface TranslationTree {

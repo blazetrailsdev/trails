@@ -7,8 +7,8 @@
  * - Sets secure cookies flag
  */
 
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 
 export interface SSLOptions {
   redirect?: boolean | { status?: number; body?: string; port?: number };

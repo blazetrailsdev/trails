@@ -5,8 +5,8 @@
  * in development mode.
  */
 
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "../exception-wrapper.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;

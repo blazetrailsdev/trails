@@ -1,4 +1,4 @@
-import { Table, SelectManager, Nodes, Visitors } from "@rails-ts/arel";
+import { Table, SelectManager, Nodes, Visitors } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
 import { RecordNotFound, SoleRecordExceeded } from "./errors.js";
@@ -9,7 +9,7 @@ import {
   camelize as _camelize,
   singularize as _singularize,
   pluralize as _pluralize,
-} from "@rails-ts/activesupport";
+} from "@blazetrails/activesupport";
 
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
 export { Range };

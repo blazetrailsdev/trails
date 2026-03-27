@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Static } from "../middleware/static.js";
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString, bodyToString } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";

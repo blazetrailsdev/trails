@@ -5,8 +5,8 @@
  * only allowing requests to specified hosts.
  */
 
-import type { RackEnv, RackResponse } from "@rails-ts/rack";
-import { bodyFromString } from "@rails-ts/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 
 export interface HostAuthorizationOptions {
   hosts: (string | RegExp)[];

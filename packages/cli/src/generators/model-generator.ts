@@ -50,7 +50,7 @@ export class ModelGenerator extends GeneratorBase {
 
     this.createFile(
       `src/app/models/${fileName}${ext}`,
-      `import { Base } from "@rails-ts/activerecord";
+      `import { Base } from "@blazetrails/activerecord";
 
 export class ${className} extends Base {${staticBlock}}
 `,

@@ -5,7 +5,7 @@ import type {
   ValidatorContract as Validator,
 } from "../validator.js";
 import { shouldValidate } from "../validator.js";
-import { humanize } from "@rails-ts/activesupport";
+import { humanize } from "@blazetrails/activesupport";
 
 export interface ConfirmationOptions extends ConditionalOptions {
   message?: string;

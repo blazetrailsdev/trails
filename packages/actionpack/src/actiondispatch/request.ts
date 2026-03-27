@@ -5,7 +5,7 @@
  * mirroring the Rails Request API.
  */
 
-import type { RackEnv } from "@rails-ts/rack";
+import type { RackEnv } from "@blazetrails/rack";
 
 export class Request {
   readonly env: RackEnv;

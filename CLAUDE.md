@@ -28,9 +28,9 @@ This is a TypeScript monorepo. Packages live under `packages/`:
   raw strings when possible, but always support the string form for parity.
 - **Use the package ecosystem like Rails does**: ActiveRecord's power comes
   from Arel. When building queries, subqueries, or SQL conditions in
-  `activerecord`, use `@rails-ts/arel` (Table, SelectManager, Nodes, Attribute)
+  `activerecord`, use `@blazetrails/arel` (Table, SelectManager, Nodes, Attribute)
   to build AST nodes — never construct raw SQL strings. Similarly, use
-  `@rails-ts/activemodel` for validations/callbacks and `@rails-ts/activesupport`
+  `@blazetrails/activemodel` for validations/callbacks and `@blazetrails/activesupport`
   for inflection/utilities rather than reimplementing them.
 - **Implementation-first**: The goal is to implement Rails features in
   TypeScript. Tests being unskipped is a side effect of implementation, not

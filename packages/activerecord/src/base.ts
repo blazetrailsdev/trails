@@ -1,6 +1,6 @@
-import { Model } from "@rails-ts/activemodel";
-import { Table, quoteArrayLiteral } from "@rails-ts/arel";
-import { pluralize, underscore } from "@rails-ts/activesupport";
+import { Model } from "@blazetrails/activemodel";
+import { Table, quoteArrayLiteral } from "@blazetrails/arel";
+import { pluralize, underscore } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import { NameError, SubclassNotFound } from "./errors.js";
 import { modelRegistry } from "./associations.js";

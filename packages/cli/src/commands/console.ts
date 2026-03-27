@@ -17,7 +17,7 @@ export function consoleCommand(): Command {
       const { loadDatabaseConfig, connectAdapter } = await import("../database.js");
       const config = await loadDatabaseConfig();
       dbAdapter = await connectAdapter(config);
-      const { Base } = await import("@rails-ts/activerecord");
+      const { Base } = await import("@blazetrails/activerecord");
       Base.adapter = dbAdapter;
       console.log(
         `Connected to ${config.adapter ?? "sqlite3"} (${config.database ?? "in-memory"})`,
@@ -87,7 +87,7 @@ export function consoleCommand(): Command {
 
     // Make activerecord Base available
     try {
-      const ar = await import("@rails-ts/activerecord");
+      const ar = await import("@blazetrails/activerecord");
       r.context.Base = ar.Base;
       r.context.Migration = ar.Migration;
     } catch {
