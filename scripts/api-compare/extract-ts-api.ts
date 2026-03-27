@@ -120,13 +120,15 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
         if (!isExported(node)) return;
         const classInfo = extractClass(node, checker, relPath);
         if (classInfo) {
-          info.classes[classInfo.name] = classInfo;
+          const classKey = `${relPath}:${classInfo.name}`;
+          info.classes[classKey] = classInfo;
           fileHasClassOrModule = true;
         }
       } else if (ts.isInterfaceDeclaration(node) && node.name) {
         if (!isExported(node)) return;
         const name = node.name.text;
-        info.modules[name] = {
+        const modKey = `${relPath}:${name}`;
+        info.modules[modKey] = {
           name,
           file: relPath,
           includes: [],
@@ -138,7 +140,8 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
       } else if (ts.isModuleDeclaration(node) && node.name) {
         if (!isExported(node)) return;
         const name = node.name.text;
-        info.modules[name] = {
+        const modKey = `${relPath}:${name}`;
+        info.modules[modKey] = {
           name,
           file: relPath,
           includes: [],
@@ -152,8 +155,9 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
         // Only record if not already defined by an interface/namespace declaration
         if (node.exportClause && ts.isNamespaceExport(node.exportClause)) {
           const name = node.exportClause.name.text;
-          if (info.modules[name]) return;
-          info.modules[name] = {
+          const modKey = `${relPath}:${name}`;
+          if (info.modules[modKey]) return;
+          info.modules[modKey] = {
             name,
             file: relPath,
             includes: [],
@@ -213,8 +217,9 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
         .split("-")
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join("");
-      if (!info.modules[moduleName] && !info.classes[moduleName]) {
-        info.modules[moduleName] = {
+      const autoModKey = `${relPath}:${moduleName}`;
+      if (!info.modules[autoModKey] && !info.classes[autoModKey]) {
+        info.modules[autoModKey] = {
           name: moduleName,
           file: relPath,
           includes: [],

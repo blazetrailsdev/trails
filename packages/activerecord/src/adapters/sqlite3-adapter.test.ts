@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SQLite3Adapter } from "./sqlite3-adapter.js";
+import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import {
   Base,
   Migration,

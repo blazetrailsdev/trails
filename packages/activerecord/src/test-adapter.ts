@@ -256,7 +256,7 @@ if (PG_TEST_URL) {
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else {
-  const { SQLite3Adapter } = await import("./adapters/sqlite3-adapter.js");
+  const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
   _sharedAdapter = new SQLite3Adapter(":memory:");
   _factory = () => new SchemaAdapter(_sharedAdapter);
 }

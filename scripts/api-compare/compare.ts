@@ -265,15 +265,15 @@ function main() {
     // Includes both classes and modules (interfaces/namespaces)
     const tsClassesByName = new Map<string, { file: string; info: ClassInfo }[]>();
     if (tsPkg) {
-      for (const [name, cls] of Object.entries(tsPkg.classes)) {
-        const entries = tsClassesByName.get(name) || [];
+      for (const [_key, cls] of Object.entries(tsPkg.classes)) {
+        const entries = tsClassesByName.get(cls.name) || [];
         entries.push({ file: cls.file || "", info: cls });
-        tsClassesByName.set(name, entries);
+        tsClassesByName.set(cls.name, entries);
       }
-      for (const [name, mod] of Object.entries(tsPkg.modules)) {
-        const entries = tsClassesByName.get(name) || [];
+      for (const [_key, mod] of Object.entries(tsPkg.modules)) {
+        const entries = tsClassesByName.get(mod.name) || [];
         entries.push({ file: mod.file || "", info: mod });
-        tsClassesByName.set(name, entries);
+        tsClassesByName.set(mod.name, entries);
       }
     }
 

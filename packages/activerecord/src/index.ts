@@ -53,7 +53,7 @@ export {
 } from "./sti.js";
 export { hasSecurePassword } from "./secure-password.js";
 export { store, storeAccessor, storedAttributes } from "./store.js";
-export { SQLite3Adapter } from "./adapters/sqlite3-adapter.js";
+export { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 export { PostgreSQLAdapter } from "./adapters/postgresql-adapter.js";
 export { Mysql2Adapter } from "./adapters/mysql2-adapter.js";
 export { QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";

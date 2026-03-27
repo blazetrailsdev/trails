@@ -40,7 +40,7 @@ async function _loadAdapter(name: string): Promise<AdapterConstructor> {
       return mod.Mysql2Adapter;
     }
     case "sqlite": {
-      const mod = await import("./adapters/sqlite3-adapter.js");
+      const mod = await import("./connection-adapters/sqlite3-adapter.js");
       _adapterCache[name] = mod.SQLite3Adapter;
       return mod.SQLite3Adapter;
     }
