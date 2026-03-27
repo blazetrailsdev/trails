@@ -2,11 +2,22 @@ export { Base } from "./base.js";
 export { Relation, Range } from "./relation.js";
 export type { DatabaseAdapter } from "./adapter.js";
 export { Migration, MigrationContext } from "./migration.js";
-export { TableDefinition, Table } from "./connection-adapters/abstract/schema-definitions.js";
+export {
+  TableDefinition,
+  Table,
+  ColumnDefinition,
+  AddColumnDefinition,
+  CreateIndexDefinition,
+  IndexDefinition,
+  ForeignKeyDefinition,
+  CheckConstraintDefinition,
+} from "./connection-adapters/abstract/schema-definitions.js";
 export type {
   ColumnType,
   ColumnOptions,
+  ReferentialAction,
 } from "./connection-adapters/abstract/schema-definitions.js";
+export { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 export { Schema } from "./schema.js";
 export { MigrationRunner } from "./migration-runner.js";
 export {

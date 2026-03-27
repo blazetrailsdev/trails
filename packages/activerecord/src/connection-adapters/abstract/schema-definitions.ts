@@ -18,10 +18,63 @@ export type ColumnType =
   | "jsonb"
   | "primary_key";
 
-interface ColumnDefinition {
-  name: string;
-  type: ColumnType;
-  options: ColumnOptions;
+export type ReferentialAction = "cascade" | "nullify" | "restrict" | "no_action";
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ColumnDefinition
+ */
+export class ColumnDefinition {
+  sqlType?: string;
+  constructor(
+    readonly name: string,
+    readonly type: ColumnType,
+    readonly options: ColumnOptions = {},
+  ) {}
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::AddColumnDefinition
+ */
+export class AddColumnDefinition {
+  constructor(readonly column: ColumnDefinition) {}
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::CreateIndexDefinition
+ */
+export class CreateIndexDefinition {
+  constructor(
+    readonly index: IndexDefinition,
+    readonly ifNotExists: boolean = false,
+    readonly algorithm?: string,
+  ) {}
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition
+ */
+export class ForeignKeyDefinition {
+  constructor(
+    readonly fromTable: string,
+    readonly toTable: string,
+    readonly column: string,
+    readonly primaryKey: string,
+    readonly name: string,
+    readonly onDelete?: ReferentialAction,
+    readonly onUpdate?: ReferentialAction,
+  ) {}
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::CheckConstraintDefinition
+ */
+export class CheckConstraintDefinition {
+  constructor(
+    readonly tableName: string,
+    readonly expression: string,
+    readonly name: string,
+    readonly validate: boolean = true,
+  ) {}
 }
 
 export interface ColumnOptions {
@@ -73,21 +126,17 @@ export class TableDefinition {
     this._id = options.id !== false;
 
     if (this._id) {
-      this.columns.push({
-        name: "id",
-        type: "primary_key",
-        options: { primaryKey: true },
-      });
+      this.columns.push(new ColumnDefinition("id", "primary_key", { primaryKey: true }));
     }
   }
 
   string(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "string", options });
+    this.columns.push(new ColumnDefinition(name, "string", options));
     return this;
   }
 
   text(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "text", options });
+    this.columns.push(new ColumnDefinition(name, "text", options));
     return this;
   }
 
@@ -97,7 +146,7 @@ export class TableDefinition {
   }
 
   float(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "float", options });
+    this.columns.push(new ColumnDefinition(name, "float", options));
     return this;
   }
 
@@ -105,42 +154,42 @@ export class TableDefinition {
     if (options.scale !== undefined && options.precision === undefined) {
       throw new Error("Error adding decimal column: precision is required if scale is specified");
     }
-    this.columns.push({ name, type: "decimal", options });
+    this.columns.push(new ColumnDefinition(name, "decimal", options));
     return this;
   }
 
   boolean(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "boolean", options });
+    this.columns.push(new ColumnDefinition(name, "boolean", options));
     return this;
   }
 
   date(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "date", options });
+    this.columns.push(new ColumnDefinition(name, "date", options));
     return this;
   }
 
   datetime(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "datetime", options });
+    this.columns.push(new ColumnDefinition(name, "datetime", options));
     return this;
   }
 
   timestamp(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "timestamp", options });
+    this.columns.push(new ColumnDefinition(name, "timestamp", options));
     return this;
   }
 
   binary(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "binary", options });
+    this.columns.push(new ColumnDefinition(name, "binary", options));
     return this;
   }
 
   json(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "json", options });
+    this.columns.push(new ColumnDefinition(name, "json", options));
     return this;
   }
 
   jsonb(name: string, options: ColumnOptions = {}): this {
-    this.columns.push({ name, type: "jsonb", options });
+    this.columns.push(new ColumnDefinition(name, "jsonb", options));
     return this;
   }
 

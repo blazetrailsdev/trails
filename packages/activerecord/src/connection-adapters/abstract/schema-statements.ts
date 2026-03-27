@@ -12,17 +12,32 @@ import type { DatabaseAdapter } from "../../adapter.js";
 import {
   TableDefinition,
   Table,
+  IndexDefinition,
+  ColumnDefinition,
+  AddColumnDefinition,
+  CreateIndexDefinition,
+  ForeignKeyDefinition,
   type ColumnType,
   type ColumnOptions,
 } from "./schema-definitions.js";
+import { SchemaCreation } from "./schema-creation.js";
 import { detectAdapterName } from "../../adapter-name.js";
 import { quoteIdentifier, quoteDefaultExpression } from "../../quoting.js";
 
 export class SchemaStatements {
+  private _schemaCreation?: SchemaCreation;
+
   constructor(
     protected adapter: DatabaseAdapter,
     protected adapterName: "sqlite" | "postgres" | "mysql" = detectAdapterName(adapter),
   ) {}
+
+  get schemaCreation(): SchemaCreation {
+    if (!this._schemaCreation) {
+      this._schemaCreation = new SchemaCreation(this.adapterName);
+    }
+    return this._schemaCreation;
+  }
 
   protected _qi(name: string): string {
     return quoteIdentifier(name, this.adapterName);
@@ -87,12 +102,10 @@ export class SchemaStatements {
     if (options.ifNotExists && (await this.columnExists(tableName, columnName))) {
       return;
     }
-    const sqlType = this.typeToSql(type, options);
-    const nullable = options.null === false ? " NOT NULL" : "";
-    const defaultClause = this._defaultClause(options.default);
-
+    const colDef = new ColumnDefinition(columnName, type, options);
+    const addDef = new AddColumnDefinition(colDef);
     await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(tableName)} ADD COLUMN ${this._qi(columnName)} ${sqlType}${nullable}${defaultClause}`,
+      `ALTER TABLE ${this._qi(tableName)} ${this.schemaCreation.accept(addDef)}`,
     );
   }
 
@@ -121,13 +134,10 @@ export class SchemaStatements {
     options: { unique?: boolean; name?: string } = {},
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
-    const indexName = options.name ?? `index_${tableName}_on_${cols.join("_and_")}`;
-    const unique = options.unique ? "UNIQUE " : "";
-    const quotedCols = cols.map((c) => quoteIdentifier(c, this.adapterName)).join(", ");
-
-    await this.adapter.executeMutation(
-      `CREATE ${unique}INDEX ${quoteIdentifier(indexName, this.adapterName)} ON ${quoteIdentifier(tableName, this.adapterName)} (${quotedCols})`,
-    );
+    const indexName = options.name ?? this.indexName(tableName, { column: cols });
+    const indexDef = new IndexDefinition(tableName, indexName, options.unique ?? false, cols);
+    const createDef = new CreateIndexDefinition(indexDef);
+    await this.adapter.executeMutation(this.schemaCreation.accept(createDef));
   }
 
   async removeIndex(
@@ -159,13 +169,13 @@ export class SchemaStatements {
     type: ColumnType,
     options: ColumnOptions = {},
   ): Promise<void> {
-    const sqlType = this.typeToSql(type, options);
+    const sqlType = this.schemaCreation.typeToSql(type, options);
     const table = this._qi(tableName);
     const col = this._qi(columnName);
 
     if (this.adapterName === "mysql") {
       const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause = this._defaultClause(options.default);
+      const defaultClause = quoteDefaultExpression(options.default);
       await this.adapter.executeMutation(
         `ALTER TABLE ${table} MODIFY COLUMN ${col} ${sqlType}${nullable}${defaultClause}`,
       );
@@ -177,12 +187,12 @@ export class SchemaStatements {
         );
       }
       if (options.default !== undefined) {
-        clauses.push(`ALTER COLUMN ${col} SET${this._defaultClause(options.default)}`);
+        clauses.push(`ALTER COLUMN ${col} SET${quoteDefaultExpression(options.default)}`);
       }
       await this.adapter.executeMutation(`ALTER TABLE ${table} ${clauses.join(", ")}`);
     } else {
       const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause = this._defaultClause(options.default);
+      const defaultClause = quoteDefaultExpression(options.default);
       await this.adapter.executeMutation(
         `ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${sqlType}${nullable}${defaultClause}`,
       );
@@ -245,7 +255,7 @@ export class SchemaStatements {
       typeof options === "object" && options !== null && "to" in (options as any)
         ? (options as any).to
         : options;
-    const clause = this._defaultClause(defaultVal);
+    const clause = quoteDefaultExpression(defaultVal);
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET${clause || " DEFAULT NULL"}`,
     );
@@ -309,8 +319,9 @@ export class SchemaStatements {
     const column = options.column ?? `${toTable.replace(/s$/, "")}_id`;
     const pk = options.primaryKey ?? "id";
     const name = options.name ?? `fk_${fromTable}_${column}`;
+    const fkDef = new ForeignKeyDefinition(fromTable, toTable, column, pk, name);
     await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(fromTable)} ADD CONSTRAINT ${this._qi(name)} FOREIGN KEY (${this._qi(column)}) REFERENCES ${this._qi(toTable)} (${this._qi(pk)})`,
+      `ALTER TABLE ${this._qi(fromTable)} ADD ${this.schemaCreation.accept(fkDef)}`,
     );
   }
 
@@ -660,38 +671,6 @@ export class SchemaStatements {
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
-    switch (type) {
-      case "string":
-        return `VARCHAR(${options.limit ?? 255})`;
-      case "text":
-        return "TEXT";
-      case "integer":
-        return "INTEGER";
-      case "float":
-        return this.adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
-      case "decimal":
-        return `DECIMAL(${options.precision ?? 10}, ${options.scale ?? 0})`;
-      case "boolean":
-        return "BOOLEAN";
-      case "date":
-        return "DATE";
-      case "datetime":
-      case "timestamp":
-        return this.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
-      case "binary":
-        return this.adapterName === "postgres" ? "BYTEA" : "BLOB";
-      case "json":
-        return "JSON";
-      case "jsonb":
-        return this.adapterName === "postgres" ? "JSONB" : "JSON";
-      case "primary_key":
-        if (this.adapterName === "postgres") return "SERIAL PRIMARY KEY";
-        if (this.adapterName === "mysql") return "INT AUTO_INCREMENT PRIMARY KEY";
-        return "INTEGER PRIMARY KEY AUTOINCREMENT";
-    }
-  }
-
-  protected _defaultClause(defaultValue: unknown): string {
-    return quoteDefaultExpression(defaultValue);
+    return this.schemaCreation.typeToSql(type, options);
   }
 }
