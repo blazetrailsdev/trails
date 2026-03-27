@@ -301,8 +301,33 @@ function main() {
         kind: "class",
       });
     }
+
+    // Ruby's `module ClassMethods` pattern (from ActiveSupport::Concern) defines
+    // methods that get mixed into the including class as class-level (static)
+    // methods. In TypeScript, these are just static methods on the class or
+    // exported functions from the file — there's no separate ClassMethods wrapper.
+    // Fold ClassMethods instance methods into the parent module as classMethods.
+    const classMethodModuleFqns = new Set<string>();
+    for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
+      if (!fqn.endsWith("::ClassMethods")) continue;
+      const parentFqn = fqn.replace(/::ClassMethods$/, "");
+      const parentMod = rubyPkg.modules[parentFqn] as unknown as ClassInfo | undefined;
+      if (parentMod) {
+        const mod = info as unknown as ClassInfo;
+        // Move ClassMethods instance methods → parent's classMethods
+        for (const m of mod.instanceMethods) {
+          if (!parentMod.classMethods.some((pm: MethodInfo) => pm.name === m.name)) {
+            parentMod.classMethods.push(m);
+          }
+        }
+        classMethodModuleFqns.add(fqn);
+      }
+    }
+
     for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
       const mod = info as unknown as ClassInfo;
+      // Skip ClassMethods modules — their methods were folded into the parent
+      if (classMethodModuleFqns.has(fqn)) continue;
       // Skip pure namespace modules (no methods, no includes, no extends)
       // — these are just Ruby's `module Foo; end` containers that map to directories in TS
       if (
