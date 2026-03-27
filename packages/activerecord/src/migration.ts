@@ -1,11 +1,12 @@
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   TableDefinition,
+  Table,
   type ColumnType,
   type ColumnOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
+import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { detectAdapterName } from "./adapter-name.js";
-import { quoteDefaultExpression } from "./quoting.js";
 
 interface RecordedOperation {
   method: string;
@@ -27,6 +28,15 @@ export abstract class Migration {
   /** Determine adapter type from the adapter class name. */
   protected get _adapterName(): "sqlite" | "postgres" | "mysql" {
     return detectAdapterName(this.adapter);
+  }
+
+  private _schema?: SchemaStatements;
+
+  get schema(): SchemaStatements {
+    if (!this._schema) {
+      this._schema = new SchemaStatements(this.adapter);
+    }
+    return this._schema;
   }
 
   /**
@@ -126,16 +136,31 @@ export abstract class Migration {
         break;
       case "changeColumn":
         throw new Error("Cannot reverse changeColumn without previous type info");
+      case "addForeignKey": {
+        const fkOpts = op.args[2] as { column?: string; name?: string } | undefined;
+        await this.removeForeignKey(op.args[0] as string, fkOpts ?? (op.args[1] as string));
+        break;
+      }
+      case "createJoinTable":
+        await this.dropJoinTable(
+          op.args[0] as string,
+          op.args[1] as string,
+          op.args[2] as { tableName?: string } | undefined,
+        );
+        break;
+      case "dropJoinTable":
+        throw new Error("Cannot reverse dropJoinTable without table definition");
       default:
         throw new Error(`Cannot reverse operation: ${op.method}`);
     }
   }
 
-  /**
-   * Create a table.
-   *
-   * Mirrors: ActiveRecord::Migration#create_table
-   */
+  // -- Schema operations (delegated to SchemaStatements) --
+  // Migration records operations for reversibility, then delegates
+  // actual SQL execution to this.schema (a SchemaStatements instance).
+  // In Rails, these methods live on the connection adapter via
+  // ActiveRecord::ConnectionAdapters::SchemaStatements.
+
   async createTable(
     name: string,
     optionsOrFn?:
@@ -147,68 +172,17 @@ export abstract class Migration {
       this._recordedOps.push({ method: "createTable", args: [name, optionsOrFn, fn] });
       return;
     }
-    let options: { id?: boolean; force?: boolean; ifNotExists?: boolean } = {};
-    let definer: ((t: TableDefinition) => void) | undefined;
-
-    if (typeof optionsOrFn === "function") {
-      definer = optionsOrFn;
-    } else if (optionsOrFn) {
-      options = optionsOrFn;
-      definer = fn;
-    }
-
-    if (name.length > 64) {
-      throw new Error(`Table name '${name}' is too long; the limit is 64 characters`);
-    }
-
-    if (options.force && options.ifNotExists) {
-      throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
-    }
-
-    if (options.force) {
-      if (await this.tableExists(name)) {
-        await this.dropTable(name);
-      }
-    }
-
-    if (options.ifNotExists && (await this.tableExists(name))) {
-      return;
-    }
-
-    const td = new TableDefinition(name, { ...options, adapterName: this._adapterName });
-    if (definer) definer(td);
-
-    await this.adapter.executeMutation(td.toSql());
-
-    // Create indexes
-    for (const idx of td.indexes) {
-      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
-      const unique = idx.unique ? "UNIQUE " : "";
-      const cols = idx.columns.map((c) => `"${c}"`).join(", ");
-      await this.adapter.executeMutation(
-        `CREATE ${unique}INDEX "${indexName}" ON "${name}" (${cols})`,
-      );
-    }
+    await this.schema.createTable(name, optionsOrFn, fn);
   }
 
-  /**
-   * Drop a table.
-   *
-   * Mirrors: ActiveRecord::Migration#drop_table
-   */
-  async dropTable(name?: string, _options?: { ifExists?: boolean }): Promise<void> {
+  async dropTable(name: string, options?: { ifExists?: boolean }): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "dropTable", args: [name] });
       return;
     }
-    await this.adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
+    await this.schema.dropTable(name, options);
   }
 
-  /**
-   * Add a column to a table.
-   *
-   * Mirrors: ActiveRecord::Migration#add_column
-   */
   async addColumn(
     tableName: string,
     columnName: string,
@@ -219,23 +193,9 @@ export abstract class Migration {
       this._recordedOps.push({ method: "addColumn", args: [tableName, columnName, type, options] });
       return;
     }
-    if (options.ifNotExists && (await this.columnExists(tableName, columnName))) {
-      return;
-    }
-    const sqlType = this._sqlType(type, options);
-    const nullable = options.null === false ? " NOT NULL" : "";
-    const defaultClause = this._defaultClause(options.default);
-
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${sqlType}${nullable}${defaultClause}`,
-    );
+    await this.schema.addColumn(tableName, columnName, type, options);
   }
 
-  /**
-   * Remove a column from a table.
-   *
-   * Mirrors: ActiveRecord::Migration#remove_column
-   */
   async removeColumn(
     tableName: string,
     columnName: string,
@@ -245,32 +205,17 @@ export abstract class Migration {
       this._recordedOps.push({ method: "removeColumn", args: [tableName, columnName, options] });
       return;
     }
-    if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
-      return;
-    }
-    await this.adapter.executeMutation(`ALTER TABLE "${tableName}" DROP COLUMN "${columnName}"`);
+    await this.schema.removeColumn(tableName, columnName, options);
   }
 
-  /**
-   * Rename a column.
-   *
-   * Mirrors: ActiveRecord::Migration#rename_column
-   */
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "renameColumn", args: [tableName, oldName, newName] });
       return;
     }
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" RENAME COLUMN "${oldName}" TO "${newName}"`,
-    );
+    await this.schema.renameColumn(tableName, oldName, newName);
   }
 
-  /**
-   * Add an index.
-   *
-   * Mirrors: ActiveRecord::Migration#add_index
-   */
   async addIndex(
     tableName: string,
     columns: string | string[],
@@ -280,20 +225,9 @@ export abstract class Migration {
       this._recordedOps.push({ method: "addIndex", args: [tableName, columns, options] });
       return;
     }
-    const cols = Array.isArray(columns) ? columns : [columns];
-    const indexName = options.name ?? `index_${tableName}_on_${cols.join("_and_")}`;
-    const unique = options.unique ? "UNIQUE " : "";
-
-    await this.adapter.executeMutation(
-      `CREATE ${unique}INDEX "${indexName}" ON "${tableName}" (${cols.map((c) => `"${c}"`).join(", ")})`,
-    );
+    await this.schema.addIndex(tableName, columns, options);
   }
 
-  /**
-   * Remove an index.
-   *
-   * Mirrors: ActiveRecord::Migration#remove_index
-   */
   async removeIndex(
     tableName: string,
     options: { column?: string | string[]; name?: string } = {},
@@ -302,29 +236,9 @@ export abstract class Migration {
       this._recordedOps.push({ method: "removeIndex", args: [tableName, options] });
       return;
     }
-    let indexName: string;
-    if (options.name) {
-      indexName = options.name;
-    } else if (options.column) {
-      const cols = Array.isArray(options.column) ? options.column : [options.column];
-      indexName = `index_${tableName}_on_${cols.join("_and_")}`;
-    } else {
-      throw new Error("Must specify either name or column for remove_index");
-    }
-
-    const adp = detectAdapterName(this.adapter);
-    if (adp === "mysql") {
-      await this.adapter.executeMutation(`DROP INDEX \`${indexName}\` ON \`${tableName}\``);
-    } else {
-      await this.adapter.executeMutation(`DROP INDEX IF EXISTS "${indexName}"`);
-    }
+    await this.schema.removeIndex(tableName, options);
   }
 
-  /**
-   * Change a column's type or options.
-   *
-   * Mirrors: ActiveRecord::Migration#change_column
-   */
   async changeColumn(
     tableName: string,
     columnName: string,
@@ -338,61 +252,25 @@ export abstract class Migration {
       });
       return;
     }
-    const sqlType = this._sqlType(type, options);
-    const nullable = options.null === false ? " NOT NULL" : "";
-    const defaultClause = this._defaultClause(options.default);
-
-    if (this._adapterName === "mysql") {
-      await this.adapter.executeMutation(
-        `ALTER TABLE "${tableName}" MODIFY COLUMN "${columnName}" ${sqlType}${nullable}${defaultClause}`,
-      );
-    } else {
-      await this.adapter.executeMutation(
-        `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" TYPE ${sqlType}${nullable}${defaultClause}`,
-      );
-    }
+    await this.schema.changeColumn(tableName, columnName, type, options);
   }
 
-  /**
-   * Rename a table.
-   *
-   * Mirrors: ActiveRecord::Migration#rename_table
-   */
   async renameTable(oldName: string, newName: string): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "renameTable", args: [oldName, newName] });
       return;
     }
-    await this.adapter.executeMutation(`ALTER TABLE "${oldName}" RENAME TO "${newName}"`);
+    await this.schema.renameTable(oldName, newName);
   }
 
-  /**
-   * Check if a table exists.
-   *
-   * Mirrors: ActiveRecord::Migration#table_exists?
-   */
   async tableExists(tableName: string): Promise<boolean> {
-    const rows = await this.adapter.execute(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}'`,
-    );
-    return rows.length > 0;
+    return this.schema.tableExists(tableName);
   }
 
-  /**
-   * Check if a column exists on a table.
-   *
-   * Mirrors: ActiveRecord::Migration#column_exists?
-   */
   async columnExists(tableName: string, columnName: string): Promise<boolean> {
-    const rows = await this.adapter.execute(`PRAGMA table_info("${tableName}")`);
-    return rows.some((row: any) => row.name === columnName);
+    return this.schema.columnExists(tableName, columnName);
   }
 
-  /**
-   * Change the default value of a column.
-   *
-   * Mirrors: ActiveRecord::Migration#change_column_default
-   */
   async changeColumnDefault(
     tableName: string,
     columnName: string,
@@ -405,45 +283,25 @@ export abstract class Migration {
       });
       return;
     }
-    const defaultVal =
-      typeof options === "object" && options !== null && "to" in (options as any)
-        ? (options as any).to
-        : options;
-    const clause = this._defaultClause(defaultVal);
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" SET${clause || " DEFAULT NULL"}`,
-    );
+    await this.schema.changeColumnDefault(tableName, columnName, options);
   }
 
-  /**
-   * Change whether a column allows NULL.
-   *
-   * Mirrors: ActiveRecord::Migration#change_column_null
-   */
   async changeColumnNull(
     tableName: string,
     columnName: string,
     allowNull: boolean,
-    _defaultValue?: unknown,
+    defaultValue?: unknown,
   ): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({
         method: "changeColumnNull",
-        args: [tableName, columnName, allowNull, _defaultValue],
+        args: [tableName, columnName, allowNull, defaultValue],
       });
       return;
     }
-    const constraint = allowNull ? "DROP NOT NULL" : "SET NOT NULL";
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" ${constraint}`,
-    );
+    await this.schema.changeColumnNull(tableName, columnName, allowNull, defaultValue);
   }
 
-  /**
-   * Add a reference (foreign key column + index).
-   *
-   * Mirrors: ActiveRecord::Migration#add_reference
-   */
   async addReference(
     tableName: string,
     refName: string,
@@ -458,22 +316,9 @@ export abstract class Migration {
       this._recordedOps.push({ method: "addReference", args: [tableName, refName, options] });
       return;
     }
-    const colType = options.type ?? "integer";
-    await this.addColumn(tableName, `${refName}_id`, colType, options);
-    if (options.polymorphic) {
-      await this.addColumn(tableName, `${refName}_type`, "string", options);
-    }
-    if (options.index !== false) {
-      const cols = options.polymorphic ? [`${refName}_id`, `${refName}_type`] : [`${refName}_id`];
-      await this.addIndex(tableName, cols);
-    }
+    await this.schema.addReference(tableName, refName, options);
   }
 
-  /**
-   * Remove a reference (foreign key column + index).
-   *
-   * Mirrors: ActiveRecord::Migration#remove_reference
-   */
   async removeReference(
     tableName: string,
     refName: string,
@@ -483,17 +328,9 @@ export abstract class Migration {
       this._recordedOps.push({ method: "removeReference", args: [tableName, refName, options] });
       return;
     }
-    if (options.polymorphic) {
-      await this.removeColumn(tableName, `${refName}_type`);
-    }
-    await this.removeColumn(tableName, `${refName}_id`);
+    await this.schema.removeReference(tableName, refName, options);
   }
 
-  /**
-   * Add a foreign key constraint.
-   *
-   * Mirrors: ActiveRecord::Migration#add_foreign_key
-   */
   async addForeignKey(
     fromTable: string,
     toTable: string,
@@ -503,19 +340,9 @@ export abstract class Migration {
       this._recordedOps.push({ method: "addForeignKey", args: [fromTable, toTable, options] });
       return;
     }
-    const column = options.column ?? `${toTable.replace(/s$/, "")}_id`;
-    const pk = options.primaryKey ?? "id";
-    const name = options.name ?? `fk_${fromTable}_${column}`;
-    await this.adapter.executeMutation(
-      `ALTER TABLE "${fromTable}" ADD CONSTRAINT "${name}" FOREIGN KEY ("${column}") REFERENCES "${toTable}" ("${pk}")`,
-    );
+    await this.schema.addForeignKey(fromTable, toTable, options);
   }
 
-  /**
-   * Remove a foreign key constraint.
-   *
-   * Mirrors: ActiveRecord::Migration#remove_foreign_key
-   */
   async removeForeignKey(
     fromTable: string,
     toTableOrOptions?: string | { column?: string; name?: string },
@@ -524,142 +351,75 @@ export abstract class Migration {
       this._recordedOps.push({ method: "removeForeignKey", args: [fromTable, toTableOrOptions] });
       return;
     }
-    let name: string;
-    if (typeof toTableOrOptions === "string") {
-      const column = `${toTableOrOptions.replace(/s$/, "")}_id`;
-      name = `fk_${fromTable}_${column}`;
-    } else if (toTableOrOptions?.name) {
-      name = toTableOrOptions.name;
-    } else if (toTableOrOptions?.column) {
-      name = `fk_${fromTable}_${toTableOrOptions.column}`;
-    } else {
-      throw new Error("removeForeignKey requires a target table or options");
-    }
-    await this.adapter.executeMutation(`ALTER TABLE "${fromTable}" DROP CONSTRAINT "${name}"`);
+    await this.schema.removeForeignKey(fromTable, toTableOrOptions);
   }
 
-  /**
-   * Add timestamp columns (created_at, updated_at).
-   *
-   * Mirrors: ActiveRecord::Migration#add_timestamps
-   */
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addTimestamps", args: [tableName, options] });
       return;
     }
-    const nullable = options.null !== undefined ? options.null : false;
-    await this.addColumn(tableName, "created_at", "datetime", { null: nullable });
-    await this.addColumn(tableName, "updated_at", "datetime", { null: nullable });
+    await this.schema.addTimestamps(tableName, options);
   }
 
-  /**
-   * Remove timestamp columns.
-   *
-   * Mirrors: ActiveRecord::Migration#remove_timestamps
-   */
   async removeTimestamps(tableName: string): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "removeTimestamps", args: [tableName] });
       return;
     }
-    await this.removeColumn(tableName, "created_at");
-    await this.removeColumn(tableName, "updated_at");
+    await this.schema.removeTimestamps(tableName);
   }
 
-  /**
-   * Create a join table.
-   *
-   * Mirrors: ActiveRecord::Migration#create_join_table
-   */
   async createJoinTable(
     table1: string,
     table2: string,
     options?: { tableName?: string } | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
-    let opts: { tableName?: string } = {};
-    let definer: ((t: TableDefinition) => void) | undefined;
-    if (typeof options === "function") {
-      definer = options;
-    } else if (options) {
-      opts = options;
-      definer = fn;
+    if (this._recording) {
+      this._recordedOps.push({ method: "createJoinTable", args: [table1, table2, options, fn] });
+      return;
     }
-    const tableName = opts.tableName ?? [table1, table2].sort().join("_");
-    await this.createTable(tableName, { id: false }, (t) => {
-      t.integer(`${table1.replace(/s$/, "")}_id`);
-      t.integer(`${table2.replace(/s$/, "")}_id`);
-      if (definer) definer(t);
-    });
+    await this.schema.createJoinTable(table1, table2, options, fn);
   }
 
-  /**
-   * Drop a join table.
-   *
-   * Mirrors: ActiveRecord::Migration#drop_join_table
-   */
   async dropJoinTable(
     table1: string,
     table2: string,
     options?: { tableName?: string },
   ): Promise<void> {
-    const tableName = options?.tableName ?? [table1, table2].sort().join("_");
-    await this.dropTable(tableName);
+    if (this._recording) {
+      this._recordedOps.push({ method: "dropJoinTable", args: [table1, table2, options] });
+      return;
+    }
+    await this.schema.dropJoinTable(table1, table2, options);
   }
 
-  /**
-   * Modify an existing table.
-   *
-   * Mirrors: ActiveRecord::Migration#change_table
-   */
-  async changeTable(
-    tableName: string,
-    fn?: (t: ChangeTableProxy) => void | Promise<void>,
-  ): Promise<void> {
-    const proxy = new ChangeTableProxy(tableName, this);
-    if (fn) await fn(proxy);
+  async changeTable(tableName: string, fn?: (t: Table) => void | Promise<void>): Promise<void> {
+    // Build Table against Migration (not SchemaStatements) so that
+    // per-operation recording in addColumn/removeColumn/etc. still applies
+    const table = new Table(tableName, this);
+    if (fn) await fn(table);
   }
 
-  /**
-   * Rename an index.
-   *
-   * Mirrors: ActiveRecord::Migration#rename_index
-   */
   async renameIndex(_tableName: string, oldName: string, newName: string): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "renameIndex", args: [_tableName, oldName, newName] });
       return;
     }
-    await this.adapter.executeMutation(`ALTER INDEX "${oldName}" RENAME TO "${newName}"`);
+    await this.schema.renameIndex(_tableName, oldName, newName);
   }
 
-  /**
-   * Generate an index name from table and options.
-   *
-   * Mirrors: ActiveRecord::Migration#index_name
-   */
   indexName(tableName: string, options: { column?: string | string[] }): string {
-    const cols = Array.isArray(options.column) ? options.column : [options.column ?? ""];
-    return `index_${tableName}_on_${cols.join("_and_")}`;
+    return this.schema.indexName(tableName, options);
   }
 
-  /**
-   * Remove multiple columns from a table.
-   *
-   * Mirrors: ActiveRecord::Migration#remove_columns
-   */
   async removeColumns(tableName: string, ...columns: string[]): Promise<void> {
     for (const col of columns) {
       await this.removeColumn(tableName, col);
     }
   }
 
-  /**
-   * Add multiple columns to a table.
-   *
-   * Mirrors: ActiveRecord::Migration#add_columns (via change_table)
-   */
   async addColumns(
     tableName: string,
     ...columns: Array<{ name: string; type: ColumnType; options?: ColumnOptions }>
@@ -669,94 +429,34 @@ export abstract class Migration {
     }
   }
 
-  /**
-   * Get column information for a table.
-   *
-   * Mirrors: ActiveRecord::Migration#columns
-   */
   async columns(
     tableName: string,
   ): Promise<Array<{ name: string; type: string; null: boolean; default: unknown }>> {
-    const rows = await this.adapter.execute(`PRAGMA table_info("${tableName}")`);
-    return rows.map((row: any) => ({
-      name: row.name,
-      type: row.type,
-      null: row.notnull === 0,
-      default: row.dflt_value,
-    }));
+    return this.schema.columns(tableName);
   }
 
-  /**
-   * Get indexes for a table.
-   *
-   * Mirrors: ActiveRecord::Migration#indexes
-   */
   async indexes(
     tableName: string,
   ): Promise<Array<{ name: string; columns: string[]; unique: boolean }>> {
-    const rows = await this.adapter.execute(`PRAGMA index_list("${tableName}")`);
-    const result: Array<{ name: string; columns: string[]; unique: boolean }> = [];
-    for (const row of rows as any[]) {
-      const cols = await this.adapter.execute(`PRAGMA index_info("${row.name}")`);
-      result.push({
-        name: row.name,
-        columns: (cols as any[]).map((c: any) => c.name),
-        unique: row.unique === 1,
-      });
-    }
-    return result;
+    return this.schema.indexes(tableName);
   }
 
-  /**
-   * Get the primary key column for a table.
-   *
-   * Mirrors: ActiveRecord::Migration#primary_key
-   */
   async primaryKey(tableName: string): Promise<string | null> {
-    const rows = await this.adapter.execute(`PRAGMA table_info("${tableName}")`);
-    const pk = (rows as any[]).find((r: any) => r.pk > 0);
-    return pk ? pk.name : null;
+    return this.schema.primaryKey(tableName);
   }
 
-  /**
-   * Get foreign keys for a table.
-   *
-   * Mirrors: ActiveRecord::Migration#foreign_keys
-   */
   async foreignKeys(
     tableName: string,
   ): Promise<Array<{ from: string; to: string; column: string; primaryKey: string }>> {
-    const rows = await this.adapter.execute(`PRAGMA foreign_key_list("${tableName}")`);
-    return (rows as any[]).map((row: any) => ({
-      from: tableName,
-      to: row.table,
-      column: row.from,
-      primaryKey: row.to,
-    }));
+    return this.schema.foreignKeys(tableName);
   }
 
-  /**
-   * List all tables.
-   *
-   * Mirrors: ActiveRecord::Migration#tables
-   */
   async tables(): Promise<string[]> {
-    const rows = await this.adapter.execute(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
-    );
-    return (rows as any[]).map((r: any) => r.name);
+    return this.schema.tables();
   }
 
-  /**
-   * List all views.
-   *
-   * Mirrors: ActiveRecord::Migration#views
-   */
   async views(): Promise<string[]> {
-    const rows = await this.adapter.execute(
-      `SELECT name FROM sqlite_master WHERE type='view' ORDER BY name`,
-    );
-    return (rows as any[]).map((r: any) => r.name);
+    return this.schema.views();
   }
 
   /**
@@ -848,43 +548,16 @@ export abstract class Migration {
     return this._recording;
   }
 
-  /**
-   * Check if a view exists.
-   *
-   * Mirrors: ActiveRecord::Migration#view_exists?
-   */
   async isViewExists(viewName: string): Promise<boolean> {
-    const rows = await this.adapter.execute(
-      `SELECT name FROM sqlite_master WHERE type='view' AND name='${viewName}'`,
-    );
-    return rows.length > 0;
+    return this.schema.viewExists(viewName);
   }
 
-  /**
-   * Check if an index exists on a table.
-   *
-   * Mirrors: ActiveRecord::Migration#index_exists?
-   */
   async isIndexExists(
     tableName: string,
     columnName: string | string[],
-    _options?: { unique?: boolean; name?: string },
+    options?: { unique?: boolean; name?: string },
   ): Promise<boolean> {
-    const indexList = await this.adapter.execute(`PRAGMA index_list("${tableName}")`);
-    const targetCols = Array.isArray(columnName) ? columnName : [columnName];
-    for (const idx of indexList as any[]) {
-      if (_options?.name && idx.name !== _options.name) continue;
-      if (_options?.unique !== undefined && (idx.unique === 1) !== _options.unique) continue;
-      const colInfo = await this.adapter.execute(`PRAGMA index_info("${idx.name}")`);
-      const indexCols = (colInfo as any[]).map((c: any) => c.name);
-      if (
-        targetCols.length === indexCols.length &&
-        targetCols.every((c, i) => c === indexCols[i])
-      ) {
-        return true;
-      }
-    }
-    return false;
+    return this.schema.indexExists(tableName, columnName, options);
   }
 
   /**
@@ -913,103 +586,6 @@ export abstract class Migration {
    */
   get version(): string {
     return (this.constructor as any).version ?? this.constructor.name;
-  }
-
-  private _sqlType(type: ColumnType, options: ColumnOptions): string {
-    switch (type) {
-      case "string":
-        return `VARCHAR(${options.limit ?? 255})`;
-      case "text":
-        return "TEXT";
-      case "integer":
-        return "INTEGER";
-      case "float":
-        return this._adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL";
-      case "decimal":
-        return `DECIMAL(${options.precision ?? 10}, ${options.scale ?? 0})`;
-      case "boolean":
-        return "BOOLEAN";
-      case "date":
-        return "DATE";
-      case "datetime":
-      case "timestamp":
-        return this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
-      case "binary":
-        return this._adapterName === "postgres" ? "BYTEA" : "BLOB";
-      case "json":
-        return "JSON";
-      case "jsonb":
-        return this._adapterName === "postgres" ? "JSONB" : "JSON";
-      case "primary_key":
-        if (this._adapterName === "postgres") return "SERIAL PRIMARY KEY";
-        if (this._adapterName === "mysql") return "INT AUTO_INCREMENT PRIMARY KEY";
-        return "INTEGER PRIMARY KEY AUTOINCREMENT";
-    }
-  }
-
-  private _defaultClause(defaultValue: unknown): string {
-    return quoteDefaultExpression(defaultValue);
-  }
-}
-
-/**
- * ChangeTableProxy — used inside changeTable blocks.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Table
- */
-class ChangeTableProxy {
-  constructor(
-    private _tableName: string,
-    private _migration: Migration,
-  ) {}
-
-  async string(name: string, options: ColumnOptions = {}): Promise<void> {
-    await (this._migration as any).addColumn(this._tableName, name, "string", options);
-  }
-  async text(name: string, options: ColumnOptions = {}): Promise<void> {
-    await (this._migration as any).addColumn(this._tableName, name, "text", options);
-  }
-  async integer(name: string, options: ColumnOptions = {}): Promise<void> {
-    await (this._migration as any).addColumn(this._tableName, name, "integer", options);
-  }
-  async float(name: string, options: ColumnOptions = {}): Promise<void> {
-    await (this._migration as any).addColumn(this._tableName, name, "float", options);
-  }
-  async decimal(name: string, options: ColumnOptions = {}): Promise<void> {
-    await (this._migration as any).addColumn(this._tableName, name, "decimal", options);
-  }
-  async boolean(name: string, options: ColumnOptions = {}): Promise<void> {
-    await (this._migration as any).addColumn(this._tableName, name, "boolean", options);
-  }
-  async date(name: string, options: ColumnOptions = {}): Promise<void> {
-    await (this._migration as any).addColumn(this._tableName, name, "date", options);
-  }
-  async datetime(name: string, options: ColumnOptions = {}): Promise<void> {
-    await (this._migration as any).addColumn(this._tableName, name, "datetime", options);
-  }
-  async remove(name: string): Promise<void> {
-    await (this._migration as any).removeColumn(this._tableName, name);
-  }
-  async rename(oldName: string, newName: string): Promise<void> {
-    await (this._migration as any).renameColumn(this._tableName, oldName, newName);
-  }
-  async index(
-    columns: string | string[],
-    options?: { unique?: boolean; name?: string },
-  ): Promise<void> {
-    await (this._migration as any).addIndex(this._tableName, columns, options);
-  }
-  async removeIndex(options: { column?: string | string[]; name?: string }): Promise<void> {
-    await (this._migration as any).removeIndex(this._tableName, options);
-  }
-  async references(
-    name: string,
-    options?: ColumnOptions & { polymorphic?: boolean; foreignKey?: boolean },
-  ): Promise<void> {
-    await (this._migration as any).addReference(this._tableName, name, options);
-  }
-  async timestamps(options?: ColumnOptions): Promise<void> {
-    await (this._migration as any).addTimestamps(this._tableName, options);
   }
 }
 

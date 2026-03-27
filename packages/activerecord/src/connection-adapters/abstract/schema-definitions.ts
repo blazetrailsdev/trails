@@ -241,3 +241,103 @@ export class TableDefinition {
     return `CREATE TABLE ${quoteTableName(this.tableName, this._adapterName)} (${columnDefs.join(", ")})`;
   }
 }
+
+/**
+ * Table — proxy for modifying an existing table inside a changeTable block.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Table
+ */
+export class Table {
+  constructor(
+    private _tableName: string,
+    private _schema: SchemaStatementsLike,
+  ) {}
+
+  async string(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "string", options);
+  }
+  async text(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "text", options);
+  }
+  async integer(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "integer", options);
+  }
+  async float(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "float", options);
+  }
+  async decimal(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "decimal", options);
+  }
+  async boolean(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "boolean", options);
+  }
+  async date(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "date", options);
+  }
+  async datetime(name: string, options: ColumnOptions = {}): Promise<void> {
+    await this._schema.addColumn(this._tableName, name, "datetime", options);
+  }
+  async remove(name: string): Promise<void> {
+    await this._schema.removeColumn(this._tableName, name);
+  }
+  async rename(oldName: string, newName: string): Promise<void> {
+    await this._schema.renameColumn(this._tableName, oldName, newName);
+  }
+  async index(
+    columns: string | string[],
+    options?: { unique?: boolean; name?: string },
+  ): Promise<void> {
+    await this._schema.addIndex(this._tableName, columns, options);
+  }
+  async removeIndex(options: { column?: string | string[]; name?: string }): Promise<void> {
+    await this._schema.removeIndex(this._tableName, options);
+  }
+  async references(
+    name: string,
+    options?: ColumnOptions & { polymorphic?: boolean; foreignKey?: boolean },
+  ): Promise<void> {
+    await this._schema.addReference(this._tableName, name, options);
+  }
+  async timestamps(options?: ColumnOptions): Promise<void> {
+    await this._schema.addTimestamps(this._tableName, options);
+  }
+}
+
+/**
+ * Interface for the subset of SchemaStatements that Table needs.
+ * Avoids circular dependency between schema-definitions and schema-statements.
+ */
+export interface SchemaStatementsLike {
+  addColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options?: ColumnOptions,
+  ): Promise<void>;
+  removeColumn(
+    tableName: string,
+    columnName: string,
+    options?: { ifExists?: boolean },
+  ): Promise<void>;
+  renameColumn(tableName: string, oldName: string, newName: string): Promise<void>;
+  addIndex(
+    tableName: string,
+    columns: string | string[],
+    options?: { unique?: boolean; name?: string },
+  ): Promise<void>;
+  removeIndex(
+    tableName: string,
+    options?: { column?: string | string[]; name?: string },
+  ): Promise<void>;
+  addReference(
+    tableName: string,
+    refName: string,
+    options?: ColumnOptions & {
+      polymorphic?: boolean;
+      foreignKey?: boolean;
+      type?: ColumnType;
+      index?: boolean;
+    },
+  ): Promise<void>;
+  addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
+}

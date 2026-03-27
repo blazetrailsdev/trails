@@ -2,7 +2,7 @@ export { Base } from "./base.js";
 export { Relation, Range } from "./relation.js";
 export type { DatabaseAdapter } from "./adapter.js";
 export { Migration, MigrationContext } from "./migration.js";
-export { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+export { TableDefinition, Table } from "./connection-adapters/abstract/schema-definitions.js";
 export type {
   ColumnType,
   ColumnOptions,
@@ -47,6 +47,7 @@ export { MysqlAdapter } from "./adapters/mysql-adapter.js";
 export { QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
 export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";
 export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
+export { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 export type {
   SchemaSource,
