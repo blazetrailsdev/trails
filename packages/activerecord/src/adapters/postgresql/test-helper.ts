@@ -1,6 +1,6 @@
 import { describe } from "vitest";
 import pg from "pg";
-import { PostgresAdapter } from "../postgres-adapter.js";
+import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 
 export const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
 
@@ -21,4 +21,4 @@ async function checkPg(): Promise<boolean> {
 pgAvailable = await checkPg();
 
 export const describeIfPg = pgAvailable ? describe : (describe.skip as typeof describe);
-export { PostgresAdapter };
+export { PostgreSQLAdapter };

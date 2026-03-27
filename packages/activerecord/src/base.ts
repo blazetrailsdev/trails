@@ -30,19 +30,19 @@ async function _loadAdapter(name: string): Promise<AdapterConstructor> {
   if (_adapterCache[name]) return _adapterCache[name];
   switch (name) {
     case "postgresql": {
-      const mod = await import("./adapters/postgres-adapter.js");
-      _adapterCache[name] = mod.PostgresAdapter;
-      return mod.PostgresAdapter;
+      const mod = await import("./adapters/postgresql-adapter.js");
+      _adapterCache[name] = mod.PostgreSQLAdapter;
+      return mod.PostgreSQLAdapter;
     }
     case "mysql": {
-      const mod = await import("./adapters/mysql-adapter.js");
-      _adapterCache[name] = mod.MysqlAdapter;
-      return mod.MysqlAdapter;
+      const mod = await import("./adapters/mysql2-adapter.js");
+      _adapterCache[name] = mod.Mysql2Adapter;
+      return mod.Mysql2Adapter;
     }
     case "sqlite": {
-      const mod = await import("./adapters/sqlite-adapter.js");
-      _adapterCache[name] = mod.SqliteAdapter;
-      return mod.SqliteAdapter;
+      const mod = await import("./adapters/sqlite3-adapter.js");
+      _adapterCache[name] = mod.SQLite3Adapter;
+      return mod.SQLite3Adapter;
     }
     default:
       throw new Error(

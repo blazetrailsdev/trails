@@ -11,7 +11,7 @@ import type { DatabaseAdapter } from "../adapter.js";
  * Accepts either a connection string (`postgres://...`) or a `pg.PoolConfig`
  * object. Uses a connection pool internally for concurrent access.
  */
-export class PostgresAdapter implements DatabaseAdapter {
+export class PostgreSQLAdapter implements DatabaseAdapter {
   private pool: pg.Pool;
   private _client: pg.PoolClient | null = null;
   private _inTransaction = false;
@@ -916,7 +916,7 @@ export class PostgresAdapter implements DatabaseAdapter {
     const { schema: newSchema } = this.parseSchemaQualifiedName(newName);
     if (newSchema) {
       throw new Error(
-        "PostgresAdapter#renameEnum does not support changing enum schema; pass an unqualified type name.",
+        "PostgreSQLAdapter#renameEnum does not support changing enum schema; pass an unqualified type name.",
       );
     }
     const { schema, table: enumName } = this.parseSchemaQualifiedName(name);

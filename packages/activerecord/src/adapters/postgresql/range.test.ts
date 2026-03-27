@@ -2,17 +2,17 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/range_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { parseRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
 
 const toInt = (s: string) => parseInt(s, 10);
 const toFloat = (s: string) => parseFloat(s);
 
-describeIfPg("PostgresAdapter", () => {
-  let adapter: PostgresAdapter;
+describeIfPg("PostgreSQLAdapter", () => {
+  let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgresAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
     await adapter.exec(`
       CREATE TABLE postgresql_ranges (

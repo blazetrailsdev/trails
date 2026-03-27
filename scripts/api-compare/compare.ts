@@ -329,10 +329,95 @@ function main() {
       byFile.set(file, list);
     }
 
-    // Track which TS classes have been consumed (to avoid double-matching
-    // when two Ruby FQNs share the same short name, e.g., Base)
+    // Two-pass matching to avoid false "misplaced" reports when multiple Ruby
+    // classes share the same short name (e.g., Associations::Association vs
+    // Preloader::Association). Pass 1 claims exact-file matches; pass 2 does
+    // fallback (misplaced) matching on what remains.
     const consumedTs = new Set<string>(); // "name:file" keys
 
+    // Pre-compute per-item: expected TS file + candidate names
+    interface ItemWithMeta {
+      item: (typeof allRuby)[0];
+      rubyFile: string;
+      expectedTs: string;
+      candidates: string[];
+    }
+    const allItems: ItemWithMeta[] = [];
+    const itemToMeta = new Map<object, ItemWithMeta>();
+    for (const [rubyFile, items] of byFile.entries()) {
+      const expectedTs = rubyFileToTs(rubyFile);
+      for (const item of items) {
+        const meta: ItemWithMeta = {
+          item,
+          rubyFile,
+          expectedTs,
+          candidates: candidateNames(item.fqn),
+        };
+        allItems.push(meta);
+        itemToMeta.set(item, meta);
+      }
+    }
+
+    // Pass 1: exact-file matches only
+    const matchResults = new Map<
+      ItemWithMeta,
+      {
+        status: ClassStatus;
+        matchedName: string;
+        actualFile: string | null;
+        tsClass: ClassInfo | null;
+      }
+    >();
+
+    for (const meta of allItems) {
+      let matched = false;
+      for (const candidate of meta.candidates) {
+        const entries = tsClassesByName.get(candidate) || [];
+        const inExpected = entries.find(
+          (e) => e.file === meta.expectedTs && !consumedTs.has(`${candidate}:${e.file}`),
+        );
+        if (inExpected) {
+          consumedTs.add(`${candidate}:${meta.expectedTs}`);
+          matchResults.set(meta, {
+            status: "found",
+            matchedName: candidate,
+            actualFile: meta.expectedTs,
+            tsClass: inExpected.info,
+          });
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        matchResults.set(meta, {
+          status: "missing",
+          matchedName: "",
+          actualFile: null,
+          tsClass: null,
+        });
+      }
+    }
+
+    // Pass 2: for still-unmatched items, try fallback (misplaced) matching
+    for (const meta of allItems) {
+      const result = matchResults.get(meta)!;
+      if (result.status !== "missing") continue;
+
+      for (const candidate of meta.candidates) {
+        const entries = tsClassesByName.get(candidate) || [];
+        const inAny = entries.find((e) => !consumedTs.has(`${candidate}:${e.file}`));
+        if (inAny) {
+          consumedTs.add(`${candidate}:${inAny.file}`);
+          result.status = "misplaced";
+          result.matchedName = candidate;
+          result.actualFile = inAny.file;
+          result.tsClass = inAny.info;
+          break;
+        }
+      }
+    }
+
+    // Aggregate results by file
     let totalFound = 0;
     let totalMisplaced = 0;
     let totalMissing = 0;
@@ -347,62 +432,17 @@ function main() {
       let fileMissing = 0;
 
       for (const item of items) {
-        const name = shortName(item.fqn);
-        const candidates = candidateNames(item.fqn);
+        const meta = itemToMeta.get(item)!;
+        const result = matchResults.get(meta)!;
+        const { status, matchedName, actualFile, tsClass } = result;
 
-        // Prefer a candidate that has an unconsumed entry in the expected file,
-        // and only fall back to any-unconsumed candidate.
-        let tsEntries: { file: string; info: ClassInfo }[] = [];
-        let matchedName = name;
-        let fallbackEntries: { file: string; info: ClassInfo }[] | null = null;
-        let fallbackName: string | null = null;
-        for (const candidate of candidates) {
-          const entries = tsClassesByName.get(candidate) || [];
-          const hasUnconsumedInExpected = entries.some(
-            (e) => e.file === expectedTs && !consumedTs.has(`${candidate}:${e.file}`),
-          );
-          if (hasUnconsumedInExpected) {
-            tsEntries = entries;
-            matchedName = candidate;
-            break;
-          }
-          const hasUnconsumed = entries.some((e) => !consumedTs.has(`${candidate}:${e.file}`));
-          if (hasUnconsumed && !fallbackEntries) {
-            fallbackEntries = entries;
-            fallbackName = candidate;
-          }
-        }
-        if (tsEntries.length === 0 && fallbackEntries && fallbackName) {
-          tsEntries = fallbackEntries;
-          matchedName = fallbackName;
-        }
-
-        // Prefer match in expected file, then any unconsumed match
-        const inExpected = tsEntries.find(
-          (e) => e.file === expectedTs && !consumedTs.has(`${matchedName}:${e.file}`),
-        );
-        const inAny = tsEntries.find((e) => !consumedTs.has(`${matchedName}:${e.file}`));
-
-        let status: ClassStatus;
-        let actualFile: string | null = null;
-        let tsClass: ClassInfo | null = null;
-
-        if (inExpected) {
-          status = "found";
-          actualFile = expectedTs;
-          tsClass = inExpected.info;
-          consumedTs.add(`${matchedName}:${expectedTs}`);
+        if (status === "found") {
           fileFound++;
           totalFound++;
-        } else if (inAny) {
-          status = "misplaced";
-          actualFile = inAny.file;
-          tsClass = inAny.info;
-          consumedTs.add(`${matchedName}:${inAny.file}`);
+        } else if (status === "misplaced") {
           fileMisplaced++;
           totalMisplaced++;
         } else {
-          status = "missing";
           fileMissing++;
           totalMissing++;
         }
@@ -443,7 +483,7 @@ function main() {
 
         classResults.push({
           rubyFqn: item.fqn,
-          rubyShortName: name,
+          rubyShortName: shortName(item.fqn),
           rubyFile,
           expectedTsFile: expectedTs,
           actualTsFile: actualFile,

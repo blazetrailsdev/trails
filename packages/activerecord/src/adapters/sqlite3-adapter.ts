@@ -6,7 +6,7 @@ import type { DatabaseAdapter } from "../adapter.js";
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter
  */
-export class SqliteAdapter implements DatabaseAdapter {
+export class SQLite3Adapter implements DatabaseAdapter {
   private db: Database.Database;
   private _inTransaction = false;
   private _savepointCounter = 0;

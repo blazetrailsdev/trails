@@ -2,12 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/serial_test.rb
  */
 import { describe, it, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
-describeIfPg("PostgresAdapter", () => {
-  let adapter: PostgresAdapter;
+describeIfPg("PostgreSQLAdapter", () => {
+  let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgresAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
     await adapter.close();

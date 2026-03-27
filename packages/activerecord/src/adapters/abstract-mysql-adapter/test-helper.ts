@@ -1,6 +1,6 @@
 import { describe } from "vitest";
 import mysql from "mysql2/promise";
-import { MysqlAdapter } from "../mysql-adapter.js";
+import { Mysql2Adapter } from "../mysql2-adapter.js";
 
 export const MYSQL_TEST_URL =
   process.env.MYSQL_TEST_URL ?? "mysql://root@localhost:3306/rails_js_test";
@@ -21,4 +21,4 @@ async function checkMysql(): Promise<boolean> {
 mysqlAvailable = await checkMysql();
 
 export const describeIfMysql = mysqlAvailable ? describe : (describe.skip as typeof describe);
-export { MysqlAdapter };
+export { Mysql2Adapter };

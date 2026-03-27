@@ -3,8 +3,8 @@ import { detectAdapterName } from "./adapter-name.js";
 
 describe("detectAdapterName", () => {
   it("returns postgres for PostgresAdapter", () => {
-    class PostgresAdapter {}
-    expect(detectAdapterName(new PostgresAdapter() as any)).toBe("postgres");
+    class PostgreSQLAdapter {}
+    expect(detectAdapterName(new PostgreSQLAdapter() as any)).toBe("postgres");
   });
 
   it("returns postgres for any class containing Postgres", () => {
@@ -13,8 +13,8 @@ describe("detectAdapterName", () => {
   });
 
   it("returns mysql for MysqlAdapter", () => {
-    class MysqlAdapter {}
-    expect(detectAdapterName(new MysqlAdapter() as any)).toBe("mysql");
+    class Mysql2Adapter {}
+    expect(detectAdapterName(new Mysql2Adapter() as any)).toBe("mysql");
   });
 
   it("returns mysql for MariaDB adapter", () => {

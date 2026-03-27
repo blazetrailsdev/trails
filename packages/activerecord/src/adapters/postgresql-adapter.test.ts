@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SqliteAdapter } from "./sqlite-adapter.js";
+import pg from "pg";
+import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 import {
   Base,
-  Migration,
   transaction,
   savepoint,
   registerModel,
@@ -10,29 +10,78 @@ import {
   loadHasMany,
 } from "../index.js";
 
-describe("SqliteAdapter", () => {
-  let adapter: SqliteAdapter;
+/**
+ * These tests require a running PostgreSQL instance. They will be skipped if
+ * the connection fails.
+ *
+ * Set PG_TEST_URL to a connection string, or the tests will default to:
+ *   postgres://localhost:5432/rails_js_test
+ *
+ * To set up:
+ *   createdb rails_js_test
+ */
+const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
 
-  beforeEach(() => {
-    adapter = new SqliteAdapter(":memory:");
+let pgAvailable = false;
+
+// Quick connectivity check
+async function checkPg(): Promise<boolean> {
+  try {
+    const client = new pg.Client({ connectionString: PG_TEST_URL });
+    await client.connect();
+    await client.query("SELECT 1");
+    await client.end();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+pgAvailable = await checkPg();
+
+const describeIfPg = pgAvailable ? describe : describe.skip;
+
+describeIfPg("PostgreSQLAdapter", () => {
+  let adapter: PostgreSQLAdapter;
+
+  beforeEach(async () => {
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
 
-  afterEach(() => {
-    adapter.close();
+  afterEach(async () => {
+    // Drop test tables to clean up
+    try {
+      await adapter.exec('DROP TABLE IF EXISTS "books" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "authors" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "users" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "items" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "accounts" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "products" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "posts" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "pk_test" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "no_pk_test" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "bind_test" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "quoting_test" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "schema_test_idx" CASCADE');
+    } catch {
+      // ignore cleanup errors
+    }
+    await adapter.close();
   });
 
   // -- Basic adapter operations --
   describe("raw SQL execution", () => {
     it("creates tables and inserts data", async () => {
-      adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec('DROP TABLE IF EXISTS "users" CASCADE');
+      await adapter.exec('CREATE TABLE "users" ("id" SERIAL PRIMARY KEY, "name" TEXT)');
       await adapter.executeMutation(`INSERT INTO "users" ("name") VALUES ('Alice')`);
-      const rows = await adapter.execute(`SELECT * FROM "users"`);
+      const rows = await adapter.execute('SELECT * FROM "users"');
       expect(rows).toHaveLength(1);
       expect(rows[0].name).toBe("Alice");
     });
 
-    it("returns last insert rowid for INSERT", async () => {
-      adapter.exec(`CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    it("returns last insert id for INSERT", async () => {
+      await adapter.exec('CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT)');
       const id1 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
       const id2 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
       expect(id1).toBe(1);
@@ -40,29 +89,42 @@ describe("SqliteAdapter", () => {
     });
 
     it("returns affected rows for UPDATE", async () => {
-      adapter.exec(
-        `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT, "active" INTEGER DEFAULT 1)`,
+      await adapter.exec(
+        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT, "active" INTEGER DEFAULT 1)',
       );
       await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
       await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
-      const affected = await adapter.executeMutation(`UPDATE "items" SET "active" = 0`);
+      const affected = await adapter.executeMutation('UPDATE "items" SET "active" = 0');
       expect(affected).toBe(2);
     });
 
     it("returns affected rows for DELETE", async () => {
-      adapter.exec(`CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec('CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT)');
       await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
       await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
       const deleted = await adapter.executeMutation(`DELETE FROM "items" WHERE "name" = 'A'`);
       expect(deleted).toBe(1);
     });
+
+    it("supports parameterized queries with ? binds", async () => {
+      await adapter.exec(
+        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT, "price" INTEGER)',
+      );
+      await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES ('A', 10)`);
+      await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES ('B', 20)`);
+      await adapter.executeMutation(`INSERT INTO "items" ("name", "price") VALUES ('C', 30)`);
+
+      // ? gets rewritten to $1
+      const rows = await adapter.execute('SELECT * FROM "items" WHERE "price" > ?', [15]);
+      expect(rows).toHaveLength(2);
+    });
   });
 
   // -- Transactions --
   describe("transactions", () => {
-    beforeEach(() => {
-      adapter.exec(
-        `CREATE TABLE "accounts" ("id" INTEGER PRIMARY KEY, "name" TEXT, "balance" INTEGER)`,
+    beforeEach(async () => {
+      await adapter.exec(
+        'CREATE TABLE "accounts" ("id" SERIAL PRIMARY KEY, "name" TEXT, "balance" INTEGER)',
       );
     });
 
@@ -76,7 +138,7 @@ describe("SqliteAdapter", () => {
       );
       await adapter.commit();
 
-      const rows = await adapter.execute(`SELECT * FROM "accounts"`);
+      const rows = await adapter.execute('SELECT * FROM "accounts"');
       expect(rows).toHaveLength(2);
     });
 
@@ -87,7 +149,7 @@ describe("SqliteAdapter", () => {
       );
       await adapter.rollback();
 
-      const rows = await adapter.execute(`SELECT * FROM "accounts"`);
+      const rows = await adapter.execute('SELECT * FROM "accounts"');
       expect(rows).toHaveLength(0);
     });
 
@@ -108,16 +170,24 @@ describe("SqliteAdapter", () => {
       );
       await adapter.commit();
 
-      const rows = await adapter.execute(`SELECT * FROM "accounts"`);
+      const rows = await adapter.execute('SELECT * FROM "accounts"');
       expect(rows).toHaveLength(2);
       const names = rows.map((r) => r.name);
       expect(names).toContain("Alice");
       expect(names).toContain("Charlie");
       expect(names).not.toContain("Bob");
     });
+
+    it("tracks inTransaction state", async () => {
+      expect(adapter.inTransaction).toBe(false);
+      await adapter.beginTransaction();
+      expect(adapter.inTransaction).toBe(true);
+      await adapter.commit();
+      expect(adapter.inTransaction).toBe(false);
+    });
   });
 
-  // -- ActiveRecord Base with real SQLite --
+  // -- ActiveRecord Base with real PostgreSQL --
   describe("Base integration", () => {
     class User extends Base {
       static {
@@ -127,10 +197,10 @@ describe("SqliteAdapter", () => {
       }
     }
 
-    beforeEach(() => {
-      adapter.exec(`
+    beforeEach(async () => {
+      await adapter.exec(`
         CREATE TABLE "users" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "id" SERIAL PRIMARY KEY,
           "name" TEXT,
           "email" TEXT,
           "age" INTEGER
@@ -180,16 +250,8 @@ describe("SqliteAdapter", () => {
     });
 
     it("findBy with multiple conditions", async () => {
-      await User.create({
-        name: "Alice",
-        email: "alice@test.com",
-        age: 30,
-      });
-      await User.create({
-        name: "Bob",
-        email: "bob@test.com",
-        age: 25,
-      });
+      await User.create({ name: "Alice", email: "alice@test.com", age: 30 });
+      await User.create({ name: "Bob", email: "bob@test.com", age: 25 });
 
       const found = await User.findBy({ name: "Bob", age: 25 });
       expect(found).not.toBeNull();
@@ -212,24 +274,9 @@ describe("SqliteAdapter", () => {
       expect(found.email).toBeNull();
       expect(found.age).toBeNull();
     });
-
-    it("reloads from database", async () => {
-      const user = await User.create({
-        name: "Original",
-        email: "test@test.com",
-        age: 20,
-      });
-
-      // Update via raw SQL
-      adapter.exec(`UPDATE "users" SET "name" = 'Modified' WHERE "id" = ${user.id}`);
-
-      expect(user.name).toBe("Original");
-      await user.reload();
-      expect(user.name).toBe("Modified");
-    });
   });
 
-  // -- Relation with real SQLite --
+  // -- Relation with real PostgreSQL --
   describe("Relation integration", () => {
     class Product extends Base {
       static {
@@ -240,9 +287,9 @@ describe("SqliteAdapter", () => {
     }
 
     beforeEach(async () => {
-      adapter.exec(`
+      await adapter.exec(`
         CREATE TABLE "products" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "id" SERIAL PRIMARY KEY,
           "name" TEXT,
           "price" INTEGER,
           "category" TEXT
@@ -323,90 +370,6 @@ describe("SqliteAdapter", () => {
     });
   });
 
-  // -- Migrations with real SQLite --
-  describe("Migration integration", () => {
-    it("creates tables with migrations", async () => {
-      class CreatePosts extends Migration {
-        async up() {
-          await this.createTable("posts", (t) => {
-            t.string("title", { null: false });
-            t.text("body");
-            t.integer("author_id");
-            t.boolean("published", { default: false });
-            t.timestamps();
-          });
-        }
-
-        async down() {
-          await this.dropTable("posts");
-        }
-      }
-
-      const migration = new CreatePosts();
-      await migration.run(adapter, "up");
-
-      // Verify table exists
-      const id = await adapter.executeMutation(
-        `INSERT INTO "posts" ("title", "body", "author_id", "published", "created_at", "updated_at") VALUES ('Test', 'Body', 1, 0, '2024-01-01', '2024-01-01')`,
-      );
-      expect(id).toBe(1);
-
-      const rows = await adapter.execute(`SELECT * FROM "posts"`);
-      expect(rows).toHaveLength(1);
-      expect(rows[0].title).toBe("Test");
-
-      // Rollback
-      await migration.run(adapter, "down");
-      await expect(adapter.execute(`SELECT * FROM "posts"`)).rejects.toThrow();
-    });
-
-    it("adds columns with migrations", async () => {
-      adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-
-      class AddEmailToUsers extends Migration {
-        async up() {
-          await this.addColumn("users", "email", "string");
-        }
-
-        async down() {
-          await this.removeColumn("users", "email");
-        }
-      }
-
-      const migration = new AddEmailToUsers();
-      await migration.run(adapter, "up");
-
-      await adapter.executeMutation(
-        `INSERT INTO "users" ("name", "email") VALUES ('Alice', 'alice@test.com')`,
-      );
-      const rows = await adapter.execute(`SELECT * FROM "users"`);
-      expect(rows[0].email).toBe("alice@test.com");
-    });
-
-    it("creates indexes", async () => {
-      adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "email" TEXT)`);
-
-      class AddEmailIndex extends Migration {
-        async up() {
-          await this.addIndex("users", "email", { unique: true });
-        }
-
-        async down() {
-          await this.removeIndex("users", { column: "email" });
-        }
-      }
-
-      const migration = new AddEmailIndex();
-      await migration.run(adapter, "up");
-
-      // Unique index should prevent duplicates
-      await adapter.executeMutation(`INSERT INTO "users" ("email") VALUES ('alice@test.com')`);
-      await expect(
-        adapter.executeMutation(`INSERT INTO "users" ("email") VALUES ('alice@test.com')`),
-      ).rejects.toThrow();
-    });
-  });
-
   // -- Transactions with real rollback --
   describe("transaction integration", () => {
     class Account extends Base {
@@ -416,10 +379,10 @@ describe("SqliteAdapter", () => {
       }
     }
 
-    beforeEach(() => {
-      adapter.exec(`
+    beforeEach(async () => {
+      await adapter.exec(`
         CREATE TABLE "accounts" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "id" SERIAL PRIMARY KEY,
           "name" TEXT,
           "balance" INTEGER DEFAULT 0
         )
@@ -451,7 +414,7 @@ describe("SqliteAdapter", () => {
       // Only the pre-transaction record should exist
       const count = await Account.all().count();
       expect(count).toBe(1);
-      const rows = await adapter.execute(`SELECT * FROM "accounts"`);
+      const rows = await adapter.execute('SELECT * FROM "accounts"');
       expect(rows[0].name).toBe("Existing");
     });
 
@@ -471,14 +434,14 @@ describe("SqliteAdapter", () => {
         await Account.create({ name: "Charlie", balance: 300 });
       });
 
-      const rows = await adapter.execute(`SELECT * FROM "accounts" ORDER BY "name"`);
+      const rows = await adapter.execute('SELECT * FROM "accounts" ORDER BY "name"');
       expect(rows).toHaveLength(2);
       expect(rows[0].name).toBe("Alice");
       expect(rows[1].name).toBe("Charlie");
     });
   });
 
-  // -- Associations with real SQLite --
+  // -- Associations with real PostgreSQL --
   describe("associations integration", () => {
     class Author extends Base {
       static {
@@ -493,16 +456,16 @@ describe("SqliteAdapter", () => {
       }
     }
 
-    beforeEach(() => {
-      adapter.exec(`
+    beforeEach(async () => {
+      await adapter.exec(`
         CREATE TABLE "authors" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "id" SERIAL PRIMARY KEY,
           "name" TEXT
         )
       `);
-      adapter.exec(`
+      await adapter.exec(`
         CREATE TABLE "books" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+          "id" SERIAL PRIMARY KEY,
           "title" TEXT,
           "author_id" INTEGER
         )
@@ -535,4 +498,55 @@ describe("SqliteAdapter", () => {
       expect(books).toHaveLength(2);
     });
   });
+
+  // -- PostgreSQL-specific features --
+  describe("PostgreSQL-specific features", () => {
+    it("handles SERIAL auto-increment correctly", async () => {
+      await adapter.exec('CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT)');
+
+      const id1 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('first')`);
+      const id2 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('second')`);
+      const id3 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('third')`);
+
+      expect(id1).toBe(1);
+      expect(id2).toBe(2);
+      expect(id3).toBe(3);
+    });
+
+    it("handles explicit RETURNING clause", async () => {
+      await adapter.exec(
+        'CREATE TABLE "items" ("id" SERIAL PRIMARY KEY, "name" TEXT, "code" TEXT)',
+      );
+
+      // executeMutation with explicit RETURNING should return the specified column
+      const result = await adapter.executeMutation(
+        `INSERT INTO "items" ("name", "code") VALUES ('test', 'ABC') RETURNING "id"`,
+      );
+      expect(result).toBe(1);
+    });
+
+    it("supports TEXT, INTEGER, BOOLEAN, REAL column types", async () => {
+      await adapter.exec(`
+        CREATE TABLE "items" (
+          "id" SERIAL PRIMARY KEY,
+          "name" TEXT,
+          "count" INTEGER,
+          "active" BOOLEAN,
+          "price" REAL
+        )
+      `);
+
+      await adapter.executeMutation(
+        `INSERT INTO "items" ("name", "count", "active", "price") VALUES ('Widget', 42, true, 9.99)`,
+      );
+
+      const rows = await adapter.execute('SELECT * FROM "items"');
+      expect(rows[0].name).toBe("Widget");
+      expect(rows[0].count).toBe(42);
+      expect(rows[0].active).toBe(true);
+      expect(rows[0].price).toBeCloseTo(9.99);
+    });
+  });
+
+  // ── Rails-matching test stubs ──
 });

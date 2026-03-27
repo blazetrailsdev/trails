@@ -9,7 +9,7 @@ import type { DatabaseAdapter } from "../adapter.js";
  * Accepts either a connection URI (`mysql://...`) or a `mysql2` pool config
  * object. Uses a connection pool internally for concurrent access.
  */
-export class MysqlAdapter implements DatabaseAdapter {
+export class Mysql2Adapter implements DatabaseAdapter {
   private pool: mysql.Pool;
   private _conn: mysql.PoolConnection | null = null;
   private _inTransaction = false;

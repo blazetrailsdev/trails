@@ -2,12 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_create_folder_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SqliteAdapter } from "../sqlite-adapter.js";
+import { SQLite3Adapter } from "../sqlite3-adapter.js";
 
-let adapter: SqliteAdapter;
+let adapter: SQLite3Adapter;
 
 beforeEach(() => {
-  adapter = new SqliteAdapter(":memory:");
+  adapter = new SQLite3Adapter(":memory:");
 });
 
 afterEach(() => {
@@ -23,7 +23,7 @@ describe("SQLite3CreateFolder", () => {
     const dir = path.join(os.tmpdir(), `sqlite-dir-test-${Date.now()}`);
     const dbPath = path.join(dir, "test.db");
     fs.mkdirSync(dir, { recursive: true });
-    const a = new SqliteAdapter(dbPath);
+    const a = new SQLite3Adapter(dbPath);
     expect(a.isOpen).toBe(true);
     a.close();
     fs.unlinkSync(dbPath);

@@ -2,13 +2,13 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/enum_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 
-describeIfPg("PostgresAdapter", () => {
-  let adapter: PostgresAdapter;
+describeIfPg("PostgreSQLAdapter", () => {
+  let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgresAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
     await adapter.exec(`DROP TYPE IF EXISTS "mood" CASCADE`);
     await adapter.createEnum("mood", ["sad", "ok", "happy"]);

@@ -117,12 +117,12 @@ describe("connectAdapter", () => {
 
   it("creates SqliteAdapter for sqlite3", async () => {
     adapter = await connectAdapter({ adapter: "sqlite3", database: ":memory:" });
-    expect(adapter.constructor.name).toBe("SqliteAdapter");
+    expect(adapter.constructor.name).toBe("SQLite3Adapter");
   });
 
   it("creates SqliteAdapter for sqlite", async () => {
     adapter = await connectAdapter({ adapter: "sqlite", database: ":memory:" });
-    expect(adapter.constructor.name).toBe("SqliteAdapter");
+    expect(adapter.constructor.name).toBe("SQLite3Adapter");
   });
 
   it("throws for unknown adapter", async () => {
@@ -244,8 +244,8 @@ describe("full migration flow", () => {
   });
 
   it("migrate, status, rollback with SQLite", async () => {
-    const { SqliteAdapter } = await import("@rails-ts/activerecord");
-    adapter = new SqliteAdapter(":memory:");
+    const { SQLite3Adapter } = await import("@rails-ts/activerecord");
+    adapter = new SQLite3Adapter(":memory:");
 
     fs.writeFileSync(
       path.join(tmpDir, "20260101000000-create-posts.ts"),
@@ -301,12 +301,12 @@ export class CreatePosts extends Migration {
 
 describe("schema dump and load", () => {
   it("dumps schema from SQLite and loads it into a fresh database", async () => {
-    const { SqliteAdapter, SchemaDumper, MigrationContext } =
+    const { SQLite3Adapter, SchemaDumper, MigrationContext } =
       await import("@rails-ts/activerecord");
     const { AdapterSchemaSource } = await import("../schema-source.js");
 
-    const sourceAdapter = new SqliteAdapter(":memory:");
-    const targetAdapter = new SqliteAdapter(":memory:");
+    const sourceAdapter = new SQLite3Adapter(":memory:");
+    const targetAdapter = new SQLite3Adapter(":memory:");
     try {
       // Create a database with a table
       const ctx = new MigrationContext(sourceAdapter);

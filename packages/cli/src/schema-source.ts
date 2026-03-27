@@ -8,10 +8,11 @@ function sqliteId(name: string): string {
 
 /** Detect adapter type via instanceof (falls back to constructor name for subclasses). */
 async function detectAdapter(adapter: DatabaseAdapter): Promise<"sqlite" | "postgres" | "mysql"> {
-  const { SqliteAdapter, PostgresAdapter, MysqlAdapter } = await import("@rails-ts/activerecord");
-  if (adapter instanceof PostgresAdapter) return "postgres";
-  if (adapter instanceof MysqlAdapter) return "mysql";
-  if (adapter instanceof SqliteAdapter) return "sqlite";
+  const { SQLite3Adapter, PostgreSQLAdapter, Mysql2Adapter } =
+    await import("@rails-ts/activerecord");
+  if (adapter instanceof PostgreSQLAdapter) return "postgres";
+  if (adapter instanceof Mysql2Adapter) return "mysql";
+  if (adapter instanceof SQLite3Adapter) return "sqlite";
   // Fallback for subclasses
   const name = adapter.constructor.name;
   if (name.includes("Postgres")) return "postgres";

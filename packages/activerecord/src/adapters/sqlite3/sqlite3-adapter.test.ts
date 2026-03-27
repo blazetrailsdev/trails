@@ -2,12 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_adapter_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SqliteAdapter } from "../sqlite-adapter.js";
+import { SQLite3Adapter } from "../sqlite3-adapter.js";
 
-let adapter: SqliteAdapter;
+let adapter: SQLite3Adapter;
 
 beforeEach(() => {
-  adapter = new SqliteAdapter(":memory:");
+  adapter = new SQLite3Adapter(":memory:");
 });
 
 afterEach(() => {
@@ -29,7 +29,7 @@ describe("SQLite3AdapterTest", () => {
     const nested = path.join(baseDir, "sub", "dir");
     fs.mkdirSync(nested, { recursive: true });
     const dbPath = path.join(nested, "test.db");
-    const a = new SqliteAdapter(dbPath);
+    const a = new SQLite3Adapter(dbPath);
     expect(a.isOpen).toBe(true);
     a.close();
     fs.rmSync(baseDir, { recursive: true, force: true });
@@ -41,20 +41,20 @@ describe("SQLite3AdapterTest", () => {
   });
 
   it("database exists returns true for an in memory db", () => {
-    const memAdapter = new SqliteAdapter(":memory:");
+    const memAdapter = new SQLite3Adapter(":memory:");
     expect(memAdapter).toBeDefined();
     memAdapter.close();
   });
 
   it("connect with url", () => {
     // better-sqlite3 doesn't use URLs, but we can open a :memory: db
-    const a = new SqliteAdapter(":memory:");
+    const a = new SQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
     a.close();
   });
 
   it("connect memory with url", () => {
-    const a = new SqliteAdapter(":memory:");
+    const a = new SQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
     a.close();
   });
@@ -99,7 +99,7 @@ describe("SQLite3AdapterTest", () => {
     const path = await import("path");
     expect(
       () =>
-        new SqliteAdapter(path.join(os.tmpdir(), "nonexistent-path-12345", "no.db"), {
+        new SQLite3Adapter(path.join(os.tmpdir(), "nonexistent-path-12345", "no.db"), {
           readonly: true,
         }),
     ).toThrow();
@@ -107,20 +107,20 @@ describe("SQLite3AdapterTest", () => {
 
   it("bad timeout", () => {
     // better-sqlite3 accepts timeout option; a negative value is accepted but harmless
-    const a = new SqliteAdapter(":memory:");
+    const a = new SQLite3Adapter(":memory:");
     expect(a).toBeDefined();
     a.close();
   });
 
   it("nil timeout", () => {
     // No timeout specified — default constructor works fine
-    const a = new SqliteAdapter(":memory:");
+    const a = new SQLite3Adapter(":memory:");
     expect(a).toBeDefined();
     a.close();
   });
 
   it("connect", () => {
-    const a = new SqliteAdapter(":memory:");
+    const a = new SQLite3Adapter(":memory:");
     expect(a).toBeDefined();
     a.close();
   });
@@ -490,20 +490,20 @@ describe("SQLite3AdapterTest", () => {
   });
 
   it("statement closed", () => {
-    const a = new SqliteAdapter(":memory:");
+    const a = new SQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
     a.close();
     expect(a.isOpen).toBe(false);
   });
 
   it("db is not readonly when readonly option is false", () => {
-    const a = new SqliteAdapter(":memory:", { readonly: false });
+    const a = new SQLite3Adapter(":memory:", { readonly: false });
     expect(a.isOpen).toBe(true);
     a.close();
   });
 
   it("db is not readonly when readonly option is unspecified", () => {
-    const a = new SqliteAdapter(":memory:");
+    const a = new SQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
     a.close();
   });
@@ -514,10 +514,10 @@ describe("SQLite3AdapterTest", () => {
     const path = await import("path");
     const os = await import("os");
     const tmpFile = path.join(os.tmpdir(), `sqlite-readonly-test-${Date.now()}.db`);
-    const writer = new SqliteAdapter(tmpFile);
+    const writer = new SQLite3Adapter(tmpFile);
     writer.exec(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     writer.close();
-    const reader = new SqliteAdapter(tmpFile, { readonly: true });
+    const reader = new SQLite3Adapter(tmpFile, { readonly: true });
     const rows = await reader.execute(`SELECT * FROM "test"`);
     expect(rows).toHaveLength(0);
     reader.close();
@@ -529,10 +529,10 @@ describe("SQLite3AdapterTest", () => {
     const path = await import("path");
     const os = await import("os");
     const tmpFile = path.join(os.tmpdir(), `sqlite-readonly-write-${Date.now()}.db`);
-    const writer = new SqliteAdapter(tmpFile);
+    const writer = new SQLite3Adapter(tmpFile);
     writer.exec(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     writer.close();
-    const reader = new SqliteAdapter(tmpFile, { readonly: true });
+    const reader = new SQLite3Adapter(tmpFile, { readonly: true });
     await expect(
       reader.executeMutation(`INSERT INTO "test" ("name") VALUES ('fail')`),
     ).rejects.toThrow();

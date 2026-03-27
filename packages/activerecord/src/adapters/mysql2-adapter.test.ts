@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import mysql from "mysql2/promise";
-import { MysqlAdapter } from "./mysql-adapter.js";
+import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { Base, transaction, registerModel, loadBelongsTo, loadHasMany } from "../index.js";
 
 /**
@@ -32,11 +32,11 @@ mysqlAvailable = await checkMysql();
 
 const describeIfMysql = mysqlAvailable ? describe : describe.skip;
 
-describeIfMysql("MysqlAdapter", () => {
-  let adapter: MysqlAdapter;
+describeIfMysql("Mysql2Adapter", () => {
+  let adapter: Mysql2Adapter;
 
   beforeEach(async () => {
-    adapter = new MysqlAdapter(MYSQL_TEST_URL);
+    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
   });
 
   afterEach(async () => {

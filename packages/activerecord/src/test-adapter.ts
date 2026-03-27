@@ -2,9 +2,9 @@
  * Shared test adapter factory.
  *
  * Returns the appropriate adapter based on environment variables:
- *   - PG_TEST_URL    → PostgresAdapter (wrapped in SchemaAdapter)
- *   - MYSQL_TEST_URL → MysqlAdapter (wrapped in SchemaAdapter)
- *   - (default)      → SqliteAdapter (:memory:)
+ *   - PG_TEST_URL    → PostgreSQLAdapter (wrapped in SchemaAdapter)
+ *   - MYSQL_TEST_URL → Mysql2Adapter (wrapped in SchemaAdapter)
+ *   - (default)      → SQLite3Adapter (:memory:)
  *
  * For real database adapters, a single shared connection pool is reused
  * across all test adapters to avoid exhausting database connections.
@@ -233,8 +233,8 @@ async function dropAllTables(inner: any): Promise<void> {
 let _factory: () => DatabaseAdapter;
 
 if (PG_TEST_URL) {
-  const { PostgresAdapter } = await import("./adapters/postgres-adapter.js");
-  _sharedAdapter = new PostgresAdapter(PG_TEST_URL);
+  const { PostgreSQLAdapter } = await import("./adapters/postgresql-adapter.js");
+  _sharedAdapter = new PostgreSQLAdapter(PG_TEST_URL);
   const rows = await _sharedAdapter.execute(
     `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,
   );
@@ -245,8 +245,8 @@ if (PG_TEST_URL) {
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else if (MYSQL_TEST_URL) {
-  const { MysqlAdapter } = await import("./adapters/mysql-adapter.js");
-  _sharedAdapter = new MysqlAdapter(MYSQL_TEST_URL);
+  const { Mysql2Adapter } = await import("./adapters/mysql2-adapter.js");
+  _sharedAdapter = new Mysql2Adapter(MYSQL_TEST_URL);
   const rows = await _sharedAdapter.execute(`SHOW TABLES`);
   for (const r of rows) {
     const table = Object.values(r)[0] as string;
@@ -256,8 +256,8 @@ if (PG_TEST_URL) {
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else {
-  const { SqliteAdapter } = await import("./adapters/sqlite-adapter.js");
-  _sharedAdapter = new SqliteAdapter(":memory:");
+  const { SQLite3Adapter } = await import("./adapters/sqlite3-adapter.js");
+  _sharedAdapter = new SQLite3Adapter(":memory:");
   _factory = () => new SchemaAdapter(_sharedAdapter);
 }
 

@@ -2,12 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/postgresql_adapter_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
-describeIfPg("PostgresAdapter", () => {
-  let adapter: PostgresAdapter;
+describeIfPg("PostgreSQLAdapter", () => {
+  let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgresAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
     // Clean up test tables
@@ -450,7 +450,7 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("bad connection to postgres database", async () => {
-      const bad = new PostgresAdapter("postgres://localhost:59999/nonexistent");
+      const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
       await expect(bad.execute("SELECT 1")).rejects.toThrow();
       await bad.close();
     });
@@ -669,7 +669,7 @@ describeIfPg("PostgresAdapter", () => {
       }
     });
     it("connection error", async () => {
-      const bad = new PostgresAdapter("postgres://localhost:59999/nonexistent");
+      const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
       await expect(bad.execute("SELECT 1")).rejects.toThrow();
       await bad.close();
     });
@@ -717,7 +717,7 @@ describeIfPg("PostgresAdapter", () => {
     });
 
     it("bad connection", async () => {
-      const bad = new PostgresAdapter("postgres://localhost:59999/nonexistent");
+      const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
       await expect(bad.execute("SELECT 1")).rejects.toThrow();
       await bad.close();
     });

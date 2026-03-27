@@ -88,16 +88,16 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
   switch (adapter) {
     case "sqlite3":
     case "sqlite": {
-      const { SqliteAdapter } = await import("@rails-ts/activerecord");
-      return new SqliteAdapter(config.database ?? ":memory:");
+      const { SQLite3Adapter } = await import("@rails-ts/activerecord");
+      return new SQLite3Adapter(config.database ?? ":memory:");
     }
     case "postgresql":
     case "postgres": {
-      const { PostgresAdapter } = await import("@rails-ts/activerecord");
+      const { PostgreSQLAdapter } = await import("@rails-ts/activerecord");
       if (config.url) {
-        return new PostgresAdapter(config.url);
+        return new PostgreSQLAdapter(config.url);
       }
-      return new PostgresAdapter({
+      return new PostgreSQLAdapter({
         host: config.host ?? "localhost",
         port: config.port ?? 5432,
         database: config.database,
@@ -107,11 +107,11 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
     }
     case "mysql2":
     case "mysql": {
-      const { MysqlAdapter } = await import("@rails-ts/activerecord");
+      const { Mysql2Adapter } = await import("@rails-ts/activerecord");
       if (config.url) {
-        return new MysqlAdapter(config.url);
+        return new Mysql2Adapter(config.url);
       }
-      return new MysqlAdapter({
+      return new Mysql2Adapter({
         host: config.host ?? "localhost",
         port: config.port ?? 3306,
         database: config.database,

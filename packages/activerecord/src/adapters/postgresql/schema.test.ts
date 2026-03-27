@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -31,7 +31,7 @@ const PK_TABLE_NAME = "table_with_pk";
 const UNMATCHED_SEQUENCE_NAME = "unmatched_primary_key_default_value_seq";
 const UNMATCHED_PK_TABLE_NAME = "table_with_unmatched_sequence_for_pk";
 
-async function setupSchemas(adapter: PostgresAdapter) {
+async function setupSchemas(adapter: PostgreSQLAdapter) {
   await adapter.exec(
     `CREATE SCHEMA ${SCHEMA_NAME} CREATE TABLE ${TABLE_NAME} (${COLUMNS.join(",")})`,
   );
@@ -80,7 +80,7 @@ async function setupSchemas(adapter: PostgresAdapter) {
   );
 }
 
-async function teardownSchemas(adapter: PostgresAdapter) {
+async function teardownSchemas(adapter: PostgreSQLAdapter) {
   await adapter.dropSchema(SCHEMA2_NAME, { ifExists: true, cascade: true });
   await adapter.dropSchema(SCHEMA_NAME, { ifExists: true, cascade: true });
   await adapter.dropSchema("test_schema3", { ifExists: true, cascade: true });
@@ -88,10 +88,10 @@ async function teardownSchemas(adapter: PostgresAdapter) {
   await adapter.dropSchema("my_other_schema", { ifExists: true, cascade: true });
 }
 
-describeIfPg("PostgresAdapter", () => {
-  let adapter: PostgresAdapter;
+describeIfPg("PostgreSQLAdapter", () => {
+  let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgresAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
     await adapter.close();

@@ -2,12 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/sqlite3_adapter_prevent_writes_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SqliteAdapter } from "../sqlite-adapter.js";
+import { SQLite3Adapter } from "../sqlite3-adapter.js";
 
-let adapter: SqliteAdapter;
+let adapter: SQLite3Adapter;
 
 beforeEach(() => {
-  adapter = new SqliteAdapter(":memory:");
+  adapter = new SQLite3Adapter(":memory:");
 });
 
 afterEach(() => {

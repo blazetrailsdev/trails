@@ -4,14 +4,14 @@
 import { describe, it, beforeEach, afterEach } from "vitest";
 import {
   describeIfMysql,
-  MysqlAdapter,
+  Mysql2Adapter,
   MYSQL_TEST_URL,
 } from "../abstract-mysql-adapter/test-helper.js";
 
-describeIfMysql("MysqlAdapter", () => {
-  let adapter: MysqlAdapter;
+describeIfMysql("Mysql2Adapter", () => {
+  let adapter: Mysql2Adapter;
   beforeEach(async () => {
-    adapter = new MysqlAdapter(MYSQL_TEST_URL);
+    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
   });
   afterEach(async () => {
     await adapter.close();

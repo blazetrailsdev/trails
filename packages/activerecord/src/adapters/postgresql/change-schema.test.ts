@@ -2,12 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/change_schema_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgresAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("Migration", () => {
-  let adapter: PostgresAdapter;
+  let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgresAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec("DROP TABLE IF EXISTS strings");
     await adapter.exec(`CREATE TABLE strings (id serial primary key, somedate character varying)`);
   });

@@ -53,9 +53,9 @@ export {
 } from "./sti.js";
 export { hasSecurePassword } from "./secure-password.js";
 export { store, storeAccessor, storedAttributes } from "./store.js";
-export { SqliteAdapter } from "./adapters/sqlite-adapter.js";
-export { PostgresAdapter } from "./adapters/postgres-adapter.js";
-export { MysqlAdapter } from "./adapters/mysql-adapter.js";
+export { SQLite3Adapter } from "./adapters/sqlite3-adapter.js";
+export { PostgreSQLAdapter } from "./adapters/postgresql-adapter.js";
+export { Mysql2Adapter } from "./adapters/mysql2-adapter.js";
 export { QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
 export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";
 export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
