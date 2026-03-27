@@ -1745,3 +1745,91 @@ describe("MigrationTest", () => {
     }); // MigrationValidationTest
   }); // CopyMigrationsTest
 });
+
+describe("addCheckConstraint / removeCheckConstraint", () => {
+  function mockMigration(): { migration: Migration; sql: string[] } {
+    const sql: string[] = [];
+    const migration = new (class extends Migration {
+      static version = "20240101000000";
+      async change() {}
+    })();
+    (migration as any).adapter = {
+      execute: async () => [],
+      executeMutation: async (s: string) => {
+        sql.push(s);
+        return 0;
+      },
+      beginTransaction: async () => {},
+      commit: async () => {},
+      rollback: async () => {},
+      createSavepoint: async () => {},
+      releaseSavepoint: async () => {},
+      rollbackToSavepoint: async () => {},
+    };
+    return { migration, sql };
+  }
+
+  it("generates ADD CONSTRAINT CHECK SQL", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addCheckConstraint("games", "status IN ('active', 'waiting')", {
+      name: "games_status_check",
+    });
+    expect(sql[0]).toBe(
+      `ALTER TABLE "games" ADD CONSTRAINT "games_status_check" CHECK (status IN ('active', 'waiting'))`,
+    );
+  });
+
+  it("generates unique default name from expression", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addCheckConstraint("games", "score >= 0");
+    expect(sql[0]).toMatch(/"chk_games_[0-9a-f]{8}"/);
+  });
+
+  it("different expressions produce different default names", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addCheckConstraint("games", "score >= 0");
+    await migration.addCheckConstraint("games", "score <= 100");
+    const name1 = sql[0].match(/"(chk_games_[0-9a-f]{8})"/)?.[1];
+    const name2 = sql[1].match(/"(chk_games_[0-9a-f]{8})"/)?.[1];
+    expect(name1).not.toBe(name2);
+  });
+
+  it("validate: false throws on non-postgres adapters", async () => {
+    const { migration } = mockMigration();
+    await expect(
+      migration.addCheckConstraint("games", "score >= 0", {
+        name: "games_score_check",
+        validate: false,
+      }),
+    ).rejects.toThrow(/only supported on PostgreSQL/);
+  });
+
+  it("omits NOT VALID by default", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addCheckConstraint("games", "score >= 0", {
+      name: "games_score_check",
+    });
+    expect(sql[0]).not.toContain("NOT VALID");
+  });
+
+  it("generates DROP CONSTRAINT SQL with name", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.removeCheckConstraint("games", { name: "games_status_check" });
+    expect(sql[0]).toBe(`ALTER TABLE "games" DROP CONSTRAINT "games_status_check"`);
+  });
+
+  it("removes by expression using same default name", async () => {
+    const { migration, sql } = mockMigration();
+    await migration.addCheckConstraint("games", "score >= 0");
+    await migration.removeCheckConstraint("games", "score >= 0");
+    const addName = sql[0].match(/"(chk_games_[0-9a-f]{8})"/)?.[1];
+    expect(sql[1]).toContain(`"${addName}"`);
+  });
+
+  it("throws when no expression or name given to remove", async () => {
+    const { migration } = mockMigration();
+    await expect(migration.removeCheckConstraint("games")).rejects.toThrow(
+      /requires either an expression or/,
+    );
+  });
+});

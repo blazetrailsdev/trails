@@ -17,6 +17,7 @@ import {
   AddColumnDefinition,
   CreateIndexDefinition,
   ForeignKeyDefinition,
+  CheckConstraintDefinition,
   type ColumnType,
   type ColumnOptions,
 } from "./schema-definitions.js";
@@ -343,6 +344,45 @@ export class SchemaStatements {
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(fromTable)} DROP CONSTRAINT ${this._qi(name)}`,
     );
+  }
+
+  async addCheckConstraint(
+    tableName: string,
+    expression: string,
+    options: { name?: string; validate?: boolean } = {},
+  ): Promise<void> {
+    const name = options.name ?? this._checkConstraintName(tableName, expression);
+    const validate = options.validate !== false;
+    const chkDef = new CheckConstraintDefinition(tableName, expression, name, validate);
+    await this.adapter.executeMutation(
+      `ALTER TABLE ${this._qi(tableName)} ADD ${this.schemaCreation.accept(chkDef)}`,
+    );
+  }
+
+  async removeCheckConstraint(
+    tableName: string,
+    expressionOrOptions?: string | { name?: string },
+  ): Promise<void> {
+    let name: string;
+    if (typeof expressionOrOptions === "string") {
+      name = this._checkConstraintName(tableName, expressionOrOptions);
+    } else if (expressionOrOptions?.name) {
+      name = expressionOrOptions.name;
+    } else {
+      throw new Error("removeCheckConstraint requires either an expression or { name } option");
+    }
+    await this.adapter.executeMutation(
+      `ALTER TABLE ${this._qi(tableName)} DROP CONSTRAINT ${this._qi(name)}`,
+    );
+  }
+
+  _checkConstraintName(tableName: string, expression: string): string {
+    let hash = 0;
+    for (let i = 0; i < expression.length; i++) {
+      hash = ((hash << 5) - hash + expression.charCodeAt(i)) | 0;
+    }
+    const hex = (hash >>> 0).toString(16).padStart(8, "0");
+    return `chk_${tableName}_${hex}`;
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {

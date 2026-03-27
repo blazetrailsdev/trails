@@ -150,6 +150,21 @@ export abstract class Migration {
         break;
       case "dropJoinTable":
         throw new Error("Cannot reverse dropJoinTable without table definition");
+      case "addCheckConstraint": {
+        const [table, expr, opts] = op.args as [string, string, { name?: string }?];
+        const constraintName = opts?.name ?? this.schema._checkConstraintName(table, expr);
+        await this.removeCheckConstraint(table, { name: constraintName });
+        break;
+      }
+      case "removeCheckConstraint": {
+        const [rmTable, rmArg] = op.args as [string, string | { name?: string } | undefined];
+        if (typeof rmArg === "string") {
+          await this.addCheckConstraint(rmTable, rmArg);
+        } else {
+          throw new Error("Cannot reverse removeCheckConstraint without expression");
+        }
+        break;
+      }
       default:
         throw new Error(`Cannot reverse operation: ${op.method}`);
     }
@@ -354,6 +369,34 @@ export abstract class Migration {
     await this.schema.removeForeignKey(fromTable, toTableOrOptions);
   }
 
+  async addCheckConstraint(
+    tableName: string,
+    expression: string,
+    options: { name?: string; validate?: boolean } = {},
+  ): Promise<void> {
+    if (this._recording) {
+      this._recordedOps.push({
+        method: "addCheckConstraint",
+        args: [tableName, expression, options],
+      });
+      return;
+    }
+    await this.schema.addCheckConstraint(tableName, expression, options);
+  }
+
+  async removeCheckConstraint(
+    tableName: string,
+    expressionOrOptions?: string | { name?: string },
+  ): Promise<void> {
+    if (this._recording) {
+      this._recordedOps.push({
+        method: "removeCheckConstraint",
+        args: [tableName, expressionOrOptions],
+      });
+      return;
+    }
+    await this.schema.removeCheckConstraint(tableName, expressionOrOptions);
+  }
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
     if (this._recording) {
       this._recordedOps.push({ method: "addTimestamps", args: [tableName, options] });
