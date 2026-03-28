@@ -20,6 +20,7 @@ import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { Calculations } from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { FromClause } from "./relation/from-clause.js";
+import { WhereClause } from "./relation/where-clause.js";
 
 /**
  * Relation — the lazy, chainable query interface.
@@ -28,10 +29,8 @@ import { FromClause } from "./relation/from-clause.js";
  */
 export class Relation<T extends Base> {
   private _modelClass: typeof Base;
-  private _whereClauses: Array<Record<string, unknown>> = [];
-  private _whereNotClauses: Array<Record<string, unknown>> = [];
-  private _whereRawClauses: string[] = [];
-  private _whereArelNodes: Nodes.Node[] = [];
+  /** @internal */
+  _whereClause: WhereClause = WhereClause.empty();
   private _orderClauses: Array<string | [string, "asc" | "desc"]> = [];
   private _rawOrderClauses: string[] = [];
   private _limitValue: number | null = null;
@@ -94,7 +93,7 @@ export class Relation<T extends Base> {
     // Arel node: store directly, bypass string/hash processing
     if (conditionsOrSql instanceof Nodes.Node) {
       const rel = this._clone();
-      rel._whereArelNodes.push(conditionsOrSql);
+      rel._whereClause.arelNodes.push(conditionsOrSql);
       return rel;
     }
 
@@ -149,7 +148,7 @@ export class Relation<T extends Base> {
           sql = sql.replace("?", replacement);
         }
       }
-      rel._whereRawClauses.push(sql);
+      rel._whereClause.rawClauses.push(sql);
     } else {
       // Check for subquery values (Relation instances)
       const normalConditions: Record<string, unknown> = {};
@@ -158,7 +157,7 @@ export class Relation<T extends Base> {
           // Subquery: WHERE column IN (SELECT ...)
           const subSql = value.toSql();
           const { tbl, col } = this._qualifiedCol(this._modelClass.arelTable, key);
-          rel._whereRawClauses.push(`"${tbl}"."${col}" IN (${subSql})`);
+          rel._whereClause.rawClauses.push(`"${tbl}"."${col}" IN (${subSql})`);
         } else {
           normalConditions[key] = Array.isArray(value)
             ? value.map((v) => this._castWhereValue(key, v))
@@ -166,7 +165,7 @@ export class Relation<T extends Base> {
         }
       }
       if (Object.keys(normalConditions).length > 0) {
-        rel._whereClauses.push(normalConditions);
+        rel._whereClause.conditions.push(normalConditions);
       }
     }
     return rel;
@@ -181,7 +180,7 @@ export class Relation<T extends Base> {
     const rel = this._clone();
     // Remove existing clauses for the keys being rewritten
     const keysToReplace = new Set(Object.keys(conditions));
-    rel._whereClauses = rel._whereClauses
+    rel._whereClause.conditions = rel._whereClause.conditions
       .map((clause) => {
         const filtered: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(clause)) {
@@ -191,7 +190,7 @@ export class Relation<T extends Base> {
       })
       .filter((c) => Object.keys(c).length > 0);
     // Also remove NOT clauses for the same keys
-    rel._whereNotClauses = rel._whereNotClauses
+    rel._whereClause.notConditions = rel._whereClause.notConditions
       .map((clause) => {
         const filtered: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(clause)) {
@@ -200,7 +199,7 @@ export class Relation<T extends Base> {
         return filtered;
       })
       .filter((c) => Object.keys(c).length > 0);
-    rel._whereClauses.push(conditions);
+    rel._whereClause.conditions.push(conditions);
     return rel;
   }
 
@@ -235,7 +234,7 @@ export class Relation<T extends Base> {
         const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
         const whereClause = typeClause ? `WHERE ${typeClause}` : "";
         const cloned = rel._clone();
-        cloned._whereRawClauses.push(
+        cloned._whereClause.rawClauses.push(
           `"${sourceTable}"."${pk}" IN (SELECT "${targetTable}"."${foreignKey}" FROM "${targetTable}"${whereClause ? " " + whereClause : ""})`,
         );
         rel = cloned;
@@ -275,7 +274,7 @@ export class Relation<T extends Base> {
         const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
         const whereClause = typeClause ? `WHERE ${typeClause}` : "";
         const cloned = rel._clone();
-        cloned._whereRawClauses.push(
+        cloned._whereClause.rawClauses.push(
           `"${sourceTable}"."${pk}" NOT IN (SELECT "${targetTable}"."${foreignKey}" FROM "${targetTable}"${whereClause ? " " + whereClause : ""})`,
         );
         rel = cloned;
@@ -369,7 +368,7 @@ export class Relation<T extends Base> {
         ? value.map((v) => this._castWhereValue(key, v))
         : this._castWhereValue(key, value);
     }
-    rel._whereNotClauses.push(castConditions);
+    rel._whereClause.notConditions.push(castConditions);
     return rel;
   }
 
@@ -392,10 +391,7 @@ export class Relation<T extends Base> {
    */
   and(other: Relation<T>): Relation<T> {
     const rel = this._clone();
-    rel._whereClauses = [...rel._whereClauses, ...other._whereClauses];
-    rel._whereNotClauses = [...rel._whereNotClauses, ...other._whereNotClauses];
-    rel._whereRawClauses = [...rel._whereRawClauses, ...other._whereRawClauses];
-    rel._whereArelNodes = [...rel._whereArelNodes, ...other._whereArelNodes];
+    rel._whereClause = rel._whereClause.merge(other._whereClause);
     return rel;
   }
 
@@ -411,10 +407,7 @@ export class Relation<T extends Base> {
     // Build a chain: where(cond1).or(where(cond2)).or(where(cond3))...
     const makeRel = (cond: Record<string, unknown>) => {
       const r = this._clone();
-      r._whereClauses = [cond];
-      r._whereNotClauses = [];
-      r._whereRawClauses = [];
-      r._whereArelNodes = [];
+      r._whereClause = new WhereClause([cond]);
       r._orRelations = [];
       return r;
     };
@@ -422,10 +415,8 @@ export class Relation<T extends Base> {
     for (let i = 1; i < conditions.length; i++) {
       combined = combined.or(makeRel(conditions[i]));
     }
-    // Merge existing where clauses from `this` with the OR result
     const rel = this._clone();
-    // Replace where clauses with the combined OR result
-    rel._whereClauses = combined._whereClauses;
+    rel._whereClause = combined._whereClause;
     rel._orRelations = [...rel._orRelations, ...combined._orRelations];
     return rel;
   }
@@ -706,10 +697,7 @@ export class Relation<T extends Base> {
    */
   invertWhere(): Relation<T> {
     const rel = this._clone();
-    const oldWhere = rel._whereClauses;
-    const oldWhereNot = rel._whereNotClauses;
-    rel._whereClauses = oldWhereNot;
-    rel._whereNotClauses = oldWhere;
+    rel._whereClause = rel._whereClause.invert();
     return rel;
   }
 
@@ -721,14 +709,14 @@ export class Relation<T extends Base> {
   inspect(): string {
     const parts: string[] = [];
     parts.push(`${this._modelClass.name}.all`);
-    if (this._whereClauses.length > 0) {
+    if (this._whereClause.conditions.length > 0) {
       parts.push(
-        `.where(${JSON.stringify(this._whereClauses.length === 1 ? this._whereClauses[0] : this._whereClauses)})`,
+        `.where(${JSON.stringify(this._whereClause.conditions.length === 1 ? this._whereClause.conditions[0] : this._whereClause.conditions)})`,
       );
     }
-    if (this._whereNotClauses.length > 0) {
+    if (this._whereClause.notConditions.length > 0) {
       parts.push(
-        `.whereNot(${JSON.stringify(this._whereNotClauses.length === 1 ? this._whereNotClauses[0] : this._whereNotClauses)})`,
+        `.whereNot(${JSON.stringify(this._whereClause.notConditions.length === 1 ? this._whereClause.notConditions[0] : this._whereClause.notConditions)})`,
       );
     }
     if (this._orderClauses.length > 0) {
@@ -897,10 +885,7 @@ export class Relation<T extends Base> {
     for (const type of types) {
       switch (type) {
         case "where":
-          rel._whereClauses = [];
-          rel._whereNotClauses = [];
-          rel._whereRawClauses = [];
-          rel._whereArelNodes = [];
+          rel._whereClause = WhereClause.empty();
           break;
         case "order":
           rel._orderClauses = [];
@@ -2761,7 +2746,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#where_clause
    */
   get whereValues(): Array<Record<string, unknown>> {
-    return [...this._whereClauses];
+    return [...this._whereClause.conditions];
   }
 
   // -- Collection convenience methods --
@@ -2805,7 +2790,7 @@ export class Relation<T extends Base> {
 
   private _scopeAttributes(): Record<string, unknown> {
     const attrs: Record<string, unknown> = {};
-    for (const clause of this._whereClauses) {
+    for (const clause of this._whereClause.conditions) {
       for (const [key, value] of Object.entries(clause)) {
         if (value !== null && !Array.isArray(value) && !(value instanceof Range)) {
           attrs[key] = value;
@@ -2850,11 +2835,13 @@ export class Relation<T extends Base> {
       // Apply start/finish range constraints
       if (start !== undefined) {
         const startQuoted = typeof start === "number" ? String(start) : `'${start}'`;
-        rel._whereRawClauses.push(`"${this._modelClass.arelTable.name}"."${pk}" >= ${startQuoted}`);
+        rel._whereClause.rawClauses.push(
+          `"${this._modelClass.arelTable.name}"."${pk}" >= ${startQuoted}`,
+        );
       }
       if (finish !== undefined) {
         const finishQuoted = typeof finish === "number" ? String(finish) : `'${finish}'`;
-        rel._whereRawClauses.push(
+        rel._whereClause.rawClauses.push(
           `"${this._modelClass.arelTable.name}"."${pk}" <= ${finishQuoted}`,
         );
       }
@@ -2908,7 +2895,9 @@ export class Relation<T extends Base> {
       const rel = this._clone();
       if (lastId !== null) {
         const pkQuoted = typeof lastId === "number" ? String(lastId) : `'${lastId}'`;
-        rel._whereRawClauses.push(`"${this._modelClass.arelTable.name}"."${pk}" > ${pkQuoted}`);
+        rel._whereClause.rawClauses.push(
+          `"${this._modelClass.arelTable.name}"."${pk}" > ${pkQuoted}`,
+        );
       }
       rel._orderClauses = [pk as string];
       rel._limitValue = batchSize;
@@ -2919,7 +2908,7 @@ export class Relation<T extends Base> {
       // Create a scoped relation for just these PKs
       const ids = records.map((r) => (r as any).id);
       const batchRel = this._clone();
-      batchRel._whereClauses.push({ [pk as string]: ids });
+      batchRel._whereClause.conditions.push({ [pk as string]: ids });
       yield batchRel;
 
       if (records.length < batchSize) break;
@@ -3075,11 +3064,15 @@ export class Relation<T extends Base> {
   }
 
   private _collectAllWhereNodes(table: Table, rel: Relation<T>): Nodes.Node[] {
-    const nodes = this._buildWhereNodes(table, rel._whereClauses, rel._whereNotClauses);
-    for (const rawClause of rel._whereRawClauses) {
+    const nodes = this._buildWhereNodes(
+      table,
+      rel._whereClause.conditions,
+      rel._whereClause.notConditions,
+    );
+    for (const rawClause of rel._whereClause.rawClauses) {
       nodes.push(new Nodes.SqlLiteral(rawClause));
     }
-    for (const arelNode of rel._whereArelNodes) {
+    for (const arelNode of rel._whereClause.arelNodes) {
       nodes.push(arelNode);
     }
     return nodes;
@@ -3100,7 +3093,7 @@ export class Relation<T extends Base> {
         manager.where(new Nodes.Grouping(combined));
       }
     } else {
-      for (const clause of this._whereClauses) {
+      for (const clause of this._whereClause.conditions) {
         for (const [key, value] of Object.entries(clause)) {
           const attr = this._resolveColumn(table, key);
           if (value === null) {
@@ -3119,7 +3112,7 @@ export class Relation<T extends Base> {
           }
         }
       }
-      for (const clause of this._whereNotClauses) {
+      for (const clause of this._whereClause.notConditions) {
         for (const [key, value] of Object.entries(clause)) {
           const attr = this._resolveColumn(table, key);
           if (value === null) {
@@ -3134,11 +3127,11 @@ export class Relation<T extends Base> {
         }
       }
       // Raw SQL WHERE clauses
-      for (const rawClause of this._whereRawClauses) {
+      for (const rawClause of this._whereClause.rawClauses) {
         manager.where(new Nodes.SqlLiteral(rawClause));
       }
       // Arel node WHERE clauses
-      for (const node of this._whereArelNodes) {
+      for (const node of this._whereClause.arelNodes) {
         manager.where(node);
       }
     }
@@ -3203,7 +3196,7 @@ export class Relation<T extends Base> {
 
   private _buildWhereStrings(table: Table): string[] {
     const conditions: string[] = [];
-    for (const clause of this._whereClauses) {
+    for (const clause of this._whereClause.conditions) {
       for (const [key, value] of Object.entries(clause)) {
         const { tbl, col } = this._qualifiedCol(table, key);
         if (value === null) {
@@ -3240,7 +3233,7 @@ export class Relation<T extends Base> {
         }
       }
     }
-    for (const clause of this._whereNotClauses) {
+    for (const clause of this._whereClause.notConditions) {
       for (const [key, value] of Object.entries(clause)) {
         const { tbl, col } = this._qualifiedCol(table, key);
         if (value === null) {
@@ -3274,11 +3267,11 @@ export class Relation<T extends Base> {
       }
     }
     // Raw SQL WHERE clauses
-    for (const rawClause of this._whereRawClauses) {
+    for (const rawClause of this._whereClause.rawClauses) {
       conditions.push(rawClause);
     }
     // Arel node WHERE clauses — compile to SQL for the condition list
-    for (const node of this._whereArelNodes) {
+    for (const node of this._whereClause.arelNodes) {
       conditions.push(`(${this._compileArelNode(node)})`);
     }
     return conditions;
@@ -4425,10 +4418,7 @@ export class Relation<T extends Base> {
   /** @internal */
   _clone(): Relation<T> {
     const rel = new Relation<T>(this._modelClass);
-    rel._whereClauses = [...this._whereClauses];
-    rel._whereNotClauses = [...this._whereNotClauses];
-    rel._whereRawClauses = [...this._whereRawClauses];
-    rel._whereArelNodes = [...this._whereArelNodes];
+    rel._whereClause = this._whereClause.clone();
     rel._orderClauses = [...this._orderClauses];
     rel._rawOrderClauses = [...this._rawOrderClauses];
     rel._limitValue = this._limitValue;

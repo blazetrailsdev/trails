@@ -15,10 +15,7 @@ export class Merger {
 
   merge(): any {
     const rel = this.relation._clone();
-    rel._whereClauses.push(...this.other._whereClauses);
-    rel._whereNotClauses.push(...this.other._whereNotClauses);
-    rel._whereRawClauses.push(...this.other._whereRawClauses);
-    rel._whereArelNodes.push(...this.other._whereArelNodes);
+    rel._whereClause = rel._whereClause.merge(this.other._whereClause);
     if (this.other._orderClauses.length > 0) {
       rel._orderClauses = [...this.other._orderClauses];
     }
