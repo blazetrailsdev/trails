@@ -828,6 +828,7 @@ export class Model {
   // -- Instance --
 
   _attributes: AttributeSet = new AttributeSet();
+  _accessedFields: Set<string> = new Set();
   errors: Errors = new Errors(this);
   _dirty: DirtyTracker = new DirtyTracker();
 
@@ -871,6 +872,7 @@ export class Model {
     if (!this._attributes.has(name)) {
       return this.attributeMissing(name);
     }
+    this._accessedFields.add(name);
     return this._attributes.fetchValue(name) ?? null;
   }
 

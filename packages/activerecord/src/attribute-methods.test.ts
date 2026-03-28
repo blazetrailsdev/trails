@@ -1190,10 +1190,14 @@ describe("AttributeMethodsTest", () => {
         this.adapter = adp;
       }
     }
-    const t = Topic.new({ title: "access-test" }) as any;
+    const t = Topic.new({ title: "access-test", body: "hello" }) as any;
+    expect(t.accessedFields()).toEqual([]);
     void t.title;
-    // accessed_fields tracks what was read
-    expect(t.title).toBe("access-test");
+    expect(t.accessedFields()).toEqual(["title"]);
+    void t.body;
+    expect(t.accessedFields()).toContain("title");
+    expect(t.accessedFields()).toContain("body");
+    expect(t.accessedFields()).toHaveLength(2);
   });
 
   it("read_attribute_before_type_cast with aliased attribute", async () => {

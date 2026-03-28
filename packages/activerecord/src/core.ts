@@ -62,9 +62,9 @@ interface CoreRecord {
  *
  * Mirrors: ActiveRecord::Core#inspect
  */
-export function inspect(record: CoreRecord): string {
-  const ctor = record.constructor as { name: string };
-  const attrs = Array.from(record._attributes)
+export function inspect(this: CoreRecord): string {
+  const ctor = this.constructor as { name: string };
+  const attrs = Array.from(this._attributes)
     .map(([k, v]) => {
       if (v === null) return `${k}: nil`;
       if (v instanceof InspectionMask) return `${k}: ${v}`;
@@ -81,8 +81,8 @@ export function inspect(record: CoreRecord): string {
  *
  * Mirrors: ActiveRecord::Core#attribute_for_inspect
  */
-export function attributeForInspect(record: CoreRecord, attr: string): string {
-  const value = record.readAttribute(attr);
+export function attributeForInspect(this: CoreRecord, attr: string): string {
+  const value = this.readAttribute(attr);
   if (value === null || value === undefined) return "nil";
   if (value instanceof InspectionMask) return value.toString();
   if (typeof value === "string") {
@@ -98,12 +98,12 @@ export function attributeForInspect(record: CoreRecord, attr: string): string {
  *
  * Mirrors: ActiveRecord::Core#==
  */
-export function isEqual(record: CoreRecord, other: unknown): boolean {
+export function isEqual(this: CoreRecord, other: unknown): boolean {
   if (other === null || other === undefined) return false;
   if (typeof other !== "object") return false;
-  if (!(other instanceof (record.constructor as any))) return false;
-  if (record.constructor !== (other as any).constructor) return false;
-  const thisId = record.id;
+  if (!(other instanceof (this.constructor as any))) return false;
+  if (this.constructor !== (other as any).constructor) return false;
+  const thisId = this.id;
   const otherId = (other as CoreRecord).id;
   return thisId != null && thisId === otherId;
 }
@@ -113,8 +113,8 @@ export function isEqual(record: CoreRecord, other: unknown): boolean {
  *
  * Mirrors: ActiveRecord::Core#present?
  */
-export function isPresent(record: CoreRecord): boolean {
-  return record.isPersisted();
+export function isPresent(this: CoreRecord): boolean {
+  return this.isPersisted();
 }
 
 /**
@@ -122,6 +122,6 @@ export function isPresent(record: CoreRecord): boolean {
  *
  * Mirrors: ActiveRecord::Core#blank?
  */
-export function isBlank(record: CoreRecord): boolean {
-  return !isPresent(record);
+export function isBlank(this: CoreRecord): boolean {
+  return !isPresent.call(this);
 }

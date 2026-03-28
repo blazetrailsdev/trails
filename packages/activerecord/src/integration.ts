@@ -15,8 +15,8 @@ interface Identifiable {
  *
  * Mirrors: ActiveRecord::Integration#to_param
  */
-export function toParam(record: Identifiable): string | null {
-  const pk = record.id;
+export function toParam(this: Identifiable): string | null {
+  const pk = this.id;
   return pk != null ? String(pk) : null;
 }
 
@@ -25,10 +25,10 @@ export function toParam(record: Identifiable): string | null {
  *
  * Mirrors: ActiveRecord::Integration#cache_key
  */
-export function cacheKey(record: Identifiable): string {
-  const modelKey = (record.constructor as any).tableName as string;
-  const pk = record.id;
-  if (record.isNewRecord()) {
+export function cacheKey(this: Identifiable): string {
+  const modelKey = (this.constructor as any).tableName as string;
+  const pk = this.id;
+  if (this.isNewRecord()) {
     return `${modelKey}/new`;
   }
   return `${modelKey}/${pk}`;
@@ -39,9 +39,9 @@ export function cacheKey(record: Identifiable): string {
  *
  * Mirrors: ActiveRecord::Integration#cache_key_with_version
  */
-export function cacheKeyWithVersion(record: Identifiable): string {
-  const base = cacheKey(record);
-  const updatedAt = record.readAttribute("updated_at");
+export function cacheKeyWithVersion(this: Identifiable): string {
+  const base = cacheKey.call(this);
+  const updatedAt = this.readAttribute("updated_at");
   if (updatedAt instanceof Date) {
     return `${base}-${updatedAt.toISOString().replace(/[^0-9]/g, "")}`;
   }
@@ -53,8 +53,8 @@ export function cacheKeyWithVersion(record: Identifiable): string {
  *
  * Mirrors: ActiveRecord::Integration#cache_version
  */
-export function cacheVersion(record: Identifiable): string | null {
-  const updatedAt = record.readAttribute("updated_at");
+export function cacheVersion(this: Identifiable): string | null {
+  const updatedAt = this.readAttribute("updated_at");
   if (updatedAt instanceof Date) {
     return updatedAt.toISOString().replace(/[^0-9]/g, "");
   }
