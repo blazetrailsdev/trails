@@ -6,7 +6,7 @@
  * we use a simple stack for use_zone and a module-level variable for zone.
  */
 
-import { TimeZone } from "./time-zone.js";
+import { TimeZone } from "./values/time-zone.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
 

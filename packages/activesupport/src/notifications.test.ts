@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Notifications, Event } from "./notifications.js";
+import { Notifications } from "./notifications.js";
+import { Event } from "./notifications/instrumenter.js";
 
 beforeEach(() => {
   Notifications.unsubscribeAll();

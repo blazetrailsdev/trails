@@ -3,7 +3,7 @@
  * Mirrors ActiveSupport::Inflector from Rails.
  */
 
-import { Inflections } from "./inflections.js";
+import { Inflections } from "./inflector/inflections.js";
 
 function applyInflections(word: string, rules: { rule: RegExp; replacement: string }[]): string {
   if (!word || word.length === 0) return word;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { titleize, underscore } from "./inflector.js";
-import { SafeBuffer, htmlSafe, htmlEscape, isHtmlSafe } from "./safe-buffer.js";
+import { SafeBuffer, htmlSafe, htmlEscape, isHtmlSafe } from "./core-ext/string/output-safety.js";
 
 describe("SafeBufferTest", () => {
   it("Should look like a string", () => {

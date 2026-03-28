@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FileStore, MemoryStore, NullStore } from "./cache/stores.js";
+import { MemoryStore } from "./cache/memory-store.js";
+import { NullStore } from "./cache/null-store.js";
+import { FileStore } from "./cache/file-store.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

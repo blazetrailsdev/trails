@@ -7,48 +7,13 @@
  *   Notifications.unsubscribe(sub);
  */
 
-export type EventPayload = Record<string, unknown>;
+import { Event } from "./notifications/instrumenter.js";
+import type { EventPayload } from "./notifications/instrumenter.js";
 
 export type NotificationSubscriber = {
   readonly pattern: string | RegExp | null;
   readonly callback: (event: Event) => void;
 };
-
-/**
- * Mirrors ActiveSupport::Notifications::Event.
- */
-export class Event {
-  readonly name: string;
-  readonly time: Date;
-  end: Date | null;
-  readonly payload: EventPayload;
-  readonly transactionId: string;
-  readonly children: Event[];
-
-  constructor(name: string, start: Date, payload: EventPayload = {}) {
-    this.name = name;
-    this.time = start;
-    this.end = null;
-    this.payload = payload;
-    this.transactionId = generateTransactionId();
-    this.children = [];
-  }
-
-  /** Duration in milliseconds (like Rails' Event#duration in ms). */
-  get duration(): number {
-    if (!this.end) return 0;
-    return this.end.getTime() - this.time.getTime();
-  }
-
-  /** Alias: Rails calls it `duration` but measured in ms. */
-  durationMs(): number {
-    return this.duration;
-  }
-
-  finish(endTime?: Date): void {
-    this.end = endTime ?? new Date();
-  }
-}
 
 type Subscriber = {
   pattern: string | RegExp | null;
@@ -248,13 +213,4 @@ export class Notifications {
     if (typeof pattern === "string") return pattern === name;
     return pattern.test(name);
   }
-}
-
-// -------------------------------------------------------------------------
-// Helpers
-// -------------------------------------------------------------------------
-
-let _txCounter = 0;
-function generateTransactionId(): string {
-  return `tx-${Date.now()}-${(++_txCounter).toString(36)}`;
 }

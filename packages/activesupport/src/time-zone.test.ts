@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TimeZone } from "./time-zone.js";
+import { TimeZone } from "./values/time-zone.js";
 import { TimeWithZone } from "./time-with-zone.js";
 
 describe("TimeZoneTest", () => {

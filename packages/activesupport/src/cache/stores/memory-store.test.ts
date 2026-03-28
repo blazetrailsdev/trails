@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { MemoryStore } from "../stores.js";
+import { MemoryStore } from "../memory-store.js";
 
 describe("MemoryStoreTest", () => {
   let store: MemoryStore;

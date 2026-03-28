@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Logger, BroadcastLogger, taggedLogging } from "./logger.js";
+import { Logger, taggedLogging } from "./logger.js";
+import { BroadcastLogger } from "./broadcast-logger.js";
 
 function makeBuffer() {
   const lines: string[] = [];

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { KeyGenerator, CachingKeyGenerator, BacktraceCleaner } from "./key-generator.js";
+import { KeyGenerator, CachingKeyGenerator } from "./key-generator.js";
+import { BacktraceCleaner } from "./backtrace-cleaner.js";
 
 describe("KeyGeneratorTest", () => {
   it("Generating a key of the default length", () => {

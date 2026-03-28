@@ -5,7 +5,7 @@
  * Mirrors the Rails API: https://api.rubyonrails.org/classes/ActiveSupport/TimeWithZone.html
  */
 
-import { TimeZone, getLocalComponents } from "./time-zone.js";
+import { TimeZone, getLocalComponents } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { getZone } from "./time-zone-config.js";

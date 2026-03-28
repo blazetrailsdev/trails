@@ -4,7 +4,7 @@
  * Uses the built-in Intl API for timezone data, wrapping IANA timezone names.
  */
 
-import { TimeWithZone } from "./time-with-zone.js";
+import { TimeWithZone } from "../time-with-zone.js";
 
 // Rails maps friendly names to IANA zones
 const MAPPING: Record<string, string> = {

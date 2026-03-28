@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { Event, Notifications } from "../notifications.js";
+import { Notifications } from "../notifications.js";
+import { Event } from "./instrumenter.js";
 
 describe("InstrumenterTest", () => {
   afterEach(() => {

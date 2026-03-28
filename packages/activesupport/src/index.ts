@@ -16,7 +16,7 @@ export {
   ordinalize,
 } from "./inflector.js";
 
-export { Inflections, loadDefaults } from "./inflections.js";
+export { Inflections, loadDefaults } from "./inflector/inflections.js";
 
 export {
   isBlank,
@@ -145,10 +145,13 @@ export { classAttribute } from "./class-attribute.js";
 export { onLoad, runLoadHooks, resetLoadHooks } from "./lazy-load-hooks.js";
 export type { ClassAttributeOptions } from "./class-attribute.js";
 
-export { Logger, BroadcastLogger, taggedLogging } from "./logger.js";
+export { Logger, taggedLogging } from "./logger.js";
+export { BroadcastLogger } from "./broadcast-logger.js";
 export type { LogLevel, LoggerOutput, TaggedLogger } from "./logger.js";
 
-export { MemoryStore, NullStore, FileStore } from "./cache/stores.js";
+export { MemoryStore } from "./cache/memory-store.js";
+export { NullStore } from "./cache/null-store.js";
+export { FileStore } from "./cache/file-store.js";
 export type { CacheOptions, CacheStore } from "./cache/index.js";
 
 export { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
@@ -161,12 +164,14 @@ export { MessageVerifier, InvalidSignature } from "./message-verifier.js";
 export { Duration, seconds, minutes, hours, days, weeks, months, years } from "./duration.js";
 export type { DurationParts } from "./duration.js";
 
-export { TimeZone, ZONES_MAP } from "./time-zone.js";
+export { TimeZone, ZONES_MAP } from "./values/time-zone.js";
 export { TimeWithZone } from "./time-with-zone.js";
 export type { ChangeOptions, AdvanceOptions } from "./time-with-zone.js";
 
-export { Notifications, Event as NotificationEvent } from "./notifications.js";
-export type { EventPayload, NotificationSubscriber } from "./notifications.js";
+export { Notifications } from "./notifications.js";
+export { Event as NotificationEvent } from "./notifications/instrumenter.js";
+export type { EventPayload } from "./notifications/instrumenter.js";
+export type { NotificationSubscriber } from "./notifications.js";
 
 export { ParameterFilter } from "./parameter-filter.js";
 export {
@@ -176,14 +181,14 @@ export {
   htmlEscapeOnce,
   xmlNameEscape,
   isHtmlSafe,
-} from "./safe-buffer.js";
+} from "./core-ext/string/output-safety.js";
 export {
   KeyGenerator,
   CachingKeyGenerator,
   secureRandomBase58,
   secureRandomBase36,
-  BacktraceCleaner,
 } from "./key-generator.js";
+export { BacktraceCleaner } from "./backtrace-cleaner.js";
 export { OrderedHash } from "./ordered-hash.js";
 export { ErrorReporter } from "./error-reporter.js";
 export type {

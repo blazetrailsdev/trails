@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FileStore } from "../stores.js";
+import { FileStore } from "../file-store.js";
 describe("FileStoreTest", () => {
   let cacheDir: string;
   let store: FileStore;

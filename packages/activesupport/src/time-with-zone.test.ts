@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { TimeWithZone } from "./time-with-zone.js";
-import { TimeZone } from "./time-zone.js";
+import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 
 describe("TimeWithZoneTest", () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NullStore } from "../stores.js";
+import { NullStore } from "../null-store.js";
 
 describe("NullStoreTest", () => {
   it("cleanup", () => {

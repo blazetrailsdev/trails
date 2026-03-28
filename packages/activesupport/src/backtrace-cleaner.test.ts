@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { BacktraceCleaner } from "./key-generator.js";
+import { BacktraceCleaner } from "./backtrace-cleaner.js";
 
 describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
   // Simulate the BacktraceCleaner used in key-generator tests

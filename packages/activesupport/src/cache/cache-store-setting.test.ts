@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 
-import { MemoryStore, NullStore, FileStore } from "../cache/stores.js";
+import { MemoryStore } from "../cache/memory-store.js";
+import { NullStore } from "../cache/null-store.js";
+import { FileStore } from "../cache/file-store.js";
 
 describe("CacheStoreSettingTest", () => {
   it("memory store gets created if no arguments passed to lookup store method", () => {

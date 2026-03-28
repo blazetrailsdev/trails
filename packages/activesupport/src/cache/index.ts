@@ -23,4 +23,6 @@ export interface CacheStore {
   decrement(key: string, amount?: number, options?: CacheOptions): number | null;
 }
 
-export { MemoryStore, NullStore, FileStore } from "./stores.js";
+export { MemoryStore } from "./memory-store.js";
+export { NullStore } from "./null-store.js";
+export { FileStore } from "./file-store.js";

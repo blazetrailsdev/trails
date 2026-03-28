@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { at, from, to, first, last, indent, exclude } from "../string-utils.js";
 
-import { htmlSafe, isHtmlSafe, htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../safe-buffer.js";
+import {
+  htmlSafe,
+  isHtmlSafe,
+  htmlEscape,
+  htmlEscapeOnce,
+  xmlNameEscape,
+} from "../core-ext/string/output-safety.js";
 import {
   pluralize,
   singularize,

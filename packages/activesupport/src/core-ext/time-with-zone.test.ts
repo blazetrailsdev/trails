@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Duration } from "../duration.js";
 import { TimeWithZone } from "../time-with-zone.js";
-import { TimeZone } from "../time-zone.js";
+import { TimeZone } from "../values/time-zone.js";
 import { travelTo } from "../testing-helpers.js";
 import {
   getZone,
