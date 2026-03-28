@@ -16,6 +16,7 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import type { ExecutionStrategy, MigrationLike } from "./migration/execution-strategy.js";
 import type { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
+import { registerVersion, findVersion, CURRENT_VERSION } from "./migration/compatibility.js";
 
 export type {
   ReferentialAction,
@@ -25,6 +26,12 @@ export type {
 export { ExecutionStrategy, type MigrationLike } from "./migration/execution-strategy.js";
 export { DefaultStrategy } from "./migration/default-strategy.js";
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
+export {
+  registerVersion,
+  findVersion,
+  currentVersion,
+  type Compatibility,
+} from "./migration/compatibility.js";
 
 export class MigrationError extends Error {
   constructor(message?: string) {
@@ -149,6 +156,20 @@ export abstract class Migration {
   constructor(name?: string, version?: string) {
     this._name = name;
     this._version = version;
+  }
+
+  /**
+   * Get the migration base class for a specific version.
+   *
+   * Usage:
+   *   class CreateUsers extends Migration.forVersion(1.0) {
+   *     async change() { ... }
+   *   }
+   *
+   * Mirrors: ActiveRecord[version] (e.g. ActiveRecord::Migration[7.2])
+   */
+  static forVersion(v: string | number): typeof Migration {
+    return findVersion(v) as unknown as typeof Migration;
   }
 
   /**
@@ -1507,13 +1528,17 @@ export class Migrator {
 /**
  * Mirrors: ActiveRecord::Migration::Current
  *
- * Alias for the latest migration version — migrations that don't
+ * Alias for the latest migration version. Migrations that don't
  * specify a version inherit from this.
+ *
+ * Equivalent to Migration.forVersion(CURRENT_VERSION).
  */
 export class Current extends Migration {
-  async up(): Promise<void> {}
-  async down(): Promise<void> {}
+  static readonly VERSION = CURRENT_VERSION;
 }
+
+// Register the current version so Migration.forVersion(1.0) works
+registerVersion(CURRENT_VERSION, Current);
 
 /**
  * Mirrors: ActiveRecord::Migration::CheckPending
