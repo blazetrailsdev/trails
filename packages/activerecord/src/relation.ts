@@ -17,7 +17,14 @@ import { WhereChain } from "./relation/query-methods.js";
 import { Merger } from "./relation/merger.js";
 import { Batches } from "./relation/batches.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
-import { Calculations } from "./relation/calculations.js";
+import {
+  performCount,
+  performSum,
+  performAverage,
+  performMinimum,
+  performMaximum,
+  type CalculationMethods,
+} from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { WhereClause } from "./relation/where-clause.js";
@@ -28,6 +35,7 @@ import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
  *
  * Mirrors: ActiveRecord::Relation
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
   private _modelClass: typeof Base;
   /** @internal */
@@ -2011,148 +2019,8 @@ export class Relation<T extends Base> {
     return `EXPLAIN not supported by this adapter`;
   }
 
-  /**
-   * Count records. Optionally count a specific column (ignores NULLs).
-   * When used with group(), returns a Record keyed by group value.
-   *
-   * Mirrors: ActiveRecord::Relation#count
-   */
-  async count(column?: string): Promise<number | Record<string, number>> {
-    return Calculations.count(this, column);
-  }
-
-  async _performCount(column?: string): Promise<number | Record<string, number>> {
-    if (this._limitValue === 0) return 0;
-    if (this._isNone) return this._groupColumns.length > 0 ? {} : 0;
-
-    // Grouped count: SELECT group_col, COUNT(*) FROM ... GROUP BY group_col
-    if (this._groupColumns.length > 0) {
-      return this._groupedAggregate("COUNT", column ?? "*");
-    }
-
-    // When limit is set, fetch all matching rows then count (simulates COUNT(*) of subquery with LIMIT)
-    if (this._limitValue !== null) {
-      const rows = await this.toArray();
-      return rows.length;
-    }
-
-    const table = this._modelClass.arelTable;
-    let countExpr: string;
-    if (column) {
-      const isDistinct = this._isDistinct;
-      countExpr = isDistinct
-        ? `COUNT(DISTINCT "${table.name}"."${column}") AS count`
-        : `COUNT("${table.name}"."${column}") AS count`;
-    } else {
-      countExpr = this._isDistinct
-        ? `COUNT(DISTINCT "${table.name}"."${this._modelClass.primaryKey}") AS count`
-        : "COUNT(*) AS count";
-    }
-    const manager = table.project(countExpr);
-    this._applyJoinsToManager(manager);
-    this._applyWheresToManager(manager, table);
-
-    const sql = manager.toSql();
-    const rows = await this._modelClass.adapter.execute(sql);
-    return Number(rows[0]?.count ?? 0);
-  }
-
-  /**
-   * Sum a column.
-   * When used with group(), returns a Record keyed by group value.
-   *
-   * Mirrors: ActiveRecord::Relation#sum
-   */
-  async sum(column?: string): Promise<number | Record<string, number>> {
-    return Calculations.sum(this, column);
-  }
-
-  async _performSum(column?: string): Promise<number | Record<string, number>> {
-    if (this._isNone) return this._groupColumns.length > 0 ? {} : 0;
-    if (!column) return 0;
-    if (this._groupColumns.length > 0) {
-      return this._groupedAggregate("SUM", column);
-    }
-    const result = await this._aggregate("SUM", column);
-    return result ?? 0;
-  }
-
-  /**
-   * Average a column.
-   * When used with group(), returns a Record keyed by group value.
-   *
-   * Mirrors: ActiveRecord::Relation#average
-   */
-  async average(column: string): Promise<number | null | Record<string, number>> {
-    return Calculations.average(this, column);
-  }
-
-  async _performAverage(column: string): Promise<number | null | Record<string, number>> {
-    if (this._isNone) return this._groupColumns.length > 0 ? {} : null;
-    if (this._groupColumns.length > 0) {
-      return this._groupedAggregate("AVG", column);
-    }
-    return this._aggregate("AVG", column);
-  }
-
-  /**
-   * Minimum value of a column.
-   * When used with group(), returns a Record keyed by group value.
-   *
-   * Mirrors: ActiveRecord::Relation#minimum
-   */
-  async minimum(column: string): Promise<unknown | null | Record<string, unknown>> {
-    return Calculations.minimum(this, column);
-  }
-
-  async _performMinimum(column: string): Promise<unknown | null | Record<string, unknown>> {
-    if (this._isNone) return this._groupColumns.length > 0 ? {} : null;
-    if (this._groupColumns.length > 0) {
-      return this._groupedAggregate("MIN", column);
-    }
-    return this._aggregate("MIN", column);
-  }
-
-  /**
-   * Maximum value of a column.
-   * When used with group(), returns a Record keyed by group value.
-   *
-   * Mirrors: ActiveRecord::Relation#maximum
-   */
-  async maximum(column: string): Promise<unknown | null | Record<string, unknown>> {
-    return Calculations.maximum(this, column);
-  }
-
-  async _performMaximum(column: string): Promise<unknown | null | Record<string, unknown>> {
-    if (this._isNone) return this._groupColumns.length > 0 ? {} : null;
-    if (this._groupColumns.length > 0) {
-      return this._groupedAggregate("MAX", column);
-    }
-    return this._aggregate("MAX", column);
-  }
-
-  private async _groupedAggregate(fn: string, column: string): Promise<Record<string, number>> {
-    const table = this._modelClass.arelTable;
-    const groupCol = this._groupColumns[0]; // Support single group column
-    const aggExpr =
-      column === "*" ? `${fn}(*) AS val` : `${fn}("${table.name}"."${column}") AS val`;
-    const manager = table.project(`"${table.name}"."${groupCol}" AS group_key, ${aggExpr}`);
-    this._applyJoinsToManager(manager);
-    this._applyWheresToManager(manager, table);
-    manager.group(groupCol);
-
-    let sql = manager.toSql();
-    if (this._limitValue !== null) sql += ` LIMIT ${this._limitValue}`;
-    if (this._offsetValue !== null) sql += ` OFFSET ${this._offsetValue}`;
-    const rows = await this._modelClass.adapter.execute(sql);
-
-    const result: Record<string, number> = {};
-    for (const row of rows) {
-      const key = String(row.group_key ?? "null");
-      result[key] = Number(row.val ?? 0);
-    }
-    return result;
-  }
+  // count, sum, average, minimum, maximum are mixed in via
+  // interface merge + prototype assignment (see bottom of file)
 
   private _applyJoinsToManager(manager: SelectManager): void {
     for (const join of this._joinClauses) {
@@ -2166,21 +2034,6 @@ export class Relation<T extends Base> {
     for (const rawJoin of this._rawJoins) {
       (manager as any).core.source.right.push(new Nodes.StringJoin(new Nodes.SqlLiteral(rawJoin)));
     }
-  }
-
-  private async _aggregate(fn: string, column: string): Promise<number | null> {
-    const table = this._modelClass.arelTable;
-    const projection = this._isDistinct
-      ? `${fn}(DISTINCT "${table.name}"."${column}") AS val`
-      : `${fn}("${table.name}"."${column}") AS val`;
-    const manager = table.project(projection);
-    this._applyJoinsToManager(manager);
-    this._applyWheresToManager(manager, table);
-
-    const sql = manager.toSql();
-    const rows = await this._modelClass.adapter.execute(sql);
-    const val = rows[0]?.val;
-    return val === undefined || val === null ? null : Number(val);
   }
 
   /**
@@ -4487,6 +4340,23 @@ function wrapWithScopeProxy<T extends Base>(rel: Relation<T>): Relation<T> {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Mixin: calculation methods via interface merge + prototype assignment.
+// The interface merge declares proper method signatures in .d.ts output.
+// The prototype assignment wires the implementations from calculations.ts.
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Relation<T extends Base> extends CalculationMethods {}
+
+Object.defineProperties(Relation.prototype, {
+  count: { value: performCount, writable: true, configurable: true, enumerable: false },
+  sum: { value: performSum, writable: true, configurable: true, enumerable: false },
+  average: { value: performAverage, writable: true, configurable: true, enumerable: false },
+  minimum: { value: performMinimum, writable: true, configurable: true, enumerable: false },
+  maximum: { value: performMaximum, writable: true, configurable: true, enumerable: false },
+});
 
 // Register Relation with Base to break the circular dependency.
 _setRelationCtor(Relation as any);
