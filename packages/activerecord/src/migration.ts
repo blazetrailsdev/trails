@@ -1567,7 +1567,10 @@ export class CheckPending {
             );
           }
         } catch (err: unknown) {
-          if (err instanceof Error && /no such column|does not exist/i.test(err.message)) {
+          if (
+            err instanceof Error &&
+            /no such column|does not exist|unknown column/i.test(err.message)
+          ) {
             // Table exists with incompatible schema; treat as no versions applied
           } else {
             throw err;
