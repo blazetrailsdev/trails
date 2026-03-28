@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } from "./index.js";
-import { getStiBase, isStiSubclass } from "./sti.js";
+import { getStiBase, isStiSubclass } from "./inheritance.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";

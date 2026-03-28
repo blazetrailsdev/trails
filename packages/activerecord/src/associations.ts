@@ -8,7 +8,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./associations/errors.js";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
-import { getInheritanceColumn, findStiClass } from "./sti.js";
+import { getInheritanceColumn, findStiClass } from "./inheritance.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";

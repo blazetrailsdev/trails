@@ -1,6 +1,84 @@
+/**
+ * Inheritance — STI, abstract classes, and subclass tracking.
+ *
+ * Mirrors: ActiveRecord::Inheritance
+ */
+
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
-import { SubclassNotFound } from "./errors.js";
+import { NameError, SubclassNotFound } from "./errors.js";
+
+/**
+ * Resolve a type name string to a model class.
+ * Used by STI to look up subclasses by their type column value.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#compute_type
+ */
+export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
+  const klass = modelRegistry.get(typeName);
+  if (!klass) {
+    throw new NameError(`uninitialized constant ${typeName}`);
+  }
+  if (klass !== baseClass && !(klass.prototype instanceof baseClass)) {
+    throw new SubclassNotFound(
+      `Invalid single-table inheritance type: ${typeName} is not a subclass of ${baseClass.name}`,
+    );
+  }
+  return klass;
+}
+
+/**
+ * Return direct subclasses of a model class.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#subclasses
+ */
+export function subclasses(modelClass: typeof Base): (typeof Base)[] {
+  return Object.prototype.hasOwnProperty.call(modelClass, "_subclasses")
+    ? (modelClass as any)._subclasses
+    : [];
+}
+
+/**
+ * Return all descendant classes (recursive).
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#descendants
+ */
+export function descendants(modelClass: typeof Base): (typeof Base)[] {
+  const result: (typeof Base)[] = [];
+  for (const sub of subclasses(modelClass)) {
+    result.push(sub);
+    result.push(...descendants(sub));
+  }
+  return result;
+}
+
+/**
+ * Check if a model descends directly from ActiveRecord::Base
+ * (i.e. is not an STI subclass).
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#descends_from_active_record?
+ */
+export function isDescendsFromActiveRecord(modelClass: typeof Base): boolean {
+  return !isStiSubclass(modelClass);
+}
+
+/**
+ * Return the STI name for this class (used as the type column value).
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#sti_name
+ */
+export function stiName(modelClass: typeof Base): string {
+  return modelClass.name;
+}
+
+/**
+ * Return the polymorphic name for this class.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_name
+ */
+export function polymorphicName(modelClass: typeof Base): string {
+  return modelClass.name;
+}
 
 /**
  * Register a class as a subclass of its parent.

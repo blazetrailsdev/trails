@@ -17,7 +17,7 @@ import {
   singularize as _singularize,
 } from "@blazetrails/activesupport";
 import { modelRegistry } from "../associations.js";
-import { getInheritanceColumn, isStiSubclass } from "../sti.js";
+import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
 
 export interface JoinNode {
   tableIndex: number;

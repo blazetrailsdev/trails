@@ -50,7 +50,7 @@ export {
   instantiateSti,
   registerSubclass,
   findStiClass,
-} from "./sti.js";
+} from "./inheritance.js";
 export { hasSecurePassword } from "./secure-password.js";
 export { store, storeAccessor, storedAttributes } from "./store.js";
 export { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";

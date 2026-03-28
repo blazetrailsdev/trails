@@ -3,7 +3,7 @@ import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
 import { RecordNotFound, SoleRecordExceeded } from "./errors.js";
 import { modelRegistry } from "./associations.js";
-import { getInheritanceColumn, isStiSubclass } from "./sti.js";
+import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,

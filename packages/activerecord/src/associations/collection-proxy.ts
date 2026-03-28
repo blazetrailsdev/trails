@@ -8,7 +8,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
   HasManyThroughOrderError,
 } from "./errors.js";
-import { getInheritanceColumn, findStiClass } from "../sti.js";
+import { getInheritanceColumn, findStiClass } from "../inheritance.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   resolveModel,

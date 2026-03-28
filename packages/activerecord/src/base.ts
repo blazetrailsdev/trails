@@ -2,9 +2,15 @@ import { Model } from "@blazetrails/activemodel";
 import { Table, quoteArrayLiteral } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
-import { NameError, SubclassNotFound } from "./errors.js";
-import { modelRegistry } from "./associations.js";
-import { getInheritanceColumn, isStiSubclass, getStiBase, instantiateSti } from "./sti.js";
+import {
+  getInheritanceColumn,
+  isStiSubclass,
+  getStiBase,
+  instantiateSti,
+  computeType as inheritanceComputeType,
+  subclasses as inheritanceSubclasses,
+  descendants as inheritanceDescendants,
+} from "./inheritance.js";
 import {
   RecordNotFound,
   RecordInvalid,
@@ -739,52 +745,16 @@ export class Base extends Model {
     return getStiBase(this);
   }
 
-  /**
-   * Resolve a type name string to a model class.
-   * Used by STI to look up subclasses by their type column value.
-   *
-   * Mirrors: ActiveRecord::Inheritance.compute_type
-   */
   static computeType(typeName: string): typeof Base {
-    // Unlike findStiClass (which always throws SubclassNotFound),
-    // computeType distinguishes unknown constants (NameError) from
-    // known classes that aren't subclasses (SubclassNotFound).
-    const klass = modelRegistry.get(typeName);
-    if (!klass) {
-      throw new NameError(`uninitialized constant ${typeName}`);
-    }
-    if (klass !== this && !(klass.prototype instanceof this)) {
-      throw new SubclassNotFound(
-        `Invalid single-table inheritance type: ${typeName} is not a subclass of ${this.name}`,
-      );
-    }
-    return klass;
+    return inheritanceComputeType(this, typeName);
   }
 
-  /**
-   * Return direct subclasses of this class.
-   * Subclasses register themselves via registerSubclass().
-   *
-   * Mirrors: ActiveRecord::Base.subclasses
-   */
   static get subclasses(): (typeof Base)[] {
-    return Object.prototype.hasOwnProperty.call(this, "_subclasses")
-      ? (this as any)._subclasses
-      : [];
+    return inheritanceSubclasses(this);
   }
 
-  /**
-   * Return all descendant classes (recursive).
-   *
-   * Mirrors: ActiveRecord::Base.descendants
-   */
   static get descendants(): (typeof Base)[] {
-    const result: (typeof Base)[] = [];
-    for (const sub of this.subclasses) {
-      result.push(sub);
-      result.push(...sub.descendants);
-    }
-    return result;
+    return inheritanceDescendants(this);
   }
 
   // -- Logger --
