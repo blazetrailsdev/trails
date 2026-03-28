@@ -111,6 +111,12 @@ importers:
       "@blazetrails/rack":
         specifier: workspace:*
         version: link:../rack
+      commander:
+        specifier: ^14.0.0
+        version: 14.0.3
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.1(@types/node@25.3.5)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/rack: {}
 

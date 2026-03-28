@@ -6,7 +6,11 @@
     "trails": "./dist/bin.js"
   },
   "exports": {
-    ".": "./dist/cli.js"
+    ".": "./dist/cli.js",
+    "./vite": {
+      "types": "./dist/server/vite-plugin.d.ts",
+      "default": "./dist/server/vite-plugin.js"
+    }
   },
   "files": [
     "dist"
@@ -15,6 +19,8 @@
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/rack": "workspace:*",
-    "@blazetrails/actionpack": "workspace:*"
+    "@blazetrails/actionpack": "workspace:*",
+    "commander": "^14.0.0",
+    "vite": "^7.0.0"
   }
 }

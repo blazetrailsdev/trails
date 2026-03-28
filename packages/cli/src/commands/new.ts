@@ -10,6 +10,7 @@ export function newCommand(): Command {
     .option("-d, --database <type>", "Database adapter (sqlite, postgres, mysql)", "sqlite")
     .option("--skip-git", "Skip git init")
     .option("--skip-install", "Skip dependency installation")
+    .option("--skip-docker", "Skip Dockerfile creation")
     .action(async (name: string, options) => {
       const cwd = process.cwd();
       const gen = new AppGenerator({
@@ -20,6 +21,7 @@ export function newCommand(): Command {
         database: options.database,
         skipGit: options.skipGit,
         skipInstall: options.skipInstall,
+        skipDocker: options.skipDocker,
       });
     });
 

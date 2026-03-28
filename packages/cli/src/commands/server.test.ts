@@ -10,6 +10,6 @@ describe("ServerCommand", () => {
   it("starts and stops", async () => {
     const server = new DevServer({ port: 0, host: "127.0.0.1", cwd: "." });
     await server.start();
-    server.stop();
+    await server.stop();
   });
 });

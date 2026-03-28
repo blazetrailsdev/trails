@@ -30,10 +30,10 @@ export abstract class GeneratorBase {
     return this.isTypeScript() ? ".ts" : ".js";
   }
 
-  protected createFile(relativePath: string, content: string): void {
+  protected createFile(relativePath: string, content: string, options?: { mode?: number }): void {
     const fullPath = path.join(this.cwd, relativePath);
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    fs.writeFileSync(fullPath, content);
+    fs.writeFileSync(fullPath, content, { mode: options?.mode });
     this.createdFiles.push(relativePath);
     this.output(`      create  ${relativePath}`);
   }
