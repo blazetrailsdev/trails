@@ -19,6 +19,7 @@ import { Batches } from "./relation/batches.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { Calculations } from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
+import { FromClause } from "./relation/from-clause.js";
 
 /**
  * Relation — the lazy, chainable query interface.
@@ -56,7 +57,7 @@ export class Relation<T extends Base> {
   private _isStrictLoading = false;
   private _annotations: string[] = [];
   private _optimizerHints: string[] = [];
-  private _fromClause: string | null = null;
+  private _fromClause: FromClause = FromClause.empty();
   private _createWithAttrs: Record<string, unknown> = {};
   private _extending: Array<Record<string, Function>> = [];
   private _ctes: Array<{ name: string; sql: string; recursive: boolean }> = [];
@@ -857,7 +858,7 @@ export class Relation<T extends Base> {
    */
   from(source: string): Relation<T> {
     const rel = this._clone();
-    rel._fromClause = source;
+    rel._fromClause = new FromClause(source);
     return rel;
   }
 
@@ -929,7 +930,7 @@ export class Relation<T extends Base> {
           rel._isReadonly = false;
           break;
         case "from":
-          rel._fromClause = null;
+          rel._fromClause = FromClause.empty();
           break;
       }
     }
@@ -1640,7 +1641,12 @@ export class Relation<T extends Base> {
 
   private async _executeEagerLoad(): Promise<void> {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    if (Array.isArray(basePk) || this._ctes.length > 0 || this._setOperation || this._fromClause) {
+    if (
+      Array.isArray(basePk) ||
+      this._ctes.length > 0 ||
+      this._setOperation ||
+      !this._fromClause.isEmpty()
+    ) {
       const sql = this._toSql();
       const rows = await this._modelClass.adapter.execute(sql);
       this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
@@ -3015,8 +3021,8 @@ export class Relation<T extends Base> {
     let sql = manager.toSql();
 
     // Replace FROM clause if from() was used
-    if (this._fromClause) {
-      sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${this._fromClause}`);
+    if (!this._fromClause.isEmpty()) {
+      sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${this._fromClause.value}`);
     }
 
     // Insert optimizer hints after SELECT
