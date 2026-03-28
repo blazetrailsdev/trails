@@ -42,3 +42,5 @@ export async function bodyToString(body: RackBody): Promise<string> {
   }
   return chunks.join("");
 }
+
+export { parseNestedQuery, buildNestedQuery } from "./utils.js";

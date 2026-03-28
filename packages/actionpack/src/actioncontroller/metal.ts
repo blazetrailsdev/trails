@@ -51,7 +51,9 @@ export class Metal extends AbstractController {
   async dispatch(action: string, request: Request, response: Response): Promise<Response> {
     this.request = request;
     this.response = response;
-    this.params = (request as any).parameters ?? new Parameters(request.params ?? {});
+    this.params =
+      (request as any).parameters ??
+      new Parameters({ ...request.params, ...request.pathParameters });
 
     await this.processAction(action);
 

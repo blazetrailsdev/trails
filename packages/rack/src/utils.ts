@@ -92,7 +92,7 @@ export function parseNestedQuery(
   _separator?: string,
 ): Record<string, any> {
   if (!qs) return {};
-  const result: Record<string, any> = {};
+  const result: Record<string, any> = Object.create(null);
 
   for (const part of qs.split(/&/)) {
     if (!part) continue;
@@ -110,6 +110,8 @@ export function parseNestedQuery(
   return result;
 }
 
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function normalizeParams(params: any, name: string, v: string | null, depth: number): void {
   if (depth >= _paramDepthLimit) {
     throw new ParamsTooDeepError("param depth limit exceeded");
@@ -117,6 +119,7 @@ function normalizeParams(params: any, name: string, v: string | null, depth: num
 
   // Simple key: "foo"
   if (!name.includes("[")) {
+    if (DANGEROUS_KEYS.has(name)) return;
     params[name] = v;
     return;
   }
@@ -130,6 +133,7 @@ function normalizeParams(params: any, name: string, v: string | null, depth: num
   }
 
   const prefix = match[1];
+  if (DANGEROUS_KEYS.has(prefix)) return;
   const rest = match[2];
 
   if (!rest || rest === "") {
@@ -153,11 +157,11 @@ function normalizeParams(params: any, name: string, v: string | null, depth: num
     let current = params;
     for (const k of keys) {
       if (!(k in current) || typeof current[k] !== "object" || Array.isArray(current[k])) {
-        current[k] = {};
+        current[k] = Object.create(null);
       }
       current = current[k];
     }
-    current[realLastKey] = v;
+    if (!DANGEROUS_KEYS.has(realLastKey)) current[realLastKey] = v;
     return;
   }
 
@@ -175,6 +179,8 @@ function setNestedValue(
   if (depth >= _paramDepthLimit) {
     throw new ParamsTooDeepError("param depth limit exceeded");
   }
+
+  if (DANGEROUS_KEYS.has(prefix)) return;
 
   if (keys.length === 0) {
     // Direct assignment
@@ -220,7 +226,7 @@ function setNestedValue(
     } else {
       // Nested within array: foo[][bar]=1
       if (arr.length === 0 || shouldStartNewHash(arr[arr.length - 1], restKeys)) {
-        arr.push({});
+        arr.push(Object.create(null));
       }
       const lastItem = arr[arr.length - 1];
       setNestedValue(lastItem, restKeys[0], restKeys.slice(1), v, depth + 1);
@@ -230,7 +236,7 @@ function setNestedValue(
 
   // Hash key: foo[bar]
   if (!(prefix in params)) {
-    params[prefix] = {};
+    params[prefix] = Object.create(null);
   }
   const container = params[prefix];
   if (typeof container === "string" || container === null) {

@@ -6,6 +6,7 @@
  */
 
 import type { RackEnv } from "@blazetrails/rack";
+import { parseNestedQuery } from "@blazetrails/rack";
 
 export class Request {
   readonly env: RackEnv;
@@ -248,8 +249,74 @@ export class Request {
 
   // --- Parameters ---
 
-  get params(): Record<string, string> | undefined {
-    return this.env["action_dispatch.request.parameters"] as Record<string, string> | undefined;
+  get params(): Record<string, unknown> {
+    if (this.env["action_dispatch.request.parameters"]) {
+      return this.env["action_dispatch.request.parameters"] as Record<string, unknown>;
+    }
+    const merged: Record<string, unknown> = {
+      ...this.queryParameters,
+      ...this.requestParameters,
+    };
+    this.env["action_dispatch.request.parameters"] = merged;
+    return merged;
+  }
+
+  get queryParameters(): Record<string, unknown> {
+    const qs = this.queryString;
+    if (!qs) return {};
+    return parseNestedQuery(qs);
+  }
+
+  get requestParameters(): Record<string, unknown> {
+    const cached = this.env["action_dispatch.request.request_parameters"];
+    if (cached && typeof cached === "object") {
+      return cached as Record<string, unknown>;
+    }
+
+    const raw = this.env["rack.input"];
+    if (!raw) {
+      this.env["action_dispatch.request.request_parameters"] = {};
+      return {};
+    }
+
+    let input: string | null;
+    if (typeof raw === "string") {
+      input = raw;
+    } else if (typeof (raw as any).read === "function") {
+      input = (raw as any).read();
+      if (typeof (raw as any).rewind === "function") {
+        try {
+          (raw as any).rewind();
+        } catch {
+          // ignore rewind errors
+        }
+      }
+    } else {
+      input = null;
+    }
+
+    if (!input || typeof input !== "string") {
+      this.env["action_dispatch.request.request_parameters"] = {};
+      return {};
+    }
+
+    let params: Record<string, unknown> = {};
+    const ct = ((this.env["CONTENT_TYPE"] as string) || "").toLowerCase();
+    if (ct.includes("application/json")) {
+      try {
+        const parsed = JSON.parse(input);
+        if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+          params = parsed;
+        }
+      } catch {
+        // ignore
+      }
+    } else if (ct.includes("application/x-www-form-urlencoded")) {
+      params = parseNestedQuery(input);
+    }
+
+    this.env["action_dispatch.request.request_parameters"] = params;
+    return params;
   }
 
   get pathParameters(): Record<string, string> {
@@ -261,7 +328,7 @@ export class Request {
   get format(): string | undefined {
     // Check explicit format parameter
     const paramFormat = this.params?.["format"];
-    if (paramFormat) return paramFormat;
+    if (paramFormat) return String(paramFormat);
 
     // Check path extension
     const ext = this.path.match(/\.(\w+)$/);
