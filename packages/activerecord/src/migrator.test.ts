@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Migrator } from "./migration.js";
+import {
+  Migrator,
+  EnvironmentMismatchError,
+  NoEnvironmentInSchemaError,
+  ProtectedEnvironmentError,
+} from "./migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -461,5 +466,55 @@ describe("MigratorTest", () => {
     await migrator.migrate();
     const versions = await migrator.getAllVersions();
     expect(versions).toEqual(["1", "2", "3"]);
+  });
+
+  it("stores environment after up migration", async () => {
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
+      environment: "test",
+    });
+    await migrator.up();
+    const env = await migrator.internalMetadata.get("environment");
+    expect(env).toBe("test");
+  });
+
+  it("checkEnvironment raises NoEnvironmentInSchemaError when no environment stored", async () => {
+    const migrator = new Migrator(adapter, [], { environment: "development" });
+    await expect(migrator.checkEnvironment()).rejects.toThrow(NoEnvironmentInSchemaError);
+  });
+
+  it("checkEnvironment raises EnvironmentMismatchError on mismatch", async () => {
+    const migrator1 = new Migrator(adapter, [makeMigration("1", "M1")], {
+      environment: "production",
+    });
+    await migrator1.up();
+
+    const migrator2 = new Migrator(adapter, [makeMigration("1", "M1")], {
+      environment: "development",
+    });
+    await expect(migrator2.checkEnvironment()).rejects.toThrow(EnvironmentMismatchError);
+  });
+
+  it("checkEnvironment passes when environments match", async () => {
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
+      environment: "development",
+    });
+    await migrator.up();
+    await expect(migrator.checkEnvironment()).resolves.toBeUndefined();
+  });
+
+  it("checkProtectedEnvironments raises for production", async () => {
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
+      environment: "production",
+    });
+    await migrator.up();
+    await expect(migrator.checkProtectedEnvironments()).rejects.toThrow(ProtectedEnvironmentError);
+  });
+
+  it("checkProtectedEnvironments passes for development", async () => {
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")], {
+      environment: "development",
+    });
+    await migrator.up();
+    await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
   });
 });

@@ -5,6 +5,8 @@
  */
 
 import type { DatabaseAdapter } from "./adapter.js";
+import { detectAdapterName } from "./adapter-name.js";
+import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 
 export class NullInternalMetadata {
   async createTable(): Promise<void> {}
@@ -23,27 +25,41 @@ export class InternalMetadata {
   static readonly TABLE_NAME = "ar_internal_metadata";
   private _adapter: DatabaseAdapter;
 
+  private get _adapterName(): "sqlite" | "postgres" | "mysql" {
+    return detectAdapterName(this._adapter);
+  }
+
+  private _q(name: string): string {
+    return quoteIdentifier(name, this._adapterName);
+  }
+
+  private get _quotedTable(): string {
+    return quoteTableName(InternalMetadata.TABLE_NAME, this._adapterName);
+  }
+
   constructor(adapter: DatabaseAdapter) {
     this._adapter = adapter;
   }
 
   async createTable(): Promise<void> {
+    const tsType = this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
+    const q = (n: string) => this._q(n);
     await this._adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS ${InternalMetadata.TABLE_NAME} (` +
-        `"key" VARCHAR(255) NOT NULL PRIMARY KEY, ` +
-        `"value" VARCHAR(255), ` +
-        `"created_at" DATETIME NOT NULL, ` +
-        `"updated_at" DATETIME NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS ${this._quotedTable} (` +
+        `${q("key")} VARCHAR(255) NOT NULL PRIMARY KEY, ` +
+        `${q("value")} VARCHAR(255), ` +
+        `${q("created_at")} ${tsType} NOT NULL, ` +
+        `${q("updated_at")} ${tsType} NOT NULL)`,
     );
   }
 
   async dropTable(): Promise<void> {
-    await this._adapter.executeMutation(`DROP TABLE IF EXISTS ${InternalMetadata.TABLE_NAME}`);
+    await this._adapter.executeMutation(`DROP TABLE IF EXISTS ${this._quotedTable}`);
   }
 
   async get(key: string): Promise<string | null> {
     const rows = await this._adapter.execute(
-      `SELECT "value" FROM ${InternalMetadata.TABLE_NAME} WHERE "key" = ?`,
+      `SELECT ${this._q("value")} FROM ${this._quotedTable} WHERE ${this._q("key")} = ?`,
       [key],
     );
     if (rows.length === 0) return null;
@@ -51,16 +67,16 @@ export class InternalMetadata {
   }
 
   async set(key: string, value: string): Promise<void> {
-    const now = new Date().toISOString();
+    const now = new Date().toISOString().replace("T", " ").replace("Z", "");
     const existing = await this.get(key);
     if (existing !== null) {
       await this._adapter.executeMutation(
-        `UPDATE ${InternalMetadata.TABLE_NAME} SET "value" = ?, "updated_at" = ? WHERE "key" = ?`,
+        `UPDATE ${this._quotedTable} SET ${this._q("value")} = ?, ${this._q("updated_at")} = ? WHERE ${this._q("key")} = ?`,
         [value, now, key],
       );
     } else {
       await this._adapter.executeMutation(
-        `INSERT INTO ${InternalMetadata.TABLE_NAME} ("key", "value", "created_at", "updated_at") VALUES (?, ?, ?, ?)`,
+        `INSERT INTO ${this._quotedTable} (${this._q("key")}, ${this._q("value")}, ${this._q("created_at")}, ${this._q("updated_at")}) VALUES (?, ?, ?, ?)`,
         [key, value, now, now],
       );
     }
@@ -68,7 +84,7 @@ export class InternalMetadata {
 
   async tableExists(): Promise<boolean> {
     try {
-      await this._adapter.execute(`SELECT 1 FROM ${InternalMetadata.TABLE_NAME} LIMIT 1`);
+      await this._adapter.execute(`SELECT 1 FROM ${this._quotedTable} LIMIT 1`);
       return true;
     } catch {
       return false;
@@ -76,6 +92,6 @@ export class InternalMetadata {
   }
 
   async deleteAll(): Promise<void> {
-    await this._adapter.executeMutation(`DELETE FROM ${InternalMetadata.TABLE_NAME}`);
+    await this._adapter.executeMutation(`DELETE FROM ${this._quotedTable}`);
   }
 }

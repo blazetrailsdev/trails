@@ -11,6 +11,8 @@ import { detectAdapterName } from "./adapter-name.js";
 import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
+import { DatabaseConfigurations } from "./database-configurations.js";
 
 export type {
   ReferentialAction,
@@ -651,9 +653,13 @@ export abstract class Migration {
       up: (f) => upFns.push(f),
       down: (f) => downFns.push(f),
     });
-    // In a forward migration, run up fns. In reverse, run down fns.
-    // We always run the up direction here; down is handled by _runChange
-    for (const f of upFns) await f();
+    if (this._recording) {
+      // During reversal recording, run the down fns
+      for (const f of downFns) await f();
+    } else {
+      // During forward migration, run the up fns
+      for (const f of upFns) await f();
+    }
   }
 
   /**
@@ -1140,12 +1146,21 @@ export class Migrator {
   private _adapter: DatabaseAdapter;
   private _migrations: MigrationProxy[];
   private _schemaMigration: SchemaMigration;
+  private _internalMetadata: InternalMetadata;
+  private _environment: string;
   verbose = true;
   private _output: string[] = [];
 
-  constructor(adapter: DatabaseAdapter, migrations: MigrationProxy[]) {
+  constructor(
+    adapter: DatabaseAdapter,
+    migrations: MigrationProxy[],
+    options: { environment?: string } = {},
+  ) {
     this._adapter = adapter;
     this._schemaMigration = new SchemaMigration(adapter);
+    this._internalMetadata = new InternalMetadata(adapter);
+    this._environment =
+      options.environment ?? (process.env.NODE_ENV || DatabaseConfigurations.defaultEnv);
     this._validateMigrations(migrations);
     const normalized = migrations.map((m) => ({
       ...m,
@@ -1356,6 +1371,7 @@ export class Migrator {
   private async _ensureSchemaTable(): Promise<void> {
     if (this._schemaTableEnsured) return;
     await this._schemaMigration.createTable();
+    await this._internalMetadata.createTable();
     this._schemaTableEnsured = true;
   }
 
@@ -1421,6 +1437,7 @@ export class Migrator {
     if (direction === "up") {
       await migration.up(this._adapter);
       await this._schemaMigration.recordVersion(proxy.version);
+      await this._internalMetadata.set("environment", this._environment);
     } else {
       await migration.down(this._adapter);
       await this._schemaMigration.deleteVersion(proxy.version);
@@ -1430,6 +1447,57 @@ export class Migrator {
       const action = direction === "up" ? "migrated" : "reverted";
       this._output.push(`== ${proxy.version} ${proxy.name}: ${action} ==`);
     }
+  }
+
+  /**
+   * Check that the current environment matches the stored environment.
+   * Raises EnvironmentMismatchError if they differ.
+   *
+   * Mirrors: ActiveRecord::Tasks::DatabaseTasks.check_current_environment
+   */
+  async checkEnvironment(): Promise<void> {
+    if (process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK === "1") return;
+    await this._ensureSchemaTable();
+    const stored = await this._internalMetadata.get("environment");
+    if (stored === null) {
+      throw new NoEnvironmentInSchemaError(
+        "Environment data not found in the schema. Run migrations to initialize it.",
+      );
+    }
+    if (stored !== this._environment) {
+      throw new EnvironmentMismatchError(
+        `You are attempting to modify a database that was last used in the '${stored}' environment. ` +
+          `You are running in the '${this._environment}' environment. ` +
+          `If you are sure you want to continue, run with DISABLE_DATABASE_ENVIRONMENT_CHECK=1.`,
+      );
+    }
+  }
+
+  /**
+   * Check that the current environment is not protected.
+   * Protected environments (e.g. production) require explicit confirmation
+   * for destructive operations.
+   *
+   * Mirrors: ActiveRecord::Tasks::DatabaseTasks.check_protected_environments!
+   */
+  async checkProtectedEnvironments(protectedEnvironments?: string[]): Promise<void> {
+    await this._ensureSchemaTable();
+    const stored = await this._internalMetadata.get("environment");
+    const env = stored ?? this._environment;
+
+    let envList = protectedEnvironments;
+    if (!envList) {
+      const { Base } = await import("./base.js");
+      envList = Base.protectedEnvironments ?? ["production"];
+    }
+
+    if (envList.includes(env)) {
+      throw new ProtectedEnvironmentError(env);
+    }
+  }
+
+  get internalMetadata(): InternalMetadata {
+    return this._internalMetadata;
   }
 }
 

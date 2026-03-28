@@ -6,6 +6,7 @@
 
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
+import { ProtectedEnvironmentError } from "../migration.js";
 
 export class DatabaseTasks {
   static get env(): string {
@@ -264,9 +265,7 @@ export class DatabaseTasks {
     const { Base } = await import("../base.js");
     const protectedEnvs = Base.protectedEnvironments;
     if (protectedEnvs.includes(env)) {
-      throw new Error(
-        `You are attempting to run a destructive action against your '${env}' database. Aborting.`,
-      );
+      throw new ProtectedEnvironmentError(env);
     }
   }
 
