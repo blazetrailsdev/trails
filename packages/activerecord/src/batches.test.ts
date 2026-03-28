@@ -938,6 +938,136 @@ describe("EachTest", () => {
 });
 
 // ==========================================================================
+// BatchEnumerator API tests — matches Rails batches_test.rb names
+// ==========================================================================
+describe("EachTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  it("in_batches each_batch should yield batch relations if block is given", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
+    const batches: any[] = [];
+    await Post.all()
+      .inBatches({ batchSize: 2 })
+      .eachBatch((batch: any) => {
+        batches.push(batch);
+      });
+    expect(batches.length).toBe(3);
+  });
+
+  it("in_batches each_batch should return enumerator if no block given", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    for (let i = 0; i < 4; i++) await Post.create({ title: `post-${i}` });
+    const batches: any[] = [];
+    for await (const batch of Post.all().inBatches({ batchSize: 2 }).eachBatch()) {
+      batches.push(batch);
+    }
+    expect(batches.length).toBe(2);
+  });
+
+  it("in_batches each_record should yield record if block is given", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
+    const records: any[] = [];
+    await Post.all()
+      .inBatches({ batchSize: 2 })
+      .eachRecord((record: any) => {
+        records.push(record);
+      });
+    expect(records.length).toBe(5);
+  });
+
+  it("in_batches each_record should return enumerator if no block given", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    for (let i = 0; i < 3; i++) await Post.create({ title: `post-${i}` });
+    const records: any[] = [];
+    for await (const record of Post.all().inBatches({ batchSize: 2 }).eachRecord()) {
+      records.push(record);
+    }
+    expect(records.length).toBe(3);
+  });
+
+  it("in_batches update_all affect all records", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    for (let i = 0; i < 4; i++) await Post.create({ title: `post-${i}`, active: false });
+    const count = await Post.all().inBatches({ batchSize: 2 }).updateAll({ active: true });
+    expect(count).toBe(4);
+    const all = await Post.all().toArray();
+    for (const post of all) {
+      expect((post as any).readAttribute("active")).toBe(true);
+    }
+  });
+
+  it("in_batches update_all returns rows affected", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
+    const count = await Post.all().inBatches({ batchSize: 2 }).updateAll({ title: "updated" });
+    expect(count).toBe(5);
+  });
+
+  it("in_batches update_all returns zero when no batches", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const count = await Post.where({ title: "nonexistent" })
+      .inBatches({ batchSize: 2 })
+      .updateAll({ title: "updated" });
+    expect(count).toBe(0);
+  });
+
+  it("in_batches delete_all should not delete records in other batches", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    for (let i = 0; i < 5; i++) await Post.create({ title: `post-${i}` });
+    const count = await Post.all().inBatches({ batchSize: 2 }).deleteAll();
+    expect(count).toBe(5);
+    expect((await Post.all().toArray()).length).toBe(0);
+  });
+});
+
+// ==========================================================================
 // EachTest3 — additional missing tests from batches_test.rb
 // ==========================================================================
 describe("EachTest", () => {

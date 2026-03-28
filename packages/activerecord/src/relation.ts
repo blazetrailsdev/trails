@@ -21,6 +21,7 @@ import { Calculations } from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { WhereClause } from "./relation/where-clause.js";
+import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 
 /**
  * Relation — the lazy, chainable query interface.
@@ -2834,15 +2835,13 @@ export class Relation<T extends Base> {
 
       // Apply start/finish range constraints
       if (start !== undefined) {
-        const startQuoted = typeof start === "number" ? String(start) : `'${start}'`;
         rel._whereClause.rawClauses.push(
-          `"${this._modelClass.arelTable.name}"."${pk}" >= ${startQuoted}`,
+          `"${this._modelClass.arelTable.name}"."${pk}" >= ${quoteSqlValue(start)}`,
         );
       }
       if (finish !== undefined) {
-        const finishQuoted = typeof finish === "number" ? String(finish) : `'${finish}'`;
         rel._whereClause.rawClauses.push(
-          `"${this._modelClass.arelTable.name}"."${pk}" <= ${finishQuoted}`,
+          `"${this._modelClass.arelTable.name}"."${pk}" <= ${quoteSqlValue(finish)}`,
         );
       }
 
@@ -2880,40 +2879,47 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Yields Relations scoped to each batch. Unlike findInBatches which yields
-   * arrays of records, this yields Relation objects that can be further refined.
+   * Returns a BatchEnumerator that yields Relations scoped to each batch.
+   * Unlike findInBatches which yields arrays of records, this yields
+   * Relation objects that can be further refined, and supports batch-level
+   * operations like deleteAll/updateAll.
    *
    * Mirrors: ActiveRecord::Batches#in_batches
    */
-  async *inBatches({
+  inBatches({
     batchSize = Batches.DEFAULT_BATCH_SIZE,
-  }: { batchSize?: number } = {}): AsyncGenerator<Relation<T>> {
+  }: { batchSize?: number } = {}): BatchEnumerator<Relation<T>> {
+    const self = this;
     const pk = this._modelClass.primaryKey;
-    let lastId: unknown = null;
-
-    while (true) {
-      const rel = this._clone();
-      if (lastId !== null) {
-        const pkQuoted = typeof lastId === "number" ? String(lastId) : `'${lastId}'`;
-        rel._whereClause.rawClauses.push(
-          `"${this._modelClass.arelTable.name}"."${pk}" > ${pkQuoted}`,
-        );
-      }
-      rel._orderClauses = [pk as string];
-      rel._limitValue = batchSize;
-
-      const records = await rel.toArray();
-      if (records.length === 0) break;
-
-      // Create a scoped relation for just these PKs
-      const ids = records.map((r) => (r as any).id);
-      const batchRel = this._clone();
-      batchRel._whereClause.conditions.push({ [pk as string]: ids });
-      yield batchRel;
-
-      if (records.length < batchSize) break;
-      lastId = (records[records.length - 1] as any).id;
+    if (Array.isArray(pk)) {
+      throw new Error("inBatches does not support composite primary keys");
     }
+    return new BatchEnumerator(async function* () {
+      let lastId: unknown = null;
+
+      while (true) {
+        const rel = self._clone();
+        if (lastId !== null) {
+          rel._whereClause.rawClauses.push(
+            `"${self._modelClass.arelTable.name}"."${pk}" > ${quoteSqlValue(lastId)}`,
+          );
+        }
+        rel._orderClauses = [pk];
+        rel._limitValue = batchSize;
+        rel._selectColumns = [pk];
+
+        const records = await rel.toArray();
+        if (records.length === 0) break;
+
+        const ids = records.map((r) => (r as any).readAttribute(pk));
+        const batchRel = self._clone();
+        batchRel._whereClause.conditions.push({ [pk]: ids });
+        yield batchRel;
+
+        if (records.length < batchSize) break;
+        lastId = (records[records.length - 1] as any).readAttribute(pk);
+      }
+    }, batchSize);
   }
 
   // -- SQL generation --
