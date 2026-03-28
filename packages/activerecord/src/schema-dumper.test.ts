@@ -377,3 +377,74 @@ describe("SchemaDumperDefaultsTest", () => {
     /* needs Infinity default handling */
   });
 });
+
+describe("SchemaDumperAdapterTest", () => {
+  let adapter: DatabaseAdapter;
+  let ctx: MigrationContext;
+
+  beforeEach(() => {
+    adapter = createTestAdapter();
+    ctx = new MigrationContext(adapter);
+  });
+
+  it("dumps schema from adapter introspection", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    await ctx.createTable("articles", {}, (t) => {
+      t.string("title", { null: false });
+      t.text("body");
+    });
+    const result = await TopLevelDumper.dump(adapter);
+    expect(result).toContain("articles");
+    expect(result).toContain('"title"');
+    expect(result).toContain('"body"');
+  });
+
+  it("dumps schema with indexes from adapter", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    await ctx.createTable("comments", {}, (t) => {
+      t.integer("post_id");
+    });
+    await ctx.addIndex("comments", "post_id", { name: "index_comments_on_post_id" });
+    const result = await TopLevelDumper.dump(adapter);
+    expect(result).toContain("addIndex");
+    expect(result).toContain("index_comments_on_post_id");
+  });
+
+  it("skips internal tables when dumping from adapter", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaMigration } = await import("./schema-migration.js");
+    const { InternalMetadata } = await import("./internal-metadata.js");
+    await new SchemaMigration(adapter).createTable();
+    await new InternalMetadata(adapter).createTable();
+    await ctx.createTable("products", {}, (t) => {
+      t.string("name");
+    });
+    const result = await TopLevelDumper.dump(adapter);
+    expect(result).toContain("products");
+    expect(result).not.toContain("schema_migrations");
+    expect(result).not.toContain("ar_internal_metadata");
+  });
+
+  it("dumpWithVersion defaults to 0 when no versions recorded", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaMigration } = await import("./schema-migration.js");
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await sm.deleteAllVersions();
+    const dumper = new TopLevelDumper(adapter);
+    const result = await dumper.dumpWithVersion();
+    expect(result).toContain("Schema version: 0");
+  });
+
+  it("dumpWithVersion includes latest migration version", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaMigration } = await import("./schema-migration.js");
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await sm.recordVersion("20240101000000");
+    await sm.recordVersion("20240201000000");
+    const dumper = new TopLevelDumper(adapter);
+    const result = await dumper.dumpWithVersion();
+    expect(result).toContain("Schema version: 20240201000000");
+  });
+});

@@ -482,7 +482,9 @@ export class SchemaStatements {
 
   async columns(
     tableName: string,
-  ): Promise<Array<{ name: string; type: string; null: boolean; default: unknown }>> {
+  ): Promise<
+    Array<{ name: string; type: string; null: boolean; default: unknown; primaryKey: boolean }>
+  > {
     switch (this.adapterName) {
       case "sqlite": {
         const rows = await this.adapter.execute(`PRAGMA table_info("${tableName}")`);
@@ -491,29 +493,72 @@ export class SchemaStatements {
           type: row.type,
           null: row.notnull === 0,
           default: row.dflt_value,
+          primaryKey: row.pk > 0,
         }));
       }
       case "postgres": {
         const rows = await this.adapter.execute(
-          `SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '${tableName}' ORDER BY ordinal_position`,
+          `SELECT c.column_name, c.udt_name, c.character_maximum_length, c.numeric_precision, c.numeric_scale, c.is_nullable, c.column_default,
+            CASE WHEN pk.attname IS NOT NULL THEN true ELSE false END AS is_primary_key
+          FROM information_schema.columns c
+          LEFT JOIN (
+            SELECT a.attname
+            FROM pg_index i
+            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+            WHERE i.indrelid = to_regclass($1) AND i.indisprimary
+          ) pk ON pk.attname = c.column_name
+          WHERE c.table_schema = 'public' AND c.table_name = $1
+          ORDER BY c.ordinal_position`,
+          [tableName],
         );
-        return rows.map((row: any) => ({
-          name: row.column_name,
-          type: row.data_type,
-          null: row.is_nullable === "YES",
-          default: row.column_default,
-        }));
+        return rows.map((row: any) => {
+          let type: string = row.udt_name;
+          if (row.character_maximum_length) {
+            type = `${type}(${row.character_maximum_length})`;
+          } else if (
+            row.numeric_precision != null &&
+            row.numeric_scale != null &&
+            (type === "numeric" || type === "decimal")
+          ) {
+            type = `numeric(${row.numeric_precision},${row.numeric_scale})`;
+          }
+          return {
+            name: row.column_name,
+            type,
+            null: row.is_nullable === "YES",
+            default: row.column_default,
+            primaryKey: row.is_primary_key === true,
+          };
+        });
       }
       case "mysql": {
         const rows = await this.adapter.execute(
-          `SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '${tableName}' ORDER BY ordinal_position`,
+          `SELECT column_name, column_key, data_type, character_maximum_length, numeric_precision, numeric_scale, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position`,
+          [tableName],
         );
-        return rows.map((row: any) => ({
-          name: row.COLUMN_NAME ?? row.column_name,
-          type: row.DATA_TYPE ?? row.data_type,
-          null: (row.IS_NULLABLE ?? row.is_nullable) === "YES",
-          default: row.COLUMN_DEFAULT ?? row.column_default,
-        }));
+        return rows.map((row: any) => {
+          const name = row.COLUMN_NAME ?? row.column_name;
+          let type: string = row.DATA_TYPE ?? row.data_type;
+          const maxLen = row.CHARACTER_MAXIMUM_LENGTH ?? row.character_maximum_length;
+          const precision = row.NUMERIC_PRECISION ?? row.numeric_precision;
+          const scale = row.NUMERIC_SCALE ?? row.numeric_scale;
+          if (maxLen != null && (type === "varchar" || type === "char")) {
+            type = `${type}(${maxLen})`;
+          } else if (
+            precision != null &&
+            scale != null &&
+            (type === "decimal" || type === "numeric")
+          ) {
+            type = `${type}(${precision},${scale})`;
+          }
+          return {
+            name,
+            type,
+            null: (row.IS_NULLABLE ?? row.is_nullable) === "YES",
+            default: row.COLUMN_DEFAULT ?? row.column_default,
+            primaryKey: (row.COLUMN_KEY ?? row.column_key) === "PRI",
+          };
+        });
       }
     }
   }
@@ -555,17 +600,22 @@ export class SchemaStatements {
       }
       case "mysql": {
         const rows = await this.adapter.execute(
-          `SHOW INDEX FROM \`${tableName}\` WHERE Key_name != 'PRIMARY' ORDER BY Key_name, Seq_in_index`,
+          `SHOW INDEX FROM ${quoteIdentifier(tableName, "mysql")} WHERE Key_name != 'PRIMARY'`,
         );
-        const indexMap = new Map<string, { columns: string[]; unique: boolean }>();
+        const indexMap = new Map<string, { unique: boolean; seqs: [number, string][] }>();
         for (const row of rows as any[]) {
           const name = row.Key_name;
           if (!indexMap.has(name)) {
-            indexMap.set(name, { columns: [], unique: row.Non_unique === 0 });
+            indexMap.set(name, { unique: row.Non_unique === 0, seqs: [] });
           }
-          indexMap.get(name)!.columns.push(row.Column_name);
+          indexMap.get(name)!.seqs.push([row.Seq_in_index, row.Column_name]);
         }
-        return Array.from(indexMap.entries()).map(([name, info]) => ({ name, ...info }));
+        return Array.from(indexMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([name, info]) => {
+            info.seqs.sort((a, b) => a[0] - b[0]);
+            return { name, columns: info.seqs.map((s) => s[1]), unique: info.unique };
+          });
       }
     }
   }
