@@ -9,6 +9,8 @@ import {
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { detectAdapterName } from "./adapter-name.js";
 import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
+import { CommandRecorder } from "./migration/command-recorder.js";
+import { SchemaMigration } from "./schema-migration.js";
 
 export type {
   ReferentialAction,
@@ -106,11 +108,6 @@ export class EnvironmentStorageError extends MigrationError {
   }
 }
 
-interface RecordedOperation {
-  method: string;
-  args: unknown[];
-}
-
 /**
  * Migration — base class for database migrations.
  *
@@ -119,7 +116,7 @@ interface RecordedOperation {
 export abstract class Migration {
   protected adapter!: DatabaseAdapter;
   private _recording = false;
-  private _recordedOps: RecordedOperation[] = [];
+  private _recorder = new CommandRecorder();
   private _name?: string;
   private _version?: string;
 
@@ -184,78 +181,83 @@ export abstract class Migration {
     } else {
       // Record operations from change(), then replay in reverse
       this._recording = true;
-      this._recordedOps = [];
-      await this.change();
-      this._recording = false;
+      this._recorder = new CommandRecorder();
+      try {
+        await this.change();
+      } finally {
+        this._recording = false;
+      }
 
       // If no operations were recorded, migration is irreversible
-      if (this._recordedOps.length === 0) {
+      if (this._recorder.commands.length === 0) {
         throw new IrreversibleMigration(
           `${this.constructor.name}#down is not implemented. This migration is irreversible.`,
         );
       }
 
-      // Replay in reverse
-      for (const op of this._recordedOps.reverse()) {
-        await this._reverseOperation(op);
+      // Replay in reverse using CommandRecorder
+      for (const { cmd, args } of this._recorder.commands.slice().reverse()) {
+        await this._reverseOperation(cmd, args);
       }
     }
   }
 
-  private async _reverseOperation(op: RecordedOperation): Promise<void> {
-    switch (op.method) {
+  private async _reverseOperation(cmd: string, args: unknown[]): Promise<void> {
+    switch (cmd) {
       case "createTable":
-        await this.dropTable(op.args[0] as string);
+        await this.dropTable(args[0] as string);
         break;
       case "dropTable":
         throw new IrreversibleMigration("Cannot reverse dropTable without table definition");
       case "addColumn":
-        await this.removeColumn(op.args[0] as string, op.args[1] as string);
+        await this.removeColumn(args[0] as string, args[1] as string);
         break;
       case "removeColumn":
         throw new IrreversibleMigration("Cannot reverse removeColumn without type info");
-      case "addIndex":
-        {
-          const idxOpts: { column: string | string[]; name?: string } = {
-            column: op.args[1] as string | string[],
-          };
-          const origOpts = op.args[2] as { name?: string } | undefined;
-          if (origOpts?.name) idxOpts.name = origOpts.name;
-          await this.removeIndex(op.args[0] as string, idxOpts);
-        }
+      case "addIndex": {
+        const idxOpts: { column: string | string[]; name?: string } = {
+          column: args[1] as string | string[],
+        };
+        const origOpts = args[2] as { name?: string } | undefined;
+        if (origOpts?.name) idxOpts.name = origOpts.name;
+        await this.removeIndex(args[0] as string, idxOpts);
         break;
+      }
       case "removeIndex":
         throw new IrreversibleMigration("Cannot reverse removeIndex without column info");
       case "renameColumn":
-        await this.renameColumn(op.args[0] as string, op.args[2] as string, op.args[1] as string);
+        await this.renameColumn(args[0] as string, args[2] as string, args[1] as string);
         break;
       case "renameTable":
-        await this.renameTable(op.args[1] as string, op.args[0] as string);
+        await this.renameTable(args[1] as string, args[0] as string);
+        break;
+      case "renameIndex":
+        await this.renameIndex(args[0] as string, args[2] as string, args[1] as string);
         break;
       case "changeColumn":
         throw new IrreversibleMigration("Cannot reverse changeColumn without previous type info");
       case "addForeignKey": {
-        const fkOpts = op.args[2] as { column?: string; name?: string } | undefined;
-        await this.removeForeignKey(op.args[0] as string, fkOpts ?? (op.args[1] as string));
+        const fkOpts = args[2] as { column?: string; name?: string } | undefined;
+        await this.removeForeignKey(args[0] as string, fkOpts ?? (args[1] as string));
         break;
       }
       case "createJoinTable":
         await this.dropJoinTable(
-          op.args[0] as string,
-          op.args[1] as string,
-          op.args[2] as { tableName?: string } | undefined,
+          args[0] as string,
+          args[1] as string,
+          args[2] as { tableName?: string } | undefined,
         );
         break;
       case "dropJoinTable":
         throw new IrreversibleMigration("Cannot reverse dropJoinTable without table definition");
       case "addCheckConstraint": {
-        const [table, expr, opts] = op.args as [string, string, { name?: string }?];
+        const [table, expr, opts] = args as [string, string, { name?: string }?];
         const constraintName = opts?.name ?? this.schema._checkConstraintName(table, expr);
         await this.removeCheckConstraint(table, { name: constraintName });
         break;
       }
       case "removeCheckConstraint": {
-        const [rmTable, rmArg] = op.args as [string, string | { name?: string } | undefined];
+        const [rmTable, rmArg] = args as [string, string | { name?: string } | undefined];
         if (typeof rmArg === "string") {
           await this.addCheckConstraint(rmTable, rmArg);
         } else {
@@ -266,7 +268,7 @@ export abstract class Migration {
         break;
       }
       default:
-        throw new IrreversibleMigration(`Cannot reverse operation: ${op.method}`);
+        throw new IrreversibleMigration(`Cannot reverse operation: ${cmd}`);
     }
   }
 
@@ -284,7 +286,7 @@ export abstract class Migration {
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "createTable", args: [name, optionsOrFn, fn] });
+      this._recorder.record("createTable", [name, optionsOrFn, fn]);
       return;
     }
     await this.schema.createTable(name, optionsOrFn, fn);
@@ -292,7 +294,7 @@ export abstract class Migration {
 
   async dropTable(name: string, options?: { ifExists?: boolean }): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "dropTable", args: [name] });
+      this._recorder.record("dropTable", [name]);
       return;
     }
     await this.schema.dropTable(name, options);
@@ -305,7 +307,7 @@ export abstract class Migration {
     options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "addColumn", args: [tableName, columnName, type, options] });
+      this._recorder.record("addColumn", [tableName, columnName, type, options]);
       return;
     }
     await this.schema.addColumn(tableName, columnName, type, options);
@@ -317,7 +319,7 @@ export abstract class Migration {
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "removeColumn", args: [tableName, columnName, options] });
+      this._recorder.record("removeColumn", [tableName, columnName, options]);
       return;
     }
     await this.schema.removeColumn(tableName, columnName, options);
@@ -325,7 +327,7 @@ export abstract class Migration {
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "renameColumn", args: [tableName, oldName, newName] });
+      this._recorder.record("renameColumn", [tableName, oldName, newName]);
       return;
     }
     await this.schema.renameColumn(tableName, oldName, newName);
@@ -343,7 +345,7 @@ export abstract class Migration {
     } = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "addIndex", args: [tableName, columns, options] });
+      this._recorder.record("addIndex", [tableName, columns, options]);
       return;
     }
     await this.schema.addIndex(tableName, columns, options);
@@ -354,7 +356,7 @@ export abstract class Migration {
     options: { column?: string | string[]; name?: string } = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "removeIndex", args: [tableName, options] });
+      this._recorder.record("removeIndex", [tableName, options]);
       return;
     }
     await this.schema.removeIndex(tableName, options);
@@ -367,10 +369,7 @@ export abstract class Migration {
     options: ColumnOptions = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({
-        method: "changeColumn",
-        args: [tableName, columnName, type, options],
-      });
+      this._recorder.record("changeColumn", [tableName, columnName, type, options]);
       return;
     }
     await this.schema.changeColumn(tableName, columnName, type, options);
@@ -378,7 +377,7 @@ export abstract class Migration {
 
   async renameTable(oldName: string, newName: string): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "renameTable", args: [oldName, newName] });
+      this._recorder.record("renameTable", [oldName, newName]);
       return;
     }
     await this.schema.renameTable(oldName, newName);
@@ -398,10 +397,7 @@ export abstract class Migration {
     options: { from?: unknown; to: unknown } | unknown,
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({
-        method: "changeColumnDefault",
-        args: [tableName, columnName, options],
-      });
+      this._recorder.record("changeColumnDefault", [tableName, columnName, options]);
       return;
     }
     await this.schema.changeColumnDefault(tableName, columnName, options);
@@ -414,10 +410,7 @@ export abstract class Migration {
     defaultValue?: unknown,
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({
-        method: "changeColumnNull",
-        args: [tableName, columnName, allowNull, defaultValue],
-      });
+      this._recorder.record("changeColumnNull", [tableName, columnName, allowNull, defaultValue]);
       return;
     }
     await this.schema.changeColumnNull(tableName, columnName, allowNull, defaultValue);
@@ -434,7 +427,7 @@ export abstract class Migration {
     } = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "addReference", args: [tableName, refName, options] });
+      this._recorder.record("addReference", [tableName, refName, options]);
       return;
     }
     await this.schema.addReference(tableName, refName, options);
@@ -446,7 +439,7 @@ export abstract class Migration {
     options: { polymorphic?: boolean } = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "removeReference", args: [tableName, refName, options] });
+      this._recorder.record("removeReference", [tableName, refName, options]);
       return;
     }
     await this.schema.removeReference(tableName, refName, options);
@@ -458,7 +451,7 @@ export abstract class Migration {
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "addForeignKey", args: [fromTable, toTable, options] });
+      this._recorder.record("addForeignKey", [fromTable, toTable, options]);
       return;
     }
     await this.schema.addForeignKey(fromTable, toTable, options);
@@ -469,7 +462,7 @@ export abstract class Migration {
     toTableOrOptions?: string | { column?: string; name?: string },
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "removeForeignKey", args: [fromTable, toTableOrOptions] });
+      this._recorder.record("removeForeignKey", [fromTable, toTableOrOptions]);
       return;
     }
     await this.schema.removeForeignKey(fromTable, toTableOrOptions);
@@ -481,10 +474,7 @@ export abstract class Migration {
     options: { name?: string; validate?: boolean } = {},
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({
-        method: "addCheckConstraint",
-        args: [tableName, expression, options],
-      });
+      this._recorder.record("addCheckConstraint", [tableName, expression, options]);
       return;
     }
     await this.schema.addCheckConstraint(tableName, expression, options);
@@ -495,17 +485,14 @@ export abstract class Migration {
     expressionOrOptions?: string | { name?: string },
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({
-        method: "removeCheckConstraint",
-        args: [tableName, expressionOrOptions],
-      });
+      this._recorder.record("removeCheckConstraint", [tableName, expressionOrOptions]);
       return;
     }
     await this.schema.removeCheckConstraint(tableName, expressionOrOptions);
   }
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "addTimestamps", args: [tableName, options] });
+      this._recorder.record("addTimestamps", [tableName, options]);
       return;
     }
     await this.schema.addTimestamps(tableName, options);
@@ -513,7 +500,7 @@ export abstract class Migration {
 
   async removeTimestamps(tableName: string): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "removeTimestamps", args: [tableName] });
+      this._recorder.record("removeTimestamps", [tableName]);
       return;
     }
     await this.schema.removeTimestamps(tableName);
@@ -526,7 +513,7 @@ export abstract class Migration {
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "createJoinTable", args: [table1, table2, options, fn] });
+      this._recorder.record("createJoinTable", [table1, table2, options, fn]);
       return;
     }
     await this.schema.createJoinTable(table1, table2, options, fn);
@@ -538,7 +525,7 @@ export abstract class Migration {
     options?: { tableName?: string },
   ): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "dropJoinTable", args: [table1, table2, options] });
+      this._recorder.record("dropJoinTable", [table1, table2, options]);
       return;
     }
     await this.schema.dropJoinTable(table1, table2, options);
@@ -553,7 +540,7 @@ export abstract class Migration {
 
   async renameIndex(_tableName: string, oldName: string, newName: string): Promise<void> {
     if (this._recording) {
-      this._recordedOps.push({ method: "renameIndex", args: [_tableName, oldName, newName] });
+      this._recorder.record("renameIndex", [_tableName, oldName, newName]);
       return;
     }
     await this.schema.renameIndex(_tableName, oldName, newName);
@@ -628,15 +615,21 @@ export abstract class Migration {
       (migrationOrFn as any).adapter = this.adapter;
       await migrationOrFn.down();
     } else {
-      // Record operations and reverse them
+      // Record operations and reverse them, preserving outer recorder state
+      const outerRecording = this._recording;
+      const outerRecorder = this._recorder;
+      const innerRecorder = new CommandRecorder();
       this._recording = true;
-      this._recordedOps = [];
-      await migrationOrFn();
-      this._recording = false;
-      for (const op of this._recordedOps.reverse()) {
-        await this._reverseOperation(op);
+      this._recorder = innerRecorder;
+      try {
+        await migrationOrFn();
+      } finally {
+        this._recording = outerRecording;
+        this._recorder = outerRecorder;
       }
-      this._recordedOps = [];
+      for (const { cmd, args } of innerRecorder.commands.slice().reverse()) {
+        await this._reverseOperation(cmd, args);
+      }
     }
   }
 
@@ -1146,12 +1139,13 @@ export interface MigrationLike {
 export class Migrator {
   private _adapter: DatabaseAdapter;
   private _migrations: MigrationProxy[];
-  private _schemaTableName = "schema_migrations";
+  private _schemaMigration: SchemaMigration;
   verbose = true;
   private _output: string[] = [];
 
   constructor(adapter: DatabaseAdapter, migrations: MigrationProxy[]) {
     this._adapter = adapter;
+    this._schemaMigration = new SchemaMigration(adapter);
     this._validateMigrations(migrations);
     const normalized = migrations.map((m) => ({
       ...m,
@@ -1361,17 +1355,14 @@ export class Migrator {
 
   private async _ensureSchemaTable(): Promise<void> {
     if (this._schemaTableEnsured) return;
-    await this._adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "${this._schemaTableName}" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
-    );
+    await this._schemaMigration.createTable();
     this._schemaTableEnsured = true;
   }
 
   private async _appliedVersions(): Promise<Set<string>> {
-    const rows = await this._adapter.execute(`SELECT "version" FROM "${this._schemaTableName}"`);
+    const versions = await this._schemaMigration.allVersions();
     return new Set(
-      rows.map((r) => {
-        const v = String(r.version).trim();
+      versions.map((v) => {
         try {
           return String(BigInt(v));
         } catch {
@@ -1429,16 +1420,10 @@ export class Migrator {
     const migration = proxy.migration();
     if (direction === "up") {
       await migration.up(this._adapter);
-      await this._adapter.executeMutation(
-        `INSERT INTO "${this._schemaTableName}" ("version") VALUES (?)`,
-        [proxy.version],
-      );
+      await this._schemaMigration.recordVersion(proxy.version);
     } else {
       await migration.down(this._adapter);
-      await this._adapter.executeMutation(
-        `DELETE FROM "${this._schemaTableName}" WHERE "version" = ?`,
-        [proxy.version],
-      );
+      await this._schemaMigration.deleteVersion(proxy.version);
     }
 
     if (this.verbose) {
@@ -1466,12 +1451,23 @@ export class Current extends Migration {
  */
 export class CheckPending {
   private _app: (env: Record<string, unknown>) => Promise<unknown>;
+  private _migrator?: Migrator;
 
-  constructor(app: (env: Record<string, unknown>) => Promise<unknown>) {
+  constructor(app: (env: Record<string, unknown>) => Promise<unknown>, migrator?: Migrator) {
     this._app = app;
+    this._migrator = migrator;
   }
 
   async call(env: Record<string, unknown>): Promise<unknown> {
+    if (this._migrator) {
+      const pending = await this._migrator.pendingMigrations();
+      if (pending.length > 0) {
+        throw new PendingMigrationError(
+          `Migrations are pending. To resolve this issue, run:\n\n  migrate\n\n` +
+            `You have ${pending.length} pending migration(s).`,
+        );
+      }
+    }
     return this._app(env);
   }
 }
