@@ -21,6 +21,26 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { pathToFileURL } from "url";
+import { sanitizeSqlArray, sanitizeSqlLike } from "./sanitization.js";
+import {
+  toParam as integrationToParam,
+  cacheKey as integrationCacheKey,
+  cacheKeyWithVersion as integrationCacheKeyWithVersion,
+  cacheVersion as integrationCacheVersion,
+} from "./integration.js";
+import {
+  noTouching as _noTouchingBlock,
+  isAppliedTo as _isNoTouchingApplied,
+} from "./no-touching.js";
+import { suppress as _suppressBlock, isSuppressed as _isSuppressed } from "./suppressor.js";
+import {
+  inspect as coreInspect,
+  attributeForInspect as coreAttributeForInspect,
+  isEqual as coreIsEqual,
+  isPresent as coreIsPresent,
+  isBlank as coreIsBlank,
+} from "./core.js";
+import { ScopeRegistry } from "./scoping.js";
 
 type AdapterConstructor = new (config: any) => DatabaseAdapter;
 
@@ -50,7 +70,6 @@ async function _loadAdapter(name: string): Promise<AdapterConstructor> {
       );
   }
 }
-import { ScopeRegistry } from "./scoping.js";
 import { Default as DefaultScoping } from "./scoping/default.js";
 import { Named as NamedScoping } from "./scoping/named.js";
 import { AssociationNotFoundError } from "./associations/errors.js";
@@ -794,13 +813,7 @@ export class Base extends Model {
 
   // -- Timestamp control --
   static _recordTimestamps = true;
-  private static _noTouching = false;
 
-  /**
-   * Controls whether timestamps are automatically set on save.
-   *
-   * Mirrors: ActiveRecord::Base.record_timestamps
-   */
   static get recordTimestamps(): boolean {
     return this._recordTimestamps;
   }
@@ -809,25 +822,12 @@ export class Base extends Model {
     this._recordTimestamps = value;
   }
 
-  /**
-   * Execute a block with timestamp updates suppressed.
-   *
-   * Mirrors: ActiveRecord::Base.no_touching
-   */
   static async noTouching<R>(fn: () => R | Promise<R>): Promise<R> {
-    this._noTouching = true;
-    try {
-      return await fn();
-    } finally {
-      this._noTouching = false;
-    }
+    return _noTouchingBlock(this, fn);
   }
 
-  /**
-   * Check if touching is currently suppressed.
-   */
   static get isTouchingSuppressed(): boolean {
-    return this._noTouching;
+    return _isNoTouchingApplied(this);
   }
 
   // -- Sequence name --
@@ -915,29 +915,12 @@ export class Base extends Model {
     _encrypts(this, ...args);
   }
 
-  // -- Suppress --
-  private static _suppressed = false;
-
-  /**
-   * Suppress persistence operations (insert/update/delete) during the block.
-   * Records appear to save but nothing hits the database.
-   *
-   * Mirrors: ActiveRecord::Suppressor.suppress
-   */
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {
-    this._suppressed = true;
-    try {
-      return await fn();
-    } finally {
-      this._suppressed = false;
-    }
+    return _suppressBlock(this, fn);
   }
 
-  /**
-   * Check if this model class is currently suppressed.
-   */
   static get isSuppressed(): boolean {
-    return this._suppressed;
+    return _isSuppressed(this);
   }
 
   /**
@@ -2289,46 +2272,16 @@ export class Base extends Model {
     this._destroyedByAssociation = assoc;
   }
 
-  /**
-   * Return a cache key suitable for use in key/value stores.
-   *
-   * Mirrors: ActiveRecord::Base#cache_key
-   */
   cacheKey(): string {
-    const ctor = this.constructor as typeof Base;
-    const modelKey = ctor.tableName;
-    const pk = this.id;
-    if (this.isNewRecord()) {
-      return `${modelKey}/new`;
-    }
-    return `${modelKey}/${pk}`;
+    return integrationCacheKey(this);
   }
 
-  /**
-   * Return a cache key with version based on updated_at.
-   *
-   * Mirrors: ActiveRecord::Base#cache_key_with_version
-   */
   cacheKeyWithVersion(): string {
-    const base = this.cacheKey();
-    const updatedAt = this.readAttribute("updated_at");
-    if (updatedAt instanceof Date) {
-      return `${base}-${updatedAt.toISOString().replace(/[^0-9]/g, "")}`;
-    }
-    return base;
+    return integrationCacheKeyWithVersion(this);
   }
 
-  /**
-   * Return cache version (typically the updated_at timestamp).
-   *
-   * Mirrors: ActiveRecord::Base#cache_version
-   */
   cacheVersion(): string | null {
-    const updatedAt = this.readAttribute("updated_at");
-    if (updatedAt instanceof Date) {
-      return updatedAt.toISOString().replace(/[^0-9]/g, "");
-    }
-    return null;
+    return integrationCacheVersion(this);
   }
 
   /**
@@ -2687,7 +2640,7 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
 
     // If suppressed, skip the actual insert but update record state
-    if (ctor._suppressed || (ctor as any).__proto__._suppressed) {
+    if (_isSuppressed(ctor)) {
       this._newRecord = false;
       (this as any)._dirty.snapshot(this._attributes);
       this.changesApplied();
@@ -2753,7 +2706,7 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
 
     // If suppressed, skip the actual update
-    if (ctor._suppressed || (ctor as any).__proto__._suppressed) {
+    if (_isSuppressed(ctor)) {
       (this as any)._dirty.snapshot(this._attributes);
       this.changesApplied();
       return;
@@ -3059,48 +3012,16 @@ export class Base extends Model {
     });
   }
 
-  /**
-   * Returns the id as a string for URL params.
-   *
-   * Mirrors: ActiveRecord::Base#to_param
-   */
   override toParam(): string | null {
-    const pk = this.id;
-    return pk != null ? String(pk) : null;
+    return integrationToParam(this);
   }
 
-  /**
-   * Return a human-readable string representation of this record.
-   *
-   * Mirrors: ActiveRecord::Base#inspect
-   */
   inspect(): string {
-    const ctor = this.constructor as typeof Base;
-    const attrs = Array.from(this._attributes.entries())
-      .map(([k, v]) => {
-        if (v === null) return `${k}: nil`;
-        if (typeof v === "string") return `${k}: "${v}"`;
-        if (v instanceof Date) return `${k}: "${v.toISOString()}"`;
-        return `${k}: ${JSON.stringify(v)}`;
-      })
-      .join(", ");
-    return `#<${ctor.name} ${attrs}>`;
+    return coreInspect(this as any);
   }
 
-  /**
-   * Format a single attribute value for display in inspect output.
-   *
-   * Mirrors: ActiveRecord::Base#attribute_for_inspect
-   */
   attributeForInspect(attr: string): string {
-    const value = this.readAttribute(attr);
-    if (value === null || value === undefined) return "nil";
-    if (typeof value === "string") {
-      if (value.length > 50) return `"${value.substring(0, 50)}..."`;
-      return `"${value}"`;
-    }
-    if (value instanceof Date) return `"${value.toISOString()}"`;
-    return JSON.stringify(value);
+    return coreAttributeForInspect(this as any, attr);
   }
 
   /**
@@ -3471,11 +3392,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Core#==
    */
   isEqual(other: unknown): boolean {
-    if (!(other instanceof Base)) return false;
-    if (this.constructor !== other.constructor) return false;
-    const thisId = this.id;
-    const otherId = other.id;
-    return thisId != null && thisId === otherId;
+    return coreIsEqual(this as any, other);
   }
 
   /**
@@ -3488,54 +3405,18 @@ export class Base extends Model {
     return this.toParam();
   }
 
-  /**
-   * Sanitize a SQL template with bind parameters.
-   *
-   * Mirrors: ActiveRecord::Base.sanitize_sql_array
-   */
   static sanitizeSqlArray(template: string, ...binds: unknown[]): string {
-    let result = template;
-    for (const bind of binds) {
-      const quoted =
-        bind === null || bind === undefined
-          ? "NULL"
-          : typeof bind === "number"
-            ? String(bind)
-            : typeof bind === "boolean"
-              ? bind
-                ? "TRUE"
-                : "FALSE"
-              : `'${String(bind).replace(/'/g, "''")}'`;
-      result = result.replace("?", quoted);
-    }
-    return result;
+    return sanitizeSqlArray(template, ...binds);
   }
 
-  /**
-   * Sanitize SQL — accepts either a string or an array of [template, ...binds].
-   *
-   * Mirrors: ActiveRecord::Base.sanitize_sql
-   */
   static sanitizeSql(input: string | [string, ...unknown[]]): string {
     if (typeof input === "string") return input;
     const [template, ...binds] = input;
     return this.sanitizeSqlArray(template, ...binds);
   }
 
-  /**
-   * Sanitize a string for use in a SQL LIKE clause.
-   * Escapes %, _, and the escape character itself.
-   *
-   * Mirrors: ActiveRecord::Base.sanitize_sql_like
-   */
   static sanitizeSqlLike(value: string, escapeChar: string = "\\"): string {
-    return value
-      .replace(
-        new RegExp(escapeChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
-        escapeChar + escapeChar,
-      )
-      .replace(/%/g, escapeChar + "%")
-      .replace(/_/g, escapeChar + "_");
+    return sanitizeSqlLike(value, escapeChar);
   }
 
   /**
@@ -3609,29 +3490,14 @@ export class Base extends Model {
     return this;
   }
 
-  /**
-   * Check if this record is present (persisted and not destroyed).
-   *
-   * Mirrors: ActiveRecord::Base#present? (via Object#present?)
-   */
   isPresent(): boolean {
-    return this.isPersisted();
+    return coreIsPresent(this as any);
   }
 
-  /**
-   * Check if this record is blank (new record or destroyed).
-   *
-   * Mirrors: ActiveRecord::Base#blank? (via Object#blank?)
-   */
   isBlank(): boolean {
-    return !this.isPresent();
+    return coreIsBlank(this as any);
   }
 
-  /**
-   * Compare two records for equality.
-   *
-   * Mirrors: ActiveRecord::Core#== (alias)
-   */
   equals(other: unknown): boolean {
     return this.isEqual(other);
   }
