@@ -16,10 +16,10 @@ export interface DatabaseConfig {
 
 /**
  * Resolve the current environment.
- * Checks RAILS_TS_ENV, then NODE_ENV, defaults to "development".
+ * Checks TRAILS_ENV, then NODE_ENV, defaults to "development".
  */
 export function resolveEnv(): string {
-  return process.env.RAILS_TS_ENV || process.env.NODE_ENV || "development";
+  return process.env.TRAILS_ENV || process.env.NODE_ENV || "development";
 }
 
 /**
@@ -61,7 +61,7 @@ export async function loadDatabaseConfig(
     const rel = path.relative(cwd, configPath);
     const enhanced = new Error(
       `Failed to load database config from "${rel}": ${error.message}. ` +
-        `Run with tsx (e.g., "npx tsx node_modules/.bin/rails-ts").`,
+        `Run with tsx (e.g., "npx tsx node_modules/.bin/trails").`,
     );
     (enhanced as any).cause = error;
     throw enhanced;

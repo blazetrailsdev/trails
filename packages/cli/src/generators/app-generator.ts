@@ -17,7 +17,7 @@ export class AppGenerator extends GeneratorBase {
     const appDir = path.join(this.cwd, name);
     this.cwd = appDir;
 
-    this.output(`Creating new rails-ts application: ${name}`);
+    this.output(`Creating new trails application: ${name}`);
     this.output("");
 
     // package.json
@@ -32,8 +32,8 @@ export class AppGenerator extends GeneratorBase {
           scripts: {
             build: "tsc",
             test: "vitest run",
-            dev: "rails-ts server",
-            "db:migrate": "rails-ts db migrate",
+            dev: "trails server",
+            "db:migrate": "trails db migrate",
           },
           dependencies: {
             "@blazetrails/activerecord": "*",
@@ -91,7 +91,7 @@ dist/
     // Application entry
     this.createFile(
       "src/app.ts",
-      `// Rails-TS Application
+      `// Trails Application
 export const APP_NAME = "${name}";
 `,
     );
@@ -104,7 +104,7 @@ export const APP_NAME = "${name}";
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 const server = http.createServer(async (req, res) => {
-  // TODO: integrate with rails-ts router
+  // TODO: integrate with trails router
   res.writeHead(200, { "content-type": "text/plain" });
   res.end("Hello from ${name}!");
 });
@@ -221,7 +221,7 @@ export class ApplicationController extends ActionController.Base {
     }
 
     this.output("");
-    this.output(`  Done! cd ${name} && rails-ts server`);
+    this.output(`  Done! cd ${name} && trails server`);
 
     return this.getCreatedFiles();
   }

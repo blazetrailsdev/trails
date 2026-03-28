@@ -29,7 +29,7 @@ export function consoleCommand(): Command {
       }
     }
 
-    console.log("Loading rails-ts console...");
+    console.log("Loading trails console...");
 
     // Custom eval that supports top-level await.
     // Expressions (e.g., `await User.all()`) are wrapped as return values.
@@ -70,7 +70,7 @@ export function consoleCommand(): Command {
     };
 
     const r = repl.start({
-      prompt: "rails-ts> ",
+      prompt: "trails> ",
       eval: asyncEval,
     });
 

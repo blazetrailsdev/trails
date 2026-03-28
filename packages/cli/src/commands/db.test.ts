@@ -76,30 +76,30 @@ describe("DbCommand", () => {
 });
 
 describe("resolveEnv", () => {
-  const origRailsEnv = process.env.RAILS_TS_ENV;
+  const origRailsEnv = process.env.TRAILS_ENV;
   const origNodeEnv = process.env.NODE_ENV;
 
   afterEach(() => {
-    if (origRailsEnv === undefined) delete process.env.RAILS_TS_ENV;
-    else process.env.RAILS_TS_ENV = origRailsEnv;
+    if (origRailsEnv === undefined) delete process.env.TRAILS_ENV;
+    else process.env.TRAILS_ENV = origRailsEnv;
     if (origNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = origNodeEnv;
   });
 
-  it("prefers RAILS_TS_ENV", () => {
-    process.env.RAILS_TS_ENV = "staging";
+  it("prefers TRAILS_ENV", () => {
+    process.env.TRAILS_ENV = "staging";
     process.env.NODE_ENV = "production";
     expect(resolveEnv()).toBe("staging");
   });
 
   it("falls back to NODE_ENV", () => {
-    delete process.env.RAILS_TS_ENV;
+    delete process.env.TRAILS_ENV;
     process.env.NODE_ENV = "production";
     expect(resolveEnv()).toBe("production");
   });
 
   it("defaults to development", () => {
-    delete process.env.RAILS_TS_ENV;
+    delete process.env.TRAILS_ENV;
     delete process.env.NODE_ENV;
     expect(resolveEnv()).toBe("development");
   });
@@ -134,7 +134,7 @@ describe("loadDatabaseConfig", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-db-test-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-test-"));
   });
 
   afterEach(() => {
@@ -180,7 +180,7 @@ describe("discoverMigrations", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-migrations-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrations-"));
   });
 
   afterEach(() => {
@@ -232,7 +232,7 @@ describe("full migration flow", () => {
   let adapter: any;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-flow-"));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-flow-"));
   });
 
   afterEach(async () => {

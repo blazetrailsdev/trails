@@ -5,7 +5,7 @@ export function newCommand(): Command {
   const cmd = new Command("new");
 
   cmd
-    .description("Create a new rails-ts application")
+    .description("Create a new trails application")
     .argument("<name>", "Application name")
     .option("-d, --database <type>", "Database adapter (sqlite, postgres, mysql)", "sqlite")
     .option("--skip-git", "Skip git init")

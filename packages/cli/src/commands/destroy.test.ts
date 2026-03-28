@@ -7,7 +7,7 @@ import { createProgram } from "../cli.js";
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-test-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
 });
 
 afterEach(() => {

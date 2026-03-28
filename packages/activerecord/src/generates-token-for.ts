@@ -88,7 +88,7 @@ export function generatesTokenFor(
   }
 }
 
-const SECRET = "rails-ts-token-secret";
+const SECRET = "trails-token-secret";
 
 function _generateToken(record: Base, purpose: string): string {
   const config = _getConfig(record.constructor as typeof Base, purpose);

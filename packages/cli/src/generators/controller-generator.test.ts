@@ -8,7 +8,7 @@ let tmpDir: string;
 let lines: string[];
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-test-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
 });
@@ -80,7 +80,7 @@ describe("ControllerGenerator (JavaScript project)", () => {
   let jsLines: string[];
 
   beforeEach(() => {
-    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-js-test-"));
+    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
     jsLines = [];
   });
 

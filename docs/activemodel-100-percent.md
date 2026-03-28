@@ -65,5 +65,5 @@ Complete type casting and serialization:
 
 ## Dependencies
 
-- `@rails-ts/activesupport` — humanize, deepDup, deepMergeInPlace
+- `@blazetrails/activesupport` — humanize, deepDup, deepMergeInPlace
 - `bcryptjs` — password hashing for SecurePassword

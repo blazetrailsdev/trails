@@ -1,4 +1,4 @@
-# rails-ts
+# trails
 
 A set of TypeScript packages that mirror the Rails API as closely as possible.
 Someone reading the Rails API docs should be able to use these packages with

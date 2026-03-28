@@ -31,7 +31,7 @@ export interface LoggerOutput {
  * and formatter support. Mirrors the Rails API as closely as TypeScript allows.
  */
 export class Logger {
-  progname: string = "rails-ts";
+  progname: string = "trails";
   protected _formatter:
     | ((severity: string, datetime: Date, progname: string, msg: string) => string)
     | null = null;

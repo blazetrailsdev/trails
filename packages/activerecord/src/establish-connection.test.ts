@@ -100,7 +100,7 @@ describe("Base.establishConnection", () => {
 describe("Base.establishConnection with config file", () => {
   const originalEnv = process.env.DATABASE_URL;
   const originalNodeEnv = process.env.NODE_ENV;
-  const tempDir = join(tmpdir(), `rails-ts-test-${process.pid}`);
+  const tempDir = join(tmpdir(), `trails-test-${process.pid}`);
   const configPath = join(tempDir, "database.json");
 
   beforeEach(() => {
@@ -205,7 +205,7 @@ describe("Base.establishConnection with JS config file", () => {
   const originalEnv = process.env.DATABASE_URL;
   const originalNodeEnv = process.env.NODE_ENV;
   const originalCwd = process.cwd();
-  const tempDir = join(tmpdir(), `rails-ts-jsconfig-${process.pid}`);
+  const tempDir = join(tmpdir(), `trails-jsconfig-${process.pid}`);
   const configDir = join(tempDir, "config");
 
   beforeEach(() => {

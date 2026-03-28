@@ -74,8 +74,8 @@ describe("BroadcastLoggerTest", () => {
   it("#progname= sets the progname on the Broadcast logger but doesn't modify the inner loggers", () => {
     logger.progname = "Foo";
     expect(logger.progname).toBe("Foo");
-    expect(log1.progname).toBe("rails-ts");
-    expect(log2.progname).toBe("rails-ts");
+    expect(log1.progname).toBe("trails");
+    expect(log2.progname).toBe("trails");
   });
 
   it("#formatter= assigns to all the loggers", () => {

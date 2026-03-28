@@ -72,7 +72,7 @@ export class Application {
   }
 
   /**
-   * Get the route set for inspection (e.g., `rails-ts routes`).
+   * Get the route set for inspection (e.g., `trails routes`).
    */
   getRouteSet(): RouteSet {
     return this.routeSet;

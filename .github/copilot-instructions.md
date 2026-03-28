@@ -1,4 +1,4 @@
-# Copilot Instructions for rails-ts
+# Copilot Instructions for trails
 
 ## What this project is
 
@@ -33,7 +33,7 @@ Some tests appear in multiple `describe` blocks within the same file. This is so
 
 ## Use the package ecosystem like Rails does
 
-ActiveRecord's power comes from Arel. When building queries, subqueries, or SQL conditions in `activerecord`, use `@rails-ts/arel` (Table, SelectManager, Nodes, Attribute) to build AST nodes — never construct raw SQL strings. Similarly, use `@rails-ts/activemodel` for validations/callbacks and `@rails-ts/activesupport` for inflection/utilities rather than reimplementing them. If you see raw SQL string construction in activerecord, flag it — it should be using Arel.
+ActiveRecord's power comes from Arel. When building queries, subqueries, or SQL conditions in `activerecord`, use `@blazetrails/arel` (Table, SelectManager, Nodes, Attribute) to build AST nodes — never construct raw SQL strings. Similarly, use `@blazetrails/activemodel` for validations/callbacks and `@blazetrails/activesupport` for inflection/utilities rather than reimplementing them. If you see raw SQL string construction in activerecord, flag it — it should be using Arel.
 
 ## Code style
 

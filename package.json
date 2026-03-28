@@ -1,5 +1,5 @@
 {
-  "name": "rails-ts",
+  "name": "trails",
   "private": true,
   "packageManager": "pnpm@10.27.0",
   "scripts": {

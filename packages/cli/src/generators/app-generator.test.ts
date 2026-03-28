@@ -8,7 +8,7 @@ let tmpDir: string;
 let lines: string[];
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-test-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   lines = [];
 });
 

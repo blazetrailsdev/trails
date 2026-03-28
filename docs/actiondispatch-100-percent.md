@@ -49,7 +49,7 @@ A large portion of the missing tests (1,295 out of 2,751 — 47%) live under `co
 We have two options:
 
 1. **Build a minimal ActionController within actiondispatch** — just enough to run controller tests (filters, rendering to string, params handling). This is simpler but blurs package boundaries.
-2. **Create a separate `@rails-ts/actioncontroller` package** — more faithful to Rails structure but more setup overhead.
+2. **Create a separate `@blazetrails/actioncontroller` package** — more faithful to Rails structure but more setup overhead.
 
 Recommendation: Start with option 1, extracting to a separate package later if it grows large enough. Many controller tests can be satisfied with a lightweight controller base class that dispatches actions, runs filters, and returns responses.
 

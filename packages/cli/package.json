@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "rails-ts": "./dist/bin.js"
+    "trails": "./dist/bin.js"
   },
   "exports": {
     ".": "./dist/cli.js"

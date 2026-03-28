@@ -12,7 +12,7 @@ export function createProgram(): Command {
   const program = new Command();
 
   program
-    .name("rails-ts")
+    .name("trails")
     .description("TypeScript framework inspired by Ruby on Rails")
     .version(VERSION, "-v, --version");
 

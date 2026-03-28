@@ -8,7 +8,7 @@ let tmpDir: string;
 let lines: string[];
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-test-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   // Create tsconfig.json so generators produce TypeScript output by default
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
@@ -181,7 +181,7 @@ describe("MigrationGeneratorTest (JavaScript project)", () => {
   let jsLines: string[];
 
   beforeEach(() => {
-    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rails-ts-js-test-"));
+    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
     // No tsconfig.json — this is a JS project
     jsLines = [];
   });

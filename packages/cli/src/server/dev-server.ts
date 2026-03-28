@@ -50,7 +50,7 @@ export class DevServer {
 
     return new Promise((resolve) => {
       this.server!.listen(this.port, this.host, () => {
-        console.log(`=> Rails-TS development server starting on http://${this.host}:${this.port}`);
+        console.log(`=> Trails development server starting on http://${this.host}:${this.port}`);
         console.log(`=> Ctrl+C to stop`);
         console.log("");
         resolve();
