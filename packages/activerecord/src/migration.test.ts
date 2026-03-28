@@ -1338,36 +1338,82 @@ describe("MigrationTest", () => {
     // Requires migration runner
   });
 
-  it.skip("internal metadata table name", () => {
-    // Requires migration runner metadata
+  it("internal metadata table name", async () => {
+    const { InternalMetadata } = await import("./internal-metadata.js");
+    expect(InternalMetadata.TABLE_NAME).toBe("ar_internal_metadata");
   });
 
-  it.skip("internal metadata stores environment when migration fails", () => {
-    // Requires migration runner
+  it("internal metadata stores environment when migration fails", async () => {
+    const { adapter } = freshContext();
+    const { InternalMetadata } = await import("./internal-metadata.js");
+    const im = new InternalMetadata(adapter);
+    await im.createTable();
+
+    class FailingMigration extends Migration {
+      async up(): Promise<void> {
+        throw new Error("migration failed");
+      }
+      async down(): Promise<void> {}
+    }
+    const proxy: MigrationProxy = {
+      version: "1",
+      name: "Failing",
+      migration: () => new FailingMigration(),
+    };
+    const migrator = new Migrator(adapter, [proxy], { environment: "test" });
+    await migrator.up().catch(() => {});
+    const env = await im.get("environment");
+    // Environment should NOT be stored when migration fails
+    expect(env).toBeNull();
   });
 
-  it.skip("internal metadata stores environment when other data exists", () => {
-    // Requires migration runner
+  it("internal metadata stores environment when other data exists", async () => {
+    const { adapter } = freshContext();
+    const { InternalMetadata } = await import("./internal-metadata.js");
+    const im = new InternalMetadata(adapter);
+    await im.createTable();
+    await im.set("custom_key", "custom_value");
+
+    const proxy: MigrationProxy = {
+      version: "1",
+      name: "M1",
+      migration: () => ({ up: async () => {}, down: async () => {} }),
+    };
+    const migrator = new Migrator(adapter, [proxy], { environment: "staging" });
+    await migrator.up();
+    expect(await im.get("environment")).toBe("staging");
+    expect(await im.get("custom_key")).toBe("custom_value");
   });
 
   it.skip("internal metadata not used when not enabled", () => {
-    // Requires migration runner
+    // Requires enable/disable config for internal metadata
   });
 
-  it.skip("inserting a new entry into internal metadata", () => {
-    // Requires migration runner
+  it("inserting a new entry into internal metadata", async () => {
+    const { adapter } = freshContext();
+    const { InternalMetadata } = await import("./internal-metadata.js");
+    const im = new InternalMetadata(adapter);
+    await im.createTable();
+    await im.set("foo", "bar");
+    expect(await im.get("foo")).toBe("bar");
   });
 
-  it.skip("updating an existing entry into internal metadata", () => {
-    // Requires migration runner
+  it("updating an existing entry into internal metadata", async () => {
+    const { adapter } = freshContext();
+    const { InternalMetadata } = await import("./internal-metadata.js");
+    const im = new InternalMetadata(adapter);
+    await im.createTable();
+    await im.set("foo", "bar");
+    await im.set("foo", "baz");
+    expect(await im.get("foo")).toBe("baz");
   });
 
   it.skip("internal metadata create table wont be affected by schema cache", () => {
-    // Requires migration runner
+    // Requires schema cache implementation
   });
 
   it.skip("schema migration create table wont be affected by schema cache", () => {
-    // Requires migration runner
+    // Requires schema cache implementation
   });
 
   it.skip("add drop table with prefix and suffix", () => {

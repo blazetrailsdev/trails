@@ -20,14 +20,44 @@ describe("SchemaDumperTest", () => {
     SchemaDumper.ignoreTables = [];
   });
 
-  it.skip("dump schema information with empty versions", () => {
-    /* needs migration version tracking in schema_migrations table */
+  it("dump schema information with empty versions", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaMigration } = await import("./schema-migration.js");
+    const adapter = createTestAdapter();
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await sm.deleteAllVersions();
+    const dumper = new TopLevelDumper(adapter);
+    const result = await dumper.dumpWithVersion();
+    expect(result).toContain("Schema version: 0");
   });
-  it.skip("dump schema information outputs lexically reverse ordered versions regardless of database order", () => {
-    /* needs migration version tracking in schema_migrations table */
+
+  it("dump schema information outputs lexically reverse ordered versions regardless of database order", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaMigration } = await import("./schema-migration.js");
+    const adapter = createTestAdapter();
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await sm.deleteAllVersions();
+    await sm.recordVersion("20240301000000");
+    await sm.recordVersion("20240101000000");
+    await sm.recordVersion("20240201000000");
+    const dumper = new TopLevelDumper(adapter);
+    const result = await dumper.dumpWithVersion();
+    expect(result).toContain("Schema version: 20240301000000");
   });
-  it.skip("schema dump include migration version", () => {
-    /* needs migration version tracking in schema_migrations table */
+
+  it("schema dump include migration version", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaMigration } = await import("./schema-migration.js");
+    const adapter = createTestAdapter();
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await sm.recordVersion("20240601120000");
+    const dumper = new TopLevelDumper(adapter);
+    const result = await dumper.dumpWithVersion();
+    expect(result).toContain("Schema version: 20240601120000");
+    expect(result).toContain("defineSchema");
   });
 
   it("schema dump", async () => {

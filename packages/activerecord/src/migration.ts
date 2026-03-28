@@ -13,11 +13,18 @@ import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
+import { DefaultStrategy } from "./migration/default-strategy.js";
+import type { ExecutionStrategy, MigrationLike } from "./migration/execution-strategy.js";
+import type { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 
 export type {
   ReferentialAction,
   AddForeignKeyOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
+
+export { ExecutionStrategy, type MigrationLike } from "./migration/execution-strategy.js";
+export { DefaultStrategy } from "./migration/default-strategy.js";
+export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 
 export class MigrationError extends Error {
   constructor(message?: string) {
@@ -1137,30 +1144,27 @@ export interface MigrationProxy {
   migration: () => MigrationLike;
 }
 
-export interface MigrationLike {
-  up(adapter: DatabaseAdapter): Promise<void>;
-  down(adapter: DatabaseAdapter): Promise<void>;
-}
-
 export class Migrator {
   private _adapter: DatabaseAdapter;
   private _migrations: MigrationProxy[];
   private _schemaMigration: SchemaMigration;
   private _internalMetadata: InternalMetadata;
   private _environment: string;
+  private _strategy: ExecutionStrategy;
   verbose = true;
   private _output: string[] = [];
 
   constructor(
     adapter: DatabaseAdapter,
     migrations: MigrationProxy[],
-    options: { environment?: string } = {},
+    options: { environment?: string; strategy?: ExecutionStrategy } = {},
   ) {
     this._adapter = adapter;
     this._schemaMigration = new SchemaMigration(adapter);
     this._internalMetadata = new InternalMetadata(adapter);
     this._environment =
       options.environment ?? (process.env.NODE_ENV || DatabaseConfigurations.defaultEnv);
+    this._strategy = options.strategy ?? new DefaultStrategy();
     this._validateMigrations(migrations);
     const normalized = migrations.map((m) => ({
       ...m,
@@ -1434,12 +1438,11 @@ export class Migrator {
     }
 
     const migration = proxy.migration();
+    await this._strategy.exec(direction, migration, this._adapter);
     if (direction === "up") {
-      await migration.up(this._adapter);
       await this._schemaMigration.recordVersion(proxy.version);
       await this._internalMetadata.set("environment", this._environment);
     } else {
-      await migration.down(this._adapter);
       await this._schemaMigration.deleteVersion(proxy.version);
     }
 
@@ -1520,22 +1523,78 @@ export class Current extends Migration {
 export class CheckPending {
   private _app: (env: Record<string, unknown>) => Promise<unknown>;
   private _migrator?: Migrator;
+  private _pendingConnection?: PendingMigrationConnection;
+  private _migrations: MigrationProxy[];
 
-  constructor(app: (env: Record<string, unknown>) => Promise<unknown>, migrator?: Migrator) {
+  constructor(
+    app: (env: Record<string, unknown>) => Promise<unknown>,
+    options: {
+      migrator?: Migrator;
+      pendingConnection?: PendingMigrationConnection;
+      migrations?: MigrationProxy[];
+    } = {},
+  ) {
     this._app = app;
-    this._migrator = migrator;
+    this._migrator = options.migrator;
+    this._pendingConnection = options.pendingConnection;
+    this._migrations = options.migrations ?? [];
   }
 
   async call(env: Record<string, unknown>): Promise<unknown> {
     if (this._migrator) {
       const pending = await this._migrator.pendingMigrations();
-      if (pending.length > 0) {
-        throw new PendingMigrationError(
-          `Migrations are pending. To resolve this issue, run:\n\n  migrate\n\n` +
-            `You have ${pending.length} pending migration(s).`,
+      this._throwIfPending(pending.length);
+    } else if (this._pendingConnection) {
+      if (this._migrations.length === 0) {
+        throw new MigrationError(
+          "CheckPending requires a migrations list when using pendingConnection",
         );
       }
+      await this._pendingConnection.withAdapter(async (adapter) => {
+        const sm = new SchemaMigration(adapter);
+        let applied = new Set<string>();
+        try {
+          if (await sm.tableExists()) {
+            const versions = await sm.allVersions();
+            applied = new Set(
+              versions.map((v) => {
+                try {
+                  return String(BigInt(v));
+                } catch {
+                  return v;
+                }
+              }),
+            );
+          }
+        } catch (err: unknown) {
+          if (err instanceof Error && /no such column|does not exist/i.test(err.message)) {
+            // Table exists with incompatible schema; treat as no versions applied
+          } else {
+            throw err;
+          }
+        }
+        let pendingCount = 0;
+        for (const m of this._migrations) {
+          let normalized: string;
+          try {
+            normalized = String(BigInt(m.version));
+          } catch {
+            throw new MigrationError(`Invalid migration version "${m.version}" in CheckPending`);
+          }
+          if (!applied.has(normalized)) pendingCount++;
+        }
+        this._throwIfPending(pendingCount);
+      });
     }
     return this._app(env);
+  }
+
+  private _throwIfPending(count: number): void {
+    if (count > 0) {
+      throw new PendingMigrationError(
+        `Migrations are pending. To resolve this issue, run:\n\n  migrate\n\n` +
+          `You have ${count} pending migration(s).`,
+      );
+    }
   }
 }

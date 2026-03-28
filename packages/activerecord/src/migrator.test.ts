@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Migrator,
+  CheckPending,
+  PendingMigrationError,
   EnvironmentMismatchError,
   NoEnvironmentInSchemaError,
   ProtectedEnvironmentError,
 } from "./migration.js";
 import type { MigrationProxy } from "./migration.js";
+import { ExecutionStrategy } from "./migration/execution-strategy.js";
+import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
@@ -516,5 +520,59 @@ describe("MigratorTest", () => {
     });
     await migrator.up();
     await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
+  });
+
+  it("uses custom execution strategy", async () => {
+    const log: string[] = [];
+    class LoggingStrategy extends ExecutionStrategy {
+      async exec(
+        direction: "up" | "down",
+        migration: {
+          up(a: DatabaseAdapter): Promise<void>;
+          down(a: DatabaseAdapter): Promise<void>;
+        },
+        a: DatabaseAdapter,
+      ): Promise<void> {
+        log.push(`before:${direction}`);
+        if (direction === "up") {
+          await migration.up(a);
+        } else {
+          await migration.down(a);
+        }
+        log.push(`after:${direction}`);
+      }
+    }
+
+    const migrator = new Migrator(
+      adapter,
+      [
+        makeMigration("1", "M1", async () => {
+          log.push("up");
+        }),
+      ],
+      {
+        strategy: new LoggingStrategy(),
+      },
+    );
+    await migrator.up();
+    expect(log).toEqual(["before:up", "up", "after:up"]);
+  });
+
+  it("CheckPending with PendingMigrationConnection detects pending migrations", async () => {
+    const conn = new PendingMigrationConnection({ adapter });
+    const migrations = [makeMigration("1", "M1")];
+    const app = async () => "ok";
+    const check = new CheckPending(app, { pendingConnection: conn, migrations });
+    await expect(check.call({})).rejects.toThrow(PendingMigrationError);
+  });
+
+  it("CheckPending with PendingMigrationConnection passes when no pending", async () => {
+    const conn = new PendingMigrationConnection({ adapter });
+    const migrations = [makeMigration("1", "M1")];
+    const migrator = new Migrator(adapter, migrations);
+    await migrator.up();
+    const app = async () => "ok";
+    const check = new CheckPending(app, { pendingConnection: conn, migrations });
+    expect(await check.call({})).toBe("ok");
   });
 });
