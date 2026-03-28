@@ -43,3 +43,10 @@ export class Schema {
     }
   }
 }
+
+/**
+ * Mirrors: ActiveRecord::Schema::Definition
+ */
+export interface Definition {
+  define(adapter: DatabaseAdapter, fn: (schema: Schema) => void | Promise<void>): Promise<void>;
+}

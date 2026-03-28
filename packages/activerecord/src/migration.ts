@@ -15,6 +15,97 @@ export type {
   AddForeignKeyOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 
+export class MigrationError extends Error {
+  constructor(message?: string) {
+    super(message);
+    this.name = "MigrationError";
+  }
+}
+
+export class IrreversibleMigration extends MigrationError {
+  constructor(message = "This migration uses a feature that is not reversible.") {
+    super(message);
+    this.name = "IrreversibleMigration";
+  }
+}
+
+export class DuplicateMigrationVersionError extends MigrationError {
+  constructor(version: string | number) {
+    super(`Duplicate migration version: ${version}`);
+    this.name = "DuplicateMigrationVersionError";
+  }
+}
+
+export class DuplicateMigrationNameError extends MigrationError {
+  constructor(name: string) {
+    super(`Duplicate migration name: ${name}`);
+    this.name = "DuplicateMigrationNameError";
+  }
+}
+
+export class UnknownMigrationVersionError extends MigrationError {
+  constructor(version: string | number) {
+    super(`No migration with version number ${version}.`);
+    this.name = "UnknownMigrationVersionError";
+  }
+}
+
+export class IllegalMigrationNameError extends MigrationError {
+  constructor(name: string) {
+    super(`Illegal name for migration file: ${name}.`);
+    this.name = "IllegalMigrationNameError";
+  }
+}
+
+export class InvalidMigrationTimestampError extends MigrationError {
+  constructor(version: string | number) {
+    super(`Invalid timestamp ${version} in migration file name.`);
+    this.name = "InvalidMigrationTimestampError";
+  }
+}
+
+export class PendingMigrationError extends MigrationError {
+  constructor(message = "Migrations are pending. Run `migrate` to resolve.") {
+    super(message);
+    this.name = "PendingMigrationError";
+  }
+}
+
+export class ConcurrentMigrationError extends MigrationError {
+  constructor(message = "Cannot run migrations because another migration is currently running.") {
+    super(message);
+    this.name = "ConcurrentMigrationError";
+  }
+}
+
+export class NoEnvironmentInSchemaError extends MigrationError {
+  constructor(message = "Environment data not found in the schema.") {
+    super(message);
+    this.name = "NoEnvironmentInSchemaError";
+  }
+}
+
+export class ProtectedEnvironmentError extends MigrationError {
+  constructor(env: string) {
+    super(`You are attempting to run a destructive action against your '${env}' database.`);
+    this.name = "ProtectedEnvironmentError";
+  }
+}
+
+export class EnvironmentMismatchError extends MigrationError {
+  constructor(message = "The environment does not match the stored environment.") {
+    super(message);
+    this.name = "EnvironmentMismatchError";
+  }
+}
+
+export class EnvironmentStorageError extends MigrationError {
+  constructor(message = "Cannot store environment data.") {
+    super(message);
+    this.name = "EnvironmentStorageError";
+  }
+}
+
 interface RecordedOperation {
   method: string;
   args: unknown[];
@@ -99,7 +190,7 @@ export abstract class Migration {
 
       // If no operations were recorded, migration is irreversible
       if (this._recordedOps.length === 0) {
-        throw new Error(
+        throw new IrreversibleMigration(
           `${this.constructor.name}#down is not implemented. This migration is irreversible.`,
         );
       }
@@ -117,12 +208,12 @@ export abstract class Migration {
         await this.dropTable(op.args[0] as string);
         break;
       case "dropTable":
-        throw new Error("Cannot reverse dropTable without table definition");
+        throw new IrreversibleMigration("Cannot reverse dropTable without table definition");
       case "addColumn":
         await this.removeColumn(op.args[0] as string, op.args[1] as string);
         break;
       case "removeColumn":
-        throw new Error("Cannot reverse removeColumn without type info");
+        throw new IrreversibleMigration("Cannot reverse removeColumn without type info");
       case "addIndex":
         {
           const idxOpts: { column: string | string[]; name?: string } = {
@@ -134,7 +225,7 @@ export abstract class Migration {
         }
         break;
       case "removeIndex":
-        throw new Error("Cannot reverse removeIndex without column info");
+        throw new IrreversibleMigration("Cannot reverse removeIndex without column info");
       case "renameColumn":
         await this.renameColumn(op.args[0] as string, op.args[2] as string, op.args[1] as string);
         break;
@@ -142,7 +233,7 @@ export abstract class Migration {
         await this.renameTable(op.args[1] as string, op.args[0] as string);
         break;
       case "changeColumn":
-        throw new Error("Cannot reverse changeColumn without previous type info");
+        throw new IrreversibleMigration("Cannot reverse changeColumn without previous type info");
       case "addForeignKey": {
         const fkOpts = op.args[2] as { column?: string; name?: string } | undefined;
         await this.removeForeignKey(op.args[0] as string, fkOpts ?? (op.args[1] as string));
@@ -156,7 +247,7 @@ export abstract class Migration {
         );
         break;
       case "dropJoinTable":
-        throw new Error("Cannot reverse dropJoinTable without table definition");
+        throw new IrreversibleMigration("Cannot reverse dropJoinTable without table definition");
       case "addCheckConstraint": {
         const [table, expr, opts] = op.args as [string, string, { name?: string }?];
         const constraintName = opts?.name ?? this.schema._checkConstraintName(table, expr);
@@ -168,12 +259,14 @@ export abstract class Migration {
         if (typeof rmArg === "string") {
           await this.addCheckConstraint(rmTable, rmArg);
         } else {
-          throw new Error("Cannot reverse removeCheckConstraint without expression");
+          throw new IrreversibleMigration(
+            "Cannot reverse removeCheckConstraint without expression",
+          );
         }
         break;
       }
       default:
-        throw new Error(`Cannot reverse operation: ${op.method}`);
+        throw new IrreversibleMigration(`Cannot reverse operation: ${op.method}`);
     }
   }
 
@@ -685,7 +778,7 @@ export class MigrationContext {
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     if (name.length > 64) {
-      throw new Error(`Table name '${name}' is too long; the limit is 64 characters`);
+      throw new MigrationError(`Table name '${name}' is too long; the limit is 64 characters`);
     }
     if (options?.force && options?.ifNotExists) {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
@@ -1248,16 +1341,16 @@ export class Migrator {
 
     for (const m of migrations) {
       if (!m.version || !/^\d+$/.test(m.version)) {
-        throw new Error(
+        throw new MigrationError(
           `Invalid migration version: ${m.version}. Version must be a numeric string.`,
         );
       }
       const normalized = String(BigInt(m.version));
       if (versions.has(normalized)) {
-        throw new Error(`Duplicate migration version: ${m.version}`);
+        throw new DuplicateMigrationVersionError(m.version);
       }
       if (names.has(m.name)) {
-        throw new Error(`Duplicate migration name: ${m.name}`);
+        throw new DuplicateMigrationNameError(m.name);
       }
       versions.add(normalized);
       names.add(m.name);
@@ -1291,11 +1384,13 @@ export class Migrator {
   private _validateTargetVersion(v: number | string): void {
     if (typeof v === "string") {
       if (!/^\d+$/.test(v)) {
-        throw new Error(`Invalid target version: ${v}. Must be a non-negative numeric value.`);
+        throw new MigrationError(
+          `Invalid target version: ${v}. Must be a non-negative numeric value.`,
+        );
       }
     } else {
       if (!Number.isInteger(v) || v < 0) {
-        throw new Error(`Invalid target version: ${v}. Must be a non-negative integer.`);
+        throw new MigrationError(`Invalid target version: ${v}. Must be a non-negative integer.`);
       }
     }
   }
@@ -1350,5 +1445,33 @@ export class Migrator {
       const action = direction === "up" ? "migrated" : "reverted";
       this._output.push(`== ${proxy.version} ${proxy.name}: ${action} ==`);
     }
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::Migration::Current
+ *
+ * Alias for the latest migration version — migrations that don't
+ * specify a version inherit from this.
+ */
+export class Current extends Migration {
+  async up(): Promise<void> {}
+  async down(): Promise<void> {}
+}
+
+/**
+ * Mirrors: ActiveRecord::Migration::CheckPending
+ *
+ * Middleware that raises PendingMigrationError if migrations are pending.
+ */
+export class CheckPending {
+  private _app: (env: Record<string, unknown>) => Promise<unknown>;
+
+  constructor(app: (env: Record<string, unknown>) => Promise<unknown>) {
+    this._app = app;
+  }
+
+  async call(env: Record<string, unknown>): Promise<unknown> {
+    return this._app(env);
   }
 }
