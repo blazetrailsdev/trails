@@ -7,56 +7,38 @@
  * (typically YAML/JSON) and load it into the database for tests.
  */
 
-const MAX_ID = 2 ** 30 - 1;
+import type { DatabaseAdapter } from "../adapter.js";
+import { quoteIdentifier, quoteTableName } from "../connection-adapters/abstract/quoting.js";
+import { detectAdapterName } from "../adapter-name.js";
+import { type ReflectionProxy } from "./table-row.js";
+import { TableRows } from "./table-rows.js";
+
+export { identify, compositeIdentify } from "./identify.js";
 
 /**
- * Generate a deterministic integer ID from a fixture label.
- * Uses the same algorithm as Rails: Zlib.crc32(label.to_s) % MAX_ID
+ * Mirrors: ActiveRecord::FixtureSet::File
  *
- * Mirrors: ActiveRecord::FixtureSet.identify
+ * Reads and parses fixture data from a file (YAML in Rails, JSON/objects in TS).
  */
-export function identify(label: string): number {
-  const crc = crc32(Buffer.from(label));
-  return ((crc % MAX_ID) + MAX_ID) % MAX_ID;
-}
+export class File {
+  private _data: Record<string, Record<string, unknown>>;
 
-/**
- * Generate a composite identity from a label for composite primary keys.
- * Returns an object mapping each key column name to a deterministic ID.
- *
- * Mirrors: ActiveRecord::FixtureSet.composite_identify
- */
-export function compositeIdentify(label: string, keyColumns: string[]): Record<string, number> {
-  const baseId = identify(label);
-  const result: Record<string, number> = {};
-  for (let i = 0; i < keyColumns.length; i++) {
-    result[keyColumns[i]] = Number((BigInt(baseId) * (1n << BigInt(i))) % BigInt(MAX_ID));
+  constructor(data: Record<string, Record<string, unknown>>) {
+    this._data = data;
   }
-  return result;
-}
 
-/**
- * CRC-32 implementation matching Ruby's Zlib.crc32.
- */
-function crc32(buf: Buffer): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ buf[i]) & 0xff];
+  get rows(): Array<[string, Record<string, unknown>]> {
+    return Object.entries(this._data);
   }
-  return (crc ^ 0xffffffff) >>> 0;
-}
 
-const CRC32_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let crc = i;
-    for (let j = 0; j < 8; j++) {
-      crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
-    }
-    table[i] = crc >>> 0;
+  get labels(): string[] {
+    return Object.keys(this._data);
   }
-  return table;
-})();
+
+  static parse(data: Record<string, Record<string, unknown>>): File {
+    return new File(data);
+  }
+}
 
 /**
  * A set of fixtures loaded from data (typically parsed from YAML).
@@ -107,15 +89,84 @@ export class FixtureSet {
    * If a fixture doesn't have a primary key value, one is generated
    * from the label using identify().
    */
-  toRows(primaryKey = "id"): Array<Record<string, unknown>> {
-    const rows: Array<Record<string, unknown>> = [];
+  toRows(
+    options: {
+      primaryKey?: string;
+      associations?: ReflectionProxy[];
+    } = {},
+  ): Array<Record<string, unknown>> {
+    const data: Record<string, Record<string, unknown>> = {};
     for (const [label, attrs] of this._fixtures) {
-      const row = { ...attrs };
-      if (row[primaryKey] === undefined) {
-        row[primaryKey] = identify(label);
-      }
-      rows.push(row);
+      data[label] = attrs;
     }
-    return rows;
+    const tableRows = new TableRows(this.tableName, data, options);
+    return tableRows.toRecords();
+  }
+
+  /**
+   * Insert all fixture rows into the database.
+   * Resolves association labels to foreign key IDs if associations are provided.
+   *
+   * Mirrors: ActiveRecord::FixtureSet#insert
+   */
+  async insertAll(
+    adapter: DatabaseAdapter,
+    options: { primaryKey?: string; associations?: ReflectionProxy[] } = {},
+  ): Promise<void> {
+    const rows = this.toRows(options);
+    if (rows.length === 0) return;
+    await adapter.beginTransaction();
+    try {
+      await this._insertRows(adapter, rows);
+      await adapter.commit();
+    } catch (error) {
+      await adapter.rollback();
+      throw error;
+    }
+  }
+
+  /**
+   * Delete all rows from the fixture's table, then insert fixtures.
+   * Runs as a single atomic transaction.
+   *
+   * Mirrors: ActiveRecord::FixtureSet#create_fixtures (truncate + insert)
+   */
+  async loadInto(
+    adapter: DatabaseAdapter,
+    options: { primaryKey?: string; associations?: ReflectionProxy[] } = {},
+  ): Promise<void> {
+    const rows = this.toRows(options);
+    const adapterName = detectAdapterName(adapter);
+    const quotedTable = quoteTableName(this.tableName, adapterName);
+    await adapter.beginTransaction();
+    try {
+      await adapter.executeMutation(`DELETE FROM ${quotedTable}`);
+      await this._insertRows(adapter, rows);
+      await adapter.commit();
+    } catch (error) {
+      await adapter.rollback();
+      throw error;
+    }
+  }
+
+  private async _insertRows(
+    adapter: DatabaseAdapter,
+    rows: Array<Record<string, unknown>>,
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    const adapterName = detectAdapterName(adapter);
+    const quotedTable = quoteTableName(this.tableName, adapterName);
+
+    for (const row of rows) {
+      const rowColumns = Object.keys(row);
+      if (rowColumns.length === 0) continue;
+      const quotedCols = rowColumns.map((c) => quoteIdentifier(c, adapterName)).join(", ");
+      const placeholders = rowColumns.map(() => "?").join(", ");
+      const values = rowColumns.map((c) => row[c]);
+      await adapter.executeMutation(
+        `INSERT INTO ${quotedTable} (${quotedCols}) VALUES (${placeholders})`,
+        values,
+      );
+    }
   }
 }
