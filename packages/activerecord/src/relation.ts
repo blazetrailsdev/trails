@@ -14,8 +14,8 @@ import {
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
 export { Range };
 import { WhereChain } from "./relation/query-methods.js";
-import { Merger } from "./relation/merger.js";
 import { Batches } from "./relation/batches.js";
+import { performSpawn, performMerge } from "./relation/spawn-methods.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import {
   performCount,
@@ -867,14 +867,7 @@ export class Relation<T extends Base> {
     return rel;
   }
 
-  /**
-   * Merge another relation's conditions into this one.
-   *
-   * Mirrors: ActiveRecord::Relation#merge
-   */
-  merge<U extends Base>(other: Relation<U>): Relation<T> {
-    return new Merger(this, other).merge();
-  }
+  // merge and spawn are mixed in from spawn-methods.ts
 
   /**
    * Change the FROM clause (for subqueries or alternate table names).
@@ -1448,14 +1441,7 @@ export class Relation<T extends Base> {
     return this;
   }
 
-  /**
-   * Create a fresh copy of this relation.
-   *
-   * Mirrors: ActiveRecord::Relation#spawn
-   */
-  spawn(): Relation<T> {
-    return this._clone();
-  }
+  // spawn is mixed in from spawn-methods.ts
 
   /**
    * Build a new record with the relation's scoped conditions.
@@ -4025,6 +4011,9 @@ export interface Relation<T extends Base> extends CalculationMethods {
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T>;
+  // SpawnMethods
+  spawn(): Relation<T>;
+  merge<U extends Base>(other: Relation<U>): Relation<T>;
 }
 
 const def = { writable: true, configurable: true, enumerable: false };
@@ -4063,6 +4052,9 @@ Object.defineProperties(Relation.prototype, {
   thirdToLastBang: { ...def, value: performThirdToLastBang },
   findOrCreateByBang: { ...def, value: performFindOrCreateByBang },
   createOrFindByBang: { ...def, value: performCreateOrFindByBang },
+  // SpawnMethods
+  spawn: { ...def, value: performSpawn },
+  merge: { ...def, value: performMerge },
 });
 
 // Register Relation with Base to break the circular dependency.

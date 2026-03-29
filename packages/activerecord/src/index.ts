@@ -1,5 +1,6 @@
 export { Base } from "./base.js";
 export { Relation, Range } from "./relation.js";
+export { QueryAttribute } from "./relation/query-attribute.js";
 export type { DatabaseAdapter } from "./adapter.js";
 export { Migration, MigrationContext } from "./migration.js";
 export {
