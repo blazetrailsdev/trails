@@ -1,7 +1,7 @@
 import { Table, SelectManager, Nodes, Visitors } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
-import { RecordNotFound, SoleRecordExceeded } from "./errors.js";
+import { RecordNotFound } from "./errors.js";
 import { modelRegistry } from "./associations.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import {
@@ -25,7 +25,35 @@ import {
   performMaximum,
   type CalculationMethods,
 } from "./relation/calculations.js";
-import { FinderMethods } from "./relation/finder-methods.js";
+import {
+  performFind,
+  performFindBy,
+  performFindByBang,
+  performFindSoleBy,
+  performFirst,
+  performFirstBang,
+  performLast,
+  performLastBang,
+  performSole,
+  performTake,
+  performTakeBang,
+  performSecond,
+  performThird,
+  performFourth,
+  performFifth,
+  performFortyTwo,
+  performSecondToLast,
+  performThirdToLast,
+  performSecondBang,
+  performThirdBang,
+  performFourthBang,
+  performFifthBang,
+  performFortyTwoBang,
+  performSecondToLastBang,
+  performThirdToLastBang,
+  performFindOrCreateByBang,
+  performCreateOrFindByBang,
+} from "./relation/finder-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { WhereClause } from "./relation/where-clause.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
@@ -1789,209 +1817,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#first
    */
-  async first(n?: number): Promise<T | T[] | null> {
-    return FinderMethods.first(this, n);
-  }
-
-  async _performFirst(n?: number): Promise<T | T[] | null> {
-    if (this._isNone) return n !== undefined ? [] : null;
-    if (n !== undefined) {
-      const rel = this._clone();
-      rel._limitValue = n;
-      return rel.toArray();
-    }
-    const rel = this._clone();
-    rel._limitValue = 1;
-    const records = await rel.toArray();
-    return records[0] ?? null;
-  }
-
-  /**
-   * Return the first record, or throw if none found.
-   *
-   * Mirrors: ActiveRecord::Relation#first!
-   */
-  async firstBang(): Promise<T> {
-    const record = await this.first();
-    if (!record) {
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    }
-    return record as T;
-  }
-
-  /**
-   * Return the last record, or last N records when n is given.
-   * When no order is specified, defaults to ordering by primary key
-   * descending (matching Rails behavior).
-   *
-   * Mirrors: ActiveRecord::Relation#last
-   */
-  async last(n?: number): Promise<T | T[] | null> {
-    return FinderMethods.last(this, n);
-  }
-
-  async _performLast(n?: number): Promise<T | T[] | null> {
-    if (this._isNone) return n !== undefined ? [] : null;
-    let rel: Relation<T>;
-    if (this._orderClauses.length === 0) {
-      rel = this.order({ [this._modelClass.primaryKey as string]: "desc" as const });
-    } else {
-      rel = this.reverseOrder();
-    }
-    if (n !== undefined) {
-      rel = rel.limit(n);
-      const records = await rel.toArray();
-      return records.reverse();
-    }
-    rel = rel.limit(1);
-    const records = await rel.toArray();
-    return records[0] ?? null;
-  }
-
-  /**
-   * Return the last record, or throw if none found.
-   *
-   * Mirrors: ActiveRecord::Relation#last!
-   */
-  async lastBang(): Promise<T> {
-    const record = await this.last();
-    if (!record) {
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    }
-    return record as T;
-  }
-
-  /**
-   * Return exactly one record, or raise if zero or more than one.
-   *
-   * Mirrors: ActiveRecord::Relation#sole
-   */
-  async sole(): Promise<T> {
-    const rel = this._clone();
-    rel._limitValue = 2; // Only need 2 to detect "more than one"
-    const records = await rel.toArray();
-    if (records.length === 0) {
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    }
-    if (records.length > 1) {
-      throw new SoleRecordExceeded(this._modelClass.name);
-    }
-    return records[0];
-  }
-
-  /**
-   * Return the second record.
-   *
-   * Mirrors: ActiveRecord::Relation#second
-   */
-  async second(): Promise<T | null> {
-    return this._findNthWithLimit(1);
-  }
-
-  /**
-   * Return the third record.
-   *
-   * Mirrors: ActiveRecord::Relation#third
-   */
-  async third(): Promise<T | null> {
-    return this._findNthWithLimit(2);
-  }
-
-  /**
-   * Return the fourth record.
-   *
-   * Mirrors: ActiveRecord::Relation#fourth
-   */
-  async fourth(): Promise<T | null> {
-    return this._findNthWithLimit(3);
-  }
-
-  /**
-   * Return the fifth record.
-   *
-   * Mirrors: ActiveRecord::Relation#fifth
-   */
-  async fifth(): Promise<T | null> {
-    return this._findNthWithLimit(4);
-  }
-
-  /**
-   * Return the forty-second record.
-   *
-   * Mirrors: ActiveRecord::Relation#forty_two
-   */
-  async fortyTwo(): Promise<T | null> {
-    return this._findNthWithLimit(41);
-  }
-
-  /**
-   * Return the second-to-last record.
-   *
-   * Mirrors: ActiveRecord::Relation#second_to_last
-   */
-  async secondToLast(): Promise<T | null> {
-    return this._findNthFromLast(1);
-  }
-
-  /**
-   * Return the third-to-last record.
-   *
-   * Mirrors: ActiveRecord::Relation#third_to_last
-   */
-  async thirdToLast(): Promise<T | null> {
-    return this._findNthFromLast(2);
-  }
-
-  private async _findNthWithLimit(index: number): Promise<T | null> {
-    const rel = this._clone();
-    rel._limitValue = 1;
-    rel._offsetValue = (this._offsetValue ?? 0) + index;
-    if (rel._orderClauses.length === 0 && rel._rawOrderClauses.length === 0) {
-      rel._orderClauses.push(this._modelClass.primaryKey as string);
-    }
-    const records = await rel.toArray();
-    return records[0] ?? null;
-  }
-
-  private async _findNthFromLast(index: number): Promise<T | null> {
-    let rel: Relation<T>;
-    if (this._orderClauses.length === 0 && this._rawOrderClauses.length === 0) {
-      rel = this.order({ [this._modelClass.primaryKey as string]: "desc" as const });
-    } else {
-      rel = this.reverseOrder();
-    }
-    const result = await (rel as any)._findNthWithLimit(index);
-    return result;
-  }
-
-  /**
-   * Return a record without any implicit ordering.
-   *
-   * Mirrors: ActiveRecord::Relation#take
-   */
-  async take(limit?: number): Promise<T | T[] | null> {
-    const rel = this._clone();
-    if (limit !== undefined) {
-      rel._limitValue = limit;
-      return rel.toArray();
-    }
-    rel._limitValue = 1;
-    const records = await rel.toArray();
-    return records[0] ?? null;
-  }
-
-  /**
-   * Return a record without ordering, or throw if none found.
-   *
-   * Mirrors: ActiveRecord::Relation#take!
-   */
-  async takeBang(): Promise<T> {
-    const record = await this.take();
-    if (!record) {
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    }
-    return record as T;
-  }
+  // first, firstBang, last, lastBang, sole, take, takeBang,
+  // second, third, fourth, fifth, fortyTwo, secondToLast, thirdToLast,
+  // and their bang variants are mixed in from finder-methods.ts
 
   /**
    * Pick values for columns from the first matching record.
@@ -3773,199 +3601,8 @@ export class Relation<T extends Base> {
     }
   }
 
-  // -- Finder methods --
-
-  /**
-   * Find records by primary key.
-   *
-   * Mirrors: ActiveRecord::Relation#find
-   */
-  async find(...ids: unknown[]): Promise<T | T[]> {
-    return FinderMethods.find(this, ...ids);
-  }
-
-  async _performFind(...ids: unknown[]): Promise<T | T[]> {
-    const pk = this._modelClass.primaryKey;
-    if (ids.length === 1 && !Array.isArray(ids[0])) {
-      const records = await this.where({ [pk as string]: ids[0] })
-        .limit(1)
-        .toArray();
-      if (records.length === 0) {
-        throw new RecordNotFound(
-          `Couldn't find ${this._modelClass.name} with '${pk}'=${ids[0]}`,
-          this._modelClass.name,
-          pk as string,
-          ids[0],
-        );
-      }
-      return records[0];
-    }
-    const flatIds = ids.flat();
-    if (flatIds.length === 0) {
-      throw new RecordNotFound(
-        `Couldn't find ${this._modelClass.name} with an empty list of ids`,
-        this._modelClass.name,
-        pk as string,
-        [],
-      );
-    }
-    const records = await this.where({ [pk as string]: flatIds }).toArray();
-    if (records.length !== flatIds.length) {
-      throw new RecordNotFound(
-        `Couldn't find all ${this._modelClass.name} with '${pk}': (${flatIds.join(", ")})`,
-        this._modelClass.name,
-        pk as string,
-        flatIds,
-      );
-    }
-    return records;
-  }
-
-  /**
-   * Find the first record matching conditions.
-   *
-   * Mirrors: ActiveRecord::Relation#find_by
-   */
-  async findBy(conditions: Record<string, unknown>): Promise<T | null> {
-    const records = await this.where(conditions).limit(1).toArray();
-    return records[0] ?? null;
-  }
-
-  /**
-   * Find the first record matching conditions, or throw.
-   *
-   * Mirrors: ActiveRecord::Relation#find_by!
-   */
-  async findByBang(conditions: Record<string, unknown>): Promise<T> {
-    const record = await this.findBy(conditions);
-    if (!record) {
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    }
-    return record;
-  }
-
-  /**
-   * Find the sole record matching conditions.
-   *
-   * Mirrors: ActiveRecord::Relation#find_sole_by
-   */
-  async findSoleBy(conditions: Record<string, unknown>): Promise<T> {
-    return this.where(conditions).sole();
-  }
-
-  /**
-   * Find or create, raising on validation failure.
-   *
-   * Mirrors: ActiveRecord::Relation#find_or_create_by!
-   */
-  async findOrCreateByBang(
-    conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>,
-  ): Promise<T> {
-    const records = await this.where(conditions).limit(1).toArray();
-    if (records.length > 0) return records[0];
-    return this._modelClass.createBang({
-      ...this._createWithAttrs,
-      ...this._scopeAttributes(),
-      ...conditions,
-      ...extra,
-    }) as Promise<T>;
-  }
-
-  /**
-   * Try to create first; if uniqueness violation, find. Raises on validation failure.
-   *
-   * Mirrors: ActiveRecord::Relation#create_or_find_by!
-   */
-  async createOrFindByBang(
-    conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>,
-  ): Promise<T> {
-    try {
-      return (await this._modelClass.createBang({
-        ...this._createWithAttrs,
-        ...this._scopeAttributes(),
-        ...conditions,
-        ...extra,
-      })) as T;
-    } catch {
-      const records = await this.where(conditions).limit(1).toArray();
-      if (records.length > 0) return records[0];
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    }
-  }
-
-  // -- Bang ordinal methods --
-
-  /**
-   * Mirrors: ActiveRecord::Relation#second!
-   */
-  async secondBang(): Promise<T> {
-    const record = await this.second();
-    if (!record)
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    return record;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#third!
-   */
-  async thirdBang(): Promise<T> {
-    const record = await this.third();
-    if (!record)
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    return record;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#fourth!
-   */
-  async fourthBang(): Promise<T> {
-    const record = await this.fourth();
-    if (!record)
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    return record;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#fifth!
-   */
-  async fifthBang(): Promise<T> {
-    const record = await this.fifth();
-    if (!record)
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    return record;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#forty_two!
-   */
-  async fortyTwoBang(): Promise<T> {
-    const record = await this.fortyTwo();
-    if (!record)
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    return record;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#second_to_last!
-   */
-  async secondToLastBang(): Promise<T> {
-    const record = await this.secondToLast();
-    if (!record)
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    return record;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#third_to_last!
-   */
-  async thirdToLastBang(): Promise<T> {
-    const record = await this.thirdToLast();
-    if (!record)
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
-    return record;
-  }
+  // find, findBy, findByBang, findSoleBy, findOrCreateByBang, createOrFindByBang,
+  // and all bang ordinal methods are mixed in from finder-methods.ts
 
   // -- CTE support --
 
@@ -4347,15 +3984,85 @@ function wrapWithScopeProxy<T extends Base>(rel: Relation<T>): Relation<T> {
 // The prototype assignment wires the implementations from calculations.ts.
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Relation<T extends Base> extends CalculationMethods {}
+export interface Relation<T extends Base> extends CalculationMethods {
+  // Finder methods — typed with T to preserve generics through the interface merge.
+  // Implementations are in finder-methods.ts, wired via prototype assignment below.
+  find(ids: unknown[]): Promise<T[]>;
+  find(id: unknown): Promise<T>;
+  find(...ids: unknown[]): Promise<T | T[]>;
+  findBy(conditions: Record<string, unknown>): Promise<T | null>;
+  findByBang(conditions: Record<string, unknown>): Promise<T>;
+  findSoleBy(conditions: Record<string, unknown>): Promise<T>;
+  first(): Promise<T | null>;
+  first(n: number): Promise<T[]>;
+  firstBang(): Promise<T>;
+  last(): Promise<T | null>;
+  last(n: number): Promise<T[]>;
+  lastBang(): Promise<T>;
+  sole(): Promise<T>;
+  take(): Promise<T | null>;
+  take(limit: number): Promise<T[]>;
+  takeBang(): Promise<T>;
+  second(): Promise<T | null>;
+  third(): Promise<T | null>;
+  fourth(): Promise<T | null>;
+  fifth(): Promise<T | null>;
+  fortyTwo(): Promise<T | null>;
+  secondToLast(): Promise<T | null>;
+  thirdToLast(): Promise<T | null>;
+  secondBang(): Promise<T>;
+  thirdBang(): Promise<T>;
+  fourthBang(): Promise<T>;
+  fifthBang(): Promise<T>;
+  fortyTwoBang(): Promise<T>;
+  secondToLastBang(): Promise<T>;
+  thirdToLastBang(): Promise<T>;
+  findOrCreateByBang(
+    conditions: Record<string, unknown>,
+    extra?: Record<string, unknown>,
+  ): Promise<T>;
+  createOrFindByBang(
+    conditions: Record<string, unknown>,
+    extra?: Record<string, unknown>,
+  ): Promise<T>;
+}
 
+const def = { writable: true, configurable: true, enumerable: false };
 Object.defineProperties(Relation.prototype, {
-  count: { value: performCount, writable: true, configurable: true, enumerable: false },
-  sum: { value: performSum, writable: true, configurable: true, enumerable: false },
-  average: { value: performAverage, writable: true, configurable: true, enumerable: false },
-  minimum: { value: performMinimum, writable: true, configurable: true, enumerable: false },
-  maximum: { value: performMaximum, writable: true, configurable: true, enumerable: false },
+  // Calculations
+  count: { ...def, value: performCount },
+  sum: { ...def, value: performSum },
+  average: { ...def, value: performAverage },
+  minimum: { ...def, value: performMinimum },
+  maximum: { ...def, value: performMaximum },
+  // Finders
+  find: { ...def, value: performFind },
+  findBy: { ...def, value: performFindBy },
+  findByBang: { ...def, value: performFindByBang },
+  findSoleBy: { ...def, value: performFindSoleBy },
+  first: { ...def, value: performFirst },
+  firstBang: { ...def, value: performFirstBang },
+  last: { ...def, value: performLast },
+  lastBang: { ...def, value: performLastBang },
+  sole: { ...def, value: performSole },
+  take: { ...def, value: performTake },
+  takeBang: { ...def, value: performTakeBang },
+  second: { ...def, value: performSecond },
+  third: { ...def, value: performThird },
+  fourth: { ...def, value: performFourth },
+  fifth: { ...def, value: performFifth },
+  fortyTwo: { ...def, value: performFortyTwo },
+  secondToLast: { ...def, value: performSecondToLast },
+  thirdToLast: { ...def, value: performThirdToLast },
+  secondBang: { ...def, value: performSecondBang },
+  thirdBang: { ...def, value: performThirdBang },
+  fourthBang: { ...def, value: performFourthBang },
+  fifthBang: { ...def, value: performFifthBang },
+  fortyTwoBang: { ...def, value: performFortyTwoBang },
+  secondToLastBang: { ...def, value: performSecondToLastBang },
+  thirdToLastBang: { ...def, value: performThirdToLastBang },
+  findOrCreateByBang: { ...def, value: performFindOrCreateByBang },
+  createOrFindByBang: { ...def, value: performCreateOrFindByBang },
 });
 
 // Register Relation with Base to break the circular dependency.
