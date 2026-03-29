@@ -6542,6 +6542,7 @@ describe("CalculationsTest", () => {
         this.adapter = adapter;
       }
     }
+    await User.createTable();
     await User.all().deleteAll();
     await User.create({ name: "A" });
     await User.create({ name: "B" });

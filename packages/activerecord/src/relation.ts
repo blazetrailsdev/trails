@@ -16,6 +16,7 @@ export { Range };
 import { WhereChain } from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
 import { performSpawn, performMerge } from "./relation/spawn-methods.js";
+import { wrapWithScopeProxy } from "./relation/delegation.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import {
   performCount,
@@ -3929,39 +3930,6 @@ export class Relation<T extends Base> {
     rel._ctes = [...this._ctes];
     return wrapWithScopeProxy(rel);
   }
-}
-
-/**
- * Wrap a Relation in a Proxy that delegates scope names
- * to the model's registered scopes.
- */
-function wrapWithScopeProxy<T extends Base>(rel: Relation<T>): Relation<T> {
-  return new Proxy(rel, {
-    get(target: any, prop: string | symbol, receiver: any) {
-      const value = Reflect.get(target, prop, receiver);
-      if (typeof prop === "symbol") return value;
-      if (value !== undefined) return value;
-      if (prop in target) return value;
-
-      // Check if this is a scope on the model class
-      const modelClass = target._modelClass as typeof Base;
-      if (modelClass._scopes.has(prop as string)) {
-        return (...args: any[]) => {
-          const scopeFn = modelClass._scopes.get(prop as string)!;
-          const result = scopeFn(target, ...args);
-          // Apply scope extensions if any
-          const extensions = modelClass._scopeExtensions?.get(prop as string);
-          if (extensions && result && typeof result === "object") {
-            for (const [name, fn] of Object.entries(extensions)) {
-              (result as any)[name] = fn.bind(result);
-            }
-          }
-          return result;
-        };
-      }
-      return value;
-    },
-  });
 }
 
 // ---------------------------------------------------------------------------
