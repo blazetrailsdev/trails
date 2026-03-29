@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import type { DatabaseAdapter } from "../adapter.js";
+import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 
 /**
  * SQLite adapter — connects ActiveRecord to a real SQLite database.
@@ -173,39 +174,10 @@ export class SQLite3Adapter implements DatabaseAdapter {
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::StatementPool
+ *
+ * SQLite3-specific statement pool backed by the generic StatementPool.
  */
-export class StatementPool {
-  private _statements = new Map<string, Database.Statement>();
-  private _maxSize: number;
-
-  constructor(maxSize = 1000) {
-    this._maxSize = maxSize;
-  }
-
-  get length(): number {
-    return this._statements.size;
-  }
-
-  get(key: string): Database.Statement | undefined {
-    return this._statements.get(key);
-  }
-
-  set(key: string, stmt: Database.Statement): void {
-    if (this._statements.size >= this._maxSize) {
-      const firstKey = this._statements.keys().next().value;
-      if (firstKey !== undefined) this._statements.delete(firstKey);
-    }
-    this._statements.set(key, stmt);
-  }
-
-  clear(): void {
-    this._statements.clear();
-  }
-
-  delete(key: string): void {
-    this._statements.delete(key);
-  }
-}
+export class StatementPool extends GenericStatementPool<Database.Statement> {}
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer

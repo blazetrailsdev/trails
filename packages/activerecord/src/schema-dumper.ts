@@ -32,10 +32,13 @@ class AdapterSchemaSource implements SchemaSource {
     const cols = await this._schema.columns(tableName);
     return cols.map((col) => ({
       name: col.name,
-      type: col.type,
+      type: col.sqlType || col.type || "unknown",
       primaryKey: col.primaryKey,
       null: col.null,
       default: col.default,
+      limit: col.limit ?? undefined,
+      precision: col.precision ?? undefined,
+      scale: col.scale ?? undefined,
     }));
   }
 

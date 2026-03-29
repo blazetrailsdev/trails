@@ -595,9 +595,7 @@ export abstract class Migration {
     }
   }
 
-  async columns(
-    tableName: string,
-  ): Promise<Array<{ name: string; type: string; null: boolean; default: unknown }>> {
+  async columns(tableName: string): Promise<import("./connection-adapters/column.js").Column[]> {
     return this.schema.columns(tableName);
   }
 

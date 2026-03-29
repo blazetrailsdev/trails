@@ -11,14 +11,14 @@ import type { DatabaseConfig } from "../../database-configurations/database-conf
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractPool
  */
 export interface AbstractPool {
-  get schema_cache(): unknown;
+  get schemaCache(): unknown;
 }
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool::NullConfig
  */
 export class NullConfig {
-  get schema_cache(): null {
+  get schemaCache(): null {
     return null;
   }
 }
@@ -31,7 +31,7 @@ export class NullPool implements AbstractPool {
 
   static readonly NullConfig = NullConfig;
 
-  get schema_cache(): null {
+  get schemaCache(): null {
     return null;
   }
 
