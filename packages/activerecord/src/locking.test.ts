@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { Base, transaction, registerModel } from "./index.js";
+import { Base, transaction, registerModel, StaleObjectError } from "./index.js";
 import { Associations } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -41,7 +41,7 @@ describe("OptimisticLockingTest", () => {
     const p1 = await Person.create({ name: "Test" });
     const p2 = await Person.find(p1.id);
     await p1.update({ name: "Changed" });
-    await expect(p2.destroy()).rejects.toThrow("StaleObjectError");
+    await expect(p2.destroy()).rejects.toThrow(StaleObjectError);
   });
 
   it("lock new when explicitly passing nil", () => {
@@ -71,7 +71,7 @@ describe("OptimisticLockingTest", () => {
     const p1 = await Person.create({ name: "Szymon" });
     const p2 = await Person.find(p1.id);
     await p1.update({ name: "Changed by p1" });
-    await expect(p2.update({ name: "Changed by p2" })).rejects.toThrow("StaleObjectError");
+    await expect(p2.update({ name: "Changed by p2" })).rejects.toThrow(StaleObjectError);
   });
 
   it.skip("update with dirty primary key", () => {
@@ -220,7 +220,7 @@ describe("OptimisticLockingTest", () => {
     const t2 = await LockCustom.find(t1.id);
     await t1.update({ title: "new title1" });
     expect(t1.custom_lock_version).toBe(1);
-    await expect(t2.update({ title: "new title2" })).rejects.toThrow("StaleObjectError");
+    await expect(t2.update({ title: "new title2" })).rejects.toThrow(StaleObjectError);
   });
 
   it.skip("lock with custom column without default queries count", () => {
@@ -470,7 +470,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     const p1 = await Person.create({ name: "Test" });
     const p2 = await Person.find(p1.id);
     await p1.update({ name: "Changed" });
-    await expect(p2.update({ name: "Conflict" })).rejects.toThrow("StaleObjectError");
+    await expect(p2.update({ name: "Conflict" })).rejects.toThrow(StaleObjectError);
   });
 
   it("null lock version in database allows first update", async () => {
@@ -548,7 +548,7 @@ describe("OptimisticLockingTest", () => {
     await post1.update({ title: "Updated by 1" });
     // post1 now has lock_version 1, but post2 still has 0
 
-    await expect(post2.update({ title: "Updated by 2" })).rejects.toThrow("StaleObjectError");
+    await expect(post2.update({ title: "Updated by 2" })).rejects.toThrow(StaleObjectError);
   });
 });
 
@@ -595,7 +595,7 @@ describe("OptimisticLockingTest", () => {
 
     await p1.update({ name: "Changed by p1" });
 
-    await expect(p2.update({ name: "Changed by p2" })).rejects.toThrow("StaleObjectError");
+    await expect(p2.update({ name: "Changed by p2" })).rejects.toThrow(StaleObjectError);
   });
 });
 

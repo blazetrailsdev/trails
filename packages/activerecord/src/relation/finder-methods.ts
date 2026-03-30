@@ -236,7 +236,7 @@ export async function performSole(this: FinderRelation): Promise<any> {
     throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
   }
   if (records.length > 1) {
-    throw new SoleRecordExceeded(this._modelClass.name);
+    throw new SoleRecordExceeded(this._modelClass);
   }
   return records[0];
 }

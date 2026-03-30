@@ -1,6 +1,13 @@
 import Database from "better-sqlite3";
 import type { DatabaseAdapter } from "../adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
+import {
+  ReadOnlyError,
+  StatementInvalid,
+  RecordNotUnique,
+  InvalidForeignKey,
+  NotNullViolation,
+} from "../errors.js";
 
 /**
  * SQLite adapter — connects ActiveRecord to a real SQLite database.
@@ -29,8 +36,12 @@ export class SQLite3Adapter implements DatabaseAdapter {
    * Execute a SELECT query and return rows.
    */
   async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
-    const stmt = this.db.prepare(sql);
-    return stmt.all(...binds) as Record<string, unknown>[];
+    try {
+      const stmt = this.db.prepare(sql);
+      return stmt.all(...binds) as Record<string, unknown>[];
+    } catch (e) {
+      throw this._translateException(e, sql, binds);
+    }
   }
 
   /**
@@ -68,18 +79,22 @@ export class SQLite3Adapter implements DatabaseAdapter {
    */
   async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
     if (this._preventWrites) {
-      throw new Error("Write query attempted while preventing writes");
+      throw new ReadOnlyError("Write query attempted while preventing writes");
     }
-    const stmt = this.db.prepare(sql);
-    const result = stmt.run(...binds);
+    try {
+      const stmt = this.db.prepare(sql);
+      const result = stmt.run(...binds);
 
-    // For INSERT, return the last inserted rowid
-    if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-      return Number(result.lastInsertRowid);
+      // For INSERT, return the last inserted rowid
+      if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
+        return Number(result.lastInsertRowid);
+      }
+
+      // For UPDATE/DELETE, return affected rows
+      return result.changes;
+    } catch (e) {
+      throw this._translateException(e, sql, binds);
     }
-
-    // For UPDATE/DELETE, return affected rows
-    return result.changes;
   }
 
   /**
@@ -169,6 +184,23 @@ export class SQLite3Adapter implements DatabaseAdapter {
    */
   get raw(): Database.Database {
     return this.db;
+  }
+
+  private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
+    const msg = e instanceof Error ? e.message : String(e);
+    const code = (e as any)?.code as string | undefined;
+    const cause = e;
+
+    if (code?.includes("CONSTRAINT_UNIQUE") || msg.includes("UNIQUE constraint failed")) {
+      return new RecordNotUnique(msg, { sql, binds, cause });
+    }
+    if (code?.includes("CONSTRAINT_FOREIGNKEY") || msg.includes("FOREIGN KEY constraint failed")) {
+      return new InvalidForeignKey(msg, { sql, binds, cause });
+    }
+    if (code?.includes("CONSTRAINT_NOTNULL") || msg.includes("NOT NULL constraint failed")) {
+      return new NotNullViolation(msg, { sql, binds, cause });
+    }
+    return new StatementInvalid(msg, { sql, binds, cause });
   }
 }
 

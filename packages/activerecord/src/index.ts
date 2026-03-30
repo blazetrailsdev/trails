@@ -42,7 +42,6 @@ export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationOptions } from "./associations.js";
 export { Transaction } from "./connection-adapters/abstract/transaction.js";
 export { transaction, savepoint, currentTransaction } from "./transactions.js";
-export { Rollback } from "./errors.js";
 export { delegate } from "./delegate.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export {
@@ -68,16 +67,31 @@ export type {
   IndexInfo,
 } from "./connection-adapters/abstract/schema-dumper.js";
 export {
+  ActiveRecordError,
+  SubclassNotFound,
+  AdapterNotSpecified,
+  AdapterNotFound,
+  AdapterError,
+  ConnectionNotEstablished,
+  ConnectionTimeoutError,
+  ReadOnlyError,
   RecordNotFound,
   RecordInvalid,
   RecordNotSaved,
   RecordNotDestroyed,
-  StaleObjectError,
-  ReadOnlyRecord,
   SoleRecordExceeded,
+  StatementInvalid,
+  WrappedDatabaseException,
+  RecordNotUnique,
+  InvalidForeignKey,
+  NotNullViolation,
+  StaleObjectError,
+  ConfigurationError,
+  ReadOnlyRecord,
   StrictLoadingViolationError,
+  Rollback,
+  DangerousAttributeError,
   UnknownAttributeError,
-  SubclassNotFound,
   NameError,
 } from "./errors.js";
 export {

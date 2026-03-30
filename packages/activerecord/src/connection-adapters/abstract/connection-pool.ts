@@ -6,6 +6,7 @@
 
 import type { DatabaseAdapter } from "../../adapter.js";
 import type { DatabaseConfig } from "../../database-configurations/database-config.js";
+import { ConnectionNotEstablished, ConnectionTimeoutError } from "../../errors.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractPool
@@ -36,7 +37,7 @@ export class NullPool implements AbstractPool {
   }
 
   checkout(): never {
-    throw new Error("NullPool does not support checkout");
+    throw new ConnectionNotEstablished("NullPool does not support checkout");
   }
 
   checkin(_conn: DatabaseAdapter): void {}
@@ -156,8 +157,9 @@ export class ConnectionPool {
       this._checkedOut.add(conn);
       return conn;
     }
-    throw new Error(
+    throw new ConnectionTimeoutError(
       `Could not obtain a connection from the pool. All ${this.size} connections are in use.`,
+      { connectionPool: this },
     );
   }
 
@@ -237,6 +239,6 @@ export class ConnectionPool {
     if (this._adapterFactory) {
       return this._adapterFactory();
     }
-    throw new Error("No adapter factory configured for connection pool");
+    throw new ConnectionNotEstablished("No adapter factory configured for connection pool");
   }
 }

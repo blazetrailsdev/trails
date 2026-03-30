@@ -20,6 +20,11 @@ import {
   RecordNotDestroyed,
   StaleObjectError,
   ReadOnlyRecord,
+  AdapterNotFound,
+  AdapterNotSpecified,
+  ConnectionNotEstablished,
+  ConfigurationError,
+  DangerousAttributeError,
 } from "./errors.js";
 import { encrypts as _encrypts, getEncryptor } from "./encryption.js";
 import { Association as AssociationInstance } from "./associations/association.js";
@@ -80,7 +85,7 @@ async function _loadAdapter(name: string): Promise<AdapterConstructor> {
       return mod.SQLite3Adapter;
     }
     default:
-      throw new Error(
+      throw new AdapterNotFound(
         `Unknown database adapter "${name}". Supported adapters: postgresql, mysql, sqlite`,
       );
   }
@@ -452,7 +457,7 @@ export class Base extends Model {
       return Base._adapter;
     }
 
-    throw new Error(
+    throw new ConnectionNotEstablished(
       `No database configuration found for ${this.name}. ` +
         `Call await ${this.name}.establishConnection() or set ${this.name}.adapter directly`,
     );
@@ -561,7 +566,7 @@ export class Base extends Model {
     const dbConfig = primaryConfigs[0] ?? configs.findDbConfig(env);
 
     if (!dbConfig) {
-      throw new Error(
+      throw new ConnectionNotEstablished(
         `No database configuration found for ${this.name}. ` +
           `Add config/database.json, set DATABASE_URL, or call ${this.name}.establishConnection(url)`,
       );
@@ -570,7 +575,7 @@ export class Base extends Model {
     const url = dbConfig.configuration.url || "";
     const adapterName = dbConfig.adapter || (url ? this._adapterNameFromUrl(url) : undefined);
     if (!adapterName) {
-      throw new Error(
+      throw new AdapterNotSpecified(
         `Database configuration for "${env}" must include an adapter name or a URL. ` +
           `Add config/database.json, set DATABASE_URL, or call ${this.name}.establishConnection(url)`,
       );
@@ -598,7 +603,9 @@ export class Base extends Model {
     }
 
     if (!adapterName && !url && !fullConfig?.database) {
-      throw new Error("Database configuration must include a url, database, or adapter name");
+      throw new AdapterNotSpecified(
+        "Database configuration must include a url, database, or adapter name",
+      );
     }
 
     if (!adapterName) {
@@ -649,7 +656,7 @@ export class Base extends Model {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return {};
       }
-      throw new Error(
+      throw new ConfigurationError(
         `Failed to load database config at ${configPath}: ${(error as Error).message}`,
         { cause: error },
       );
@@ -696,7 +703,7 @@ export class Base extends Model {
     ) {
       return "sqlite";
     }
-    throw new Error(
+    throw new AdapterNotFound(
       `Cannot detect database adapter from URL "${url}". ` +
         `Use a URL starting with postgres://, mysql://, or sqlite://, ` +
         `or pass { adapter: "postgresql", url: "..." }`,
@@ -2297,7 +2304,7 @@ export class Base extends Model {
    */
   writeAttribute(name: string, value: unknown): void {
     if (!/^[\p{L}\p{N}_]+$/u.test(name)) {
-      throw new Error(`Invalid attribute name: ${name}`);
+      throw new DangerousAttributeError(`Invalid attribute name: ${name}`);
     }
     if (this._frozen) {
       throw new Error(`Cannot modify a frozen ${(this.constructor as typeof Base).name}`);
@@ -2475,7 +2482,7 @@ export class Base extends Model {
       );
     }
     if (this._readonly) {
-      throw new ReadOnlyRecord(this);
+      throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
     }
     const shouldValidate = options?.validate !== false;
     if (shouldValidate) {
@@ -2797,7 +2804,7 @@ export class Base extends Model {
    */
   async destroy(): Promise<this | false> {
     if (this._readonly) {
-      throw new ReadOnlyRecord(this);
+      throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
     }
     const ctor = this.constructor as typeof Base;
 
@@ -3082,7 +3089,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#touch
    */
   async touch(...names: string[]): Promise<boolean> {
-    if (this._readonly) throw new ReadOnlyRecord(this);
+    if (this._readonly) throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
     if (!this.isPersisted()) return false;
     const now = new Date();
     const attrs: Record<string, unknown> = {};
@@ -3135,7 +3142,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#update_columns
    */
   async updateColumns(attrs: Record<string, unknown>): Promise<void> {
-    if (this._readonly) throw new ReadOnlyRecord(this);
+    if (this._readonly) throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
     if (!this.isPersisted()) {
       throw new Error("Cannot update columns on a new or destroyed record");
     }

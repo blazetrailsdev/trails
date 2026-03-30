@@ -1,20 +1,83 @@
-/**
- * ActiveRecord error classes.
- *
- * Mirrors: ActiveRecord::RecordNotFound, ActiveRecord::RecordInvalid, etc.
- */
+export class ActiveRecordError extends Error {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ActiveRecordError";
+  }
+}
 
-/**
- * Raised when a record cannot be found by primary key or conditions.
- *
- * Mirrors: ActiveRecord::RecordNotFound
- */
-export class RecordNotFound extends Error {
+export class SubclassNotFound extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "SubclassNotFound";
+  }
+}
+
+export class AdapterNotSpecified extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "AdapterNotSpecified";
+  }
+}
+
+export class AdapterNotFound extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "AdapterNotFound";
+  }
+}
+
+export class AdapterError extends ActiveRecordError {
+  protected _connectionPool?: unknown;
+
+  get connectionPool(): unknown | undefined {
+    return this._connectionPool;
+  }
+
+  constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
+    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
+    this.name = "AdapterError";
+    this._connectionPool = options?.connectionPool;
+  }
+}
+
+export class ConnectionNotEstablished extends AdapterError {
+  private _poolSet: boolean;
+
+  constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
+    super(message, options);
+    this.name = "ConnectionNotEstablished";
+    this._poolSet = options?.connectionPool !== undefined;
+  }
+
+  setPool(connectionPool: unknown): this {
+    if (!this._poolSet) {
+      this._connectionPool = connectionPool;
+      this._poolSet = true;
+    }
+    return this;
+  }
+}
+
+export class ConnectionTimeoutError extends ConnectionNotEstablished {
+  constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
+    super(message, options);
+    this.name = "ConnectionTimeoutError";
+  }
+}
+
+export class ReadOnlyError extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ReadOnlyError";
+  }
+}
+
+export class RecordNotFound extends ActiveRecordError {
   readonly model: string;
   readonly primaryKey?: string;
   readonly id?: unknown;
 
-  constructor(message: string, model?: string, primaryKey?: string, id?: unknown) {
+  constructor(message?: string, model?: string, primaryKey?: string, id?: unknown) {
     super(message);
     this.name = "RecordNotFound";
     this.model = model ?? "Record";
@@ -23,124 +86,177 @@ export class RecordNotFound extends Error {
   }
 }
 
-import { RecordInvalid } from "./validations.js";
-export { RecordInvalid };
-
-/**
- * Raised when a record cannot be saved.
- *
- * Mirrors: ActiveRecord::RecordNotSaved
- */
-export class RecordNotSaved extends Error {
+export class RecordNotSaved extends ActiveRecordError {
   readonly record: any;
 
-  constructor(message: string, record?: any) {
+  constructor(message?: string, record?: any) {
     super(message);
     this.name = "RecordNotSaved";
     this.record = record;
   }
 }
 
-/**
- * Raised when a record cannot be destroyed.
- *
- * Mirrors: ActiveRecord::RecordNotDestroyed
- */
-export class RecordNotDestroyed extends Error {
+export class RecordNotDestroyed extends ActiveRecordError {
   readonly record: any;
 
-  constructor(message: string, record?: any) {
+  constructor(message?: string, record?: any) {
     super(message);
     this.name = "RecordNotDestroyed";
     this.record = record;
   }
 }
 
-/**
- * Raised when a record is stale (optimistic locking conflict).
- *
- * Mirrors: ActiveRecord::StaleObjectError
- */
-export class StaleObjectError extends Error {
+export class RecordInvalid extends ActiveRecordError {
   readonly record: any;
 
-  constructor(record: any, attemptedAction: string) {
-    const model = record?.constructor?.name ?? "Record";
-    super(
-      `StaleObjectError: Attempted to ${attemptedAction} a stale ${model}. The record has been modified by another process.`,
-    );
-    this.name = "StaleObjectError";
+  constructor(record: any) {
+    const fullMessages = record.errors?.fullMessages;
+    const message =
+      Array.isArray(fullMessages) && fullMessages.length > 0
+        ? `Validation failed: ${fullMessages.join(", ")}`
+        : "Validation failed";
+    super(message);
+    this.name = "RecordInvalid";
     this.record = record;
   }
 }
 
-/**
- * Raised when attempting to modify a readonly record.
- *
- * Mirrors: ActiveRecord::ReadOnlyRecord
- */
-export class ReadOnlyRecord extends Error {
-  readonly record: any;
+export class SoleRecordExceeded extends ActiveRecordError {
+  readonly model?: any;
 
-  constructor(record?: any) {
-    const model = record?.constructor?.name ?? "Record";
-    super(`${model} is marked as readonly`);
-    this.name = "ReadOnlyRecord";
-    this.record = record;
-  }
-}
-
-/**
- * Raised when sole() finds more than one record.
- *
- * Mirrors: ActiveRecord::SoleRecordExceeded
- */
-export class SoleRecordExceeded extends Error {
-  readonly model: string;
-
-  constructor(model: string) {
-    super(`${model} has more than one record`);
+  constructor(model?: any) {
+    super(`Wanted only one ${model?.name ?? "record"}`);
     this.name = "SoleRecordExceeded";
     this.model = model;
   }
 }
 
-/**
- * Raised when a lazy-loaded association is accessed on a strict_loading record.
- *
- * Mirrors: ActiveRecord::StrictLoadingViolationError
- */
-export class StrictLoadingViolationError extends Error {
-  readonly record: any;
-  readonly association: string;
+export class StatementInvalid extends AdapterError {
+  sql?: string;
+  binds?: unknown[];
+  private _querySet = false;
 
-  constructor(record: any, association: string) {
-    const model = record?.constructor?.name ?? "Record";
-    super(
-      `${model} is marked for strict_loading. The ${association} association cannot be lazily loaded.`,
-    );
-    this.name = "StrictLoadingViolationError";
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, { connectionPool: options?.connectionPool, cause: options?.cause });
+    this.name = "StatementInvalid";
+    this.sql = options?.sql;
+    this.binds = options?.binds;
+    this._querySet = options?.sql !== undefined || options?.binds !== undefined;
+  }
+
+  setQuery(sql: string, binds: unknown[]): this {
+    if (!this._querySet) {
+      this.sql = sql;
+      this.binds = binds;
+      this._querySet = true;
+    }
+    return this;
+  }
+}
+
+export class WrappedDatabaseException extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "WrappedDatabaseException";
+  }
+}
+
+export class RecordNotUnique extends WrappedDatabaseException {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "RecordNotUnique";
+  }
+}
+
+export class InvalidForeignKey extends WrappedDatabaseException {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "InvalidForeignKey";
+  }
+}
+
+export class NotNullViolation extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "NotNullViolation";
+  }
+}
+
+export class StaleObjectError extends ActiveRecordError {
+  readonly record?: any;
+  readonly attemptedAction?: string;
+
+  constructor(record?: any, attemptedAction?: string) {
+    if (record && attemptedAction) {
+      const model = record?.constructor?.name ?? "Record";
+      super(`Attempted to ${attemptedAction} a stale object: ${model}.`);
+    } else {
+      super("Stale object error.");
+    }
+    this.name = "StaleObjectError";
     this.record = record;
-    this.association = association;
+    this.attemptedAction = attemptedAction;
   }
 }
 
-/**
- * Raised when a type column value does not correspond to a valid subclass.
- *
- * Mirrors: ActiveRecord::SubclassNotFound
- */
-export class SubclassNotFound extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "SubclassNotFound";
+export class ConfigurationError extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ConfigurationError";
   }
 }
 
-/**
- * Mirrors: ActiveRecord::UnknownAttributeError
- */
-export class UnknownAttributeError extends Error {
+export class ReadOnlyRecord extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "ReadOnlyRecord";
+  }
+}
+
+export class StrictLoadingViolationError extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "StrictLoadingViolationError";
+  }
+
+  static forAssociation(record: any, associationName: string): StrictLoadingViolationError {
+    const model = record?.constructor?.name ?? "Record";
+    return new StrictLoadingViolationError(
+      `${model} is marked for strict_loading. The ${associationName} association cannot be lazily loaded.`,
+    );
+  }
+}
+
+export class Rollback extends ActiveRecordError {
+  constructor() {
+    super("Rollback");
+    this.name = "Rollback";
+  }
+}
+
+export class DangerousAttributeError extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "DangerousAttributeError";
+  }
+}
+
+export class UnknownAttributeError extends ActiveRecordError {
   readonly record: any;
   readonly attribute: string;
 
@@ -157,18 +273,5 @@ export class NameError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "NameError";
-  }
-}
-
-/**
- * Throw inside a transaction block to trigger a rollback without
- * re-raising the error to the caller.
- *
- * Mirrors: ActiveRecord::Rollback
- */
-export class Rollback extends Error {
-  constructor() {
-    super("Rollback");
-    this.name = "Rollback";
   }
 }

@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import { CollectionProxy } from "./associations/collection-proxy.js";
-import { StrictLoadingViolationError } from "./errors.js";
+import { StrictLoadingViolationError, ConfigurationError } from "./errors.js";
 import {
   DeleteRestrictionError,
   InverseOfAssociationNotFoundError,
@@ -256,7 +256,7 @@ export async function loadBelongsTo(
 
   // Strict loading check: this is a lazy load
   if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
-    throw new StrictLoadingViolationError(record, assocName);
+    throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
   const defaultFk = `${underscore(assocName)}_id`;
@@ -339,7 +339,7 @@ export async function loadHasOne(
 
   // Strict loading check
   if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
-    throw new StrictLoadingViolationError(record, assocName);
+    throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
   // Handle has_one :through
@@ -495,7 +495,7 @@ export async function loadHasMany(
 
   // Strict loading check
   if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
-    throw new StrictLoadingViolationError(record, assocName);
+    throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
   // Handle through associations
@@ -680,7 +680,9 @@ export async function loadHasManyThrough(
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
   const throughAssoc = associations.find((a) => a.name === options.through);
   if (!throughAssoc) {
-    throw new Error(`Through association "${options.through}" not found on ${ctor.name}`);
+    throw new ConfigurationError(
+      `Through association "${options.through}" not found on ${ctor.name}`,
+    );
   }
 
   // Resolve the target model
@@ -780,7 +782,9 @@ export async function loadHasOneThrough(
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
   const throughAssoc = associations.find((a) => a.name === options.through);
   if (!throughAssoc) {
-    throw new Error(`Through association "${options.through}" not found on ${ctor.name}`);
+    throw new ConfigurationError(
+      `Through association "${options.through}" not found on ${ctor.name}`,
+    );
   }
 
   // Load the through record (could be has_one or belongs_to)
@@ -898,7 +902,7 @@ function createHabtmJoinModel(
 
 function singleFk(fk: string | string[] | undefined, fallback: string): string {
   if (Array.isArray(fk)) {
-    throw new Error("HABTM associations do not support composite foreign keys");
+    throw new ConfigurationError("HABTM associations do not support composite foreign keys");
   }
   return fk ?? fallback;
 }
@@ -907,7 +911,7 @@ function singleFk(fk: string | string[] | undefined, fallback: string): string {
 function habtmOwnerPk(options: AssociationOptions, ctor: typeof Base): string {
   const pk = options.primaryKey ?? ctor.primaryKey;
   if (Array.isArray(pk)) {
-    throw new Error("HABTM associations do not support composite primary keys");
+    throw new ConfigurationError("HABTM associations do not support composite primary keys");
   }
   return pk as string;
 }
@@ -1078,7 +1082,9 @@ export function buildThroughAssociation(
   const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
   const assocDef = associations.find((a) => a.name === assocName);
   if (!assocDef || !assocDef.options.through) {
-    throw new Error(`Association "${assocName}" is not a through association on ${ctor.name}`);
+    throw new ConfigurationError(
+      `Association "${assocName}" is not a through association on ${ctor.name}`,
+    );
   }
   if (assocDef.type !== "hasOne" && (assocDef.type as string) !== "hasOneThrough") {
     throw new Error(
@@ -1120,7 +1126,9 @@ export function buildThroughAssociation(
   const ownerFkOption = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
   const ownerPkOption = throughAssoc.options.primaryKey ?? ctor.primaryKey;
   if (Array.isArray(ownerFkOption) || Array.isArray(ownerPkOption)) {
-    throw new Error("Composite foreignKey/primaryKey is not supported for through associations");
+    throw new ConfigurationError(
+      "Composite foreignKey/primaryKey is not supported for through associations",
+    );
   }
 
   // Build intermediate record with owner FK
@@ -1186,13 +1194,17 @@ export async function createThroughAssociation(
 
       const sourceFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
       if (Array.isArray(sourceFk)) {
-        throw new Error("createThroughAssociation does not support composite foreign keys");
+        throw new ConfigurationError(
+          "createThroughAssociation does not support composite foreign keys",
+        );
       }
       const targetPk =
         (sourceAssocDef?.options?.primaryKey as string) ??
         (target.constructor as typeof Base).primaryKey;
       if (Array.isArray(targetPk)) {
-        throw new Error("createThroughAssociation does not support composite primary keys");
+        throw new ConfigurationError(
+          "createThroughAssociation does not support composite primary keys",
+        );
       }
       through.writeAttribute(sourceFk as string, target.readAttribute(targetPk as string));
       if (sourceAssocDef?.options?.polymorphic) {
@@ -1213,11 +1225,15 @@ export async function createThroughAssociation(
         ? (sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
         : (sourceAssocDef?.options?.foreignKey ?? `${underscore(throughCtor.name)}_id`);
       if (Array.isArray(targetFk)) {
-        throw new Error("createThroughAssociation does not support composite foreign keys");
+        throw new ConfigurationError(
+          "createThroughAssociation does not support composite foreign keys",
+        );
       }
       const throughPk = sourceAssocDef?.options?.primaryKey ?? throughCtor.primaryKey;
       if (Array.isArray(throughPk)) {
-        throw new Error("createThroughAssociation does not support composite primary keys");
+        throw new ConfigurationError(
+          "createThroughAssociation does not support composite primary keys",
+        );
       }
       target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
       if (sourceAsName) {

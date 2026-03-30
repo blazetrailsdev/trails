@@ -7,6 +7,8 @@
  * controller, action, etc.) to help trace queries back to application code.
  */
 
+import { ConfigurationError } from "./errors.js";
+
 export type TagValue = string | number | boolean | null | undefined;
 export type TagHandler = (context?: Record<string, TagValue>) => TagValue;
 export type TagDefinition = string | TagHandler | Record<string, TagValue | TagHandler>;
@@ -87,7 +89,7 @@ export class QueryLogs {
     } else if (typeof format === "object" && format !== null) {
       this._formatter = format;
     } else {
-      throw new Error(`Formatter is unsupported: ${format}`);
+      throw new ConfigurationError(`Formatter is unsupported: ${format}`);
     }
     this._cachedComment = undefined;
   }

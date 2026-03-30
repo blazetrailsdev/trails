@@ -726,7 +726,7 @@ export class CollectionProxy {
   private async _resolveRecords(): Promise<Base[]> {
     if (this._loaded) return this._target;
     if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
-      throw new StrictLoadingViolationError(this._record, this._assocName);
+      throw StrictLoadingViolationError.forAssociation(this._record, this._assocName);
     }
     // For through associations, scope() may not handle all cases (nested through).
     // Fall back to loading via the loader, filtering to persisted records only

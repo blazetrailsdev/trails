@@ -9,6 +9,7 @@ import { DatabaseConfig } from "../../database-configurations/database-config.js
 import { HashConfig } from "../../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../../database-configurations.js";
 import type { DatabaseAdapter } from "../../adapter.js";
+import { AdapterNotSpecified } from "../../errors.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler::ConnectionDescriptor
@@ -47,7 +48,7 @@ export class ConnectionHandler {
           );
 
     if (!dbConfig.adapter) {
-      throw new Error("database configuration does not specify adapter");
+      throw new AdapterNotSpecified("database configuration does not specify adapter");
     }
 
     const owner = options.owner ?? dbConfig.name;
