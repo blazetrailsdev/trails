@@ -80,8 +80,8 @@ describe("MigrationGeneratorTest", () => {
     const gen = makeGen();
     const files = gen.run("remove_title_body_from_posts", ["title:string:index", "body:text"]);
     const content = readMigration(files);
-    expect(content).toContain('removeColumn("posts", "title")');
-    expect(content).toContain('removeColumn("posts", "body")');
+    expect(content).toContain('removeColumn("posts", "title", "string")');
+    expect(content).toContain('removeColumn("posts", "body", "text")');
     expect(content).toContain('removeIndex("posts", { column: "title" })');
   });
 
@@ -89,15 +89,15 @@ describe("MigrationGeneratorTest", () => {
     const gen = makeGen();
     const files = gen.run("remove_title_body_from_posts", ["title:string", "body:text"]);
     const content = readMigration(files);
-    expect(content).toContain('removeColumn("posts", "title")');
-    expect(content).toContain('removeColumn("posts", "body")');
+    expect(content).toContain('removeColumn("posts", "title", "string")');
+    expect(content).toContain('removeColumn("posts", "body", "text")');
   });
 
   it("remove migration with table having to in title", () => {
     const gen = makeGen();
     const files = gen.run("remove_email_address_from_sent_to_user", ["email_address:string"]);
     const content = readMigration(files);
-    expect(content).toContain('removeColumn("sent_to_users", "email_address")');
+    expect(content).toContain('removeColumn("sent_to_users", "email_address", "string")');
   });
 
   it("remove migration with references options", () => {

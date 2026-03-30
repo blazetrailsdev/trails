@@ -687,11 +687,15 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
   async createTable(
     tableName: string,
     callback: (t: SimpleTableBuilder) => void,
-    options: { id?: boolean } = {},
+    options: { id?: boolean | "uuid" } = {},
   ): Promise<void> {
     const table = new SimpleTableBuilder();
     if (options.id !== false) {
-      table.column("id", "serial primary key");
+      if (typeof options.id === "string" && options.id === "uuid") {
+        table.column("id", "uuid default gen_random_uuid() primary key");
+      } else {
+        table.column("id", "serial primary key");
+      }
     }
     callback(table);
     const quotedTable = this.quoteTableName(tableName);

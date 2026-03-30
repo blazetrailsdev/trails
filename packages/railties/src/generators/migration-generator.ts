@@ -307,7 +307,7 @@ ${body}
             }
             return `    await this.removeReference("${table}", "${c.name}");`;
           }
-          return `    await this.removeColumn("${table}", "${c.name}");`;
+          return `    await this.removeColumn("${table}", "${c.name}", "${c.type}");`;
         })
         .join("\n");
       return rmIdxLines ? `${rmIdxLines}\n${upLines}` : upLines;

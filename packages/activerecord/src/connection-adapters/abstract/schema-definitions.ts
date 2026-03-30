@@ -18,7 +18,10 @@ export type ColumnType =
   | "json"
   | "jsonb"
   | "char"
-  | "primary_key";
+  | "primary_key"
+  | "uuid";
+
+export type PrimaryKeyType = "uuid";
 
 export type ReferentialAction = "cascade" | "nullify" | "restrict" | "no_action";
 
@@ -239,19 +242,20 @@ export class TableDefinition {
   readonly tableName: string;
   readonly columns: ColumnDefinition[] = [];
   readonly indexes: IndexDefinition[] = [];
-  private _id: boolean;
+  private _id: boolean | PrimaryKeyType;
   private _adapterName: "sqlite" | "postgres" | "mysql";
 
   constructor(
     tableName: string,
-    options: { id?: boolean; adapterName?: "sqlite" | "postgres" | "mysql" } = {},
+    options: { id?: boolean | PrimaryKeyType; adapterName?: "sqlite" | "postgres" | "mysql" } = {},
   ) {
     this.tableName = tableName;
     this._adapterName = options.adapterName ?? "sqlite";
-    this._id = options.id !== false;
+    this._id = options.id ?? true;
 
-    if (this._id) {
-      this.columns.push(new ColumnDefinition("id", "primary_key", { primaryKey: true }));
+    if (this._id !== false) {
+      const pkType = (typeof this._id === "string" ? this._id : "primary_key") as ColumnType;
+      this.columns.push(new ColumnDefinition("id", pkType, { primaryKey: true }));
     }
   }
 
@@ -379,6 +383,22 @@ export class TableDefinition {
             parts.push("INTEGER PRIMARY KEY AUTOINCREMENT");
           }
           break;
+        case "uuid": {
+          if (this._adapterName === "postgres") {
+            parts.push("UUID");
+          } else if (this._adapterName === "mysql") {
+            parts.push("CHAR(36)");
+          } else {
+            parts.push("VARCHAR(36)");
+          }
+          if (col.options.primaryKey) {
+            if (this._adapterName === "postgres" && col.options.default === undefined) {
+              parts.push("DEFAULT gen_random_uuid()");
+            }
+            parts.push("PRIMARY KEY");
+          }
+          break;
+        }
         case "string":
           parts.push(`VARCHAR(${col.options.limit ?? 255})`);
           break;
@@ -419,6 +439,11 @@ export class TableDefinition {
         case "char":
           parts.push(`CHAR(${col.options.limit ?? 1})`);
           break;
+      }
+
+      // For types that don't handle PRIMARY KEY internally, append it if requested
+      if (col.options.primaryKey && col.type !== "primary_key" && col.type !== "uuid") {
+        parts.push("PRIMARY KEY");
       }
 
       if (col.options.array && col.type !== "primary_key") {

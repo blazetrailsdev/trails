@@ -121,18 +121,34 @@ ${actions.map((a) => `  it("${a}", () => {\n    // TODO: test ${a} action\n  });
 
     if (!routesFile) return;
 
-    const controllerName = dasherize(underscore(namespaceParts[namespaceParts.length - 1]));
+    const controllerSegment = dasherize(underscore(namespaceParts[namespaceParts.length - 1]));
 
     if (namespaceParts.length > 1) {
-      const namespace = underscore(namespaceParts[0]);
-      const routeLines = actions
-        .map((a) => `    router.get("/${controllerName}/${a}", "${controllerName}#${a}");`)
-        .join("\n");
-      const block = `  router.namespace("${namespace}", (router) => {\n${routeLines}\n  });`;
-      this.insertIntoFile(routesFile, "// routes", block + "\n");
+      const namespaces = namespaceParts.slice(0, -1).map((p) => underscore(p));
+
+      const lines: string[] = [];
+      let indentLevel = 1;
+      for (const ns of namespaces) {
+        const indent = "  ".repeat(indentLevel);
+        lines.push(`${indent}router.namespace("${ns}", (router) => {`);
+        indentLevel += 1;
+      }
+
+      const innerIndent = "  ".repeat(indentLevel);
+      for (const action of actions) {
+        lines.push(
+          `${innerIndent}router.get("/${controllerSegment}/${action}", "${controllerSegment}#${action}");`,
+        );
+      }
+
+      for (let i = namespaces.length; i > 0; i--) {
+        lines.push(`${"  ".repeat(i)}});`);
+      }
+
+      this.insertIntoFile(routesFile, "// routes", lines.join("\n") + "\n");
     } else {
       const routeLines = actions
-        .map((a) => `  router.get("/${controllerName}/${a}", "${controllerName}#${a}");`)
+        .map((a) => `  router.get("/${controllerSegment}/${a}", "${controllerSegment}#${a}");`)
         .join("\n");
       this.insertIntoFile(routesFile, "// routes", routeLines + "\n");
     }

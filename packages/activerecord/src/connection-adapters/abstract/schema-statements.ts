@@ -51,11 +51,15 @@ export class SchemaStatements {
   async createTable(
     name: string,
     optionsOrFn?:
-      | { id?: boolean; force?: boolean; ifNotExists?: boolean }
+      | { id?: boolean | "uuid"; force?: boolean; ifNotExists?: boolean }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
-    let options: { id?: boolean; force?: boolean; ifNotExists?: boolean } = {};
+    let options: {
+      id?: boolean | "uuid";
+      force?: boolean;
+      ifNotExists?: boolean;
+    } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
 
     if (typeof optionsOrFn === "function") {

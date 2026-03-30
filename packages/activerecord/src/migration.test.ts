@@ -358,6 +358,30 @@ describe("Migrations", () => {
       expect(sql).toContain('"active" BOOLEAN DEFAULT TRUE');
     });
 
+    it("supports id: uuid option", () => {
+      const td = new TableDefinition("accounts", { id: "uuid", adapterName: "postgres" });
+      td.string("name");
+      const sql = td.toSql();
+      expect(sql).toContain("UUID DEFAULT gen_random_uuid() PRIMARY KEY");
+      expect(sql).not.toContain("SERIAL");
+    });
+
+    it("supports id: uuid option for sqlite", () => {
+      const td = new TableDefinition("accounts", { id: "uuid" });
+      td.string("name");
+      const sql = td.toSql();
+      expect(sql).toContain("VARCHAR(36) PRIMARY KEY");
+      expect(sql).not.toContain("AUTOINCREMENT");
+    });
+
+    it("supports id: uuid option for mysql", () => {
+      const td = new TableDefinition("accounts", { id: "uuid", adapterName: "mysql" });
+      td.string("name");
+      const sql = td.toSql();
+      expect(sql).toContain("CHAR(36) PRIMARY KEY");
+      expect(sql).not.toContain("AUTO_INCREMENT");
+    });
+
     it("supports id: false option", () => {
       const td = new TableDefinition("join_table", { id: false });
       td.integer("user_id");
@@ -868,6 +892,62 @@ describe("Rails-guided: migrations", () => {
 
     await m.run(adapter, "down");
     expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(0);
+  });
+
+  it("reversible removeColumn with type auto-reverses", async () => {
+    class SetupArticles extends Migration {
+      async change() {
+        await this.createTable("articles", (t) => {
+          t.string("title");
+          t.text("body");
+        });
+      }
+    }
+    const setup = new SetupArticles();
+    await setup.run(adapter, "up");
+
+    class RemoveBodyFromArticles extends Migration {
+      async change() {
+        await this.removeColumn("articles", "body", "text");
+      }
+    }
+    const m = new RemoveBodyFromArticles();
+    await m.run(adapter, "up");
+
+    const colsAfterUp = await m.schema.columnExists("articles", "body");
+    expect(colsAfterUp).toBe(false);
+
+    await m.run(adapter, "down");
+    const colsAfterDown = await m.schema.columnExists("articles", "body");
+    expect(colsAfterDown).toBe(true);
+
+    await setup.run(adapter, "down");
+  });
+
+  it("reversible removeIndex with column auto-reverses", async () => {
+    class SetupProducts extends Migration {
+      async change() {
+        await this.createTable("products", (t) => {
+          t.string("sku");
+        });
+        await this.addIndex("products", "sku");
+      }
+    }
+    const setup = new SetupProducts();
+    await setup.run(adapter, "up");
+
+    class RemoveSkuIndex extends Migration {
+      async change() {
+        await this.removeIndex("products", { column: "sku" });
+      }
+    }
+    const m = new RemoveSkuIndex();
+    await m.run(adapter, "up");
+
+    // Verify down() completes without error (re-creates the index)
+    await expect(m.run(adapter, "down")).resolves.not.toThrow();
+
+    await setup.run(adapter, "down");
   });
 
   it("MigrationRunner runs and rolls back", async () => {

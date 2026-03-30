@@ -242,8 +242,14 @@ export abstract class Migration {
       case "addColumn":
         await this.removeColumn(args[0] as string, args[1] as string);
         break;
-      case "removeColumn":
-        throw new IrreversibleMigration("Cannot reverse removeColumn without type info");
+      case "removeColumn": {
+        const [rcTable, rcCol, rcType] = args as [string, string, ColumnType?];
+        if (!rcType) {
+          throw new IrreversibleMigration("Cannot reverse removeColumn without type info");
+        }
+        await this.addColumn(rcTable, rcCol, rcType);
+        break;
+      }
       case "addIndex": {
         const idxOpts: { column: string | string[]; name?: string } = {
           column: args[1] as string | string[],
@@ -253,8 +259,18 @@ export abstract class Migration {
         await this.removeIndex(args[0] as string, idxOpts);
         break;
       }
-      case "removeIndex":
-        throw new IrreversibleMigration("Cannot reverse removeIndex without column info");
+      case "removeIndex": {
+        const riOpts = args[1] as { column?: string | string[]; name?: string } | undefined;
+        if (!riOpts?.column) {
+          throw new IrreversibleMigration("Cannot reverse removeIndex without column info");
+        }
+        if (riOpts.name) {
+          await this.addIndex(args[0] as string, riOpts.column, { name: riOpts.name });
+        } else {
+          await this.addIndex(args[0] as string, riOpts.column);
+        }
+        break;
+      }
       case "renameColumn":
         await this.renameColumn(args[0] as string, args[2] as string, args[1] as string);
         break;
@@ -271,6 +287,20 @@ export abstract class Migration {
         await this.removeForeignKey(args[0] as string, fkOpts ?? (args[1] as string));
         break;
       }
+      case "addReference":
+        await this.removeReference(
+          args[0] as string,
+          args[1] as string,
+          args[2] as { polymorphic?: boolean } | undefined,
+        );
+        break;
+      case "removeReference":
+        await this.addReference(
+          args[0] as string,
+          args[1] as string,
+          args[2] as { polymorphic?: boolean; foreignKey?: boolean } | undefined,
+        );
+        break;
       case "createJoinTable":
         await this.dropJoinTable(
           args[0] as string,
@@ -311,7 +341,7 @@ export abstract class Migration {
   async createTable(
     name: string,
     optionsOrFn?:
-      | { id?: boolean; force?: boolean; ifNotExists?: boolean }
+      | { id?: boolean | "uuid"; force?: boolean; ifNotExists?: boolean }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
@@ -346,13 +376,16 @@ export abstract class Migration {
   async removeColumn(
     tableName: string,
     columnName: string,
-    options: { ifExists?: boolean } = {},
+    typeOrOptions?: ColumnType | { ifExists?: boolean },
+    options?: { ifExists?: boolean },
   ): Promise<void> {
+    const type = typeof typeOrOptions === "string" ? typeOrOptions : undefined;
+    const opts = typeof typeOrOptions === "object" ? typeOrOptions : (options ?? {});
     if (this._recording) {
-      this._recorder.record("removeColumn", [tableName, columnName, options]);
+      this._recorder.record("removeColumn", [tableName, columnName, type, opts]);
       return;
     }
-    await this.schema.removeColumn(tableName, columnName, options);
+    await this.schema.removeColumn(tableName, columnName, opts);
   }
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -799,7 +832,12 @@ export class MigrationContext {
 
   async createTable(
     name: string,
-    options?: { primaryKey?: string | false; force?: boolean; ifNotExists?: boolean; id?: boolean },
+    options?: {
+      primaryKey?: string | false;
+      force?: boolean;
+      ifNotExists?: boolean;
+      id?: boolean | "uuid";
+    },
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     if (name.length > 64) {
@@ -838,7 +876,8 @@ export class MigrationContext {
       }
     >();
     if (options?.id !== false) {
-      meta.set("id", { type: "integer", primaryKey: true });
+      const idType = typeof options?.id === "string" ? options.id : "integer";
+      meta.set("id", { type: idType, primaryKey: true });
     }
     for (const col of td.columns) {
       if (col.name === "id" && meta.has("id")) continue;

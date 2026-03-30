@@ -174,6 +174,11 @@ export class SchemaCreation {
       case "char":
         sql = `CHAR(${options.limit ?? 1})`;
         break;
+      case "uuid":
+        if (this.adapterName === "postgres") sql = "UUID";
+        else if (this.adapterName === "mysql") sql = "CHAR(36)";
+        else sql = "VARCHAR(36)";
+        break;
       case "primary_key":
         if (this.adapterName === "postgres") sql = "SERIAL PRIMARY KEY";
         else if (this.adapterName === "mysql") sql = "INT AUTO_INCREMENT PRIMARY KEY";

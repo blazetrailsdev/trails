@@ -8,7 +8,7 @@ import { TableDefinition as AbstractTableDefinition } from "../abstract/schema-d
 import type { ColumnOptions } from "../abstract/schema-definitions.js";
 
 export class TableDefinition extends AbstractTableDefinition {
-  constructor(tableName: string, options: { id?: boolean } = {}) {
+  constructor(tableName: string, options: { id?: boolean | "uuid" } = {}) {
     super(tableName, { ...options, adapterName: "sqlite" });
   }
 

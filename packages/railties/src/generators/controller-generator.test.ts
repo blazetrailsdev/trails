@@ -141,6 +141,16 @@ describe("ControllerGeneratorTest", () => {
     expect(routes).toContain('router.get("/dashboard/show", "dashboard#show")');
   });
 
+  it("deeply nested namespace routes are created in routes", () => {
+    const gen = makeGen();
+    gen.run("admin/api/dashboard", ["index"]);
+    const routes = readFile("src/config/routes.ts");
+    expect(routes).toContain('router.namespace("admin"');
+    expect(routes).toContain('router.namespace("api"');
+    expect(routes).toMatch(/router\.namespace\("admin"[\s\S]*router\.namespace\("api"/);
+    expect(routes).toContain('router.get("/dashboard/index", "dashboard#index")');
+  });
+
   it("does not add routes when action is not specified", () => {
     const gen = makeGen();
     gen.run("admin/dashboard", []);
