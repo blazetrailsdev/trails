@@ -1,4 +1,19 @@
 /**
+ * AttributeMethods mixin contract — dynamic attribute method generation.
+ *
+ * Mirrors: ActiveModel::AttributeMethods
+ *
+ * Model implements this via attributeMethodPrefix/Suffix/Affix,
+ * defineAttributeMethods, and undefineAttributeMethods.
+ */
+export interface AttributeMethods {
+  hasAttribute(name: string): boolean;
+  attributePresent(name: string): boolean;
+  attributeMissing(name: string): unknown;
+  respondTo(method: string): boolean;
+}
+
+/**
  * Represents an error related to a missing attribute.
  *
  * Mirrors: ActiveModel::MissingAttributeError
@@ -15,6 +30,27 @@ export class MissingAttributeError extends globalThis.Error {
  *
  * Mirrors: ActiveModel::AttributeMethods::ClassMethods::AttributeMethodPattern
  */
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace AttrNames {
+  const DEF_SAFE_NAME = /^[a-zA-Z_]\w*$/;
+
+  export function defineAttributeAccessorMethod(
+    attrName: string,
+    writer: boolean = false,
+  ): { methodName: string; attrNameRef: string } {
+    const methodName = writer ? `${attrName}=` : attrName;
+    if (DEF_SAFE_NAME.test(attrName)) {
+      return { methodName, attrNameRef: `'${attrName}'` };
+    }
+    const escaped = attrName
+      .replace(/\\/g, "\\\\")
+      .replace(/'/g, "\\'")
+      .replace(/\r/g, "\\r")
+      .replace(/\n/g, "\\n");
+    return { methodName, attrNameRef: `'${escaped}'` };
+  }
+}
+
 export class AttributeMethodPattern {
   readonly prefix: string;
   readonly suffix: string;

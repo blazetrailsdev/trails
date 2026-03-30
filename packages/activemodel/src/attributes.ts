@@ -23,6 +23,16 @@ type Constructor<T = object> = new (...args: any[]) => T;
  *     }
  *   }
  */
+/**
+ * Attributes mixin contract — declares typed attributes with defaults and casting.
+ *
+ * Mirrors: ActiveModel::Attributes
+ */
+export interface Attributes {
+  readonly attributes: Record<string, unknown>;
+  attributeNames(): string[];
+}
+
 export interface AttributesStatic {
   _attributeDefinitions: Map<string, AttributeDefinition>;
   attribute(name: string, typeName: string, options?: { default?: unknown }): void;

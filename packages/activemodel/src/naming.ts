@@ -1,9 +1,52 @@
-/**
- * ModelName — naming conventions for a model class.
- *
- * Mirrors: ActiveModel::Name
- */
 import { underscore, pluralize, humanize } from "@blazetrails/activesupport";
+
+/**
+ * Naming mixin — provides model_name on classes and naming helpers.
+ *
+ * Mirrors: ActiveModel::Naming
+ */
+export interface Naming {
+  readonly modelName: ModelName;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace Naming {
+  type RecordOrClass =
+    | ModelName
+    | { modelName: ModelName }
+    | { constructor: { modelName: ModelName } };
+
+  export function modelNameFromRecordOrClass(recordOrClass: RecordOrClass): ModelName {
+    if (recordOrClass instanceof ModelName) return recordOrClass;
+    if ("modelName" in recordOrClass) return recordOrClass.modelName;
+    return (recordOrClass.constructor as { modelName: ModelName }).modelName;
+  }
+
+  export function plural(recordOrClass: RecordOrClass): string {
+    return modelNameFromRecordOrClass(recordOrClass).plural;
+  }
+
+  export function singular(recordOrClass: RecordOrClass): string {
+    return modelNameFromRecordOrClass(recordOrClass).singular;
+  }
+
+  export function isUncountable(recordOrClass: RecordOrClass): boolean {
+    const mn = modelNameFromRecordOrClass(recordOrClass);
+    return mn.singular === mn.plural;
+  }
+
+  export function singularRouteKey(recordOrClass: RecordOrClass): string {
+    return modelNameFromRecordOrClass(recordOrClass).singular;
+  }
+
+  export function routeKey(recordOrClass: RecordOrClass): string {
+    return modelNameFromRecordOrClass(recordOrClass).routeKey;
+  }
+
+  export function paramKey(recordOrClass: RecordOrClass): string {
+    return modelNameFromRecordOrClass(recordOrClass).paramKey;
+  }
+}
 import { I18n } from "./i18n.js";
 
 interface ModelLike {
@@ -96,3 +139,11 @@ export class ModelName {
     return [scope, "models"];
   }
 }
+
+/**
+ * Mirrors: ActiveModel::Name
+ *
+ * Inherits from ModelName — matches the Rails class name exactly.
+ * ModelName remains the primary export for backwards compatibility.
+ */
+export class Name extends ModelName {}

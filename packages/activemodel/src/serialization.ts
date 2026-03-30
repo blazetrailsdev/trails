@@ -2,6 +2,15 @@
 type AnyRecord = any;
 
 /**
+ * Serialization mixin contract — provides serializable_hash.
+ *
+ * Mirrors: ActiveModel::Serialization
+ */
+export interface Serialization {
+  serializableHash(options?: SerializeOptions): Record<string, unknown>;
+}
+
+/**
  * Serialization options.
  */
 export interface SerializeOptions {

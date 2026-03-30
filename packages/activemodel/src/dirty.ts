@@ -1,5 +1,28 @@
 import { AttributeSet } from "./attribute-set.js";
 
+/**
+ * Dirty mixin contract — tracks attribute changes on a model.
+ *
+ * Mirrors: ActiveModel::Dirty
+ *
+ * Model implements this interface via DirtyTracker delegation.
+ */
+export interface Dirty {
+  readonly changed: boolean;
+  readonly changedAttributes: string[];
+  readonly changes: Record<string, [unknown, unknown]>;
+  readonly previousChanges: Record<string, [unknown, unknown]>;
+  attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean;
+  attributeWas(name: string): unknown;
+  attributePreviouslyChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean;
+  attributePreviouslyWas(name: string): unknown;
+  restoreAttributes(): void;
+  changesApplied(): void;
+  clearChangesInformation(): void;
+  clearAttributeChanges(attributes: string[]): void;
+  attributeChangedInPlace(name: string): boolean;
+}
+
 function resolveValue(value: unknown): unknown {
   return AttributeSet.resolveSnapshotValue(value);
 }

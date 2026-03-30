@@ -6,9 +6,16 @@ const MIN_COST = 4;
 const DEFAULT_COST = 12;
 const textEncoder = new TextEncoder();
 
-export const SecurePassword = {
+export const SecurePassword: { minCost: boolean } = {
   minCost: false,
 };
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace SecurePassword {
+  export interface ClassMethods {
+    hasSecurePassword(attribute?: string, options?: { validations?: boolean }): void;
+  }
+}
 
 function setPassword(
   instance: Model,
