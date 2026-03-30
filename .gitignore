@@ -6,3 +6,7 @@ scripts/test-compare/output/
 scripts/api-compare/output/
 scripts/api-compare/.rack-source
 scripts/api-compare/.rails-source
+.claude/settings.local.json
+.claude/worktrees/
+.claude/hooks/
+.claude/skills/
