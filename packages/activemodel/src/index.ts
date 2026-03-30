@@ -12,6 +12,8 @@ export { ValidationError, ValidationContext } from "./validations.js";
 export { Validator, EachValidator, BlockValidator } from "./validator.js";
 export { MissingAttributeError, AttributeMethodPattern } from "./attribute-methods.js";
 export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
+export { assignAttributes, attributeWriterMissing, ArgumentError } from "./attribute-assignment.js";
+export type { AttributeAssignment } from "./attribute-assignment.js";
 export {
   AttributeMutationTracker,
   ForcedMutationTracker,

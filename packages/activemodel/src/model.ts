@@ -12,6 +12,11 @@ import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from 
 import { serializableHash, SerializeOptions } from "./serialization.js";
 import { BlockValidator } from "./validator.js";
 import { AttributeMethodPattern } from "./attribute-methods.js";
+import {
+  assignAttributes as assignAttrs,
+  attributeWriterMissing as defaultAttributeWriterMissing,
+  ArgumentError,
+} from "./attribute-assignment.js";
 import type {
   ValidatorContract as Validator,
   ConditionalOptions,
@@ -1355,12 +1360,18 @@ export class Model {
    * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
    */
   assignAttributes(attrs: Record<string, unknown>): void {
-    if (typeof attrs !== "object" || attrs === null) {
-      throw new Error("When assigning attributes, you must pass a hash as an argument");
-    }
-    for (const [key, value] of Object.entries(attrs)) {
-      this.writeAttribute(key, value);
-    }
+    assignAttrs(this, attrs);
+  }
+
+  /**
+   * Hook invoked when assignAttributes encounters an unknown attribute
+   * that causes writeAttribute to throw UnknownAttributeError.
+   * Override to customize behavior (e.g. log instead of raise).
+   *
+   * Mirrors: ActiveModel::AttributeAssignment#attribute_writer_missing
+   */
+  attributeWriterMissing(name: string, value: unknown): void {
+    defaultAttributeWriterMissing(this, name, value);
   }
 
   toParam(): string | null {
@@ -1485,12 +1496,5 @@ function _validateOnCondition(on: string | string[]): void {
 function _rejectOnOption(conditions?: CallbackConditions): void {
   if (conditions && "on" in conditions) {
     throw new ArgumentError("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
-  }
-}
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
   }
 }

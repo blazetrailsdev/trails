@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model } from "./index.js";
+import { Model, ArgumentError } from "./index.js";
 
 describe("AttributeAssignmentTest", () => {
   it("simple assignment alias", () => {
@@ -74,7 +74,9 @@ describe("AttributeAssignmentTest", () => {
       }
     }
     const p = new Person({});
-    expect(() => p.assignAttributes("not a hash" as any)).toThrow();
+    expect(() => p.assignAttributes("not a hash" as any)).toThrow(ArgumentError);
+    expect(() => p.assignAttributes(null as any)).toThrow(ArgumentError);
+    expect(() => p.assignAttributes([] as any)).toThrow(ArgumentError);
   });
 
   it("forbidden attributes cannot be used for mass assignment", () => {
