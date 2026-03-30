@@ -5,17 +5,17 @@ rewritten in TypeScript" — backed by a working demo and rock-solid core packag
 
 ## Current State (2026-03-30)
 
-| Package | Tests | Coverage | Status |
-|---|---|---|---|
-| arel | 703/707 | 99.4% | Near-complete |
-| activemodel | 958/963 | 99.5% | Near-complete |
-| activerecord | 5,187/8,385 | 61.9% | In progress |
-| activesupport | 2,160/2,862 | 75.5% | In progress |
-| rack | 764/773 | 98.8% | Near-complete |
-| actiondispatch | 406/1,432 | 28.4% | In progress (27 misplaced) |
-| actioncontroller | 7/1,860 | 0.4% | Early (229 misplaced) |
-| railties | 39/2,411 | 1.6% | Early |
-| **Overall** | **10,224/19,393** | **52.7%** | |
+| Package          | Tests             | Coverage  | Status                     |
+| ---------------- | ----------------- | --------- | -------------------------- |
+| arel             | 703/707           | 99.4%     | Near-complete              |
+| activemodel      | 958/963           | 99.5%     | Near-complete              |
+| activerecord     | 5,187/8,385       | 61.9%     | In progress                |
+| activesupport    | 2,160/2,862       | 75.5%     | In progress                |
+| rack             | 764/773           | 98.8%     | Near-complete              |
+| actiondispatch   | 406/1,432         | 28.4%     | In progress (27 misplaced) |
+| actioncontroller | 7/1,860           | 0.4%      | Early (229 misplaced)      |
+| railties         | 39/2,411          | 1.6%      | Early                      |
+| **Overall**      | **10,224/19,393** | **52.7%** |                            |
 
 **Frontiers** (PR #281, draft): Interactive browser sandbox with WASM SQLite,
 Monaco editor, CLI, sample databases, project management, and auth. 246 tests
@@ -43,20 +43,20 @@ These don't need 100%, but they need to support the Frontiers demo flow: scaffol
 a model, run migrations, start a server, hit JSON and HTML endpoints.
 
 - [ ] **actioncontroller** — needs basic `render json:`, `render` (EJS templates),
-  `before_action`, params, and standard CRUD actions. Currently at 0.4% — most
-  tests are misplaced (229), not missing. Fix the misplacement first, then
-  implement the basics.
+      `before_action`, params, and standard CRUD actions. Currently at 0.4% — most
+      tests are misplaced (229), not missing. Fix the misplacement first, then
+      implement the basics.
 - [ ] **actiondispatch** — routing, request/response, session basics. At 28.4%
-  with 27 misplaced. Already has a foundation — needs the routes that scaffold
-  generates (`resources`) to actually dispatch to controllers.
+      with 27 misplaced. Already has a foundation — needs the routes that scaffold
+      generates (`resources`) to actually dispatch to controllers.
 - [ ] **CLI** (`packages/cli`) — `trails new`, `trails generate`, `trails server`,
-  `trails db:migrate`. The Frontiers sandbox already implements these commands
-  in-browser; the real CLI needs to match.
+      `trails db:migrate`. The Frontiers sandbox already implements these commands
+      in-browser; the real CLI needs to match.
 
 ### Nice to have
 
 - [ ] **railties** — application bootstrap, configuration. Would be great for
-  `trails new` to produce a real runnable app, but not blocking.
+      `trails new` to produce a real runnable app, but not blocking.
 - [ ] Marketing site polish (landing page is in the Frontiers PR)
 - [ ] README overhaul with code examples and badges
 - [ ] npm publish of all packages
@@ -83,6 +83,7 @@ a model, run migrations, start a server, hit JSON and HTML endpoints.
 Working title: **"BlazeTrails: Rails, rewritten in TypeScript"**
 
 Key points to hit:
+
 - Full Rails API fidelity — not inspired by, actually mirroring the API
 - 19,000+ tests derived from the Rails test suite
 - Arel query builder, ActiveRecord ORM, ActiveModel validations — all of it
