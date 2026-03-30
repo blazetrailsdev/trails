@@ -9,7 +9,15 @@ const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 function getPackageTestFiles(): Record<string, string[]> {
-  const packages = ["arel", "activemodel", "activerecord", "activesupport", "rack", "railties"];
+  const packages = [
+    "arel",
+    "activemodel",
+    "activerecord",
+    "activesupport",
+    "rack",
+    "actionview",
+    "railties",
+  ];
   const packageAliases: Record<string, string> = {};
   const result: Record<string, string[]> = {};
 
@@ -27,14 +35,9 @@ function getPackageTestFiles(): Record<string, string[]> {
   const actionControllerFiles = globSync("packages/actionpack/src/actioncontroller/**/*.test.ts", {
     cwd: ROOT_DIR,
   }).sort();
-  const actionViewFiles = globSync("packages/actionpack/src/actionview/**/*.test.ts", {
-    cwd: ROOT_DIR,
-  }).sort();
-
   result["actiondispatch"] = actionDispatchFiles;
   // Shared test files also relevant to controller/ Ruby tests
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
-  result["actionview"] = actionViewFiles;
 
   // Aliased packages (railties → cli)
   for (const [alias, dir] of Object.entries(packageAliases)) {

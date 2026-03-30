@@ -26,6 +26,7 @@ const PKG_DIRS: Record<string, string> = {
   rack: "packages/rack/src/",
   actiondispatch: "packages/actionpack/src/actiondispatch/",
   actioncontroller: "packages/actionpack/src/actioncontroller/",
+  actionview: "packages/actionview/src/",
 };
 
 interface ConventionFile {

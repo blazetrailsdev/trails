@@ -21,6 +21,7 @@ PACKAGE_DIRS = {
   "activesupport" => File.join(RAILS_DIR, "activesupport", "lib", "active_support"),
   "actiondispatch" => File.join(RAILS_DIR, "actionpack", "lib", "action_dispatch"),
   "actioncontroller" => File.join(RAILS_DIR, "actionpack", "lib", "action_controller"),
+  "actionview" => File.join(RAILS_DIR, "actionview", "lib", "action_view"),
   "railties" => File.join(RAILS_DIR, "railties", "lib", "rails"),
 }
 

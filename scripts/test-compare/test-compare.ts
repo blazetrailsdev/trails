@@ -37,6 +37,7 @@ const DETAIL_PACKAGES = new Set([
   "activerecord",
   "activesupport",
   "rack",
+  "actionview",
   "railties",
 ]);
 
@@ -639,7 +640,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     rack: "packages/rack/src/",
     actiondispatch: "packages/actionpack/src/actiondispatch/",
     actioncontroller: "packages/actionpack/src/actioncontroller/",
-    actionview: "packages/actionpack/src/actionview/",
+    actionview: "packages/actionview/src/",
     railties: "packages/railties/src/",
   };
 

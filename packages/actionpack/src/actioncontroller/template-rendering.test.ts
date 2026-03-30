@@ -8,7 +8,7 @@ import {
   LookupContext,
   EjsHandler,
   MissingTemplate,
-} from "../actionview/index.js";
+} from "@blazetrails/actionview";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({

@@ -23,6 +23,7 @@
     { "path": "packages/activemodel" },
     { "path": "packages/activerecord" },
     { "path": "packages/rack" },
+    { "path": "packages/actionview" },
     { "path": "packages/actionpack" },
     { "path": "packages/railties" }
   ],

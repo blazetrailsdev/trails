@@ -1,7 +1,7 @@
 {
-  "name": "@blazetrails/actionpack",
+  "name": "@blazetrails/actionview",
   "version": "0.1.0",
-  "description": "ActionController and ActionDispatch — mirroring Rails ActionPack",
+  "description": "ActionView — mirroring Rails ActionView",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,7 +13,6 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@blazetrails/actionview": "workspace:*",
-    "@blazetrails/rack": "workspace:*"
+    "@blazetrails/activesupport": "workspace:*"
   }
 }

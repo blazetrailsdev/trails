@@ -21,6 +21,7 @@ const PACKAGES = [
   "activesupport",
   "actiondispatch",
   "actioncontroller",
+  "actionview",
   "railties",
 ];
 

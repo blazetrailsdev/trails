@@ -10,6 +10,7 @@ export default defineConfig({
       "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/src/index.ts"),
       "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
       "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
+      "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
       "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/src/index.ts"),
     },
   },

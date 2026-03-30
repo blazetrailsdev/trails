@@ -65,9 +65,18 @@ importers:
 
   packages/actionpack:
     dependencies:
+      "@blazetrails/actionview":
+        specifier: workspace:*
+        version: link:../actionview
       "@blazetrails/rack":
         specifier: workspace:*
         version: link:../rack
+
+  packages/actionview:
+    dependencies:
+      "@blazetrails/activesupport":
+        specifier: workspace:*
+        version: link:../activesupport
 
   packages/activemodel:
     dependencies:

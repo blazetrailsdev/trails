@@ -30,6 +30,7 @@ git sparse-checkout set \
   activesupport/lib/active_support \
   actionpack/lib/action_dispatch \
   actionpack/lib/action_controller \
+  actionview/lib/action_view \
   railties/lib/rails
 
 echo "Rails source ready at $RAILS_DIR"
