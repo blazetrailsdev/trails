@@ -12,6 +12,7 @@ import type { DatabaseAdapter } from "../adapter.js";
  * object. Uses a connection pool internally for concurrent access.
  */
 export class PostgreSQLAdapter implements DatabaseAdapter {
+  private static _spCounter = 0;
   private pool: pg.Pool;
   private _client: pg.PoolClient | null = null;
   private _inTransaction = false;
@@ -79,10 +80,13 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
       // For INSERT without RETURNING, append RETURNING id automatically
       if (upper.startsWith("INSERT") && !upper.includes("RETURNING")) {
         const withReturning = `${pgSql} RETURNING id`;
+        const useSavepoint = this._inTransaction;
+        const spName = useSavepoint ? `_bt_ret_${++PostgreSQLAdapter._spCounter}` : "";
         try {
+          if (useSavepoint) await client.query(`SAVEPOINT "${spName}"`);
           const result = await client.query(withReturning, binds);
+          if (useSavepoint) await client.query(`RELEASE SAVEPOINT "${spName}"`);
           if (result.rows.length > 1) {
-            // Multi-row INSERT: return count of inserted rows
             return result.rowCount ?? result.rows.length;
           }
           if (result.rows.length > 0) {
@@ -91,7 +95,10 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
           }
           return result.rowCount ?? 0;
         } catch {
-          // If RETURNING id fails (e.g. no "id" column), fall back to plain insert
+          if (useSavepoint) {
+            await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
+            await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
+          }
           const result = await client.query(pgSql, binds);
           return result.rowCount ?? 0;
         }

@@ -48,9 +48,12 @@ const _pendingCpk = new Map<string, string[]>();
 // Model classes registered via the hook — used to lazily extract attributes.
 const _registeredModelClasses = new Set<any>();
 
+// Module-level lock to serialize setup() across all SchemaAdapter instances.
+let _setupLock: Promise<void> | null = null;
+
 // Set true when createTestAdapter() is called; cleared after data cleanup.
 let _needsCleanup = false;
-let _cleanupInProgress = false;
+let _cleanupPromise: Promise<void> | null = null;
 
 /** Map ActiveModel type names to SQL column types. */
 function sqlType(typeName: string): string {
@@ -210,8 +213,14 @@ async function processPendingModels(inner: any): Promise<void> {
  * Drop all known tables and reset tracking state.
  */
 async function dropAllTables(inner: any): Promise<void> {
-  if (_cleanupInProgress) return;
-  _cleanupInProgress = true;
+  if (_cleanupPromise) {
+    await _cleanupPromise;
+    return;
+  }
+  let resolve!: () => void;
+  _cleanupPromise = new Promise<void>((r) => {
+    resolve = r;
+  });
   try {
     for (const table of _createdTables) {
       try {
@@ -226,7 +235,8 @@ async function dropAllTables(inner: any): Promise<void> {
     _createdTables.clear();
     _createdColumns.clear();
   } finally {
-    _cleanupInProgress = false;
+    _cleanupPromise = null;
+    resolve();
   }
 }
 
@@ -300,16 +310,36 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   private async setup(): Promise<void> {
-    if (_needsCleanup && !_cleanupInProgress) {
-      _needsCleanup = false;
-      await dropAllTables(this.inner);
-    }
-    // Extract columns from any newly registered model classes
-    if (_registeredModelClasses.size > 0) {
-      extractColumnsFromModels();
-    }
-    if (_pendingModels.size > 0) {
-      await processPendingModels(this.inner);
+    // Wait for any in-flight setup or cleanup to complete
+    while (_setupLock) await _setupLock;
+    if (_cleanupPromise) await _cleanupPromise;
+
+    // Check if there's any work to do
+    if (!_needsCleanup && _registeredModelClasses.size === 0 && _pendingModels.size === 0) return;
+
+    // Acquire module-level lock
+    let resolve!: () => void;
+    _setupLock = new Promise<void>((r) => {
+      resolve = r;
+    });
+    try {
+      // Loop until all work is drained — new models may register during async operations
+      while (_needsCleanup || _registeredModelClasses.size > 0 || _pendingModels.size > 0) {
+        if (_needsCleanup) {
+          if (_cleanupPromise) await _cleanupPromise;
+          _needsCleanup = false;
+          await dropAllTables(this.inner);
+        }
+        if (_registeredModelClasses.size > 0) {
+          extractColumnsFromModels();
+        }
+        if (_pendingModels.size > 0) {
+          await processPendingModels(this.inner);
+        }
+      }
+    } finally {
+      _setupLock = null;
+      resolve();
     }
   }
 
@@ -364,14 +394,19 @@ class SchemaAdapter implements DatabaseAdapter {
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
     await this.setup();
     sql = this.fixSqliteCompat(sql);
-    try {
-      return await this.inner.execute(sql, binds);
-    } catch (e: any) {
-      if (await this.handleMissingTable(e, sql)) {
-        return this.inner.execute(sql, binds);
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await this.inner.execute(sql, binds);
+      } catch (e: any) {
+        lastError = e;
+        if (await this.handleMissingSchemaError(e, sql)) {
+          continue;
+        }
+        throw e;
       }
-      throw e;
     }
+    throw lastError;
   }
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
@@ -402,22 +437,79 @@ class SchemaAdapter implements DatabaseAdapter {
       sql = sql.replace(/DROP\s+TABLE\s+/i, "DROP TABLE IF EXISTS ");
     }
 
-    try {
-      return await this.inner.executeMutation(sql, binds);
-    } catch (e: any) {
-      if (await this.handleMissingTable(e, sql)) {
-        return this.inner.executeMutation(sql, binds);
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await this.inner.executeMutation(sql, binds);
+      } catch (e: any) {
+        lastError = e;
+        if (await this.handleMissingSchemaError(e, sql)) {
+          continue;
+        }
+        throw e;
       }
-      throw e;
     }
+    throw lastError;
   }
 
   /**
-   * If the error is about a missing table, create the table with columns
-   * extracted from the SQL statement. Returns true if recovery succeeded.
+   * If the error is about a missing table or column, recover by creating
+   * the table or adding the column. Returns true if recovery succeeded.
    */
-  private async handleMissingTable(e: any, sql: string): Promise<boolean> {
+  private async handleMissingSchemaError(e: any, sql: string): Promise<boolean> {
     const msg = e?.message || e?.sqlMessage || "";
+
+    // Handle missing column: add the column and retry
+    let colName: string | undefined;
+    let colTableName: string | undefined;
+
+    const pgColMatch = msg.match(/column "(\w+)" of relation "(\w+)" does not exist/i);
+    if (pgColMatch) {
+      colName = pgColMatch[1];
+      colTableName = pgColMatch[2];
+    } else {
+      const mysqlColMatch = msg.match(/Unknown column '(\w+)' in/i);
+      if (mysqlColMatch) {
+        colName = mysqlColMatch[1];
+        colTableName = this.extractTableFromSql(sql) || undefined;
+      } else {
+        const sqliteColMatch = msg.match(/table (\w+) has no column named (\w+)/i);
+        if (sqliteColMatch) {
+          colTableName = sqliteColMatch[1];
+          colName = sqliteColMatch[2];
+        }
+      }
+    }
+
+    if (colTableName && colName) {
+      const colType = colName.endsWith("_id") ? "INTEGER" : "TEXT";
+      try {
+        const alterSql = isMysql()
+          ? `ALTER TABLE \`${colTableName}\` ADD COLUMN \`${colName}\` ${colType}`
+          : `ALTER TABLE "${colTableName}" ADD COLUMN "${colName}" ${colType}`;
+        await this.inner.exec(alterSql);
+        let known = _createdColumns.get(colTableName);
+        if (!known) {
+          known = new Set(["id"]);
+          _createdColumns.set(colTableName, known);
+        }
+        known.add(colName);
+        return true;
+      } catch (alterErr: any) {
+        const alterMsg = String(alterErr?.message ?? "").toLowerCase();
+        if (alterMsg.includes("duplicate column") || alterMsg.includes("already exists")) {
+          let known = _createdColumns.get(colTableName);
+          if (!known) {
+            known = new Set(["id"]);
+            _createdColumns.set(colTableName, known);
+          }
+          known.add(colName);
+          return true;
+        }
+        return false;
+      }
+    }
+
     const tableMatch =
       msg.match(/relation "(\w+)" does not exist/i) ||
       msg.match(/Table '(?:[\w]+\.)?(\w+)' doesn't exist/i) ||
@@ -446,7 +538,13 @@ class SchemaAdapter implements DatabaseAdapter {
 
     _pendingModels.set(tableName, cols);
     await processPendingModels(this.inner);
-    return true;
+    return _createdTables.has(tableName);
+  }
+
+  private extractTableFromSql(sql: string): string | null {
+    const m = sql.match(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|FROM)\s+(?:["`](\w+)["`]|(\w+))/i);
+    if (!m) return null;
+    return m[1] || m[2] || null;
   }
 
   async beginTransaction(): Promise<void> {
