@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::FixtureSet::TableRows
  */
 
-import { TableRow, type ReflectionProxy } from "./table-row.js";
+import { TableRow, type ReflectionProxy, type JoinRow } from "./table-row.js";
 
 export class TableRows {
   readonly tableName: string;
@@ -34,6 +34,14 @@ export class TableRows {
 
   toRecords(): Array<Record<string, unknown>> {
     return this._rows.map((r) => r.row);
+  }
+
+  joinRows(): JoinRow[] {
+    const result: JoinRow[] = [];
+    for (const row of this._rows) {
+      result.push(...row.joinRows);
+    }
+    return result;
   }
 
   [Symbol.iterator](): IterableIterator<TableRow> {

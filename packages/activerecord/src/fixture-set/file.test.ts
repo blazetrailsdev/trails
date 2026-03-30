@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FixtureSet, identify } from "./file.js";
-import { ReflectionProxy } from "./table-row.js";
+import { ReflectionProxy, HasManyThroughProxy } from "./table-row.js";
+import { RenderContext } from "./render-context.js";
+import { ModelMetadata } from "./model-metadata.js";
+import { modelRegistry } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { MigrationContext } from "../migration.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -191,6 +194,143 @@ describe("FixtureSet", () => {
 
       const authorRows = await adapter.execute('SELECT "id" FROM "authors"');
       expect(authorRows[0].id).toBe(identify("alice"));
+    });
+  });
+
+  describe("RenderContext integration", () => {
+    it("renders template values in fixture data", () => {
+      const ctx = new RenderContext();
+      ctx.registerHelper("timestamp", () => "2024-01-01 00:00:00");
+
+      const fs = new FixtureSet(
+        "events",
+        {
+          meeting: { title: "Standup", created_at: "${timestamp}" },
+        },
+        { renderContext: ctx },
+      );
+
+      expect(fs.get("meeting")!.created_at).toBe("2024-01-01 00:00:00");
+    });
+
+    it("passes label as local to template", () => {
+      const ctx = new RenderContext();
+      const fs = new FixtureSet(
+        "users",
+        {
+          alice: { name: "User ${label}" },
+        },
+        { renderContext: ctx },
+      );
+
+      expect(fs.get("alice")!.name).toBe("User alice");
+    });
+  });
+
+  describe("encryption integration", () => {
+    it("encrypts specified attributes on insert", async () => {
+      const adapter = createTestAdapter();
+      const migCtx = new MigrationContext(adapter);
+      await migCtx.createTable("secrets", {}, (t) => {
+        t.string("name");
+        t.string("ssn");
+      });
+
+      const encrypt = (v: unknown) => `ENC[${v}]`;
+      const fs = new FixtureSet(
+        "secrets",
+        {
+          alice: { name: "Alice", ssn: "123-45-6789" },
+        },
+        { encryptedAttributes: ["ssn"], encrypt },
+      );
+
+      await fs.insertAll(adapter);
+      const rows = await adapter.execute('SELECT "name", "ssn" FROM "secrets"');
+      expect(rows[0].name).toBe("Alice");
+      expect(rows[0].ssn).toBe("ENC[123-45-6789]");
+    });
+  });
+
+  describe("has_many through join rows", () => {
+    it("generates join table rows for array labels", async () => {
+      const adapter = createTestAdapter();
+      const migCtx = new MigrationContext(adapter);
+      await migCtx.createTable("posts", {}, (t) => {
+        t.string("title");
+      });
+      await migCtx.createTable("tags", {}, (t) => {
+        t.string("name");
+      });
+      await migCtx.createTable("posts_tags", { id: false }, (t) => {
+        t.integer("post_id");
+        t.integer("tag_id");
+      });
+
+      const tags = new FixtureSet("tags", {
+        ruby: { name: "Ruby" },
+        rails: { name: "Rails" },
+      });
+      await tags.insertAll(adapter);
+
+      const associations = [
+        new HasManyThroughProxy({
+          name: "tags",
+          joinTable: "posts_tags",
+          foreignKey: "post_id",
+          associationForeignKey: "tag_id",
+          className: "Tag",
+        }),
+      ];
+      const posts = new FixtureSet("posts", {
+        first_post: { title: "Hello", tags: ["ruby", "rails"] },
+      });
+      await posts.insertAll(adapter, { associations });
+
+      const joinRows = await adapter.execute('SELECT "post_id", "tag_id" FROM "posts_tags"');
+      expect(joinRows.length).toBe(2);
+      const tagIds = new Set(joinRows.map((r) => r.tag_id));
+      expect(tagIds.has(identify("ruby"))).toBe(true);
+      expect(tagIds.has(identify("rails"))).toBe(true);
+      expect(joinRows.every((r) => r.post_id === identify("first_post"))).toBe(true);
+    });
+  });
+
+  describe("ModelMetadata", () => {
+    it("resolves tableName and primaryKey from registered model", () => {
+      const fakeModel = { tableName: "widgets", primaryKey: "id" } as any;
+      const prev = modelRegistry.get("Widget");
+      modelRegistry.set("Widget", fakeModel);
+      try {
+        const meta = new ModelMetadata("Widget");
+        expect(meta.tableName).toBe("widgets");
+        expect(meta.primaryKeyName).toBe("id");
+        expect(meta.className).toBe("Widget");
+      } finally {
+        if (prev) {
+          modelRegistry.set("Widget", prev);
+        } else {
+          modelRegistry.delete("Widget");
+        }
+      }
+    });
+
+    it("fromModel throws when model not registered", () => {
+      expect(() => ModelMetadata.fromModel("NonExistent")).toThrow(
+        /not found in registry.*registerModel/,
+      );
+    });
+
+    it("uses explicit overrides over model values", () => {
+      const meta = new ModelMetadata("Anything", "custom_table", "uuid");
+      expect(meta.tableName).toBe("custom_table");
+      expect(meta.primaryKeyName).toBe("uuid");
+    });
+
+    it("falls back to className-based table name when no model", () => {
+      const meta = new ModelMetadata("User");
+      expect(meta.tableName).toBe("users");
+      expect(meta.primaryKeyName).toBe("id");
     });
   });
 });

@@ -36,26 +36,30 @@ export class ReflectionProxy {
 /**
  * Mirrors: ActiveRecord::FixtureSet::TableRow::HasManyThroughProxy
  *
- * NOTE: Join table row generation for has_many :through associations
- * is not yet implemented. This class exists for API parity but passing
- * it to _resolveAssociations will only resolve the foreign key like a
- * regular belongs_to — it will not generate join table rows.
+ * Describes a has_many :through association. When a fixture row has
+ * a key matching `name` with an array of labels, join table rows
+ * are generated linking this fixture to each referenced fixture.
  */
 export class HasManyThroughProxy extends ReflectionProxy {
-  readonly through: string;
-  readonly sourceReflection: ReflectionProxy;
+  readonly joinTable: string;
+  readonly associationForeignKey: string;
 
-  constructor(
-    name: string,
-    foreignKey: string,
-    className: string,
-    through: string,
-    sourceReflection: ReflectionProxy,
-  ) {
-    super(name, foreignKey, className);
-    this.through = through;
-    this.sourceReflection = sourceReflection;
+  constructor(options: {
+    name: string;
+    joinTable: string;
+    foreignKey: string;
+    associationForeignKey: string;
+    className: string;
+  }) {
+    super(options.name, options.foreignKey, options.className);
+    this.joinTable = options.joinTable;
+    this.associationForeignKey = options.associationForeignKey;
   }
+}
+
+export interface JoinRow {
+  table: string;
+  row: Record<string, unknown>;
 }
 
 /**
@@ -69,6 +73,7 @@ export class TableRow {
   readonly label: string;
   private _row: Record<string, unknown>;
   private _primaryKey: string;
+  private _joinRows: JoinRow[] = [];
 
   constructor(
     label: string,
@@ -99,29 +104,56 @@ export class TableRow {
     return this._row[this._primaryKey];
   }
 
-  /**
-   * Resolve association labels to foreign key IDs.
-   *
-   * If a fixture row has a key matching an association name (e.g. "author")
-   * and the value is a string (a fixture label), replace it with the
-   * foreign key column set to the deterministic ID for that label.
-   *
-   * Example:
-   *   row: { title: "Hello", author: "alice" }
-   *   association: { name: "author", foreignKey: "author_id", className: "Author" }
-   *   result: { title: "Hello", author_id: identify("alice") }
-   */
+  get joinRows(): JoinRow[] {
+    return [...this._joinRows];
+  }
+
   private _resolveAssociations(associations: ReflectionProxy[]): void {
     for (const assoc of associations) {
-      const value = this._row[assoc.name];
-      if (typeof value === "string" && value !== "") {
-        if (!Object.prototype.hasOwnProperty.call(this._row, assoc.foreignKey)) {
-          this._row[assoc.foreignKey] = identify(value);
-        }
-        if (assoc.name !== assoc.foreignKey) {
-          delete this._row[assoc.name];
+      if (assoc instanceof HasManyThroughProxy) {
+        this._resolveHasManyThrough(assoc);
+      } else {
+        const value = this._row[assoc.name];
+        if (typeof value === "string") {
+          if (value !== "" && !Object.prototype.hasOwnProperty.call(this._row, assoc.foreignKey)) {
+            this._row[assoc.foreignKey] = identify(value);
+          }
+          if (assoc.name !== assoc.foreignKey) {
+            delete this._row[assoc.name];
+          }
         }
       }
     }
+  }
+
+  private _resolveHasManyThrough(assoc: HasManyThroughProxy): void {
+    const raw = this._row[assoc.name];
+    if (raw === undefined) return;
+
+    // Normalize to array: single string becomes [string]
+    if (typeof raw !== "string" && !Array.isArray(raw)) {
+      throw new Error(
+        `Fixture "${this.label}": expected string or array for has_many :through association "${assoc.name}", got ${typeof raw}`,
+      );
+    }
+    const labels: unknown[] = typeof raw === "string" ? [raw] : raw;
+
+    for (const label of labels) {
+      if (label === "") continue;
+      if (typeof label !== "string") {
+        throw new Error(
+          `Fixture "${this.label}": expected all entries for has_many :through association "${assoc.name}" to be strings, got ${typeof label}`,
+        );
+      }
+      this._joinRows.push({
+        table: assoc.joinTable,
+        row: {
+          [assoc.foreignKey]: this.primaryKeyValue,
+          [assoc.associationForeignKey]: identify(label),
+        },
+      });
+    }
+
+    delete this._row[assoc.name];
   }
 }
