@@ -9,15 +9,9 @@ import type { CallbackFn, CallbackConditions } from "../callbacks.js";
  * class methods. Model already implements these via beforeValidation()
  * and afterValidation() which delegate to CallbackChain.
  */
-export interface Callbacks {
-  beforeValidation(fn: CallbackFn, conditions?: CallbackConditions): void;
-  afterValidation(fn: CallbackFn, conditions?: CallbackConditions): void;
-}
-
-/**
- * Mirrors: ActiveModel::Validations::Callbacks::ClassMethods
- */
 export interface CallbacksClassMethods {
   beforeValidation(fn: CallbackFn, conditions?: CallbackConditions): void;
   afterValidation(fn: CallbackFn, conditions?: CallbackConditions): void;
 }
+
+export type Callbacks = CallbacksClassMethods;

@@ -8,7 +8,7 @@
  */
 export interface Timezone {
   isUtc(): boolean;
-  defaultTimezone(): string;
+  defaultTimezone(): "utc" | "local";
 }
 
 let _defaultTimezone: "utc" | "local" = "utc";
@@ -17,7 +17,7 @@ export function isUtc(): boolean {
   return _defaultTimezone === "utc";
 }
 
-export function defaultTimezone(): string {
+export function defaultTimezone(): "utc" | "local" {
   return _defaultTimezone;
 }
 
