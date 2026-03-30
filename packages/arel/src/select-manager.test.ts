@@ -308,7 +308,7 @@ describe("SelectManagerTest", () => {
     });
   });
 
-  describe("comment", () => {
+  describe("order", () => {
     it("chains", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
@@ -380,7 +380,7 @@ describe("SelectManagerTest", () => {
     });
   });
 
-  describe("outer join", () => {
+  describe("join", () => {
     it("noops on nil", () => {
       // Table.join with a null-like argument - the manager still works
       const mgr = users.from();
@@ -444,7 +444,7 @@ describe("SelectManagerTest", () => {
     });
   });
 
-  describe("comment", () => {
+  describe("group", () => {
     it("chains", () => {
       const mgr = users.project(star);
       expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
@@ -672,7 +672,7 @@ describe("SelectManagerTest", () => {
     });
   });
 
-  describe("comment", () => {
+  describe("take", () => {
     it("chains", () => {
       const um = new UpdateManager();
       const result = um.table(users);

@@ -95,9 +95,7 @@ describe("InsertManagerTest", () => {
       const result = im.into(users);
       expect(result).toBe(im);
     });
-  });
 
-  describe("values", () => {
     it("converts to sql", () => {
       const mgr = new InsertManager();
       mgr.into(users);
@@ -107,7 +105,9 @@ describe("InsertManagerTest", () => {
       ]);
       expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name", "age") VALUES ('dean', 30)`);
     });
+  });
 
+  describe("values", () => {
     it("converts to sql", () => {
       const im = new InsertManager();
       im.into(users);
