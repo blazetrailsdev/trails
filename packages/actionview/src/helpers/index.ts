@@ -13,7 +13,7 @@ export {
   resetTagBuilder,
 } from "./tag-helper.js";
 
-export { htmlEscape, h, htmlEscapeOnce, jsonEscape } from "./erb-util.js";
+export { htmlEscape, h, htmlEscapeOnce, jsonEscape } from "./ejs-util.js";
 
 export { escapeJavascript, j, javascriptCdataSection, javascriptTag } from "./javascript-helper.js";
 

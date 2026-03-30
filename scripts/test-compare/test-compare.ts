@@ -59,17 +59,27 @@ function rubyToConventionTs(rubyFile: string, pkg: string): string {
   const kebab = base.replace(/_/g, "-");
   const tsFile = kebab + ".test.ts";
 
-  if (dir === ".") return tsFile;
-  const tsDir = dir.replace(/_/g, "-");
-  return path.join(tsDir, tsFile);
+  let tsDir = dir === "." ? "" : dir.replace(/_/g, "-");
+
+  // Rails uses ERB; we use EJS — map erb paths to ejs
+  tsDir = tsDir.replace(/\berb\b/g, "ejs");
+  const mappedTsFile = tsFile.replace(/\berb\b/g, "ejs");
+
+  if (!tsDir) return mappedTsFile;
+  return path.join(tsDir, mappedTsFile);
 }
 
 function normalize(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+// Rails uses ERB; we use EJS — normalize class/test names to match
+function normalizeErb(s: string): string {
+  return normalize(s).replace(/erb/g, "ejs");
+}
+
 function normPath(ancestors: string[], description: string): string {
-  return [...ancestors, description].map(normalize).join(" > ");
+  return [...ancestors, description].map(normalizeErb).join(" > ");
 }
 
 /** Increment a counter in a Map. */

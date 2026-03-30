@@ -46,11 +46,12 @@ function rubyFileToTs(rubyFile: string): string {
   const dir = path.dirname(rubyFile);
   const base = path.basename(rubyFile, ".rb");
   const kebab = base.replace(/_/g, "-");
-  const tsFile = kebab + ".ts";
+  // Rails uses ERB; we use EJS
+  const tsFile = kebab.replace(/\berb\b/g, "ejs") + ".ts";
   if (dir === ".") return tsFile;
   const tsDir = dir
     .split("/")
-    .map((d) => d.replace(/_/g, "-"))
+    .map((d) => d.replace(/_/g, "-").replace(/\berb\b/g, "ejs"))
     .join("/");
   return path.join(tsDir, tsFile);
 }

@@ -6,7 +6,7 @@ import {
 } from "@blazetrails/activesupport";
 
 /**
- * ERB::Util equivalent — html_escape, json_escape, html_escape_once
+ * EJS::Util (ERB::Util equivalent) — html_escape, json_escape, html_escape_once
  */
 
 export const htmlEscape = _htmlEscape;
