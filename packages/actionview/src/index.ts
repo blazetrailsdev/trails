@@ -21,3 +21,5 @@ export {
 } from "./renderer.js";
 
 export { EjsHandler } from "./ejs-handler.js";
+
+export * from "./helpers/index.js";

@@ -746,6 +746,19 @@ describe("OutputSafetyTest", () => {
     expect(result.toString()).toContain("world");
   });
 
+  it("ERB::Util.html_escape_once preserves numeric character references", () => {
+    expect(htmlEscapeOnce("&#123;").toString()).toBe("&#123;");
+    expect(htmlEscapeOnce("&#x1F4A9;").toString()).toBe("&#x1F4A9;");
+    expect(htmlEscapeOnce("&#X27;").toString()).toBe("&#X27;");
+    expect(htmlEscapeOnce("&#x03BB;").toString()).toBe("&#x03BB;");
+  });
+
+  it("ERB::Util.html_escape_once escapes invalid entity-like sequences", () => {
+    expect(htmlEscapeOnce("&1;").toString()).toBe("&amp;1;");
+    expect(htmlEscapeOnce("&#1dfa3;").toString()).toBe("&amp;#1dfa3;");
+    expect(htmlEscapeOnce("& #123;").toString()).toBe("&amp; #123;");
+  });
+
   it("ERB::Util.xml_name_escape should escape unsafe characters for XML names", () => {
     const result = xmlNameEscape("hello world");
     expect(result).not.toContain(" ");
