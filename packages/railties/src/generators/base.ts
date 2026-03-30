@@ -109,7 +109,11 @@ export type ColumnType =
   | "datetime"
   | "timestamp"
   | "references"
-  | "belongs_to";
+  | "belongs_to"
+  | "token"
+  | "rich_text"
+  | "attachment"
+  | "attachments";
 
 export function parseColumns(args: string[]): Array<{ name: string; type: ColumnType }> {
   const columns: Array<{ name: string; type: ColumnType }> = [];

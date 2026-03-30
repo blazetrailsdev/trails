@@ -4,14 +4,38 @@ import {
   classify,
   dasherize,
   tableize,
-  parseColumns,
+  underscore,
+  ColumnType,
 } from "./base.js";
 import { MigrationGenerator } from "./migration-generator.js";
+import { singularize } from "@blazetrails/activesupport";
 
 interface ModelOptions {
   migration?: boolean;
   test?: boolean;
   timestamps?: boolean;
+  parent?: string;
+  indexes?: boolean;
+  primaryKeyType?: string;
+}
+
+function parseColumnsDefaultString(args: string[]): Array<{ name: string; type: ColumnType }> {
+  const columns: Array<{ name: string; type: ColumnType }> = [];
+  for (const arg of args) {
+    if (arg.startsWith("-")) continue;
+    const parts = arg.split(":");
+    const name = parts[0];
+    if (!name) continue;
+    let rawType = parts[1];
+
+    if (!rawType || rawType === "index" || rawType === "uniq") {
+      rawType = "string";
+    }
+
+    const type = rawType.replace(/\{[^}]*\}/, "").replace(/!$/, "") as ColumnType;
+    columns.push({ name, type });
+  }
+  return columns;
 }
 
 export class ModelGenerator extends GeneratorBase {
@@ -20,43 +44,69 @@ export class ModelGenerator extends GeneratorBase {
   }
 
   run(name: string, args: string[], options: ModelOptions = {}): string[] {
-    const { migration = true, test = true, timestamps = true } = options;
-    const className = classify(name);
-    const fileName = dasherize(name);
-    const columns = parseColumns(args);
+    const {
+      migration = true,
+      test = true,
+      timestamps = true,
+      parent,
+      indexes = true,
+      primaryKeyType,
+    } = options;
 
-    // Model file
-    // Build a set of polymorphic reference names from raw args
+    const singularName = singularize(underscore(name));
+    const className = classify(singularName);
+    const fileName = dasherize(singularName);
+    const columns = parseColumnsDefaultString(args);
+
     const polymorphicNames = new Set(
       args
         .filter((a) => /:(references|belongs_to)\{polymorphic\}/.test(a))
         .map((a) => a.split(":")[0]),
     );
 
-    const attrLines = columns
-      .map((c) => {
-        if (c.type === "references" || c.type === "belongs_to") {
-          if (polymorphicNames.has(c.name)) {
-            return `    this.belongsTo("${c.name}", { polymorphic: true });`;
-          }
-          return `    this.belongsTo("${c.name}");`;
-        }
-        return `    this.attribute("${c.name}", "${c.type}");`;
-      })
-      .join("\n");
-    const staticBlock = attrLines ? `\n  static {\n${attrLines}\n  }\n` : "";
+    const parentClass = parent ? classify(parent.replace(/::/g, "_").replace(/\//g, "_")) : "Base";
+    const parentPath = parent ? dasherize(parent.replace(/::/g, "/")) : null;
+    const importPath = parentPath
+      ? `import { ${parentClass} } from "./${parentPath}.js";`
+      : 'import { Base } from "@blazetrails/activerecord";';
 
+    const bodyLines: string[] = [];
+
+    for (const col of columns) {
+      if (col.type === "token") {
+        if (col.name === "token") {
+          bodyLines.push("    this.hasSecureToken();");
+        } else {
+          bodyLines.push(`    this.hasSecureToken("${col.name}");`);
+        }
+      } else if (col.type === "rich_text") {
+        bodyLines.push(`    this.hasRichText("${col.name}");`);
+      } else if (col.type === "attachment") {
+        bodyLines.push(`    this.hasOneAttached("${col.name}");`);
+      } else if (col.type === "attachments") {
+        bodyLines.push(`    this.hasManyAttached("${col.name}");`);
+      } else if (col.type === "references" || col.type === "belongs_to") {
+        if (polymorphicNames.has(col.name)) {
+          bodyLines.push(`    this.belongsTo("${col.name}", { polymorphic: true });`);
+        } else {
+          bodyLines.push(`    this.belongsTo("${col.name}");`);
+        }
+      } else {
+        bodyLines.push(`    this.attribute("${col.name}", "${col.type}");`);
+      }
+    }
+
+    const staticBlock = bodyLines.length > 0 ? `\n  static {\n${bodyLines.join("\n")}\n  }\n` : "";
     const ext = this.ext();
 
     this.createFile(
       `src/app/models/${fileName}${ext}`,
-      `import { Base } from "@blazetrails/activerecord";
+      `${importPath}
 
-export class ${className} extends Base {${staticBlock}}
+export class ${className} extends ${parentClass} {${staticBlock}}
 `,
     );
 
-    // Test file
     if (test) {
       this.createFile(
         `test/models/${fileName}.test${ext}`,
@@ -72,14 +122,15 @@ describe("${className}", () => {
       );
     }
 
-    // Migration
-    if (migration) {
+    if (migration && !parent) {
+      const tableName = classify(tableize(className));
       const migGen = new MigrationGenerator({ cwd: this.cwd, output: this.output });
-      const migFiles = migGen.run(
-        `Create${tableize(className).replace(/^(.)/, (c) => c.toUpperCase())}`,
-        args,
-        { timestamps },
-      );
+
+      const migArgs = indexes
+        ? args
+        : args.map((a) => a.replace(/:index/, "").replace(/:uniq/, ""));
+
+      const migFiles = migGen.run(`Create${tableName}`, migArgs, { timestamps, primaryKeyType });
       this.createdFiles.push(...migFiles);
     }
 
