@@ -415,9 +415,9 @@ export class SchemaStatements {
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
-    const nullable = options.null !== undefined ? options.null : false;
-    await this.addColumn(tableName, "created_at", "datetime", { null: nullable });
-    await this.addColumn(tableName, "updated_at", "datetime", { null: nullable });
+    const opts: ColumnOptions = { ...options, null: options.null ?? false };
+    await this.addColumn(tableName, "created_at", "datetime", opts);
+    await this.addColumn(tableName, "updated_at", "datetime", opts);
   }
 
   async removeTimestamps(tableName: string): Promise<void> {

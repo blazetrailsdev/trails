@@ -337,9 +337,11 @@ export class TableDefinition {
     return this;
   }
 
-  timestamps(): this {
-    this.datetime("created_at", { null: false });
-    this.datetime("updated_at", { null: false });
+  timestamps(options: ColumnOptions = {}): this {
+    const { null: nullOption, ...rest } = options;
+    const opts = { ...rest, null: nullOption ?? false };
+    this.datetime("created_at", opts);
+    this.datetime("updated_at", opts);
     return this;
   }
 

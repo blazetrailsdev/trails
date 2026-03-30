@@ -125,6 +125,17 @@ describe("ActiveRecordSchemaTest", () => {
     expect(createdAt!.options.null).toBe(false);
   });
 
+  it("timestamps with custom options on create table", async () => {
+    const td = new TableDefinition("ts_custom");
+    td.timestamps({ null: true, precision: 6 });
+    const createdAt = td.columns.find((c) => c.name === "created_at");
+    const updatedAt = td.columns.find((c) => c.name === "updated_at");
+    expect(createdAt!.options.null).toBe(true);
+    expect(createdAt!.options.precision).toBe(6);
+    expect(updatedAt!.options.null).toBe(true);
+    expect(updatedAt!.options.precision).toBe(6);
+  });
+
   it("timestamps with implicit default on change table", async () => {
     class TsMig extends Migration {
       async up() {
@@ -154,6 +165,29 @@ describe("ActiveRecordSchemaTest", () => {
 
   it.skip("timestamps with implicit default on change table with bulk", () => {
     /* bulk mode not supported */
+  });
+
+  it("addTimestamps forwards options to addColumn", async () => {
+    class TsOptMig extends Migration {
+      async up() {
+        await this.createTable("ts_opts", (t) => {
+          t.string("name");
+        });
+        await this.addTimestamps("ts_opts", { null: true });
+      }
+      async down() {
+        await this.dropTable("ts_opts");
+      }
+    }
+    const m = new TsOptMig();
+    (m as any).adapter = adapter;
+    await m.up();
+    // null: true means we can insert without providing timestamp values
+    await adapter.executeMutation(`INSERT INTO "ts_opts" ("name") VALUES ('test')`);
+    const rows = await adapter.execute(`SELECT * FROM "ts_opts"`);
+    expect(rows.length).toBe(1);
+    expect(rows[0].created_at).toBeNull();
+    expect(rows[0].updated_at).toBeNull();
   });
 
   it("timestamps with implicit default on add timestamps", async () => {
