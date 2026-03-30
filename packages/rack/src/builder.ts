@@ -1,3 +1,4 @@
+import { readFileSync } from "fs";
 import { URLMap } from "./urlmap.js";
 
 type RackApp = (env: Record<string, any>) => any;
@@ -19,6 +20,54 @@ export class Builder {
       // Check if it's a builder block (takes builder arg) vs an app (takes env)
       // Heuristic: if it looks like it's configuring a builder, treat as block
     }
+  }
+
+  static parseFile(path: string): RackApp {
+    let content = readFileSync(path, "utf-8");
+
+    if (content.charCodeAt(0) === 0xfeff) {
+      content = content.slice(1);
+    }
+
+    const firstLine = content.split("\n")[0];
+    if (firstLine.startsWith("#\\")) {
+      throw new Error(
+        "Parsing options from the first comment line is no longer supported. Remove the '#\\ ...' line or configure server options elsewhere.",
+      );
+    }
+
+    content = content.replace(/^#(?!\\)[^\n]*\n/gm, "\n");
+
+    const endMatch = content.match(/^__END__\s*$/m);
+    if (endMatch && typeof endMatch.index === "number") {
+      content = content.substring(0, endMatch.index);
+    }
+
+    return Builder.newFromString(content, path);
+  }
+
+  // Mirrors Rack::Builder.new_from_string which uses eval. Input must be trusted
+  // config content (from files on disk), not user-supplied strings.
+  static newFromString(content: string, file?: string): RackApp {
+    const builder = new Builder();
+    let source = `"use strict";\n${content}`;
+    if (file) {
+      source += `\n//# sourceURL=${file.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
+    }
+    let configFn: (b: Builder) => void;
+    try {
+      configFn = new Function("builder", source) as (b: Builder) => void;
+    } catch (err) {
+      const msg = file ? `Error parsing config from ${file}` : "Error parsing config string";
+      throw new Error(`${msg}: ${(err as Error).message}`, { cause: err });
+    }
+    try {
+      configFn(builder);
+    } catch (err) {
+      const msg = file ? `Error evaluating config from ${file}` : "Error evaluating config string";
+      throw new Error(`${msg}: ${(err as Error).message}`, { cause: err });
+    }
+    return builder.toApp();
   }
 
   use(middleware: any, ...args: any[]): this {

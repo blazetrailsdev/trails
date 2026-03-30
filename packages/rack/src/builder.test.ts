@@ -1,6 +1,11 @@
-import { it, expect } from "vitest";
+import { it, expect, describe } from "vitest";
+import { join } from "path";
 import { Builder } from "./builder.js";
 import { MockRequest } from "./mock-request.js";
+
+function configFile(name: string): string {
+  return join(__dirname, "builder", name);
+}
 
 it("can provide options", async () => {
   // Builder can be constructed with a block that configures it
@@ -255,4 +260,57 @@ it("handles builder with no middleware and just run", async () => {
   const app = builder.toApp();
   const res = await new MockRequest(app).get("/");
   expect(res.bodyString).toBe("simple");
+});
+
+describe("parse_file", () => {
+  it("raises if parses commented options", () => {
+    expect(() => {
+      Builder.parseFile(configFile("options.ru.txt"));
+    }).toThrow("Parsing options from the first comment line is no longer supported");
+  });
+
+  it("removes __END__ before evaluating app", async () => {
+    const app = Builder.parseFile(configFile("end.ru.txt"));
+    const res = await new MockRequest(app).get("/");
+    expect(res.bodyString).toBe("OK");
+  });
+
+  it("supports multi-line comments", () => {
+    const app = Builder.parseFile(configFile("comment.ru.txt"));
+    expect(app).toBeTypeOf("function");
+  });
+
+  it("requires an_underscore_app not ending in .ru", async () => {
+    const app = Builder.parseFile(configFile("an_underscore_app.txt"));
+    const res = await new MockRequest(app).get("/");
+    expect(res.bodyString).toBe("OK");
+  });
+
+  it("sets __LINE__ correctly", async () => {
+    const app = Builder.parseFile(configFile("line.ru.txt"));
+    const res = await new MockRequest(app).get("/");
+    expect(res.bodyString).toBe("3");
+  });
+
+  it("strips leading unicode byte order mark when present", async () => {
+    const app = Builder.parseFile(configFile("bom.ru.txt"));
+    const res = await new MockRequest(app).get("/");
+    expect(res.bodyString).toBe("OK");
+  });
+
+  it("respects the frozen_string_literal magic comment", async () => {
+    const app = Builder.parseFile(configFile("frozen.ru.txt"));
+    const res = await new MockRequest(app).get("/");
+    expect(res.bodyString).toBe("frozen");
+  });
+});
+
+describe("new_from_string", () => {
+  it("builds a rack app from string", async () => {
+    const app = Builder.newFromString(
+      "builder.run(async function(env) { return [200, {'content-type': 'text/plain'}, ['OK']]; });",
+    );
+    const res = await new MockRequest(app).get("/");
+    expect(res.bodyString).toBe("OK");
+  });
 });

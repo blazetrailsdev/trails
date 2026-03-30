@@ -36,7 +36,27 @@ it("handles exceptions with backtrace lines for files that are not readable", as
   expect(res.bodyString).toContain("nonexistent.rb");
 });
 
-it.skip("handles invalid POST data exceptions");
+it("handles invalid POST data exceptions", async () => {
+  const badInput = {
+    read() {
+      throw new Error("Invalid encoding");
+    },
+  };
+  const req = new MockRequest((env) =>
+    showExceptions(async (e: any) => {
+      e["rack.input"] = badInput;
+      throw new Error("RuntimeError");
+    }).call(env),
+  );
+  const res = await req.post("/", {
+    HTTP_ACCEPT: "text/html",
+  });
+  expect(res.status).toBe(500);
+  expect(res.bodyString).toContain("Error");
+  expect(res.bodyString).toContain("ShowExceptions");
+  expect(res.bodyString).toContain("No GET data");
+  expect(res.bodyString).toContain("Invalid POST data");
+});
 
 it("works with binary data in the Rack environment", async () => {
   const req = new MockRequest((env) =>

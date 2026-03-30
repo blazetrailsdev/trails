@@ -1,0 +1,2 @@
+# frozen_string_literal: true
+builder.run(async function(env) { return [200, {}, ["frozen"]]; });
