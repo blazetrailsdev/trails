@@ -54,6 +54,45 @@ function getModelColumns(modelClass: any): string[] {
   return cols;
 }
 
+/**
+ * Mirrors: ActiveRecord::Associations::JoinDependency::Aliases
+ *
+ * Caches the column alias mappings for joined tables, providing
+ * fast lookup from (node, column) to alias string.
+ */
+export class Aliases {
+  private _aliasCache: Map<JoinNode | null, Map<string, string>>;
+  private _columnsCache: Map<JoinNode | null, AliasMap[]>;
+  private _allColumns: AliasMap[];
+
+  constructor(tables: Array<{ node: JoinNode | null; columns: AliasMap[] }>) {
+    this._aliasCache = new Map();
+    this._columnsCache = new Map();
+    this._allColumns = [];
+    for (const table of tables) {
+      const colMap = new Map<string, string>();
+      for (const col of table.columns) {
+        colMap.set(col.column, col.alias);
+        this._allColumns.push(col);
+      }
+      this._aliasCache.set(table.node, colMap);
+      this._columnsCache.set(table.node, table.columns);
+    }
+  }
+
+  columns(): AliasMap[] {
+    return this._allColumns;
+  }
+
+  columnAliases(node: JoinNode | null): AliasMap[] {
+    return this._columnsCache.get(node) ?? [];
+  }
+
+  columnAlias(node: JoinNode | null, column: string): string | undefined {
+    return this._aliasCache.get(node)?.get(column);
+  }
+}
+
 export class JoinDependency {
   private _baseModel: typeof Base;
   private _baseAlias: string;

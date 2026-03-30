@@ -26,6 +26,10 @@ export { LazyAttributeSet, LazyAttributeHash } from "./attribute-set/builder.js"
 export { YAMLEncoder } from "./attribute-set/yaml-encoder.js";
 export { Railtie } from "./railtie.js";
 export { WithValidator } from "./validations/with.js";
+export { AbsenceValidator } from "./validations/absence.js";
+export { PresenceValidator } from "./validations/presence.js";
+export { LengthValidator } from "./validations/length.js";
+export { NumericalityValidator } from "./validations/numericality.js";
 export { AcceptsMultiparameterTime } from "./type/helpers/accepts-multiparameter-time.js";
 export type { ValidatorContract } from "./validator.js";
 export { ModelName } from "./naming.js";

@@ -95,21 +95,20 @@ sub-modules Rails uses.
 | `relation/predicate_builder/*`         | 6       | ArrayHandler, RangeHandler, etc. |        |
 | `relation/merger.rb`                   | 0       | Already matched                  | ✅     |
 
-### A5. Associations (4 missing)
+### A5. Associations (Done ✅)
 
-Most association classes are already matched (21/21 error classes, all
-concrete association types). The gaps are:
+All association classes are matched including join dependency internals.
 
-| Rails file                                         | Missing | Notes                  | Status |
-| -------------------------------------------------- | ------- | ---------------------- | ------ |
-| `associations/association.rb`                      | 0       | Base Association class | ✅     |
-| `associations/builder/association.rb`              | 0       | Base builder           | ✅     |
-| `associations/builder/collection_association.rb`   | 0       | Collection builder     | ✅     |
-| `associations/builder/singular_association.rb`     | 0       | Singular builder       | ✅     |
-| `associations/join_dependency.rb`                  | 1       | Join dependency class  |        |
-| `associations/join_dependency/join_association.rb` | 1       | Join association node  |        |
-| `associations/join_dependency/join_base.rb`        | 1       | Join base node         |        |
-| `associations/join_dependency/join_part.rb`        | 1       | Join part base class   |        |
+| Rails file                                         | Missing | Notes                    | Status |
+| -------------------------------------------------- | ------- | ------------------------ | ------ |
+| `associations/association.rb`                      | 0       | Base Association class   | ✅     |
+| `associations/builder/association.rb`              | 0       | Base builder             | ✅     |
+| `associations/builder/collection_association.rb`   | 0       | Collection builder       | ✅     |
+| `associations/builder/singular_association.rb`     | 0       | Singular builder         | ✅     |
+| `associations/join_dependency.rb`                  | 0       | JoinDependency + Aliases | ✅     |
+| `associations/join_dependency/join_association.rb` | 1       | Join association node    |        |
+| `associations/join_dependency/join_base.rb`        | 1       | Join base node           |        |
+| `associations/join_dependency/join_part.rb`        | 1       | Join part base class     |        |
 
 ### A6. Types (16 missing)
 
@@ -134,14 +133,27 @@ Each type is self-contained: inherit from an ActiveModel type, override
 | `type_caster/connection.rb`         | 1       | TypeCaster::Connection           |        |
 | `type_caster/map.rb`                | 1       | TypeCaster::Map                  |        |
 
-### A7. Validations (7 missing)
+### A7. Validations (Done ✅ — stubs, integration pending)
 
-Thin wrappers around ActiveModel validations with AR-specific behavior.
+All 7 classes exist for API parity. Most are thin subclasses of ActiveModel
+validators without AR-specific behavior yet.
 
-`validations/absence.rb`, `validations/associated.rb`,
-`validations/length.rb`, `validations/numericality.rb`,
-`validations/presence.rb`, `validations/uniqueness.rb`,
-plus the top-level `validations.rb` module.
+| Rails file                    | Status | Notes                                                     |
+| ----------------------------- | ------ | --------------------------------------------------------- |
+| `validations.rb`              | ✅     | Validations interface + re-exports                        |
+| `validations/absence.rb`      | ✅     | Empty subclass of ActiveModel AbsenceValidator            |
+| `validations/associated.rb`   | ✅     | Stub — needs to fetch associations from record, not attrs |
+| `validations/length.rb`       | ✅     | Empty subclass of ActiveModel LengthValidator             |
+| `validations/numericality.rb` | ✅     | Empty subclass of ActiveModel NumericalityValidator       |
+| `validations/presence.rb`     | ✅     | Empty subclass of ActiveModel PresenceValidator           |
+| `validations/uniqueness.rb`   | ✅     | Has real logic but not fully integrated with Base         |
+
+**Integration TODOs:**
+
+- AbsenceValidator/PresenceValidator: exclude records marked for destruction
+- AssociatedValidator: fetch association value from record (not readAttribute)
+- UniquenessValidator: verify async lifecycle integration with Base.save()
+- LengthValidator/NumericalityValidator: use type-cast values for comparison
 
 ### A8. Scoping (Done ✅)
 
