@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { Model, Errors } from "./index.js";
+import { describe, it, expect, afterEach } from "vitest";
+import { Model, Errors, I18n } from "./index.js";
+import { Error as ActiveModelError } from "./error.js";
 
 describe("ErrorsTest", () => {
   // =========================================================================
@@ -213,6 +214,39 @@ describe("ErrorsTest", () => {
     const errors = new Errors({});
     expect(errors.fullMessage("name", "is invalid")).toBe("Name is invalid");
     expect(errors.fullMessage("base", "is invalid")).toBe("is invalid");
+  });
+
+  describe("i18nCustomizeFullMessage", () => {
+    afterEach(() => {
+      ActiveModelError.i18nCustomizeFullMessage = false;
+      I18n.reset();
+    });
+
+    it("falls back to default format when model-specific keys are missing", () => {
+      ActiveModelError.i18nCustomizeFullMessage = true;
+      const errors = new Errors({});
+      expect(errors.fullMessage("name", "is invalid")).toBe("Name is invalid");
+    });
+
+    it("uses model-specific attribute format when present", () => {
+      ActiveModelError.i18nCustomizeFullMessage = true;
+      class User {}
+      I18n.storeTranslations("en", {
+        activemodel: {
+          errors: {
+            models: {
+              user: {
+                attributes: {
+                  name: { format: "%{message}" },
+                },
+              },
+            },
+          },
+        },
+      });
+      const errors = new Errors(new User());
+      expect(errors.fullMessage("name", "is invalid")).toBe("is invalid");
+    });
   });
 
   it("inspect", () => {

@@ -1,4 +1,4 @@
-import { humanize } from "@blazetrails/activesupport";
+import { humanize, underscore } from "@blazetrails/activesupport";
 import { I18n } from "./i18n.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,6 +10,8 @@ type AnyRecord = any;
  * Mirrors: ActiveModel::Error
  */
 export class Error {
+  static i18nCustomizeFullMessage: boolean = false;
+
   readonly base: AnyRecord;
   readonly attribute: string;
   readonly type: string;
@@ -115,9 +117,30 @@ export class Error {
     const humanAttr = modelClass?.humanAttributeName
       ? modelClass.humanAttributeName(attribute)
       : humanize(attribute);
-    const format = I18n.t("activemodel.errors.format", {
-      defaultValue: "%{attribute} %{message}",
-    });
+
+    let format: string;
+    if (Error.i18nCustomizeFullMessage) {
+      const modelKey =
+        (modelClass as AnyRecord)?.modelName?.i18nKey ??
+        (modelClass?.name ? underscore(modelClass.name) : undefined);
+      const defaults: string[] = [];
+      if (modelKey) {
+        defaults.push(`activemodel.errors.models.${modelKey}.attributes.${attribute}.format`);
+        defaults.push(`activemodel.errors.models.${modelKey}.format`);
+      }
+      defaults.push("activemodel.errors.format");
+      const primaryKey = defaults[0];
+      const fallbackDefaults = defaults.slice(1).map((key) => ({ key }));
+      format = I18n.t(primaryKey, {
+        defaults: fallbackDefaults,
+        defaultValue: "%{attribute} %{message}",
+      });
+    } else {
+      format = I18n.t("activemodel.errors.format", {
+        defaultValue: "%{attribute} %{message}",
+      });
+    }
+
     return format.replace("%{attribute}", humanAttr).replace("%{message}", message);
   }
 

@@ -1,18 +1,37 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { Railtie } from "./railtie.js";
+import { SecurePassword } from "./secure-password.js";
+import { Error as ActiveModelError } from "./error.js";
 
-// Railtie tests cover Rails-specific initialization hooks.
-// These are stubbed to match test:compare since we don't have
-// a Rails application context. The behavior they test (min_cost config,
-// i18n_customize_full_message) would need a Railtie equivalent to
-// implement properly.
 describe("RailtieTest", () => {
-  it.skip("secure password min_cost is false in the development environment", () => {});
+  afterEach(() => {
+    SecurePassword.minCost = false;
+    ActiveModelError.i18nCustomizeFullMessage = false;
+  });
 
-  it.skip("secure password min_cost is true in the test environment", () => {});
+  it("secure password min_cost is false in the development environment", () => {
+    Railtie.initialize({ env: "development" });
+    expect(SecurePassword.minCost).toBe(false);
+  });
 
-  it.skip("i18n customize full message defaults to false", () => {});
+  it("secure password min_cost is true in the test environment", () => {
+    Railtie.initialize({ env: "test" });
+    expect(SecurePassword.minCost).toBe(true);
+  });
 
-  it.skip("i18n customize full message can be disabled", () => {});
+  it("i18n customize full message defaults to false", () => {
+    Railtie.initialize();
+    expect(ActiveModelError.i18nCustomizeFullMessage).toBe(false);
+  });
 
-  it.skip("i18n customize full message can be enabled", () => {});
+  it("i18n customize full message can be disabled", () => {
+    ActiveModelError.i18nCustomizeFullMessage = true;
+    Railtie.initialize();
+    expect(ActiveModelError.i18nCustomizeFullMessage).toBe(false);
+  });
+
+  it("i18n customize full message can be enabled", () => {
+    Railtie.initialize({ i18nCustomizeFullMessage: true });
+    expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
+  });
 });
