@@ -8,6 +8,8 @@
  * Mirrors: ActiveRecord::Batches::BatchEnumerator
  */
 
+import { applyThenable } from "../thenable.js";
+
 interface BatchRelation {
   toArray(): Promise<any[]>;
   deleteAll(): Promise<number>;
@@ -15,6 +17,7 @@ interface BatchRelation {
   destroyAll(): Promise<any[]>;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BatchEnumerator<T extends BatchRelation> {
   private _generator: () => AsyncGenerator<T>;
   readonly ofSize: number;
@@ -92,4 +95,25 @@ export class BatchEnumerator<T extends BatchRelation> {
     }
     return destroyed;
   }
+
+  async toArray(): Promise<T[]> {
+    const batches: T[] = [];
+    for await (const batch of this) {
+      batches.push(batch);
+    }
+    return batches;
+  }
 }
+
+export interface BatchEnumerator<T extends BatchRelation> {
+  then<TResult1 = T[], TResult2 = never>(
+    onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2>;
+  catch<TResult = never>(
+    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
+  ): Promise<T[] | TResult>;
+  finally(onfinally?: (() => void) | null): Promise<T[]>;
+}
+
+applyThenable(BatchEnumerator.prototype);

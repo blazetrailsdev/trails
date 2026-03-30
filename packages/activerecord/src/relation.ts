@@ -3,6 +3,7 @@ import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
 import { RecordNotFound } from "./errors.js";
 import { modelRegistry } from "./associations.js";
+import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import {
   underscore as _toUnderscore,
@@ -1415,7 +1416,7 @@ export class Relation<T extends Base> {
   async reload(): Promise<this> {
     this.reset();
     await this.toArray();
-    return this;
+    return stripThenable(this);
   }
 
   /**
@@ -1550,7 +1551,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#presence
    */
   async presence(): Promise<Relation<T> | null> {
-    return (await this.isAny()) ? this : null;
+    return (await this.isAny()) ? stripThenable(this as Relation<T>) : null;
   }
 
   /**
@@ -1605,7 +1606,7 @@ export class Relation<T extends Base> {
    */
   async load(): Promise<this> {
     await this.toArray();
-    return this;
+    return stripThenable(this);
   }
 
   /**
@@ -2562,32 +2563,35 @@ export class Relation<T extends Base> {
     if (Array.isArray(pk)) {
       throw new Error("inBatches does not support composite primary keys");
     }
-    return new BatchEnumerator(async function* () {
-      let lastId: unknown = null;
+    return new BatchEnumerator(
+      async function* () {
+        let lastId: unknown = null;
 
-      while (true) {
-        const rel = self._clone();
-        if (lastId !== null) {
-          rel._whereClause.rawClauses.push(
-            `"${self._modelClass.arelTable.name}"."${pk}" > ${quoteSqlValue(lastId)}`,
-          );
+        while (true) {
+          const rel = self._clone();
+          if (lastId !== null) {
+            rel._whereClause.rawClauses.push(
+              `"${self._modelClass.arelTable.name}"."${pk}" > ${quoteSqlValue(lastId)}`,
+            );
+          }
+          rel._orderClauses = [pk];
+          rel._limitValue = batchSize;
+          rel._selectColumns = [pk];
+
+          const records = await rel.toArray();
+          if (records.length === 0) break;
+
+          const ids = records.map((r) => (r as any).readAttribute(pk));
+          const batchRel = self._clone();
+          batchRel._whereClause.conditions.push({ [pk]: ids });
+          yield stripThenable(batchRel);
+
+          if (records.length < batchSize) break;
+          lastId = (records[records.length - 1] as any).readAttribute(pk);
         }
-        rel._orderClauses = [pk];
-        rel._limitValue = batchSize;
-        rel._selectColumns = [pk];
-
-        const records = await rel.toArray();
-        if (records.length === 0) break;
-
-        const ids = records.map((r) => (r as any).readAttribute(pk));
-        const batchRel = self._clone();
-        batchRel._whereClause.conditions.push({ [pk]: ids });
-        yield batchRel;
-
-        if (records.length < batchSize) break;
-        lastId = (records[records.length - 1] as any).readAttribute(pk);
-      }
-    }, batchSize);
+      } as () => AsyncGenerator<Relation<T>>,
+      batchSize,
+    );
   }
 
   // -- SQL generation --
@@ -3939,6 +3943,14 @@ export class Relation<T extends Base> {
 // ---------------------------------------------------------------------------
 
 export interface Relation<T extends Base> extends CalculationMethods {
+  then<TResult1 = T[], TResult2 = never>(
+    onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2>;
+  catch<TResult = never>(
+    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
+  ): Promise<T[] | TResult>;
+  finally(onfinally?: (() => void) | null): Promise<T[]>;
   // Finder methods — typed with T to preserve generics through the interface merge.
   // Implementations are in finder-methods.ts, wired via prototype assignment below.
   find(ids: unknown[]): Promise<T[]>;
@@ -4024,6 +4036,9 @@ Object.defineProperties(Relation.prototype, {
   spawn: { ...def, value: performSpawn },
   merge: { ...def, value: performMerge },
 });
+
+// Thenable: make Relation directly awaitable (delegates to toArray).
+applyThenable(Relation.prototype);
 
 // Register Relation with Base to break the circular dependency.
 _setRelationCtor(Relation as any);

@@ -1,4 +1,5 @@
 import type { Base } from "../base.js";
+import { applyThenable, stripThenable } from "../relation/thenable.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { StrictLoadingViolationError } from "../errors.js";
@@ -17,6 +18,19 @@ import {
   loadHasMany,
 } from "../associations.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CollectionProxy {
+  then<TResult1 = Base[], TResult2 = never>(
+    onfulfilled?: ((value: Base[]) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2>;
+  catch<TResult = never>(
+    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
+  ): Promise<Base[] | TResult>;
+  finally(onfinally?: (() => void) | null): Promise<Base[]>;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CollectionProxy {
   private _record: Base;
   private _assocName: string;
@@ -743,7 +757,7 @@ export class CollectionProxy {
     this._loaded = false;
     this._target = [];
     await this.load();
-    return this;
+    return stripThenable(this);
   }
 
   reset(): void {
@@ -882,3 +896,5 @@ export class CollectionProxy {
     }
   }
 }
+
+applyThenable(CollectionProxy.prototype);
