@@ -1,5 +1,7 @@
 import { Model } from "@blazetrails/activemodel";
 import { Table, quoteArrayLiteral } from "@blazetrails/arel";
+import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
+import { detectAdapterName } from "./adapter-name.js";
 import { pluralize, underscore } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
@@ -362,25 +364,45 @@ export class Base extends Model {
    */
   static async createTable(): Promise<void> {
     const table = this.tableName;
-    const pk = this.primaryKey;
-    await this.adapter.executeMutation(`DROP TABLE IF EXISTS "${table}"`);
+    const pks = Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey];
+    const adapterName = detectAdapterName(this.adapter);
+    const isMysql = adapterName === "mysql";
+    const isPg = adapterName === "postgres";
+    const pkSet = new Set(pks);
 
-    const isPg = !!process.env.PG_TEST_URL;
-    const isMysql = !!process.env.MYSQL_TEST_URL;
-    const pkDef = isPg
-      ? `"${pk}" SERIAL PRIMARY KEY`
-      : isMysql
-        ? `\`${pk}\` INT AUTO_INCREMENT PRIMARY KEY`
-        : `"${pk}" INTEGER PRIMARY KEY AUTOINCREMENT`;
-    const colDefs: string[] = [pkDef];
+    await this.adapter.executeMutation(
+      `DROP TABLE IF EXISTS ${quoteTableName(table, adapterName)}`,
+    );
+
+    const colDefs: string[] = [];
+    if (pks.length === 1) {
+      const pk = pks[0];
+      const pkDef = isPg
+        ? `${quoteIdentifier(pk, adapterName)} SERIAL PRIMARY KEY`
+        : isMysql
+          ? `${quoteIdentifier(pk, adapterName)} INT AUTO_INCREMENT PRIMARY KEY`
+          : `${quoteIdentifier(pk, adapterName)} INTEGER PRIMARY KEY AUTOINCREMENT`;
+      colDefs.push(pkDef);
+    } else {
+      for (const pk of pks) {
+        const pkDef = this._attributeDefinitions.get(pk);
+        const pkType = pkDef ? this.sqlTypeFor(pkDef.type?.name || "integer") : "INTEGER";
+        colDefs.push(`${quoteIdentifier(pk, adapterName)} ${pkType} NOT NULL`);
+      }
+    }
+
     for (const [name, def] of this._attributeDefinitions) {
-      if (name === pk) continue;
+      if (pkSet.has(name)) continue;
       const sqlType = this.sqlTypeFor(def.type?.name || "string");
-      colDefs.push(`"${name}" ${sqlType}`);
+      colDefs.push(`${quoteIdentifier(name, adapterName)} ${sqlType}`);
+    }
+
+    if (pks.length > 1) {
+      colDefs.push(`PRIMARY KEY (${pks.map((pk) => quoteIdentifier(pk, adapterName)).join(", ")})`);
     }
 
     await this.adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "${table}" (${colDefs.join(", ")})`,
+      `CREATE TABLE IF NOT EXISTS ${quoteTableName(table, adapterName)} (${colDefs.join(", ")})`,
     );
   }
 
