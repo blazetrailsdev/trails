@@ -172,6 +172,7 @@ export { Notifications } from "./notifications.js";
 export { Event as NotificationEvent } from "./notifications/instrumenter.js";
 export type { EventPayload } from "./notifications/instrumenter.js";
 export type { NotificationSubscriber } from "./notifications.js";
+export { Fanout, InstrumentationSubscriberError } from "./notifications/fanout.js";
 
 export { ParameterFilter } from "./parameter-filter.js";
 export {

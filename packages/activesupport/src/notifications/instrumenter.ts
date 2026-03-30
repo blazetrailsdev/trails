@@ -16,12 +16,12 @@ export class Event {
   readonly transactionId: string;
   readonly children: Event[];
 
-  constructor(name: string, start: Date, payload: EventPayload = {}) {
+  constructor(name: string, start: Date, payload: EventPayload = {}, transactionId?: string) {
     this.name = name;
     this.time = start;
     this.end = null;
     this.payload = payload;
-    this.transactionId = generateTransactionId();
+    this.transactionId = transactionId ?? generateTransactionId();
     this.children = [];
   }
 
