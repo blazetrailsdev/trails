@@ -1,13 +1,3 @@
-/**
- * Callback system mirroring Rails ActiveSupport::Callbacks.
- *
- * Provides defineCallbacks, setCallback, skipCallback, resetCallbacks,
- * and runCallbacks for before/after/around lifecycle hooks.
- *
- * Also provides a class-based mixin pattern via CallbacksMixin for Rails-style
- * `include ActiveSupport::Callbacks` usage.
- */
-
 export type CallbackKind = "before" | "after" | "around";
 
 export type CallbackCondition = (target: any) => boolean;
@@ -19,58 +9,335 @@ export interface CallbackOptions {
 }
 
 export interface DefineCallbacksOptions {
-  /**
-   * When true (default), a before callback returning `false` halts the chain.
-   */
   terminator?: boolean;
 }
 
 export type BeforeCallback = (target: any) => any;
 export type AfterCallback = (target: any) => void;
 export type AroundCallback = (target: any, next: () => void) => void;
-
 export type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
 
-interface CallbackEntry {
-  kind: CallbackKind;
-  callback: AnyCallback;
-  options: CallbackOptions;
+export class Callback {
+  readonly kind: CallbackKind;
+  readonly filter: AnyCallback;
+  readonly options: CallbackOptions;
+  readonly name: string;
+
+  constructor(
+    name: string,
+    filter: AnyCallback,
+    kind: CallbackKind,
+    options: CallbackOptions = {},
+  ) {
+    this.name = name;
+    this.filter = filter;
+    this.kind = kind;
+    this.options = options;
+  }
+
+  matches(kind: CallbackKind, filter?: AnyCallback): boolean {
+    if (this.kind !== kind) return false;
+    if (filter && this.filter !== filter) return false;
+    return true;
+  }
+
+  apply(target: any, block?: () => void): boolean {
+    if (!Conditionals.Value.check(this.options, target)) return true;
+
+    if (this.kind === "before") {
+      return (this.filter as BeforeCallback)(target) !== false;
+    } else if (this.kind === "after") {
+      (this.filter as AfterCallback)(target);
+      return true;
+    } else if (this.kind === "around") {
+      if (!block) {
+        throw new Error("Around callbacks require a block/next function");
+      }
+      (this.filter as AroundCallback)(target, block);
+      return true;
+    }
+    return true;
+  }
 }
 
-interface CallbackChain {
-  entries: CallbackEntry[];
-  chainOptions: DefineCallbacksOptions;
+export class CallbackChain {
+  readonly name: string;
+  readonly config: DefineCallbacksOptions;
+  private chain: Callback[];
+
+  constructor(name: string, config: DefineCallbacksOptions = {}) {
+    this.name = name;
+    this.config = { terminator: true, ...config };
+    this.chain = [];
+  }
+
+  get entries(): Callback[] {
+    return this.chain;
+  }
+
+  append(callback: Callback): void {
+    this.chain.push(callback);
+  }
+
+  prepend(callback: Callback): void {
+    this.chain.unshift(callback);
+  }
+
+  remove(kind: CallbackKind, filter?: AnyCallback): void {
+    this.chain = this.chain.filter((cb) => !cb.matches(kind, filter));
+  }
+
+  clear(): void {
+    this.chain = [];
+  }
+
+  compile(): CallbackSequence {
+    return new CallbackSequence(this);
+  }
+
+  get isEmpty(): boolean {
+    return this.chain.length === 0;
+  }
+}
+
+export class CallbackSequence {
+  private readonly callbackChain: CallbackChain;
+
+  constructor(callbackChain: CallbackChain) {
+    this.callbackChain = callbackChain;
+  }
+
+  invoke(target: any, block?: () => void): boolean {
+    const entries = this.callbackChain.entries;
+    const terminator = this.callbackChain.config.terminator !== false;
+
+    const befores = entries.filter((e) => e.kind === "before");
+    const afters = entries.filter((e) => e.kind === "after");
+    const arounds = entries.filter((e) => e.kind === "around");
+
+    for (const entry of befores) {
+      if (!Conditionals.Value.check(entry.options, target)) continue;
+      const result = (entry.filter as BeforeCallback)(target);
+      if (terminator && result === false) return false;
+    }
+
+    let core = () => {
+      block?.();
+    };
+
+    for (let i = arounds.length - 1; i >= 0; i--) {
+      const entry = arounds[i];
+      const inner = core;
+      if (!Conditionals.Value.check(entry.options, target)) continue;
+      core = () => {
+        (entry.filter as AroundCallback)(target, inner);
+      };
+    }
+
+    core();
+
+    for (let i = afters.length - 1; i >= 0; i--) {
+      const entry = afters[i];
+      if (!Conditionals.Value.check(entry.options, target)) continue;
+      (entry.filter as AfterCallback)(target);
+    }
+
+    return true;
+  }
+}
+
+export namespace CallTemplate {
+  export class MethodCall {
+    constructor(readonly methodName: string) {}
+
+    make(target: any, _value: any): any {
+      return target[this.methodName]?.call(target);
+    }
+  }
+
+  export class ObjectCall {
+    constructor(
+      readonly target: any,
+      readonly methodName: string,
+    ) {}
+
+    make(instance: any, _value: any): any {
+      return this.target[this.methodName]?.call(this.target, instance);
+    }
+  }
+
+  export class InstanceExec0 {
+    constructor(readonly fn: () => any) {}
+
+    make(target: any, _value: any): any {
+      return this.fn.call(target);
+    }
+  }
+
+  export class InstanceExec1 {
+    constructor(readonly fn: (target: any) => any) {}
+
+    make(target: any, _value: any): any {
+      return this.fn(target);
+    }
+  }
+
+  export class InstanceExec2 {
+    constructor(readonly fn: (target: any, value: any) => any) {}
+
+    make(target: any, value: any): any {
+      return this.fn(target, value);
+    }
+  }
+
+  export class ProcCall {
+    constructor(readonly fn: (...args: any[]) => any) {}
+
+    make(target: any, _value: any): any {
+      return this.fn(target);
+    }
+  }
+}
+
+export namespace Conditionals {
+  export class Value {
+    static check(options: CallbackOptions, target: any): boolean {
+      if (options.if) {
+        const conditions = Array.isArray(options.if) ? options.if : [options.if];
+        if (!conditions.every((cond) => cond(target))) return false;
+      }
+      if (options.unless) {
+        const conditions = Array.isArray(options.unless) ? options.unless : [options.unless];
+        if (conditions.some((cond) => cond(target))) return false;
+      }
+      return true;
+    }
+  }
+}
+
+export namespace Filters {
+  export class Before {
+    static build(callback: Callback, _options: DefineCallbacksOptions): (target: any) => boolean {
+      const terminator = _options.terminator !== false;
+      return (target: any) => {
+        if (!Conditionals.Value.check(callback.options, target)) return true;
+        const result = (callback.filter as BeforeCallback)(target);
+        return !(terminator && result === false);
+      };
+    }
+  }
+
+  export class After {
+    static build(callback: Callback): (target: any) => void {
+      return (target: any) => {
+        if (!Conditionals.Value.check(callback.options, target)) return;
+        (callback.filter as AfterCallback)(target);
+      };
+    }
+  }
+
+  export class Around {
+    static build(callback: Callback): (target: any, block: () => void) => void {
+      return (target: any, block: () => void) => {
+        if (!Conditionals.Value.check(callback.options, target)) {
+          block();
+          return;
+        }
+        (callback.filter as AroundCallback)(target, block);
+      };
+    }
+  }
 }
 
 const CALLBACKS = Symbol("callbacks");
 
 function getCallbackChains(target: any): Map<string, CallbackChain> {
-  if (!target[CALLBACKS]) {
-    target[CALLBACKS] = new Map<string, CallbackChain>();
+  if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
+    const parent: Map<string, CallbackChain> | undefined = target[CALLBACKS];
+    const own = new Map<string, CallbackChain>();
+    if (parent) {
+      for (const [name, chain] of parent) {
+        own.set(name, new CallbackChain(chain.name, chain.config));
+        for (const entry of chain.entries) {
+          own.get(name)!.append(new Callback(entry.name, entry.filter, entry.kind, entry.options));
+        }
+      }
+    }
+    target[CALLBACKS] = own;
   }
   return target[CALLBACKS];
 }
 
-/**
- * Register a named callback chain on the target object/class prototype.
- */
+export namespace Callbacks {
+  export function defineCallbacks(
+    target: any,
+    name: string,
+    options: DefineCallbacksOptions = {},
+  ): void {
+    const chains = getCallbackChains(target);
+    if (!chains.has(name)) {
+      chains.set(name, new CallbackChain(name, options));
+    }
+  }
+
+  export function setCallback(
+    target: any,
+    name: string,
+    kind: CallbackKind,
+    callback: AnyCallback,
+    options: CallbackOptions = {},
+  ): void {
+    const chains = getCallbackChains(target);
+    const chain = chains.get(name);
+    if (!chain) {
+      throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
+    }
+    const entry = new Callback(name, callback, kind, options);
+    if (options.prepend) {
+      chain.prepend(entry);
+    } else {
+      chain.append(entry);
+    }
+  }
+
+  export function skipCallback(
+    target: any,
+    name: string,
+    kind: CallbackKind,
+    callback?: AnyCallback,
+  ): void {
+    const chains = getCallbackChains(target);
+    const chain = chains.get(name);
+    if (!chain) return;
+    chain.remove(kind, callback);
+  }
+
+  export function resetCallbacks(target: any, name: string): void {
+    const chains = getCallbackChains(target);
+    const chain = chains.get(name);
+    if (chain) chain.clear();
+  }
+
+  export function runCallbacks(target: any, name: string, block?: () => void): boolean {
+    const chains = getCallbackChains(target);
+    const chain = chains.get(name);
+    if (!chain) {
+      block?.();
+      return true;
+    }
+    const sequence = chain.compile();
+    return sequence.invoke(target, block);
+  }
+}
+
 export function defineCallbacks(
   target: any,
   name: string,
   options: DefineCallbacksOptions = {},
 ): void {
-  const chains = getCallbackChains(target);
-  if (!chains.has(name)) {
-    chains.set(name, {
-      entries: [],
-      chainOptions: { terminator: true, ...options },
-    });
-  }
+  Callbacks.defineCallbacks(target, name, options);
 }
 
-/**
- * Add a callback to a named chain.
- */
 export function setCallback(
   target: any,
   name: string,
@@ -78,149 +345,34 @@ export function setCallback(
   callback: AnyCallback,
   options: CallbackOptions = {},
 ): void {
-  const chains = getCallbackChains(target);
-  const chain = chains.get(name);
-  if (!chain) {
-    throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
-  }
-  const entry: CallbackEntry = { kind, callback, options };
-  if (options.prepend) {
-    chain.entries.unshift(entry);
-  } else {
-    chain.entries.push(entry);
-  }
+  Callbacks.setCallback(target, name, kind, callback, options);
 }
 
-/**
- * Remove a callback from a named chain.
- */
 export function skipCallback(
   target: any,
   name: string,
   kind: CallbackKind,
   callback?: AnyCallback,
 ): void {
-  const chains = getCallbackChains(target);
-  const chain = chains.get(name);
-  if (!chain) return;
-  chain.entries = chain.entries.filter((e) => {
-    if (e.kind !== kind) return true;
-    if (callback && e.callback !== callback) return true;
-    return false;
-  });
+  Callbacks.skipCallback(target, name, kind, callback);
 }
 
-/**
- * Remove all callbacks from a named chain.
- */
 export function resetCallbacks(target: any, name: string): void {
-  const chains = getCallbackChains(target);
-  const chain = chains.get(name);
-  if (chain) {
-    chain.entries = [];
-  }
+  Callbacks.resetCallbacks(target, name);
 }
 
-function shouldRun(entry: CallbackEntry, target: any): boolean {
-  const { options } = entry;
-  if (options.if) {
-    const conditions = Array.isArray(options.if) ? options.if : [options.if];
-    if (!conditions.every((cond) => cond(target))) return false;
-  }
-  if (options.unless) {
-    const conditions = Array.isArray(options.unless) ? options.unless : [options.unless];
-    if (conditions.some((cond) => cond(target))) return false;
-  }
-  return true;
-}
-
-/**
- * Execute the callback chain. Returns false if the chain was halted.
- */
 export function runCallbacks(target: any, name: string, block?: () => void): boolean {
-  const chains = getCallbackChains(target);
-  const chain = chains.get(name);
-  if (!chain) {
-    block?.();
-    return true;
-  }
-
-  const befores = chain.entries.filter((e) => e.kind === "before");
-  const afters = chain.entries.filter((e) => e.kind === "after");
-  const arounds = chain.entries.filter((e) => e.kind === "around");
-  const terminator = chain.chainOptions.terminator !== false;
-
-  // Run before callbacks
-  for (const entry of befores) {
-    if (!shouldRun(entry, target)) continue;
-    const result = (entry.callback as BeforeCallback)(target);
-    if (terminator && result === false) {
-      return false;
-    }
-  }
-
-  // Build the around chain wrapping the block
-  let core = () => {
-    block?.();
-  };
-
-  // Wrap arounds from outside-in (last registered wraps outermost)
-  for (let i = arounds.length - 1; i >= 0; i--) {
-    const entry = arounds[i];
-    const inner = core;
-    if (!shouldRun(entry, target)) continue;
-    core = () => {
-      (entry.callback as AroundCallback)(target, inner);
-    };
-  }
-
-  core();
-
-  // Run after callbacks (in reverse order, matching Rails)
-  for (let i = afters.length - 1; i >= 0; i--) {
-    const entry = afters[i];
-    if (!shouldRun(entry, target)) continue;
-    (entry.callback as AfterCallback)(target);
-  }
-
-  return true;
+  return Callbacks.runCallbacks(target, name, block);
 }
 
-// ---------------------------------------------------------------------------
-// Class-based mixin — Rails-style `include ActiveSupport::Callbacks`
-// ---------------------------------------------------------------------------
-
-/**
- * CallbacksMixin provides a class-based API mirroring Rails' include of
- * ActiveSupport::Callbacks. Extend a class with this to get instance methods
- * `runCallbacks` and class methods `defineCallbacks`, `beforeCallback`, etc.
- *
- * Usage:
- *   class MyModel extends CallbacksMixin() {
- *     static {
- *       this.defineCallbacks("save");
- *       this.beforeCallback("save", (self: MyModel) => self.validate());
- *     }
- *
- *     save() {
- *       return this.runCallbacks("save", () => { ... });
- *     }
- *   }
- */
 export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {
   const ActualBase = (Base ?? class {}) as TBase;
 
   class WithCallbacks extends ActualBase {
-    /**
-     * Define a named callback chain on this class.
-     */
     static defineCallbacks(name: string, options: DefineCallbacksOptions = {}): void {
       defineCallbacks(this.prototype, name, options);
     }
 
-    /**
-     * Register a before callback on this class.
-     */
     static beforeCallback(
       name: string,
       callback: BeforeCallback,
@@ -229,9 +381,6 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
       setCallback(this.prototype, name, "before", callback, options);
     }
 
-    /**
-     * Register an after callback on this class.
-     */
     static afterCallback(
       name: string,
       callback: AfterCallback,
@@ -240,9 +389,6 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
       setCallback(this.prototype, name, "after", callback, options);
     }
 
-    /**
-     * Register an around callback on this class.
-     */
     static aroundCallback(
       name: string,
       callback: AroundCallback,
@@ -251,24 +397,14 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
       setCallback(this.prototype, name, "around", callback, options);
     }
 
-    /**
-     * Skip (remove) a callback from this class's chain.
-     */
     static skipCallback(name: string, kind: CallbackKind, callback?: AnyCallback): void {
       skipCallback(this.prototype, name, kind, callback);
     }
 
-    /**
-     * Reset all callbacks on a named chain.
-     */
     static resetCallbacks(name: string): void {
       resetCallbacks(this.prototype, name);
     }
 
-    /**
-     * Run the named callback chain, optionally wrapping a block.
-     * Returns false if the chain was halted, true otherwise.
-     */
     runCallbacks(name: string, block?: () => void): boolean {
       return runCallbacks(this, name, block);
     }

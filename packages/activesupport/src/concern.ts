@@ -1,21 +1,23 @@
-/**
- * Concern — a pattern for mixins mirroring Rails ActiveSupport::Concern.
- *
- * Handles `included` blocks, class methods, instance methods, and
- * dependency resolution.
- */
+export class MultipleIncludedBlocks extends Error {
+  constructor() {
+    super("Cannot define multiple 'included' blocks for a Concern");
+    this.name = "MultipleIncludedBlocks";
+  }
+}
+
+export class MultiplePrependBlocks extends Error {
+  constructor() {
+    super("Cannot define multiple 'prepended' blocks for a Concern");
+    this.name = "MultiplePrependBlocks";
+  }
+}
 
 export interface ConcernDefinition {
   dependencies?: ConcernMixin[];
   included?: (base: any) => void;
+  prepended?: (base: any) => void;
   classMethods?: Record<string, Function>;
   instanceMethods?: Record<string, Function>;
-  /**
-   * prepend: true — methods are installed such that they shadow existing
-   * prototype methods while still being able to call the original via the
-   * explicit `_super_<name>` property on the instance. Mirrors Rails'
-   * Module#prepend semantics where prepended methods wrap existing ones.
-   */
   prepend?: boolean;
 }
 
@@ -25,67 +27,89 @@ export interface ConcernMixin {
 }
 
 const INCLUDED_CONCERNS = Symbol("includedConcerns");
+const INCLUDED_BLOCK = Symbol("includedBlock");
+const PREPENDED_BLOCK = Symbol("prependedBlock");
 
-/**
- * Define a concern (mixin with lifecycle support).
- */
-export function concern(definition: ConcernDefinition): ConcernMixin {
-  return { __concern: true, definition };
-}
-
-/**
- * Include a concern into a class. Handles dependency resolution,
- * included blocks, and method mixing.
- */
-export function includeConcern(klass: any, mixin: ConcernMixin): void {
-  // Track which concerns have been included to avoid duplicates
-  if (!klass[INCLUDED_CONCERNS]) {
-    klass[INCLUDED_CONCERNS] = new Set<ConcernMixin>();
+export namespace Concern {
+  export function define(definition: ConcernDefinition): ConcernMixin {
+    return { __concern: true, definition };
   }
-  const included: Set<ConcernMixin> = klass[INCLUDED_CONCERNS];
 
-  if (included.has(mixin)) return;
-  included.add(mixin);
-
-  const def = mixin.definition;
-
-  // Resolve dependencies first
-  if (def.dependencies) {
-    for (const dep of def.dependencies) {
-      includeConcern(klass, dep);
+  export function include(klass: any, mixin: ConcernMixin): void {
+    if (!Object.prototype.hasOwnProperty.call(klass, INCLUDED_CONCERNS)) {
+      const inherited: Set<ConcernMixin> | undefined = klass[INCLUDED_CONCERNS];
+      klass[INCLUDED_CONCERNS] = inherited ? new Set(inherited) : new Set<ConcernMixin>();
     }
-  }
+    const included: Set<ConcernMixin> = klass[INCLUDED_CONCERNS];
 
-  // Mix instance methods into prototype
-  if (def.instanceMethods) {
-    for (const [name, fn] of Object.entries(def.instanceMethods)) {
-      if (def.prepend && klass.prototype[name]) {
-        // Save the original method under _super_<name> so the prepended
-        // method can call it. Mirrors Module#prepend wrap semantics.
-        const original = klass.prototype[name];
-        klass.prototype[`_super_${name}`] = original;
+    if (included.has(mixin)) return;
+    included.add(mixin);
+
+    const def = mixin.definition;
+
+    if (def.dependencies) {
+      for (const dep of def.dependencies) {
+        include(klass, dep);
       }
-      klass.prototype[name] = fn;
+    }
+
+    if (def.instanceMethods) {
+      for (const [name, fn] of Object.entries(def.instanceMethods)) {
+        if (def.prepend && klass.prototype[name]) {
+          const original = klass.prototype[name];
+          klass.prototype[`_super_${name}`] = original;
+        }
+        klass.prototype[name] = fn;
+      }
+    }
+
+    if (def.classMethods) {
+      for (const [name, fn] of Object.entries(def.classMethods)) {
+        klass[name] = fn;
+      }
+    }
+
+    const includedBlock = def.included ?? (mixin as any)[INCLUDED_BLOCK];
+    if (includedBlock) {
+      includedBlock(klass);
+    }
+
+    if (def.prepend) {
+      const prependedBlock = def.prepended ?? (mixin as any)[PREPENDED_BLOCK];
+      if (prependedBlock) {
+        prependedBlock(klass);
+      }
     }
   }
 
-  // Mix class methods as static methods
-  if (def.classMethods) {
-    for (const [name, fn] of Object.entries(def.classMethods)) {
-      klass[name] = fn;
-    }
+  export function hasConcern(klass: any, mixin: ConcernMixin): boolean {
+    const included: Set<ConcernMixin> | undefined = klass[INCLUDED_CONCERNS];
+    return included?.has(mixin) ?? false;
   }
 
-  // Run included block
-  if (def.included) {
-    def.included(klass);
+  export function setIncludedBlock(target: any, block: (base: any) => void): void {
+    if (Object.prototype.hasOwnProperty.call(target, INCLUDED_BLOCK)) {
+      throw new MultipleIncludedBlocks();
+    }
+    target[INCLUDED_BLOCK] = block;
+  }
+
+  export function setPrependedBlock(target: any, block: (base: any) => void): void {
+    if (Object.prototype.hasOwnProperty.call(target, PREPENDED_BLOCK)) {
+      throw new MultiplePrependBlocks();
+    }
+    target[PREPENDED_BLOCK] = block;
   }
 }
 
-/**
- * Check if a class has included a specific concern.
- */
+export function concern(definition: ConcernDefinition): ConcernMixin {
+  return Concern.define(definition);
+}
+
+export function includeConcern(klass: any, mixin: ConcernMixin): void {
+  Concern.include(klass, mixin);
+}
+
 export function hasConcern(klass: any, mixin: ConcernMixin): boolean {
-  const included: Set<ConcernMixin> | undefined = klass[INCLUDED_CONCERNS];
-  return included?.has(mixin) ?? false;
+  return Concern.hasConcern(klass, mixin);
 }

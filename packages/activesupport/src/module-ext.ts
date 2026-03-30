@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "./descendants-tracker.js";
+
 /**
  * Module extensions mirroring Rails ActiveSupport module/class extensions.
  * Covers delegate, mattr_accessor, cattr_accessor, attr_internal, and helpers.
@@ -240,32 +242,16 @@ export function suppress<T>(
 
 // ── Descendants tracking ──────────────────────────────────────────────────────
 
-const _subclassMap = new WeakMap<Function, Set<Function>>();
-
-/**
- * registerSubclass — records that `child` is a direct subclass of `parent`.
- * Call this from child class bodies to participate in descendants tracking.
- */
 export function registerSubclass(parent: Function, child: Function): void {
-  if (!_subclassMap.has(parent)) _subclassMap.set(parent, new Set());
-  _subclassMap.get(parent)!.add(child);
+  DescendantsTracker.registerSubclass(parent, child);
 }
 
-/**
- * subclasses — returns the direct subclasses registered for `klass`.
- * Mirrors Rails Class#subclasses.
- */
 export function subclasses(klass: Function): Function[] {
-  return [...(_subclassMap.get(klass) ?? [])];
+  return DescendantsTracker.subclasses(klass);
 }
 
-/**
- * descendants — returns all registered descendants (recursive) of `klass`.
- * Mirrors Rails Class#descendants.
- */
 export function descendants(klass: Function): Function[] {
-  const subs = subclasses(klass);
-  return [...subs, ...subs.flatMap((s) => descendants(s))];
+  return DescendantsTracker.descendants(klass);
 }
 
 // ── Rescuable ────────────────────────────────────────────────────────────────

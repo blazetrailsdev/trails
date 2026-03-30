@@ -29,6 +29,31 @@ function getStore(target: any): AttrStore {
  * Define a class-level attribute that is inherited by subclasses.
  * Reads walk the prototype chain; writes are local to the class/instance.
  */
+export namespace ClassAttribute {
+  export function redefine(
+    owner: any,
+    _name: string,
+    namespacedName: string,
+    value: unknown,
+  ): void {
+    const store = getStore(owner);
+    store.values.set(namespacedName, value);
+  }
+
+  export function redefineMethod(
+    owner: any,
+    name: string,
+    isPrivate: boolean,
+    fn: () => unknown,
+  ): void {
+    Object.defineProperty(owner.prototype ?? owner, name, {
+      get: fn,
+      configurable: true,
+      enumerable: !isPrivate,
+    });
+  }
+}
+
 export function classAttribute(
   klass: any,
   name: string,

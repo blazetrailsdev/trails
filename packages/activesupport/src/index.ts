@@ -211,6 +211,20 @@ export { SecurityUtils } from "./security-utils.js";
 export { ConfigurationFile } from "./configuration-file.js";
 export { ActionableError, NonActionable } from "./actionable-error.js";
 export { NullLock } from "./concurrency/null-lock.js";
+export { Gzip, Stream as GzipStream } from "./gzip.js";
+export { DescendantsTracker } from "./descendants-tracker.js";
+export { Configurable, Configuration } from "./configurable.js";
+export {
+  Callback,
+  CallbackChain,
+  CallbackSequence,
+  Callbacks,
+  Filters,
+  Conditionals,
+  CallTemplate,
+} from "./callbacks.js";
+export { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
+export { ClassAttribute } from "./class-attribute.js";
 
 export {
   travelTo,
