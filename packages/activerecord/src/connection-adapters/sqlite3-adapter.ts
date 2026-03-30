@@ -8,6 +8,22 @@ import {
   InvalidForeignKey,
   NotNullViolation,
 } from "../errors.js";
+import { TypeMap } from "../type/type-map.js";
+import { Date as DateType } from "../type/date.js";
+import { DateTime as DateTimeType } from "../type/date-time.js";
+import { Time as TimeType } from "../type/time.js";
+import { Text as TextType } from "../type/text.js";
+import { Json as JsonType } from "../type/json.js";
+import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
+import {
+  StringType,
+  IntegerType,
+  FloatType,
+  BooleanType,
+  BinaryType,
+  BigIntegerType,
+  DecimalType,
+} from "@blazetrails/activemodel";
 
 /**
  * SQLite adapter — connects ActiveRecord to a real SQLite database.
@@ -20,6 +36,7 @@ export class SQLite3Adapter implements DatabaseAdapter {
   private _savepointCounter = 0;
   private _readonly: boolean;
   private _preventWrites = false;
+  private _nativeTypeMap: TypeMap;
 
   constructor(filename: string | ":memory:" = ":memory:", options?: { readonly?: boolean }) {
     this._readonly = options?.readonly ?? false;
@@ -30,6 +47,7 @@ export class SQLite3Adapter implements DatabaseAdapter {
       // Enable foreign keys
       this.db.pragma("foreign_keys = ON");
     }
+    this._nativeTypeMap = SQLite3Adapter._buildTypeMap();
   }
 
   /**
@@ -184,6 +202,52 @@ export class SQLite3Adapter implements DatabaseAdapter {
    */
   get raw(): Database.Database {
     return this.db;
+  }
+
+  /**
+   * Resolve a SQL column type string to an ActiveRecord Type instance.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#lookup_cast_type
+   */
+  lookupCastType(sqlType: string): import("@blazetrails/activemodel").Type {
+    // Strip precision/scale metadata and normalize for lookup.
+    // e.g. "DECIMAL(10, 0)" → "decimal", "VARCHAR(255)" → "varchar"
+    const normalized = sqlType
+      .toLowerCase()
+      .replace(/\(.*\)/, "")
+      .trim();
+    return this._nativeTypeMap.lookup(normalized);
+  }
+
+  get nativeTypeMap(): TypeMap {
+    return this._nativeTypeMap;
+  }
+
+  private static _buildTypeMap(): TypeMap {
+    const map = new TypeMap();
+    map.registerType("string", new StringType());
+    map.registerType("text", new TextType());
+    map.registerType("integer", new IntegerType());
+    map.registerType("float", new FloatType());
+    map.registerType("decimal", new DecimalType());
+    map.registerType("boolean", new BooleanType());
+    map.registerType("date", new DateType());
+    map.registerType("datetime", new DateTimeType());
+    map.registerType("time", new TimeType());
+    map.registerType("blob", new BinaryType());
+    map.registerType("binary", new BinaryType());
+    map.registerType("json", new JsonType());
+    map.registerType("bigint", new BigIntegerType());
+    map.registerType("numeric", new DecimalWithoutScale());
+    // SQLite type affinity — regex matches for flexible type names
+    map.registerType(/int/i, undefined, (lookupKey) => {
+      if (/bigint/i.test(lookupKey)) return new BigIntegerType();
+      return new IntegerType();
+    });
+    map.registerType(/char|clob/i, undefined, () => new StringType());
+    map.registerType(/blob/i, undefined, () => new BinaryType());
+    map.registerType(/real|floa|doub/i, undefined, () => new FloatType());
+    return map;
   }
 
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {

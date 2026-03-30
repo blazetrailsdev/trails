@@ -535,4 +535,41 @@ describe("SqliteAdapter", () => {
       expect(books).toHaveLength(2);
     });
   });
+
+  describe("lookupCastType", () => {
+    it("resolves base SQL types", () => {
+      expect(adapter.lookupCastType("string").name).toBe("string");
+      expect(adapter.lookupCastType("text").name).toBe("text");
+      expect(adapter.lookupCastType("integer").name).toBe("integer");
+      expect(adapter.lookupCastType("float").name).toBe("float");
+      expect(adapter.lookupCastType("boolean").name).toBe("boolean");
+      expect(adapter.lookupCastType("date").name).toBe("date");
+      expect(adapter.lookupCastType("datetime").name).toBe("datetime");
+      expect(adapter.lookupCastType("time").name).toBe("time");
+      expect(adapter.lookupCastType("json").name).toBe("json");
+      expect(adapter.lookupCastType("blob").name).toBe("binary");
+    });
+
+    it("strips precision/scale metadata", () => {
+      expect(adapter.lookupCastType("DECIMAL(10, 0)").name).toBe("decimal");
+      expect(adapter.lookupCastType("decimal(5,2)").name).toBe("decimal");
+      expect(adapter.lookupCastType("INTEGER(11)").name).toBe("integer");
+    });
+
+    it("handles case-insensitive types", () => {
+      expect(adapter.lookupCastType("TEXT").name).toBe("text");
+      expect(adapter.lookupCastType("INTEGER").name).toBe("integer");
+      expect(adapter.lookupCastType("BOOLEAN").name).toBe("boolean");
+    });
+
+    it("resolves SQLite affinity types via regex", () => {
+      expect(adapter.lookupCastType("varchar").name).toBe("string");
+      expect(adapter.lookupCastType("character").name).toBe("string");
+      expect(adapter.lookupCastType("clob").name).toBe("string");
+      expect(adapter.lookupCastType("real").name).toBe("float");
+      expect(adapter.lookupCastType("double").name).toBe("float");
+      expect(adapter.lookupCastType("bigint").name).toBe("big_integer");
+      expect(adapter.lookupCastType("tinyint").name).toBe("integer");
+    });
+  });
 });

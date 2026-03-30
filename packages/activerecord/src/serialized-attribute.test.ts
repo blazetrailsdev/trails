@@ -718,8 +718,8 @@ describe("SerializedAttributeTest", () => {
 
     const b = new Blob({});
     b.data = "not valid json" as any;
-    // Should return the raw string (not throw)
-    expect(b.data).toBe("not valid json");
+    // Json#deserialize returns null on parse failure (Rails: rescue nil)
+    expect(b.data).toBeNull();
   });
 
   it("multiple serialized attributes on same class", async () => {

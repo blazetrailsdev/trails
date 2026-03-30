@@ -1,4 +1,5 @@
 import { Model } from "@blazetrails/activemodel";
+import "./type.js"; // Register AR type overrides into AM's type registry
 import { Table, quoteArrayLiteral } from "@blazetrails/arel";
 import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { detectAdapterName } from "./adapter-name.js";

@@ -1,24 +1,19 @@
 import type { Base } from "./base.js";
+import { Json } from "./type/json.js";
 
 interface Coder {
   dump(value: unknown): string;
   load(raw: unknown): unknown;
 }
 
+const _jsonType = new Json();
+
 const JSON_CODER: Coder = {
   dump(value: unknown): string {
-    return JSON.stringify(value);
+    return _jsonType.serialize(value) ?? "null";
   },
   load(raw: unknown): unknown {
-    if (raw === null || raw === undefined || raw === "") return null;
-    if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return raw;
-      }
-    }
-    return raw;
+    return _jsonType.deserialize(raw);
   },
 };
 
@@ -91,14 +86,9 @@ export function serialize(
     (modelClass as any)._serializedAttributes = new Map();
   }
   (modelClass as any)._serializedAttributes.set(attribute, coder);
-
-  // Override writeAttribute to serialize before storing
-  const originalWrite = modelClass.prototype.writeAttribute;
-  const originalRead = modelClass.prototype.readAttribute;
-
-  // Wrap the readAttribute to deserialize
   if (!(modelClass as any)._serializeWrapped) {
     (modelClass as any)._serializeWrapped = true;
+    const originalRead = modelClass.prototype.readAttribute;
 
     modelClass.prototype.readAttribute = function (name: string): unknown {
       const raw = originalRead.call(this, name);

@@ -1,4 +1,5 @@
 export { Base } from "./base.js";
+export * as Type from "./type.js";
 export { Relation, Range } from "./relation.js";
 export { QueryAttribute } from "./relation/query-attribute.js";
 export type { DatabaseAdapter } from "./adapter.js";
