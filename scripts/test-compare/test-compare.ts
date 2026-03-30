@@ -640,8 +640,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     actiondispatch: "packages/actionpack/src/actiondispatch/",
     actioncontroller: "packages/actionpack/src/actioncontroller/",
     actionview: "packages/actionpack/src/actionview/",
-    cli: "packages/cli/src/",
-    railties: "packages/cli/src/",
+    railties: "packages/railties/src/",
   };
 
   const prefix = pkgDirs[pkg];

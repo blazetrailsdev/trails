@@ -108,9 +108,9 @@ export default defineConfig(
     },
   },
 
-  // ── actionpack + cli ──
+  // ── actionpack + railties ──
   {
-    files: ["packages/actionpack/src/**/*.ts", "packages/cli/src/**/*.ts"],
+    files: ["packages/actionpack/src/**/*.ts", "packages/railties/src/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "unused-imports/no-unused-vars": "off",

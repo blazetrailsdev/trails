@@ -1,5 +1,5 @@
 {
-  "name": "@blazetrails/cli",
+  "name": "@blazetrails/railties",
   "version": "0.1.0",
   "type": "module",
   "bin": {

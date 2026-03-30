@@ -28,7 +28,6 @@ const PACKAGES = [
 const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actiondispatch: "actionpack",
   actioncontroller: "actionpack",
-  railties: "cli",
 };
 
 /** Override package → src subdirectory when package shares a dir */

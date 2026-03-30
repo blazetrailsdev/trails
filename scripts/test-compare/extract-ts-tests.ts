@@ -9,9 +9,8 @@ const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 function getPackageTestFiles(): Record<string, string[]> {
-  const packages = ["arel", "activemodel", "activerecord", "activesupport", "rack"];
-  // Railties maps to our cli package
-  const packageAliases: Record<string, string> = { railties: "cli" };
+  const packages = ["arel", "activemodel", "activerecord", "activesupport", "rack", "railties"];
+  const packageAliases: Record<string, string> = {};
   const result: Record<string, string[]> = {};
 
   for (const pkg of packages) {
@@ -190,7 +189,7 @@ function pkgFromPath(relPath: string): string {
     if (parts[1] === "actionpack" && parts[3]) {
       return parts[3]; // actiondispatch, actioncontroller, actionview
     }
-    if (parts[1] === "cli") return "railties";
+    if (parts[1] === "railties") return "railties";
     return parts[1];
   }
   return "unknown";

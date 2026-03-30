@@ -101,7 +101,9 @@ importers:
 
   packages/arel: {}
 
-  packages/cli:
+  packages/rack: {}
+
+  packages/railties:
     dependencies:
       "@blazetrails/actionpack":
         specifier: workspace:*
@@ -121,8 +123,6 @@ importers:
       vite:
         specifier: ^7.0.0
         version: 7.3.1(@types/node@25.3.5)(tsx@4.21.0)(yaml@2.8.3)
-
-  packages/rack: {}
 
 packages:
   "@esbuild/aix-ppc64@0.27.3":

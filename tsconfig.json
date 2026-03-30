@@ -24,7 +24,7 @@
     { "path": "packages/activerecord" },
     { "path": "packages/rack" },
     { "path": "packages/actionpack" },
-    { "path": "packages/cli" }
+    { "path": "packages/railties" }
   ],
   "exclude": ["node_modules", "dist"]
 }
