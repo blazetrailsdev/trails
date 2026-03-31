@@ -12,13 +12,6 @@ export class SubclassNotFound extends ActiveRecordError {
   }
 }
 
-export class AssociationTypeMismatch extends ActiveRecordError {
-  constructor(message?: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "AssociationTypeMismatch";
-  }
-}
-
 export class SerializationTypeMismatch extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
@@ -360,30 +353,6 @@ export class AttributeAssignmentError extends ActiveRecordError {
   }
 }
 
-export class UnknownPrimaryKey extends ActiveRecordError {
-  readonly model?: any;
-
-  constructor(model?: any, description?: string) {
-    if (model) {
-      const modelName =
-        typeof model === "function"
-          ? model.name || "UnknownModel"
-          : model.constructor?.name || "UnknownModel";
-      const tableName =
-        typeof model === "function"
-          ? ((model as any).tableName ?? "unknown_table")
-          : (model.constructor?.tableName ?? "unknown_table");
-      let message = `Unknown primary key for table ${tableName} in model ${modelName}.`;
-      if (description) message += `\n${description}`;
-      super(message);
-    } else {
-      super("Unknown primary key.");
-    }
-    this.name = "UnknownPrimaryKey";
-    this.model = model;
-  }
-}
-
 export class TransactionIsolationError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
@@ -391,100 +360,10 @@ export class TransactionIsolationError extends ActiveRecordError {
   }
 }
 
-export class TransactionRollbackError extends StatementInvalid {
-  constructor(
-    message?: string,
-    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "TransactionRollbackError";
-  }
-}
-
-export class SerializationFailure extends TransactionRollbackError {
-  constructor(
-    message?: string,
-    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "SerializationFailure";
-  }
-}
-
-export class Deadlocked extends TransactionRollbackError {
-  constructor(
-    message?: string,
-    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "Deadlocked";
-  }
-}
-
 export class IrreversibleOrderError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "IrreversibleOrderError";
-  }
-}
-
-export class QueryAborted extends StatementInvalid {
-  constructor(
-    message?: string,
-    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "QueryAborted";
-  }
-}
-
-export class LockWaitTimeout extends StatementInvalid {
-  constructor(
-    message?: string,
-    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "LockWaitTimeout";
-  }
-}
-
-export class StatementTimeout extends QueryAborted {
-  constructor(
-    message?: string,
-    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "StatementTimeout";
-  }
-}
-
-export class QueryCanceled extends QueryAborted {
-  constructor(
-    message?: string,
-    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "QueryCanceled";
-  }
-}
-
-export class AdapterTimeout extends QueryAborted {
-  constructor(
-    message?: string,
-    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "AdapterTimeout";
-  }
-}
-
-export class ConnectionFailed extends QueryAborted {
-  constructor(
-    message?: string,
-    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = "ConnectionFailed";
   }
 }
 
