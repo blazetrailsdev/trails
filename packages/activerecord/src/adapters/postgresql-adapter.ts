@@ -1,6 +1,13 @@
 import pg from "pg";
 import { singularize, underscore } from "@blazetrails/activesupport";
-import { splitQuotedIdentifier } from "./postgresql/utils.js";
+import { splitQuotedIdentifier, Utils } from "../connection-adapters/postgresql/utils.js";
+import { Column } from "../connection-adapters/postgresql/column.js";
+import { ExplainPrettyPrinter } from "../connection-adapters/postgresql/explain-pretty-printer.js";
+import {
+  quoteTableName as pgQuoteTableName,
+  quoteColumnName as pgQuoteColumnName,
+  quoteString as pgQuoteString,
+} from "../connection-adapters/postgresql/quoting.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 /**
@@ -196,7 +203,8 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
     const client = await this.getClient();
     try {
       const result = await client.query(`EXPLAIN ${sql}`);
-      return result.rows.map((r: any) => r["QUERY PLAN"]).join("\n");
+      const printer = new ExplainPrettyPrinter();
+      return printer.pp(result.rows);
     } finally {
       this.releaseClient(client);
     }
@@ -310,8 +318,7 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
   }
 
   quoteTableName(name: string): string {
-    const parts = splitQuotedIdentifier(name);
-    return parts.map((p) => this.quoteIdentifier(p)).join(".");
+    return pgQuoteTableName(name);
   }
 
   columnsForDistinct(columns: string, orders: string[]): string {
@@ -587,15 +594,7 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
     await this.exec(`ALTER INDEX ${qualifiedOld} RENAME TO ${this.quoteIdentifier(newName)}`);
   }
 
-  async columns(tableName: string): Promise<
-    {
-      name: string;
-      type: string;
-      default: string | null;
-      null?: boolean;
-      primaryKey?: boolean;
-    }[]
-  > {
+  async columns(tableName: string): Promise<Column[]> {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
     let tableCondition: string;
@@ -614,7 +613,9 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
               pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
               pg_get_expr(d.adbin, d.adrelid) AS "default",
               a.attnotnull AS notnull,
-              (i.indisprimary IS TRUE) AS is_primary
+              (i.indisprimary IS TRUE) AS is_primary,
+              a.atttypid AS oid,
+              a.atttypmod AS fmod
        FROM pg_attribute a
        JOIN pg_class t ON t.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
@@ -630,13 +631,27 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
       binds,
     );
 
-    return rows.map((r) => ({
-      name: r.name as string,
-      type: r.type as string,
-      default: (r.default as string | null) ?? null,
-      null: !(r.notnull as boolean),
-      primaryKey: r.is_primary as boolean,
-    }));
+    return rows.map((r) => {
+      const sqlType = r.type as string;
+      const defaultExpr = (r.default as string | null) ?? null;
+      const isSerial = typeof defaultExpr === "string" && defaultExpr.startsWith("nextval(");
+
+      return new Column(
+        r.name as string,
+        defaultExpr,
+        {
+          sqlType,
+          oid: r.oid as number,
+          fmod: r.fmod as number,
+        },
+        !(r.notnull as boolean),
+        {
+          primaryKey: r.is_primary as boolean,
+          serial: isSerial,
+          array: sqlType.endsWith("[]"),
+        },
+      );
+    });
   }
 
   async changeColumn(
@@ -1004,19 +1019,16 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
     schema: string | null;
     table: string;
   } {
-    const parts = splitQuotedIdentifier(name);
-    if (parts.length === 2) {
-      return { schema: parts[0], table: parts[1] };
-    }
-    return { schema: null, table: parts[0] };
+    const pgName = Utils.extractSchemaQualifiedName(name);
+    return { schema: pgName.schema, table: pgName.identifier };
   }
 
   private quoteIdentifier(name: string): string {
-    return `"${name.replace(/"/g, '""')}"`;
+    return pgQuoteColumnName(name);
   }
 
   private quoteSchemaName(name: string): string {
-    return this.quoteIdentifier(name);
+    return pgQuoteColumnName(name);
   }
 
   private nativeType(type: string): string {
@@ -1045,7 +1057,7 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
     if (value === null) return "NULL";
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-    return `'${String(value).replace(/'/g, "''")}'`;
+    return pgQuoteString(String(value));
   }
 }
 

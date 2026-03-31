@@ -237,19 +237,68 @@ Our primary adapter. Highest priority among concrete adapters.
 | `sqlite3/schema_dumper.rb`          | 0       | SchemaDumper           | ✅     |
 | `sqlite3/schema_statements.rb`      | 0       | SchemaStatements       | ✅     |
 
-### B3. PostgreSQL Adapter (35 missing)
+### B3. PostgreSQL Adapter (Done ✅)
 
-Large surface area, mostly OID types. Each OID type is small and self-contained.
+All 35 classes now matched by `api:compare`. The adapter internals and OID
+types live under `connection-adapters/postgresql/`.
 
-**OID types (23):**
-Array, Bit, BitVarying, Bytea, Cidr, Date, DateTime, Decimal, Enum, Inet,
-Interval, Jsonb, LegacyPoint, MacAddr, Money, Oid, Point, SpecializedString,
-Timestamp, TimestampWithTimeZone, TypeMapInitializer, Vector, Xml
+Initial integration is in place — the main `PostgreSQLAdapter` delegates to
+`Column`, `ExplainPrettyPrinter`, `Utils`, and the `quoting` module. Further
+integration work is tracked below.
 
-**Adapter internals (12):**
-PostgreSQLAdapter, Column, DatabaseStatements, ExplainPrettyPrinter, Quoting,
-ReferentialIntegrity, SchemaCreation, SchemaDefinitions, SchemaDumper,
-SchemaStatements, TypeMetadata, Utils
+#### B3a. Next steps: deeper integration
+
+The connection-adapters modules are matched by `api:compare` and partially
+wired into the main adapter, but several modules are still not consumed at
+runtime. These are ordered by impact:
+
+1. **Replace `SimpleTableBuilder` with `TableDefinition`** — The adapter's
+   `createTable()` uses a private `SimpleTableBuilder` class that duplicates
+   logic already in `connection-adapters/postgresql/schema-definitions.ts`.
+   Switching to `TableDefinition` (which extends the abstract base and emits
+   correct PG-native types via `toSql()`) removes ~40 lines of duplication
+   and makes `createTable` honor PG-specific column types like CIDR, INET,
+   HSTORE, etc.
+
+2. **Add `disableReferentialIntegrity()`** — The `referential-integrity`
+   module exports SQL helpers for `ALTER TABLE ... DISABLE/ENABLE TRIGGER ALL`.
+   The adapter has no method for this yet; adding it enables fixture loading
+   and bulk seeding without FK constraint violations.
+
+3. **Attach `TypeMetadata` to `Column`** — The `columns()` method already
+   fetches `atttypid` (OID) and `atttypmod` (fmod) but only stores them as
+   raw numbers. Wrapping them in `TypeMetadata` instances gives downstream
+   code a structured way to compare and hash column types.
+
+4. **Build an OID type registry** — The biggest remaining piece. There are
+   26 OID type modules under `connection-adapters/postgresql/oid/`. Of these,
+   only 3 are consumed at runtime (`hstore`, `range`, `uuid`). The other 23
+   (array, bit, bit-varying, bytea, cidr, date, date-time, decimal, enum,
+   inet, interval, jsonb, legacy-point, macaddr, money, oid, point,
+   specialized-string, timestamp, timestamp-with-time-zone,
+   type-map-initializer, vector, xml) exist for API surface matching but
+   are not wired into query result deserialization. Wiring them in means:
+   - Create a type map that maps PG OID numbers → type caster instances
+   - Use `TypeMapInitializer` to populate it from `pg_type` rows on connect
+   - Run query results through the type map to auto-cast values (e.g.,
+     `jsonb` → parsed object, `point` → `{x, y}`, `interval` → duration,
+     `money` → number, `bytea` → Buffer)
+   - This mirrors Rails' `OID::TypeMapInitializer` + `PostgreSQLAdapter#initialize_type_map`
+
+5. **Wire `SchemaCreation` into DDL generation** — The `SchemaCreation`
+   subclass has PG-specific FK generation with proper quoting and
+   `actionSql()` validation, but the adapter builds FK DDL inline in
+   `addForeignKey()`. Routing through `SchemaCreation` centralizes DDL
+   generation and ensures consistent quoting.
+
+6. **Implement `DatabaseStatements` interface** — The interface defines
+   PG-specific query methods (`execQuery`, `execInsert`, `explain` with
+   options like `analyze`/`verbose`/`buffers`/`format`). The adapter has
+   these capabilities but doesn't conform to the interface shape.
+
+7. **Implement `SchemaStatements` interface** — Similarly, the adapter
+   already has most schema methods but doesn't formally implement the
+   interface from `connection-adapters/postgresql/schema-statements.ts`.
 
 ### B4. MySQL Adapter (18 missing)
 
