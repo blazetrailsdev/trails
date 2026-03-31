@@ -1,0 +1,4 @@
+stats.db
+stats.db-wal
+stats.db-shm
+stats.db-journal

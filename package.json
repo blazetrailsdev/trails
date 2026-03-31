@@ -16,7 +16,8 @@
     "db:down": "docker compose down",
     "api:compare": "bash scripts/api-compare/fetch-rails.sh && ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/extract-ts-api.ts && pnpm tsx scripts/api-compare/compare.ts",
     "test:compare": "bash scripts/test-compare/fetch-rails-tests.sh && ruby scripts/test-compare/extract-ruby-tests.rb && pnpm tsx scripts/test-compare/extract-ts-tests.ts && pnpm tsx scripts/test-compare/test-compare.ts",
-    "test:stubs": "pnpm test:compare -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts"
+    "test:stubs": "pnpm test:compare -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
+    "stats:sync": "pnpm tsx scripts/sync-stats/sync.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
