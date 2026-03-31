@@ -577,6 +577,10 @@ export class Parameters {
     return parts.join("&");
   }
 
+  toParam(): string {
+    return this.toQuery();
+  }
+
   equals(other: Parameters): boolean {
     if (!(other instanceof Parameters)) return false;
     return this._permitted === other._permitted && deepEqualValue(this._data, other._data);

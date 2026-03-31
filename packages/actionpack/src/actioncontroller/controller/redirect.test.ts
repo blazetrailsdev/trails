@@ -336,4 +336,77 @@ describe("RedirectTest", () => {
     expect(result.body).not.toContain("<script>");
     expect(result.body).toContain("&lt;script&gt;");
   });
+
+  it("redirect to url with stringlike", () => {
+    const url = new URL("http://example.com/path");
+    const result = redirectTo(url);
+    expect(result.location).toBe("http://example.com/path");
+  });
+
+  it("redirect to nil", () => {
+    expect(() => redirectTo(null)).toThrow("Cannot redirect to nil!");
+  });
+
+  it("redirect to params", () => {
+    const result = redirectTo("/posts?page=2");
+    expect(result.location).toBe("/posts?page=2");
+  });
+
+  it("unsafe redirect", () => {
+    const result = redirectTo("http://evil.com/attack");
+    expect(result.location).toBe("http://evil.com/attack");
+  });
+
+  it("unsafe redirect back", () => {
+    const result = redirectBack({
+      referer: "http://evil.com/attack",
+      fallbackLocation: "/",
+      allowOtherHost: true,
+    });
+    expect(result.location).toBe("http://evil.com/attack");
+  });
+
+  it("only path redirect", () => {
+    const result = redirectTo("/only/this/path");
+    expect(result.location).toBe("/only/this/path");
+    expect(result.status).toBe(302);
+  });
+
+  it("redirect to external with rescue", async () => {
+    class C extends Base {
+      async action() {
+        this.redirectTo("http://external.com");
+      }
+    }
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.getHeader("location")).toBe("http://external.com");
+    expect(c.status).toBe(302);
+  });
+});
+
+// ==========================================================================
+// controller/redirect_test.rb — ModuleRedirectTest
+// ==========================================================================
+describe("ModuleRedirectTest", () => {
+  it("simple redirect", () => {
+    const result = redirectTo("/module/dashboard");
+    expect(result.location).toBe("/module/dashboard");
+    expect(result.status).toBe(302);
+  });
+
+  it("simple redirect using options", () => {
+    const result = redirectTo("/module/dashboard", { status: 301 });
+    expect(result.status).toBe(301);
+  });
+
+  it("module redirect", () => {
+    const result = redirectTo("/admin/module/dashboard");
+    expect(result.location).toBe("/admin/module/dashboard");
+  });
+
+  it("module redirect using options", () => {
+    const result = redirectTo("/admin/module/dashboard", { status: 307 });
+    expect(result.status).toBe(307);
+  });
 });

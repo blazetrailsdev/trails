@@ -36,6 +36,8 @@ export type RenderOptions = {
   collection?: unknown[];
   /** Variable name for each collection item */
   as?: string;
+  /** JSONP callback function name */
+  callback?: string;
   status?: number | string;
   contentType?: string;
   layout?: boolean | string;
@@ -84,8 +86,18 @@ export class Base extends Metal {
     }
 
     if (options.json !== undefined) {
-      this.contentType = options.contentType ?? "application/json; charset=utf-8";
-      this.body = typeof options.json === "string" ? options.json : JSON.stringify(options.json);
+      const jsonStr =
+        typeof options.json === "string" ? options.json : JSON.stringify(options.json);
+      if (options.callback && JSONP_CALLBACK_RE.test(options.callback)) {
+        const jsonPayload =
+          typeof options.json === "string" ? JSON.stringify(options.json) : jsonStr;
+        const safeJson = escapeJsonForJs(jsonPayload);
+        this.contentType = options.contentType ?? "text/javascript; charset=utf-8";
+        this.body = `/**/\n${options.callback}(${safeJson})`;
+      } else {
+        this.contentType = options.contentType ?? "application/json; charset=utf-8";
+        this.body = jsonStr;
+      }
     } else if (options.plain !== undefined) {
       this.contentType = options.contentType ?? "text/plain; charset=utf-8";
       this.body = options.plain;
@@ -495,6 +507,27 @@ export class DoubleRenderError extends Error {
     super(message);
     this.name = "DoubleRenderError";
   }
+}
+
+const JSONP_CALLBACK_RE = /^[a-zA-Z_$][0-9a-zA-Z_$]*(?:\.[a-zA-Z_$][0-9a-zA-Z_$]*)*$/;
+
+function escapeJsonForJs(json: string): string {
+  return json.replace(/[<>&\u2028\u2029]/g, (c) => {
+    switch (c) {
+      case "<":
+        return "\\u003c";
+      case ">":
+        return "\\u003e";
+      case "&":
+        return "\\u0026";
+      case "\u2028":
+        return "\\u2028";
+      case "\u2029":
+        return "\\u2029";
+      default:
+        return c;
+    }
+  });
 }
 
 const SEND_FILE_MIME_TYPES: Record<string, string> = {

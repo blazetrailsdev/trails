@@ -10,9 +10,16 @@ export interface RedirectResult {
   body: string;
 }
 
-export function redirectTo(url: string, options: { status?: number } = {}): RedirectResult {
+export function redirectTo(
+  url: string | URL | null | undefined,
+  options: { status?: number } = {},
+): RedirectResult {
+  if (url == null) {
+    throw new Error("Cannot redirect to nil!");
+  }
+  const urlStr = url instanceof URL ? url.toString() : url;
   const status = options.status ?? 302;
-  const location = sanitizeUrl(url);
+  const location = sanitizeUrl(urlStr);
   return {
     status,
     location,
