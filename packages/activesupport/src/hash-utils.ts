@@ -219,7 +219,7 @@ export function extractKeys<T extends AnyObject>(obj: T, ...keys: string[]): Par
   return result;
 }
 
-function isPlainObject(value: unknown): value is AnyObject {
+export function isPlainObject(value: unknown): value is AnyObject {
   if (value === null || value === undefined) return false;
   if (typeof value !== "object") return false;
   if (Array.isArray(value)) return false;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deepMerge, deepMergeInPlace } from "./index.js";
+import { DeepMergeable } from "./deep-mergeable.js";
 
 describe("DeepMergeableTest", () => {
   it("deep_merge works", () => {
@@ -68,4 +69,30 @@ describe("DeepMergeableTest", () => {
   });
 
   it.skip("deep_merge? can be overridden to allow deep merging of non-subclass values");
+});
+
+describe("DeepMergeable namespace", () => {
+  it("deepMerge with block for conflict resolution", () => {
+    const a = { a: 100, b: 200, c: { c1: 100 } };
+    const b = { b: 250, c: { c1: 200 } };
+    const result = DeepMergeable.deepMerge(a, b, (_key, thisVal, otherVal) => {
+      return (thisVal as number) + (otherVal as number);
+    });
+    expect(result).toEqual({ a: 100, b: 450, c: { c1: 300 } });
+  });
+
+  it("deepMerge does not mutate inputs", () => {
+    const a = { x: { y: 1 }, z: 2 };
+    const b = { x: { w: 3 } };
+    const result = DeepMergeable.deepMerge(a, b);
+    expect(result).toEqual({ x: { y: 1, w: 3 }, z: 2 });
+    expect(a).toEqual({ x: { y: 1 }, z: 2 });
+    expect(b).toEqual({ x: { w: 3 } });
+  });
+
+  it("isDeepMergeable returns true for plain objects", () => {
+    expect(DeepMergeable.isDeepMergeable({})).toBe(true);
+    expect(DeepMergeable.isDeepMergeable(null)).toBe(false);
+    expect(DeepMergeable.isDeepMergeable([1])).toBe(false);
+  });
 });

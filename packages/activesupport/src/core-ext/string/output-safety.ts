@@ -65,6 +65,13 @@ export function xmlNameEscape(name: string): string {
   return chars.join("");
 }
 
+export class SafeConcatError extends Error {
+  constructor() {
+    super("Could not concatenate to the buffer because it is not HTML safe.");
+    this.name = "SafeConcatError";
+  }
+}
+
 /**
  * SafeBuffer — a string that is marked as HTML safe.
  * Safe strings can be concatenated without escaping; unsafe strings are escaped when added.
@@ -114,7 +121,7 @@ export class SafeBuffer {
   /** safeConcat — appends without escaping. Raises if this buffer is not safe. */
   safeConcat(other: string | SafeBuffer): SafeBuffer {
     if (!this._safe) {
-      throw new Error("Safe concat called on unsafe buffer");
+      throw new SafeConcatError();
     }
     const otherStr = other instanceof SafeBuffer ? other.toString() : String(other);
     return new SafeBuffer(this._value + otherStr, true);

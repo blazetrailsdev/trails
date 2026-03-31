@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tryBang, tryCall, tryWith } from "../../try.js";
+import { Tryable, Delegator } from "./try.js";
 
 describe("ObjectTryTest", () => {
   it("nonexisting method", () => {
@@ -153,5 +154,57 @@ describe("ObjectTryTest", () => {
   it("try with private method on delegator target bang", () => {
     const target = {};
     expect(() => tryBang(target, "missing")).toThrow();
+  });
+});
+
+describe("Tryable namespace", () => {
+  it("try calls method on object", () => {
+    const obj = { greet: () => "hello" };
+    expect(Tryable.try(obj, "greet")).toBe("hello");
+  });
+
+  it("try returns undefined for null", () => {
+    expect(Tryable.try(null, "greet")).toBeUndefined();
+    expect(Tryable.try(undefined, "greet")).toBeUndefined();
+  });
+
+  it("try returns undefined for missing method", () => {
+    expect(Tryable.try({ name: "test" }, "greet")).toBeUndefined();
+  });
+
+  it("try passes arguments", () => {
+    const obj = { add: (a: number, b: number) => a + b };
+    expect(Tryable.try(obj, "add", 2, 3)).toBe(5);
+  });
+
+  it("tryBang throws for missing method with descriptive message", () => {
+    expect(() => Tryable.tryBang({}, "greet")).toThrow(TypeError);
+    expect(() => Tryable.tryBang({}, "greet")).toThrow(/undefined method 'greet'/);
+  });
+
+  it("tryBang returns undefined for null", () => {
+    expect(Tryable.tryBang(null, "greet")).toBeUndefined();
+  });
+});
+
+describe("Delegator", () => {
+  it("try forwards to delegate", () => {
+    const d = new Delegator({ greet: () => "hello" });
+    expect(d.try("greet")).toBe("hello");
+  });
+
+  it("try returns undefined for null delegate", () => {
+    const d = new Delegator(null);
+    expect(d.try("greet")).toBeUndefined();
+  });
+
+  it("tryBang forwards to delegate", () => {
+    const d = new Delegator({ greet: () => "hello" });
+    expect(d.tryBang("greet")).toBe("hello");
+  });
+
+  it("tryBang throws for missing method on delegate", () => {
+    const d = new Delegator({ name: "test" });
+    expect(() => d.tryBang("greet")).toThrow(TypeError);
   });
 });

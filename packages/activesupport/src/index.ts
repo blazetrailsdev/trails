@@ -194,6 +194,7 @@ export type { Matcher } from "./notifications/fanout.js";
 export { ParameterFilter } from "./parameter-filter.js";
 export {
   SafeBuffer,
+  SafeConcatError,
   htmlSafe,
   htmlEscape,
   htmlEscapeOnce,
@@ -219,6 +220,25 @@ export type {
 } from "./error-reporter.js";
 export type { ParameterFilterOptions } from "./parameter-filter.js";
 export { transliterate } from "./transliterate.js";
+export { TagStack, Formatter, LocalTagStorage } from "./tagged-logging.js";
+export { TaggedLogging } from "./tagged-logging.js";
+export { DeepMergeable } from "./deep-mergeable.js";
+export { DelegationError, Delegation } from "./delegation.js";
+export {
+  NilClass,
+  FalseClass,
+  TrueClass,
+  Symbol as BlankSymbol,
+  String as BlankString,
+  Time as BlankTime,
+} from "./core-ext/object/blank.js";
+export { Delegator, Tryable } from "./core-ext/object/try.js";
+export {
+  isDuplicable,
+  Method as DuplicableMethod,
+  UnboundMethod as DuplicableUnboundMethod,
+  Singleton as DuplicableSingleton,
+} from "./core-ext/object/duplicable.js";
 export { CurrentAttributes } from "./current-attributes.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
 export { ArrayInquirer, arrayInquiry } from "./array-inquirer.js";
