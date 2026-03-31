@@ -16,6 +16,8 @@ import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract
 import { LookupContext } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../actiondispatch/routing/route-helpers.js";
 import { createHash } from "crypto";
+import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
+import { Notifications } from "@blazetrails/activesupport";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -314,6 +316,47 @@ export class Base extends Metal {
     return csrf.maskToken(realToken);
   }
 
+  // --- Allow Browser ---
+
+  static allowBrowser(options: {
+    versions: BrowserVersions;
+    block?: ((this: Base) => void | Promise<void>) | string;
+    only?: string[];
+    except?: string[];
+  }): void {
+    const { versions, block } = options;
+    const callbackOptions: CallbackOptions = {};
+    if (options.only) callbackOptions.only = options.only;
+    if (options.except) callbackOptions.except = options.except;
+
+    this.beforeAction(async function (controller): Promise<boolean> {
+      const base = controller as Base;
+      const userAgent = base.request?.getHeader("user-agent") ?? "";
+      const blocker = new BrowserBlocker(userAgent, versions);
+      if (!blocker.blocked) return true;
+
+      await Notifications.instrumentAsync(
+        "browser_block.action_controller",
+        {
+          user_agent: userAgent,
+          method: base.request?.method ?? "GET",
+          path: base.request?.path ?? "/",
+          versions,
+        },
+        async () => {
+          if (typeof block === "function") {
+            await block.call(base);
+          } else if (typeof block === "string" && typeof (base as any)[block] === "function") {
+            await (base as any)[block].call(base);
+          } else {
+            base.head(406);
+          }
+        },
+      );
+      return false;
+    }, callbackOptions);
+  }
+
   // --- Rescue ---
 
   /** Register a rescue handler for a specific error class. */
@@ -336,9 +379,9 @@ export class Base extends Metal {
       }
     } catch (error) {
       if (error instanceof Error) {
-        const handler = this._findRescueHandler(error);
-        if (handler) {
-          await handler.call(this, error);
+        const match = this._findRescueHandler(error);
+        if (match) {
+          await match.handler.call(this, match.error);
           return;
         }
       }
@@ -458,7 +501,7 @@ export class Base extends Metal {
     }
   }
 
-  private _findRescueHandler(error: Error): RescueHandler | null {
+  private _findRescueHandler(error: Error): { handler: RescueHandler; error: Error } | null {
     const hierarchy: Array<typeof Base> = [];
     let klass = this.constructor as typeof Base;
     while (klass && klass !== (Object as unknown)) {
@@ -466,17 +509,32 @@ export class Base extends Metal {
       klass = Object.getPrototypeOf(klass);
     }
 
-    for (const k of hierarchy.reverse()) {
-      if (Object.prototype.hasOwnProperty.call(k, "_rescueHandlers")) {
-        const handlers = (k as any)._rescueHandlers as Array<{
-          errorClass: new (...args: any[]) => Error;
-          handler: RescueHandler;
-        }>;
-        for (const { errorClass, handler } of handlers.reverse()) {
-          if (error instanceof errorClass) return handler;
+    const matchHandler = (err: Error): RescueHandler | null => {
+      for (let i = hierarchy.length - 1; i >= 0; i--) {
+        const k = hierarchy[i];
+        if (Object.prototype.hasOwnProperty.call(k, "_rescueHandlers")) {
+          const handlers = (k as any)._rescueHandlers as Array<{
+            errorClass: new (...args: any[]) => Error;
+            handler: RescueHandler;
+          }>;
+          for (let j = handlers.length - 1; j >= 0; j--) {
+            if (err instanceof handlers[j].errorClass) return handlers[j].handler;
+          }
         }
       }
+      return null;
+    };
+
+    let current: Error | undefined = error;
+    const seen = new Set<Error>();
+    while (current) {
+      if (seen.has(current)) break;
+      seen.add(current);
+      const handler = matchHandler(current);
+      if (handler) return { handler, error: current };
+      current = (current as any).cause instanceof Error ? (current as any).cause : undefined;
     }
+
     return null;
   }
 

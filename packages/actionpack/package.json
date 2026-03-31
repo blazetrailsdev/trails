@@ -15,6 +15,7 @@
   "dependencies": {
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
-    "@blazetrails/rack": "workspace:*"
+    "@blazetrails/rack": "workspace:*",
+    "ua-parser-js": "^2.0.9"
   }
 }
