@@ -10,24 +10,24 @@ The goal is to be **100% API compatible with Rails**, matching behavior **test f
 
 | Package                      | Rails Equivalent                                                        | API       | Tests     | Description                                                |
 | ---------------------------- | ----------------------------------------------------------------------- | --------- | --------- | ---------------------------------------------------------- |
-| `@blazetrails/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **47.6%** | **61.9%** | ORM — persistence, querying, associations, migrations      |
-| `@blazetrails/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **17.3%** | **75.6%** | Core utilities, inflection, caching, notifications         |
+| `@blazetrails/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **61.4%** | **61.9%** | ORM — persistence, querying, associations, migrations      |
+| `@blazetrails/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **25.5%** | **75.9%** | Core utilities, inflection, caching, notifications         |
 | `@blazetrails/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **100%**  | **99.4%** | SQL AST builder and query generation                       |
 | `@blazetrails/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **94.5%** | **100%**  | Attributes, validations, callbacks, dirty tracking, i18n   |
 | `@blazetrails/rack`          | [Rack](https://rack.github.io/)                                         | —         | **100%**  | Modular web server interface, request/response, middleware |
 
-**Data Layer Parity** (ActiveRecord + Arel + ActiveModel + ActiveSupport): **50.1% API** | **69.8% Tests**
+**Data Layer Parity** (ActiveRecord + Arel + ActiveModel + ActiveSupport): **59.4% API** | **69.9% Tests**
 
 **ActionPack** — started but not the current priority:
 
-| Package                         | Rails Equivalent                                                              | API      | Tests     | Description                                            |
-| ------------------------------- | ----------------------------------------------------------------------------- | -------- | --------- | ------------------------------------------------------ |
-| `@blazetrails/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **4.4%** | **28.4%** | Routing, middleware stack, cookies, sessions, security |
-| `@blazetrails/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **3.2%** | **0.4%**  | Controller layer, rendering, filters, parameters       |
+| Package                         | Rails Equivalent                                                              | API       | Tests     | Description                                            |
+| ------------------------------- | ----------------------------------------------------------------------------- | --------- | --------- | ------------------------------------------------------ |
+| `@blazetrails/actiondispatch`   | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **4.9%**  | **37.3%** | Routing, middleware stack, cookies, sessions, security |
+| `@blazetrails/actioncontroller` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **10.8%** | **14.5%** | Controller layer, rendering, filters, parameters       |
 
 **Tests** = `test:compare` — matches our test names against the Rails test suite. **API** = `api:compare` — tracks class/module existence and file placement against Rails source. Rack doesn't have API comparison yet (it's not a Rails gem).
 
-**47%** overall test coverage — 10,296 of 21,890 tests matched. CI runs both comparisons on every push.
+**49.4%** overall test coverage — 10,823 of 21,890 tests matched. CI runs both comparisons on every push.
 
 ## Quick Example
 

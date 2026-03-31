@@ -1,6 +1,6 @@
 # ActiveRecord API Compare: Road to 100%
 
-Current state: **47.0%** (261/555 classes/modules). Target: 100%.
+Current state: **61.4%** (341/555 classes/modules). Target: 100%.
 
 ```bash
 pnpm run api:compare -- --package activerecord
@@ -11,7 +11,7 @@ parent module (their methods become static/class methods on the parent). This
 avoids inflating the count with namespace wrappers that have no TS equivalent —
 in JS/TS, the filename is the module and static methods live on the class.
 
-This plan splits the remaining 290 missing classes into two independent
+This plan splits the remaining 209 missing classes into two independent
 workstreams that can be worked in parallel without conflicts.
 
 ---
@@ -394,7 +394,7 @@ Lower priority — MySQL support isn't the primary target right now.
 | -------------- | ------------------------------------------------------- | --- |
 | **30%** (~167) | A1 (errors) + B1 (abstract adapter) — ~71 classes       | ✅  |
 | **40%** (~222) | + A2 (core modules) + A4 (relation) + B2 (SQLite3)      | ✅  |
-| **50%** (~278) | + A3 (attribute methods) + A6 (types) + B6 (migrations) |     |
+| **50%** (~278) | + A3 (attribute methods) + A6 (types) + B6 (migrations) | ✅  |
 | **75%** (~416) | + A5, A7-A10 + B3 (PostgreSQL) + B5 (adapter infra)     |     |
 | **100%** (555) | + B4 (MySQL) + B7 (fixtures) + B8 (middleware/misc)     |     |
 
