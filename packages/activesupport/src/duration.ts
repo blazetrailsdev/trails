@@ -469,3 +469,45 @@ function applyDuration(date: Date, parts: DurationParts, direction: 1 | -1): Dat
 
   return d;
 }
+
+export class Scalar {
+  readonly value: number;
+
+  constructor(value: number) {
+    this.value = value;
+  }
+
+  toI(): number {
+    return Math.trunc(this.value);
+  }
+
+  toF(): number {
+    return this.value;
+  }
+
+  toString(): string {
+    return String(this.value);
+  }
+
+  valueOf(): number {
+    return this.value;
+  }
+
+  plus(other: Scalar | number): Scalar {
+    const otherVal = other instanceof Scalar ? other.value : other;
+    return new Scalar(this.value + otherVal);
+  }
+
+  minus(other: Scalar | number): Scalar {
+    const otherVal = other instanceof Scalar ? other.value : other;
+    return new Scalar(this.value - otherVal);
+  }
+
+  times(other: number): Scalar {
+    return new Scalar(this.value * other);
+  }
+
+  div(other: number): Scalar {
+    return new Scalar(this.value / other);
+  }
+}

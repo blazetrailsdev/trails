@@ -171,3 +171,19 @@ export class MemoryStore implements CacheStore {
     if (oldest) this.store.delete(oldest[0]);
   }
 }
+
+export namespace DupCoder {
+  export function dump(entry: unknown): unknown {
+    if (entry === null || entry === undefined) return entry;
+    if (typeof entry !== "object") return entry;
+    try {
+      return structuredClone(entry);
+    } catch {
+      return entry;
+    }
+  }
+
+  export function load(entry: unknown): unknown {
+    return dump(entry);
+  }
+}

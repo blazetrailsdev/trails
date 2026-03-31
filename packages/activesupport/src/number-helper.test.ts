@@ -167,3 +167,58 @@ describe("NumberHelperTest", () => {
     expect(numberToHumanSize("x")).toBe("x");
   });
 });
+
+describe("NumberConverter subclasses", () => {
+  it("NumberToPhoneConverter.convert works", async () => {
+    const { NumberToPhoneConverter } = await import("./number-helper/number-to-phone-converter.js");
+    expect(NumberToPhoneConverter.convert(5551234567, { areaCode: true })).toBe("(555) 123-4567");
+  });
+
+  it("NumberToCurrencyConverter.convert works", async () => {
+    const { NumberToCurrencyConverter } =
+      await import("./number-helper/number-to-currency-converter.js");
+    expect(NumberToCurrencyConverter.convert(1234.56)).toBe("$1,234.56");
+  });
+
+  it("NumberToHumanConverter.convert works", async () => {
+    const { NumberToHumanConverter } = await import("./number-helper/number-to-human-converter.js");
+    expect(NumberToHumanConverter.convert(1234567)).toBe("1.23 Million");
+  });
+});
+
+describe("RoundingHelper", () => {
+  it("rounds to precision", async () => {
+    const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
+    const h = new RoundingHelper({ precision: 2 });
+    expect(h.round(1.236)).toBeCloseTo(1.24, 5);
+    expect(h.round(1.234)).toBeCloseTo(1.23, 5);
+    expect(h.round(1.555)).toBeCloseTo(1.56, 5);
+  });
+
+  it("rounds negative numbers half away from zero", async () => {
+    const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
+    const h = new RoundingHelper({ precision: 0 });
+    expect(h.round(-1.5)).toBe(-2);
+    expect(h.round(1.5)).toBe(2);
+  });
+
+  it("rounds with significant digits", async () => {
+    const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
+    const h = new RoundingHelper({ precision: 3, significant: true });
+    expect(h.round(1234)).toBeCloseTo(1230, 0);
+    expect(h.round(0.001234)).toBeCloseTo(0.00123, 10);
+  });
+
+  it("handles zero", async () => {
+    const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
+    const h = new RoundingHelper({ precision: 2, significant: true });
+    expect(h.round(0)).toBe(0);
+  });
+
+  it("precision <= 0 rounds to integer", async () => {
+    const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
+    const h = new RoundingHelper({ precision: 0 });
+    expect(h.round(3.7)).toBe(4);
+    expect(h.round(3.2)).toBe(3);
+  });
+});

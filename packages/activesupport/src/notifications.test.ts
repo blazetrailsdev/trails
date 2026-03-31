@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Notifications } from "./notifications.js";
-import { Event } from "./notifications/instrumenter.js";
+import { Event, Instrumenter, LegacyHandle, Wrapper } from "./notifications/instrumenter.js";
 
 beforeEach(() => {
   Notifications.unsubscribeAll();
@@ -547,5 +547,114 @@ describe("ActiveSupport::Notifications", () => {
       expect(() => Notifications.instrument("safe")).not.toThrow();
       expect(events).toHaveLength(1);
     });
+  });
+});
+
+describe("Instrumenter", () => {
+  it("publishes an event", () => {
+    const published: Event[] = [];
+    const notifier = {
+      publish(_name: string, event: Event) {
+        published.push(event);
+      },
+    };
+    const inst = new Instrumenter(notifier);
+    inst.instrument("test.event");
+    expect(published).toHaveLength(1);
+    expect(published[0].name).toBe("test.event");
+    expect(published[0].end).not.toBeNull();
+  });
+
+  it("returns the block's return value", () => {
+    const notifier = { publish() {} };
+    const inst = new Instrumenter(notifier);
+    const result = inst.instrument("test.event", {}, () => 42);
+    expect(result).toBe(42);
+  });
+
+  it("publishes even when callback throws", () => {
+    const published: Event[] = [];
+    const notifier = {
+      publish(_name: string, event: Event) {
+        published.push(event);
+      },
+    };
+    const inst = new Instrumenter(notifier);
+    expect(() =>
+      inst.instrument("test.event", {}, () => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    expect(published).toHaveLength(1);
+  });
+
+  it("tracks children for nested instrumentation", () => {
+    const notifier = { publish() {} };
+    const inst = new Instrumenter(notifier);
+    let parentEvent: Event | undefined;
+    inst.instrument("parent", {}, (parent) => {
+      parentEvent = parent;
+      inst.instrument("child", {});
+    });
+    expect(parentEvent!.children).toHaveLength(1);
+    expect(parentEvent!.children[0].name).toBe("child");
+  });
+
+  it("instrumentAsync publishes after promise resolves", async () => {
+    const published: Event[] = [];
+    const notifier = {
+      publish(_name: string, event: Event) {
+        published.push(event);
+      },
+    };
+    const inst = new Instrumenter(notifier);
+    const result = await inst.instrumentAsync("async.event", {}, async () => {
+      return 99;
+    });
+    expect(result).toBe(99);
+    expect(published).toHaveLength(1);
+    expect(published[0].end).not.toBeNull();
+  });
+
+  it("instrumentAsync publishes on rejection", async () => {
+    const published: Event[] = [];
+    const notifier = {
+      publish(_name: string, event: Event) {
+        published.push(event);
+      },
+    };
+    const inst = new Instrumenter(notifier);
+    await expect(
+      inst.instrumentAsync("async.fail", {}, async () => {
+        throw new Error("async boom");
+      }),
+    ).rejects.toThrow("async boom");
+    expect(published).toHaveLength(1);
+  });
+});
+
+describe("LegacyHandle", () => {
+  it("finish publishes the event", () => {
+    const published: Event[] = [];
+    const notifier = {
+      publish(_name: string, event: Event) {
+        published.push(event);
+      },
+    };
+    const event = new Event("legacy.event", new Date());
+    const handle = new LegacyHandle(event, notifier);
+    handle.finish();
+    expect(published).toHaveLength(1);
+    expect(published[0].name).toBe("legacy.event");
+    expect(published[0].end).not.toBeNull();
+  });
+});
+
+describe("Wrapper", () => {
+  it("returns a stable Instrumenter instance", () => {
+    const notifier = { publish() {} };
+    const wrapper = new Wrapper(notifier);
+    expect(wrapper.instrumenter).toBeInstanceOf(Instrumenter);
+    expect(wrapper.instrumenter).toBe(wrapper.instrumenter);
   });
 });

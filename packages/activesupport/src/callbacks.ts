@@ -243,18 +243,27 @@ export class Around {
   }
 }
 
-export const CallTemplate = {
-  MethodCall,
-  ObjectCall,
-  InstanceExec0,
-  InstanceExec1,
-  InstanceExec2,
-  ProcCall,
-};
+const _ct = { MethodCall, ObjectCall, InstanceExec0, InstanceExec1, InstanceExec2, ProcCall };
+export namespace CallTemplate {
+  export const MethodCall = _ct.MethodCall;
+  export const ObjectCall = _ct.ObjectCall;
+  export const InstanceExec0 = _ct.InstanceExec0;
+  export const InstanceExec1 = _ct.InstanceExec1;
+  export const InstanceExec2 = _ct.InstanceExec2;
+  export const ProcCall = _ct.ProcCall;
+}
 
-export const Conditionals = { Value };
+const _cond = { Value };
+export namespace Conditionals {
+  export const Value = _cond.Value;
+}
 
-export const Filters = { Before, After, Around };
+const _filt = { Before, After, Around };
+export namespace Filters {
+  export const Before = _filt.Before;
+  export const After = _filt.After;
+  export const Around = _filt.Around;
+}
 
 export interface ClassMethods {
   defineCallbacks(name: string, options?: DefineCallbacksOptions): void;

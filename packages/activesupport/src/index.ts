@@ -145,11 +145,12 @@ export { classAttribute } from "./class-attribute.js";
 export { onLoad, runLoadHooks, resetLoadHooks } from "./lazy-load-hooks.js";
 export type { ClassAttributeOptions } from "./class-attribute.js";
 
-export { Logger, taggedLogging } from "./logger.js";
+export { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
 export { BroadcastLogger } from "./broadcast-logger.js";
 export type { LogLevel, LoggerOutput, TaggedLogger } from "./logger.js";
 
 export { MemoryStore } from "./cache/memory-store.js";
+export { DupCoder } from "./cache/memory-store.js";
 export { NullStore } from "./cache/null-store.js";
 export { FileStore } from "./cache/file-store.js";
 export type { CacheOptions, CacheStore } from "./cache/index.js";
@@ -158,7 +159,7 @@ export { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
 export type { DeprecationBehavior } from "./deprecation.js";
 
 export * from "./time-ext.js";
-export { MessageEncryptor, InvalidMessage } from "./message-encryptor.js";
+export { MessageEncryptor, InvalidMessage, NullSerializer } from "./message-encryptor.js";
 export { MessageVerifier, InvalidSignature } from "./message-verifier.js";
 
 export { Duration, seconds, minutes, hours, days, weeks, months, years } from "./duration.js";
@@ -169,7 +170,12 @@ export { TimeWithZone } from "./time-with-zone.js";
 export type { ChangeOptions, AdvanceOptions } from "./time-with-zone.js";
 
 export { Notifications } from "./notifications.js";
-export { Event as NotificationEvent } from "./notifications/instrumenter.js";
+export {
+  Event as NotificationEvent,
+  Instrumenter,
+  LegacyHandle,
+  Wrapper as InstrumenterWrapper,
+} from "./notifications/instrumenter.js";
 export type { EventPayload } from "./notifications/instrumenter.js";
 export type { NotificationSubscriber } from "./notifications.js";
 export {
@@ -303,3 +309,14 @@ export {
 export type { Range as RangeExt } from "./range-ext.js";
 
 export { I18n } from "./i18n.js";
+export { Scalar } from "./duration.js";
+export { NumberHelper } from "./number-helper.js";
+export { NumberConverter } from "./number-helper/number-converter.js";
+export { NumberToPhoneConverter } from "./number-helper/number-to-phone-converter.js";
+export { NumberToCurrencyConverter } from "./number-helper/number-to-currency-converter.js";
+export { NumberToDelimitedConverter } from "./number-helper/number-to-delimited-converter.js";
+export { NumberToRoundedConverter } from "./number-helper/number-to-rounded-converter.js";
+export { NumberToPercentageConverter } from "./number-helper/number-to-percentage-converter.js";
+export { NumberToHumanConverter } from "./number-helper/number-to-human-converter.js";
+export { NumberToHumanSizeConverter } from "./number-helper/number-to-human-size-converter.js";
+export { RoundingHelper } from "./number-helper/rounding-helper.js";

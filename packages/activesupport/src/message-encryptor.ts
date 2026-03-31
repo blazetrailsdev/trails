@@ -175,3 +175,15 @@ export class MessageEncryptor {
     return 16;
   }
 }
+
+export namespace NullSerializer {
+  export function dump(value: unknown): string {
+    if (typeof value !== "string") {
+      throw new TypeError("NullSerializer.dump expects a string value");
+    }
+    return value;
+  }
+  export function load(value: string): string {
+    return value;
+  }
+}

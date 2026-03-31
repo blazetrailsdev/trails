@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MemoryStore } from "./cache/memory-store.js";
+import { MemoryStore, DupCoder } from "./cache/memory-store.js";
 import { NullStore } from "./cache/null-store.js";
 import { FileStore } from "./cache/file-store.js";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -343,5 +343,35 @@ describe("FileStoreTest", () => {
     store.write("tmp", "value", { expiresIn: 10 });
     await new Promise((r) => setTimeout(r, 20));
     expect(store.read("tmp")).toBeNull();
+  });
+});
+
+describe("DupCoder", () => {
+  it("deep-clones plain objects", () => {
+    const obj = { a: { b: 1 }, c: [2, 3] };
+    const dup = DupCoder.dump(obj) as typeof obj;
+    expect(dup).toEqual(obj);
+    expect(dup).not.toBe(obj);
+    expect(dup.a).not.toBe(obj.a);
+  });
+
+  it("deep-clones arrays", () => {
+    const arr = [{ x: 1 }, { y: 2 }];
+    const dup = DupCoder.dump(arr) as typeof arr;
+    expect(dup).toEqual(arr);
+    expect(dup[0]).not.toBe(arr[0]);
+  });
+
+  it("returns primitives unchanged", () => {
+    expect(DupCoder.dump(42)).toBe(42);
+    expect(DupCoder.dump("hello")).toBe("hello");
+    expect(DupCoder.dump(true)).toBe(true);
+    expect(DupCoder.dump(null)).toBe(null);
+    expect(DupCoder.dump(undefined)).toBe(undefined);
+  });
+
+  it("load is symmetric with dump", () => {
+    const obj = { a: 1 };
+    expect(DupCoder.load(DupCoder.dump(obj))).toEqual(obj);
   });
 });

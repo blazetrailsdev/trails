@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { Duration, seconds, minutes, hours, days, weeks, months, years } from "./duration.js";
+import {
+  Duration,
+  seconds,
+  minutes,
+  hours,
+  days,
+  weeks,
+  months,
+  years,
+  Scalar,
+} from "./duration.js";
 describe("Numeric helpers (functional equivalents of Rails numeric extensions)", () => {
   it("seconds() creates a Duration", () => {
     expect(seconds(30).inSeconds()).toBe(30);
@@ -52,5 +62,32 @@ describe("Numeric helpers (functional equivalents of Rails numeric extensions)",
 
   it("Duration.sum of empty array is zero", () => {
     expect(Duration.sum([]).inSeconds()).toBe(0);
+  });
+});
+
+describe("Scalar", () => {
+  it("wraps a numeric value", () => {
+    const s = new Scalar(42);
+    expect(s.value).toBe(42);
+    expect(s.valueOf()).toBe(42);
+    expect(s.toString()).toBe("42");
+  });
+
+  it("toI truncates to integer", () => {
+    expect(new Scalar(3.7).toI()).toBe(3);
+    expect(new Scalar(-2.9).toI()).toBe(-2);
+  });
+
+  it("toF returns the float value", () => {
+    expect(new Scalar(3.14).toF()).toBeCloseTo(3.14);
+  });
+
+  it("arithmetic operations", () => {
+    const a = new Scalar(10);
+    expect(a.plus(5).value).toBe(15);
+    expect(a.plus(new Scalar(3)).value).toBe(13);
+    expect(a.minus(4).value).toBe(6);
+    expect(a.times(3).value).toBe(30);
+    expect(a.div(2).value).toBe(5);
   });
 });

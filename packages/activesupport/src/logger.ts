@@ -403,3 +403,19 @@ taggedLogging.logger = function (output: LoggerOutput): TaggedLogger {
   const logger = new Logger(output);
   return taggedLogging(logger);
 };
+
+export class SimpleFormatter {
+  call(_severity: string, _timestamp: Date, _progname: string | null, msg: string): string {
+    return `${msg}\n`;
+  }
+}
+
+export function simpleFormatter(): (
+  severity: string,
+  timestamp: Date,
+  progname: string | null,
+  msg: string,
+) => string {
+  const fmt = new SimpleFormatter();
+  return fmt.call.bind(fmt);
+}

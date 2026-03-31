@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Logger, taggedLogging } from "./logger.js";
+import { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
 
 function makeBuffer() {
@@ -367,6 +367,18 @@ describe("TaggedLoggingTest", () => {
   it("implicit logger instance", () => {
     logger.info("implicit");
     expect(output.string).toContain("implicit");
+  });
+});
+
+describe("SimpleFormatter", () => {
+  it("formats a string message with newline", () => {
+    const fmt = new SimpleFormatter();
+    expect(fmt.call("INFO", new Date(), null, "hello")).toBe("hello\n");
+  });
+
+  it("formats empty string", () => {
+    const fmt = new SimpleFormatter();
+    expect(fmt.call("DEBUG", new Date(), null, "")).toBe("\n");
   });
 });
 
