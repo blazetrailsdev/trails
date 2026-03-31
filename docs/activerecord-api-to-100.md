@@ -133,27 +133,19 @@ Each type is self-contained: inherit from an ActiveModel type, override
 | `type_caster/connection.rb`         | 1       | TypeCaster::Connection           |        |
 | `type_caster/map.rb`                | 1       | TypeCaster::Map                  |        |
 
-### A7. Validations (Done ✅ — stubs, integration pending)
+### A7. Validations (Done ✅)
 
-All 7 classes exist for API parity. Most are thin subclasses of ActiveModel
-validators without AR-specific behavior yet.
+All 7 classes with AR-specific behavior integrated.
 
-| Rails file                    | Status | Notes                                                     |
-| ----------------------------- | ------ | --------------------------------------------------------- |
-| `validations.rb`              | ✅     | Validations interface + re-exports                        |
-| `validations/absence.rb`      | ✅     | Empty subclass of ActiveModel AbsenceValidator            |
-| `validations/associated.rb`   | ✅     | Stub — needs to fetch associations from record, not attrs |
-| `validations/length.rb`       | ✅     | Empty subclass of ActiveModel LengthValidator             |
-| `validations/numericality.rb` | ✅     | Empty subclass of ActiveModel NumericalityValidator       |
-| `validations/presence.rb`     | ✅     | Empty subclass of ActiveModel PresenceValidator           |
-| `validations/uniqueness.rb`   | ✅     | Has real logic but not fully integrated with Base         |
-
-**Integration TODOs:**
-
-- AbsenceValidator/PresenceValidator: exclude records marked for destruction
-- AssociatedValidator: fetch association value from record (not readAttribute)
-- UniquenessValidator: verify async lifecycle integration with Base.save()
-- LengthValidator/NumericalityValidator: use type-cast values for comparison
+| Rails file                    | Status | Notes                                                           |
+| ----------------------------- | ------ | --------------------------------------------------------------- |
+| `validations.rb`              | ✅     | Validations interface + re-exports                              |
+| `validations/absence.rb`      | ✅     | Filters association records marked for destruction              |
+| `validations/associated.rb`   | ✅     | Fetches association targets, skips destroyed records            |
+| `validations/length.rb`       | ✅     | Delegates to ActiveModel (type-cast handled by attribute layer) |
+| `validations/numericality.rb` | ✅     | Delegates to ActiveModel (type-cast handled by attribute layer) |
+| `validations/presence.rb`     | ✅     | Filters association records marked for destruction              |
+| `validations/uniqueness.rb`   | ✅     | Async DB check, integrated with Base.\_runAsyncValidations      |
 
 ### A8. Scoping (Done ✅)
 

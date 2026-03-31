@@ -46,10 +46,12 @@ export class UniquenessValidator extends EachValidator {
       if (conditioned) relation = conditioned;
     }
 
-    let asyncValidations = (record as any)._asyncValidations as Promise<unknown>[] | undefined;
+    let asyncValidations = (record as any)._asyncValidationPromises as
+      | Promise<unknown>[]
+      | undefined;
     if (!Array.isArray(asyncValidations)) {
       asyncValidations = [];
-      (record as any)._asyncValidations = asyncValidations;
+      (record as any)._asyncValidationPromises = asyncValidations;
     }
 
     const errorOpts: Record<string, unknown> = { value };

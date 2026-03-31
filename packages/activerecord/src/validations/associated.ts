@@ -9,13 +9,22 @@
  *   }
  */
 import { EachValidator } from "@blazetrails/activemodel";
+import { isMarkedForDestruction } from "../autosave-association.js";
+import { resolveAssociation } from "./association-helpers.js";
 
 export class AssociatedValidator extends EachValidator {
   validateEach(record: any, attribute: string, value: unknown): void {
-    const values = Array.isArray(value) ? value : value ? [value] : [];
+    const associationValue = resolveAssociation(record, attribute, value);
+
+    const values = Array.isArray(associationValue)
+      ? associationValue
+      : associationValue
+        ? [associationValue]
+        : [];
     for (const assoc of values) {
+      if (isMarkedForDestruction(assoc)) continue;
       if (typeof assoc?.isValid === "function" && !assoc.isValid()) {
-        record.errors.add(attribute, "invalid", { value });
+        record.errors.add(attribute, "invalid", { value: associationValue });
         return;
       }
     }
