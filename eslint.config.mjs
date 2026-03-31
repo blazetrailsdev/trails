@@ -8,7 +8,13 @@ import vitest from "@vitest/eslint-plugin";
 
 export default defineConfig(
   {
-    ignores: ["vendor/**", "scripts/**", "**/dist/**"],
+    ignores: [
+      "vendor/**",
+      "scripts/**",
+      "**/dist/**",
+      "packages/website/static/**",
+      "packages/website/build/**",
+    ],
   },
   eslint.configs.recommended,
   tseslint.configs.recommended,
@@ -115,6 +121,16 @@ export default defineConfig(
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "unused-imports/no-unused-vars": "off",
+      "no-undef": "off",
+    },
+  },
+
+  // ── website ──
+  {
+    files: ["packages/website/src/**/*.ts", "packages/website/server/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "no-useless-assignment": "off",
       "no-undef": "off",
     },
   },

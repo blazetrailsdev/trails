@@ -17,6 +17,7 @@ export default defineConfig({
   test: {
     globals: true,
     include: ["packages/*/src/**/*.test.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**", "packages/website/**"],
     setupFiles: process.env.MYSQL_TEST_URL
       ? ["./packages/activerecord/src/test-setup-mysql.ts"]
       : [],

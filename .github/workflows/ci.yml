@@ -130,6 +130,22 @@ jobs:
         env:
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
 
+  website:
+    name: Website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @blazetrails/website exec svelte-kit sync
+      - run: pnpm --filter @blazetrails/website run build
+
   rails-comparison:
     name: Rails API/Test Comparison
     runs-on: ubuntu-latest

@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  /* Earth base — warm brown */
+  --color-surface: #1c1916;
+  --color-surface-raised: #272320;
+  --color-surface-overlay: #353029;
+  --color-border: #4a433b;
+  --color-border-focus: #5a8a42;
+  --color-text: #e4ded4;
+  --color-text-muted: #a59d91;
+
+  /* Forest accents */
+  --color-accent: #6b9e50;
+  --color-accent-hover: #7db060;
+  --color-info: #5b96b5;
+  --color-success: #7da668;
+  --color-error: #d0654e;
+  --color-warning: #d4a04a;
+
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+html[data-theme="light"] {
+  --color-surface: #f3eee8;
+  --color-surface-raised: #faf8f5;
+  --color-surface-overlay: #eae4db;
+  --color-border: #cfc7bb;
+  --color-border-focus: #4a7a34;
+  --color-text: #2a2520;
+  --color-text-muted: #6b6055;
+  --color-accent: #3d6e28;
+  --color-accent-hover: #4a7a34;
+  --color-info: #2e6b85;
+  --color-success: #3d6a2c;
+  --color-error: #a04030;
+  --color-warning: #a07830;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+.hero-section {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.hero-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-cta {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
