@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { respondTo, Collector, UnknownFormat } from "./respond-to.js";
+import { respondTo, Collector, UnknownFormat } from "../../../actiondispatch/respond-to.js";
 
 // ==========================================================================
 // controller/mime/respond_to_test.rb

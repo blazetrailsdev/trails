@@ -242,7 +242,8 @@ export class RequestForgeryProtection {
         }
         break;
       case "null_session":
-        // Return a null session (caller should use an empty proxy)
+        // Caller is responsible for using an empty session for the
+        // remainder of the request; we don't clear the underlying store.
         break;
     }
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { urlFor } from "./url-for.js";
+import { urlFor } from "../../actiondispatch/url-for.js";
 
-describe("ActionController::UrlFor", () => {
+describe("UrlForTest", () => {
   it("exception is thrown without host", () => {
     expect(() => urlFor({ path: "/posts" })).toThrow(/Missing host/);
   });
