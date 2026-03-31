@@ -1,11 +1,11 @@
 <script>
   const packages = [
-    { name: "ActiveRecord", path: "activerecord", desc: "ORM with migrations, associations, and query building", coverage: "62%" },
-    { name: "ActiveModel", path: "activemodel", desc: "Validations, callbacks, dirty tracking, serialization", coverage: "99%" },
-    { name: "ActiveSupport", path: "activesupport", desc: "Inflection, caching, notifications, encryption", coverage: "94%" },
-    { name: "Arel", path: "arel", desc: "SQL AST builder and query generation", coverage: "99%" },
-    { name: "Rack", path: "rack", desc: "Web server interface, middleware, request/response", coverage: "99%" },
-    { name: "ActionPack", path: "actionpack", desc: "Controllers, routing, views, sessions, CSRF", coverage: "5%" },
+    { name: "ActiveRecord", path: "activerecord", desc: "ORM with migrations, associations, and query building", coverage: "71%" },
+    { name: "ActiveModel", path: "activemodel", desc: "Validations, callbacks, dirty tracking, serialization", coverage: "95%" },
+    { name: "ActiveSupport", path: "activesupport", desc: "Inflection, caching, notifications, encryption", coverage: "38%" },
+    { name: "Arel", path: "arel", desc: "SQL AST builder and query generation", coverage: "100%" },
+    { name: "Rack", path: "rack", desc: "Web server interface, middleware, request/response", coverage: "100%" },
+    { name: "ActionPack", path: "actionpack", desc: "Controllers (74% API), routing, sessions, CSRF", coverage: "27%" },
   ];
 
   const codeExample = `import { Base, Schema } from "@blazetrails/activerecord";

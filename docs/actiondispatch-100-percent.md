@@ -1,6 +1,6 @@
 # ActionDispatch: Road to 100% Test Coverage
 
-Current state: **25.1%** (407 matched / 1,622 total Rails tests). 16/75 files matched, 67 misplaced, 0 wrong describes.
+Current state: **37.3%** (534 matched / 1,432 total Rails tests). 23/60 files matched, 0 misplaced.
 
 Unlike ActiveRecord (which has many `it.skip` stubs to convert), ActionDispatch's gap is entirely **missing tests** — tests that exist in Rails but have no TypeScript counterpart at all. This means the work is about implementing features and writing new test files, not unskipping existing tests.
 
@@ -22,36 +22,9 @@ We already have 23 test files and 30 source files covering:
 - **Middleware** — Stack, Static, RequestId, SSL, HostAuthorization, DebugExceptions
 - **Content** — MIME type negotiation, respond_to, redirect helpers, URL generation, uploaded files, exception wrapper
 
-## Summary by feature area
+## Related
 
-| #   | Feature Area         | Missing   | Matched | Key Blocker                    |
-| --- | -------------------- | --------- | ------- | ------------------------------ |
-| 1   | Controller Core      | 814       | 158     | Needs ActionController         |
-| 2   | Routing              | 600       | 164     | Routing engine gaps            |
-| 3   | Controller Rendering | 295       | 28      | Needs ActionController + views |
-| 4   | Controller Testing   | 132       | 0       | Needs test harness             |
-| 5   | Request              | 125       | 74      | Param parsing, edge cases      |
-| 6   | Middleware           | 109       | 0       | Individual middleware impl     |
-| 7   | Cookies              | 96        | 41      | Cookie edge cases              |
-| 8   | Sessions             | 87        | 0       | Session stores                 |
-| 9   | Security Middleware  | 81        | 0       | SSL/Host auth edge cases       |
-| 10  | Error Handling       | 73        | 5       | Debug exceptions, rescue       |
-| 11  | Controller Filters   | 54        | 0       | Needs ActionController         |
-| 12  | Response             | 52        | 27      | Response edge cases            |
-| 13  | System Testing       | 44        | 0       | Browser automation — defer     |
-| 14  | Other small areas    | 189       | 106     | Various                        |
-|     | **TOTAL**            | **2,751** | **603** |                                |
-
-## The ActionController question
-
-A large portion of the missing tests (1,295 out of 2,751 — 47%) live under `controller/` and test ActionController behavior: filters, rendering, caching, streaming, test harness, params wrapping, etc. In Rails, ActionDispatch and ActionController are tightly coupled — ActionDispatch handles routing and middleware, ActionController handles the actual request processing.
-
-We have two options:
-
-1. **Build a minimal ActionController within actiondispatch** — just enough to run controller tests (filters, rendering to string, params handling). This is simpler but blurs package boundaries.
-2. **Create a separate `@blazetrails/actioncontroller` package** — more faithful to Rails structure but more setup overhead.
-
-Recommendation: Start with option 1, extracting to a separate package later if it grows large enough. Many controller tests can be satisfied with a lightweight controller base class that dispatches actions, runs filters, and returns responses.
+ActionController has its own road-to-100 doc: [actioncontroller-100-percent.md](actioncontroller-100-percent.md).
 
 ## Dependency graph
 

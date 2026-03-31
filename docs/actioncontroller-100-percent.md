@@ -1,8 +1,8 @@
 # ActionController: Road to 100% Test Coverage
 
-**API surface: 65/93 classes/modules (69.9%)** — real implementations only, no stubs.
+**API surface: 69/93 classes/modules (74.2%)** — real implementations only, no stubs.
 
-Test coverage: **0.4%** (7 matched / 1,860 total Rails tests). 8/91 files matched, 229 misplaced, 0 wrong describes.
+Test coverage: **28.3%** (527 matched / 1,860 total Rails tests). 29/91 files matched, 26 misplaced.
 
 In Rails, ActionController lives inside the ActionPack gem alongside ActionDispatch. The package has been restructured so that `packages/actionpack/` contains both `actioncontroller/` and `actiondispatch/` side by side.
 
@@ -28,7 +28,7 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 | `actioncontroller/metal/*.ts`                 | Metal modules with real implementations: redirecting, renderers, mime-responds, request-forgery-protection, params-wrapper, allow-browser, http-authentication, live/SSE, exceptions     |
 | `actioncontroller/index.ts`                   | Package exports                                                                                                                                                                          |
 
-### Test files (263 tests, all passing)
+### Test files (888 tests, all passing)
 
 | File                          | Tests | Coverage area                                                                                   |
 | ----------------------------- | ----- | ----------------------------------------------------------------------------------------------- |
