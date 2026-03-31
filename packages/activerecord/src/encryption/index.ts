@@ -19,3 +19,21 @@ export type { SchemeOptions } from "./scheme.js";
 export { Config } from "./config.js";
 export type { Compressor } from "./config.js";
 export * from "./context.js";
+export { Configurable } from "./configurable.js";
+export { Contexts } from "./contexts.js";
+export { EncryptedAttributeType } from "./encrypted-attribute-type.js";
+export { EncryptableRecord } from "./encryptable-record.js";
+export { AutoFilteredParameters } from "./auto-filtered-parameters.js";
+export { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
+export {
+  ExtendedDeterministicQueries,
+  EncryptedQuery,
+  RelationQueries,
+  CoreQueries,
+  AdditionalValue,
+  ExtendedEncryptableType,
+} from "./extended-deterministic-queries.js";
+export {
+  ExtendedDeterministicUniquenessValidator,
+  EncryptedUniquenessValidator,
+} from "./extended-deterministic-uniqueness-validator.js";
