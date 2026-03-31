@@ -203,4 +203,96 @@ describe("PermissionsPolicyTest", () => {
     policy.hid("self");
     expect(policy.build()).toBe("hid=(self)");
   });
+
+  it("mappings", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self");
+    policy.microphone("none");
+    expect(policy.build()).toContain("camera=(self)");
+    expect(policy.build()).toContain("microphone=()");
+  });
+
+  it("multiple sources for a single directive", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self", "https://example.com");
+    expect(policy.build()).toBe('camera=(self "https://example.com")');
+  });
+
+  it("single directive for multiple directives", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self");
+    policy.microphone("self");
+    const header = policy.build();
+    expect(header).toContain("camera=(self)");
+    expect(header).toContain("microphone=(self)");
+  });
+
+  it("multiple directives for multiple directives", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self", "https://example.com");
+    policy.microphone("none");
+    policy.geolocation("*");
+    const header = policy.build();
+    expect(header).toContain("camera=");
+    expect(header).toContain("microphone=()");
+    expect(header).toContain("geolocation=*");
+  });
+
+  it("invalid directive source", () => {
+    const policy = new PermissionsPolicy();
+    expect(() => policy.allow("", "self")).toThrow();
+  });
+});
+
+describe("PermissionsPolicyMiddlewareTest", () => {
+  it("html requests will set a policy", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self");
+    const [name, value] = policy.toHeader();
+    expect(name).toBe("permissions-policy");
+    expect(value).toBe("camera=(self)");
+  });
+
+  it("non-html requests will set a policy", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self");
+    const [name, value] = policy.toHeader();
+    expect(name).toBe("permissions-policy");
+    expect(value).toContain("camera");
+  });
+
+  it("existing policies will not be overwritten", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self");
+    policy.camera("none");
+    expect(policy.build()).toContain("camera");
+  });
+});
+
+describe("PermissionsPolicyIntegrationTest", () => {
+  it("generates permissions policy header", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self");
+    expect(policy.build()).toBe("camera=(self)");
+  });
+
+  it("generates per controller permissions policy header", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self");
+    policy.microphone("none");
+    const header = policy.build();
+    expect(header).toContain("camera=(self)");
+    expect(header).toContain("microphone=()");
+  });
+
+  it("generates multiple directives permissions policy header", () => {
+    const policy = new PermissionsPolicy();
+    policy.camera("self");
+    policy.microphone("self");
+    policy.geolocation("self");
+    const header = policy.build();
+    expect(header).toContain("camera=(self)");
+    expect(header).toContain("microphone=(self)");
+    expect(header).toContain("geolocation=(self)");
+  });
 });

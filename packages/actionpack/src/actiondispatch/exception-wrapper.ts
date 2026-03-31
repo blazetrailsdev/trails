@@ -15,6 +15,7 @@ const STATUS_MAP: Record<string, number> = {
   UnknownFormat: 406,
   InvalidAuthenticityToken: 422,
   ParameterMissing: 400,
+  ParameterTypeError: 400,
   UnpermittedParameters: 400,
 };
 
@@ -31,7 +32,9 @@ export class ExceptionWrapper {
 
   /** The exception class/constructor name. */
   get exceptionName(): string {
-    return this.exception.constructor?.name ?? this.exception.name ?? "Error";
+    const name = this.exception.name;
+    if (name && name !== "Error") return name;
+    return this.exception.constructor?.name ?? "Error";
   }
 
   /** The exception message. */
@@ -79,6 +82,32 @@ export class ExceptionWrapper {
   /** Get the status code for an exception name. */
   static statusCodeFor(exceptionName: string): number {
     return STATUS_MAP[exceptionName] ?? 500;
+  }
+
+  /** The full trace (application + framework combined). */
+  get fullTrace(): string[] {
+    return this.traces;
+  }
+
+  /** Whether this exception has a registered rescue response. */
+  static rescueResponse(exceptionName: string): boolean {
+    return Object.hasOwn(STATUS_MAP, exceptionName) && STATUS_MAP[exceptionName] !== 500;
+  }
+
+  /** Whether this exception should be shown based on the show_exceptions mode. */
+  show(mode: "all" | "rescuable" | "none"): boolean {
+    if (mode === "all") return true;
+    if (mode === "none") return false;
+    return ExceptionWrapper.rescueResponse(this.exceptionName);
+  }
+
+  /** Extract file paths and line numbers from the backtrace. */
+  get sourceExtracts(): Array<{ file: string; line: number }> {
+    return this.traces.map((trace) => {
+      const match = trace.match(/\((.+):(\d+):\d+\)/) ?? trace.match(/at\s+(.+):(\d+):\d+/);
+      if (!match) return { file: trace, line: 0 };
+      return { file: match[1], line: parseInt(match[2], 10) };
+    });
   }
 
   /** Build a simple error response. */

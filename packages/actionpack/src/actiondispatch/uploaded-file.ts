@@ -24,15 +24,19 @@ export class UploadedFile {
   private _closed: boolean = false;
 
   constructor(options: UploadedFileOptions = {}) {
+    if (!options.tempfile && options.content == null) {
+      throw new Error("ArgumentError: either :tempfile or :content is required");
+    }
     this.originalFilename = options.filename ?? "";
     this.contentType = options.type ?? "application/octet-stream";
     this.headers = options.head ?? "";
     this._tempfile = options.tempfile ?? null;
-    this._content = options.content
-      ? Buffer.isBuffer(options.content)
-        ? options.content
-        : Buffer.from(options.content)
-      : null;
+    this._content =
+      options.content != null
+        ? Buffer.isBuffer(options.content)
+          ? options.content
+          : Buffer.from(options.content)
+        : null;
   }
 
   /** The file extension (including dot). */
@@ -83,7 +87,22 @@ export class UploadedFile {
   }
 
   /** Close the file handle. */
-  close(): void {
+  close(unlink?: boolean): void {
+    if (unlink && this._tempfile) {
+      const tempPath = this._tempfile;
+      try {
+        fs.unlinkSync(tempPath);
+        this._tempfile = null;
+      } catch {
+        try {
+          if (!fs.existsSync(tempPath)) {
+            this._tempfile = null;
+          }
+        } catch {
+          // Leave _tempfile as-is if existence check fails.
+        }
+      }
+    }
     this._closed = true;
   }
 

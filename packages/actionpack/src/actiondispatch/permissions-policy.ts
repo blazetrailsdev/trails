@@ -42,7 +42,11 @@ export class PermissionsPolicy {
 
   /** Set a directive to allow specific origins. */
   allow(directive: string, ...sources: PermissionSource[]): this {
-    this.directives.set(directive, sources);
+    const normalized = directive.trim();
+    if (!normalized) {
+      throw new Error("ArgumentError: directive name cannot be empty");
+    }
+    this.directives.set(normalized, sources);
     return this;
   }
 

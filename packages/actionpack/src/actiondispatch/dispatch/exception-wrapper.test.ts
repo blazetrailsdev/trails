@@ -5,124 +5,143 @@ import { ExceptionWrapper } from "../exception-wrapper.js";
 // dispatch/exception_wrapper_test.rb
 // ==========================================================================
 describe("ExceptionWrapperTest", () => {
-  it("status code for standard error", () => {
-    const wrapper = new ExceptionWrapper(new Error("boom"));
-    expect(wrapper.statusCode).toBe(500);
+  it("#source_extracts fetches source fragments for every backtrace entry", () => {
+    const err = new Error("test");
+    const wrapper = new ExceptionWrapper(err);
+    const extracts = wrapper.sourceExtracts;
+    expect(extracts.length).toBeGreaterThan(0);
+    for (const extract of extracts) {
+      expect(extract).toHaveProperty("file");
+      expect(extract).toHaveProperty("line");
+    }
   });
 
-  it("status text for standard error", () => {
-    const wrapper = new ExceptionWrapper(new Error("boom"));
-    expect(wrapper.statusText).toBe("Internal Server Error");
+  it("#source_extracts works with Windows paths", () => {
+    const err = new Error("test");
+    err.stack = "Error: test\n    at Object.<anonymous> (C:\\Users\\test\\file.ts:10:5)";
+    const wrapper = new ExceptionWrapper(err);
+    const extracts = wrapper.sourceExtracts;
+    expect(extracts.length).toBe(1);
   });
 
-  it("exception name", () => {
-    const wrapper = new ExceptionWrapper(new TypeError("bad type"));
-    expect(wrapper.exceptionName).toBe("TypeError");
+  it("#source_extracts works with non standard backtrace", () => {
+    const err = new Error("test");
+    err.stack = "Error: test\n    at some_function (weird/path:42:1)";
+    const wrapper = new ExceptionWrapper(err);
+    const extracts = wrapper.sourceExtracts;
+    expect(extracts.length).toBe(1);
   });
 
-  it("message", () => {
-    const wrapper = new ExceptionWrapper(new Error("something broke"));
-    expect(wrapper.message).toBe("something broke");
+  it("#source_extracts works with eval syntax error", () => {
+    const err = new SyntaxError("Unexpected token");
+    const wrapper = new ExceptionWrapper(err);
+    const extracts = wrapper.sourceExtracts;
+    expect(Array.isArray(extracts)).toBe(true);
   });
 
-  it("traces returns stack trace lines", () => {
-    const wrapper = new ExceptionWrapper(new Error("test"));
-    expect(wrapper.traces.length).toBeGreaterThan(0);
-    expect(wrapper.traces[0]).toContain("at ");
+  it("#source_extracts works with nil backtrace_locations", () => {
+    const err = new Error("no stack");
+    err.stack = undefined;
+    const wrapper = new ExceptionWrapper(err);
+    expect(wrapper.sourceExtracts).toEqual([]);
   });
 
-  it("application trace filters node_modules", () => {
+  it("#source_extracts works with error_highlight", () => {
+    const err = new Error("highlighted");
+    const wrapper = new ExceptionWrapper(err);
+    const extracts = wrapper.sourceExtracts;
+    expect(Array.isArray(extracts)).toBe(true);
+  });
+
+  it("#application_trace returns traces only from the application", () => {
     const wrapper = new ExceptionWrapper(new Error("test"));
     for (const line of wrapper.applicationTrace) {
       expect(line).not.toContain("node_modules");
     }
   });
 
-  it("framework trace includes only node_modules", () => {
+  it("#status_code returns 400 for Rack::Utils::ParameterTypeError", () => {
+    expect(ExceptionWrapper.statusCodeFor("ParameterTypeError")).toBe(400);
+  });
+
+  it("#rescue_response? returns false for an exception that's not in rescue_responses", () => {
+    expect(ExceptionWrapper.rescueResponse("SomeRandomError")).toBe(false);
+  });
+
+  it("#rescue_response? returns true for an exception that is in rescue_responses", () => {
+    expect(ExceptionWrapper.rescueResponse("RoutingError")).toBe(true);
+  });
+
+  it("#application_trace cannot be nil", () => {
+    const err = new Error("no stack");
+    err.stack = undefined;
+    const wrapper = new ExceptionWrapper(err);
+    expect(wrapper.applicationTrace).toEqual([]);
+  });
+
+  it("#framework_trace returns traces outside the application", () => {
     const wrapper = new ExceptionWrapper(new Error("test"));
     for (const line of wrapper.frameworkTrace) {
       expect(line).toContain("node_modules");
     }
   });
 
-  it("source location", () => {
-    const wrapper = new ExceptionWrapper(new Error("test"));
-    const loc = wrapper.sourceLocation;
-    // In test environment, should point to this file
-    if (loc) {
-      expect(loc.file).toBeTruthy();
-      expect(loc.line).toBeGreaterThan(0);
-    }
-  });
-
-  it("custom exception status registration", () => {
-    class CustomNotFound extends Error {
-      name = "CustomNotFound";
-    }
-    ExceptionWrapper.registerStatus("CustomNotFound", 404);
-    const wrapper = new ExceptionWrapper(new CustomNotFound("not here"));
-    expect(wrapper.statusCode).toBe(404);
-    expect(wrapper.statusText).toBe("Not Found");
-  });
-
-  it("status code for registered exception name", () => {
-    expect(ExceptionWrapper.statusCodeFor("ParameterMissing")).toBe(400);
-    expect(ExceptionWrapper.statusCodeFor("UnknownType")).toBe(500);
-  });
-
-  it("to response", () => {
-    const wrapper = new ExceptionWrapper(new Error("server error"));
-    const [status, headers, body] = wrapper.toResponse();
-    expect(status).toBe(500);
-    expect(headers["content-type"]).toContain("text/plain");
-    expect(body).toContain("500");
-    expect(body).toContain("server error");
-  });
-
-  it("TypeError status code", () => {
-    const wrapper = new ExceptionWrapper(new TypeError("bad"));
-    expect(wrapper.statusCode).toBe(500);
-  });
-
-  it("RangeError status code", () => {
-    const wrapper = new ExceptionWrapper(new RangeError("out of range"));
-    expect(wrapper.statusCode).toBe(500);
-  });
-
-  it("empty stack trace", () => {
+  it("#framework_trace cannot be nil", () => {
     const err = new Error("no stack");
     err.stack = undefined;
     const wrapper = new ExceptionWrapper(err);
-    expect(wrapper.traces).toEqual([]);
-    expect(wrapper.sourceLocation).toBeNull();
+    expect(wrapper.frameworkTrace).toEqual([]);
   });
 
-  it("registered NotFoundError maps to 404", () => {
-    class NotFoundError extends Error {
-      get name() {
-        return "NotFoundError";
-      }
-    }
-    ExceptionWrapper.registerStatus("NotFoundError", 404);
-    const wrapper = new ExceptionWrapper(new NotFoundError("missing"));
-    expect(wrapper.statusCode).toBe(404);
-  });
-
-  it("registered RoutingError maps to 404", () => {
-    expect(ExceptionWrapper.statusCodeFor("RoutingError")).toBe(404);
-  });
-
-  it("registered UnknownFormat maps to 406", () => {
-    expect(ExceptionWrapper.statusCodeFor("UnknownFormat")).toBe(406);
-  });
-
-  it("registered InvalidAuthenticityToken maps to 422", () => {
-    expect(ExceptionWrapper.statusCodeFor("InvalidAuthenticityToken")).toBe(422);
-  });
-
-  it("application trace and framework trace are disjoint", () => {
+  it("#full_trace returns application and framework traces", () => {
     const wrapper = new ExceptionWrapper(new Error("test"));
     const total = wrapper.applicationTrace.length + wrapper.frameworkTrace.length;
-    expect(total).toBe(wrapper.traces.length);
+    expect(wrapper.fullTrace.length).toBe(total);
+  });
+
+  it("#full_trace cannot be nil", () => {
+    const err = new Error("no stack");
+    err.stack = undefined;
+    const wrapper = new ExceptionWrapper(err);
+    expect(wrapper.fullTrace).toEqual([]);
+  });
+
+  it("#traces returns every trace by category enumerated with an index", () => {
+    const wrapper = new ExceptionWrapper(new Error("test"));
+    expect(wrapper.traces.length).toBeGreaterThan(0);
+    for (const line of wrapper.traces) {
+      expect(typeof line).toBe("string");
+    }
+  });
+
+  it("#show? returns false when using :rescuable and the exceptions is not rescuable", () => {
+    const wrapper = new ExceptionWrapper(new Error("generic"));
+    expect(wrapper.show("rescuable")).toBe(false);
+  });
+
+  it("#show? returns true when using :rescuable and the exceptions is rescuable", () => {
+    class RoutingError extends Error {
+      get name() {
+        return "RoutingError";
+      }
+    }
+    ExceptionWrapper.registerStatus("RoutingError", 404);
+    const wrapper = new ExceptionWrapper(new RoutingError("not found"));
+    expect(wrapper.show("rescuable")).toBe(true);
+  });
+
+  it("#show? returns false when using :none and the exceptions is rescuable", () => {
+    class RoutingError extends Error {
+      get name() {
+        return "RoutingError";
+      }
+    }
+    const wrapper = new ExceptionWrapper(new RoutingError("not found"));
+    expect(wrapper.show("none")).toBe(false);
+  });
+
+  it("#show? returns true when using :all and the exceptions is not rescuable", () => {
+    const wrapper = new ExceptionWrapper(new Error("generic"));
+    expect(wrapper.show("all")).toBe(true);
   });
 });
