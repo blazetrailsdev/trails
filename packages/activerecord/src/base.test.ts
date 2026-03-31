@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, RecordNotFound } from "./index.js";
+import { Base, RecordNotFound, AttributeAssignmentError } from "./index.js";
 import { SubclassNotFound, NameError } from "./errors.js";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -2666,6 +2666,19 @@ describe("BasicsTest", () => {
       // Not saved yet — DB still has old value
       const found = await Post.find(p.id);
       expect(found.title).toBe("Old");
+    });
+
+    it("assignAttributes wraps write errors in AttributeAssignmentError", async () => {
+      const p = await Post.create({ title: "Test", body: "Content" });
+      p.freeze();
+      expect(() => p.assignAttributes({ title: "New" })).toThrow(AttributeAssignmentError);
+      try {
+        p.assignAttributes({ title: "New" });
+      } catch (e) {
+        expect(e).toBeInstanceOf(AttributeAssignmentError);
+        expect((e as AttributeAssignmentError).attribute).toBe("title");
+        expect((e as AttributeAssignmentError).exception).toBeInstanceOf(Error);
+      }
     });
   });
 

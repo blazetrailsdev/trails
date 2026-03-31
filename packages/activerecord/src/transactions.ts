@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 
-import { Rollback } from "./errors.js";
+import { Rollback, TransactionIsolationError } from "./errors.js";
 export { Rollback };
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
 
@@ -24,8 +24,22 @@ let _savepointCounter = 0;
 export async function transaction<T>(
   modelClass: typeof Base,
   fn: (tx: Transaction) => Promise<T>,
+  options?: { isolation?: string },
 ): Promise<T | undefined> {
   const adapter = modelClass.adapter;
+
+  if (options?.isolation) {
+    const previousTx = _currentTransaction;
+    if (previousTx !== null) {
+      throw new TransactionIsolationError(
+        "Setting transaction isolation level is not supported inside a nested transaction",
+      );
+    }
+    throw new TransactionIsolationError(
+      `Transaction isolation level '${options.isolation}' is not yet supported`,
+    );
+  }
+
   const tx = new Transaction(adapter);
   const previousTx = _currentTransaction;
   _currentTransaction = tx;

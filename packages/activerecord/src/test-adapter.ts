@@ -98,6 +98,7 @@ function registerModel(modelClass: any): void {
  */
 function extractColumnsFromModels(): void {
   for (const modelClass of _registeredModelClasses) {
+    if (modelClass.abstractClass) continue;
     const tableName: string = modelClass.tableName;
     if (!tableName) continue;
 

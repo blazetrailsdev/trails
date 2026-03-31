@@ -5,6 +5,7 @@
  */
 
 import { quote } from "./connection-adapters/abstract/quoting.js";
+import { PreparedStatementInvalid } from "./errors.js";
 
 /**
  * Sanitize a SQL template with bind parameters.
@@ -13,6 +14,12 @@ import { quote } from "./connection-adapters/abstract/quoting.js";
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_array
  */
 export function sanitizeSqlArray(template: string, ...binds: unknown[]): string {
+  const placeholderCount = (template.match(/\?/g) ?? []).length;
+  if (placeholderCount !== binds.length) {
+    throw new PreparedStatementInvalid(
+      `wrong number of bind variables (${binds.length} for ${placeholderCount}) in: ${template}`,
+    );
+  }
   let result = template;
   for (const bind of binds) {
     const quoted = quote(bind);

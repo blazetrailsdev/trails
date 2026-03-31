@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, serialize } from "./index.js";
+import { Base, serialize, SerializationTypeMismatch } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -225,10 +225,27 @@ describe("SerializedAttributeTest", () => {
   });
 
   it.skip("serialized attribute should raise exception on assignment with wrong type", () => {
-    /* needs type constraint checking */
+    /* needs write-time type validation in serialize (assert_valid_value on dump) */
   });
-  it.skip("should raise exception on serialized attribute with type mismatch", () => {
-    /* needs type constraint checking */
+  it("should raise exception on serialized attribute with type mismatch", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.adapter = adapter;
+      }
+    }
+    serialize(Topic, "content", { coder: "json" });
+    const topic = await Topic.create({
+      title: "test",
+      content: JSON.stringify({ zomg: true }) as any,
+    });
+
+    // Re-declare with Array type — reading back the Hash should throw
+    serialize(Topic, "content", { coder: "array" });
+    const found = await Topic.find(topic.id);
+    expect(() => found.content).toThrow(SerializationTypeMismatch);
   });
   it.skip("serialized attribute with class constraint", () => {
     /* needs class-based serialization */
@@ -313,8 +330,23 @@ describe("SerializedAttributeTest", () => {
     expect(p.data).toEqual({});
   });
 
-  it.skip("unexpected serialized type", () => {
-    /* needs type checking */
+  it("unexpected serialized type", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("content", "string");
+        this.adapter = adapter;
+      }
+    }
+    serialize(Topic, "content", { coder: "hash" });
+    await Topic.create({ title: "test", content: JSON.stringify({ zomg: true }) as any });
+
+    // Switch expected type to Array
+    serialize(Topic, "content", { coder: "array" });
+
+    const topic = (await Topic.all().toArray())[0];
+    const error = expect(() => topic.content).toThrow(SerializationTypeMismatch);
   });
 
   it("serialized column should unserialize after update column", async () => {

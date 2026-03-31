@@ -1,7 +1,7 @@
 import { Table, SelectManager, Nodes, Visitors } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
-import { RecordNotFound } from "./errors.js";
+import { RecordNotFound, IrreversibleOrderError } from "./errors.js";
 import { modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
@@ -692,6 +692,12 @@ export class Relation<T extends Base> {
           const col = match[1];
           const dir = match[2].toUpperCase() === "ASC" ? "desc" : "asc";
           return [col, dir] as [string, "asc" | "desc"];
+        }
+        // Complex expressions (functions, CASE, subqueries) can't be reversed
+        if (/[(),]/.test(clause) || /\bCASE\b/i.test(clause)) {
+          throw new IrreversibleOrderError(
+            `Relation has a non-reversible order and cannot be reversed: ${clause}`,
+          );
         }
         return [clause, "desc" as const];
       }

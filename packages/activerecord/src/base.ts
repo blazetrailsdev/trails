@@ -24,8 +24,10 @@ import {
   AdapterNotFound,
   AdapterNotSpecified,
   ConnectionNotEstablished,
+  ConnectionNotDefined,
   ConfigurationError,
   DangerousAttributeError,
+  AttributeAssignmentError,
 } from "./errors.js";
 import { encrypts as _encrypts, getEncryptor } from "./encryption.js";
 import { Association as AssociationInstance } from "./associations/association.js";
@@ -458,9 +460,10 @@ export class Base extends Model {
       return Base._adapter;
     }
 
-    throw new ConnectionNotEstablished(
-      `No database configuration found for ${this.name}. ` +
+    throw new ConnectionNotDefined(
+      `No connection pool for '${this.name}' found. ` +
         `Call await ${this.name}.establishConnection() or set ${this.name}.adapter directly`,
+      { connectionName: this.name },
     );
   }
 
@@ -3090,7 +3093,21 @@ export class Base extends Model {
    */
   assignAttributes(attrs: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(attrs)) {
-      this.writeAttribute(key, value);
+      try {
+        this.writeAttribute(key, value);
+      } catch (e) {
+        let repr: string;
+        try {
+          repr = JSON.stringify(value);
+        } catch {
+          repr = String(value);
+        }
+        throw new AttributeAssignmentError(
+          `error on assignment ${repr} to ${key} (${e instanceof Error ? e.message : String(e)})`,
+          e instanceof Error ? e : undefined,
+          key,
+        );
+      }
     }
   }
 

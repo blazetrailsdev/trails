@@ -298,4 +298,13 @@ describe("sanitizeSql", () => {
       "name = 'Alice' AND age > 30",
     );
   });
+
+  it("sanitize sql array raises on placeholder bind mismatch", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    expect(() => Post.sanitizeSqlArray("title = ? AND body = ?", "hello")).toThrow(
+      /wrong number of bind variables \(1 for 2\)/,
+    );
+  });
 });

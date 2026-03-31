@@ -12,6 +12,20 @@ export class SubclassNotFound extends ActiveRecordError {
   }
 }
 
+export class AssociationTypeMismatch extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "AssociationTypeMismatch";
+  }
+}
+
+export class SerializationTypeMismatch extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "SerializationTypeMismatch";
+  }
+}
+
 export class AdapterNotSpecified extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
@@ -62,6 +76,51 @@ export class ConnectionTimeoutError extends ConnectionNotEstablished {
   constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
     super(message, options);
     this.name = "ConnectionTimeoutError";
+  }
+}
+
+export class ConnectionNotDefined extends ConnectionNotEstablished {
+  readonly connectionName?: string;
+  readonly role?: string;
+  readonly shard?: string;
+
+  constructor(
+    message?: string,
+    options?: {
+      connectionName?: string;
+      role?: string;
+      shard?: string;
+      connectionPool?: unknown;
+      cause?: unknown;
+    },
+  ) {
+    super(message, {
+      connectionPool: options?.connectionPool,
+      cause: options?.cause,
+    });
+    this.name = "ConnectionNotDefined";
+    this.connectionName = options?.connectionName;
+    this.role = options?.role;
+    this.shard = options?.shard;
+  }
+}
+
+export class DatabaseConnectionError extends ConnectionNotEstablished {
+  constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
+    super(message ?? "Database connection error", options);
+    this.name = "DatabaseConnectionError";
+  }
+
+  static hostnameError(hostname: string): DatabaseConnectionError {
+    return new DatabaseConnectionError(
+      `There is an issue connecting with your hostname: ${hostname}.\n\nPlease check your database configuration and ensure there is a valid connection to your database.`,
+    );
+  }
+
+  static usernameError(username: string): DatabaseConnectionError {
+    return new DatabaseConnectionError(
+      `There is an issue connecting to your database with your username/password, username: ${username}.\n\nPlease check your database configuration to ensure the username/password are valid.`,
+    );
   }
 }
 
@@ -197,6 +256,39 @@ export class NotNullViolation extends StatementInvalid {
   }
 }
 
+export class ValueTooLong extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "ValueTooLong";
+  }
+}
+
+export class PreparedStatementInvalid extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "PreparedStatementInvalid";
+  }
+}
+
+export class NoDatabaseError extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message ?? "Database not found", options);
+    this.name = "NoDatabaseError";
+  }
+
+  static dbError(dbName: string): NoDatabaseError {
+    return new NoDatabaseError(
+      `We could not find your database: ${dbName}. Available database configurations can be found in config/database.yml.`,
+    );
+  }
+}
+
 export class StaleObjectError extends ActiveRecordError {
   readonly record?: any;
   readonly attemptedAction?: string;
@@ -253,6 +345,146 @@ export class DangerousAttributeError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "DangerousAttributeError";
+  }
+}
+
+export class AttributeAssignmentError extends ActiveRecordError {
+  readonly exception?: Error;
+  readonly attribute?: string;
+
+  constructor(message?: string, exception?: Error, attribute?: string) {
+    super(message, exception ? { cause: exception } : undefined);
+    this.name = "AttributeAssignmentError";
+    this.exception = exception;
+    this.attribute = attribute;
+  }
+}
+
+export class UnknownPrimaryKey extends ActiveRecordError {
+  readonly model?: any;
+
+  constructor(model?: any, description?: string) {
+    if (model) {
+      const modelName =
+        typeof model === "function"
+          ? model.name || "UnknownModel"
+          : model.constructor?.name || "UnknownModel";
+      const tableName =
+        typeof model === "function"
+          ? ((model as any).tableName ?? "unknown_table")
+          : (model.constructor?.tableName ?? "unknown_table");
+      let message = `Unknown primary key for table ${tableName} in model ${modelName}.`;
+      if (description) message += `\n${description}`;
+      super(message);
+    } else {
+      super("Unknown primary key.");
+    }
+    this.name = "UnknownPrimaryKey";
+    this.model = model;
+  }
+}
+
+export class TransactionIsolationError extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "TransactionIsolationError";
+  }
+}
+
+export class TransactionRollbackError extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "TransactionRollbackError";
+  }
+}
+
+export class SerializationFailure extends TransactionRollbackError {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "SerializationFailure";
+  }
+}
+
+export class Deadlocked extends TransactionRollbackError {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "Deadlocked";
+  }
+}
+
+export class IrreversibleOrderError extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "IrreversibleOrderError";
+  }
+}
+
+export class QueryAborted extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "QueryAborted";
+  }
+}
+
+export class LockWaitTimeout extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "LockWaitTimeout";
+  }
+}
+
+export class StatementTimeout extends QueryAborted {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "StatementTimeout";
+  }
+}
+
+export class QueryCanceled extends QueryAborted {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "QueryCanceled";
+  }
+}
+
+export class AdapterTimeout extends QueryAborted {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "AdapterTimeout";
+  }
+}
+
+export class ConnectionFailed extends QueryAborted {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "ConnectionFailed";
   }
 }
 

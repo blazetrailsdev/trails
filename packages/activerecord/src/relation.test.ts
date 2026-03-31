@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, Relation } from "./index.js";
+import { Base, Relation, IrreversibleOrderError } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -699,5 +699,15 @@ describe("RelationTest", () => {
       }
     }
     expect(Post.all()).toBeInstanceOf(Relation);
+  });
+
+  it("reverse order raises on complex expressions", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(() => Post.order("LOWER(title) ASC").reverseOrder()).toThrow(IrreversibleOrderError);
   });
 });

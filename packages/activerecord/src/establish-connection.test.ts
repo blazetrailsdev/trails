@@ -252,6 +252,6 @@ describe("Base.adapter without establishConnection", () => {
 
   it("throws when no connection is established", () => {
     delete process.env.DATABASE_URL;
-    expect(() => Base.adapter).toThrow(/No database configuration found/);
+    expect(() => Base.adapter).toThrow(/No connection pool for/);
   });
 });
