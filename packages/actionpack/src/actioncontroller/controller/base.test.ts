@@ -575,3 +575,82 @@ describe("DoubleRenderError", () => {
     expect(err.message).toBe("custom");
   });
 });
+
+// ==========================================================================
+// controller/base_test.rb — ControllerClassTests
+// ==========================================================================
+describe("ControllerClassTests", () => {
+  it("controller path", () => {
+    class EmptyController extends Base {}
+    expect(EmptyController.controllerPath()).toBe("empty");
+    expect(new EmptyController().controllerPath()).toBe("empty");
+
+    class SuperAdminController extends Base {}
+    expect(SuperAdminController.controllerPath()).toBe("super_admin");
+  });
+
+  it("controller name", () => {
+    class EmptyController extends Base {}
+    expect(EmptyController.controllerName()).toBe("empty");
+    expect(new EmptyController().controllerName()).toBe("empty");
+
+    class SuperAdminController extends Base {}
+    expect(SuperAdminController.controllerName()).toBe("super_admin");
+    expect(new SuperAdminController().controllerName()).toBe("super_admin");
+  });
+});
+
+// ==========================================================================
+// controller/base_test.rb — ControllerInstanceTests
+// ==========================================================================
+describe("ControllerInstanceTests", () => {
+  it("performed?", async () => {
+    class EmptyController extends Base {
+      async index() {
+        this.render({ plain: "done" });
+      }
+    }
+    const c = new EmptyController();
+    expect(c.performed).toBe(false);
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.performed).toBe(true);
+  });
+
+  it("empty controller action methods", () => {
+    class EmptyController extends Base {}
+    const baseMethods = new Set(Base.actionMethods());
+    const emptyMethods = new Set(EmptyController.actionMethods());
+    const customMethods = [...emptyMethods].filter((m) => !baseMethods.has(m));
+    expect(customMethods).toEqual([]);
+  });
+
+  it("inspect", () => {
+    class EmptyController extends Base {}
+    const c = new EmptyController();
+    expect(c.inspect()).toMatch(/^#<EmptyController>$/);
+  });
+});
+
+// ==========================================================================
+// controller/base_test.rb — PerformActionTest
+// ==========================================================================
+describe("PerformActionTest", () => {
+  it("process should be precise", async () => {
+    class EmptyController extends Base {}
+    const c = new EmptyController();
+    await expect(c.dispatch("non_existent", makeRequest(), makeResponse())).rejects.toThrow(
+      /could not be found for EmptyController/,
+    );
+  });
+
+  it("action missing should work", async () => {
+    class ActionMissingController extends Base {
+      async actionMissing(action: string) {
+        this.render({ plain: `Response for ${action}` });
+      }
+    }
+    const c = new ActionMissingController();
+    await c.dispatch("arbitrary_action", makeRequest(), makeResponse());
+    expect(c.body).toBe("Response for arbitrary_action");
+  });
+});

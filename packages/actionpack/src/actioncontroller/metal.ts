@@ -11,6 +11,7 @@ import { Response } from "../actiondispatch/response.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
+import { underscore } from "@blazetrails/activesupport";
 import {
   MiddlewareStack as DispatchMiddlewareStack,
   type MiddlewareEntry,
@@ -57,6 +58,28 @@ export class Metal extends AbstractController {
   request!: Request;
   response!: Response;
   params: Parameters = new Parameters({});
+
+  static controllerPath(): string {
+    return underscore(this.name.replace(/Controller$/, ""));
+  }
+
+  static controllerName(): string {
+    const path = this.controllerPath();
+    const lastSlash = path.lastIndexOf("/");
+    return lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
+  }
+
+  controllerPath(): string {
+    return (this.constructor as typeof Metal).controllerPath();
+  }
+
+  controllerName(): string {
+    return (this.constructor as typeof Metal).controllerName();
+  }
+
+  inspect(): string {
+    return `#<${this.constructor.name}>`;
+  }
 
   private _status: number = 200;
   private _headers: Record<string, string> = {};

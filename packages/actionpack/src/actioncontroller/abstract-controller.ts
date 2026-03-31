@@ -46,30 +46,71 @@ export class AbstractController {
     options: CallbackOptions;
   }> = [];
 
-  /** Available actions. Override in subclasses. */
+  private static readonly _internalMethods: ReadonlySet<string> = new Set([
+    "constructor",
+    "processAction",
+    "availableActions",
+    "actionMissing",
+    "dispatch",
+    "head",
+    "setHeader",
+    "getHeader",
+    "toRackResponse",
+    "render",
+    "renderAsync",
+    "renderToString",
+    "redirectTo",
+    "redirectBack",
+    "respondTo",
+    "freshWhen",
+    "stale",
+    "expiresIn",
+    "expiresNow",
+    "sendFile",
+    "sendData",
+    "verifyAuthenticityToken",
+    "formAuthenticityToken",
+    "markPerformed",
+    "inspect",
+    "controllerPath",
+    "controllerName",
+  ]);
+
+  private static _actionMethodCache?: Set<string>;
+
+  /** Returns the set of public action methods defined on this controller. */
   static actionMethods(): string[] {
-    const proto = this.prototype;
-    const methods: string[] = [];
-    const excluded = new Set(["constructor", "processAction", "availableActions"]);
-    let current = proto;
-    while (current && current !== Object.prototype) {
-      for (const name of Object.getOwnPropertyNames(current)) {
-        if (
-          typeof (current as any)[name] === "function" &&
-          !name.startsWith("_") &&
-          !excluded.has(name)
-        ) {
-          methods.push(name);
+    if (
+      !Object.prototype.hasOwnProperty.call(this, "_actionMethodCache") ||
+      !this._actionMethodCache
+    ) {
+      const internal = AbstractController._internalMethods;
+      const methods: string[] = [];
+      let current: object | null = this.prototype;
+      while (current && current !== AbstractController.prototype && current !== Object.prototype) {
+        for (const name of Object.getOwnPropertyNames(current)) {
+          if (name.startsWith("_") || internal.has(name)) continue;
+          const descriptor = Object.getOwnPropertyDescriptor(current, name);
+          if (descriptor && typeof descriptor.value === "function") {
+            methods.push(name);
+          }
         }
+        current = Object.getPrototypeOf(current);
       }
-      current = Object.getPrototypeOf(current);
+      this._actionMethodCache = new Set(methods);
     }
-    return [...new Set(methods)];
+    return [...this._actionMethodCache];
   }
 
   /** Check if an action exists. */
   static hasAction(action: string): boolean {
-    return this.actionMethods().includes(action);
+    if (
+      !Object.prototype.hasOwnProperty.call(this, "_actionMethodCache") ||
+      !this._actionMethodCache
+    ) {
+      this.actionMethods();
+    }
+    return this._actionMethodCache!.has(action);
   }
 
   /** Register a before_action callback. */
@@ -169,10 +210,14 @@ export class AbstractController {
 
       if (this._performed) return;
 
-      // Execute the action
-      const method = (this as any)[action];
-      if (typeof method === "function") {
-        await method.call(this);
+      // Execute the action (only if it's a recognized action method)
+      if (Constructor.hasAction(action)) {
+        const method = (this as any)[action];
+        if (typeof method === "function") {
+          await method.call(this);
+        }
+      } else if (typeof (this as any).actionMissing === "function") {
+        await (this as any).actionMissing(action);
       } else {
         throw new ActionNotFound(
           `The action '${action}' could not be found for ${this.constructor.name}`,

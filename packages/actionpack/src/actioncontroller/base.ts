@@ -142,7 +142,7 @@ export class Base extends Metal {
       );
     }
 
-    const controllerName = this._controllerName();
+    const controllerPrefix = this.controllerPath();
     const format = this.request?.format ?? "html";
     const routeHelpers = (this.constructor as typeof Base).routeHelpers ?? {};
     const locals = { ...routeHelpers, ...options.locals };
@@ -158,28 +158,23 @@ export class Base extends Metal {
         // Render collection with partial
         this.body = await ctx.renderCollection(
           options.partial,
-          controllerName,
+          controllerPrefix,
           format,
           options.collection,
           options.as,
         );
       } else {
-        this.body = await ctx.renderPartial(options.partial, controllerName, format, locals);
+        this.body = await ctx.renderPartial(options.partial, controllerPrefix, format, locals);
       }
     } else {
       const action = options.action ?? this.actionName;
-      this.body = await ctx.render(controllerName, action, format, locals, {
+      this.body = await ctx.render(controllerPrefix, action, format, locals, {
         layout: layout === false ? false : layout || undefined,
       });
     }
 
     this.contentType = options.contentType ?? "text/html; charset=utf-8";
     this.markPerformed();
-  }
-
-  /** Derive controller name from class name. */
-  private _controllerName(): string {
-    return this.constructor.name.replace(/Controller$/, "").toLowerCase();
   }
 
   /** Render to string without committing the response. */
@@ -441,9 +436,9 @@ export class Base extends Metal {
     const resolver = (this.constructor as typeof Base).templateResolver;
     if (!resolver) return;
 
-    const controllerName = this.constructor.name.replace(/Controller$/, "").toLowerCase();
+    const controllerPrefix = this.controllerPath();
     const format = this.request?.format ?? "html";
-    const template = resolver(controllerName, action, format);
+    const template = resolver(controllerPrefix, action, format);
     if (template) {
       this.contentType = "text/html; charset=utf-8";
       this.body = template;
