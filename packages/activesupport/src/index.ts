@@ -109,6 +109,10 @@ export {
   cattrAccessor,
   configAccessor,
   attrInternal,
+  attrInternalReader,
+  attrInternalWriter,
+  getAttrInternalNamingFormat,
+  setAttrInternalNamingFormat,
   isAnonymous,
   moduleParentName,
   suppress,
@@ -247,6 +251,9 @@ export {
 } from "./core-ext/object/duplicable.js";
 export { CurrentAttributes } from "./current-attributes.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
+export { EnvironmentInquirer } from "./environment-inquirer.js";
+export { ExecutionContext } from "./execution-context.js";
+export { objectWith } from "./core-ext/object/with.js";
 export { ArrayInquirer, arrayInquiry } from "./array-inquirer.js";
 export { tryCall, tryWith, tryBang } from "./try.js";
 export { OrderedOptions, InheritableOptions } from "./ordered-options.js";

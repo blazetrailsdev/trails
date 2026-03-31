@@ -20,6 +20,8 @@ export class Inflections {
   humans: HumanRule[] = [];
   acronyms: Map<string, string> = new Map();
   acronymRegex: RegExp = /(?=a)b/; // matches nothing by default
+  acronymsCamelizeRegex: RegExp = /^\w/;
+  acronymsUnderscoreRegex: RegExp = /(?=a)b/;
 
   private static instances: Map<string, Inflections> = new Map();
 
@@ -84,8 +86,26 @@ export class Inflections {
 
   acronym(word: string): void {
     this.acronyms.set(word.toLowerCase(), word);
-    const acronymValues = Array.from(this.acronyms.values()).join("|");
-    this.acronymRegex = new RegExp(acronymValues);
+    this.defineAcronymRegexPatterns();
+  }
+
+  private defineAcronymRegexPatterns(): void {
+    if (this.acronyms.size === 0) {
+      this.acronymRegex = /(?=a)b/;
+      this.acronymsCamelizeRegex = /^\w/;
+      this.acronymsUnderscoreRegex = /(?=a)b/;
+    } else {
+      const escaped = Array.from(this.acronyms.values())
+        .sort((a, b) => b.length - a.length)
+        .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      const acronymValues = escaped.join("|");
+      this.acronymRegex = new RegExp(acronymValues);
+      this.acronymsCamelizeRegex = new RegExp(`^(?:${acronymValues}(?=\\b|[A-Z_])|\\w)`);
+      this.acronymsUnderscoreRegex = new RegExp(
+        `(?:(?<=([A-Za-z\\d]))|\\b)(${acronymValues})(?=\\b|[^a-z])`,
+        "g",
+      );
+    }
   }
 
   human(rule: RegExp | string, replacement: string): void {
@@ -101,7 +121,7 @@ export class Inflections {
       this.uncountables = new Set();
       this.humans = [];
       this.acronyms = new Map();
-      this.acronymRegex = /(?=a)b/;
+      this.defineAcronymRegexPatterns();
     } else if (scope === "plurals") {
       this.plurals = [];
     } else if (scope === "singulars") {
@@ -112,7 +132,7 @@ export class Inflections {
       this.humans = [];
     } else if (scope === "acronyms") {
       this.acronyms = new Map();
-      this.acronymRegex = /(?=a)b/;
+      this.defineAcronymRegexPatterns();
     }
   }
 }

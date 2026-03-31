@@ -186,6 +186,26 @@ describe("CurrentAttributesTest", () => {
     expect(inst.attributes).toHaveProperty("user", "david");
   });
 
-  it.skip("CurrentAttributes restricted attribute names");
-  it.skip("method_added hook doesn't reach the instance. Fix for #54646");
+  it("CurrentAttributes restricted attribute names", () => {
+    expect(() => {
+      class InvalidAttributeNames extends CurrentAttributes {
+        static {
+          this.attribute("reset", "foo", "set");
+        }
+      }
+      void InvalidAttributeNames;
+    }).toThrow(/Restricted attribute names: reset, set/);
+  });
+
+  it("method_added hook doesn't reach the instance. Fix for #54646", () => {
+    class MyCurrent extends CurrentAttributes {
+      static {
+        this.attribute("bar", { default: () => ({}) });
+      }
+      declare bar: Record<string, unknown>;
+      foo() {}
+    }
+    MyCurrent.reset();
+    expect(MyCurrent.instance().bar).toBeInstanceOf(Object);
+  });
 });

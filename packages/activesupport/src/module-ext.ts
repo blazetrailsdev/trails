@@ -177,13 +177,77 @@ export function configAccessor(target: any, ...namesAndOptions: (string | MattrO
   mattrAccessor(target, ...namesAndOptions);
 }
 
+let _attrInternalNamingFormat = "_%s_";
+
+export function getAttrInternalNamingFormat(): string {
+  return _attrInternalNamingFormat;
+}
+
+export function setAttrInternalNamingFormat(format: string): void {
+  if (format.startsWith("@")) {
+    throw new Error("invalid attribute storage format");
+  }
+  const count = (format.match(/%s/g) || []).length;
+  if (count !== 1) {
+    throw new Error("naming format must contain exactly one %s placeholder");
+  }
+  _attrInternalNamingFormat = format;
+}
+
+function internalStorageKey(name: string): string {
+  return _attrInternalNamingFormat.replace("%s", name);
+}
+
+/**
+ * attrInternalReader — defines a reader for an attribute stored in a prefixed key.
+ */
+export function attrInternalReader(target: object, ...names: string[]): void {
+  for (const name of names) {
+    assertValidAttrName(name);
+    const storageKey = internalStorageKey(name);
+    Object.defineProperty(target, name, {
+      configurable: true,
+      enumerable: false,
+      get(this: Record<string, unknown>) {
+        return this[storageKey];
+      },
+    });
+  }
+}
+
+/**
+ * attrInternalWriter — defines a writer for an attribute stored in a prefixed key.
+ */
+export function attrInternalWriter(target: object, ...names: string[]): void {
+  for (const name of names) {
+    assertValidAttrName(name);
+    const storageKey = internalStorageKey(name);
+    Object.defineProperty(target, name, {
+      configurable: true,
+      enumerable: false,
+      set(this: Record<string, unknown>, value: unknown) {
+        this[storageKey] = value;
+      },
+    });
+
+    Object.defineProperty(target, `${name}=`, {
+      configurable: true,
+      enumerable: false,
+      value(this: Record<string, unknown>, value: unknown) {
+        this[storageKey] = value;
+      },
+    });
+  }
+}
+
 /**
  * attrInternal — defines instance-level attribute with underscore-prefixed storage.
  * Mirrors Rails Module#attr_internal_accessor.
  */
 export function attrInternal(target: object, ...names: string[]): void {
   for (const name of names) {
-    const storageKey = `_${name}_`;
+    assertValidAttrName(name);
+    const storageKey = internalStorageKey(name);
     Object.defineProperty(target, name, {
       configurable: true,
       enumerable: false,

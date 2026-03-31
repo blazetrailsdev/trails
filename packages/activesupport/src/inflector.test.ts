@@ -16,6 +16,7 @@ import {
   ordinal,
   ordinalize,
 } from "./index.js";
+import { Inflections } from "./inflector/inflections.js";
 
 // Rails inflector_test_cases.rb — SingularToPlural
 const SingularToPlural: Record<string, string> = {
@@ -93,6 +94,30 @@ const SingularToPlural: Record<string, string> = {
   taxi: "taxis",
 };
 
+function withInflections(fn: (inflect: Inflections) => void): void {
+  const inflect = Inflections.instance("en");
+  const savedPlurals = [...inflect.plurals];
+  const savedSingulars = [...inflect.singulars];
+  const savedUncountables = new Set(inflect.uncountables);
+  const savedHumans = [...inflect.humans];
+  const savedAcronyms = new Map(inflect.acronyms);
+  const savedAcronymRegex = inflect.acronymRegex;
+  const savedAcronymsCamelizeRegex = inflect.acronymsCamelizeRegex;
+  const savedAcronymsUnderscoreRegex = inflect.acronymsUnderscoreRegex;
+  try {
+    fn(inflect);
+  } finally {
+    inflect.plurals = savedPlurals;
+    inflect.singulars = savedSingulars;
+    inflect.uncountables = savedUncountables;
+    inflect.humans = savedHumans;
+    inflect.acronyms = savedAcronyms;
+    inflect.acronymRegex = savedAcronymRegex;
+    inflect.acronymsCamelizeRegex = savedAcronymsCamelizeRegex;
+    inflect.acronymsUnderscoreRegex = savedAcronymsUnderscoreRegex;
+  }
+}
+
 describe("InflectorTest", () => {
   it("pluralize plurals", () => {
     expect(pluralize("plurals")).toBe("plurals");
@@ -104,16 +129,36 @@ describe("InflectorTest", () => {
 
   it.skip("pluralize with fallback");
 
-  it.skip("uncountability of ascii word");
+  it("uncountability of ascii word", () => {
+    withInflections((inflect) => {
+      inflect.uncountable("HTTP");
+      expect(pluralize("HTTP")).toBe("HTTP");
+      expect(singularize("HTTP")).toBe("HTTP");
+      expect(pluralize("HTTP")).toBe(singularize("HTTP"));
+    });
+  });
 
-  it.skip("uncountability of non-ascii word");
+  it("uncountability of non-ascii word", () => {
+    withInflections((inflect) => {
+      inflect.uncountable("猫");
+      expect(pluralize("猫")).toBe("猫");
+      expect(singularize("猫")).toBe("猫");
+      expect(pluralize("猫")).toBe(singularize("猫"));
+    });
+  });
 
   it("uncountable word is not greedy", () => {
     expect(singularize("sponsor")).toBe("sponsor");
     expect(pluralize("sponsor")).toBe("sponsors");
   });
 
-  it.skip("overwrite previous inflectors");
+  it("overwrite previous inflectors", () => {
+    withInflections((inflect) => {
+      expect(singularize("series")).toBe("series");
+      inflect.singular("series", "serie");
+      expect(singularize("series")).toBe("serie");
+    });
+  });
 
   it("camelize", () => {
     expect(camelize("product")).toBe("Product");
@@ -157,13 +202,87 @@ describe("InflectorTest", () => {
     expect(camelize("Camel_Case")).toBe("CamelCase");
   });
 
-  it.skip("acronyms");
+  it("acronyms", () => {
+    withInflections((inflect) => {
+      inflect.acronym("API");
+      inflect.acronym("HTML");
+      inflect.acronym("HTTP");
+      inflect.acronym("RESTful");
+      inflect.acronym("W3C");
+      inflect.acronym("PhD");
+      inflect.acronym("RoR");
+      inflect.acronym("SSL");
 
-  it.skip("acronym override");
+      const cases: [string, string, string, string][] = [
+        ["API", "api", "API", "API"],
+        ["APIController", "api_controller", "API controller", "API Controller"],
+        ["Nokogiri::HTML", "nokogiri/html", "Nokogiri/HTML", "Nokogiri/HTML"],
+        ["HTTPAPI", "http_api", "HTTP API", "HTTP API"],
+        ["HTTP::Get", "http/get", "HTTP/get", "HTTP/Get"],
+        ["SSLError", "ssl_error", "SSL error", "SSL Error"],
+        ["RESTful", "restful", "RESTful", "RESTful"],
+        ["RESTfulController", "restful_controller", "RESTful controller", "RESTful Controller"],
+        ["Nested::RESTful", "nested/restful", "Nested/RESTful", "Nested/RESTful"],
+        ["IHeartW3C", "i_heart_w3c", "I heart W3C", "I Heart W3C"],
+        ["PhDRequired", "phd_required", "PhD required", "PhD Required"],
+        ["IRoRU", "i_ror_u", "I RoR u", "I RoR U"],
+        ["RESTfulHTTPAPI", "restful_http_api", "RESTful HTTP API", "RESTful HTTP API"],
+        ["HTTP::RESTful", "http/restful", "HTTP/RESTful", "HTTP/RESTful"],
+        ["HTTP::RESTfulAPI", "http/restful_api", "HTTP/RESTful API", "HTTP/RESTful API"],
+        ["APIRESTful", "api_restful", "API RESTful", "API RESTful"],
+        // misdirection
+        ["Capistrano", "capistrano", "Capistrano", "Capistrano"],
+        ["CapiController", "capi_controller", "Capi controller", "Capi Controller"],
+        ["HttpsApis", "https_apis", "Https apis", "Https Apis"],
+        ["Html5", "html5", "Html5", "Html5"],
+        ["Restfully", "restfully", "Restfully", "Restfully"],
+        ["RoRails", "ro_rails", "Ro rails", "Ro Rails"],
+      ];
 
-  it.skip("acronyms camelize lower");
+      for (const [camel, under, human, title] of cases) {
+        expect(camelize(under)).toBe(camel);
+        expect(camelize(camel)).toBe(camel);
+        expect(underscore(under)).toBe(under);
+        expect(underscore(camel)).toBe(under);
+        expect(titleize(under)).toBe(title);
+        expect(titleize(camel)).toBe(title);
+        expect(humanize(under)).toBe(human);
+      }
+    });
+  });
 
-  it.skip("underscore acronym sequence");
+  it("acronym override", () => {
+    withInflections((inflect) => {
+      inflect.acronym("API");
+      inflect.acronym("LegacyApi");
+
+      expect(camelize("legacyapi")).toBe("LegacyApi");
+      expect(camelize("legacy_api")).toBe("LegacyAPI");
+      expect(camelize("some_legacyapi")).toBe("SomeLegacyApi");
+      expect(camelize("nonlegacyapi")).toBe("Nonlegacyapi");
+    });
+  });
+
+  it("acronyms camelize lower", () => {
+    withInflections((inflect) => {
+      inflect.acronym("API");
+      inflect.acronym("HTML");
+
+      expect(camelize("html_api", false)).toBe("htmlAPI");
+      expect(camelize("htmlAPI", false)).toBe("htmlAPI");
+      expect(camelize("HTMLAPI", false)).toBe("htmlAPI");
+    });
+  });
+
+  it("underscore acronym sequence", () => {
+    withInflections((inflect) => {
+      inflect.acronym("API");
+      inflect.acronym("JSON");
+      inflect.acronym("HTML");
+
+      expect(underscore("JSONHTMLAPI")).toBe("json_html_api");
+    });
+  });
 
   it("underscore", () => {
     expect(underscore("HTMLTidy")).toBe("html_tidy");
@@ -285,11 +404,35 @@ describe("InflectorTest", () => {
     expect(humanize("author_id", { keepIdSuffix: true })).toBe("Author id");
   });
 
-  it.skip("humanize by rule");
+  it("humanize by rule", () => {
+    withInflections((inflect) => {
+      inflect.human(/_cnt$/i, "_count");
+      inflect.human(/^prefx_/i, "");
+      expect(humanize("jargon_cnt")).toBe("Jargon count");
+      expect(humanize("prefx_request")).toBe("Request");
+    });
+  });
 
-  it.skip("humanize by string");
+  it("humanize by string", () => {
+    withInflections((inflect) => {
+      inflect.human("col_rpted_bugs", "Reported bugs");
+      expect(humanize("col_rpted_bugs")).toBe("Reported bugs");
+      expect(humanize("COL_rpted_bugs")).toBe("Col rpted bugs");
+    });
+  });
 
-  it.skip("humanize with acronyms");
+  it("humanize with acronyms", () => {
+    withInflections((inflect) => {
+      inflect.acronym("LAX");
+      inflect.acronym("SFO");
+      expect(humanize("LAX ROUNDTRIP TO SFO")).toBe("LAX roundtrip to SFO");
+      expect(humanize("LAX ROUNDTRIP TO SFO", { capitalize: false })).toBe("LAX roundtrip to SFO");
+      expect(humanize("lax roundtrip to sfo")).toBe("LAX roundtrip to SFO");
+      expect(humanize("lax roundtrip to sfo", { capitalize: false })).toBe("LAX roundtrip to SFO");
+      expect(humanize("Lax Roundtrip To Sfo")).toBe("LAX roundtrip to SFO");
+      expect(humanize("Lax Roundtrip To Sfo", { capitalize: false })).toBe("LAX roundtrip to SFO");
+    });
+  });
 
   it.skip("constantize");
 
@@ -355,17 +498,74 @@ describe("InflectorTest", () => {
     expect(camelize("html_parser", false)).toBe("htmlParser");
   });
 
-  it.skip("clear acronyms resets to reusable state");
+  it("clear acronyms resets to reusable state", () => {
+    withInflections((inflect) => {
+      inflect.clear("acronyms");
+      expect(inflect.acronyms.size).toBe(0);
+
+      inflect.acronym("HTML");
+      expect(titleize("html")).toBe("HTML");
+    });
+  });
 
   it.skip("inflector locality");
 
-  it.skip("clear all");
+  it("clear all", () => {
+    withInflections((inflect) => {
+      inflect.plural(/(quiz)$/i, "$1zes");
+      inflect.singular(/(database)s$/i, "$1");
+      inflect.uncountable("series");
+      inflect.human("col_rpted_bugs", "Reported bugs");
+      inflect.acronym("HTML");
 
-  it.skip("clear with default");
+      inflect.clear("all");
 
-  it.skip("clear all resets camelize and underscore regexes");
+      expect(inflect.plurals).toEqual([]);
+      expect(inflect.singulars).toEqual([]);
+      expect(inflect.uncountables.size).toBe(0);
+      expect(inflect.humans).toEqual([]);
+      expect(inflect.acronyms.size).toBe(0);
+    });
+  });
 
-  it.skip("clear inflections with acronyms");
+  it("clear with default", () => {
+    withInflections((inflect) => {
+      inflect.plural(/(quiz)$/i, "$1zes");
+      inflect.singular(/(database)s$/i, "$1");
+      inflect.uncountable("series");
+      inflect.human("col_rpted_bugs", "Reported bugs");
+      inflect.acronym("HTML");
+
+      inflect.clear();
+
+      expect(inflect.plurals).toEqual([]);
+      expect(inflect.singulars).toEqual([]);
+      expect(inflect.uncountables.size).toBe(0);
+      expect(inflect.humans).toEqual([]);
+      expect(inflect.acronyms.size).toBe(0);
+    });
+  });
+
+  it("clear all resets camelize and underscore regexes", () => {
+    withInflections((inflect) => {
+      inflect.acronym("HTTP");
+      expect(underscore("HTTPS")).toBe("http_s");
+      expect(camelize("https")).toBe("Https");
+
+      inflect.clear("all");
+
+      expect(inflect.acronyms.size).toBe(0);
+      expect(underscore("HTTPS")).toBe("https");
+      expect(camelize("https")).toBe("Https");
+    });
+  });
+
+  it("clear inflections with acronyms", () => {
+    withInflections((inflect) => {
+      inflect.clear("acronyms");
+      expect(inflect.acronyms.size).toBe(0);
+    });
+  });
 
   it("output is not frozen even if input is frozen", () => {
     const input = "word";
@@ -407,6 +607,4 @@ describe("InflectorTest", () => {
     expect(humanize("é_employee")).toBe("É employee");
     expect(humanize("ü_user")).toBe("Ü user");
   });
-
-  it.skip("overlapping acronyms");
 });

@@ -1,7 +1,16 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
+import { EnvironmentInquirer } from "./environment-inquirer.js";
 
 describe("EnvironmentInquirerTest", () => {
-  it.skip("local predicate");
+  it("local predicate", () => {
+    expect(new EnvironmentInquirer("development").isLocal()).toBe(true);
+    expect(new EnvironmentInquirer("test").isLocal()).toBe(true);
+    expect(new EnvironmentInquirer("production").isLocal()).toBe(false);
+  });
 
-  it.skip("prevent local from being used as an actual environment name");
+  it("prevent local from being used as an actual environment name", () => {
+    expect(() => {
+      new EnvironmentInquirer("local");
+    }).toThrow();
+  });
 });

@@ -51,10 +51,7 @@ export function camelize(
       return match.charAt(0).toUpperCase() + match.slice(1);
     });
   } else {
-    result = result.replace(
-      new RegExp(`^(?:${inflections.acronymRegex.source}(?=\\b|[A-Z_])|\\w)`),
-      (match) => match.toLowerCase(),
-    );
+    result = result.replace(inflections.acronymsCamelizeRegex, (match) => match.toLowerCase());
   }
 
   result = result.replace(/(?:_|(\/))([a-z\d]*)/gi, (_match, slash, rest) => {
@@ -69,22 +66,20 @@ export function camelize(
 }
 
 export function underscore(camelCasedWord: string): string {
+  if (!/[A-Z-]|::/.test(camelCasedWord)) return camelCasedWord;
+
   const inflections = Inflections.instance("en");
   let word = camelCasedWord;
 
   word = word.replace(/::/g, "/");
 
   if (inflections.acronyms.size > 0) {
-    word = word.replace(
-      new RegExp(`(?:([A-Za-z\\d])|^)(${inflections.acronymRegex.source})(?=\\b|[^a-z])`, "g"),
-      (_match, pre, acronym) => {
-        return (pre ? pre + "_" : "") + acronym.toLowerCase();
-      },
-    );
+    word = word.replace(inflections.acronymsUnderscoreRegex, (_match, pre, acronym) => {
+      return (pre ? "_" : "") + acronym.toLowerCase();
+    });
   }
 
-  word = word.replace(/([A-Z\d]+)([A-Z][a-z])/g, "$1_$2");
-  word = word.replace(/([a-z\d])([A-Z])/g, "$1_$2");
+  word = word.replace(/(?<=[A-Z])(?=[A-Z][a-z])|(?<=[a-z\d])(?=[A-Z])/g, "_");
   word = word.replace(/-/g, "_");
   word = word.toLowerCase();
 

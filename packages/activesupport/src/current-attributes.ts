@@ -41,6 +41,8 @@ export abstract class CurrentAttributes {
    * static { this.attribute("user", "account"); }
    * ```
    */
+  private static readonly RESTRICTED_NAMES = new Set(["reset", "set"]);
+
   static attribute(...names: string[]): void;
   static attribute(name: string, options: AttributeDefinition): void;
   static attribute(name: string, ...rest: unknown[]): void {
@@ -48,23 +50,34 @@ export abstract class CurrentAttributes {
     if (!Object.prototype.hasOwnProperty.call(ctor, "_definitions")) {
       ctor._definitions = new Map(ctor._definitions);
     }
-    const options: AttributeDefinition =
-      rest.length === 1 && typeof rest[0] === "object" && rest[0] !== null
-        ? (rest[0] as AttributeDefinition)
-        : {};
-    ctor._definitions.set(name, options);
-    // Define accessor on the prototype
-    const proto = ctor.prototype as unknown as Record<string, unknown>;
-    if (!(name in proto)) {
-      Object.defineProperty(proto, name, {
-        get(this: CurrentAttributes) {
-          return this._get(name);
-        },
-        set(this: CurrentAttributes, v: unknown) {
-          this._set(name, v);
-        },
-        configurable: true,
-      });
+    const lastArg = rest[rest.length - 1];
+    const hasOptions =
+      lastArg !== undefined &&
+      typeof lastArg === "object" &&
+      lastArg !== null &&
+      !Array.isArray(lastArg);
+    const options: AttributeDefinition = hasOptions ? (lastArg as AttributeDefinition) : {};
+    const extraNames = hasOptions ? rest.slice(0, -1) : rest;
+    const allNames = [name, ...(extraNames as string[])];
+    const restricted = allNames.filter((n) => CurrentAttributes.RESTRICTED_NAMES.has(n));
+    if (restricted.length > 0) {
+      throw new Error(`Restricted attribute names: ${restricted.join(", ")}`);
+    }
+
+    for (const n of allNames) {
+      ctor._definitions.set(n, options);
+      const proto = ctor.prototype as unknown as Record<string, unknown>;
+      if (!(n in proto)) {
+        Object.defineProperty(proto, n, {
+          get(this: CurrentAttributes) {
+            return this._get(n);
+          },
+          set(this: CurrentAttributes, v: unknown) {
+            this._set(n, v);
+          },
+          configurable: true,
+        });
+      }
     }
   }
 
