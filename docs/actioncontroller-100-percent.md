@@ -1,6 +1,8 @@
 # ActionController: Road to 100% Test Coverage
 
-Current state: **0.4%** (7 matched / 1,860 total Rails tests). 8/91 files matched, 229 misplaced, 0 wrong describes.
+**API surface: 65/93 classes/modules (69.9%)** — real implementations only, no stubs.
+
+Test coverage: **0.4%** (7 matched / 1,860 total Rails tests). 8/91 files matched, 229 misplaced, 0 wrong describes.
 
 In Rails, ActionController lives inside the ActionPack gem alongside ActionDispatch. The package has been restructured so that `packages/actionpack/` contains both `actioncontroller/` and `actiondispatch/` side by side.
 
@@ -15,12 +17,16 @@ AbstractController::Base → ActionController::Metal → ActionController::Base
 
 ### Implementation files
 
-| File                                      | What it provides                                                                                                                                                                         |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `actioncontroller/abstract-controller.ts` | Action dispatch, callbacks (before/after/around), skip, only/except/if/unless/prepend, class hierarchy traversal                                                                         |
-| `actioncontroller/metal.ts`               | Request/Response/Params, `dispatch()`, `head()`, status codes (22 symbols), headers, `toRackResponse()`                                                                                  |
-| `actioncontroller/base.ts`                | Rendering (json/plain/html/body/text), redirects, flash, CSRF, `rescue_from`, conditional GET (freshWhen/stale/expiresIn), `sendFile`/`sendData`, content negotiation, template resolver |
-| `actioncontroller/index.ts`               | Package exports                                                                                                                                                                          |
+| File                                          | What it provides                                                                                                                                                                         |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `actioncontroller/abstract-controller.ts`     | Action dispatch, callbacks (before/after/around), skip, only/except/if/unless/prepend, class hierarchy traversal                                                                         |
+| `actioncontroller/metal.ts`                   | Metal, MiddlewareStack, Middleware, `dispatch()`, `head()`, status codes, headers, `toRackResponse()`                                                                                    |
+| `actioncontroller/base.ts`                    | Rendering (json/plain/html/body/text), redirects, flash, CSRF, `rescue_from`, conditional GET (freshWhen/stale/expiresIn), `sendFile`/`sendData`, content negotiation, template resolver |
+| `actioncontroller/api.ts`                     | API controller (JSON-only variant of Base)                                                                                                                                               |
+| `actioncontroller/metal/exceptions.ts`        | 13 error classes: ActionControllerError, BadRequest, RenderError, RoutingError, UrlGenerationError, MethodNotAllowed, etc.                                                               |
+| `actioncontroller/metal/strong-parameters.ts` | Parameters, ParameterMissing, UnpermittedParameters, UnfilteredParameters, InvalidParameterKey, StrongParameters                                                                         |
+| `actioncontroller/metal/*.ts`                 | Metal modules with real implementations: redirecting, renderers, mime-responds, request-forgery-protection, params-wrapper, allow-browser, http-authentication, live/SSE, exceptions     |
+| `actioncontroller/index.ts`                   | Package exports                                                                                                                                                                          |
 
 ### Test files (263 tests, all passing)
 

@@ -14,6 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/rack": "workspace:*"
   }
 }

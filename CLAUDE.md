@@ -52,6 +52,9 @@ This is a TypeScript monorepo. Packages live under `packages/`:
 - Do NOT add code comments that just describe what the line does. Only add
   comments when they provide additional value — a potential bug hidden, or
   explanation about the larger context.
+- Do NOT add empty stubs or placeholder interfaces. Only add real
+  implementations with meaningful logic. If a feature isn't implemented yet,
+  don't create an empty file for it.
 - **NEVER rename or reword test names.** Test names are derived from the Rails
   test suite and are how `test:compare` matches our tests to Rails tests.
   If a test is failing or the behavior doesn't match the name, fix the test body

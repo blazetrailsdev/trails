@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { RouteSet } from "../../actiondispatch/routing/route-set.js";
 import { Request } from "../../actiondispatch/request.js";
 import { Response } from "../../actiondispatch/response.js";
-import { Base, API } from "../base.js";
+import { Base } from "../base.js";
+import { API } from "../api.js";
 import { bodyToString } from "@blazetrails/rack";
 
 describe("Controller JSON rendering integration", () => {
