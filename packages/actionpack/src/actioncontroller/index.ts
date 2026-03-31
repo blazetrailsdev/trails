@@ -21,3 +21,13 @@ export {
   type WrapParametersOptions,
   type ParamsWrapperConfig,
 } from "./params-wrapper.js";
+
+export {
+  Parameters,
+  ParameterMissing,
+  ExpectedParameterMissing,
+  UnpermittedParameters,
+  UnfilteredParameters,
+  InvalidParameterKey,
+  type StrongParameters,
+} from "./metal/strong-parameters.js";

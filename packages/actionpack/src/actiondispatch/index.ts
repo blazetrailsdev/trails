@@ -18,7 +18,14 @@ export {
 
 export { Request } from "./request.js";
 export { Response, type CookieOptions } from "./response.js";
-export { Parameters, ParameterMissing } from "./parameters.js";
+export {
+  Parameters,
+  ParameterMissing,
+  ExpectedParameterMissing,
+  UnpermittedParameters,
+  UnfilteredParameters,
+  InvalidParameterKey,
+} from "../actioncontroller/metal/strong-parameters.js";
 export { urlFor, type UrlOptions } from "./url-for.js";
 export {
   CookieJar,

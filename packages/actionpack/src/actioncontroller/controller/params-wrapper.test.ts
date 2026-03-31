@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { wrapParameters, applyParamsWrapper, deriveWrapperKey } from "../params-wrapper.js";
-import { Parameters } from "../../actiondispatch/parameters.js";
+import { Parameters } from "../metal/strong-parameters.js";
 
 // ==========================================================================
 // action_controller/params_wrapper_test.rb

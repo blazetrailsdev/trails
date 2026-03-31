@@ -35,7 +35,7 @@
 
 import { Request } from "../actiondispatch/request.js";
 import { Response } from "../actiondispatch/response.js";
-import { Parameters } from "../actiondispatch/parameters.js";
+import { Parameters } from "./metal/strong-parameters.js";
 import { FlashHash } from "../actiondispatch/flash.js";
 import type { Metal } from "./metal.js";
 

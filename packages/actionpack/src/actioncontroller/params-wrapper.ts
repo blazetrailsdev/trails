@@ -18,7 +18,7 @@
  *   }
  */
 
-import { Parameters } from "../actiondispatch/parameters.js";
+import { Parameters } from "./metal/strong-parameters.js";
 
 export interface WrapParametersOptions {
   /** Keys to include in the wrapped hash. If omitted, all non-framework keys are included. */
@@ -99,7 +99,7 @@ export function applyParamsWrapper(
 
   // Collect wrappable keys
   const wrapped: Record<string, unknown> = {};
-  const original = params.toHash();
+  const original = params.toUnsafeHash();
 
   for (const [k, v] of Object.entries(original)) {
     if (config.exclude.has(k)) continue;
