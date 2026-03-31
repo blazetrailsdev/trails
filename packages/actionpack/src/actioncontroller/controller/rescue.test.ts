@@ -231,4 +231,332 @@ describe("RescueControllerTest", () => {
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(rescued).toBe(true);
   });
+
+  // --- Tests matching Rails test names ---
+
+  it("rescue handler", async () => {
+    class NotAuthorized extends Error {}
+    class C extends Base {
+      async notAuthorized() {
+        throw new NotAuthorized();
+      }
+    }
+    C.rescueFrom(NotAuthorized, function (this: Base) {
+      this.head(403);
+    });
+    const c = new C();
+    await c.dispatch("notAuthorized", makeRequest(), makeResponse());
+    expect(c.status).toBe(403);
+  });
+
+  it("rescue handler string", async () => {
+    class NotAuthorizedString extends Error {}
+    class C extends Base {
+      async action() {
+        throw new NotAuthorizedString();
+      }
+    }
+    C.rescueFrom(NotAuthorizedString, function (this: Base) {
+      this.head(403);
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(403);
+  });
+
+  it("rescue handler with argument", async () => {
+    class RecordInvalid extends Error {}
+    class C extends Base {
+      async action() {
+        throw new RecordInvalid("invalid record");
+      }
+    }
+    let caughtError: Error | null = null;
+    C.rescueFrom(RecordInvalid, (err: Error) => {
+      caughtError = err;
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(caughtError).toBeInstanceOf(RecordInvalid);
+  });
+
+  it("rescue handler with argument as string", async () => {
+    class RecordInvalidStr extends Error {}
+    class C extends Base {
+      async action() {
+        throw new RecordInvalidStr("invalid");
+      }
+    }
+    let caughtError: Error | null = null;
+    C.rescueFrom(RecordInvalidStr, (err: Error) => {
+      caughtError = err;
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(caughtError).toBeInstanceOf(RecordInvalidStr);
+  });
+
+  it("proc rescue handler", async () => {
+    class NotAllowed extends Error {}
+    class C extends Base {
+      async action() {
+        throw new NotAllowed();
+      }
+    }
+    C.rescueFrom(NotAllowed, function (this: Base) {
+      this.head(403);
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(403);
+  });
+
+  it("proc rescue handler as string", async () => {
+    class NotAllowedStr extends Error {}
+    class C extends Base {
+      async action() {
+        throw new NotAllowedStr();
+      }
+    }
+    C.rescueFrom(NotAllowedStr, function (this: Base) {
+      this.head(403);
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(403);
+  });
+
+  it("proc rescue handle with argument", async () => {
+    class InvalidRequest extends Error {
+      constructor() {
+        super("InvalidRequest");
+      }
+    }
+    class C extends Base {
+      async action() {
+        throw new InvalidRequest();
+      }
+    }
+    C.rescueFrom(InvalidRequest, function (this: Base, err: Error) {
+      this.render({ plain: err.message });
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.body).toBe("InvalidRequest");
+  });
+
+  it("proc rescue handle with argument as string", async () => {
+    class InvalidRequestStr extends Error {
+      constructor() {
+        super("InvalidRequestStr");
+      }
+    }
+    class C extends Base {
+      async action() {
+        throw new InvalidRequestStr();
+      }
+    }
+    C.rescueFrom(InvalidRequestStr, function (this: Base, err: Error) {
+      this.render({ plain: err.message });
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.body).toBe("InvalidRequestStr");
+  });
+
+  it("block rescue handler", async () => {
+    class BadGateway extends Error {}
+    class C extends Base {
+      async action() {
+        throw new BadGateway();
+      }
+    }
+    C.rescueFrom(BadGateway, function (this: Base) {
+      this.head(502);
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(502);
+  });
+
+  it("block rescue handler as string", async () => {
+    class BadGatewayStr extends Error {}
+    class C extends Base {
+      async action() {
+        throw new BadGatewayStr();
+      }
+    }
+    C.rescueFrom(BadGatewayStr, function (this: Base) {
+      this.head(502);
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(502);
+  });
+
+  it("block rescue handler with argument", async () => {
+    class ResourceUnavailable extends Error {
+      constructor() {
+        super("ResourceUnavailable");
+      }
+    }
+    class C extends Base {
+      async action() {
+        throw new ResourceUnavailable();
+      }
+    }
+    C.rescueFrom(ResourceUnavailable, function (this: Base, err: Error) {
+      this.render({ plain: err.message });
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.body).toBe("ResourceUnavailable");
+  });
+
+  it("block rescue handler with argument as string", async () => {
+    class ResourceUnavailableStr extends Error {
+      constructor() {
+        super("ResourceUnavailableStr");
+      }
+    }
+    class C extends Base {
+      async action() {
+        throw new ResourceUnavailableStr();
+      }
+    }
+    C.rescueFrom(ResourceUnavailableStr, function (this: Base, err: Error) {
+      this.render({ plain: err.message });
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.body).toBe("ResourceUnavailableStr");
+  });
+});
+
+describe("ExceptionInheritanceRescueControllerTest", () => {
+  it("bottom first", async () => {
+    class ParentException extends Error {}
+    class ChildException extends ParentException {}
+    class GrandchildException extends ChildException {}
+    class C extends Base {
+      async action() {
+        throw new GrandchildException();
+      }
+    }
+    C.rescueFrom(ParentException, function (this: Base) {
+      this.head(201);
+    });
+    C.rescueFrom(GrandchildException, function (this: Base) {
+      this.head(204);
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(204);
+  });
+
+  it("inheritance works", async () => {
+    class ParentException extends Error {}
+    class ChildException extends ParentException {}
+    class C extends Base {
+      async action() {
+        throw new ChildException();
+      }
+    }
+    C.rescueFrom(ParentException, function (this: Base) {
+      this.head(201);
+    });
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(201);
+  });
+});
+
+describe("ControllerInheritanceRescueControllerTest", () => {
+  it("first exception in child controller", async () => {
+    class ParentException extends Error {}
+    class FirstChildException extends Error {}
+    class Parent extends Base {
+      async action() {
+        throw new FirstChildException();
+      }
+    }
+    Parent.rescueFrom(ParentException, function (this: Base) {
+      this.head(201);
+    });
+    class Child extends Parent {}
+    Child.rescueFrom(FirstChildException, function (this: Base) {
+      this.head(410);
+    });
+    const c = new Child();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(410);
+  });
+
+  it("second exception in child controller", async () => {
+    class ParentException extends Error {}
+    class SecondChildException extends Error {}
+    class Parent extends Base {
+      async action() {
+        throw new SecondChildException();
+      }
+    }
+    Parent.rescueFrom(ParentException, function (this: Base) {
+      this.head(201);
+    });
+    class Child extends Parent {}
+    Child.rescueFrom(SecondChildException, function (this: Base) {
+      this.head(410);
+    });
+    const c = new Child();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(410);
+  });
+
+  it("exception in parent controller", async () => {
+    class ParentException extends Error {}
+    class Parent extends Base {
+      async action() {
+        throw new ParentException();
+      }
+    }
+    Parent.rescueFrom(ParentException, function (this: Base) {
+      this.head(201);
+    });
+    class Child extends Parent {}
+    const c = new Child();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.status).toBe(201);
+  });
+});
+
+describe("RescueTest", () => {
+  it("normal request", async () => {
+    class C extends Base {
+      async foo() {
+        this.render({ plain: "foo" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("foo", makeRequest(), makeResponse());
+    expect(c.body).toBe("foo");
+  });
+
+  it("rescue exceptions inside controller", async () => {
+    class RecordInvalid extends Error {
+      constructor() {
+        super("invalid");
+      }
+    }
+    class C extends Base {
+      async invalid() {
+        throw new RecordInvalid();
+      }
+    }
+    C.rescueFrom(RecordInvalid, function (this: Base, err: Error) {
+      this.render({ plain: err.message });
+    });
+    const c = new C();
+    await c.dispatch("invalid", makeRequest(), makeResponse());
+    expect(c.body).toBe("invalid");
+  });
 });

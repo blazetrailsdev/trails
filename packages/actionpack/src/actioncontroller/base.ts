@@ -331,7 +331,7 @@ export class Base extends Metal {
       if (error instanceof Error) {
         const handler = this._findRescueHandler(error);
         if (handler) {
-          await handler(error);
+          await handler.call(this, error);
           return;
         }
       }
@@ -409,7 +409,12 @@ export class Base extends Metal {
   ): void {
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
 
-    this.contentType = options.type ?? "application/octet-stream";
+    let guessedType = "application/octet-stream";
+    if (options.filename) {
+      const ext = path.extname(options.filename).toLowerCase();
+      guessedType = SEND_FILE_MIME_TYPES[ext] ?? "application/octet-stream";
+    }
+    this.contentType = options.type ?? guessedType;
     this.body = buf.toString();
 
     if (options.filename) {

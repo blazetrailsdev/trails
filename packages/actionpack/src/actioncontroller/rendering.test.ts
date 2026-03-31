@@ -431,7 +431,7 @@ describe("ActionController sendData", () => {
     const c = new C();
     await c.dispatch("download", makeRequest(), makeResponse());
     expect(c.body).toBe("hello");
-    expect(c.contentType).toBe("application/octet-stream");
+    expect(c.contentType).toBe("text/plain");
   });
 
   it("sets content-disposition with filename", async () => {
