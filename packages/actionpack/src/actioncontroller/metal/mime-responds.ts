@@ -1,13 +1,35 @@
 /**
  * ActionController::MimeResponds
  *
- * Content negotiation via respond_to blocks. Re-exports the
- * ActionDispatch Collector which handles Accept parsing, format
- * symbol lookup via MimeType, variant support, and optional handlers.
+ * Content negotiation via respond_to blocks. Exposes an ActionController
+ * Collector that wraps ActionDispatch's implementation for API compatibility
+ * and future extensions.
  * @see https://api.rubyonrails.org/classes/ActionController/MimeResponds.html
  */
 
-export { Collector, respondTo, type FormatHandler } from "../../actiondispatch/respond-to.js";
+import {
+  Collector as DispatchCollector,
+  type FormatHandler,
+} from "../../actiondispatch/respond-to.js";
+import { UnknownFormat } from "./exceptions.js";
+export { type FormatHandler };
+
+export class Collector extends DispatchCollector {}
+
+export function respondTo(
+  block: (collector: Collector) => void,
+  options: { accept?: string; format?: string; variant?: string } = {},
+): unknown {
+  const collector = new Collector();
+  block(collector);
+
+  const result = collector.negotiate(options);
+  if (!result) {
+    throw new UnknownFormat();
+  }
+
+  return result.handler();
+}
 
 export class VariantCollector {
   private _variants = new Map<string, () => void>();
