@@ -42,7 +42,7 @@ export class Callback {
   }
 
   apply(target: any, block?: () => void): boolean {
-    if (!_Value.check(this.options, target)) return true;
+    if (!Value.check(this.options, target)) return true;
 
     if (this.kind === "before") {
       return (this.filter as BeforeCallback)(target) !== false;
@@ -116,7 +116,7 @@ export class CallbackSequence {
     const arounds = entries.filter((e) => e.kind === "around");
 
     for (const entry of befores) {
-      if (!_Value.check(entry.options, target)) continue;
+      if (!Value.check(entry.options, target)) continue;
       const result = (entry.filter as BeforeCallback)(target);
       if (terminator && result === false) return false;
     }
@@ -128,7 +128,7 @@ export class CallbackSequence {
     for (let i = arounds.length - 1; i >= 0; i--) {
       const entry = arounds[i];
       const inner = core;
-      if (!_Value.check(entry.options, target)) continue;
+      if (!Value.check(entry.options, target)) continue;
       core = () => {
         (entry.filter as AroundCallback)(target, inner);
       };
@@ -138,7 +138,7 @@ export class CallbackSequence {
 
     for (let i = afters.length - 1; i >= 0; i--) {
       const entry = afters[i];
-      if (!_Value.check(entry.options, target)) continue;
+      if (!Value.check(entry.options, target)) continue;
       (entry.filter as AfterCallback)(target);
     }
 
@@ -146,7 +146,7 @@ export class CallbackSequence {
   }
 }
 
-export class _MethodCall {
+export class MethodCall {
   constructor(readonly methodName: string) {}
 
   make(target: any, _value: any): any {
@@ -154,7 +154,7 @@ export class _MethodCall {
   }
 }
 
-export class _ObjectCall {
+export class ObjectCall {
   constructor(
     readonly target: any,
     readonly methodName: string,
@@ -165,7 +165,7 @@ export class _ObjectCall {
   }
 }
 
-export class _InstanceExec0 {
+export class InstanceExec0 {
   constructor(readonly fn: () => any) {}
 
   make(target: any, _value: any): any {
@@ -173,7 +173,7 @@ export class _InstanceExec0 {
   }
 }
 
-export class _InstanceExec1 {
+export class InstanceExec1 {
   constructor(readonly fn: (target: any) => any) {}
 
   make(target: any, _value: any): any {
@@ -181,7 +181,7 @@ export class _InstanceExec1 {
   }
 }
 
-export class _InstanceExec2 {
+export class InstanceExec2 {
   constructor(readonly fn: (target: any, value: any) => any) {}
 
   make(target: any, value: any): any {
@@ -189,7 +189,7 @@ export class _InstanceExec2 {
   }
 }
 
-export class _ProcCall {
+export class ProcCall {
   constructor(readonly fn: (...args: any[]) => any) {}
 
   make(target: any, _value: any): any {
@@ -197,7 +197,7 @@ export class _ProcCall {
   }
 }
 
-export class _Value {
+export class Value {
   static check(options: CallbackOptions, target: any): boolean {
     if (options.if) {
       const conditions = Array.isArray(options.if) ? options.if : [options.if];
@@ -211,30 +211,30 @@ export class _Value {
   }
 }
 
-export class _Before {
+export class Before {
   static build(callback: Callback, _options: DefineCallbacksOptions): (target: any) => boolean {
     const terminator = _options.terminator !== false;
     return (target: any) => {
-      if (!_Value.check(callback.options, target)) return true;
+      if (!Value.check(callback.options, target)) return true;
       const result = (callback.filter as BeforeCallback)(target);
       return !(terminator && result === false);
     };
   }
 }
 
-export class _After {
+export class After {
   static build(callback: Callback): (target: any) => void {
     return (target: any) => {
-      if (!_Value.check(callback.options, target)) return;
+      if (!Value.check(callback.options, target)) return;
       (callback.filter as AfterCallback)(target);
     };
   }
 }
 
-export class _Around {
+export class Around {
   static build(callback: Callback): (target: any, block: () => void) => void {
     return (target: any, block: () => void) => {
-      if (!_Value.check(callback.options, target)) {
+      if (!Value.check(callback.options, target)) {
         block();
         return;
       }
@@ -243,24 +243,18 @@ export class _Around {
   }
 }
 
-export namespace CallTemplate {
-  export const MethodCall = _MethodCall;
-  export const ObjectCall = _ObjectCall;
-  export const InstanceExec0 = _InstanceExec0;
-  export const InstanceExec1 = _InstanceExec1;
-  export const InstanceExec2 = _InstanceExec2;
-  export const ProcCall = _ProcCall;
-}
+export const CallTemplate = {
+  MethodCall,
+  ObjectCall,
+  InstanceExec0,
+  InstanceExec1,
+  InstanceExec2,
+  ProcCall,
+};
 
-export namespace Conditionals {
-  export const Value = _Value;
-}
+export const Conditionals = { Value };
 
-export namespace Filters {
-  export const Before = _Before;
-  export const After = _After;
-  export const Around = _Around;
-}
+export const Filters = { Before, After, Around };
 
 export interface ClassMethods {
   defineCallbacks(name: string, options?: DefineCallbacksOptions): void;

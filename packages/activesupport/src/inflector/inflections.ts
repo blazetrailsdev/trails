@@ -195,3 +195,5 @@ export function loadDefaults(inflect: Inflections): void {
 // Initialize default English inflections
 const defaultInflections = Inflections.instance("en");
 loadDefaults(defaultInflections);
+
+export { Inflections as Inflector };

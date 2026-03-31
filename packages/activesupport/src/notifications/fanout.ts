@@ -51,7 +51,7 @@ type TimedCallback = (
 
 type EventObjectCallback = (event: Event) => void;
 
-interface Matcher {
+export interface Matcher {
   matches(name: string): boolean;
   unsubscribe(name: string): void;
 }
@@ -79,12 +79,14 @@ class RegExpMatcher implements Matcher {
   }
 }
 
-class AllMatcher implements Matcher {
+export class AllMessages implements Matcher {
   matches(_name: string): boolean {
     return true;
   }
   unsubscribe(_name: string): void {}
 }
+
+const AllMatcher = AllMessages;
 
 function wrapMatcher(pattern: string | RegExp | null): Matcher {
   if (typeof pattern === "string") return new StringMatcher(pattern);
@@ -133,13 +135,19 @@ function createSubscriber(
   };
 }
 
-interface Group {
-  start(name: string, id: unknown, payload: Record<string, unknown>): void;
-  finish(name: string, id: unknown, payload: Record<string, unknown>): void;
+export abstract class BaseGroup {
+  abstract start(name: string, id: unknown, payload: Record<string, unknown>): void;
+  abstract finish(name: string, id: unknown, payload: Record<string, unknown>): void;
 }
 
-class EventedGroup implements Group {
-  constructor(private listeners: EventedListener[]) {}
+export abstract class BaseTimeGroup extends BaseGroup {}
+
+type Group = BaseGroup;
+
+export class EventedGroup extends BaseGroup {
+  constructor(private listeners: EventedListener[]) {
+    super();
+  }
 
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
     iterateGuardingExceptions(this.listeners, (l) => l.start(name, id, payload));
@@ -150,9 +158,11 @@ class EventedGroup implements Group {
   }
 }
 
-class TimedGroup implements Group {
+export class TimedGroup extends BaseTimeGroup {
   private startTime: Date | null = null;
-  constructor(private listeners: TimedCallback[]) {}
+  constructor(private listeners: TimedCallback[]) {
+    super();
+  }
 
   start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
     this.startTime = new Date();
@@ -166,9 +176,11 @@ class TimedGroup implements Group {
   }
 }
 
-class MonotonicTimedGroup implements Group {
+export class MonotonicTimedGroup extends BaseTimeGroup {
   private startTime = 0;
-  constructor(private listeners: TimedCallback[]) {}
+  constructor(private listeners: TimedCallback[]) {
+    super();
+  }
 
   start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
     this.startTime = performance.now();
@@ -182,9 +194,11 @@ class MonotonicTimedGroup implements Group {
   }
 }
 
-class EventObjectGroup implements Group {
+export class EventObjectGroup extends BaseGroup {
   private event: Event | null = null;
-  constructor(private listeners: EventObjectCallback[]) {}
+  constructor(private listeners: EventObjectCallback[]) {
+    super();
+  }
 
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
     this.event = new Event(name, new Date(), payload, String(id));
@@ -199,17 +213,48 @@ class EventObjectGroup implements Group {
   }
 }
 
-interface Handle {
-  start(): void;
-  finish(): void;
-  finishWithValues(name: string, id: unknown, payload: Record<string, unknown>): void;
+export class Handle {
+  protected state: "initialized" | "started" | "finished" = "initialized";
+  protected groups: Group[];
+  protected _name: string;
+  protected _id: unknown;
+  protected _payload: Record<string, unknown>;
+
+  constructor(groups: Group[], name: string, id: unknown, payload: Record<string, unknown>) {
+    this.groups = groups;
+    this._name = name;
+    this._id = id;
+    this._payload = payload;
+  }
+
+  start(): void {
+    if (this.state !== "initialized") {
+      throw new Error(`expected state to be "initialized" but was "${this.state}"`);
+    }
+    this.state = "started";
+    iterateGuardingExceptions(this.groups, (g) => g.start(this._name, this._id, this._payload));
+  }
+
+  finish(): void {
+    this.finishWithValues(this._name, this._id, this._payload);
+  }
+
+  finishWithValues(name: string, id: unknown, payload: Record<string, unknown>): void {
+    if (this.state !== "started") {
+      throw new Error(`expected state to be "started" but was "${this.state}"`);
+    }
+    this.state = "finished";
+    iterateGuardingExceptions(this.groups, (g) => g.finish(name, id, payload));
+  }
 }
+
+class FanoutHandle extends Handle {}
 
 export class Fanout {
   private stringSubscribers = new Map<string, Subscriber[]>();
   private otherSubscribers: Subscriber[] = [];
   private listenersCache = new Map<string, Subscriber[]>();
-  private handleStack: Handle[] = [];
+  private handleStack: FanoutHandle[] = [];
 
   subscribe(
     pattern: string | RegExp | null,
@@ -274,27 +319,7 @@ export class Fanout {
 
   buildHandle(name: string, id: unknown, payload: Record<string, unknown>): Handle {
     const groups = this.groupsFor(name);
-    let state: "initialized" | "started" | "finished" = "initialized";
-
-    return {
-      start() {
-        if (state !== "initialized") {
-          throw new Error(`expected state to be "initialized" but was "${state}"`);
-        }
-        state = "started";
-        iterateGuardingExceptions(groups, (g) => g.start(name, id, payload));
-      },
-      finish() {
-        this.finishWithValues(name, id, payload);
-      },
-      finishWithValues(n: string, i: unknown, p: Record<string, unknown>) {
-        if (state !== "started") {
-          throw new Error(`expected state to be "started" but was "${state}"`);
-        }
-        state = "finished";
-        iterateGuardingExceptions(groups, (g) => g.finish(n, i, p));
-      },
-    };
+    return new FanoutHandle(groups, name, id, payload);
   }
 
   private allListenersFor(name: string): Subscriber[] {
@@ -354,3 +379,19 @@ export class Fanout {
     }
   }
 }
+
+export class Evented<D = EventedListener> {
+  readonly pattern: Matcher;
+  readonly delegate: D;
+
+  constructor(pattern: string | RegExp | null, delegate: D) {
+    this.pattern = wrapMatcher(pattern);
+    this.delegate = delegate;
+  }
+}
+
+export class Timed extends Evented<TimedCallback> {}
+export class MonotonicTimed extends Timed {}
+export class EventObject extends Evented<EventObjectCallback> {}
+
+export const Subscribers = { Evented, Timed, MonotonicTimed, EventObject };

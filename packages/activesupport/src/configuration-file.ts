@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
 import { parse as yamlParse } from "yaml";
 
+export class FormatError extends Error {
+  constructor(message: string, cause?: unknown) {
+    super(message, cause !== undefined ? { cause } : undefined);
+    this.name = "FormatError";
+  }
+}
+
 export class ConfigurationFile {
   private content: string;
   private contentPath: string;
@@ -29,7 +36,7 @@ export class ConfigurationFile {
       return {};
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new ConfigurationFile.FormatError(
+      throw new FormatError(
         `YAML syntax error occurred while parsing ${this.contentPath}. ` +
           `Please note that YAML must be consistently indented using spaces. Tabs are not allowed. ` +
           `Error: ${errorMessage}`,
@@ -38,10 +45,5 @@ export class ConfigurationFile {
     }
   }
 
-  static FormatError = class FormatError extends Error {
-    constructor(message: string, cause?: unknown) {
-      super(message, cause !== undefined ? { cause } : undefined);
-      this.name = "FormatError";
-    }
-  };
+  static FormatError = FormatError;
 }

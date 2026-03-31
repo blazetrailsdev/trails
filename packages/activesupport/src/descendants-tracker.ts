@@ -95,3 +95,5 @@ export namespace DescendantsTracker {
 }
 
 export { DescendantsTracker as default };
+
+export const WeakSet = DescendantsTracker.WeakSet;
