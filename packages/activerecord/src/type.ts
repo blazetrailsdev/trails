@@ -32,6 +32,9 @@ export { Text } from "./type/text.js";
 export { Json } from "./type/json.js";
 export { DecimalWithoutScale } from "./type/decimal-without-scale.js";
 export { TypeMap } from "./type/type-map.js";
+export { HashLookupTypeMap } from "./type/hash-lookup-type-map.js";
+export { Serialized } from "./type/serialized.js";
+export { UnsignedInteger } from "./type/unsigned-integer.js";
 export {
   AdapterSpecificRegistry,
   Registration,

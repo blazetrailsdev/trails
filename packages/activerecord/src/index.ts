@@ -154,3 +154,5 @@ export {
   isMarkedForDestruction,
   isDestroyable,
 } from "./autosave-association.js";
+export { Connection as TypeCasterConnection } from "./type-caster/connection.js";
+export { Map as TypeCasterMap } from "./type-caster/map.js";
