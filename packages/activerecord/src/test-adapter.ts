@@ -166,7 +166,7 @@ async function processPendingModels(inner: any): Promise<void> {
         const idCol = isPg()
           ? '"id" SERIAL PRIMARY KEY'
           : isMysql()
-            ? "`id` INT AUTO_INCREMENT PRIMARY KEY"
+            ? "`id` BIGINT AUTO_INCREMENT PRIMARY KEY"
             : '"id" INTEGER PRIMARY KEY AUTOINCREMENT';
         createSql = isMysql()
           ? `CREATE TABLE IF NOT EXISTS \`${tableName}\` (${[`\`id\` INT AUTO_INCREMENT PRIMARY KEY`, ...colDefs].join(", ")}) ENGINE=InnoDB`

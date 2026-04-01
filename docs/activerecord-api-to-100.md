@@ -218,3 +218,14 @@ HashAccessor.
 7. **Statement Cache** (7 missing) — performance infrastructure
 8. **Middleware** (4 missing) — database selector, shard selector
 9. **Message Pack / Marshalling / Future** (10 missing) — lowest priority
+
+---
+
+## Next steps for api:compare tooling
+
+- **Filter container-only modules**: The compare script currently counts Rails
+  modules that are pure namespace containers (e.g. `MySQL`, `Mysql2`, `Trilogy`)
+  as missing items. These modules have no methods of their own — they just wrap
+  other classes. The script should skip modules that contain only nested
+  classes/modules and no own methods, similar to how `ClassMethods` is already
+  folded into the parent.

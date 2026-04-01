@@ -181,7 +181,7 @@ export class SchemaCreation {
         break;
       case "primary_key":
         if (this.adapterName === "postgres") sql = "SERIAL PRIMARY KEY";
-        else if (this.adapterName === "mysql") sql = "INT AUTO_INCREMENT PRIMARY KEY";
+        else if (this.adapterName === "mysql") sql = "BIGINT AUTO_INCREMENT PRIMARY KEY";
         else sql = "INTEGER PRIMARY KEY AUTOINCREMENT";
         break;
       default:

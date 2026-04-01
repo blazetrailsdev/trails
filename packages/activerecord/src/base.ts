@@ -356,7 +356,7 @@ export class Base extends Model {
       const pkDef = isPg
         ? `${quoteIdentifier(pk, adapterName)} SERIAL PRIMARY KEY`
         : isMysql
-          ? `${quoteIdentifier(pk, adapterName)} INT AUTO_INCREMENT PRIMARY KEY`
+          ? `${quoteIdentifier(pk, adapterName)} BIGINT AUTO_INCREMENT PRIMARY KEY`
           : `${quoteIdentifier(pk, adapterName)} INTEGER PRIMARY KEY AUTOINCREMENT`;
       colDefs.push(pkDef);
     } else {

@@ -938,7 +938,7 @@ export class MigrationContext {
         return an === "postgres" ? "BYTEA" : "BLOB";
       case "primary_key":
         if (an === "postgres") return "SERIAL PRIMARY KEY";
-        if (an === "mysql") return "INT AUTO_INCREMENT PRIMARY KEY";
+        if (an === "mysql") return "BIGINT AUTO_INCREMENT PRIMARY KEY";
         return "INTEGER PRIMARY KEY AUTOINCREMENT";
       default:
         return type.toUpperCase();
