@@ -221,8 +221,8 @@ export class MigrationGenerator extends GeneratorBase {
     const className = classify(name);
     const body = this.inferBody(name, className, columns, args, timestamps, primaryKeyType);
     let timestamp = migrationTimestamp();
-    if (timestamp === lastTimestamp) {
-      timestamp = (parseInt(timestamp, 10) + 1).toString();
+    if (lastTimestamp && timestamp <= lastTimestamp) {
+      timestamp = (parseInt(lastTimestamp, 10) + 1).toString();
     }
     lastTimestamp = timestamp;
     const ext = this.ext();

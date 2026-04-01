@@ -14,6 +14,10 @@ export default defineConfig({
       "@blazetrails/activerecord": path.resolve(__dirname, "../activerecord/src/index.ts"),
       "@blazetrails/rack": path.resolve(__dirname, "../rack/src/index.ts"),
       "@blazetrails/actionpack": path.resolve(__dirname, "../actionpack/src/index.ts"),
+      "@blazetrails/railties/generators": path.resolve(
+        __dirname,
+        "../railties/src/generators/index.ts",
+      ),
       $frontiers: path.resolve(__dirname, "src/lib/frontiers"),
     },
   },
