@@ -9,33 +9,7 @@ import * as ts from "typescript";
 import * as path from "path";
 import * as fs from "fs";
 import type { ApiManifest, PackageInfo, ClassInfo, MethodInfo, ParamInfo } from "./types.js";
-
-const SCRIPT_DIR = __dirname;
-const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
-const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
-
-const PACKAGES = [
-  "arel",
-  "activemodel",
-  "activerecord",
-  "activesupport",
-  "actiondispatch",
-  "actioncontroller",
-  "actionview",
-  "railties",
-];
-
-/** Override package → directory mapping when they differ */
-const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
-  actiondispatch: "actionpack",
-  actioncontroller: "actionpack",
-};
-
-/** Override package → src subdirectory when package shares a dir */
-const PACKAGE_SRC_SUBDIR: Record<string, string> = {
-  actiondispatch: "actiondispatch",
-  actioncontroller: "actioncontroller",
-};
+import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } from "./config.js";
 
 function main() {
   const manifest: ApiManifest = {
@@ -45,11 +19,7 @@ function main() {
   };
 
   for (const pkg of PACKAGES) {
-    const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
-    const subDir = PACKAGE_SRC_SUBDIR[pkg];
-    const pkgDir = subDir
-      ? path.join(ROOT_DIR, "packages", dirName, "src", subDir)
-      : path.join(ROOT_DIR, "packages", dirName, "src");
+    const pkgDir = packageSrcDir(pkg);
     manifest.packages[pkg] = extractPackage(pkg, pkgDir);
   }
 
@@ -74,7 +44,7 @@ function main() {
 
 function extractPackage(pkgName: string, srcDir: string): PackageInfo {
   const files = getAllTsFiles(srcDir);
-  const info: PackageInfo = { classes: {}, modules: {} };
+  const info: PackageInfo = { classes: {}, modules: {}, fileFunctions: {} };
 
   // Create a TypeScript program
   const dirName = PACKAGE_DIR_OVERRIDES[pkgName] ?? pkgName;
@@ -128,27 +98,13 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
         if (!isExported(node)) return;
         const name = node.name.text;
         const modKey = `${relPath}:${name}`;
-        info.modules[modKey] = {
-          name,
-          file: relPath,
-          includes: [],
-          extends: [],
-          instanceMethods: [],
-          classMethods: [],
-        };
+        info.modules[modKey] = extractInterface(node, relPath);
         fileHasClassOrModule = true;
       } else if (ts.isModuleDeclaration(node) && node.name) {
         if (!isExported(node)) return;
         const name = node.name.text;
         const modKey = `${relPath}:${name}`;
-        info.modules[modKey] = {
-          name,
-          file: relPath,
-          includes: [],
-          extends: [],
-          instanceMethods: [],
-          classMethods: [],
-        };
+        info.modules[modKey] = extractNamespace(node, checker, relPath);
         fileHasClassOrModule = true;
       } else if (ts.isExportDeclaration(node)) {
         // Handle `export * as Foo from "./bar.js"` — namespace re-exports
@@ -182,22 +138,47 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
 
     // Also capture functions exported via `export { foo, bar }` (named export lists).
     // Resolve aliases so ExportSpecifier nodes reach the underlying FunctionDeclaration.
-    if (!fileHasClassOrModule) {
-      const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
-      if (moduleSymbol) {
-        const exports = checker.getExportsOfModule(moduleSymbol);
-        for (const sym of exports) {
-          if (sym.name.startsWith("_")) continue;
-          if (fileFunctions.some((f) => f.name === sym.name)) continue;
-          const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
-          const decl = resolved.valueDeclaration ?? resolved.declarations?.[0];
-          if (decl && ts.isFunctionDeclaration(decl) && decl.getSourceFile() === sourceFile) {
+    const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
+    if (moduleSymbol) {
+      const exports = checker.getExportsOfModule(moduleSymbol);
+      for (const sym of exports) {
+        if (sym.name.startsWith("_")) continue;
+        if (fileFunctions.some((f) => f.name === sym.name)) continue;
+        const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
+        const decl = resolved.valueDeclaration ?? resolved.declarations?.[0];
+        if (decl && decl.getSourceFile() === sourceFile) {
+          let params: ParamInfo[] = [];
+          let isFunctionLike = false;
+
+          if (ts.isFunctionDeclaration(decl)) {
+            isFunctionLike = true;
+            params = extractParameters(decl.parameters);
+          } else if (ts.isVariableDeclaration(decl) && decl.initializer) {
+            const init = decl.initializer;
+            if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) {
+              isFunctionLike = true;
+              params = extractParameters(init.parameters);
+            } else {
+              // Handle `export const foo = existingFunction` aliases
+              const type = checker.getTypeAtLocation(init);
+              const signatures = type.getCallSignatures();
+              if (signatures.length > 0) {
+                isFunctionLike = true;
+                const sigDecl = signatures[0].declaration;
+                if (sigDecl && ts.isFunctionLike(sigDecl)) {
+                  params = extractParameters(sigDecl.parameters);
+                }
+              }
+            }
+          }
+
+          if (isFunctionLike) {
             const line =
               decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
             fileFunctions.push({
               name: sym.name,
               visibility: "public",
-              params: extractParameters(decl.parameters),
+              params,
               isStatic: false,
               line,
               file: relPath,
@@ -207,12 +188,16 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
       }
     }
 
+    // Always record file-level functions so compare.ts can match methods
+    // against the file regardless of whether a class/interface wrapper exists.
+    if (fileFunctions.length > 0) {
+      info.fileFunctions[relPath] = fileFunctions;
+    }
+
     // If a file has exported functions but no class/interface/namespace,
-    // create a module entry from the file name. This matches Rails' pattern
-    // where modules like Enum, Sanitization, etc. contain methods.
+    // also create a module entry from the file name for backward compat.
     if (!fileHasClassOrModule && fileFunctions.length > 0) {
       const baseName = path.basename(relPath, ".ts");
-      // Convert kebab-case to PascalCase: "secure-password" → "SecurePassword"
       const moduleName = baseName
         .split("-")
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -356,6 +341,112 @@ function extractClass(
     extends: extendsArr,
     instanceMethods,
     classMethods,
+  };
+}
+
+function extractInterface(node: ts.InterfaceDeclaration, file: string): ClassInfo {
+  const name = node.name.text;
+  const instanceMethods: MethodInfo[] = [];
+  const extendsArr: string[] = [];
+
+  if (node.heritageClauses) {
+    for (const clause of node.heritageClauses) {
+      if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
+        for (const type of clause.types) {
+          extendsArr.push(type.expression.getText());
+        }
+      }
+    }
+  }
+
+  for (const member of node.members) {
+    const memberName = member.name && ts.isIdentifier(member.name) ? member.name.text : undefined;
+    if (!memberName || memberName.startsWith("_")) continue;
+
+    const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;
+
+    if (ts.isMethodSignature(member)) {
+      instanceMethods.push({
+        name: memberName,
+        visibility: "public",
+        params: member.parameters ? extractParameters(member.parameters) : [],
+        line,
+        file,
+      });
+    }
+  }
+
+  return {
+    name,
+    file,
+    includes: [],
+    extends: extendsArr,
+    instanceMethods,
+    classMethods: [],
+  };
+}
+
+function extractNamespace(
+  node: ts.ModuleDeclaration,
+  checker: ts.TypeChecker,
+  file: string,
+): ClassInfo {
+  const name = node.name.text;
+  const instanceMethods: MethodInfo[] = [];
+
+  if (node.body && ts.isModuleBlock(node.body)) {
+    for (const stmt of node.body.statements) {
+      if (ts.isFunctionDeclaration(stmt) && stmt.name && isExported(stmt)) {
+        const line = stmt.getSourceFile().getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
+        instanceMethods.push({
+          name: stmt.name.text,
+          visibility: "public",
+          params: extractParameters(stmt.parameters),
+          line,
+          file,
+        });
+      } else if (ts.isVariableStatement(stmt) && isExported(stmt)) {
+        const line = stmt.getSourceFile().getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
+        for (const decl of stmt.declarationList.declarations) {
+          if (!ts.isIdentifier(decl.name)) continue;
+          const init = decl.initializer;
+          let params: ParamInfo[] = [];
+          let isFunctionLike = false;
+          if (init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init))) {
+            isFunctionLike = true;
+            params = extractParameters(init.parameters);
+          } else if (init) {
+            const type = checker.getTypeAtLocation(init);
+            const signatures = type.getCallSignatures();
+            if (signatures.length > 0) {
+              isFunctionLike = true;
+              const sigDecl = signatures[0].declaration;
+              if (sigDecl && ts.isFunctionLike(sigDecl)) {
+                params = extractParameters(sigDecl.parameters);
+              }
+            }
+          }
+          if (isFunctionLike) {
+            instanceMethods.push({
+              name: decl.name.text,
+              visibility: "public",
+              params,
+              line,
+              file,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    name,
+    file,
+    includes: [],
+    extends: [],
+    instanceMethods,
+    classMethods: [],
   };
 }
 
