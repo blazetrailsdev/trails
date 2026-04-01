@@ -54,6 +54,14 @@ export {
 } from "./inheritance.js";
 export { hasSecurePassword } from "./secure-password.js";
 export {
+  incrementCounter,
+  decrementCounter,
+  updateCounters,
+  resetCounters,
+} from "./counter-cache.js";
+export { attrReadonly, readonlyAttributes, readonlyAttribute } from "./readonly-attributes.js";
+export { touch, touchAll } from "./timestamp.js";
+export {
   store,
   storeAccessor,
   storedAttributes,

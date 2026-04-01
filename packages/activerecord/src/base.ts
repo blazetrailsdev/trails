@@ -30,6 +30,9 @@ import {
   AttributeAssignmentError,
 } from "./errors.js";
 import { encrypts as _encrypts, getEncryptor } from "./encryption.js";
+import * as CounterCache from "./counter-cache.js";
+import * as ReadonlyAttributes from "./readonly-attributes.js";
+import * as Timestamp from "./timestamp.js";
 import { Association as AssociationInstance } from "./associations/association.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
@@ -894,12 +897,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.attr_readonly
    */
   static attrReadonly(...attributes: string[]): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_readonlyAttributes")) {
-      this._readonlyAttributes = new Set(this._readonlyAttributes);
-    }
-    for (const attr of attributes) {
-      this._readonlyAttributes.add(attr);
-    }
+    ReadonlyAttributes.attrReadonly(this, ...attributes);
   }
 
   /**
@@ -908,7 +906,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.readonly_attributes
    */
   static get readonlyAttributes(): string[] {
-    return Array.from(this._readonlyAttributes);
+    return ReadonlyAttributes.readonlyAttributes(this);
   }
 
   // -- Encrypted attributes --
@@ -1563,7 +1561,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Relation#touch_all
    */
   static async touchAll(...names: string[]): Promise<number> {
-    return this.all().touchAll(...names);
+    return Timestamp.touchAll(this, ...names);
   }
 
   /**
@@ -1993,20 +1991,7 @@ export class Base extends Model {
     by: number = 1,
     options?: { touch?: boolean | string | string[] },
   ): Promise<number> {
-    const table = this.arelTable;
-    let touchClause = "";
-    if (options?.touch) {
-      if (options.touch === true) {
-        touchClause = `, "updated_at" = CURRENT_TIMESTAMP`;
-      } else {
-        const cols = Array.isArray(options.touch) ? options.touch : [options.touch];
-        if (cols.length > 0) {
-          touchClause = cols.map((c) => `, "${c}" = CURRENT_TIMESTAMP`).join("");
-        }
-      }
-    }
-    const sql = `UPDATE "${table.name}" SET "${attribute}" = COALESCE("${attribute}", 0) + ${by}${touchClause} WHERE ${this._buildPkWhere(id)}`;
-    return this.adapter.executeMutation(sql);
+    return CounterCache.incrementCounter(this, attribute, id, by, options);
   }
 
   /**
@@ -2020,7 +2005,7 @@ export class Base extends Model {
     by: number = 1,
     options?: { touch?: boolean | string | string[] },
   ): Promise<number> {
-    return this.incrementCounter(attribute, id, -by, options);
+    return CounterCache.decrementCounter(this, attribute, id, by, options);
   }
 
   /**
@@ -2033,34 +2018,7 @@ export class Base extends Model {
     counters: Record<string, number>,
     options?: { touch?: boolean | string | string[] },
   ): Promise<number> {
-    const table = this.arelTable;
-    let touchClause = "";
-    if (options?.touch) {
-      if (options.touch === true) {
-        touchClause = `, "updated_at" = CURRENT_TIMESTAMP`;
-      } else if (Array.isArray(options.touch) && options.touch.length === 0) {
-        touchClause = "";
-      } else {
-        const cols = Array.isArray(options.touch) ? options.touch : [options.touch];
-        touchClause = cols.map((c) => `, "${c}" = CURRENT_TIMESTAMP`).join("");
-      }
-    }
-    const setClause =
-      Object.entries(counters)
-        .map(([attr, amount]) => `"${attr}" = COALESCE("${attr}", 0) + ${amount}`)
-        .join(", ") + touchClause;
-    if (Array.isArray(this.primaryKey)) {
-      // For CPK: id can be a single tuple [1,2] or array of tuples [[1,2],[3,4]]
-      const tuples =
-        Array.isArray(id) && Array.isArray(id[0]) ? (id as unknown[][]) : [id as unknown[]];
-      const whereParts = tuples.map((t) => `(${this._buildPkWhere(t)})`);
-      const sql = `UPDATE "${table.name}" SET ${setClause} WHERE ${whereParts.join(" OR ")}`;
-      return this.adapter.executeMutation(sql);
-    }
-    const ids = Array.isArray(id) ? id : [id];
-    const idList = ids.map((i) => (typeof i === "number" ? String(i) : `'${i}'`)).join(", ");
-    const sql = `UPDATE "${table.name}" SET ${setClause} WHERE "${this.primaryKey}" IN (${idList})`;
-    return this.adapter.executeMutation(sql);
+    return CounterCache.updateCounters(this, id, counters, options);
   }
 
   /**
@@ -2069,45 +2027,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.reset_counters
    */
   static async resetCounters(id: unknown, ...counterNames: string[]): Promise<void> {
-    const record = await this.find(id);
-    const assocDefs = (this as any)._associations as
-      | Array<{ type: string; name: string; options: any }>
-      | undefined;
-    const hasManyAssocs = assocDefs?.filter((a) => a.type === "hasMany") ?? [];
-    const { resolveCounterColumn, countHasMany } = await import("./associations.js");
-    for (const counterName of counterNames) {
-      // Try direct association name match first
-      let assoc = hasManyAssocs.find((a) => a.name === counterName);
-      let counterColumn: string;
-
-      if (assoc) {
-        counterColumn = resolveCounterColumn(this, assoc, counterName);
-      } else {
-        // Try stripping _count suffix to find association
-        if (counterName.endsWith("_count")) {
-          assoc = hasManyAssocs.find((a) => a.name === counterName.slice(0, -6));
-        }
-        // Try matching against resolved counter columns for each hasMany
-        if (!assoc) {
-          for (const candidate of hasManyAssocs) {
-            const col = resolveCounterColumn(this, candidate, candidate.name);
-            if (col === counterName) {
-              assoc = candidate;
-              break;
-            }
-          }
-        }
-        if (!assoc) {
-          throw new Error(
-            `'${counterName}' is not a valid counter name or hasMany association on ${this.name}`,
-          );
-        }
-        counterColumn = resolveCounterColumn(this, assoc, assoc.name);
-      }
-
-      const count = await countHasMany(record, assoc.name, assoc.options);
-      await record.updateColumn(counterColumn, count);
-    }
+    return CounterCache.resetCounters(this, id, ...counterNames);
   }
 
   /**
@@ -3119,29 +3039,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#touch
    */
   async touch(...names: string[]): Promise<boolean> {
-    if (this._readonly) throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-    if (!this.isPersisted()) return false;
-    const now = new Date();
-    const attrs: Record<string, unknown> = {};
-
-    // Always touch updated_at if defined
-    const ctor = this.constructor as typeof Base;
-    if (ctor._attributeDefinitions.has("updated_at")) {
-      attrs.updated_at = now;
-    }
-
-    // Touch any additional named timestamps
-    for (const name of names) {
-      attrs[name] = now;
-    }
-
-    if (Object.keys(attrs).length === 0) return false;
-
-    await this.updateColumns(attrs);
-
-    // Fire after_touch callbacks
-    await ctor._callbackChain.runAfter("touch", this);
-    return true;
+    return Timestamp.touch(this, ...names);
   }
 
   /**
