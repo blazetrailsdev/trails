@@ -58,7 +58,7 @@ describe("StepContent", () => {
     expect(screen.getByText("Second paragraph.")).toBeTruthy();
   });
 
-  it("renders CLI actions", async () => {
+  it("renders CLI actions", () => {
     const step: TutorialStep = {
       ...baseStep,
       actions: [{ command: "generate model User name:string" }],
@@ -108,7 +108,7 @@ describe("StepContent", () => {
     expect(screen.queryByTestId("checkpoint-panel")).toBeNull();
   });
 
-  it("renders diagram block when step has diagram", async () => {
+  it("renders diagram block when step has diagram", () => {
     const step: TutorialStep = {
       ...baseStep,
       diagram: "graph TD; A-->B",

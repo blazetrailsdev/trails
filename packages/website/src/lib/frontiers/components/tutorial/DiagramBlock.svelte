@@ -1,5 +1,5 @@
 <script lang="ts">
-  import DOMPurify from "dompurify";
+  import { onMount } from "svelte";
   import { renderDiagram } from "../../tutorials/diagram-renderer.js";
 
   interface Props {
@@ -13,24 +13,38 @@
   let error = $state<string | null>(null);
   let loading = $state(true);
   let renderToken = 0;
+  let mounted = $state(false);
 
   async function render(src: string) {
     const token = ++renderToken;
     loading = true;
     svg = null;
     error = null;
-    const result = await renderDiagram(src);
-    if (token !== renderToken) return;
-    if (result.success) {
-      svg = DOMPurify.sanitize(result.svg!, { USE_PROFILES: { svg: true } });
-    } else {
-      error = result.error ?? "Failed to render diagram";
+    try {
+      const result = await renderDiagram(src);
+      if (token !== renderToken || !mounted) return;
+      if (result.success) {
+        const { default: DOMPurify } = await import("dompurify");
+        if (token !== renderToken || !mounted) return;
+        svg = DOMPurify.sanitize(result.svg!, { USE_PROFILES: { svg: true } });
+      } else {
+        error = result.error ?? "Failed to render diagram";
+      }
+    } catch (e) {
+      if (token !== renderToken || !mounted) return;
+      error = e instanceof Error ? e.message : "Failed to render diagram";
+    } finally {
+      if (token === renderToken && mounted) loading = false;
     }
-    loading = false;
   }
 
+  onMount(() => {
+    mounted = true;
+    return () => { mounted = false; };
+  });
+
   $effect(() => {
-    render(source);
+    if (mounted) render(source);
   });
 </script>
 
