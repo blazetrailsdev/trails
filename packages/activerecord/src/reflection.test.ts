@@ -10,11 +10,20 @@ import {
   contentColumns,
   reflectOnAssociation,
   reflectOnAllAssociations,
+  reflectOnAllAggregations,
+  reflectOnAggregation,
+  reflectOnAllAutosaveAssociations,
   ThroughReflection,
+  HasManyReflection,
+  HasOneReflection,
+  BelongsToReflection,
+  AggregateReflection,
+  AssociationReflection,
   registerModel,
   composedOf,
 } from "./index.js";
 import { Associations } from "./associations.js";
+import { Table } from "@blazetrails/arel";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -393,7 +402,15 @@ describe("ReflectionTest", () => {
   });
   it.skip("column for attribute", () => {});
   it.skip("columns for attribute", () => {});
-  it.skip("reflection class for", () => {});
+  it("reflection class for", () => {
+    const { Author, Book } = makeModels();
+    const hasManyRef = reflectOnAssociation(Author, "books");
+    expect(hasManyRef).toBeInstanceOf(HasManyReflection);
+    const belongsToRef = reflectOnAssociation(Book, "author");
+    expect(belongsToRef).toBeInstanceOf(BelongsToReflection);
+    const hasOneRef = reflectOnAssociation(Author, "profile");
+    expect(hasOneRef).toBeInstanceOf(HasOneReflection);
+  });
   it("reflection type", () => {
     const { Author, Book } = makeModels();
     const hasManyRef = reflectOnAssociation(Author, "books");
@@ -401,7 +418,39 @@ describe("ReflectionTest", () => {
     const belongsToRef = reflectOnAssociation(Book, "author");
     expect(belongsToRef!.macro).toBe("belongsTo");
   });
-  it.skip("aggregate mapping", () => {});
+  it("aggregate mapping", () => {
+    class Money {
+      constructor(
+        public amount: number,
+        public currency: string,
+      ) {}
+    }
+    class Customer extends Base {
+      static {
+        this.attribute("balance_amount", "integer");
+        this.attribute("balance_currency", "string");
+        this.adapter = adapter;
+      }
+    }
+    composedOf(Customer, "balance", {
+      className: Money,
+      mapping: [
+        ["balance_amount", "amount"],
+        ["balance_currency", "currency"],
+      ],
+    });
+    const aggs = reflectOnAllAggregations(Customer);
+    expect(aggs).toHaveLength(1);
+    expect(aggs[0]).toBeInstanceOf(AggregateReflection);
+    expect(aggs[0].name).toBe("balance");
+    expect(aggs[0].mapping()).toEqual([
+      ["balance_amount", "amount"],
+      ["balance_currency", "currency"],
+    ]);
+    const single = reflectOnAggregation(Customer, "balance");
+    expect(single).not.toBeNull();
+    expect(single!.name).toBe("balance");
+  });
   it("has and belongs to many reflection", () => {
     class Category extends Base {
       static {
@@ -425,7 +474,38 @@ describe("ReflectionTest", () => {
     expect(refs[0].macro).toBe("hasAndBelongsToMany");
     expect(refs[0].name).toBe("habtmPosts");
   });
-  it.skip("has many through source reflection", () => {});
+  it("has many through source reflection", () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Comment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    registerModel("Comment", Comment);
+    Associations.hasMany.call(Author, "posts", {});
+    Associations.hasMany.call(Post, "comments", {});
+    Associations.hasMany.call(Author, "comments", { through: "posts" });
+    const ref = reflectOnAssociation(Author, "comments") as ThroughReflection;
+    expect(ref).toBeInstanceOf(ThroughReflection);
+    expect(ref.sourceReflection).not.toBeNull();
+    expect(ref.sourceReflection!.name).toBe("comments");
+    expect(ref.throughReflection).not.toBeNull();
+    expect(ref.throughReflection!.name).toBe("posts");
+  });
   it.skip("has many through conditions when using a custom foreign key", () => {});
   it("collection based on associated model", () => {
     const { Author } = makeModels();
@@ -502,7 +582,57 @@ describe("ReflectionTest", () => {
   it.skip("has many reflection scope", () => {});
   it.skip("has many through reflection scope", () => {});
   it.skip("association primary key raises error when nil", () => {});
-  it.skip("has many through join keys", () => {});
+  it("has many through join keys", () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Comment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    registerModel("Comment", Comment);
+    Associations.hasMany.call(Author, "posts", {});
+    Associations.hasMany.call(Post, "comments", {});
+    Associations.hasMany.call(Author, "comments", { through: "posts" });
+    const ref = reflectOnAssociation(Author, "comments") as ThroughReflection;
+    // Through association: source is comments on Post, so
+    // joinPrimaryKey = source FK (post_id), joinForeignKey = source owner PK (id)
+    expect(ref.joinPrimaryKey).toBe("post_id");
+    expect(ref.joinForeignKey).toBe("id");
+  });
+  it("join scope builds arel predicate for has many", () => {
+    const { Author } = makeModels();
+    const ref = reflectOnAssociation(Author, "books") as AssociationReflection;
+    const booksTable = new Table("books");
+    const authorsTable = new Table("authors");
+    const scope = ref.joinScope(booksTable, authorsTable, Author);
+    const sql = scope.toSql();
+    // has_many: books.author_id = authors.id
+    expect(sql).toMatch(/"books"\."author_id" = "authors"\."id"/);
+  });
+  it("join scope builds arel predicate for belongs to", () => {
+    const { Book, Author } = makeModels();
+    const ref = reflectOnAssociation(Book, "author") as AssociationReflection;
+    const authorsTable = new Table("authors");
+    const booksTable = new Table("books");
+    const scope = ref.joinScope(authorsTable, booksTable, Book);
+    const sql = scope.toSql();
+    // belongs_to: authors.id = books.author_id
+    expect(sql).toMatch(/"authors"\."id" = "books"\."author_id"/);
+  });
   it.skip("scope chain", () => {});
   it.skip("nested has many through reflection", () => {});
   it("columns are returned in the order they were declared", () => {
@@ -548,8 +678,52 @@ describe("ReflectionTest", () => {
   it.skip("irregular reflection class name", () => {});
   it.skip("reflection klass with same demodularized different modularized name", () => {});
   it.skip("reflection klass with same modularized name", () => {});
-  it.skip("reflect on all autosave associations", () => {});
-  it.skip("association primary key", () => {});
+  it("reflect on all autosave associations", () => {
+    class Ship extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Part extends Base {
+      static {
+        this.attribute("ship_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Crew extends Base {
+      static {
+        this.attribute("ship_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Ship", Ship);
+    registerModel("Part", Part);
+    registerModel("Crew", Crew);
+    Associations.hasMany.call(Ship, "parts", { autosave: true });
+    Associations.hasMany.call(Ship, "crews", {});
+    const autosaved = reflectOnAllAutosaveAssociations(Ship);
+    expect(autosaved).toHaveLength(1);
+    expect(autosaved[0].name).toBe("parts");
+  });
+  it("association primary key", () => {
+    const { Author, Book } = makeModels();
+    const ref = reflectOnAssociation(Author, "books") as AssociationReflection;
+    expect(ref.associationPrimaryKey).toBe("id");
+    // Custom primary key
+    class SpecialBook extends Base {
+      static {
+        this.attribute("isbn", "string");
+        this.attribute("author_id", "integer");
+        this.primaryKey = "isbn";
+        this.adapter = adapter;
+      }
+    }
+    registerModel("SpecialBook", SpecialBook);
+    Associations.hasMany.call(Author, "specialBooks", { className: "SpecialBook" });
+    const specialRef = reflectOnAssociation(Author, "specialBooks") as AssociationReflection;
+    expect(specialRef.associationPrimaryKey).toBe("isbn");
+  });
   it.skip("association primary key raises when missing primary key", () => {});
   it.skip("active record primary key raises when missing primary key", () => {});
   it("foreign type", () => {
@@ -571,10 +745,82 @@ describe("ReflectionTest", () => {
     const normalRef = reflectOnAssociation(Sponsor, "sponsorClub");
     expect(normalRef!.foreignType).toBeNull();
   });
-  it.skip("default association validation", () => {});
-  it.skip("always validate association if explicit", () => {});
-  it.skip("validate association if autosave", () => {});
-  it.skip("never validate association if explicit", () => {});
+  it("default association validation", () => {
+    class Owner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Pet extends Base {
+      static {
+        this.attribute("owner_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Owner", Owner);
+    registerModel("Pet", Pet);
+    Associations.hasMany.call(Owner, "pets", {});
+    const ref = reflectOnAssociation(Owner, "pets") as AssociationReflection;
+    expect(ref.validate).toBe(false);
+  });
+  it("always validate association if explicit", () => {
+    class Owner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Pet extends Base {
+      static {
+        this.attribute("owner_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Owner", Owner);
+    registerModel("Pet", Pet);
+    Associations.hasMany.call(Owner, "pets", { validate: true });
+    const ref = reflectOnAssociation(Owner, "pets") as AssociationReflection;
+    expect(ref.validate).toBe(true);
+  });
+  it("validate association if autosave", () => {
+    class Owner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Pet extends Base {
+      static {
+        this.attribute("owner_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Owner", Owner);
+    registerModel("Pet", Pet);
+    Associations.hasMany.call(Owner, "pets", { autosave: true });
+    const ref = reflectOnAssociation(Owner, "pets") as AssociationReflection;
+    expect(ref.validate).toBe(true);
+  });
+  it("never validate association if explicit", () => {
+    class Owner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Pet extends Base {
+      static {
+        this.attribute("owner_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Owner", Owner);
+    registerModel("Pet", Pet);
+    Associations.hasMany.call(Owner, "pets", { validate: false, autosave: true });
+    const ref = reflectOnAssociation(Owner, "pets") as AssociationReflection;
+    expect(ref.validate).toBe(false);
+  });
   it.skip("symbol for class name", () => {});
   it.skip("class for class name", () => {});
   it.skip("class for source type", () => {});

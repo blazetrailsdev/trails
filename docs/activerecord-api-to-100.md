@@ -33,6 +33,7 @@ These workstreams have zero missing classes.
 
 ## Nearly Complete Areas
 
+- **Reflection** — 9 of 12 classes (3 missing: PolymorphicReflection, RuntimeReflection, Reflection module)
 - **Encryption** — 28 of 30 classes (2 missing: top-level module export, Cipher misplaced)
 - **Relation Query Layer** — 22 of 25 classes (3 missing: 2 Relation internals, 1 Calculations class)
 - **Migrations** — 22 of 40 classes (18 missing are all version compatibility classes: V7.2, V7.1, V7.0, etc.)
@@ -61,15 +62,21 @@ exception translation) and features not yet implemented:
 | `UnmodifiableRelation`                    | Relation freezing                              |
 | `DatabaseVersionError`                    | DB version checking                            |
 
-### Reflection (10 missing in `reflection.rb`)
+### Reflection (3 missing in `reflection.rb`)
 
-Only 2 of 12 matched. This is a significant gap — Rails uses reflection
-extensively for associations and attribute introspection.
+9/12 matched. Full class hierarchy implemented with Arel-based join
+scope building (`joinScope`, `buildScope`, `joinScopes`, `klassJoinScope`).
 
-Missing: `AbstractReflection`, `MacroReflection`, `AggregateReflection`,
-`AssociationReflection`, `HasManyReflection`, `HasOneReflection`,
-`BelongsToReflection`, `HasAndBelongsToManyReflection`,
-`ThroughReflection`, `PolymorphicReflection`
+Missing:
+
+- `PolymorphicReflection` — created during join scope building for polymorphic through associations
+- `RuntimeReflection` — internal optimization, wraps reflection with runtime association instance
+- `Reflection` module — top-level container module
+
+Known gap: `foreignKey` derivation does not yet handle composite primary
+keys or `queryConstraints`. Associations with CPK will report incorrect
+foreign keys in reflection. This should be addressed when CPK association
+support is fully implemented.
 
 ### Migration Compatibility (18 missing in `migration/compatibility.rb`)
 
