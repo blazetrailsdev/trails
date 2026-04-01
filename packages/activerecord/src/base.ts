@@ -42,6 +42,10 @@ import { Association as AssociationInstance } from "./associations/association.j
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import * as ConnectionHandling from "./connection-handling.js";
 import * as ModelSchema from "./model-schema.js";
+import * as SignedIdModule from "./signed-id.js";
+import * as LockingOptimistic from "./locking/optimistic.js";
+import * as LockingPessimistic from "./locking/pessimistic.js";
+import * as Translation from "./translation.js";
 import { sanitizeSqlArray, sanitizeSqlLike } from "./sanitization.js";
 import {
   hasAttribute as _hasAttribute,
@@ -130,19 +134,11 @@ export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): 
  */
 export class Base extends Model {
   static get i18nScope(): string {
-    return "activerecord";
+    return Translation.i18nScope(this);
   }
 
   static lookupAncestors(): Array<typeof Base> {
-    const ancestors: Array<typeof Base> = [];
-    let klass: typeof Base | null = this;
-    while (klass && klass !== Base) {
-      ancestors.push(klass);
-      const parent = Object.getPrototypeOf(klass);
-      klass = parent && parent !== Model && parent.prototype ? parent : null;
-    }
-    if (ancestors.length === 0) ancestors.push(this);
-    return ancestors;
+    return Translation.lookupAncestors(this);
   }
 
   // -- Class-level configuration --
@@ -250,18 +246,15 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Locking::Optimistic.locking_column
    */
   static get lockingColumn(): string {
-    return this._lockingColumn;
+    return LockingOptimistic.lockingColumn(this);
   }
 
   static set lockingColumn(col: string) {
-    this._lockingColumn = col;
+    LockingOptimistic.setLockingColumn(this, col);
   }
 
-  /**
-   * Whether this model uses optimistic locking.
-   */
   static get lockingEnabled(): boolean {
-    return this._attributeDefinitions.has(this._lockingColumn);
+    return LockingOptimistic.lockingEnabled(this);
   }
 
   /**
@@ -2640,65 +2633,17 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base#lock!
    */
   async lockBang(lockClause: string = "FOR UPDATE"): Promise<this> {
-    if (this.changed) {
-      const dirtyAttrs = this.changedAttributes.map((a) => `"${a}"`).join(", ");
-      throw new Error(
-        `Locking a record with unpersisted changes is not supported. Changed attributes: ${dirtyAttrs}. Use save to persist the changes, or reload to discard them explicitly.`,
-      );
-    }
-    const ctor = this.constructor as typeof Base;
-    const sm = ctor.arelTable
-      .project(arelStar)
-      .where(ctor._buildPkWhereNode(this.id))
-      .lock(lockClause);
-    const rows = await ctor.adapter.execute(sm.toSql());
-
-    if (rows.length === 0) {
-      throw new RecordNotFound(
-        `${ctor.name} with ${ctor.primaryKey}=${this.id} not found`,
-        ctor.name,
-        ctor.primaryKey as string,
-        this.id,
-      );
-    }
-
-    for (const [key, value] of Object.entries(rows[0])) {
-      this._attributes.set(key, value);
-    }
-    (this as any)._dirty.snapshot(this._attributes);
+    await LockingPessimistic.lockBang(this, lockClause);
     return this;
   }
 
-  /**
-   * Wraps the passed block in a transaction, reloading the record with a lock.
-   *
-   * Mirrors: ActiveRecord::Base#with_lock
-   */
   async withLock(lock: string, fn: (record: this) => Promise<void> | void): Promise<void>;
   async withLock(fn: (record: this) => Promise<void> | void): Promise<void>;
   async withLock(
     lockOrFn?: string | ((record: this) => Promise<void> | void),
     fn?: (record: this) => Promise<void> | void,
   ): Promise<void> {
-    let lockClause = "FOR UPDATE";
-    let callback = fn;
-
-    if (typeof lockOrFn === "function") {
-      callback = lockOrFn;
-    } else if (typeof lockOrFn === "string") {
-      lockClause = lockOrFn;
-    }
-
-    if (!callback) {
-      throw new Error("withLock requires a callback block");
-    }
-
-    const cb = callback;
-    const { transaction } = await import("./transactions.js");
-    await transaction(this.constructor as typeof Base, async () => {
-      await this.lockBang(lockClause);
-      await cb(this);
-    });
+    return LockingPessimistic.withLock(this, lockOrFn as any, fn as any);
   }
 
   declare toParam: () => string | null;
@@ -2968,23 +2913,13 @@ export class Base extends Model {
   }
 
   /**
-   * Generate a signed ID for this record using base64-encoded JSON with HMAC.
-   * The purpose parameter scopes the signed ID.
+   * Generate a signed ID for this record using HMAC-SHA256 via MessageVerifier.
+   * The purpose parameter scopes the signed ID. expiresIn is in seconds.
    *
    * Mirrors: ActiveRecord::SignedId#signed_id
    */
-  signedId(options?: { purpose?: string; expiresIn?: number }): string {
-    if (!this.isPersisted()) {
-      throw new Error("Cannot generate a signed_id for a new record");
-    }
-    const payload: Record<string, unknown> = { id: this.id };
-    if (options?.purpose) payload.purpose = options.purpose;
-    if (options?.expiresIn) payload.expiresAt = Date.now() + options.expiresIn;
-    const json = JSON.stringify(payload);
-    if (typeof btoa === "function") {
-      return btoa(json);
-    }
-    return Buffer.from(json).toString("base64");
+  signedId(options?: { purpose?: string; expiresIn?: number; expiresAt?: Date }): string {
+    return SignedIdModule.signedId(this, options);
   }
 
   /**
@@ -2993,40 +2928,17 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::SignedId.find_signed
    */
   static async findSigned(signedId: string, options?: { purpose?: string }): Promise<Base | null> {
-    try {
-      let json: string;
-      if (typeof atob === "function") {
-        json = atob(signedId);
-      } else {
-        json = Buffer.from(signedId, "base64").toString("utf-8");
-      }
-      const payload = JSON.parse(json);
-      if (options?.purpose && payload.purpose !== options.purpose) return null;
-      if (payload.expiresAt && Date.now() > payload.expiresAt) return null;
-      if (Array.isArray(this.primaryKey)) {
-        const conditions: Record<string, unknown> = {};
-        (this.primaryKey as string[]).forEach((col, i) => {
-          conditions[col] = payload.id[i];
-        });
-        return this.findBy(conditions);
-      }
-      return this.findBy({ [this.primaryKey as string]: payload.id });
-    } catch {
-      return null;
-    }
+    return SignedIdModule.findSigned(this, signedId, options);
   }
 
   /**
-   * Find a record by its signed ID, or throw RecordNotFound.
+   * Find a record by its signed ID, or throw.
+   * Throws InvalidSignature if tampered/expired, RecordNotFound if not found.
    *
    * Mirrors: ActiveRecord::SignedId.find_signed!
    */
   static async findSignedBang(signedId: string, options?: { purpose?: string }): Promise<Base> {
-    const record = await this.findSigned(signedId, options);
-    if (!record) {
-      throw new RecordNotFound(`${this.name} not found with signed id`, this.name);
-    }
-    return record;
+    return SignedIdModule.findSignedBang(this, signedId, options);
   }
 
   /**

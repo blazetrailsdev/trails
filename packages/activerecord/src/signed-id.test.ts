@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, RecordNotFound } from "./index.js";
+import { Base, RecordNotFound, setSignedIdVerifierSecret } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -17,6 +17,7 @@ describe("SignedIdTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
+    setSignedIdVerifierSecret("blazetrails-test-secret");
   });
 
   function makeModel() {
@@ -38,7 +39,7 @@ describe("SignedIdTest", () => {
   it("find signed record within expiration duration", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Alice" });
-    const token = u.signedId({ expiresIn: 60_000 });
+    const token = u.signedId({ expiresIn: 60 });
     const found = await User.findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.name).toBe("Alice");
@@ -47,8 +48,7 @@ describe("SignedIdTest", () => {
   it("fail to find signed record within expiration duration", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Bob" });
-    const token = u.signedId({ expiresIn: 1 });
-    await new Promise((r) => setTimeout(r, 5));
+    const token = u.signedId({ expiresAt: new Date(Date.now() - 1000) });
     const result = await User.findSigned(token);
     expect(result).toBeNull();
   });
@@ -169,8 +169,7 @@ describe("SignedIdTest", () => {
   it("fail to find signed record within expiration time", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Expired" });
-    const token = u.signedId({ expiresIn: 1 });
-    await new Promise((r) => setTimeout(r, 5));
+    const token = u.signedId({ expiresAt: new Date(Date.now() - 1000) });
     const result = await User.findSigned(token);
     expect(result).toBeNull();
   });
@@ -190,9 +189,10 @@ describe("SignedIdTest", () => {
       }
     }
     const u = await UserShort.create({ name: "Jake" });
-    const token = u.signedId({ expiresIn: 1 });
-    await new Promise((r) => setTimeout(r, 5));
-    await expect(UserShort.findSignedBang(token)).rejects.toThrow(RecordNotFound);
+    const token = u.signedId({ expiresAt: new Date(Date.now() - 1000) });
+    await expect(UserShort.findSignedBang(token)).rejects.toThrow(
+      /Expired message|InvalidSignature/,
+    );
   });
 
   it.skip("fail to work without a signed_id_verifier_secret", () => {
