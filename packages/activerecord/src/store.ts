@@ -14,6 +14,71 @@ export function storedAttributes(modelClass: typeof Base): Record<string, string
 }
 
 /**
+ * Reads/writes hash keys on a store attribute.
+ *
+ * Mirrors: ActiveRecord::Store::HashAccessor
+ */
+export class HashAccessor {
+  static read(object: Base, attribute: string, key: string): unknown {
+    const data = object.readAttribute(attribute);
+    if (data === null || data === undefined) return null;
+    const obj = this._readHash(data);
+    return obj[key] ?? null;
+  }
+
+  static write(object: Base, attribute: string, key: string, value: unknown): void {
+    const current = this.read(object, attribute, key);
+    if (value !== current) {
+      this.prepare(object, attribute);
+      const raw = object.readAttribute(attribute);
+      const obj = this._writeHash(raw);
+      obj[key] = value;
+      const isStringColumn = typeof raw === "string" || raw === null || raw === undefined;
+      object.writeAttribute(attribute, isStringColumn ? JSON.stringify(obj) : obj);
+    }
+  }
+
+  static prepare(object: Base, attribute: string): void {
+    const val = object.readAttribute(attribute);
+    if (val === null || val === undefined) {
+      object.writeAttribute(attribute, "{}");
+    }
+  }
+
+  protected static _readHash(data: unknown): Readonly<Record<string, unknown>> {
+    if (data === null || data === undefined) return {};
+    if (typeof data === "string") return JSON.parse(data);
+    if (typeof data === "object" && !Array.isArray(data)) return data as Record<string, unknown>;
+    return {};
+  }
+
+  protected static _writeHash(data: unknown): Record<string, unknown> {
+    if (data === null || data === undefined) return {};
+    if (typeof data === "string") {
+      const parsed = JSON.parse(data);
+      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return { ...parsed };
+      }
+      return {};
+    }
+    if (typeof data === "object" && !Array.isArray(data)) {
+      return { ...(data as Record<string, unknown>) };
+    }
+    return {};
+  }
+}
+
+/**
+ * In Rails, IndifferentHashAccessor ensures the store value is a
+ * HashWithIndifferentAccess. In TypeScript, JS objects already use
+ * string keys natively, so no additional behavior is needed beyond
+ * HashAccessor. Kept as a distinct class for Rails API parity.
+ *
+ * Mirrors: ActiveRecord::Store::IndifferentHashAccessor
+ */
+export class IndifferentHashAccessor extends HashAccessor {}
+
+/**
  * Store — JSON-backed attribute accessors.
  *
  * Mirrors: ActiveRecord::Store
@@ -28,7 +93,7 @@ export function storedAttributes(modelClass: typeof Base): Record<string, string
  *   store(User, 'settings', { accessors: ['theme'], suffix: true })
  *   store(User, 'settings', { accessors: ['theme'], suffix: 'setting' })
  *
- * The column should use the "json" type.
+ * The column should use the "json" type or a serialized text column.
  */
 export function store(
   modelClass: typeof Base,
@@ -48,7 +113,6 @@ export function store(
   _storedAttributes.set(modelClass, existing);
 
   for (const accessor of accessors) {
-    // Build the accessor name with prefix/suffix
     let accessorName = accessor;
     if (prefix) {
       const pre = prefix === true ? attribute : String(prefix);
@@ -61,21 +125,10 @@ export function store(
 
     Object.defineProperty(modelClass.prototype, accessorName, {
       get: function (this: Base) {
-        const data = this.readAttribute(attribute);
-        if (data === null || data === undefined) return null;
-        const obj = typeof data === "string" ? JSON.parse(data) : data;
-        return obj[accessor] ?? null;
+        return IndifferentHashAccessor.read(this, attribute, accessor);
       },
       set: function (this: Base, value: unknown) {
-        const raw = this.readAttribute(attribute);
-        const obj =
-          raw === null || raw === undefined
-            ? {}
-            : typeof raw === "string"
-              ? JSON.parse(raw)
-              : { ...(raw as Record<string, unknown>) };
-        obj[accessor] = value;
-        this.writeAttribute(attribute, JSON.stringify(obj));
+        IndifferentHashAccessor.write(this, attribute, accessor, value);
       },
       configurable: true,
     });

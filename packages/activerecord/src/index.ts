@@ -53,7 +53,13 @@ export {
   findStiClass,
 } from "./inheritance.js";
 export { hasSecurePassword } from "./secure-password.js";
-export { store, storeAccessor, storedAttributes } from "./store.js";
+export {
+  store,
+  storeAccessor,
+  storedAttributes,
+  HashAccessor,
+  IndifferentHashAccessor,
+} from "./store.js";
 export { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 export { PostgreSQLAdapter } from "./adapters/postgresql-adapter.js";
 export { Mysql2Adapter } from "./adapters/mysql2-adapter.js";
