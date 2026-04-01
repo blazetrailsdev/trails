@@ -21,11 +21,7 @@ import {
   RecordNotDestroyed,
   StaleObjectError,
   ReadOnlyRecord,
-  AdapterNotFound,
-  AdapterNotSpecified,
-  ConnectionNotEstablished,
   ConnectionNotDefined,
-  ConfigurationError,
   DangerousAttributeError,
   AttributeAssignmentError,
 } from "./errors.js";
@@ -34,12 +30,9 @@ import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
 import * as Timestamp from "./timestamp.js";
 import { Association as AssociationInstance } from "./associations/association.js";
-import { DatabaseConfigurations } from "./database-configurations.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
-import { HashConfig } from "./database-configurations/hash-config.js";
-import { readFileSync, existsSync } from "fs";
-import { resolve } from "path";
-import { pathToFileURL } from "url";
+import * as ConnectionHandling from "./connection-handling.js";
+import * as ModelSchema from "./model-schema.js";
 import { sanitizeSqlArray, sanitizeSqlLike } from "./sanitization.js";
 import {
   hasAttribute as _hasAttribute,
@@ -68,34 +61,6 @@ import {
 } from "./core.js";
 import { ScopeRegistry } from "./scoping.js";
 
-type AdapterConstructor = new (config: any) => DatabaseAdapter;
-
-const _adapterCache: Record<string, AdapterConstructor> = {};
-
-async function _loadAdapter(name: string): Promise<AdapterConstructor> {
-  if (_adapterCache[name]) return _adapterCache[name];
-  switch (name) {
-    case "postgresql": {
-      const mod = await import("./adapters/postgresql-adapter.js");
-      _adapterCache[name] = mod.PostgreSQLAdapter;
-      return mod.PostgreSQLAdapter;
-    }
-    case "mysql": {
-      const mod = await import("./adapters/mysql2-adapter.js");
-      _adapterCache[name] = mod.Mysql2Adapter;
-      return mod.Mysql2Adapter;
-    }
-    case "sqlite": {
-      const mod = await import("./connection-adapters/sqlite3-adapter.js");
-      _adapterCache[name] = mod.SQLite3Adapter;
-      return mod.SQLite3Adapter;
-    }
-    default:
-      throw new AdapterNotFound(
-        `Unknown database adapter "${name}". Supported adapters: postgresql, mysql, sqlite`,
-      );
-  }
-}
 import { Default as DefaultScoping } from "./scoping/default.js";
 import { Named as NamedScoping } from "./scoping/named.js";
 import { AssociationNotFoundError } from "./associations/errors.js";
@@ -501,220 +466,7 @@ export class Base extends Model {
           [key: string]: unknown;
         },
   ): Promise<void> {
-    this._adapter = null;
-    Base._adapter = null;
-
-    if (config === undefined) {
-      await this._autoConnect();
-      return;
-    }
-
-    const resolved = this._resolveConfig(config);
-    await this._establishWithConfig(resolved.adapterName, resolved.url, resolved.config);
-  }
-
-  private static async _establishWithConfig(
-    adapterName: string,
-    url: string,
-    config?: Record<string, unknown>,
-  ): Promise<void> {
-    const normalized = this._normalizeAdapterName(adapterName);
-    const AdapterClass = await _loadAdapter(normalized);
-
-    // Build the argument for the adapter constructor:
-    // - sqlite: always a filename/path
-    // - postgres/mysql: URL string if available, otherwise config object
-    let adapterArg: unknown;
-    if (normalized === "sqlite") {
-      adapterArg = this._parseSqliteUrl(url || (config?.database as string) || ":memory:");
-    } else if (url) {
-      adapterArg = url;
-    } else if (config) {
-      // Pass through the full config, stripping internal keys and
-      // mapping Rails-style username -> driver-style user
-      const { adapter: _a, url: _u, username, ...rest } = config;
-      const adapterConfig: Record<string, unknown> = { ...rest };
-      if (adapterConfig.user === undefined && username !== undefined) {
-        adapterConfig.user = username;
-      }
-      if (adapterConfig.host === undefined) {
-        adapterConfig.host = "localhost";
-      }
-      adapterArg = adapterConfig;
-    } else {
-      adapterArg = url;
-    }
-
-    const dbConfig = new HashConfig(
-      process.env.NODE_ENV || DatabaseConfigurations.defaultEnv,
-      "primary",
-      { adapter: adapterName, url, ...config },
-    );
-
-    this._connectionHandler.establishConnection(dbConfig, {
-      owner: "primary",
-      adapterFactory: () => new AdapterClass(adapterArg),
-    });
-  }
-
-  /**
-   * Auto-connect by loading database configuration.
-   *
-   * Loads config/database.json if present, with DATABASE_URL merged in
-   * by DatabaseConfigurations (matching how Rails merges DATABASE_URL
-   * into database.yml). Resolves the config for the current NODE_ENV
-   * and establishes the connection through ConnectionHandler.
-   */
-  private static async _autoConnect(): Promise<void> {
-    const raw = await this._loadConfigFile();
-    const configs = DatabaseConfigurations.fromEnv(raw);
-    const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
-    const primaryConfigs = configs.configsFor({ envName: env, name: "primary" });
-    const dbConfig = primaryConfigs[0] ?? configs.findDbConfig(env);
-
-    if (!dbConfig) {
-      throw new ConnectionNotEstablished(
-        `No database configuration found for ${this.name}. ` +
-          `Add config/database.json, set DATABASE_URL, or call ${this.name}.establishConnection(url)`,
-      );
-    }
-
-    const url = dbConfig.configuration.url || "";
-    const adapterName = dbConfig.adapter || (url ? this._adapterNameFromUrl(url) : undefined);
-    if (!adapterName) {
-      throw new AdapterNotSpecified(
-        `Database configuration for "${env}" must include an adapter name or a URL. ` +
-          `Add config/database.json, set DATABASE_URL, or call ${this.name}.establishConnection(url)`,
-      );
-    }
-    await this._establishWithConfig(
-      adapterName,
-      url,
-      dbConfig.configuration as Record<string, unknown>,
-    );
-  }
-
-  private static _resolveConfig(
-    config: string | { adapter?: string; url?: string; database?: string; [key: string]: unknown },
-  ): { adapterName: string; url: string; config?: Record<string, unknown> } {
-    let url: string;
-    let adapterName: string | undefined;
-    let fullConfig: Record<string, unknown> | undefined;
-
-    if (typeof config === "string") {
-      url = config;
-    } else {
-      adapterName = config.adapter;
-      url = config.url || "";
-      fullConfig = config as Record<string, unknown>;
-    }
-
-    if (!adapterName && !url && !fullConfig?.database) {
-      throw new AdapterNotSpecified(
-        "Database configuration must include a url, database, or adapter name",
-      );
-    }
-
-    if (!adapterName) {
-      adapterName = this._adapterNameFromUrl(url || (fullConfig?.database as string) || "");
-    }
-
-    return { adapterName, url, config: fullConfig };
-  }
-
-  private static async _loadConfigFile(): Promise<Record<string, any>> {
-    // If a specific config path is set (e.g. in tests), use it directly
-    if (this._configPath) {
-      return this._loadJsonConfig(this._configPath);
-    }
-
-    const cwd = process.cwd();
-
-    // Try TS/JS config files first (matching the CLI's loadDatabaseConfig)
-    const tsCandidates = [
-      resolve(cwd, "config", "database.ts"),
-      resolve(cwd, "config", "database.js"),
-      resolve(cwd, "src", "config", "database.ts"),
-      resolve(cwd, "src", "config", "database.js"),
-    ];
-
-    for (const candidate of tsCandidates) {
-      if (existsSync(candidate)) {
-        try {
-          const mod = await import(pathToFileURL(candidate).href);
-          return mod.default ?? mod;
-        } catch (error: unknown) {
-          throw new Error(
-            `Failed to load database config at ${candidate}: ${(error as Error).message}`,
-            { cause: error },
-          );
-        }
-      }
-    }
-
-    // Fall back to JSON config
-    return this._loadJsonConfig(resolve(cwd, "config", "database.json"));
-  }
-
-  private static _loadJsonConfig(configPath: string): Record<string, any> {
-    try {
-      return JSON.parse(readFileSync(configPath, "utf-8"));
-    } catch (error: unknown) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return {};
-      }
-      throw new ConfigurationError(
-        `Failed to load database config at ${configPath}: ${(error as Error).message}`,
-        { cause: error },
-      );
-    }
-  }
-
-  private static _normalizeAdapterName(name: string): string {
-    switch (name) {
-      case "postgresql":
-      case "postgres":
-        return "postgresql";
-      case "mysql":
-      case "mysql2":
-        return "mysql";
-      case "sqlite":
-      case "sqlite3":
-        return "sqlite";
-      default:
-        return name;
-    }
-  }
-
-  private static _parseSqliteUrl(url: string): string {
-    if (url.startsWith("sqlite3://") || url.startsWith("sqlite://")) {
-      const stripped = url.replace(/^sqlite3?:\/\//, "");
-      return stripped || ":memory:";
-    }
-    return url;
-  }
-
-  private static _adapterNameFromUrl(url: string): string {
-    if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
-      return "postgresql";
-    }
-    if (url.startsWith("mysql://") || url.startsWith("mysql2://")) {
-      return "mysql";
-    }
-    if (
-      url.startsWith("sqlite://") ||
-      url.startsWith("sqlite3://") ||
-      url.endsWith(".sqlite3") ||
-      url.endsWith(".db") ||
-      url === ":memory:"
-    ) {
-      return "sqlite";
-    }
-    throw new AdapterNotFound(
-      `Cannot detect database adapter from URL "${url}". ` +
-        `Use a URL starting with postgres://, mysql://, or sqlite://, ` +
-        `or pass { adapter: "postgresql", url: "..." }`,
-    );
+    return ConnectionHandling.establishConnection(this, config);
   }
 
   /**
@@ -723,48 +475,19 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.column_names
    */
   static columnNames(): string[] {
-    const ignored = new Set(this._ignoredColumns);
-    return Array.from(this._attributeDefinitions.keys()).filter((name) => !ignored.has(name));
+    return ModelSchema.columnNames(this);
   }
 
-  /**
-   * Check if the model class has a given attribute defined.
-   *
-   * Mirrors: ActiveRecord::Base.has_attribute?
-   */
   static hasAttributeDefinition(name: string): boolean {
-    return this._attributeDefinitions.has(name);
+    return ModelSchema.hasAttributeDefinition(this, name);
   }
 
-  /**
-   * Return a hash of column definitions keyed by name.
-   *
-   * Mirrors: ActiveRecord::Base.columns_hash
-   */
   static columnsHash(): Record<string, { name: string; type: string; default: unknown }> {
-    if (this.abstractClass) {
-      throw new Error(`Cannot call columnsHash on abstract class ${this.name}`);
-    }
-    const result: Record<string, { name: string; type: string; default: unknown }> = {};
-    for (const [name, def] of this._attributeDefinitions) {
-      result[name] = { name, type: def.type.name, default: def.defaultValue };
-    }
-    return result;
+    return ModelSchema.columnsHash(this);
   }
 
-  /**
-   * Return columns excluding primary key, foreign keys (_id), and timestamps.
-   *
-   * Mirrors: ActiveRecord::Base.content_columns
-   */
   static contentColumns(): string[] {
-    const pk = this.primaryKey;
-    return this.columnNames().filter((col) => {
-      if (col === pk) return false;
-      if (col.endsWith("_id")) return false;
-      if (col === "created_at" || col === "updated_at") return false;
-      return true;
-    });
+    return ModelSchema.contentColumns(this);
   }
 
   /**

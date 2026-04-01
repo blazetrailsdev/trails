@@ -62,6 +62,17 @@ export {
 export { attrReadonly, readonlyAttributes, readonlyAttribute } from "./readonly-attributes.js";
 export { touch, touchAll } from "./timestamp.js";
 export {
+  establishConnection,
+  normalizeAdapterName,
+  parseSqliteUrl,
+  adapterNameFromUrl,
+} from "./connection-handling.js";
+export {
+  columnNames as schemaColumnNames,
+  columnsHash as schemaColumnsHash,
+  contentColumns as schemaContentColumns,
+} from "./model-schema.js";
+export {
   store,
   storeAccessor,
   storedAttributes,
