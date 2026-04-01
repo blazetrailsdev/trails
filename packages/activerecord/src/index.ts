@@ -2,6 +2,8 @@ export { Base } from "./base.js";
 export * as Type from "./type.js";
 export { Relation, Range } from "./relation.js";
 export { QueryAttribute } from "./relation/query-attribute.js";
+export { InsertAll, Builder as InsertAllBuilder } from "./insert-all.js";
+export type { InsertAllOptions } from "./insert-all.js";
 export type { DatabaseAdapter } from "./adapter.js";
 export { Migration, MigrationContext } from "./migration.js";
 export {

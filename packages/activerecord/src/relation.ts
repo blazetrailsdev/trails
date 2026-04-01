@@ -18,6 +18,7 @@ import { WhereChain } from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
 import { performSpawn, performMerge } from "./relation/spawn-methods.js";
 import { wrapWithScopeProxy } from "./relation/delegation.js";
+import { InsertAll } from "./insert-all.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import {
   performCount,
@@ -2210,34 +2211,10 @@ export class Relation<T extends Base> {
     records: Record<string, unknown>[],
     options?: { uniqueBy?: string | string[] },
   ): Promise<number> {
-    if (records.length === 0) return 0;
-
-    // Merge scope attributes (from where() and createWith()) into each record
-    const scopeAttrs = { ...this._createWithAttrs, ...this._scopeAttributes() };
-    const mergedRecords = records.map((r) => ({ ...scopeAttrs, ...r }));
-
-    const table = this._modelClass.arelTable;
-    const columns = Object.keys(mergedRecords[0]);
-    const colList = columns.map((c) => `"${c}"`).join(", ");
-
-    const arrayCols = this._arrayColumnSet(columns);
-    const valueRows = mergedRecords.map((row) => {
-      const vals = columns.map((c) => quoteSqlValue(row[c], arrayCols.has(c)));
-      return `(${vals.join(", ")})`;
+    return InsertAll.execute(this, records, {
+      uniqueBy: options?.uniqueBy,
+      onDuplicate: options?.uniqueBy ? "skip" : undefined,
     });
-
-    let sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")}`;
-
-    if (options?.uniqueBy) {
-      const uniqueCols = Array.isArray(options.uniqueBy) ? options.uniqueBy : [options.uniqueBy];
-      if (process.env.MYSQL_TEST_URL) {
-        sql = `INSERT IGNORE INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")}`;
-      } else {
-        sql += ` ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")}) DO NOTHING`;
-      }
-    }
-
-    return this._modelClass.adapter.executeMutation(sql);
   }
 
   /**
@@ -2253,90 +2230,11 @@ export class Relation<T extends Base> {
       onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
     },
   ): Promise<number> {
-    if (options?.onDuplicate !== undefined && options?.updateOnly !== undefined) {
-      throw new Error("Cannot use both onDuplicate and updateOnly");
-    }
-
-    if (records.length === 0) return 0;
-
-    // Merge scope attributes into each record
-    const scopeAttrs = { ...this._createWithAttrs, ...this._scopeAttributes() };
-    const mergedRecords = records.map((r) => ({ ...scopeAttrs, ...r }));
-
-    const table = this._modelClass.arelTable;
-    const columns = Object.keys(mergedRecords[0]);
-    const colList = columns.map((c) => `"${c}"`).join(", ");
-
-    const upsertArrayCols = this._arrayColumnSet(columns);
-    const valueRows = mergedRecords.map((row) => {
-      const vals = columns.map((c) => quoteSqlValue(row[c], upsertArrayCols.has(c)));
-      return `(${vals.join(", ")})`;
+    return InsertAll.execute(this, records, {
+      uniqueBy: options?.uniqueBy,
+      updateOnly: options?.updateOnly,
+      onDuplicate: options?.onDuplicate ?? "update",
     });
-
-    const pk = this._modelClass.primaryKey;
-    const uniqueCols = options?.uniqueBy
-      ? Array.isArray(options.uniqueBy)
-        ? options.uniqueBy
-        : [options.uniqueBy]
-      : Array.isArray(pk)
-        ? pk
-        : [pk];
-
-    let sql: string;
-    const isMysql = !!process.env.MYSQL_TEST_URL;
-
-    if (options?.onDuplicate === "skip") {
-      if (isMysql) {
-        sql = `INSERT IGNORE INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")}`;
-      } else {
-        const conflictTarget = `ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")})`;
-        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO NOTHING`;
-      }
-    } else if (options?.onDuplicate instanceof Nodes.SqlLiteral) {
-      // Custom SQL via Arel.sql() — matches Rails' on_duplicate: Arel.sql("...")
-      if (isMysql) {
-        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ON DUPLICATE KEY UPDATE ${options.onDuplicate.value}`;
-      } else {
-        const conflictTarget = `ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")})`;
-        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO UPDATE SET ${options.onDuplicate.value}`;
-      }
-    } else {
-      // Default upsert or updateOnly
-      let updateCols: string[];
-      if (options?.updateOnly) {
-        const only = Array.isArray(options.updateOnly) ? options.updateOnly : [options.updateOnly];
-        updateCols = only;
-      } else {
-        updateCols = columns.filter((c) => !uniqueCols.includes(c));
-      }
-
-      let updateClause: string;
-      if (isMysql) {
-        updateClause =
-          updateCols.length > 0
-            ? updateCols.map((c) => `"${c}" = VALUES("${c}")`).join(", ")
-            : `"${columns[0]}" = VALUES("${columns[0]}")`;
-        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ON DUPLICATE KEY UPDATE ${updateClause}`;
-      } else {
-        updateClause =
-          updateCols.length > 0
-            ? updateCols.map((c) => `"${c}" = EXCLUDED."${c}"`).join(", ")
-            : `"${columns[0]}" = EXCLUDED."${columns[0]}"`;
-        const conflictTarget = `ON CONFLICT (${uniqueCols.map((c) => `"${c}"`).join(", ")})`;
-        sql = `INSERT INTO "${table.name}" (${colList}) VALUES ${valueRows.join(", ")} ${conflictTarget} DO UPDATE SET ${updateClause}`;
-      }
-    }
-
-    return this._modelClass.adapter.executeMutation(sql);
-  }
-
-  private _arrayColumnSet(columns: string[]): Set<string> {
-    return new Set(
-      columns.filter((c) => {
-        const def = this._modelClass._attributeDefinitions.get(c);
-        return def?.type?.name === "array";
-      }),
-    );
   }
 
   /**
