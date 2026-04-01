@@ -1103,4 +1103,38 @@ describe("SelectManagerTest", () => {
       expect(mgr.toSql()).toContain("LIMIT 5");
     });
   });
+
+  describe("optimizerHints", () => {
+    it("places hints after SELECT", () => {
+      const mgr = new SelectManager(users).project(star).optimizerHints("MAX_EXECUTION_TIME(1000)");
+      expect(mgr.toSql()).toBe('SELECT /*+ MAX_EXECUTION_TIME(1000) */ * FROM "users"');
+    });
+
+    it("supports multiple hints", () => {
+      const mgr = new SelectManager(users)
+        .project(star)
+        .optimizerHints("NO_INDEX_MERGE(users)", "BKA(users)");
+      expect(mgr.toSql()).toBe('SELECT /*+ NO_INDEX_MERGE(users) BKA(users) */ * FROM "users"');
+    });
+
+    it("sanitizes comment delimiters from hints", () => {
+      const mgr = new SelectManager(users)
+        .project(star)
+        .optimizerHints("HINT */ DROP TABLE users --");
+      const sql = mgr.toSql();
+      expect(sql).toBe('SELECT /*+ HINT DROP TABLE users */ * FROM "users"');
+    });
+
+    it("sanitizes newlines from hints", () => {
+      const mgr = new SelectManager(users).project(star).optimizerHints("HINT\nwith\nnewlines");
+      const sql = mgr.toSql();
+      expect(sql).not.toContain("\n");
+      expect(sql).toContain("/*+ HINT with newlines */");
+    });
+
+    it("strips empty hints after sanitization", () => {
+      const mgr = new SelectManager(users).project(star).optimizerHints("/* */", "--");
+      expect(mgr.toSql()).toBe('SELECT * FROM "users"');
+    });
+  });
 });

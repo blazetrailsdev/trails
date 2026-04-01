@@ -82,7 +82,7 @@ describe("UpdateManagerTest", () => {
       ]);
       mgr.where(users.get("id").eq(1));
       expect(mgr.toSql()).toBe(
-        `UPDATE "users" SET "users"."name" = 'dean', "users"."age" = 31 WHERE "users"."id" = 1`,
+        `UPDATE "users" SET "name" = 'dean', "age" = 31 WHERE "users"."id" = 1`,
       );
     });
   });
@@ -111,7 +111,7 @@ describe("UpdateManagerTest", () => {
     mgr.order(users.get("name").asc());
     mgr.take(5);
     expect(mgr.toSql()).toBe(
-      `UPDATE "users" SET "users"."active" = FALSE WHERE "users"."age" < 18 ORDER BY "users"."name" ASC LIMIT 5`,
+      `UPDATE "users" SET "active" = FALSE WHERE "users"."age" < 18 ORDER BY "users"."name" ASC LIMIT 5`,
     );
   });
 
@@ -146,8 +146,8 @@ describe("UpdateManagerTest", () => {
         [users.get("name"), "hello"],
       ]);
       const sql = um.toSql();
-      expect(sql).toContain('"users"."id" = 1');
-      expect(sql).toContain('"users"."name" =');
+      expect(sql).toContain('"id" = 1');
+      expect(sql).toContain('"name" =');
     });
   });
 

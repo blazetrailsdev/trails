@@ -3,6 +3,7 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods
  */
+import { isBlank } from "@blazetrails/activesupport";
 
 /**
  * The AttributeMethods module interface.
@@ -36,10 +37,7 @@ export function hasAttribute(this: AttributeRecord, name: string): boolean {
  * Mirrors: ActiveRecord::AttributeMethods#attribute_present?
  */
 export function attributePresent(this: AttributeRecord, name: string): boolean {
-  const value = this.readAttribute(name);
-  if (value === null || value === undefined) return false;
-  if (typeof value === "string" && value.trim() === "") return false;
-  return true;
+  return !isBlank(this.readAttribute(name));
 }
 
 /**

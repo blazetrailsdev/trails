@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { loadBelongsTo, loadHasOne } from "./associations.js";
 import type { AssociationDefinition } from "./associations.js";
+import { upcaseFirst } from "@blazetrails/activesupport";
 
 /**
  * Delegate methods to an association.
@@ -22,8 +23,8 @@ export function delegate(
   for (const method of methods) {
     const delegatedName = options.prefix
       ? typeof options.prefix === "string"
-        ? `${options.prefix}${method.charAt(0).toUpperCase() + method.slice(1)}`
-        : `${assocName}${method.charAt(0).toUpperCase() + method.slice(1)}`
+        ? `${options.prefix}${upcaseFirst(method)}`
+        : `${assocName}${upcaseFirst(method)}`
       : method;
 
     Object.defineProperty(modelClass.prototype, delegatedName, {

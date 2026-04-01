@@ -24,6 +24,7 @@ export class NotImplementedError extends Error {
  */
 export class ToSql implements NodeVisitor<SQLString> {
   protected collector!: SQLString;
+  private _inUpdateSet = false;
 
   compile(node: Node): string {
     this.collector = new SQLString();
@@ -201,8 +202,20 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
+  protected emitOptimizerHints(node: Nodes.SelectCore): void {
+    if (node.optimizerHints.length === 0) return;
+    const sanitized = node.optimizerHints
+      .map((h) => this.sanitizeHint(h))
+      .filter((h) => h.length > 0);
+    if (sanitized.length > 0) {
+      this.collector.append(` /*+ ${sanitized.join(" ")} */`);
+    }
+  }
+
   protected visitSelectCore(node: Nodes.SelectCore): SQLString {
     this.collector.append("SELECT");
+
+    this.emitOptimizerHints(node);
 
     if (node.setQuantifier) {
       this.collector.append(" ");
@@ -275,7 +288,12 @@ export class ToSql implements NodeVisitor<SQLString> {
 
     if (node.values.length > 0) {
       this.collector.append(" SET ");
-      this.visitArray(node.values, ", ");
+      this._inUpdateSet = true;
+      try {
+        this.visitArray(node.values, ", ");
+      } finally {
+        this._inUpdateSet = false;
+      }
     }
 
     if (node.wheres.length > 0) {
@@ -493,7 +511,11 @@ export class ToSql implements NodeVisitor<SQLString> {
   }
 
   private visitAssignment(node: Nodes.Assignment): SQLString {
-    this.visitNodeOrValue(node.left);
+    if (this._inUpdateSet && node.left instanceof Nodes.Attribute) {
+      this.collector.append(`"${node.left.name}"`);
+    } else {
+      this.visitNodeOrValue(node.left);
+    }
     this.collector.append(" = ");
     this.visitNodeOrValue(node.right);
     return this.collector;
@@ -1086,12 +1108,6 @@ export class ToSql implements NodeVisitor<SQLString> {
       this.collector.append(this.quote(v));
     } else if (typeof v === "bigint") {
       this.collector.append(v.toString());
-    } else if (v instanceof Date) {
-      // Format as 'YYYY-MM-DD'
-      const y = v.getFullYear();
-      const m = String(v.getMonth() + 1).padStart(2, "0");
-      const d = String(v.getDate()).padStart(2, "0");
-      this.collector.append(`'${y}-${m}-${d}'`);
     } else if (
       typeof v === "object" &&
       v !== null &&
@@ -1117,12 +1133,6 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
     if (typeof value === "bigint") return value.toString();
-    if (value instanceof Date) {
-      const y = value.getFullYear();
-      const m = String(value.getMonth() + 1).padStart(2, "0");
-      const d = String(value.getDate()).padStart(2, "0");
-      return `'${y}-${m}-${d}'`;
-    }
     if (
       typeof value === "object" &&
       value !== null &&
@@ -1131,7 +1141,32 @@ export class ToSql implements NodeVisitor<SQLString> {
     ) {
       return `'${(value as { toISOString: () => string }).toISOString()}'`;
     }
+    if (typeof value === "object" && value !== null) {
+      const proto = Object.getPrototypeOf(value);
+      const hasCustomToString =
+        proto === Object.prototype && value.toString !== Object.prototype.toString;
+      if ((proto === Object.prototype || proto === null) && !hasCustomToString) {
+        try {
+          const json = JSON.stringify(value);
+          if (json !== undefined) {
+            return `'${json.replace(/'/g, "''")}'`;
+          }
+        } catch {
+          // circular references, BigInt, etc. — fall through to String()
+        }
+      }
+    }
     const escaped = String(value).replace(/'/g, "''");
     return `'${escaped}'`;
+  }
+
+  private sanitizeHint(hint: string): string {
+    return hint
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\/\*/g, "")
+      .replace(/\*\//g, "")
+      .replace(/--/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 }

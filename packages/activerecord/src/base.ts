@@ -1,6 +1,15 @@
 import { Model } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
-import { Table, quoteArrayLiteral } from "@blazetrails/arel";
+import {
+  Table,
+  quoteArrayLiteral,
+  InsertManager,
+  UpdateManager,
+  DeleteManager,
+  Nodes,
+  sql as arelSql,
+  star as arelStar,
+} from "@blazetrails/arel";
 import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { detectAdapterName } from "./adapter-name.js";
 import { pluralize, underscore } from "@blazetrails/activesupport";
@@ -287,6 +296,29 @@ export class Base extends Model {
       return pk.map((col, i) => `"${col}" = ${this._quoteValue(values[i])}`).join(" AND ");
     }
     return `"${pk}" = ${this._quoteValue(idValue)}`;
+  }
+
+  /**
+   * Build an Arel node for a primary key WHERE condition.
+   * Returns an Arel node suitable for use with Arel managers.
+   */
+  static _buildPkWhereNode(idValue: unknown): InstanceType<typeof Nodes.Node> {
+    const table = this.arelTable;
+    const pk = this.primaryKey;
+    if (Array.isArray(pk)) {
+      if (!Array.isArray(idValue)) return arelSql("1=0");
+      const values = idValue;
+      const conditions = pk.map((col, i) => {
+        const attr = table.get(col);
+        const v = values[i];
+        if (v === undefined || v === null) return arelSql("1=0");
+        return attr.eq(v);
+      });
+      return new Nodes.And(conditions);
+    }
+    const attr = table.get(pk as string);
+    if (idValue === undefined || idValue === null) return arelSql("1=0");
+    return attr.eq(idValue);
   }
 
   /**
@@ -2334,15 +2366,6 @@ export class Base extends Model {
       values.push(value);
     }
 
-    const colList = columns.map((c) => `"${c}"`).join(", ");
-    const valList = columns
-      .map((c, i) => {
-        const def = ctor._attributeDefinitions.get(c);
-        const isArray = def?.type?.name === "array";
-        return quoteSqlValue(values[i], isArray);
-      })
-      .join(", ");
-
     let sql: string;
     if (columns.length === 0) {
       // PG supports DEFAULT VALUES, MySQL/SQLite need () VALUES ()
@@ -2350,7 +2373,15 @@ export class Base extends Model {
         ? `INSERT INTO "${table.name}" () VALUES ()`
         : `INSERT INTO "${table.name}" DEFAULT VALUES`;
     } else {
-      sql = `INSERT INTO "${table.name}" (${colList}) VALUES (${valList})`;
+      const im = new InsertManager(table);
+      const insertValues: [InstanceType<typeof Nodes.Node>, unknown][] = columns.map((c, i) => {
+        const def = ctor._attributeDefinitions.get(c);
+        const isArray = def?.type?.name === "array";
+        const val = isArray ? arelSql(quoteSqlValue(values[i], true)) : values[i];
+        return [table.get(c), val];
+      });
+      im.insert(insertValues);
+      sql = im.toSql();
     }
     this._pendingOperation = ctor.adapter.executeMutation(sql).then((insertedId) => {
       if (!Array.isArray(ctor.primaryKey) && this.id === null) {
@@ -2384,38 +2415,39 @@ export class Base extends Model {
 
     if (Object.keys(changedAttrs).length === 0) return;
 
-    const setClause = Object.keys(changedAttrs)
-      .map((key) => {
-        const val = this.readAttribute(key);
-        const def = ctor._attributeDefinitions.get(key);
-        const isArray = def?.type?.name === "array";
-        return `"${key}" = ${quoteSqlValue(val, isArray)}`;
-      })
-      .join(", ");
-
-    const pkWhere = ctor._buildPkWhere(this.id);
+    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.keys(
+      changedAttrs,
+    ).map((key) => {
+      const val = this.readAttribute(key);
+      const def = ctor._attributeDefinitions.get(key);
+      const isArray = def?.type?.name === "array";
+      return [table.get(key), isArray ? arelSql(quoteSqlValue(val, true)) : val];
+    });
 
     // Optimistic locking: include lock column in WHERE and increment it
-    let lockClause = "";
     const lockCol = ctor.lockingColumn;
+    let rawVersion: unknown;
     if (ctor.lockingEnabled) {
-      const rawVersion = this.readAttribute(lockCol);
+      rawVersion = this.readAttribute(lockCol);
       const currentVersion = rawVersion == null ? 0 : Number(rawVersion) || 0;
-      if (rawVersion == null) {
-        lockClause = ` AND "${lockCol}" IS NULL`;
-      } else {
-        lockClause = ` AND "${lockCol}" = ${currentVersion}`;
-      }
       this._attributes.set(lockCol, currentVersion + 1);
+      updateValues.push([table.get(lockCol), currentVersion + 1]);
     }
 
-    const finalSetClause = ctor.lockingEnabled
-      ? `${setClause}, "${lockCol}" = ${this.readAttribute(lockCol)}`
-      : setClause;
+    const um = new UpdateManager()
+      .table(table)
+      .set(updateValues)
+      .where(ctor._buildPkWhereNode(this.id));
+    if (ctor.lockingEnabled) {
+      if (rawVersion == null) {
+        um.where(table.get(lockCol).isNull());
+      } else {
+        um.where(table.get(lockCol).eq(Number(rawVersion) || 0));
+      }
+    }
 
-    const sql = `UPDATE "${table.name}" SET ${finalSetClause} WHERE ${pkWhere}${lockClause}`;
-    this._pendingOperation = ctor.adapter.executeMutation(sql).then((affected) => {
-      if (lockClause && affected === 0) {
+    this._pendingOperation = ctor.adapter.executeMutation(um.toSql()).then((affected) => {
+      if (ctor.lockingEnabled && affected === 0) {
         throw new StaleObjectError(this, "update");
       }
     });
@@ -2475,20 +2507,19 @@ export class Base extends Model {
       const table = ctor.arelTable;
       const pk = this.id;
       if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {
-        let lockClause = "";
+        const dm = new DeleteManager().from(table).where(ctor._buildPkWhereNode(pk));
         const lockCol = ctor.lockingColumn;
         if (ctor.lockingEnabled) {
           const currentVersion = this.readAttribute(lockCol);
           if (currentVersion == null) {
-            lockClause = ` AND "${lockCol}" IS NULL`;
+            dm.where(table.get(lockCol).isNull());
           } else {
-            lockClause = ` AND "${lockCol}" = ${Number(currentVersion) || 0}`;
+            dm.where(table.get(lockCol).eq(Number(currentVersion) || 0));
           }
         }
 
-        const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}${lockClause}`;
-        const affected = await ctor.adapter.executeMutation(sql);
-        if (lockClause && affected === 0) {
+        const affected = await ctor.adapter.executeMutation(dm.toSql());
+        if (ctor.lockingEnabled && affected === 0) {
           throw new StaleObjectError(this, "destroy");
         }
         didDelete = affected > 0;
@@ -2555,8 +2586,8 @@ export class Base extends Model {
       return this;
     }
 
-    const sql = `DELETE FROM "${table.name}" WHERE ${ctor._buildPkWhere(pk)}`;
-    await ctor.adapter.executeMutation(sql);
+    const dm = new DeleteManager().from(table).where(ctor._buildPkWhereNode(pk));
+    await ctor.adapter.executeMutation(dm.toSql());
 
     this._destroyed = true;
     this._frozen = true;
@@ -2569,9 +2600,8 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.delete
    */
   static async delete(id: unknown): Promise<number> {
-    const table = this.arelTable;
-    const sql = `DELETE FROM "${table.name}" WHERE ${this._buildPkWhere(id)}`;
-    return this.adapter.executeMutation(sql);
+    const dm = new DeleteManager().from(this.arelTable).where(this._buildPkWhereNode(id));
+    return this.adapter.executeMutation(dm.toSql());
   }
 
   /**
@@ -2581,9 +2611,8 @@ export class Base extends Model {
    */
   async reload(): Promise<this> {
     const ctor = this.constructor as typeof Base;
-    const row = await ctor.adapter.execute(
-      `SELECT * FROM "${ctor.tableName}" WHERE ${ctor._buildPkWhere(this.id)}`,
-    );
+    const sm = ctor.arelTable.project(arelStar).where(ctor._buildPkWhereNode(this.id));
+    const row = await ctor.adapter.execute(sm.toSql());
 
     if (row.length === 0) {
       throw new RecordNotFound(
@@ -2618,8 +2647,11 @@ export class Base extends Model {
       );
     }
     const ctor = this.constructor as typeof Base;
-    const sql = `SELECT * FROM "${ctor.tableName}" WHERE ${ctor._buildPkWhere(this.id)} ${lockClause}`;
-    const rows = await ctor.adapter.execute(sql);
+    const sm = ctor.arelTable
+      .project(arelStar)
+      .where(ctor._buildPkWhereNode(this.id))
+      .lock(lockClause);
+    const rows = await ctor.adapter.execute(sm.toSql());
 
     if (rows.length === 0) {
       throw new RecordNotFound(

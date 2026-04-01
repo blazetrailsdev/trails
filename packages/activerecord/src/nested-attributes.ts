@@ -1,6 +1,8 @@
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
 import { UnknownAttributeError } from "./errors.js";
+import { singularize, camelize, underscore } from "@blazetrails/activesupport";
+import { Table, UpdateManager } from "@blazetrails/arel";
 
 interface NestedAttributeOptions {
   allowDestroy?: boolean;
@@ -126,18 +128,6 @@ async function processNestedAttributes(record: Base): Promise<void> {
     if (!assocDef) continue;
 
     // Resolve target model
-    const singularize = (w: string) => {
-      if (w.endsWith("ies")) return w.slice(0, -3) + "y";
-      if (w.endsWith("ses") || w.endsWith("xes") || w.endsWith("zes")) return w.slice(0, -2);
-      if (w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
-      return w;
-    };
-    const camelize = (n: string) =>
-      n
-        .split("_")
-        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-        .join("");
-
     const className =
       assocDef.options.className ??
       (assocDef.type === "hasMany" || assocDef.type === "hasAndBelongsToMany"
@@ -146,12 +136,6 @@ async function processNestedAttributes(record: Base): Promise<void> {
 
     const targetModel = modelRegistry.get(className);
     if (!targetModel) continue;
-
-    const underscore = (n: string) =>
-      n
-        .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-        .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-        .toLowerCase();
 
     const foreignKey = assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
 
@@ -218,12 +202,12 @@ async function processNestedAttributes(record: Base): Promise<void> {
         if (created && created.id != null) {
           // Use writeAttribute + direct save to avoid re-triggering nested attributes
           record.writeAttribute(foreignKey, created.id);
-          const tableName = (ctor as any).tableName;
-          const pk = (ctor as any).primaryKey || "id";
-          const pkVal = record.readAttribute(pk);
-          await (ctor as any).adapter.executeMutation(
-            `UPDATE "${tableName}" SET "${foreignKey}" = ${created.id} WHERE "${pk}" = ${pkVal}`,
-          );
+          const arelTable = (ctor as any).arelTable as Table;
+          const um = new UpdateManager()
+            .table(arelTable)
+            .set([[arelTable.get(foreignKey), created.id]])
+            .where((ctor as any)._buildPkWhereNode(record.id));
+          await (ctor as any).adapter.executeMutation(um.toSql());
         }
       } else {
         // For hasMany/hasOne, set FK on the child record

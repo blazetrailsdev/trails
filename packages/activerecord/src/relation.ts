@@ -1,4 +1,12 @@
-import { Table, SelectManager, Nodes, Visitors } from "@blazetrails/arel";
+import {
+  Table,
+  SelectManager,
+  Nodes,
+  Visitors,
+  UpdateManager,
+  DeleteManager,
+  sql as arelSql,
+} from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
 import { RecordNotFound, IrreversibleOrderError } from "./errors.js";
@@ -265,18 +273,19 @@ export class Relation<T extends Base> {
         const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
         rel = rel.whereNot({ [foreignKey]: null });
       } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
-        const { targetTable, foreignKey, typeClause } = this._resolveHasManySubquery(
+        const { targetTable, foreignKey, typeNodes } = this._resolveHasManySubquery(
           modelClass,
           assocDef,
           assocName,
         );
         const sourceTable = modelClass.tableName;
         const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
-        const whereClause = typeClause ? `WHERE ${typeClause}` : "";
+        const srcTable = new Table(sourceTable);
+        const tgtTable = new Table(targetTable);
+        const subquery = tgtTable.project(tgtTable.get(foreignKey));
+        for (const node of typeNodes) subquery.where(node);
         const cloned = rel._clone();
-        cloned._whereClause.rawClauses.push(
-          `"${sourceTable}"."${pk}" IN (SELECT "${targetTable}"."${foreignKey}" FROM "${targetTable}"${whereClause ? " " + whereClause : ""})`,
-        );
+        cloned._whereClause.arelNodes.push(srcTable.get(pk).in(subquery));
         rel = cloned;
       }
     }
@@ -305,18 +314,19 @@ export class Relation<T extends Base> {
         const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocName)}_id`;
         rel = rel.where({ [foreignKey]: null });
       } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
-        const { targetTable, foreignKey, typeClause } = this._resolveHasManySubquery(
+        const { targetTable, foreignKey, typeNodes } = this._resolveHasManySubquery(
           modelClass,
           assocDef,
           assocName,
         );
         const sourceTable = modelClass.tableName;
         const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
-        const whereClause = typeClause ? `WHERE ${typeClause}` : "";
+        const srcTable = new Table(sourceTable);
+        const tgtTable = new Table(targetTable);
+        const subquery = tgtTable.project(tgtTable.get(foreignKey));
+        for (const node of typeNodes) subquery.where(node);
         const cloned = rel._clone();
-        cloned._whereClause.rawClauses.push(
-          `"${sourceTable}"."${pk}" NOT IN (SELECT "${targetTable}"."${foreignKey}" FROM "${targetTable}"${whereClause ? " " + whereClause : ""})`,
-        );
+        cloned._whereClause.arelNodes.push(srcTable.get(pk).notIn(subquery));
         rel = cloned;
       }
     }
@@ -327,7 +337,11 @@ export class Relation<T extends Base> {
     modelClass: any,
     assocDef: any,
     assocName: string,
-  ): { targetTable: string; foreignKey: string; typeClause: string | null } {
+  ): {
+    targetTable: string;
+    foreignKey: string;
+    typeNodes: InstanceType<typeof Nodes.Node>[];
+  } {
     const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
     const targetModel = modelRegistry.get(targetClassName);
     if (!targetModel) {
@@ -336,12 +350,13 @@ export class Relation<T extends Base> {
       );
     }
     const targetTable = targetModel.tableName;
+    const tgtTable = new Table(targetTable);
     let foreignKey: string;
-    let typeClause: string | null = null;
+    const typeNodes: InstanceType<typeof Nodes.Node>[] = [];
     if (assocDef.options.as) {
       foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(assocDef.options.as)}_id`;
       const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-      typeClause = `"${targetTable}"."${typeCol}" = '${modelClass.name}'`;
+      typeNodes.push(tgtTable.get(typeCol).eq(modelClass.name));
     } else {
       foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
     }
@@ -351,11 +366,9 @@ export class Relation<T extends Base> {
         targetModel.name,
         ...(targetModel.descendants ?? []).map((d: any) => d.name),
       ];
-      const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
-      const stiClause = `"${targetTable}"."${inheritanceCol}" IN (${inList})`;
-      typeClause = typeClause ? `${typeClause} AND ${stiClause}` : stiClause;
+      typeNodes.push(tgtTable.get(inheritanceCol).in(stiNames));
     }
-    return { targetTable, foreignKey, typeClause };
+    return { targetTable, foreignKey, typeNodes };
   }
 
   private _resolveHasManyJoin(
@@ -1740,11 +1753,10 @@ export class Relation<T extends Base> {
       if (this._offsetValue !== null) manager.skip(this._offsetValue);
     }
 
-    let sql = manager.toSql();
     if (this._optimizerHints.length > 0) {
-      const hints = `/*+ ${this._optimizerHints.join(" ")} */`;
-      sql = sql.replace(/^SELECT/, `SELECT ${hints}`);
+      manager.optimizerHints(...this._optimizerHints);
     }
+    let sql = manager.toSql();
     if (this._annotations.length > 0) {
       const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
       sql = `${sql} ${comments}`;
@@ -2021,23 +2033,19 @@ export class Relation<T extends Base> {
     if (this._isNone) return 0;
 
     const table = this._modelClass.arelTable;
-    const setClauses = Object.entries(updates)
-      .map(([key, val]) => {
-        if (val === null) return `"${key}" = NULL`;
-        if (typeof val === "number") return `"${key}" = ${val}`;
-        if (typeof val === "boolean") return `"${key}" = ${val ? "TRUE" : "FALSE"}`;
-        return `"${key}" = '${String(val).replace(/'/g, "''")}'`;
-      })
-      .join(", ");
-
-    let sql = `UPDATE "${table.name}" SET ${setClauses}`;
-
-    const whereConditions = this._buildWhereStrings(table);
-    if (whereConditions.length > 0) {
-      sql += ` WHERE ${whereConditions.join(" AND ")}`;
+    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(updates).map(
+      ([key, val]) => {
+        const def = this._modelClass._attributeDefinitions.get(key);
+        const isArray = def?.type?.name === "array";
+        return [table.get(key), isArray ? arelSql(quoteSqlValue(val, true)) : val];
+      },
+    );
+    const um = new UpdateManager().table(table).set(updateValues);
+    for (const cond of this._buildWhereStrings(table)) {
+      um.where(arelSql(cond));
     }
 
-    return this._modelClass.adapter.executeMutation(sql);
+    return this._modelClass.adapter.executeMutation(um.toSql());
   }
 
   /**
@@ -2062,14 +2070,12 @@ export class Relation<T extends Base> {
     if (this._isNone) return 0;
 
     const table = this._modelClass.arelTable;
-    let sql = `DELETE FROM "${table.name}"`;
-
-    const whereConditions = this._buildWhereStrings(table);
-    if (whereConditions.length > 0) {
-      sql += ` WHERE ${whereConditions.join(" AND ")}`;
+    const dm = new DeleteManager().from(table);
+    for (const cond of this._buildWhereStrings(table)) {
+      dm.where(arelSql(cond));
     }
 
-    return this._modelClass.adapter.executeMutation(sql);
+    return this._modelClass.adapter.executeMutation(dm.toSql());
   }
 
   /**
@@ -2094,18 +2100,15 @@ export class Relation<T extends Base> {
     if (Object.keys(updates).length === 0) return 0;
 
     const table = this._modelClass.arelTable;
-    const setClauses = Object.entries(updates)
-      .map(([key, val]) => `"${key}" = ${val}`)
-      .join(", ");
-
-    let sql = `UPDATE "${table.name}" SET ${setClauses}`;
-
-    const whereConditions = this._buildWhereStrings(table);
-    if (whereConditions.length > 0) {
-      sql += ` WHERE ${whereConditions.join(" AND ")}`;
+    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(updates).map(
+      ([key, val]) => [table.get(key), arelSql(val as string)],
+    );
+    const um = new UpdateManager().table(table).set(updateValues);
+    for (const cond of this._buildWhereStrings(table)) {
+      um.where(arelSql(cond));
     }
 
-    return this._modelClass.adapter.executeMutation(sql);
+    return this._modelClass.adapter.executeMutation(um.toSql());
   }
 
   /**
@@ -2589,17 +2592,15 @@ export class Relation<T extends Base> {
       manager.lock(this._lockValue);
     }
 
+    if (this._optimizerHints.length > 0) {
+      manager.optimizerHints(...this._optimizerHints);
+    }
+
     let sql = manager.toSql();
 
     // Replace FROM clause if from() was used
     if (!this._fromClause.isEmpty()) {
       sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${this._fromClause.value}`);
-    }
-
-    // Insert optimizer hints after SELECT
-    if (this._optimizerHints.length > 0) {
-      const hints = `/*+ ${this._optimizerHints.join(" ")} */`;
-      sql = sql.replace(/^SELECT/, `SELECT ${hints}`);
     }
 
     // Append SQL comments from annotate()
@@ -2954,41 +2955,12 @@ export class Relation<T extends Base> {
           }
         }
       } else if (assocDef.type === "hasMany") {
-        const singularize = (w: string) => {
-          if (w.endsWith("ies")) return w.slice(0, -3) + "y";
-          if (w.endsWith("ses") || w.endsWith("xes") || w.endsWith("zes")) return w.slice(0, -2);
-          if (w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
-          return w;
-        };
-        const camelize = (n: string) =>
-          n
-            .split("_")
-            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-            .join("");
-        const underscore = (n: string) =>
-          n
-            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-            .toLowerCase();
-        const pluralize = (w: string) => {
-          if (w.endsWith("y") && !/[aeiou]y$/.test(w)) return w.slice(0, -1) + "ies";
-          if (
-            w.endsWith("s") ||
-            w.endsWith("x") ||
-            w.endsWith("z") ||
-            w.endsWith("ch") ||
-            w.endsWith("sh")
-          )
-            return w + "es";
-          return w + "s";
-        };
-
-        const className = assocDef.options.className ?? camelize(singularize(assocName));
+        const className = assocDef.options.className ?? _camelize(_singularize(assocName));
         const asName = assocDef.options.as;
         const foreignKey = asName
-          ? (assocDef.options.foreignKey ?? `${underscore(asName)}_id`)
-          : (assocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
-        const typeCol = asName ? `${underscore(asName)}_type` : null;
+          ? (assocDef.options.foreignKey ?? `${_toUnderscore(asName)}_id`)
+          : (assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
+        const typeCol = asName ? `${_toUnderscore(asName)}_type` : null;
         const primaryKey = assocDef.options.primaryKey ?? modelClass.primaryKey;
 
         // Handle through associations
@@ -2999,32 +2971,32 @@ export class Relation<T extends Base> {
           if (!throughAssocDef) continue;
 
           const throughClassName =
-            throughAssocDef.options.className ?? camelize(singularize(throughAssocDef.name));
+            throughAssocDef.options.className ?? _camelize(_singularize(throughAssocDef.name));
           const throughModel = _mr.get(throughClassName);
           if (!throughModel) continue;
 
           // Determine FK for loading through records
           const throughAsName = throughAssocDef.options.as;
           const throughFk = throughAsName
-            ? (throughAssocDef.options.foreignKey ?? `${underscore(throughAsName)}_id`)
-            : (throughAssocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
+            ? (throughAssocDef.options.foreignKey ?? `${_toUnderscore(throughAsName)}_id`)
+            : (throughAssocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
           const pkValues = [
             ...new Set(records.map((r) => r.readAttribute(primaryKey)).filter((v) => v != null)),
           ];
           if (pkValues.length === 0) continue;
 
-          const sourceName = assocDef.options.source ?? singularize(assocName);
+          const sourceName = assocDef.options.source ?? _singularize(assocName);
 
           // Look up the source association on the through model (try singular and plural)
           const throughModelAssociations: any[] = (throughModel as any)._associations ?? [];
           const sourceAssocDef =
             throughModelAssociations.find((a: any) => a.name === sourceName) ??
-            throughModelAssociations.find((a: any) => a.name === pluralize(sourceName));
+            throughModelAssociations.find((a: any) => a.name === _pluralize(sourceName));
           const sourceAssocKind = sourceAssocDef?.type ?? "belongsTo";
 
           const throughWhereConditions: Record<string, unknown> = { [throughFk]: pkValues };
           if (throughAsName)
-            throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
+            throughWhereConditions[`${_toUnderscore(throughAsName)}_type`] = modelClass.name;
 
           // Push sourceType filter into the DB query instead of filtering in-memory
           if (
@@ -3033,7 +3005,7 @@ export class Relation<T extends Base> {
             sourceAssocKind === "belongsTo"
           ) {
             const resolvedSourceName = sourceAssocDef?.name ?? sourceName;
-            const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
+            const sourceTypeCol = `${_toUnderscore(resolvedSourceName)}_type`;
             throughWhereConditions[sourceTypeCol] = assocDef.options.sourceType;
           }
 
@@ -3119,7 +3091,8 @@ export class Relation<T extends Base> {
 
           if (sourceAssocKind === "belongsTo") {
             // Through record has FK pointing to target (e.g., tagging.tag_id -> tag.id)
-            const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+            const targetFk =
+              sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
             const targetPk =
               sourceAssocDef?.options?.primaryKey ?? (targetModel as any).primaryKey ?? "id";
 
@@ -3143,8 +3116,8 @@ export class Relation<T extends Base> {
             // Source is has_many/has_one: target has FK pointing to through record
             const sourceAsName = sourceAssocDef?.options?.as;
             const sourceFk = sourceAsName
-              ? (sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
-              : (sourceAssocDef?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
+              ? (sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(sourceAsName)}_id`)
+              : (sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`);
             const throughIds = [
               ...new Set(
                 throughRecords.map((r: any) => r.readAttribute("id")).filter((v: any) => v != null),
@@ -3152,7 +3125,7 @@ export class Relation<T extends Base> {
             ];
             const sourceWhereConditions: Record<string, unknown> = { [sourceFk]: throughIds };
             if (sourceAsName)
-              sourceWhereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
+              sourceWhereConditions[`${_toUnderscore(sourceAsName)}_type`] = throughClassName;
             let sourceRel = (targetModel as any)._allForPreload().where(sourceWhereConditions);
             if (assocDef.options.scope) sourceRel = assocDef.options.scope(sourceRel);
             targetRecords = throughIds.length > 0 ? await sourceRel.toArray() : [];
@@ -3211,24 +3184,7 @@ export class Relation<T extends Base> {
           }
         }
       } else if (assocDef.type === "hasOne") {
-        const underscore = (n: string) =>
-          n
-            .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-            .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-            .toLowerCase();
-        const camelize = (n: string) =>
-          n
-            .split("_")
-            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-            .join("");
-        const singularize = (w: string) => {
-          if (w.endsWith("ies")) return w.slice(0, -3) + "y";
-          if (w.endsWith("ses") || w.endsWith("xes") || w.endsWith("zes")) return w.slice(0, -2);
-          if (w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
-          return w;
-        };
-
-        const className = assocDef.options.className ?? camelize(assocName);
+        const className = assocDef.options.className ?? _camelize(assocName);
         const primaryKey = assocDef.options.primaryKey ?? modelClass.primaryKey;
         const hasOneAsName = assocDef.options.as;
 
@@ -3242,15 +3198,15 @@ export class Relation<T extends Base> {
           const throughClassName =
             throughAssocDef.options.className ??
             (throughAssocDef.type === "hasMany"
-              ? camelize(singularize(throughAssocDef.name))
-              : camelize(throughAssocDef.name));
+              ? _camelize(_singularize(throughAssocDef.name))
+              : _camelize(throughAssocDef.name));
           const throughModel = _mr.get(throughClassName);
           if (!throughModel) continue;
 
           const throughAsName = throughAssocDef.options.as;
           const throughFk = throughAsName
-            ? (throughAssocDef.options.foreignKey ?? `${underscore(throughAsName)}_id`)
-            : (throughAssocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
+            ? (throughAssocDef.options.foreignKey ?? `${_toUnderscore(throughAsName)}_id`)
+            : (throughAssocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
           const pkValues = [
             ...new Set(records.map((r) => r.readAttribute(primaryKey)).filter((v) => v != null)),
           ];
@@ -3258,7 +3214,7 @@ export class Relation<T extends Base> {
 
           const throughWhereConditions: Record<string, unknown> = { [throughFk]: pkValues };
           if (throughAsName)
-            throughWhereConditions[`${underscore(throughAsName)}_type`] = modelClass.name;
+            throughWhereConditions[`${_toUnderscore(throughAsName)}_type`] = modelClass.name;
           const throughRecords = await (throughModel as any)
             ._allForPreload()
             .where(throughWhereConditions)
@@ -3270,21 +3226,9 @@ export class Relation<T extends Base> {
 
           // Look up source association on through model
           const throughModelAssociations: any[] = (throughModel as any)._associations ?? [];
-          const pluralizeHot = (w: string) => {
-            if (w.endsWith("y") && !/[aeiou]y$/.test(w)) return w.slice(0, -1) + "ies";
-            if (
-              w.endsWith("s") ||
-              w.endsWith("x") ||
-              w.endsWith("z") ||
-              w.endsWith("ch") ||
-              w.endsWith("sh")
-            )
-              return w + "es";
-            return w + "s";
-          };
           const sourceAssocDef =
             throughModelAssociations.find((a: any) => a.name === sourceName) ??
-            throughModelAssociations.find((a: any) => a.name === pluralizeHot(sourceName));
+            throughModelAssociations.find((a: any) => a.name === _pluralize(sourceName));
 
           // Recursive through: if source association is itself a through, preload recursively
           if (sourceAssocDef?.options?.through) {
@@ -3349,7 +3293,7 @@ export class Relation<T extends Base> {
             continue;
           }
 
-          const targetFk = sourceAssocDef?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
+          const targetFk = sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
           const targetIds = [
             ...new Set(
               throughRecords
@@ -3379,9 +3323,9 @@ export class Relation<T extends Base> {
         }
 
         const foreignKey = hasOneAsName
-          ? (assocDef.options.foreignKey ?? `${underscore(hasOneAsName)}_id`)
-          : (assocDef.options.foreignKey ?? `${underscore(modelClass.name)}_id`);
-        const hasOneTypeCol = hasOneAsName ? `${underscore(hasOneAsName)}_type` : null;
+          ? (assocDef.options.foreignKey ?? `${_toUnderscore(hasOneAsName)}_id`)
+          : (assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
+        const hasOneTypeCol = hasOneAsName ? `${_toUnderscore(hasOneAsName)}_type` : null;
 
         const pkValues = [
           ...new Set(records.map((r) => r.readAttribute(primaryKey)).filter((v) => v != null)),
@@ -3439,12 +3383,11 @@ export class Relation<T extends Base> {
         const targetFk = `${_toUnderscore(_singularize(assocName))}_id`;
 
         // Query join table for all owner PKs
-        const pkList = pkValues
-          .map((v) => (typeof v === "number" ? String(v) : `'${String(v).replace(/'/g, "''")}'`))
-          .join(", ");
-        const joinRows = await modelClass.adapter.execute(
-          `SELECT "${ownerFk}", "${targetFk}" FROM "${joinTable}" WHERE "${ownerFk}" IN (${pkList})`,
-        );
+        const jt = new Table(joinTable);
+        const joinQuery = jt
+          .project(jt.get(ownerFk), jt.get(targetFk))
+          .where(jt.get(ownerFk).in(pkValues));
+        const joinRows = await modelClass.adapter.execute(joinQuery.toSql());
 
         // Collect target IDs and build owner->targetIds map
         const ownerToTargetIds = new Map<unknown, unknown[]>();
@@ -3649,15 +3592,18 @@ export class Relation<T extends Base> {
   async updateCounters(counters: Record<string, number>): Promise<number> {
     if (this._isNone) return 0;
     const table = this._modelClass.arelTable;
-    const setClauses = Object.entries(counters)
-      .map(([key, val]) => `"${key}" = COALESCE("${key}", 0) + ${val}`)
-      .join(", ");
-    let sql = `UPDATE "${table.name}" SET ${setClauses}`;
-    const whereConditions = this._buildWhereStrings(table);
-    if (whereConditions.length > 0) {
-      sql += ` WHERE ${whereConditions.join(" AND ")}`;
+    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(counters).map(
+      ([key, val]) => {
+        const col = table.get(key);
+        const coalesced = new Nodes.NamedFunction("COALESCE", [col, new Nodes.Quoted(0)]);
+        return [col, new Nodes.Addition(coalesced, new Nodes.Quoted(val))];
+      },
+    );
+    const um = new UpdateManager().table(table).set(updateValues);
+    for (const cond of this._buildWhereStrings(table)) {
+      um.where(arelSql(cond));
     }
-    return this._modelClass.adapter.executeMutation(sql);
+    return this._modelClass.adapter.executeMutation(um.toSql());
   }
 
   /**
@@ -3667,11 +3613,8 @@ export class Relation<T extends Base> {
    */
   async delete(id: unknown): Promise<number> {
     const table = this._modelClass.arelTable;
-    const pk = this._modelClass.primaryKey;
-    const quoted = typeof id === "number" ? String(id) : `'${String(id).replace(/'/g, "''")}'`;
-    return this._modelClass.adapter.executeMutation(
-      `DELETE FROM "${table.name}" WHERE "${pk}" = ${quoted}`,
-    );
+    const dm = new DeleteManager().from(table).where(this._modelClass._buildPkWhereNode(id));
+    return this._modelClass.adapter.executeMutation(dm.toSql());
   }
 
   /**

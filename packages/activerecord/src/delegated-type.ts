@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { underscore } from "@blazetrails/activesupport";
 
 /**
  * Configuration for a delegated type.
@@ -79,8 +80,7 @@ export function delegatedType(
 
   // For each type, add predicates, scopes, accessors, and builder methods
   for (const typeName of options.types) {
-    const lowerName = typeName.charAt(0).toLowerCase() + typeName.slice(1);
-    const snakeName = lowerName.replace(/([A-Z])/g, "_$1").toLowerCase();
+    const snakeName = underscore(typeName);
 
     // Type predicate: isMessage(), isComment()
     Object.defineProperty(modelClass.prototype, `is${typeName}`, {

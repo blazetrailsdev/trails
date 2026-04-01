@@ -53,6 +53,8 @@ export class MySQL extends ToSql {
   protected override visitSelectCore(node: Nodes.SelectCore): SQLString {
     this.collector.append("SELECT");
 
+    this.emitOptimizerHints(node);
+
     if (node.setQuantifier) {
       this.collector.append(" ");
       this.visit(node.setQuantifier);

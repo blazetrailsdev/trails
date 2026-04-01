@@ -731,9 +731,9 @@ describe("the to_sql visitor", () => {
   });
 
   it("should visit_Date", () => {
-    const d = new Date(2020, 0, 2, 12, 0, 0);
+    const d = new Date("2020-01-02T12:00:00.000Z");
     const sql = new Visitors.ToSql().compile(new Nodes.Quoted(d));
-    expect(sql).toBe("'2020-01-02'");
+    expect(sql).toBe("'2020-01-02T12:00:00.000Z'");
   });
 
   it("should visit_DateTime", () => {
@@ -749,7 +749,7 @@ describe("the to_sql visitor", () => {
 
   it("should visit_Hash", () => {
     const sql = new Visitors.ToSql().compile(new Nodes.Quoted({ a: 1 }));
-    expect(sql).toBe("'[object Object]'");
+    expect(sql).toBe(`'{"a":1}'`);
   });
 
   it("should visit_Integer", () => {

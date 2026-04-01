@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { camelize } from "@blazetrails/activesupport";
 
 /**
  * Enum definition — maps symbolic names to integer values.
@@ -89,7 +90,7 @@ export function defineEnum(
   };
 
   // Camel-case a method name: "status_draft" -> "statusDraft"
-  const toCamel = (s: string) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+  const toCamel = (s: string) => camelize(s, false);
 
   // Define scopes for each enum value
   for (const [name, value] of mapping) {
@@ -100,7 +101,7 @@ export function defineEnum(
   // Define instance methods on the prototype
   for (const [name, value] of mapping) {
     const fullName = toCamel(methodName(name));
-    const capitalizedFullName = fullName.charAt(0).toUpperCase() + fullName.slice(1);
+    const capitalizedFullName = camelize(methodName(name));
 
     // Predicate: record.isDraft() or record.isStatusDraft()
     Object.defineProperty(modelClass.prototype, `is${capitalizedFullName}`, {
