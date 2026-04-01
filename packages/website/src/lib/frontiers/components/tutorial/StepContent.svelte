@@ -5,6 +5,7 @@
   import type { SqlJsAdapter } from "../../sql-js-adapter.js";
   import ActionCard from "./ActionCard.svelte";
   import CheckpointPanel from "./CheckpointPanel.svelte";
+  import DiagramBlock from "./DiagramBlock.svelte";
 
   interface Props {
     step: TutorialStep;
@@ -30,6 +31,10 @@
   {#each step.description as paragraph}
     <p class="text-sm leading-relaxed text-text">{paragraph}</p>
   {/each}
+
+  {#if step.diagram}
+    <DiagramBlock source={step.diagram} label={step.diagramLabel} />
+  {/if}
 
   {#if step.actions.length > 0}
     <div class="flex flex-col gap-3">

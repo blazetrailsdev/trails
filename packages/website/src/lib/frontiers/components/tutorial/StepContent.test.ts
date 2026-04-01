@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+
+vi.mock("../../tutorials/diagram-renderer.js", () => ({
+  renderDiagram: vi.fn().mockResolvedValue({ success: true, svg: "<svg>mock</svg>" }),
+}));
 import { render, screen, cleanup } from "@testing-library/svelte";
 import StepContent from "./StepContent.svelte";
 import initSqlJs, { type SqlJsStatic } from "sql.js";
@@ -102,5 +106,24 @@ describe("StepContent", () => {
       props: { step: baseStep, exec: mockExec(), vfs, adapter },
     });
     expect(screen.queryByTestId("checkpoint-panel")).toBeNull();
+  });
+
+  it("renders diagram block when step has diagram", async () => {
+    const step: TutorialStep = {
+      ...baseStep,
+      diagram: "graph TD; A-->B",
+      diagramLabel: "Test diagram",
+    };
+    render(StepContent, {
+      props: { step, exec: mockExec(), vfs, adapter },
+    });
+    expect(screen.getByTestId("diagram-block")).toBeTruthy();
+  });
+
+  it("does not render diagram block when no diagram", () => {
+    render(StepContent, {
+      props: { step: baseStep, exec: mockExec(), vfs, adapter },
+    });
+    expect(screen.queryByTestId("diagram-block")).toBeNull();
   });
 });
