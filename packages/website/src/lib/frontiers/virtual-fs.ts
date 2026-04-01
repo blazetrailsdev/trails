@@ -115,6 +115,11 @@ export class VirtualFS {
     return this.read(path) !== null;
   }
 
+  clear(): void {
+    this.adapter.runSql('DELETE FROM "_vfs_files"');
+    this._notify();
+  }
+
   /** Seed default files if the VFS is empty */
   seedDefaults(files: Array<{ path: string; content: string }>) {
     if (this.list().length > 0) return;

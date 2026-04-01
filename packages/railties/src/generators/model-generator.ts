@@ -43,6 +43,10 @@ export class ModelGenerator extends GeneratorBase {
     super(options);
   }
 
+  protected createMigrationGenerator(): MigrationGenerator {
+    return new MigrationGenerator({ cwd: this.cwd, output: this.output });
+  }
+
   run(name: string, args: string[], options: ModelOptions = {}): string[] {
     const {
       migration = true,
@@ -124,7 +128,7 @@ describe("${className}", () => {
 
     if (migration && !parent) {
       const tableName = classify(tableize(className));
-      const migGen = new MigrationGenerator({ cwd: this.cwd, output: this.output });
+      const migGen = this.createMigrationGenerator();
 
       const migArgs = indexes
         ? args
