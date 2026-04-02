@@ -2,7 +2,7 @@ import type { SqlJsStatic } from "sql.js";
 import { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VirtualFS } from "./virtual-fs.js";
 import { createTrailCLI, dropUserTables, type CliResult } from "./trail-cli.js";
-import type { MigrationProxy } from "@blazetrails/activerecord";
+import type { MigrationProxy } from "@blazetrails/activerecord/migration";
 
 export type { VirtualFS, VfsFile } from "./virtual-fs.js";
 export type { CliResult } from "./trail-cli.js";

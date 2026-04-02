@@ -1,8 +1,8 @@
 import type { VirtualFS } from "./virtual-fs.js";
 import type { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VfsModelGenerator, VfsMigrationGenerator, VfsAppGenerator } from "./vfs-generator.js";
-import type { MigrationProxy, MigrationLike } from "@blazetrails/activerecord";
-import { Migrator } from "@blazetrails/activerecord";
+import type { MigrationProxy, MigrationLike } from "@blazetrails/activerecord/migration";
+import { Migrator } from "@blazetrails/activerecord/migration";
 import { camelize } from "@blazetrails/activesupport";
 
 export interface CliResult {

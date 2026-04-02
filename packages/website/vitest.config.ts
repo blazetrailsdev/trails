@@ -10,6 +10,11 @@ const aliases = {
   "@blazetrails/arel/src": path.resolve(__dirname, "../arel/src"),
   "@blazetrails/arel": path.resolve(__dirname, "../arel/src/index.ts"),
   "@blazetrails/activemodel": path.resolve(__dirname, "../activemodel/src/index.ts"),
+  "@blazetrails/activerecord/adapter": path.resolve(__dirname, "../activerecord/src/adapter.ts"),
+  "@blazetrails/activerecord/migration": path.resolve(
+    __dirname,
+    "../activerecord/src/migration.ts",
+  ),
   "@blazetrails/activerecord": path.resolve(__dirname, "../activerecord/src/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "../rack/src/index.ts"),
   "@blazetrails/actionpack": path.resolve(__dirname, "../actionpack/src/index.ts"),

@@ -1,4 +1,4 @@
-import type { DatabaseAdapter } from "@blazetrails/activerecord";
+import type { DatabaseAdapter } from "@blazetrails/activerecord/adapter";
 import type { Database } from "sql.js";
 
 export class SqlJsAdapter implements DatabaseAdapter {
