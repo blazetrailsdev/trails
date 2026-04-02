@@ -11,6 +11,10 @@ export interface Clusivity {
   checkValidity(): void;
 }
 
+export function checkValidityBang(options: { in?: unknown }): void {
+  checkClusivityValidity(options);
+}
+
 export function checkClusivityValidity(options: { in?: unknown }): void {
   const collection = options.in;
   if (collection === undefined || collection === null) {

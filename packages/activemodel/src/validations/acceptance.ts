@@ -45,10 +45,15 @@ export class AcceptanceValidator implements Validator {
 
   validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
+    this.validateEach(record, attribute, value, errors);
+  }
+
+  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
+    const errs = errors ?? record.errors;
     if (value === null || value === undefined) return;
     const accepted = this.options.accept ?? [true, "true", "1", 1, "yes"];
     if (!accepted.includes(value)) {
-      errors.add(attribute, "accepted", { message: this.options.message });
+      errs.add(attribute, "accepted", { message: this.options.message });
     }
   }
 

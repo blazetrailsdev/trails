@@ -102,6 +102,10 @@ export class ModelName {
     this.i18nKey = lower;
   }
 
+  get cacheKey(): string {
+    return this.collection;
+  }
+
   get human(): string {
     if (!this._klass) return this._humanFallback;
 

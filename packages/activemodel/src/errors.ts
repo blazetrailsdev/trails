@@ -135,6 +135,14 @@ export class Errors {
     this.copy(other);
   }
 
+  copyBang(other: Errors): void {
+    this.copy(other);
+  }
+
+  mergeBang(other: Errors): void {
+    this.merge(other);
+  }
+
   toHash(): Record<string, string[]> {
     const result: Record<string, string[]> = {};
     for (const error of this._errors) {

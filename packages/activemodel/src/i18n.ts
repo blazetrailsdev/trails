@@ -1,4 +1,5 @@
 import { deepDup, deepMergeInPlace } from "@blazetrails/activesupport";
+import { raiseOnMissingTranslations } from "./translation.js";
 
 type TranslationValue = string | { one?: string; other?: string } | TranslationTree;
 interface TranslationTree {
@@ -65,6 +66,9 @@ class I18nService {
       return interpolate(options.defaultValue, options ?? {});
     }
 
+    if (raiseOnMissingTranslations) {
+      throw new Error(`Translation missing: ${key}`);
+    }
     return key;
   }
 

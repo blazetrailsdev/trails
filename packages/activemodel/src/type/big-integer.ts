@@ -27,4 +27,8 @@ export class BigIntegerType extends Type<bigint> {
     const cast = this.cast(value);
     return cast !== null ? cast.toString() : null;
   }
+
+  serializeCastValue(value: bigint | null): string | null {
+    return value !== null ? value.toString() : null;
+  }
 }

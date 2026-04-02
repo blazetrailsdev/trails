@@ -284,6 +284,9 @@ export class Model {
     const sharedAllowBlank = rules.allowBlank as boolean | undefined;
 
     const push = (validator: Validator) => {
+      if (typeof (validator as AnyRecord).checkValidityBang === "function") {
+        (validator as AnyRecord).checkValidityBang();
+      }
       this._validations.push({
         attribute,
         validator,
@@ -362,6 +365,19 @@ export class Model {
     if (rules.comparison) {
       push(new ComparisonValidator(rules.comparison as AnyRecord));
     }
+  }
+
+  static validatesBang(attribute: string, rules: Record<string, unknown>): void {
+    this.validates(attribute, { ...rules, strict: true });
+  }
+
+  static clearValidatorsBang(): void {
+    this._validations = [];
+    this._customValidations = [];
+  }
+
+  static isAttributeMethod(attribute: string): boolean {
+    return this._attributeDefinitions.has(attribute);
   }
 
   static validate(
@@ -499,6 +515,14 @@ export class Model {
    */
   static validatesConfirmationOf(...attributes: string[]): void {
     for (const attr of attributes) this.validates(attr, { confirmation: true });
+  }
+
+  static validatesComparisonOf(attribute: string, options: Record<string, unknown>): void {
+    this.validates(attribute, { comparison: options });
+  }
+
+  static validatesSizeOf(attribute: string, options: Record<string, unknown>): void {
+    this.validates(attribute, { length: options });
   }
 
   // -- Callbacks (Phase 1200) --
@@ -998,7 +1022,6 @@ export class Model {
       if (!shouldValidate(this, { if: entry.if, unless: entry.unless })) continue;
       const value = this.readAttribute(entry.attribute);
       if (entry.strict) {
-        // Strict validation: collect errors into a temporary Errors, then throw
         const tempErrors = new Errors(this);
         entry.validator.validate(this, entry.attribute, value, tempErrors);
         if (tempErrors.any) {

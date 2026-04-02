@@ -107,6 +107,10 @@ export class EachValidator extends Validator {
   checkValidity(): void {
     // Override in subclasses to validate options
   }
+
+  checkValidityBang(): void {
+    this.checkValidity();
+  }
 }
 
 /**

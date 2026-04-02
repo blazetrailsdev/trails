@@ -134,6 +134,16 @@ export class DirtyTracker {
     }
   }
 
+  initAttributes(
+    attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
+  ): void {
+    this.snapshot(attributes);
+  }
+
+  asJson(): Record<string, [unknown, unknown]> {
+    return this.changes;
+  }
+
   restore(attributes: {
     set(name: string, value: unknown): void;
     delete?(name: string): boolean;

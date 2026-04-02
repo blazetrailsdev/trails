@@ -12,9 +12,16 @@ export class UserProvidedDefault extends FromUser {
   readonly userProvidedValue: unknown;
 
   constructor(name: string, value: unknown, type: Type, databaseDefault: Attribute | null = null) {
-    // If value is a function (proc), evaluate it for the initial valueBeforeTypeCast
     const resolvedValue = typeof value === "function" ? value() : value;
     super(name, resolvedValue, type, databaseDefault);
     this.userProvidedValue = value;
+  }
+
+  marshalDump(): [string, unknown, Type, Attribute | null] {
+    return [this.name, this.userProvidedValue, this.type, this.getOriginalAttribute()];
+  }
+
+  static marshalLoad(data: [string, unknown, Type, Attribute | null]): UserProvidedDefault {
+    return new UserProvidedDefault(data[0], data[1], data[2], data[3]);
   }
 }

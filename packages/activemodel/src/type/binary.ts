@@ -21,6 +21,26 @@ export class BinaryType extends Type<Uint8Array> {
     if (value instanceof Data) return value.bytes;
     return this.cast(value);
   }
+
+  type(): string {
+    return this.name;
+  }
+
+  isBinary(): boolean {
+    return true;
+  }
+
+  isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
+    const old = this.deserialize(rawOldValue);
+    const cur = this.serialize(newValue);
+    if (old === null && cur === null) return false;
+    if (old === null || cur === null) return true;
+    if (old.length !== (cur as Uint8Array).length) return true;
+    for (let i = 0; i < old.length; i++) {
+      if (old[i] !== (cur as Uint8Array)[i]) return true;
+    }
+    return false;
+  }
 }
 
 export class Data {

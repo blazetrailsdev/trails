@@ -32,18 +32,39 @@ export class ComparisonValidator implements Validator {
 
   validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
+    this.validateEach(record, attribute, value, errors);
+  }
+
+  checkValidityBang(): void {
+    const keys = [
+      "greaterThan",
+      "greaterThanOrEqualTo",
+      "lessThan",
+      "lessThanOrEqualTo",
+      "equalTo",
+      "otherThan",
+    ];
+    if (!keys.some((k) => (this.options as Record<string, unknown>)[k] !== undefined)) {
+      throw new Error(
+        "One of :greater_than, :greater_than_or_equal_to, :less_than, :less_than_or_equal_to, :equal_to, or :other_than must be supplied",
+      );
+    }
+  }
+
+  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
+    const errs = errors ?? record.errors;
     if (value === null || value === undefined) return;
 
     if (this.options.greaterThan !== undefined) {
       const target = this.resolve(this.options.greaterThan, record);
       if (this.compare(value, target) <= 0) {
-        errors.add(attribute, "greater_than", { count: target, message: this.options.message });
+        errs.add(attribute, "greater_than", { count: target, message: this.options.message });
       }
     }
     if (this.options.greaterThanOrEqualTo !== undefined) {
       const target = this.resolve(this.options.greaterThanOrEqualTo, record);
       if (this.compare(value, target) < 0) {
-        errors.add(attribute, "greater_than_or_equal_to", {
+        errs.add(attribute, "greater_than_or_equal_to", {
           count: target,
           message: this.options.message,
         });
@@ -52,13 +73,13 @@ export class ComparisonValidator implements Validator {
     if (this.options.lessThan !== undefined) {
       const target = this.resolve(this.options.lessThan, record);
       if (this.compare(value, target) >= 0) {
-        errors.add(attribute, "less_than", { count: target, message: this.options.message });
+        errs.add(attribute, "less_than", { count: target, message: this.options.message });
       }
     }
     if (this.options.lessThanOrEqualTo !== undefined) {
       const target = this.resolve(this.options.lessThanOrEqualTo, record);
       if (this.compare(value, target) > 0) {
-        errors.add(attribute, "less_than_or_equal_to", {
+        errs.add(attribute, "less_than_or_equal_to", {
           count: target,
           message: this.options.message,
         });
@@ -67,13 +88,13 @@ export class ComparisonValidator implements Validator {
     if (this.options.equalTo !== undefined) {
       const target = this.resolve(this.options.equalTo, record);
       if (this.compare(value, target) !== 0) {
-        errors.add(attribute, "equal_to", { count: target, message: this.options.message });
+        errs.add(attribute, "equal_to", { count: target, message: this.options.message });
       }
     }
     if (this.options.otherThan !== undefined) {
       const target = this.resolve(this.options.otherThan, record);
       if (this.compare(value, target) === 0) {
-        errors.add(attribute, "other_than", { count: target, message: this.options.message });
+        errs.add(attribute, "other_than", { count: target, message: this.options.message });
       }
     }
   }

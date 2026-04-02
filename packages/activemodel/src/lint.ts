@@ -59,6 +59,39 @@ export namespace Tests {
       throw new Error("errors.fullMessages must return an array");
     }
   }
+
+  export function testModelNaming(model: {
+    constructor: { modelName?: { human: string; singular: string; plural: string } };
+  }): void {
+    const modelName = model.constructor.modelName;
+    if (!modelName) {
+      throw new Error("model.constructor.modelName must be defined");
+    }
+    if (typeof modelName.human !== "string") {
+      throw new Error("modelName.human must return a string");
+    }
+    if (typeof modelName.singular !== "string") {
+      throw new Error("modelName.singular must return a string");
+    }
+    if (typeof modelName.plural !== "string") {
+      throw new Error("modelName.plural must return a string");
+    }
+  }
+
+  export function testErrorsAref(model: { errors: { get(attribute: string): string[] } }): void {
+    const result = model.errors.get("attribute");
+    if (!Array.isArray(result)) {
+      throw new Error("errors.get(attribute) must return an array");
+    }
+  }
 }
 
-export const { testToKey, testToParam, testToPartialPath, testPersisted, testErrors } = Tests;
+export const {
+  testToKey,
+  testToParam,
+  testToPartialPath,
+  testPersisted,
+  testErrors,
+  testModelNaming,
+  testErrorsAref,
+} = Tests;

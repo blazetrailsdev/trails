@@ -105,14 +105,15 @@ describe("ComparisonValidationTest", () => {
   });
 
   it("validates comparison of no options", () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { comparison: {} });
+    expect(() => {
+      class Person extends Model {
+        static {
+          this.attribute("score", "integer");
+          this.validates("score", { comparison: {} });
+        }
       }
-    }
-    const p = new Person({ score: 5 });
-    expect(p.isValid()).toBe(true);
+      return Person;
+    }).toThrow();
   });
 
   it("validates comparison with greater than using numeric", () => {

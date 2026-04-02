@@ -21,3 +21,11 @@ export const deprecator = new Deprecation({ gem: "activemodel" });
 export interface ActiveModel {
   readonly deprecator: Deprecation;
 }
+
+export function gemVersion(): string {
+  return "8.0.0";
+}
+
+export function version(): string {
+  return gemVersion();
+}

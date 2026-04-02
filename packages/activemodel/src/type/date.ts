@@ -9,4 +9,19 @@ export class DateType extends Type<Date> {
     const d = new Date(String(value));
     return isNaN(d.getTime()) ? null : d;
   }
+
+  serialize(value: unknown): Date | null {
+    return this.cast(value);
+  }
+
+  type(): string {
+    return this.name;
+  }
+
+  typeCastForSchema(value: unknown): string {
+    if (value instanceof Date) {
+      return `"${value.toISOString().split("T")[0]}"`;
+    }
+    return JSON.stringify(value) ?? "null";
+  }
 }

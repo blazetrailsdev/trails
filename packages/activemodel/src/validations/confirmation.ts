@@ -17,6 +17,11 @@ export class ConfirmationValidator implements Validator {
 
   validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
+    this.validateEach(record, attribute, value, errors);
+  }
+
+  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
+    const errs = errors ?? record.errors;
     const confirmationAttr = `${attribute}Confirmation`;
     const confirmation = record.readAttribute?.(confirmationAttr) ?? record[confirmationAttr];
     if (confirmation == null) return;
@@ -32,7 +37,7 @@ export class ConfirmationValidator implements Validator {
       const humanAttr = modelClass?.humanAttributeName
         ? modelClass.humanAttributeName(attribute)
         : humanize(attribute);
-      errors.add(attribute, "confirmation", {
+      errs.add(attribute, "confirmation", {
         message: this.options.message,
         attribute: humanAttr,
       });

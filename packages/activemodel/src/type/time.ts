@@ -11,4 +11,24 @@ export class TimeType extends Type<Date> {
     const d = new Date(str);
     return isNaN(d.getTime()) ? null : d;
   }
+
+  serialize(value: unknown): Date | null {
+    return this.cast(value);
+  }
+
+  type(): string {
+    return this.name;
+  }
+
+  userInputInTimeZone(value: unknown): Date | null {
+    if (value === null || value === undefined) return null;
+    if (value instanceof Date) return value;
+    if (typeof value === "string") {
+      const timeOnly = /^\d{2}:\d{2}(:\d{2})?/.test(value);
+      const str = timeOnly ? `2000-01-01 ${value}` : String(value);
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return this.cast(value);
+  }
 }

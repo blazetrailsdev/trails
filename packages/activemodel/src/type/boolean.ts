@@ -36,4 +36,16 @@ export class BooleanType extends Type<boolean> {
     if (BooleanType.FALSE_VALUES.has(value)) return false;
     return null;
   }
+
+  serialize(value: unknown): boolean | null {
+    return this.cast(value);
+  }
+
+  type(): string {
+    return this.name;
+  }
+
+  serializeCastValue(value: boolean | null): boolean | null {
+    return value;
+  }
 }

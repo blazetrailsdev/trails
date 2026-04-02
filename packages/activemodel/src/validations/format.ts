@@ -16,20 +16,7 @@ export interface FormatOptions extends ConditionalOptions {
 }
 
 export class FormatValidator implements Validator {
-  constructor(private options: FormatOptions) {
-    const withOpt = options.with;
-    if (withOpt && withOpt instanceof RegExp && withOpt.multiline) {
-      throw new Error(
-        "The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z, or pass the `multiline: true` option?",
-      );
-    }
-    if (!options.with && !options.without) {
-      throw new Error("Either :with or :without must be supplied (but not both)");
-    }
-    if (options.with && options.without) {
-      throw new Error("Either :with or :without must be supplied (but not both)");
-    }
-  }
+  constructor(private options: FormatOptions) {}
 
   private resolveRegexp(opt: RegExp | ((record: AnyRecord) => RegExp), record: AnyRecord): RegExp {
     const re = typeof opt === "function" ? opt(record) : opt;
@@ -43,6 +30,11 @@ export class FormatValidator implements Validator {
 
   validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
+    this.validateEach(record, attribute, value, errors);
+  }
+
+  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
+    const errs = errors ?? record.errors;
     if (value === null || value === undefined) {
       if (this.options.allowNil) return;
       return;
@@ -52,14 +44,29 @@ export class FormatValidator implements Validator {
     if (this.options.with) {
       const re = this.resolveRegexp(this.options.with, record);
       if (!re.test(str)) {
-        errors.add(attribute, "invalid", { message: this.options.message });
+        errs.add(attribute, "invalid", { message: this.options.message });
       }
     }
     if (this.options.without) {
       const re = this.resolveRegexp(this.options.without, record);
       if (re.test(str)) {
-        errors.add(attribute, "invalid", { message: this.options.message });
+        errs.add(attribute, "invalid", { message: this.options.message });
       }
+    }
+  }
+
+  checkValidityBang(): void {
+    if (!this.options.with && !this.options.without) {
+      throw new Error("Either :with or :without must be supplied (but not both)");
+    }
+    if (this.options.with && this.options.without) {
+      throw new Error("Either :with or :without must be supplied (but not both)");
+    }
+    const withOpt = this.options.with;
+    if (withOpt && withOpt instanceof RegExp && withOpt.multiline) {
+      throw new Error(
+        "The provided regular expression is using multiline anchors (^ or $), which may present a security risk. Did you mean to use \\A and \\z?",
+      );
     }
   }
 }

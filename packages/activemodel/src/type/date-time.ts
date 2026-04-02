@@ -9,4 +9,12 @@ export class DateTimeType extends Type<Date> {
     const d = new Date(String(value));
     return isNaN(d.getTime()) ? null : d;
   }
+
+  serialize(value: unknown): Date | null {
+    return this.cast(value);
+  }
+
+  type(): string {
+    return this.name;
+  }
 }

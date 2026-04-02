@@ -9,4 +9,17 @@ export class FloatType extends Type<number> {
     const parsed = parseFloat(String(value));
     return isNaN(parsed) ? null : parsed;
   }
+
+  type(): string {
+    return this.name;
+  }
+
+  typeCastForSchema(value: unknown): string {
+    if (typeof value === "number") {
+      if (isNaN(value)) return '"NaN"';
+      if (value === Infinity) return '"Infinity"';
+      if (value === -Infinity) return '"-Infinity"';
+    }
+    return JSON.stringify(value) ?? String(value);
+  }
 }

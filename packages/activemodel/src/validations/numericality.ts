@@ -41,6 +41,36 @@ export class NumericalityValidator implements Validator {
 
   validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
+    this.validateEach(record, attribute, value, errors);
+  }
+
+  checkValidityBang(): void {
+    const compareKeys = [
+      "greaterThan",
+      "greaterThanOrEqualTo",
+      "lessThan",
+      "lessThanOrEqualTo",
+      "equalTo",
+      "otherThan",
+    ] as const;
+    for (const key of compareKeys) {
+      const val = this.options[key];
+      if (
+        val !== undefined &&
+        typeof val !== "number" &&
+        typeof val !== "function" &&
+        typeof val !== "string"
+      ) {
+        throw new Error(`:${key} must be a number, a symbol or a proc`);
+      }
+    }
+    if (this.options.in !== undefined && !Array.isArray(this.options.in)) {
+      throw new Error(":in must be a range");
+    }
+  }
+
+  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
+    const errs = errors ?? record.errors;
     if (value === null || value === undefined) {
       if (this.options.allowNil) return;
       // Default: skip nil (Rails default for numericality)
@@ -50,53 +80,53 @@ export class NumericalityValidator implements Validator {
 
     const num = Number(value);
     if (isNaN(num)) {
-      errors.add(attribute, "not_a_number", { message: this.options.message });
+      errs.add(attribute, "not_a_number", { message: this.options.message });
       return;
     }
 
     if (this.options.onlyInteger && !Number.isInteger(num)) {
-      errors.add(attribute, "not_an_integer", { message: this.options.message });
+      errs.add(attribute, "not_an_integer", { message: this.options.message });
       return;
     }
 
     const gt = this.resolveNumeric(this.options.greaterThan, record);
     if (gt !== undefined && !(num > gt)) {
-      errors.add(attribute, "greater_than", { count: gt });
+      errs.add(attribute, "greater_than", { count: gt });
     }
     const gte = this.resolveNumeric(this.options.greaterThanOrEqualTo, record);
     if (gte !== undefined && !(num >= gte)) {
-      errors.add(attribute, "greater_than_or_equal_to", { count: gte });
+      errs.add(attribute, "greater_than_or_equal_to", { count: gte });
     }
     const lt = this.resolveNumeric(this.options.lessThan, record);
     if (lt !== undefined && !(num < lt)) {
-      errors.add(attribute, "less_than", { count: lt });
+      errs.add(attribute, "less_than", { count: lt });
     }
     const lte = this.resolveNumeric(this.options.lessThanOrEqualTo, record);
     if (lte !== undefined && !(num <= lte)) {
-      errors.add(attribute, "less_than_or_equal_to", { count: lte });
+      errs.add(attribute, "less_than_or_equal_to", { count: lte });
     }
     const eq = this.resolveNumeric(this.options.equalTo, record);
     if (eq !== undefined && num !== eq) {
-      errors.add(attribute, "equal_to", { count: eq });
+      errs.add(attribute, "equal_to", { count: eq });
     }
     const ot = this.resolveNumeric(this.options.otherThan, record);
     if (ot !== undefined && num === ot) {
-      errors.add(attribute, "other_than", { count: ot });
+      errs.add(attribute, "other_than", { count: ot });
     }
     if (this.options.in !== undefined) {
       const [min, max] = this.options.in;
       if (num < min || num > max) {
-        errors.add(attribute, "not_in_range", {
+        errs.add(attribute, "not_in_range", {
           message: this.options.message,
           count: `${min}..${max}`,
         });
       }
     }
     if (this.options.odd && num % 2 === 0) {
-      errors.add(attribute, "odd");
+      errs.add(attribute, "odd");
     }
     if (this.options.even && num % 2 !== 0) {
-      errors.add(attribute, "even");
+      errs.add(attribute, "even");
     }
   }
 }

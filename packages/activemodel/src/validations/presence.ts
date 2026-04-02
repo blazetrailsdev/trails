@@ -16,8 +16,13 @@ export class PresenceValidator implements Validator {
 
   validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
+    this.validateEach(record, attribute, value, errors);
+  }
+
+  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
+    const errs = errors ?? record.errors;
     if (isBlank(value)) {
-      errors.add(attribute, "blank", { message: this.options.message });
+      errs.add(attribute, "blank", { message: this.options.message });
     }
   }
 }

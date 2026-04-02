@@ -23,6 +23,7 @@ export interface Validations {
  */
 export interface ValidationsClassMethods {
   validates(attribute: string, rules: Record<string, unknown>): void;
+  validatesBang(attribute: string, rules: Record<string, unknown>): void;
   validate(methodOrFn: string | ((record: unknown) => void), options?: ConditionalOptions): void;
   validatesWith(
     validatorClass: {
@@ -32,6 +33,9 @@ export interface ValidationsClassMethods {
   ): void;
   validators(): unknown[];
   validatorsOn(attribute: string): unknown[];
+  clearValidatorsBang(): void;
+  isAttributeMethod(attribute: string): boolean;
+  inherited(subclass: unknown): void;
 }
 
 /**
@@ -60,6 +64,10 @@ export class ValidationContext {
   readonly name: string;
   constructor(name: string) {
     this.name = name;
+  }
+
+  get context(): string {
+    return this.name;
   }
 
   toString(): string {
