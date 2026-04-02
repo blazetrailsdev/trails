@@ -1,8 +1,6 @@
 import type { Base } from "./base.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { existsSync, readFileSync } from "fs";
-import { resolve } from "path";
-import { pathToFileURL } from "url";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import {
@@ -179,17 +177,20 @@ async function loadConfigFile(modelClass: typeof Base): Promise<Record<string, a
     return loadJsonConfig((modelClass as any)._configPath);
   }
 
+  const pathAdapter = await getPathAsync();
+  const fsAdapter = await getFsAsync();
   const cwd = process.cwd();
   const tsCandidates = [
-    resolve(cwd, "config", "database.ts"),
-    resolve(cwd, "config", "database.js"),
-    resolve(cwd, "src", "config", "database.ts"),
-    resolve(cwd, "src", "config", "database.js"),
+    pathAdapter.resolve(cwd, "config", "database.ts"),
+    pathAdapter.resolve(cwd, "config", "database.js"),
+    pathAdapter.resolve(cwd, "src", "config", "database.ts"),
+    pathAdapter.resolve(cwd, "src", "config", "database.js"),
   ];
 
   for (const candidate of tsCandidates) {
-    if (existsSync(candidate)) {
+    if (fsAdapter.existsSync(candidate)) {
       try {
+        const { pathToFileURL } = await import("node:url");
         const mod = await import(pathToFileURL(candidate).href);
         return mod.default ?? mod;
       } catch (error: unknown) {
@@ -201,12 +202,13 @@ async function loadConfigFile(modelClass: typeof Base): Promise<Record<string, a
     }
   }
 
-  return loadJsonConfig(resolve(cwd, "config", "database.json"));
+  return loadJsonConfig(pathAdapter.resolve(cwd, "config", "database.json"));
 }
 
-function loadJsonConfig(configPath: string): Record<string, any> {
+async function loadJsonConfig(configPath: string): Promise<Record<string, any>> {
   try {
-    return JSON.parse(readFileSync(configPath, "utf-8"));
+    const fsAdapter = await getFsAsync();
+    return JSON.parse(fsAdapter.readFileSync(configPath, "utf-8"));
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return {};

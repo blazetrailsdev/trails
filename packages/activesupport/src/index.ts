@@ -1,4 +1,11 @@
-export { registerFsAdapter, getFs, getPath, fsAdapterConfig } from "./fs-adapter.js";
+export {
+  registerFsAdapter,
+  getFs,
+  getPath,
+  getFsAsync,
+  getPathAsync,
+  fsAdapterConfig,
+} from "./fs-adapter.js";
 export type { FsAdapter, PathAdapter } from "./fs-adapter.js";
 
 export { registerCryptoAdapter, getCrypto, cryptoAdapterConfig } from "./crypto-adapter.js";
