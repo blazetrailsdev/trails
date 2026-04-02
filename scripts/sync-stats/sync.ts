@@ -155,6 +155,16 @@ class ApiCompareStat extends Base {
   }
 }
 
+class CompareLog extends Base {
+  static {
+    this.tableName = "compare_logs";
+    this.attribute("merge_commit_sha", "string");
+    this.attribute("pr_number", "integer");
+    this.attribute("step_name", "string");
+    this.attribute("log_output", "string");
+  }
+}
+
 class SyncLog extends Base {
   static {
     this.tableName = "sync_log";
@@ -180,7 +190,20 @@ async function tableExists(adapter: SQLite3Adapter, name: string): Promise<boole
 async function migrateDb(adapter: SQLite3Adapter) {
   const ctx = new MigrationContext(adapter);
 
-  if (await tableExists(adapter, "sync_log")) return;
+  const hasExistingSchema = await tableExists(adapter, "sync_log");
+
+  if (hasExistingSchema) {
+    if (!(await tableExists(adapter, "compare_logs"))) {
+      await ctx.createTable("compare_logs", {}, (t) => {
+        t.string("merge_commit_sha");
+        t.integer("pr_number");
+        t.string("step_name");
+        t.text("log_output");
+        t.index(["merge_commit_sha", "step_name"], { unique: true });
+      });
+    }
+    return;
+  }
 
   await adapter.beginTransaction();
   try {
@@ -303,6 +326,14 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.index(["merge_commit_sha", "package"], { unique: true });
     });
 
+    await ctx.createTable("compare_logs", {}, (t) => {
+      t.string("merge_commit_sha");
+      t.integer("pr_number");
+      t.string("step_name");
+      t.text("log_output");
+      t.index(["merge_commit_sha", "step_name"], { unique: true });
+    });
+
     await ctx.createTable("sync_log", {}, (t) => {
       t.string("synced_at");
       t.integer("prs_synced", { default: 0 });
@@ -405,7 +436,7 @@ interface GhWorkflowJob {
 // Sync functions
 // ---------------------------------------------------------------------------
 
-async function syncPullRequests(): Promise<number> {
+async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
   const rows = await PullRequest.findBySql("SELECT MAX(number) as number FROM pull_requests");
   const lastSynced = (rows[0]?.readAttribute("number") as number) ?? 0;
   console.log(`Last synced PR: #${lastSynced}`);
@@ -428,8 +459,9 @@ async function syncPullRequests(): Promise<number> {
     "reviewDecision",
   ].join(",");
 
+  const limit = mode === "latest" ? 10 : 1000;
   const allPrs = ghJson<GhPrData[]>(
-    `pr list --repo ${REPO} --state merged --limit 1000 --json ${fields} --jq '[.[] | select(.number > ${lastSynced})]'`,
+    `pr list --repo ${REPO} --state merged --limit ${limit} --json ${fields} --jq '[.[] | select(.number > ${lastSynced})]'`,
   );
 
   console.log(`Found ${allPrs.length} new merged PRs to sync`);
@@ -626,7 +658,8 @@ async function syncPrComments() {
   }
 }
 
-async function syncWorkflowRuns(): Promise<number> {
+async function syncWorkflowRuns(mode: "latest" | "refresh"): Promise<number> {
+  const limitClause = mode === "latest" ? "LIMIT 10" : "";
   const missingRuns = await PullRequest.findBySql(`
     SELECT DISTINCT merge_commit_sha, number FROM pull_requests
     WHERE merge_commit_sha IS NOT NULL
@@ -639,7 +672,8 @@ async function syncWorkflowRuns(): Promise<number> {
         GROUP BY wr.id HAVING COUNT(wj.id) = 0
       )
     )
-    ORDER BY number
+    ORDER BY number DESC
+    ${limitClause}
   `);
 
   if (missingRuns.length === 0) {
@@ -731,6 +765,58 @@ async function syncWorkflowRuns(): Promise<number> {
 // CI log parsing
 // ---------------------------------------------------------------------------
 
+function extractStepLogs(rawLog: string): Map<string, string> {
+  const steps = new Map<string, string>();
+
+  // Collect ALL ##[group] positions as step boundaries (not just "Run" groups).
+  // This prevents the last comparison step from including post-job cleanup noise.
+  const allGroups: number[] = [];
+  const groupPattern = /##\[group\]/g;
+  let gm;
+  while ((gm = groupPattern.exec(rawLog)) !== null) {
+    allGroups.push(gm.index);
+  }
+
+  // Find comparison steps by matching "##[group]Run <command>"
+  const runPattern = /##\[group\]Run (.+)/g;
+  let m;
+  while ((m = runPattern.exec(rawLog)) !== null) {
+    const command = m[1].trim();
+    let stepName: string | null = null;
+
+    if (command.includes("api-compare/compare.ts")) {
+      stepName = "api_compare";
+    } else if (command.includes("test-compare/test-compare.ts")) {
+      stepName = "test_compare";
+    }
+
+    if (!stepName) continue;
+
+    // End boundary is the next ##[group] (any kind), not just the next "Run".
+    // For the last step, fall back to "Post job cleanup." as the boundary.
+    const stepStart = m.index;
+    const nextGroup = allGroups.find((pos) => pos > stepStart);
+    let stepEnd: number;
+    if (nextGroup) {
+      stepEnd = nextGroup;
+    } else {
+      const cleanupIdx = rawLog.indexOf("Post job cleanup.", stepStart);
+      stepEnd = cleanupIdx !== -1 ? cleanupIdx : rawLog.length;
+    }
+    const stepContent = rawLog.slice(stepStart, stepEnd);
+
+    const cleaned = stepContent
+      .split("\n")
+      .map((line) => line.replace(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s?/, ""))
+      .join("\n")
+      .trim();
+
+    steps.set(stepName, cleaned);
+  }
+
+  return steps;
+}
+
 function parseTestCompareFromLogs(logs: string) {
   const results = new Map<
     string,
@@ -810,7 +896,8 @@ function parseApiCompareFromLogs(logs: string) {
   return results;
 }
 
-async function syncCompareStats(): Promise<number> {
+async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
+  const limitClause = mode === "latest" ? "LIMIT 10" : "";
   const runsToProcess = await WorkflowRun.findBySql(`
     SELECT DISTINCT wr.id, wr.head_sha, wr.pr_number
     FROM workflow_runs wr
@@ -818,10 +905,24 @@ async function syncCompareStats(): Promise<number> {
     WHERE wj.name = 'Rails API/Test Comparison'
     AND wj.conclusion = 'success'
     AND (
-      wr.head_sha NOT IN (SELECT DISTINCT merge_commit_sha FROM test_compare_stats)
-      OR wr.head_sha NOT IN (SELECT DISTINCT merge_commit_sha FROM api_compare_stats)
+      NOT EXISTS (
+        SELECT 1 FROM test_compare_stats tcs
+        WHERE tcs.merge_commit_sha = wr.head_sha
+      )
+      OR NOT EXISTS (
+        SELECT 1 FROM api_compare_stats acs
+        WHERE acs.merge_commit_sha = wr.head_sha
+      )
+      OR EXISTS (
+        WITH expected(step_name) AS (VALUES ('api_compare'), ('test_compare'))
+        SELECT 1 FROM expected e
+        LEFT JOIN compare_logs cl
+          ON cl.merge_commit_sha = wr.head_sha AND cl.step_name = e.step_name
+        WHERE cl.step_name IS NULL
+      )
     )
-    ORDER BY wr.pr_number
+    ORDER BY wr.pr_number DESC
+    ${limitClause}
   `);
 
   if (runsToProcess.length === 0) {
@@ -846,6 +947,20 @@ async function syncCompareStats(): Promise<number> {
 
     try {
       const logs = gh(`api repos/${REPO}/actions/jobs/${jobId}/logs`);
+
+      // Store raw step logs
+      const stepLogs = extractStepLogs(logs);
+      if (stepLogs.size > 0) {
+        await CompareLog.upsertAll(
+          [...stepLogs.entries()].map(([stepName, output]) => ({
+            merge_commit_sha: headSha,
+            pr_number: prNumber,
+            step_name: stepName,
+            log_output: output,
+          })),
+          { uniqueBy: ["merge_commit_sha", "step_name"] },
+        );
+      }
 
       const testStats = parseTestCompareFromLogs(logs);
       if (testStats.size > 0) {
@@ -883,12 +998,13 @@ async function syncCompareStats(): Promise<number> {
         );
       }
 
-      if (testStats.size > 0 || apiStats.size > 0) {
+      if (stepLogs.size > 0 || testStats.size > 0 || apiStats.size > 0) {
         parsed++;
         const totalTests = [...testStats.values()].reduce((sum, s) => sum + s.matched, 0);
         const totalApi = [...apiStats.values()].reduce((sum, s) => sum + s.matched, 0);
+        const logSteps = [...stepLogs.keys()].join(", ");
         console.log(
-          `  PR #${prNumber}: ${testStats.size} test packages (${totalTests} matched), ${apiStats.size} api packages (${totalApi} matched)`,
+          `  PR #${prNumber}: ${testStats.size} test packages (${totalTests} matched), ${apiStats.size} api packages (${totalApi} matched), logs: [${logSteps}]`,
         );
       }
     } catch (err) {
@@ -905,7 +1021,7 @@ async function syncCompareStats(): Promise<number> {
 // Summary
 // ---------------------------------------------------------------------------
 
-async function printSummary() {
+async function printSummary(mode: "latest" | "refresh") {
   const count = async (table: string) => {
     const rows = await Base.adapter.execute(`SELECT COUNT(*) as cnt FROM ${table}`);
     return (rows[0] as { cnt: number }).cnt;
@@ -915,38 +1031,37 @@ async function printSummary() {
     return (rows[0] as { cnt: number }).cnt;
   };
 
-  const [
-    prCount,
-    fileCount,
-    commitCount,
-    commentCount,
-    reviewCount,
-    runCount,
-    testStatCount,
-    apiStatCount,
-  ] = await Promise.all([
+  const [prCount, runCount, testStatCount, apiStatCount, logCount] = await Promise.all([
     count("pull_requests"),
-    count("pr_files"),
-    count("pr_commits"),
-    count("pr_comments"),
-    count("pr_reviews"),
     count("workflow_runs"),
     countDistinct("test_compare_stats", "merge_commit_sha"),
     countDistinct("api_compare_stats", "merge_commit_sha"),
+    countDistinct("compare_logs", "merge_commit_sha"),
   ]);
 
   console.log("\n=== Database Summary ===");
   console.log(`  PRs: ${prCount}`);
-  console.log(`  PR files: ${fileCount}`);
-  console.log(`  PR commits: ${commitCount}`);
-  console.log(`  PR comments: ${commentCount}`);
-  console.log(`  PR reviews: ${reviewCount}`);
+
+  if (mode === "refresh") {
+    const [fileCount, commitCount, commentCount, reviewCount] = await Promise.all([
+      count("pr_files"),
+      count("pr_commits"),
+      count("pr_comments"),
+      count("pr_reviews"),
+    ]);
+    console.log(`  PR files: ${fileCount}`);
+    console.log(`  PR commits: ${commitCount}`);
+    console.log(`  PR comments: ${commentCount}`);
+    console.log(`  PR reviews: ${reviewCount}`);
+  }
+
   console.log(`  Workflow runs: ${runCount}`);
   console.log(`  Commits with test:compare stats: ${testStatCount}`);
   console.log(`  Commits with api:compare stats: ${apiStatCount}`);
+  console.log(`  Commits with compare logs: ${logCount}`);
   console.log(`  Database: ${DB_PATH}`);
 
-  const latest = await TestCompareStat.findBySql(`
+  const latestTestStats = await TestCompareStat.findBySql(`
     SELECT package, matched, total, percent, skipped
     FROM test_compare_stats
     WHERE merge_commit_sha = (
@@ -955,9 +1070,9 @@ async function printSummary() {
     ORDER BY package
   `);
 
-  if (latest.length > 0) {
+  if (latestTestStats.length > 0) {
     console.log("\n  Latest test:compare:");
-    for (const row of latest) {
+    for (const row of latestTestStats) {
       const pkg = row.readAttribute("package");
       const matched = row.readAttribute("matched");
       const total = row.readAttribute("total");
@@ -967,6 +1082,28 @@ async function printSummary() {
       console.log(`    ${pkg}: ${matched}/${total} (${percent}%)${skipStr}`);
     }
   }
+
+  const latestApiStats = await ApiCompareStat.findBySql(`
+    SELECT package, matched, total, percent, missing
+    FROM api_compare_stats
+    WHERE merge_commit_sha = (
+      SELECT merge_commit_sha FROM api_compare_stats ORDER BY pr_number DESC LIMIT 1
+    )
+    ORDER BY package
+  `);
+
+  if (latestApiStats.length > 0) {
+    console.log("\n  Latest api:compare:");
+    for (const row of latestApiStats) {
+      const pkg = row.readAttribute("package");
+      const matched = row.readAttribute("matched");
+      const total = row.readAttribute("total");
+      const percent = row.readAttribute("percent");
+      const missing = row.readAttribute("missing") as number;
+      const missStr = missing > 0 ? ` (${missing} missing)` : "";
+      console.log(`    ${pkg}: ${matched}/${total} (${percent}%)${missStr}`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -974,6 +1111,23 @@ async function printSummary() {
 // ---------------------------------------------------------------------------
 
 async function main() {
+  const args = process.argv.slice(2);
+  const knownFlags = ["--latest", "--refresh"];
+  const unknownFlags = args.filter((a) => a.startsWith("--") && !knownFlags.includes(a));
+  if (unknownFlags.length > 0) {
+    console.error(`Unknown flag(s): ${unknownFlags.join(", ")}`);
+    console.error("Usage: stats:sync [--latest | --refresh]");
+    process.exit(1);
+  }
+
+  const mode: "latest" | "refresh" = args.includes("--refresh") ? "refresh" : "latest";
+
+  if (mode === "latest") {
+    console.log("Running in latest mode (default). Use --refresh for full sync.\n");
+  } else {
+    console.log("Running full refresh sync.\n");
+  }
+
   const adapter = new SQLite3Adapter(DB_PATH);
   Base.adapter = adapter;
 
@@ -981,22 +1135,24 @@ async function main() {
     await migrateDb(adapter);
 
     console.log("=== Syncing PR data ===");
-    const prsSynced = await syncPullRequests();
+    const prsSynced = await syncPullRequests(mode);
 
-    console.log("\n=== Syncing PR files ===");
-    await syncPrFiles();
+    if (mode === "refresh") {
+      console.log("\n=== Syncing PR files ===");
+      await syncPrFiles();
 
-    console.log("\n=== Syncing PR commits ===");
-    await syncPrCommits();
+      console.log("\n=== Syncing PR commits ===");
+      await syncPrCommits();
 
-    console.log("\n=== Syncing PR comments & reviews ===");
-    await syncPrComments();
+      console.log("\n=== Syncing PR comments & reviews ===");
+      await syncPrComments();
+    }
 
     console.log("\n=== Syncing workflow runs ===");
-    const runsSynced = await syncWorkflowRuns();
+    const runsSynced = await syncWorkflowRuns(mode);
 
     console.log("\n=== Syncing compare stats from CI logs ===");
-    const logsParsed = await syncCompareStats();
+    const logsParsed = await syncCompareStats(mode);
 
     await SyncLog.create({
       synced_at: new Date().toISOString(),
@@ -1005,7 +1161,7 @@ async function main() {
       logs_parsed: logsParsed,
     });
 
-    await printSummary();
+    await printSummary(mode);
   } finally {
     adapter.close();
   }
