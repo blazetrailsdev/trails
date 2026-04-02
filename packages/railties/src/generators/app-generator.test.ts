@@ -31,7 +31,7 @@ function exists(...segments: string[]) {
 describe("AppGenerator", () => {
   it("creates application directory structure", async () => {
     const gen = makeGen();
-    await gen.run("my-app", { database: "sqlite", skipGit: true, skipInstall: true });
+    await gen.run("my-app", { database: "sqlite" });
 
     // Root files
     expect(exists("package.json")).toBe(true);
@@ -114,7 +114,7 @@ describe("AppGenerator", () => {
 
   it("generates valid package.json", async () => {
     const gen = makeGen();
-    await gen.run("my-app", { database: "sqlite", skipGit: true, skipInstall: true });
+    await gen.run("my-app", { database: "sqlite" });
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.name).toBe("my-app");
     expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
@@ -128,7 +128,7 @@ describe("AppGenerator", () => {
 
   it("configures postgres database", async () => {
     const gen = makeGen();
-    await gen.run("my-app", { database: "postgres", skipGit: true, skipInstall: true });
+    await gen.run("my-app", { database: "postgres" });
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies.pg).toBeDefined();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
@@ -137,7 +137,7 @@ describe("AppGenerator", () => {
 
   it("configures mysql database", async () => {
     const gen = makeGen();
-    await gen.run("my-app", { database: "mysql", skipGit: true, skipInstall: true });
+    await gen.run("my-app", { database: "mysql" });
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies.mysql2).toBeDefined();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
@@ -146,7 +146,7 @@ describe("AppGenerator", () => {
 
   it("configures sqlite database by default", async () => {
     const gen = makeGen();
-    await gen.run("my-app", { database: "sqlite", skipGit: true, skipInstall: true });
+    await gen.run("my-app", { database: "sqlite" });
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
     expect(dbConfig).toContain("sqlite3");
   });
@@ -155,24 +155,16 @@ describe("AppGenerator", () => {
     const gen = makeGen();
     await gen.run("my-app", {
       database: "sqlite",
-      skipGit: true,
-      skipInstall: true,
+
       skipDocker: true,
     });
     expect(exists("Dockerfile")).toBe(false);
     expect(exists(".dockerignore")).toBe(false);
   });
 
-  it("prints completion message", async () => {
-    const gen = makeGen();
-    await gen.run("my-app", { database: "sqlite", skipGit: true, skipInstall: true });
-    expect(lines.some((l) => l.includes("Done!"))).toBe(true);
-    expect(lines.some((l) => l.includes("my-app"))).toBe(true);
-  });
-
   it("includes app name in generated files", async () => {
     const gen = makeGen();
-    await gen.run("my-app", { database: "sqlite", skipGit: true, skipInstall: true });
+    await gen.run("my-app", { database: "sqlite" });
 
     const readme = fs.readFileSync(appPath("README.md"), "utf-8");
     expect(readme).toContain("my-app");

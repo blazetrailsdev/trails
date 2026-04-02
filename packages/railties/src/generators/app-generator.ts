@@ -1,11 +1,7 @@
-import * as path from "node:path";
-import { execSync } from "node:child_process";
 import { GeneratorBase, GeneratorOptions } from "./base.js";
 
 export interface AppOptions {
   database: "sqlite" | "postgres" | "mysql";
-  skipGit?: boolean;
-  skipInstall?: boolean;
   skipDocker?: boolean;
 }
 
@@ -15,7 +11,7 @@ export class AppGenerator extends GeneratorBase {
   }
 
   async run(name: string, options: AppOptions): Promise<string[]> {
-    const appDir = path.join(this.cwd, name);
+    const appDir = this.path.join(this.cwd, name);
     this.cwd = appDir;
 
     this.output(`Creating new trails application: ${name}`);
@@ -35,28 +31,6 @@ export class AppGenerator extends GeneratorBase {
     }
 
     this.output("");
-
-    if (!options.skipGit) {
-      try {
-        execSync("git init", { cwd: appDir, stdio: "pipe" });
-        this.output("  Initialized git repository");
-      } catch {
-        // git not available
-      }
-    }
-
-    if (!options.skipInstall) {
-      this.output("  Installing dependencies...");
-      try {
-        execSync("pnpm install", { cwd: appDir, stdio: "pipe" });
-        this.output("  Dependencies installed");
-      } catch {
-        this.output("  Could not install dependencies — run 'pnpm install' manually");
-      }
-    }
-
-    this.output("");
-    this.output(`  Done! cd ${name} && trails server`);
 
     return this.getCreatedFiles();
   }

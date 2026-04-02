@@ -1,6 +1,8 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
 import {
+  getFs,
+  getPath,
+  type FsAdapter,
+  type PathAdapter,
   underscore as _underscore,
   camelize as _camelize,
   tableize as _tableize,
@@ -22,8 +24,16 @@ export abstract class GeneratorBase {
     this.output = options.output;
   }
 
+  protected get fs(): FsAdapter {
+    return getFs();
+  }
+
+  protected get path(): PathAdapter {
+    return getPath();
+  }
+
   protected isTypeScript(): boolean {
-    return fs.existsSync(path.join(this.cwd, "tsconfig.json"));
+    return this.fs.existsSync(this.path.join(this.cwd, "tsconfig.json"));
   }
 
   protected ext(): string {
@@ -31,42 +41,42 @@ export abstract class GeneratorBase {
   }
 
   protected createFile(relativePath: string, content: string, options?: { mode?: number }): void {
-    const fullPath = path.join(this.cwd, relativePath);
-    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    fs.writeFileSync(fullPath, content, { mode: options?.mode });
+    const fullPath = this.path.join(this.cwd, relativePath);
+    this.fs.mkdirSync(this.path.dirname(fullPath), { recursive: true });
+    this.fs.writeFileSync(fullPath, content, { mode: options?.mode });
     this.createdFiles.push(relativePath);
     this.output(`      create  ${relativePath}`);
   }
 
   protected appendToFile(relativePath: string, content: string): void {
-    const fullPath = path.join(this.cwd, relativePath);
-    if (!fs.existsSync(fullPath)) {
+    const fullPath = this.path.join(this.cwd, relativePath);
+    if (!this.fs.existsSync(fullPath)) {
       this.createFile(relativePath, content);
       return;
     }
-    fs.appendFileSync(fullPath, content);
+    this.fs.appendFileSync(fullPath, content);
     this.output(`      append  ${relativePath}`);
   }
 
   protected insertIntoFile(relativePath: string, marker: string, content: string): void {
-    const fullPath = path.join(this.cwd, relativePath);
-    if (!fs.existsSync(fullPath)) return;
-    const existing = fs.readFileSync(fullPath, "utf-8");
+    const fullPath = this.path.join(this.cwd, relativePath);
+    if (!this.fs.existsSync(fullPath)) return;
+    const existing = this.fs.readFileSync(fullPath, "utf-8");
     const idx = existing.indexOf(marker);
     if (idx === -1) return;
     const updated = existing.slice(0, idx) + content + existing.slice(idx);
-    fs.writeFileSync(fullPath, updated);
+    this.fs.writeFileSync(fullPath, updated);
     this.output(`      insert  ${relativePath}`);
   }
 
   protected fileExists(relativePath: string): boolean {
-    return fs.existsSync(path.join(this.cwd, relativePath));
+    return this.fs.existsSync(this.path.join(this.cwd, relativePath));
   }
 
   protected removeFile(relativePath: string): boolean {
-    const fullPath = path.join(this.cwd, relativePath);
-    if (!fs.existsSync(fullPath)) return false;
-    fs.unlinkSync(fullPath);
+    const fullPath = this.path.join(this.cwd, relativePath);
+    if (!this.fs.existsSync(fullPath)) return false;
+    this.fs.unlinkSync(fullPath);
     this.output(`      remove  ${relativePath}`);
     return true;
   }
@@ -121,7 +131,6 @@ export function parseColumns(args: string[]): Array<{ name: string; type: Column
     if (arg.startsWith("-")) continue;
     const [name, rawType] = arg.split(":");
     if (!name || !rawType) continue;
-    // Strip modifiers like {polymorphic} for the base type
     const type = rawType.replace(/\{[^}]*\}/, "") as ColumnType;
     columns.push({ name, type });
   }

@@ -17,7 +17,7 @@ beforeAll(async () => {
   output = [];
 
   const appGen = new AppGenerator({ cwd: tmpDir, output: (m) => output.push(m) });
-  await appGen.run("docs", { database: "sqlite", skipGit: true, skipInstall: true });
+  await appGen.run("docs", { database: "sqlite" });
 });
 
 afterAll(() => {

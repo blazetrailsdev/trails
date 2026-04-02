@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { MessageVerifier } from "@blazetrails/activesupport";
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { underscore } from "@blazetrails/activesupport";
 
 /**

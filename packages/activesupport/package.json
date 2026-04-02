@@ -5,6 +5,52 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./message-verifier": {
+      "types": "./dist/message-verifier.d.ts",
+      "default": "./dist/message-verifier.js"
+    },
+    "./message-encryptor": {
+      "types": "./dist/message-encryptor.d.ts",
+      "default": "./dist/message-encryptor.js"
+    },
+    "./key-generator": {
+      "types": "./dist/key-generator.d.ts",
+      "default": "./dist/key-generator.js"
+    },
+    "./digest": {
+      "types": "./dist/digest.d.ts",
+      "default": "./dist/digest.js"
+    },
+    "./security-utils": {
+      "types": "./dist/security-utils.d.ts",
+      "default": "./dist/security-utils.js"
+    },
+    "./configuration-file": {
+      "types": "./dist/configuration-file.d.ts",
+      "default": "./dist/configuration-file.js"
+    },
+    "./gzip": {
+      "types": "./dist/gzip.d.ts",
+      "default": "./dist/gzip.js"
+    },
+    "./cache/file-store": {
+      "types": "./dist/cache/file-store.d.ts",
+      "default": "./dist/cache/file-store.js"
+    },
+    "./cache/*": {
+      "types": "./dist/cache/*.d.ts",
+      "default": "./dist/cache/*.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
   "scripts": {
     "build": "tsc"
   },

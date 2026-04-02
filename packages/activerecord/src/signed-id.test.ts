@@ -3,7 +3,8 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, RecordNotFound, setSignedIdVerifierSecret } from "./index.js";
+import { Base, RecordNotFound } from "./index.js";
+import { setSignedIdVerifierSecret } from "./signed-id.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";

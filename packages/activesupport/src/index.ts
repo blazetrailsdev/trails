@@ -1,3 +1,42 @@
+export { registerFsAdapter, getFs, getPath, fsAdapterConfig } from "./fs-adapter.js";
+export type { FsAdapter, PathAdapter } from "./fs-adapter.js";
+
+export { registerCryptoAdapter, getCrypto, cryptoAdapterConfig } from "./crypto-adapter.js";
+export type { CryptoAdapter, HashAdapter, HmacAdapter } from "./crypto-adapter.js";
+
+import { fsAdapterConfig } from "./fs-adapter.js";
+import { cryptoAdapterConfig } from "./crypto-adapter.js";
+
+/**
+ * ActiveSupport configuration — mirrors Rails' ActiveSupport module.
+ *
+ * In Node, "node" adapters auto-register at module load. The adapter
+ * property is null by default (meaning "use auto-detected default").
+ * Set explicitly to override:
+ *
+ *   // Browser:
+ *   registerFsAdapter("vfs", vfsImpl, pathImpl);
+ *   ActiveSupport.fsAdapter = "vfs";
+ *
+ *   registerCryptoAdapter("webcrypto", webCryptoImpl);
+ *   ActiveSupport.cryptoAdapter = "webcrypto";
+ */
+export const ActiveSupport = {
+  get fsAdapter(): string | null {
+    return fsAdapterConfig.adapter;
+  },
+  set fsAdapter(name: string | null) {
+    fsAdapterConfig.adapter = name;
+  },
+
+  get cryptoAdapter(): string | null {
+    return cryptoAdapterConfig.adapter;
+  },
+  set cryptoAdapter(name: string | null) {
+    cryptoAdapterConfig.adapter = name;
+  },
+};
+
 export {
   pluralize,
   singularize,
@@ -156,15 +195,16 @@ export type { LogLevel, LoggerOutput, TaggedLogger } from "./logger.js";
 export { MemoryStore } from "./cache/memory-store.js";
 export { DupCoder } from "./cache/memory-store.js";
 export { NullStore } from "./cache/null-store.js";
-export { FileStore } from "./cache/file-store.js";
+// FileStore requires node:fs — import from "@blazetrails/activesupport/cache/file-store"
 export type { CacheOptions, CacheStore } from "./cache/index.js";
 
 export { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
 export type { DeprecationBehavior } from "./deprecation.js";
 
 export * from "./time-ext.js";
-export { MessageEncryptor, InvalidMessage, NullSerializer } from "./message-encryptor.js";
-export { MessageVerifier, InvalidSignature } from "./message-verifier.js";
+// MessageEncryptor/MessageVerifier require node:crypto — use subpath imports:
+//   import { MessageVerifier } from "@blazetrails/activesupport/message-verifier"
+//   import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor"
 
 export { Duration, seconds, minutes, hours, days, weeks, months, years } from "./duration.js";
 export type { DurationParts } from "./duration.js";
@@ -211,12 +251,7 @@ export {
   xmlNameEscape,
   isHtmlSafe,
 } from "./core-ext/string/output-safety.js";
-export {
-  KeyGenerator,
-  CachingKeyGenerator,
-  secureRandomBase58,
-  secureRandomBase36,
-} from "./key-generator.js";
+// KeyGenerator requires node:crypto — import from "@blazetrails/activesupport/key-generator"
 export { BacktraceCleaner } from "./backtrace-cleaner.js";
 export { OrderedHash } from "./ordered-hash.js";
 export { ErrorReporter } from "./error-reporter.js";
@@ -257,13 +292,14 @@ export { objectWith } from "./core-ext/object/with.js";
 export { ArrayInquirer, arrayInquiry } from "./array-inquirer.js";
 export { tryCall, tryWith, tryBang } from "./try.js";
 export { OrderedOptions, InheritableOptions } from "./ordered-options.js";
-export { Digest } from "./digest.js";
-export { SecurityUtils } from "./security-utils.js";
-export { ConfigurationFile, FormatError } from "./configuration-file.js";
+// Digest/SecurityUtils/ConfigurationFile require node:crypto/node:fs — use subpath imports:
+//   import { Digest } from "@blazetrails/activesupport/digest"
+//   import { SecurityUtils } from "@blazetrails/activesupport/security-utils"
+//   import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file"
 export { WeakSet as DescendantsTrackerWeakSet } from "./descendants-tracker.js";
 export { ActionableError, NonActionable } from "./actionable-error.js";
 export { NullLock } from "./concurrency/null-lock.js";
-export { Gzip, Stream as GzipStream } from "./gzip.js";
+// Gzip requires node:zlib — import from "@blazetrails/activesupport/gzip"
 export { DescendantsTracker } from "./descendants-tracker.js";
 export { Configurable, Configuration } from "./configurable.js";
 export {

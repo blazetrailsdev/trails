@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, hasSecurePassword } from "./index.js";
+import { Base } from "./index.js";
+import { hasSecurePassword } from "./secure-password.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
