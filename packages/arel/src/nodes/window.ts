@@ -8,13 +8,13 @@ import { Node, NodeVisitor } from "./node.js";
 export class Window extends Node {
   orders: Node[];
   partitions: Node[];
-  framingNode: Node | null;
+  framing: Node | null;
 
   constructor() {
     super();
     this.orders = [];
     this.partitions = [];
-    this.framingNode = null;
+    this.framing = null;
   }
 
   order(...exprs: Node[]): this {
@@ -28,7 +28,23 @@ export class Window extends Node {
   }
 
   frame(node: Node): this {
-    this.framingNode = node;
+    this.framing = node;
+    return this;
+  }
+
+  rows(expr: Node | null = null): Rows | this {
+    if (this.framing) {
+      return new Rows(expr);
+    }
+    this.frame(new Rows(expr));
+    return this;
+  }
+
+  range(expr: Node | null = null): Range | this {
+    if (this.framing) {
+      return new Range(expr);
+    }
+    this.frame(new Range(expr));
     return this;
   }
 

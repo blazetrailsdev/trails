@@ -17,4 +17,5 @@ export interface Predications {
   isDistinctFrom(other: unknown): Node;
   isNotDistinctFrom(other: unknown): Node;
   concat(other: unknown): Node;
+  quotedArray(others: unknown[]): Node[];
 }

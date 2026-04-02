@@ -2,7 +2,15 @@ import { Unary } from "./unary.js";
 import type { Ascending } from "./ascending.js";
 import type { Descending } from "./descending.js";
 
-export class Ordering extends Unary {}
+export class Ordering extends Unary {
+  nullsFirst(): NullsFirst {
+    return new NullsFirst(this);
+  }
+
+  nullsLast(): NullsLast {
+    return new NullsLast(this);
+  }
+}
 
 export class NullsFirst extends Unary {
   reverse(): NullsLast {

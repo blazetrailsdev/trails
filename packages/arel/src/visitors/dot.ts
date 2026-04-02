@@ -30,6 +30,15 @@ export class DotEdge {
  * Mirrors: Arel::Visitors::Dot (loosely)
  */
 export class Dot {
+  accept(
+    object: Node,
+    collector: { append(s: string): unknown; value: string },
+  ): { value: string } {
+    const dot = this.compile(object);
+    collector.append(dot);
+    return collector as { value: string };
+  }
+
   compile(node: Node): string {
     const seen = new Map<object, string>();
     const lines: string[] = ["digraph arel {", '  node [shape="box"];'];

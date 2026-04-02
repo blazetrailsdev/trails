@@ -11,8 +11,7 @@ describe("TestComposite", () => {
     composite.addBind(123);
 
     expect(sql.value).toBe("SELECT ?");
-    expect(sql.bindValues).toEqual([123]);
-    expect(binds.value).toEqual(["SELECT ?", [123]]);
+    expect(binds.value).toEqual([123]);
   });
 
   it("retryable on composite collector propagates", () => {

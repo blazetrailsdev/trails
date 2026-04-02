@@ -18,6 +18,10 @@ export class Cte extends Node {
     this.materialized = materialized;
   }
 
+  toCte(): Cte {
+    return this;
+  }
+
   toTable(): Table {
     return new Table(this.name);
   }

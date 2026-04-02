@@ -15,6 +15,7 @@ export class SelectCore extends Node {
   windows: Node[];
   setQuantifier: Node | null;
   optimizerHints: string[];
+  comment: Node | null;
 
   constructor() {
     super();
@@ -26,6 +27,7 @@ export class SelectCore extends Node {
     this.windows = [];
     this.setQuantifier = null;
     this.optimizerHints = [];
+    this.comment = null;
   }
 
   get from(): Node | null {
@@ -46,6 +48,7 @@ export class SelectCore extends Node {
     c.windows = [...this.windows];
     c.setQuantifier = this.setQuantifier;
     c.optimizerHints = [...this.optimizerHints];
+    c.comment = this.comment;
     return c;
   }
 

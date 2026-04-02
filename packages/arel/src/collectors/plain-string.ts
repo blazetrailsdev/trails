@@ -1,5 +1,9 @@
 export class PlainString {
-  private str = "";
+  private str: string;
+
+  constructor() {
+    this.str = "";
+  }
 
   get value(): string {
     return this.str;

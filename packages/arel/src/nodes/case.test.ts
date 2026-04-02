@@ -6,7 +6,7 @@ describe("NodesTest", () => {
   describe("Case", () => {
     it("sets case expression from first argument", () => {
       const caseNode = new Nodes.Case(users.get("status"));
-      expect(caseNode.operand).toBeInstanceOf(Nodes.Attribute);
+      expect(caseNode.case).toBeInstanceOf(Nodes.Attribute);
     });
 
     it("allows aliasing", () => {
@@ -18,7 +18,7 @@ describe("NodesTest", () => {
     it("sets default case from second argument", () => {
       const caseNode = new Nodes.Case(users.get("status"));
       const withDefault = caseNode.else("unknown");
-      expect(withDefault.defaultValue).not.toBeNull();
+      expect(withDefault.default).not.toBeNull();
       expect(new Visitors.ToSql().compile(withDefault)).toContain("ELSE");
     });
 
@@ -32,9 +32,9 @@ describe("NodesTest", () => {
 
       expect(base.conditions.length).toBe(0);
       expect(c1.conditions.length).toBe(1);
-      expect(c1.defaultValue).toBeNull();
+      expect(c1.default).toBeNull();
       expect(c2.conditions.length).toBe(1);
-      expect(c2.defaultValue).not.toBeNull();
+      expect(c2.default).not.toBeNull();
     });
 
     describe("#as", () => {
@@ -78,20 +78,20 @@ describe("NodesTest", () => {
 
         expect(dolly.conditions).toEqual(built.conditions);
         expect(dolly.conditions).not.toBe(built.conditions);
-        expect(dolly.defaultValue).toBe(built.defaultValue);
-        expect(dolly.operand).toBe(built.operand);
+        expect(dolly.default).toBe(built.default);
+        expect(dolly.case).toBe(built.case);
       });
     });
 
     describe("#initialize", () => {
       it("sets case expression from first argument", () => {
         const node = new Nodes.Case(new Nodes.Quoted("foo"));
-        expect(node.operand).toBeInstanceOf(Nodes.Quoted);
+        expect(node.case).toBeInstanceOf(Nodes.Quoted);
       });
 
       it("sets default case from second argument", () => {
         const node = new Nodes.Case(undefined, new Nodes.Quoted("bar"));
-        expect(node.defaultValue).toBeInstanceOf(Nodes.Quoted);
+        expect(node.default).toBeInstanceOf(Nodes.Quoted);
       });
     });
   });

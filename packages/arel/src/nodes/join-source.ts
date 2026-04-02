@@ -15,6 +15,10 @@ export class JoinSource extends Node {
     this.right = right;
   }
 
+  isEmpty(): boolean {
+    return !this.left && this.right.length === 0;
+  }
+
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }

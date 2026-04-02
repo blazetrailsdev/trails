@@ -3,7 +3,7 @@ import { SqlLiteral } from "./sql-literal.js";
 
 export class Function extends Node {
   readonly expressions: Node[];
-  readonly alias: Node | null;
+  alias: Node | null;
   distinct: boolean;
 
   constructor(expressions: Node[], alias: string | null = null) {
@@ -11,6 +11,11 @@ export class Function extends Node {
     this.expressions = expressions;
     this.alias = alias ? new SqlLiteral(alias) : null;
     this.distinct = false;
+  }
+
+  as(aliasName: string): this {
+    this.alias = new SqlLiteral(aliasName);
+    return this;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

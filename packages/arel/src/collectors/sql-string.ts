@@ -1,25 +1,44 @@
+import { PlainString } from "./plain-string.js";
+
 /**
  * SQLString collector — accumulates SQL fragments into a single string.
  *
  * Mirrors: Arel::Collectors::SQLString
  */
-export class SQLString {
-  private parts: string[] = [];
-  readonly bindValues: unknown[] = [];
+export class SQLString extends PlainString {
+  preparable = false;
   retryable = true;
+  private bindIndex = 1;
 
-  append(str: string): this {
-    this.parts.push(str);
+  constructor() {
+    super();
+  }
+
+  addBind(bind: unknown, block?: (index: number) => string): this {
+    if (block) {
+      this.append(block(this.bindIndex));
+    } else {
+      this.append("?");
+    }
+    this.bindIndex++;
     return this;
   }
 
-  addBind(value: unknown): this {
-    this.bindValues.push(value);
-    this.parts.push("?");
+  addBinds(
+    binds: unknown[],
+    _procForBinds?: ((v: unknown) => unknown) | null,
+    block?: (index: number) => string,
+  ): this {
+    if (block) {
+      const parts: string[] = [];
+      for (let i = this.bindIndex; i < this.bindIndex + binds.length; i++) {
+        parts.push(block(i));
+      }
+      this.append(parts.join(", "));
+    } else {
+      this.append(binds.map(() => "?").join(", "));
+    }
+    this.bindIndex += binds.length;
     return this;
-  }
-
-  get value(): string {
-    return this.parts.join("");
   }
 }

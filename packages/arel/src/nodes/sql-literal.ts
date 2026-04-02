@@ -18,6 +18,14 @@ export class SqlLiteral extends Node {
     }
   }
 
+  get retryable(): boolean {
+    return this.retryableFlag;
+  }
+
+  fetchAttribute(_block?: (attr: Node) => unknown): unknown {
+    return undefined;
+  }
+
   join(other: Node): Fragments {
     return new Fragments([this, other]);
   }

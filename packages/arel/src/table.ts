@@ -20,13 +20,49 @@ import { NamedFunction } from "./nodes/named-function.js";
  * Mirrors: Arel::Table
  */
 export class Table extends Node {
+  static engine: unknown = null;
+
   readonly name: string;
   readonly tableAlias: string | null;
+  private typeCaster: unknown;
 
-  constructor(name: string, options?: { as?: string }) {
+  constructor(name: string, options?: { as?: string; klass?: unknown; typeCaster?: unknown }) {
     super();
     this.name = name;
     this.tableAlias = options?.as ?? null;
+    this.typeCaster = options?.typeCaster ?? null;
+  }
+
+  get engine(): unknown {
+    return Table.engine;
+  }
+
+  typeCastForDatabase(attrName: string, value: unknown): unknown {
+    if (
+      this.typeCaster &&
+      typeof (this.typeCaster as Record<string, unknown>).typeCastForDatabase === "function"
+    ) {
+      return (
+        this.typeCaster as { typeCastForDatabase: (n: string, v: unknown) => unknown }
+      ).typeCastForDatabase(attrName, value);
+    }
+    return value;
+  }
+
+  typeForAttribute(name: string): unknown {
+    if (
+      this.typeCaster &&
+      typeof (this.typeCaster as Record<string, unknown>).typeForAttribute === "function"
+    ) {
+      return (this.typeCaster as { typeForAttribute: (n: string) => unknown }).typeForAttribute(
+        name,
+      );
+    }
+    return undefined;
+  }
+
+  isAbleToTypeCast(): boolean {
+    return this.typeCaster != null;
   }
 
   get(name: string): Attribute {

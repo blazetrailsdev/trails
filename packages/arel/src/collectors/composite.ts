@@ -1,7 +1,9 @@
 type CollectorLike = {
   append(str: string): unknown;
   addBind(value: unknown): unknown;
+  addBinds?(binds: unknown[], procForBinds?: ((v: unknown) => unknown) | null): unknown;
   retryable?: boolean;
+  value?: unknown;
 };
 
 /**
@@ -10,32 +12,47 @@ type CollectorLike = {
  * Mirrors: Arel::Collectors::Composite
  */
 export class Composite {
-  readonly collectors: CollectorLike[];
+  private left: CollectorLike;
+  private right: CollectorLike;
+  preparable = false;
 
-  constructor(...collectors: CollectorLike[]) {
-    this.collectors = collectors;
+  constructor(left: CollectorLike, right: CollectorLike) {
+    this.left = left;
+    this.right = right;
   }
 
   append(str: string): this {
-    for (const c of this.collectors) c.append(str);
+    this.left.append(str);
+    this.right.append(str);
     return this;
   }
 
   addBind(value: unknown): this {
-    for (const c of this.collectors) c.addBind(value);
+    this.left.addBind(value);
+    this.right.addBind(value);
+    return this;
+  }
+
+  addBinds(binds: unknown[], procForBinds?: ((v: unknown) => unknown) | null): this {
+    if (this.left.addBinds) this.left.addBinds(binds, procForBinds);
+    if (this.right.addBinds) this.right.addBinds(binds, procForBinds);
     return this;
   }
 
   get retryable(): boolean {
-    for (const c of this.collectors) {
-      if ("retryable" in c && c.retryable === false) return false;
-    }
+    if ("retryable" in this.left && this.left.retryable === false) return false;
+    if ("retryable" in this.right && this.right.retryable === false) return false;
     return true;
   }
 
   set retryable(value: boolean) {
-    for (const c of this.collectors) {
-      if ("retryable" in c) (c as CollectorLike & { retryable: boolean }).retryable = value;
-    }
+    if ("retryable" in this.left)
+      (this.left as CollectorLike & { retryable: boolean }).retryable = value;
+    if ("retryable" in this.right)
+      (this.right as CollectorLike & { retryable: boolean }).retryable = value;
+  }
+
+  get value(): [unknown, unknown] {
+    return [this.left.value, this.right.value];
   }
 }

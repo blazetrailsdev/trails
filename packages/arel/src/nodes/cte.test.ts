@@ -8,8 +8,8 @@ describe("Cte", () => {
       const c1 = new Nodes.Case(users.get("name")).when(new Nodes.Quoted("a"));
       const c2 = new Nodes.Case(users.get("name")).when(new Nodes.Quoted("a"));
       expect(c1.conditions.length).toBe(c2.conditions.length);
-      expect(c1.operand).toBeInstanceOf(Nodes.Attribute);
-      expect(c2.operand).toBeInstanceOf(Nodes.Attribute);
+      expect(c1.case).toBeInstanceOf(Nodes.Attribute);
+      expect(c2.case).toBeInstanceOf(Nodes.Attribute);
     });
 
     it("is not equal with unequal ivars", () => {

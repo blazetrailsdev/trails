@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { Quoted } from "./casted.js";
 
 export class HomogeneousIn extends Node {
   readonly attribute: Node;
@@ -18,6 +19,42 @@ export class HomogeneousIn extends Node {
 
   invert(): HomogeneousIn {
     return new HomogeneousIn(this.values, this.attribute, this.type === "in" ? "notin" : "in");
+  }
+
+  get left(): Node {
+    return this.attribute;
+  }
+
+  get right(): Node[] {
+    return this.values.map((v) => (v instanceof Node ? v : new Quoted(v)));
+  }
+
+  get castedValues(): unknown[] {
+    const attr = this.attribute as unknown as {
+      typeCaster?: { serialize?: (v: unknown) => unknown; serializable?: (v: unknown) => boolean };
+    };
+    if (!attr?.typeCaster) return this.values;
+    const caster = attr.typeCaster;
+    const result: unknown[] = [];
+    for (const raw of this.values) {
+      if (typeof caster.serializable === "function" && !caster.serializable(raw)) continue;
+      if (typeof caster.serialize === "function") {
+        const cast = caster.serialize(raw);
+        if (cast != null) result.push(cast);
+      } else {
+        result.push(raw);
+      }
+    }
+    return result;
+  }
+
+  get procForBinds(): ((value: unknown) => unknown) | null {
+    return null;
+  }
+
+  fetchAttribute(block: (attr: Node) => unknown): unknown {
+    if (this.attribute) return block(this.attribute);
+    return undefined;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

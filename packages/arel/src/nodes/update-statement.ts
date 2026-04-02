@@ -13,6 +13,7 @@ export class UpdateStatement extends Node {
   groups: Node[];
   havings: Node[];
   limit: Node | null;
+  offset: Node | null;
   key: Node | null;
 
   constructor() {
@@ -24,6 +25,7 @@ export class UpdateStatement extends Node {
     this.groups = [];
     this.havings = [];
     this.limit = null;
+    this.offset = null;
     this.key = null;
   }
 
@@ -40,6 +42,7 @@ export class UpdateStatement extends Node {
     copy.groups = [...this.groups];
     copy.havings = [...this.havings];
     copy.limit = this.limit;
+    copy.offset = this.offset;
     copy.key = this.key;
     return copy;
   }

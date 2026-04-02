@@ -14,6 +14,10 @@ export class BoundSqlLiteral extends Node {
   readonly positionalBinds: unknown[];
   readonly namedBinds: Record<string, unknown>;
 
+  get sqlWithPlaceholders(): string {
+    return this.sql;
+  }
+
   constructor(
     sql: string,
     positionalBinds: unknown[] = [],

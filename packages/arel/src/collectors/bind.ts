@@ -4,21 +4,29 @@
  * Mirrors: Arel::Collectors::Bind
  */
 export class Bind {
-  private parts: string[] = [];
-  readonly binds: unknown[] = [];
+  private binds: unknown[];
+  retryable = true;
 
-  append(str: string): this {
-    this.parts.push(str);
+  constructor() {
+    this.binds = [];
+  }
+
+  append(_str: string): this {
     return this;
   }
 
-  addBind(value: unknown): this {
-    this.binds.push(value);
-    this.parts.push("?");
+  addBind(bind: unknown): this {
+    this.binds.push(bind);
     return this;
   }
 
-  get value(): [string, unknown[]] {
-    return [this.parts.join(""), this.binds];
+  addBinds(binds: unknown[], procForBinds?: ((v: unknown) => unknown) | null): this {
+    const mapped = procForBinds ? binds.map(procForBinds) : binds;
+    this.binds.push(...mapped);
+    return this;
+  }
+
+  get value(): unknown[] {
+    return this.binds;
   }
 }

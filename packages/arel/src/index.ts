@@ -11,6 +11,18 @@ export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 export { quoteArrayLiteral } from "./quote-array.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
+import { registerNodeDeps } from "./nodes/node.js";
+import { Not } from "./nodes/unary.js";
+import { Grouping } from "./nodes/grouping.js";
+import { Or } from "./nodes/or.js";
+import { And } from "./nodes/and.js";
+import { ToSql } from "./visitors/to-sql.js";
+import { registerBinaryInversions } from "./nodes/binary.js";
+import { Equality } from "./nodes/equality.js";
+import { In } from "./nodes/in.js";
+
+registerNodeDeps({ Not, Grouping, Or, And, ToSql });
+registerBinaryInversions({ Equality, In });
 
 /**
  * Arel.sql() — escape hatch for raw SQL.

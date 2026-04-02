@@ -8,6 +8,7 @@ import {
   LessThanOrEqual,
   Between,
   As,
+  ATTRIBUTE_BRAND,
 } from "../nodes/binary.js";
 import { Equality } from "../nodes/equality.js";
 import { Matches, DoesNotMatch } from "../nodes/matches.js";
@@ -48,7 +49,7 @@ function buildQuoted(value: unknown): Node {
  * Combines multiple nodes with OR, wrapped in a Grouping.
  */
 function groupedAny(nodes: Node[]): Grouping {
-  const combined = nodes.reduce((left, right) => new Or(left, right));
+  const combined = nodes.reduce((left, right) => new Or([left, right]));
   return new Grouping(combined);
 }
 
@@ -69,6 +70,7 @@ export interface TypeCaster {
 }
 
 export class Attribute extends Node {
+  readonly [ATTRIBUTE_BRAND] = true;
   readonly relation: Table;
   readonly name: string;
   readonly caster?: TypeCaster;
@@ -78,6 +80,23 @@ export class Attribute extends Node {
     this.relation = relation;
     this.name = name;
     this.caster = caster;
+  }
+
+  get typeCaster(): unknown {
+    const rel = this.relation as unknown as { typeForAttribute?: (n: string) => unknown };
+    return rel?.typeForAttribute ? rel.typeForAttribute(this.name) : undefined;
+  }
+
+  typeCastForDatabase(value: unknown): unknown {
+    const rel = this.relation as unknown as {
+      typeCastForDatabase?: (n: string, v: unknown) => unknown;
+    };
+    return rel?.typeCastForDatabase ? rel.typeCastForDatabase(this.name, value) : value;
+  }
+
+  isAbleToTypeCast(): boolean {
+    const rel = this.relation as unknown as { isAbleToTypeCast?: () => boolean };
+    return typeof rel?.isAbleToTypeCast === "function" ? rel.isAbleToTypeCast() : false;
   }
 
   private castValue(value: unknown): unknown {
@@ -498,6 +517,10 @@ export class Attribute extends Node {
    *
    * Mirrors: `OVER` support on Arel expressions.
    */
+  quotedArray(others: unknown[]): Node[] {
+    return others.map((v) => buildQuoted(v));
+  }
+
   over(window?: Window | NamedWindow | string | null): Over {
     if (!window) return new Over(this, null);
     if (typeof window === "string") return new Over(this, new SqlLiteral(window));

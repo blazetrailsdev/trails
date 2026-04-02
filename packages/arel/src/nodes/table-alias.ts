@@ -2,6 +2,13 @@ import { Node, NodeVisitor } from "./node.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Cte } from "./cte.js";
 
+interface TypeCastable {
+  name?: string;
+  typeCastForDatabase?: (attrName: string, value: unknown) => unknown;
+  typeForAttribute?: (name: string) => unknown;
+  isAbleToTypeCast?: () => boolean;
+}
+
 export class TableAlias extends Node {
   readonly relation: Node;
   readonly name: string;
@@ -14,6 +21,26 @@ export class TableAlias extends Node {
 
   get(columnName: string): Node {
     return new SqlLiteral(`"${this.name}"."${columnName}"`);
+  }
+
+  get tableName(): string {
+    const rel = this.relation as TypeCastable;
+    return typeof rel?.name === "string" ? rel.name : this.name;
+  }
+
+  typeCastForDatabase(attrName: string, value: unknown): unknown {
+    const rel = this.relation as TypeCastable;
+    return rel?.typeCastForDatabase ? rel.typeCastForDatabase(attrName, value) : value;
+  }
+
+  typeForAttribute(name: string): unknown {
+    const rel = this.relation as TypeCastable;
+    return rel?.typeForAttribute ? rel.typeForAttribute(name) : undefined;
+  }
+
+  isAbleToTypeCast(): boolean {
+    const rel = this.relation as TypeCastable;
+    return typeof rel?.isAbleToTypeCast === "function" ? rel.isAbleToTypeCast() : false;
   }
 
   toCte(): Cte {

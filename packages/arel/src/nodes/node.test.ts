@@ -29,7 +29,7 @@ describe("TestNode", () => {
     const caseNode = new Nodes.Case()
       .when(new Nodes.SqlLiteral("1 = 1"), new Nodes.SqlLiteral("'yes'"))
       .else(new Nodes.SqlLiteral("'no'"));
-    expect(caseNode.defaultValue).not.toBeNull();
+    expect(caseNode.default).not.toBeNull();
   });
 
   it("clones case, conditions and default (immutability)", () => {
@@ -38,8 +38,8 @@ describe("TestNode", () => {
     const c3 = c2.else(new Nodes.SqlLiteral("c"));
     expect(c1.conditions.length).toBe(0);
     expect(c2.conditions.length).toBe(1);
-    expect(c2.defaultValue).toBeNull();
-    expect(c3.defaultValue).not.toBeNull();
+    expect(c2.default).toBeNull();
+    expect(c3.default).not.toBeNull();
   });
 
   it("makes an AND node", () => {

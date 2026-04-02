@@ -65,7 +65,7 @@ export class InsertManager {
    * Mirrors: Arel::InsertManager#select
    */
   select(selectManager: { ast: Node }): this {
-    this.ast.values = selectManager.ast;
+    this.ast.select = selectManager.ast;
     return this;
   }
 

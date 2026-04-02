@@ -8,8 +8,6 @@ describe("TestBind", () => {
     bind.addBind(42);
     bind.append(" AND name = ");
     bind.addBind("dean");
-    const [sql, binds] = bind.value;
-    expect(sql).toBe("SELECT * FROM users WHERE id = ? AND name = ?");
-    expect(binds).toEqual([42, "dean"]);
+    expect(bind.value).toEqual([42, "dean"]);
   });
 });

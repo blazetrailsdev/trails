@@ -6,6 +6,41 @@
 export abstract class Node {
   abstract accept<T>(visitor: NodeVisitor<T>): T;
 
+  not(): Node {
+    assertRegistered("Not");
+    return new _registry.Not!(this);
+  }
+
+  or(right: Node): Node {
+    assertRegistered("Grouping");
+    assertRegistered("Or");
+    return new _registry.Grouping!(new _registry.Or!([this, right]));
+  }
+
+  and(right: Node): Node {
+    assertRegistered("And");
+    return new _registry.And!([this, right]);
+  }
+
+  invert(): Node {
+    assertRegistered("Not");
+    return new _registry.Not!(this);
+  }
+
+  toSql(): string {
+    assertRegistered("ToSql");
+    const visitor = new _registry.ToSql!();
+    return (visitor as unknown as { compile(node: Node): string }).compile(this);
+  }
+
+  fetchAttribute(_block?: (attr: Node) => unknown): unknown {
+    return undefined;
+  }
+
+  isEquality(): boolean {
+    return false;
+  }
+
   /**
    * Ruby-ish equality helper.
    *
@@ -36,6 +71,34 @@ export abstract class Node {
  */
 export interface NodeVisitor<T> {
   visit(node: Node): T;
+}
+
+// Registry for breaking circular dependencies.
+// Populated by the index module after all classes are loaded.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const _registry: Record<string, (new (...args: any[]) => any) | undefined> = {};
+
+function assertRegistered(name: string): void {
+  if (!_registry[name]) {
+    throw new Error(
+      `Node.${name} requires the arel registry. Import from "@blazetrails/arel" instead of deep-importing node classes.`,
+    );
+  }
+}
+
+export function registerNodeDeps(deps: {
+  Not: new (expr: Node) => Node;
+  Grouping: new (expr: Node) => Node;
+  Or: new (children: Node[]) => Node;
+  And: new (children: Node[]) => Node;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ToSql: new (...args: any[]) => { compile(node: Node): string };
+}): void {
+  _registry.Not = deps.Not;
+  _registry.Grouping = deps.Grouping;
+  _registry.Or = deps.Or;
+  _registry.And = deps.And;
+  _registry.ToSql = deps.ToSql;
 }
 
 function fnv1a32(input: string): number {
