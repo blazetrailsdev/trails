@@ -24,6 +24,27 @@ describe("quote", () => {
   it("escapes single quotes in strings", () => {
     expect(quote("it's")).toBe("'it''s'");
   });
+
+  it("returns NULL for undefined", () => {
+    expect(quote(undefined)).toBe("NULL");
+  });
+
+  it("returns unquoted bigints", () => {
+    expect(quote(9007199254740993n)).toBe("9007199254740993");
+  });
+
+  it("quotes dates as ISO 8601 strings", () => {
+    const d = new Date("2026-04-01T12:00:00Z");
+    expect(quote(d)).toBe("'2026-04-01T12:00:00.000Z'");
+  });
+
+  it("quotes symbols by description", () => {
+    expect(quote(Symbol("mobile"))).toBe("'mobile'");
+  });
+
+  it("throws for symbols without description", () => {
+    expect(() => quote(Symbol())).toThrow(TypeError);
+  });
 });
 
 describe("quoteDefaultExpression", () => {

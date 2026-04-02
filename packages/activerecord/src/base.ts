@@ -10,9 +10,6 @@ import {
   sql as arelSql,
   star as arelStar,
 } from "@blazetrails/arel";
-import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
-import { detectAdapterName } from "./adapter-name.js";
-import { pluralize, underscore } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   getInheritanceColumn,
@@ -214,13 +211,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.table_name
    */
   static get tableName(): string {
-    if (this._tableName) return this._tableName;
-    // STI subclasses inherit the base class's table name
-    if (isStiSubclass(this)) {
-      return getStiBase(this).tableName;
-    }
-    const inferred = pluralize(underscore(this.name));
-    return `${this._tableNamePrefix}${inferred}${this._tableNameSuffix}`;
+    return ModelSchema.resolveTableName(this);
   }
 
   static set tableName(name: string) {
@@ -269,49 +260,12 @@ export class Base extends Model {
   /**
    * Quote a single value for use in SQL.
    */
-  private static _quoteValue(val: unknown): string {
-    if (val === null) return "NULL";
-    if (typeof val === "number") return String(val);
-    if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
-    if (val instanceof Date) return `'${val.toISOString()}'`;
-    return `'${String(val).replace(/'/g, "''")}'`;
-  }
-
-  /**
-   * Build a WHERE clause for the primary key of a given record.
-   * For simple PK: `"id" = 42`
-   * For composite PK: `"shop_id" = 1 AND "id" = 42`
-   */
   static _buildPkWhere(idValue: unknown): string {
-    const pk = this.primaryKey;
-    if (Array.isArray(pk)) {
-      const values = idValue as unknown[];
-      return pk.map((col, i) => `"${col}" = ${this._quoteValue(values[i])}`).join(" AND ");
-    }
-    return `"${pk}" = ${this._quoteValue(idValue)}`;
+    return ModelSchema.buildPkWhere(this, idValue);
   }
 
-  /**
-   * Build an Arel node for a primary key WHERE condition.
-   * Returns an Arel node suitable for use with Arel managers.
-   */
   static _buildPkWhereNode(idValue: unknown): InstanceType<typeof Nodes.Node> {
-    const table = this.arelTable;
-    const pk = this.primaryKey;
-    if (Array.isArray(pk)) {
-      if (!Array.isArray(idValue)) return arelSql("1=0");
-      const values = idValue;
-      const conditions = pk.map((col, i) => {
-        const attr = table.get(col);
-        const v = values[i];
-        if (v === undefined || v === null) return arelSql("1=0");
-        return attr.eq(v);
-      });
-      return new Nodes.And(conditions);
-    }
-    const attr = table.get(pk as string);
-    if (idValue === undefined || idValue === null) return arelSql("1=0");
-    return attr.eq(idValue);
+    return ModelSchema.buildPkWhereNode(this, idValue);
   }
 
   /**
@@ -337,26 +291,6 @@ export class Base extends Model {
   }
 
   /**
-   * Map ActiveModel type names to SQL column types.
-   */
-  private static sqlTypeFor(typeName: string): string {
-    switch (typeName) {
-      case "integer":
-      case "big_integer":
-        return "INTEGER";
-      case "float":
-      case "decimal":
-        return "REAL";
-      case "boolean":
-        return "INTEGER";
-      case "binary":
-        return "BLOB";
-      default:
-        return "TEXT";
-    }
-  }
-
-  /**
    * Create the database table for this model from its attribute definitions.
    * Drops the table first if it already exists to handle schema changes
    * between tests.
@@ -364,47 +298,7 @@ export class Base extends Model {
    * This is a test/development helper — in production, use migrations.
    */
   static async createTable(): Promise<void> {
-    const table = this.tableName;
-    const pks = Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey];
-    const adapterName = detectAdapterName(this.adapter);
-    const isMysql = adapterName === "mysql";
-    const isPg = adapterName === "postgres";
-    const pkSet = new Set(pks);
-
-    await this.adapter.executeMutation(
-      `DROP TABLE IF EXISTS ${quoteTableName(table, adapterName)}`,
-    );
-
-    const colDefs: string[] = [];
-    if (pks.length === 1) {
-      const pk = pks[0];
-      const pkDef = isPg
-        ? `${quoteIdentifier(pk, adapterName)} SERIAL PRIMARY KEY`
-        : isMysql
-          ? `${quoteIdentifier(pk, adapterName)} BIGINT AUTO_INCREMENT PRIMARY KEY`
-          : `${quoteIdentifier(pk, adapterName)} INTEGER PRIMARY KEY AUTOINCREMENT`;
-      colDefs.push(pkDef);
-    } else {
-      for (const pk of pks) {
-        const pkDef = this._attributeDefinitions.get(pk);
-        const pkType = pkDef ? this.sqlTypeFor(pkDef.type?.name || "integer") : "INTEGER";
-        colDefs.push(`${quoteIdentifier(pk, adapterName)} ${pkType} NOT NULL`);
-      }
-    }
-
-    for (const [name, def] of this._attributeDefinitions) {
-      if (pkSet.has(name)) continue;
-      const sqlType = this.sqlTypeFor(def.type?.name || "string");
-      colDefs.push(`${quoteIdentifier(name, adapterName)} ${sqlType}`);
-    }
-
-    if (pks.length > 1) {
-      colDefs.push(`PRIMARY KEY (${pks.map((pk) => quoteIdentifier(pk, adapterName)).join(", ")})`);
-    }
-
-    await this.adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS ${quoteTableName(table, adapterName)} (${colDefs.join(", ")})`,
-    );
+    return ModelSchema.createTable(this);
   }
 
   /**
@@ -987,12 +881,9 @@ export class Base extends Model {
             [],
           );
         }
-        const pk = this.primaryKey as string[];
-        const whereParts = tuples.map(
-          (tuple) =>
-            `(${pk.map((col, i) => `"${col}" = ${this._quoteValue(tuple[i])}`).join(" AND ")})`,
-        );
-        const records = await this.all().where(whereParts.join(" OR ")).toArray();
+        const whereNodes = tuples.map((tuple) => ModelSchema.buildPkWhereNode(this, tuple));
+        const orCondition = whereNodes.reduce((left, right) => new Nodes.Or(left, right));
+        const records = await this.all().where(orCondition).toArray();
         if (records.length !== tuples.length) {
           throw new RecordNotFound(
             `${this.name}: couldn't find all with composite primary key`,

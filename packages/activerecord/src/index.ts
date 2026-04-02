@@ -89,6 +89,7 @@ export {
   columnNames as schemaColumnNames,
   columnsHash as schemaColumnsHash,
   contentColumns as schemaContentColumns,
+  createTable as schemaCreateTable,
 } from "./model-schema.js";
 export {
   store,
