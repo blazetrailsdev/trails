@@ -88,12 +88,14 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
   switch (adapter) {
     case "sqlite3":
     case "sqlite": {
-      const { SQLite3Adapter } = await import("@blazetrails/activerecord");
+      const { SQLite3Adapter } =
+        await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
       return new SQLite3Adapter(config.database ?? ":memory:");
     }
     case "postgresql":
     case "postgres": {
-      const { PostgreSQLAdapter } = await import("@blazetrails/activerecord");
+      const { PostgreSQLAdapter } =
+        await import("@blazetrails/activerecord/adapters/postgresql-adapter.js");
       if (config.url) {
         return new PostgreSQLAdapter(config.url);
       }
@@ -107,7 +109,8 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
     }
     case "mysql2":
     case "mysql": {
-      const { Mysql2Adapter } = await import("@blazetrails/activerecord");
+      const { Mysql2Adapter } =
+        await import("@blazetrails/activerecord/adapters/mysql2-adapter.js");
       if (config.url) {
         return new Mysql2Adapter(config.url);
       }

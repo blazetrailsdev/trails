@@ -34,6 +34,8 @@ import {
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter
  */
 export class SQLite3Adapter implements DatabaseAdapter {
+  readonly adapterName = "SQLite";
+
   private db: Database.Database;
   private _inTransaction = false;
   private _savepointCounter = 0;

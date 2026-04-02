@@ -35,6 +35,24 @@ describe("detectAdapterName", () => {
     expect(detectAdapterName(new UnknownAdapter() as any)).toBe("sqlite");
   });
 
+  describe("adapterName property detection", () => {
+    it("returns postgres for adapterName PostgreSQL", () => {
+      expect(detectAdapterName({ adapterName: "PostgreSQL" } as any)).toBe("postgres");
+    });
+
+    it("returns mysql for adapterName Mysql2", () => {
+      expect(detectAdapterName({ adapterName: "Mysql2" } as any)).toBe("mysql");
+    });
+
+    it("returns mysql for adapterName Trilogy", () => {
+      expect(detectAdapterName({ adapterName: "Trilogy" } as any)).toBe("mysql");
+    });
+
+    it("returns sqlite for adapterName SQLite", () => {
+      expect(detectAdapterName({ adapterName: "SQLite" } as any)).toBe("sqlite");
+    });
+  });
+
   describe("SchemaAdapter env-based detection", () => {
     const originalPG = process.env.PG_TEST_URL;
     const originalMySQL = process.env.MYSQL_TEST_URL;

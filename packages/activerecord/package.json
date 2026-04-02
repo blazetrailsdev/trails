@@ -5,6 +5,24 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./connection-adapters/sqlite3-adapter.js": {
+      "types": "./dist/connection-adapters/sqlite3-adapter.d.ts",
+      "default": "./dist/connection-adapters/sqlite3-adapter.js"
+    },
+    "./adapters/postgresql-adapter.js": {
+      "types": "./dist/adapters/postgresql-adapter.d.ts",
+      "default": "./dist/adapters/postgresql-adapter.js"
+    },
+    "./adapters/mysql2-adapter.js": {
+      "types": "./dist/adapters/mysql2-adapter.d.ts",
+      "default": "./dist/adapters/mysql2-adapter.js"
+    }
+  },
   "scripts": {
     "build": "tsc"
   },

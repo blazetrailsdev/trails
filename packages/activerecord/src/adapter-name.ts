@@ -4,10 +4,19 @@ import type { DatabaseAdapter } from "./adapter.js";
 export function detectAdapterName(
   adapter: DatabaseAdapter | null | undefined,
 ): "sqlite" | "postgres" | "mysql" {
-  const nameLower = (adapter?.constructor?.name ?? "").toLowerCase();
-  if (nameLower.includes("postgres")) return "postgres";
-  if (nameLower.includes("mysql") || nameLower.includes("maria")) return "mysql";
-  if (nameLower === "schemaadapter") {
+  if (adapter?.adapterName) {
+    const name = adapter.adapterName.toLowerCase();
+    if (name.includes("postgres")) return "postgres";
+    if (name.includes("mysql") || name.includes("maria") || name.includes("trilogy"))
+      return "mysql";
+    return "sqlite";
+  }
+  // Fallback for adapters without adapterName (e.g. test doubles)
+  const ctorName = (adapter?.constructor?.name ?? "").toLowerCase();
+  if (ctorName.includes("postgres")) return "postgres";
+  if (ctorName.includes("mysql") || ctorName.includes("maria") || ctorName.includes("trilogy"))
+    return "mysql";
+  if (ctorName === "schemaadapter") {
     if (process.env.PG_TEST_URL) return "postgres";
     if (process.env.MYSQL_TEST_URL) return "mysql";
     return "sqlite";

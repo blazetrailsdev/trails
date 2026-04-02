@@ -92,6 +92,10 @@ function cacheKey(sql: string, binds?: unknown[]): string {
  * - Locked queries (FOR UPDATE) bypass the cache
  */
 export class QueryCacheAdapter implements DatabaseAdapter {
+  get adapterName(): string {
+    return this.inner.adapterName;
+  }
+
   readonly inner: DatabaseAdapter;
   readonly cache: QueryCacheStore;
   private _queryCount = 0;

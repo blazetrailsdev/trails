@@ -19,6 +19,8 @@ import type { DatabaseAdapter } from "../adapter.js";
  * object. Uses a connection pool internally for concurrent access.
  */
 export class PostgreSQLAdapter implements DatabaseAdapter {
+  readonly adapterName = "PostgreSQL";
+
   private static _spCounter = 0;
   private pool: pg.Pool;
   private _client: pg.PoolClient | null = null;

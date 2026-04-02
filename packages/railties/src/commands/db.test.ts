@@ -244,7 +244,8 @@ describe("full migration flow", () => {
   });
 
   it("migrate, status, rollback with SQLite", async () => {
-    const { SQLite3Adapter } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
     adapter = new SQLite3Adapter(":memory:");
 
     fs.writeFileSync(
@@ -301,8 +302,9 @@ export class CreatePosts extends Migration {
 
 describe("schema dump and load", () => {
   it("dumps schema from SQLite and loads it into a fresh database", async () => {
-    const { SQLite3Adapter, SchemaDumper, MigrationContext } =
-      await import("@blazetrails/activerecord");
+    const { SchemaDumper, MigrationContext } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
     const { AdapterSchemaSource } = await import("../schema-source.js");
 
     const sourceAdapter = new SQLite3Adapter(":memory:");

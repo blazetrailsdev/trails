@@ -5,6 +5,13 @@
  */
 export interface DatabaseAdapter {
   /**
+   * Human-readable adapter name (e.g. "SQLite", "PostgreSQL", "Mysql2").
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#adapter_name
+   */
+  readonly adapterName: string;
+
+  /**
    * Execute a SQL query and return rows.
    */
   execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;

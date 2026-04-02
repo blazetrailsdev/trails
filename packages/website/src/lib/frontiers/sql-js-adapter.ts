@@ -2,6 +2,8 @@ import type { DatabaseAdapter } from "@blazetrails/activerecord";
 import type { Database } from "sql.js";
 
 export class SqlJsAdapter implements DatabaseAdapter {
+  readonly adapterName = "SQLite";
+
   constructor(private db: Database) {}
 
   async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {

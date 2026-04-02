@@ -1,7 +1,8 @@
 import { execSync } from "child_process";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { Base, MigrationContext, SQLite3Adapter } from "@blazetrails/activerecord";
+import { Base, MigrationContext } from "@blazetrails/activerecord";
+import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 
 const REPO = "blazetrailsdev/blazetrails";
 const __dirname = dirname(fileURLToPath(import.meta.url));
