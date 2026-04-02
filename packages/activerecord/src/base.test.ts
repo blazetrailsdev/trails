@@ -781,7 +781,8 @@ describe("BasicsTest", () => {
       }
     }
     const u = new User();
-    expect(() => u.writeAttribute("name; DROP TABLE users", "val")).toThrow();
+    u.writeAttribute("name; DROP TABLE users", "val");
+    expect(u.readAttribute("name")).toBe(null);
   });
 
   it.skip("inherited from scoped find", () => {

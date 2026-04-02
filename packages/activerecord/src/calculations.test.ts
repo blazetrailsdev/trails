@@ -5982,8 +5982,9 @@ describe("CalculationsTest", () => {
     }
     const user = await User.create({ name: "Alice", ssn: "123-45-6789" });
     expect(user.ssn).toBe("123-45-6789");
-    // Raw internal value is encrypted
-    expect(user._attributes.get("ssn")).not.toBe("123-45-6789");
+    // Serialized value (for DB) is encrypted
+    const dbValues = user._attributes.valuesForDatabase();
+    expect(dbValues.ssn).not.toBe("123-45-6789");
     // Reload from DB still decrypts
     const loaded = await User.find(1);
     expect(loaded.ssn).toBe("123-45-6789");

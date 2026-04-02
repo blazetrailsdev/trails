@@ -28,10 +28,9 @@ import {
   StaleObjectError,
   ReadOnlyRecord,
   ConnectionNotDefined,
-  DangerousAttributeError,
   AttributeAssignmentError,
 } from "./errors.js";
-import { encrypts as _encrypts, getEncryptor } from "./encryption.js";
+import { encrypts as _encrypts, applyPendingEncryptions } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
 import * as Timestamp from "./timestamp.js";
@@ -286,8 +285,10 @@ export class Base extends Model {
   }
 
   /**
-   * Override attribute() to prevent generating an accessor for "id",
-   * since Base already defines id getter/setter with CPK support.
+   * Override attribute() to prevent generating an accessor for "id"
+   * (Base defines id getter/setter with CPK support) and to apply
+   * any pending encryption decorations (matching Rails' deferred
+   * PendingDecorator pattern).
    */
   static attribute(name: string, typeName: string, options?: { default?: unknown }): void {
     super.attribute(name, typeName, options);
@@ -296,6 +297,7 @@ export class Base extends Model {
     if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
       delete (this.prototype as any).id;
     }
+    applyPendingEncryptions(this);
   }
 
   /**
@@ -1697,9 +1699,11 @@ export class Base extends Model {
       return instantiateSti(stiBase, row);
     }
 
-    this._skipEncryption = true;
-    const record = new this(row);
-    this._skipEncryption = false;
+    const record = new this();
+    // Load DB values through deserialize (not cast) so encrypted types decrypt
+    for (const [key, value] of Object.entries(row)) {
+      record._attributes.writeFromDatabase(key, value);
+    }
     record._newRecord = false;
     (record as any)._dirty.snapshot(record._attributes);
     record.changesApplied();
@@ -1727,24 +1731,8 @@ export class Base extends Model {
   _collectionProxies: Map<string, unknown> = new Map();
   _associationInstances: Map<string, AssociationInstance> = new Map();
 
-  /**
-   * Track whether we're inside _instantiate (loading from DB).
-   * In that case, attributes are already encrypted in DB, skip re-encryption.
-   */
-  private static _skipEncryption = false;
-
   constructor(attrs: Record<string, unknown> = {}) {
     super(attrs);
-    // Encrypt initial attribute values for encrypted attributes
-    // (skip when loading from DB — values are already encrypted)
-    if (!(this.constructor as typeof Base)._skipEncryption) {
-      for (const [name, value] of this._attributes) {
-        const enc = getEncryptor(this.constructor, name);
-        if (enc && typeof value === "string") {
-          this._attributes.set(name, enc.encrypt(value));
-        }
-      }
-    }
   }
 
   /**
@@ -1862,39 +1850,11 @@ export class Base extends Model {
   declare cacheKeyWithVersion: () => string;
   declare cacheVersion: () => string | null;
 
-  /**
-   * Override readAttribute to decrypt encrypted attributes.
-   */
-  readAttribute(name: string): unknown {
-    const value = super.readAttribute(name);
-    const enc = getEncryptor(this.constructor, name);
-    if (enc && typeof value === "string") {
-      try {
-        return enc.decrypt(value);
-      } catch {
-        return value;
-      }
-    }
-    return value;
-  }
-
-  /**
-   * Override writeAttribute to prevent modifications on frozen records
-   * and to encrypt encrypted attributes.
-   */
   writeAttribute(name: string, value: unknown): void {
-    if (!/^[\p{L}\p{N}_]+$/u.test(name)) {
-      throw new DangerousAttributeError(`Invalid attribute name: ${name}`);
-    }
     if (this._frozen) {
       throw new Error(`Cannot modify a frozen ${(this.constructor as typeof Base).name}`);
     }
-    const enc = getEncryptor(this.constructor, name);
-    if (enc && typeof value === "string") {
-      super.writeAttribute(name, enc.encrypt(value));
-    } else {
-      super.writeAttribute(name, value);
-    }
+    super.writeAttribute(name, value);
   }
 
   /**
@@ -2256,12 +2216,13 @@ export class Base extends Model {
       }
     }
 
-    const attrs = this.attributes;
+    const attrs = this._attributes.valuesForDatabase();
     const columns: string[] = [];
     const values: unknown[] = [];
 
     const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
     for (const [key, value] of Object.entries(attrs)) {
+      if (!ctor._attributeDefinitions.has(key)) continue;
       if (pkCols.includes(key) && value === null) continue;
       columns.push(key);
       values.push(value);
@@ -2316,14 +2277,21 @@ export class Base extends Model {
 
     if (Object.keys(changedAttrs).length === 0) return;
 
-    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.keys(
-      changedAttrs,
-    ).map((key) => {
-      const val = this.readAttribute(key);
-      const def = ctor._attributeDefinitions.get(key);
-      const isArray = def?.type?.name === "array";
-      return [table.get(key), isArray ? arelSql(quoteSqlValue(val, true)) : val];
-    });
+    const dbValues = this._attributes.valuesForDatabase();
+    const declaredChanges = Object.keys(changedAttrs).filter((key) =>
+      ctor._attributeDefinitions.has(key),
+    );
+
+    if (declaredChanges.length === 0) return;
+
+    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = declaredChanges.map(
+      (key) => {
+        const val = dbValues[key];
+        const def = ctor._attributeDefinitions.get(key);
+        const isArray = def?.type?.name === "array";
+        return [table.get(key), isArray ? arelSql(quoteSqlValue(val, true)) : val];
+      },
+    );
 
     // Optimistic locking: include lock column in WHERE and increment it
     const lockCol = ctor.lockingColumn;

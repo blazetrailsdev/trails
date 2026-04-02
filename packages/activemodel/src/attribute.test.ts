@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Model, Types } from "./index.js";
+import { Attribute } from "./attribute.js";
+import { typeRegistry } from "./type/registry.js";
+import "./attribute/user-provided-default.js";
 
 describe("AttributeTest", () => {
   it("reading memoizes falsy values", () => {
@@ -340,5 +343,30 @@ describe("AttributeTest", () => {
     const p = new Person({ age: "42" });
     expect(p.readAttributeBeforeTypeCast("age")).toBe("42");
     expect(p.readAttribute("age")).toBe(42);
+  });
+
+  it("#serializable? delegates to the type", () => {
+    const attr = Attribute.fromDatabase("count", 42, typeRegistry.lookup("integer"));
+    expect(attr.isSerializable()).toBe(true);
+  });
+
+  it("#type_cast delegates to the subclass implementation", () => {
+    const fromDb = Attribute.fromDatabase("name", "Alice", typeRegistry.lookup("string"));
+    expect(fromDb.typeCast("Bob")).toBe("Bob");
+
+    const fromUser = Attribute.fromUser("age", "42", typeRegistry.lookup("integer"));
+    expect(fromUser.typeCast("99")).toBe(99);
+  });
+
+  it("#original_value_for_database returns the original serialized value", () => {
+    const original = Attribute.fromDatabase("name", "Alice", typeRegistry.lookup("string"));
+    const changed = original.withValueFromUser("Bob");
+    expect(changed.originalValueForDatabase()).toBe("Alice");
+  });
+
+  it("#with_user_default creates a UserProvidedDefault attribute", () => {
+    const attr = Attribute.fromDatabase("name", null, typeRegistry.lookup("string"));
+    const withDefault = attr.withUserDefault("fallback");
+    expect(withDefault.value).toBe("fallback");
   });
 });

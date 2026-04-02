@@ -25,12 +25,12 @@ describe("encrypts()", () => {
     }
 
     const user = await User.create({ name: "Alice", ssn: "123-45-6789" });
-    // Reading returns decrypted value
+    // Reading returns plaintext (decrypted) value
     expect(user.ssn).toBe("123-45-6789");
 
-    // The raw stored value should be encrypted (base64)
-    const raw = user._attributes.get("ssn");
-    expect(raw).not.toBe("123-45-6789");
+    // The serialized value (for DB) should be encrypted
+    const dbValues = user._attributes.valuesForDatabase();
+    expect(dbValues.ssn).not.toBe("123-45-6789");
   });
 
   it("persists encrypted value to database and decrypts on load", async () => {
@@ -67,6 +67,8 @@ describe("encrypts()", () => {
 
     const user = await User.create({ token: "abc123" });
     expect(user.token).toBe("abc123");
-    expect(user._attributes.get("token")).toBe("ENC:abc123");
+    // Serialized value should use custom encryptor
+    const dbValues = user._attributes.valuesForDatabase();
+    expect(dbValues.token).toBe("ENC:abc123");
   });
 });

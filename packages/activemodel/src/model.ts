@@ -78,6 +78,7 @@ export class Model {
   static _attributeMethodPatterns: AttributeMethodPattern[] = [];
   static _attributeAliases: Record<string, string> = {};
   static _aliasesByAttributeName: Map<string, string[]> = new Map();
+  static _generatedMethods: Set<string> = new Set();
   static _validations: ValidationEntry[] = [];
   static _customValidations: CustomValidationEntry[] = [];
   static _callbackChain: CallbackChain = new CallbackChain();
@@ -722,12 +723,10 @@ export class Model {
     // Attributes#initialize — deep-dup class defaults
     this._attributes = initAttrs(ctor._attributeDefinitions);
 
-    // API#initialize — assign through Model.writeAttribute (casting, normalization).
-    // Uses Model.prototype directly so subclass overrides (e.g. Base's encryption)
-    // don't interfere during construction — subclass constructors handle their own
-    // post-init concerns (e.g. Base encrypts after super()).
+    // API#initialize — assign through writeAttribute (casting, normalization).
+    // Dispatches through this (so subclass overrides apply), matching Rails.
     for (const [key, value] of Object.entries(attrs)) {
-      Model.prototype.writeAttribute.call(this, key, value);
+      this.writeAttribute(key, value);
     }
 
     // Snapshot after construction — the initial state is "clean"

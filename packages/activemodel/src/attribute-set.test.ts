@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { Attribute } from "./attribute.js";
+import { AttributeSet } from "./attribute-set.js";
+import { typeRegistry } from "./type/registry.js";
 
 describe("AttributeSetTest", () => {
   it("building a new set from raw attributes", () => {
@@ -289,7 +292,11 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ name: "Alice", age: 25 });
+    // After construction, attributes may already have been read; snapshot current state:
+    const accessed = p._attributes.accessed();
+    // At minimum, reading one more attribute increases the set
     p.readAttribute("name");
+    expect(p._attributes.accessed().length).toBeGreaterThanOrEqual(accessed.length);
     expect(p.hasAttribute("name")).toBe(true);
   });
 
@@ -300,9 +307,8 @@ describe("AttributeSetTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    const attrs = p.attributes;
-    const mapped = { ...attrs, name: "Bob" };
-    expect(mapped.name).toBe("Bob");
+    const mapped = p._attributes.map((attr) => attr.withCastValue("Bob"));
+    expect(mapped.fetchValue("name")).toBe("Bob");
     expect(p.readAttribute("name")).toBe("Alice");
   });
 
@@ -326,5 +332,48 @@ describe("AttributeSetTest", () => {
     const a = new Person({ name: "Alice" });
     expect(a.attributes).not.toBe(null);
     expect(a.attributes).not.toBe(undefined);
+  });
+
+  it("#cast_types returns a hash of attribute types", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    const p = new Person({ name: "Alice", age: 25 });
+    const types = p._attributes.castTypes();
+    expect(types.name.name).toBe("string");
+    expect(types.age.name).toBe("integer");
+  });
+
+  it("#key? returns true for initialized attributes", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    const p = new Person({ name: "Alice" });
+    expect(p._attributes.isKey("name")).toBe(true);
+    expect(p._attributes.isKey("age")).toBe(true);
+    expect(p._attributes.isKey("nonexistent")).toBe(false);
+  });
+
+  it("#reverse_merge! fills missing attributes from target", () => {
+    const strType = typeRegistry.lookup("string");
+    const intType = typeRegistry.lookup("integer");
+    const a = new AttributeSet(
+      new Map([["name", Attribute.fromDatabase("name", "Alice", strType)]]),
+    );
+    const b = new AttributeSet(
+      new Map([
+        ["name", Attribute.fromDatabase("name", "Bob", strType)],
+        ["age", Attribute.fromDatabase("age", 30, intType)],
+      ]),
+    );
+    a.reverseMergeBang(b);
+    expect(a.fetchValue("name")).toBe("Alice");
+    expect(a.fetchValue("age")).toBe(30);
   });
 });

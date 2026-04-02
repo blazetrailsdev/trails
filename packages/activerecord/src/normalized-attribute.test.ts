@@ -111,12 +111,9 @@ describe("NormalizedAttributeTest", () => {
   it("does not automatically normalize value from database", async () => {
     // Create via plain Aircraft (no normalization), then load via NormalizedAircraft.
     // In Rails, find() bypasses normalization for DB-loaded values.
-    // Our implementation currently normalizes in the constructor, so we test
-    // that at least the value is consistently normalized when loaded.
     const plain = await Aircraft.create({ name: "NOT titlecase" });
     const fromDb = await NormalizedAircraft.find(plain.id);
-    // Our constructor normalizes on load — test the current behavior
-    expect(fromDb.name).toBe("Not Titlecase");
+    expect(fromDb.name).toBe("NOT titlecase");
   });
 
   it("finds record by normalized value", async () => {
