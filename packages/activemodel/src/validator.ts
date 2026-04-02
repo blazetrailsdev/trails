@@ -57,7 +57,8 @@ export abstract class Validator {
   }
 
   static get kind(): string {
-    return underscore(this.name).replace(/_validator$/, "");
+    const name = underscore(this.name);
+    return name.endsWith("_validator") ? name.slice(0, -"_validator".length) : name;
   }
 
   get kind(): string {

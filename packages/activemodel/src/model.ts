@@ -1,6 +1,6 @@
 import { Errors, StrictValidationFailed } from "./errors.js";
 import { ValidationError, ValidationContext } from "./validations.js";
-import { humanize, underscore } from "@blazetrails/activesupport";
+import { humanize, underscore, dasherize, htmlEscape } from "@blazetrails/activesupport";
 import { I18n } from "./i18n.js";
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
@@ -1157,7 +1157,7 @@ export class Model {
   private _hashToXml(hash: Record<string, unknown>, indent: string): string {
     let xml = "";
     for (const [key, value] of Object.entries(hash)) {
-      const tag = key.replace(/_/g, "-");
+      const tag = dasherize(key);
       if (value === null || value === undefined) {
         xml += `${indent}<${tag} nil="true"/>\n`;
       } else if (typeof value === "object" && !Array.isArray(value) && !(value instanceof Date)) {
@@ -1186,11 +1186,7 @@ export class Model {
   }
 
   private _escapeXml(str: string): string {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+    return htmlEscape(str).toString();
   }
 
   /**

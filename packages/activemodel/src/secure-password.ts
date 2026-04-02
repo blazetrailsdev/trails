@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { humanize } from "@blazetrails/activesupport";
+import { humanize, camelize } from "@blazetrails/activesupport";
 import { Model } from "./model.js";
 
 const MIN_COST = 4;
@@ -73,11 +73,8 @@ export function hasSecurePassword(
     configurable: true,
   });
 
-  const camelAttr = attribute.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
   const authMethodName =
-    attribute === "password"
-      ? "authenticate"
-      : `authenticate${camelAttr.charAt(0).toUpperCase()}${camelAttr.slice(1)}`;
+    attribute === "password" ? "authenticate" : `authenticate${camelize(attribute)}`;
 
   Object.defineProperty(modelClass.prototype, authMethodName, {
     value: function (this: Model, unencryptedPassword: unknown) {

@@ -155,9 +155,7 @@ export class Error {
     }
 
     const modelClass = base?.constructor;
-    const modelKey = modelClass?.name
-      ? modelClass.name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase()
-      : undefined;
+    const modelKey = modelClass?.name ? underscore(modelClass.name) : undefined;
     const humanAttr = modelClass?.humanAttributeName
       ? modelClass.humanAttributeName(attribute)
       : humanize(attribute);
