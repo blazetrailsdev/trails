@@ -10,7 +10,11 @@ import { Deprecation } from "@blazetrails/activesupport";
 
 export { Deprecation as Deprecator };
 
-export const deprecator = new Deprecation({ gem: "activemodel" });
+const _deprecator = new Deprecation({ gem: "activemodel" });
+
+export function deprecator(): Deprecation {
+  return _deprecator;
+}
 
 /**
  * Mirrors: ActiveModel (the root module that exposes .deprecator)
@@ -19,7 +23,7 @@ export const deprecator = new Deprecation({ gem: "activemodel" });
  * so the Ruby API extractor assigns the ActiveModel module to this file.
  */
 export interface ActiveModel {
-  readonly deprecator: Deprecation;
+  deprecator(): Deprecation;
 }
 
 export function gemVersion(): string {

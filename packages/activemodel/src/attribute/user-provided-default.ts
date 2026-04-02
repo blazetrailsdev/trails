@@ -1,4 +1,4 @@
-import { Attribute, FromUser } from "../attribute.js";
+import { Attribute, FromUser, _registerUserProvidedDefault } from "../attribute.js";
 import { Type } from "../type/value.js";
 
 /**
@@ -25,3 +25,6 @@ export class UserProvidedDefault extends FromUser {
     return new UserProvidedDefault(data[0], data[1], data[2], data[3]);
   }
 }
+
+// Register with Attribute to resolve circular dependency for withUserDefault
+_registerUserProvidedDefault(UserProvidedDefault);

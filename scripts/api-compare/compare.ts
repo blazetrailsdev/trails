@@ -118,6 +118,10 @@ const SKIP = new Set([
   "to_hash",
   "to_r",
   "to_c",
+  // Ruby module lifecycle hooks — no TypeScript equivalent
+  "extended",
+  "included",
+  "inherited",
 ]);
 
 /**

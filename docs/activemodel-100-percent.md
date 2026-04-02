@@ -1,129 +1,51 @@
-# ActiveModel: Road to 100%
+# ActiveModel: 100% API Coverage
 
-Current: **304/344 methods (88.4%)**. All 62 files exist. 40 methods remaining.
+**Status: 340/340 methods (100%), 62/62 files**
 
 ```bash
 pnpm run api:compare -- --package activemodel
-pnpm run api:compare -- --package activemodel --missing
 ```
 
 ---
 
-## PR Plan (7 PRs, dependency order)
+## Known Concerns
 
-### PR 1: Type system base (~21 methods)
+### Base.writeAttribute eagerly encrypts (architectural)
 
-**Files:** `type/value.ts`, `type.ts`
+`Base.writeAttribute` encrypts on every call, but `Base.constructor` also
+encrypts post-super. This means Model's constructor must call
+`Model.prototype.writeAttribute.call(this, ...)` instead of
+`this.writeAttribute(...)` to avoid double-encryption. In Rails,
+`assign_attributes` dispatches through the receiver and encryption is handled
+at the serialization layer, not at write time.
 
-Add to abstract `Type<T>` base class:
+**Fix:** Move encryption out of `Base.writeAttribute` into the persistence
+layer (serialize/valueForDatabase). Then Model's constructor can use
+`this.writeAttribute` normally and `Base.constructor`'s post-super encryption
+loop can be removed.
 
-- Constructor: `options?: { precision?: number; scale?: number; limit?: number }`
-- Properties: `precision`, `scale`, `limit`
-- Methods: `type()`, `isSerializable()`, `typeCastForSchema()`, `isBinary()`, `isChanged()`, `isChangedInPlace()`, `isValueConstructedByMassAssignment()`, `isForceEquality()`, `map()`, `assertValidValue()`, `isSerialized()`, `isMutable()`, `asJson()`
+### undefineAttributeMethods can remove user-defined methods
 
-Add to `type.ts` (module-level):
+`undefineAttributeMethods()` deletes properties directly off the prototype
+for every generated name. If a user-defined method collides with a generated
+attribute method name, it gets deleted too. In Rails, generated methods live
+in a separate `generated_attribute_methods` module that can be replaced
+wholesale without affecting user overrides.
 
-- `registry()`, `register()`, `lookup()`, `defaultValue()`
+**Fix:** Track generated method names in a Set per class, and only delete
+those. Or generate methods onto a dedicated prototype layer object (matching
+Rails' `generated_attribute_methods` module pattern).
 
-### PR 2: Concrete type methods (~22 methods)
+### Test coverage for new AttributeSet methods
 
-**Files:** All 11 type files under `type/`
+`castTypes`, `isKey`, `accessed`, `map`, `reverseMergeBang` were added to
+`AttributeSet` but don't have dedicated tests in `attribute-set.test.ts`.
+The methods are exercised indirectly through Model tests but should have
+focused unit tests.
 
-| File                  | Add                                                             |
-| --------------------- | --------------------------------------------------------------- |
-| `big-integer.ts`      | `serializeCastValue`                                            |
-| `binary.ts`           | `type()`, `isBinary()`, `isChangedInPlace()`                    |
-| `boolean.ts`          | `type()`, `serializeCastValue`                                  |
-| `date-time.ts`        | `type()`                                                        |
-| `date.ts`             | `type()`, `typeCastForSchema`                                   |
-| `decimal.ts`          | `type()`, `typeCastForSchema`                                   |
-| `float.ts`            | `type()`, `typeCastForSchema`                                   |
-| `immutable-string.ts` | `constructor`, `type()`, `serializeCastValue`                   |
-| `integer.ts`          | `constructor`, `type()`, `serializeCastValue`, `isSerializable` |
-| `string.ts`           | `isChangedInPlace`, `toImmutableString`                         |
-| `time.ts`             | `type()`, `userInputInTimeZone`                                 |
+### Test coverage for new Attribute methods
 
-### PR 3: SerializeCastValue (~3 methods)
-
-**File:** `type/serialize-cast-value.ts`
-
-Add: `constructor`, `included`, `serializeCastValue` on DefaultImplementation
-
-### PR 4: Validators (~22 methods)
-
-**Files:** `validator.ts` + 13 files in `validations/`
-
-Pattern: Add `validateEach()` to each validator (delegates to existing validate logic) and `checkValidityBang()` where needed.
-
-| File              | Add                                                                                 |
-| ----------------- | ----------------------------------------------------------------------------------- |
-| `validator.ts`    | `checkValidityBang` on EachValidator                                                |
-| `validations.ts`  | `context`, `clearValidatorsBang`, `isAttributeMethod`, `inherited`, `validatesBang` |
-| `absence.ts`      | `validateEach`, `validatesComparisonOf`, `validatesSizeOf`                          |
-| `acceptance.ts`   | `validateEach`                                                                      |
-| `clusivity.ts`    | `checkValidityBang`                                                                 |
-| `comparison.ts`   | `checkValidityBang`, `validateEach`                                                 |
-| `confirmation.ts` | `validateEach`                                                                      |
-| `exclusion.ts`    | `validateEach`                                                                      |
-| `format.ts`       | `validateEach`, `checkValidityBang`                                                 |
-| `inclusion.ts`    | `validateEach`                                                                      |
-| `length.ts`       | `checkValidityBang`, `validateEach`                                                 |
-| `numericality.ts` | `checkValidityBang`, `validateEach`                                                 |
-| `presence.ts`     | `validateEach`                                                                      |
-
-### PR 5: Attribute layer (~32 methods)
-
-**Files:** `attribute-methods.ts`, `attribute-set.ts`, `attribute-set/builder.ts`, `attribute.ts`, `attribute-registration.ts`
-
-`attribute-methods.ts` (16 methods — biggest single file):
-
-- `AttributeMethodPattern`: `proxyTarget`, `parameters` getters
-- 14 class methods: `attributeMethodPrefix`, `attributeMethodSuffix`, `attributeMethodAffix`, `aliasAttribute`, `eagerlyGenerateAliasAttributeMethods`, `generateAliasAttributeMethods`, `aliasAttributeMethodDefinition`, `isAttributeAlias`, `attributeAlias`, `defineAttributeMethods`, `defineAttributeMethod`, `defineAttributeMethodPattern`, `undefineAttributeMethods`, `aliasesByAttributeName`
-
-`attribute-set.ts` (5): `castTypes`, `isKey`, `accessed`, `map`, `reverseMergeBang`
-
-`attribute-set/builder.ts` (4): `isKey`, `eachKey`, `marshalDump`, `marshalLoad`
-
-`attribute.ts` (4): `isSerializable`, `typeCast`, `originalValueForDatabase`, `withUserDefault`
-
-`attribute-registration.ts` (3): `decorateAttributes`, `attributeTypes`, `typeForAttribute`
-
-### PR 6: Errors, Dirty, Naming, Lint (~8 methods)
-
-| File        | Add                                 |
-| ----------- | ----------------------------------- |
-| `errors.ts` | `copyBang`, `mergeBang`             |
-| `dirty.ts`  | `initAttributes`, `asJson`          |
-| `naming.ts` | `cacheKey`, `extended`              |
-| `lint.ts`   | `testModelNaming`, `testErrorsAref` |
-
-### PR 7: Miscellaneous (~14 methods)
-
-| File                                 | Add                                      |
-| ------------------------------------ | ---------------------------------------- |
-| `deprecator.ts`                      | `deprecator`, `gemVersion`, `version`    |
-| `callbacks.ts`                       | `extended`                               |
-| `secure-password.ts`                 | `minCost` (ensure detected by extractor) |
-| `translation.ts`                     | `raiseOnMissingTranslations`             |
-| `attributes.ts`                      | `constructor`, `attributes`              |
-| `attribute/user-provided-default.ts` | `marshalDump`, `marshalLoad`             |
-| `attribute-set/yaml-encoder.ts`      | `constructor`                            |
-
----
-
-## Key design decisions
-
-1. **Type base class gets precision/limit/scale** via optional constructor object
-2. **Validators keep backward-compat** `validate(record, attr, value, errors)` and add `validateEach` alongside
-3. **attribute-methods.ts** adds methods to an `AttributeMethodsRegistry` class managing patterns and aliases
-4. **marshalDump/Load** serialize to plain JSON-compatible objects (TS equivalent of Ruby Marshal)
-5. **Module hooks** (`extended`, `inherited`) are no-op functions matching Ruby's callback signatures
-
-## Verification
-
-After each PR:
-
-```bash
-pnpm run api:compare -- --package activemodel
-pnpm vitest run packages/activemodel
-```
+`isSerializable`, `originalValueForDatabase`, `withUserDefault`, and the
+now-public `typeCast` on `Attribute` don't have dedicated tests in
+`attribute.test.ts`. Should add focused tests including the failure mode
+when `UserProvidedDefault` hasn't been registered.

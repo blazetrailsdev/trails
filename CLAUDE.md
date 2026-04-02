@@ -40,6 +40,56 @@ This is a TypeScript monorepo. Packages live under `packages/`:
 - **Test-driven against Rails**: Progress is measured by `api:compare`,
   which matches our test files and test names against the actual Rails test suite.
 
+## Module Mixins (Ruby `include` → TypeScript)
+
+Rails uses `include`/`extend` to mix module methods into a class. TypeScript
+has no equivalent, so we use **`this`-typed functions assigned directly to the
+class**. This is the closest TS equivalent of Ruby's module inclusion.
+
+### Pattern
+
+Define the function in the module file with a `this` parameter:
+
+```ts
+// attribute-methods.ts
+export function aliasAttribute(this: AttributeMethodHost, newName: string, oldName: string): void {
+  // `this` is the class (e.g., Model) — use it like Ruby's `self`
+  this._attributeAliases[newName] = oldName;
+  // ...
+}
+```
+
+Assign it directly on the class — no wrapper:
+
+```ts
+// model.ts
+import { aliasAttribute } from "./attribute-methods.js";
+
+export class Model {
+  static aliasAttribute = aliasAttribute;
+}
+```
+
+### Why this pattern
+
+- **Code lives in the right file.** `aliasAttribute` lives in
+  `attribute-methods.ts`, matching Rails where it's in
+  `attribute_methods.rb`. The `api:compare` script can find it.
+- **No delegation wrappers.** `static aliasAttribute = aliasAttribute` is
+  a direct assignment — no `static aliasAttribute(...args) { fn(this, ...args) }`.
+- **Type-safe.** TypeScript checks that Model satisfies `AttributeMethodHost`
+  at compile time. The `this` parameter is erased at runtime.
+- **Subclass-safe.** `this` resolves to the actual calling class at runtime
+  (e.g., `User` not `Model`), just like Ruby's `self`.
+
+### When NOT to use this
+
+- **Ruby lifecycle hooks** (`extended`, `included`, `inherited`) have no TS
+  equivalent. Don't add empty functions just for `api:compare` — add them
+  to the skip list in `scripts/api-compare/compare.ts` instead.
+- **If the method needs Model-specific state** beyond what the host interface
+  declares, keep it in model.ts directly.
+
 ## Conventions
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).

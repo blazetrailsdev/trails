@@ -2,16 +2,27 @@ import { Errors, StrictValidationFailed } from "./errors.js";
 import { ValidationError, ValidationContext } from "./validations.js";
 import { humanize, underscore } from "@blazetrails/activesupport";
 import { I18n } from "./i18n.js";
-import { typeRegistry } from "./type/registry.js";
 import { Type } from "./type/value.js";
-import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
 import { ModelName } from "./naming.js";
 import { DirtyTracker } from "./dirty.js";
-import { CallbackChain, CallbackFn, AroundCallbackFn, CallbackConditions } from "./callbacks.js";
+import {
+  CallbackChain,
+  CallbackFn,
+  AroundCallbackFn,
+  CallbackConditions,
+  defineModelCallbacks,
+} from "./callbacks.js";
 import { serializableHash, SerializeOptions } from "./serialization.js";
 import { BlockValidator } from "./validator.js";
-import { AttributeMethodPattern } from "./attribute-methods.js";
+import {
+  AttributeMethodPattern,
+  attributeMethodPrefix,
+  attributeMethodSuffix,
+  attributeMethodAffix,
+  aliasAttribute,
+  undefineAttributeMethods,
+} from "./attribute-methods.js";
 import {
   assignAttributes as assignAttrs,
   attributeWriterMissing as defaultAttributeWriterMissing,
@@ -34,12 +45,7 @@ import { FormatValidator } from "./validations/format.js";
 import { AcceptanceValidator } from "./validations/acceptance.js";
 import { ConfirmationValidator } from "./validations/confirmation.js";
 import { ComparisonValidator } from "./validations/comparison.js";
-
-interface AttributeDefinition {
-  name: string;
-  type: Type;
-  defaultValue: unknown;
-}
+import { type AttributeDefinition, constructor as initAttrs, attribute } from "./attributes.js";
 
 interface ValidationEntry {
   attribute: string;
@@ -70,6 +76,8 @@ export class Model {
   static includeRootInJson: boolean | string = false;
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
   static _attributeMethodPatterns: AttributeMethodPattern[] = [];
+  static _attributeAliases: Record<string, string> = {};
+  static _aliasesByAttributeName: Map<string, string[]> = new Map();
   static _validations: ValidationEntry[] = [];
   static _customValidations: CustomValidationEntry[] = [];
   static _callbackChain: CallbackChain = new CallbackChain();
@@ -77,28 +85,7 @@ export class Model {
 
   // -- Attributes (Phase 1000) --
 
-  static attribute(name: string, typeName: string, options?: { default?: unknown }): void {
-    const type = typeRegistry.lookup(typeName);
-    const defaultValue = options?.default ?? null;
-    // Ensure subclass has its own copy
-    if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
-      this._attributeDefinitions = new Map(this._attributeDefinitions);
-    }
-    this._attributeDefinitions.set(name, { name, type, defaultValue });
-
-    // Auto-define property getter/setter so instances can access attributes directly (e.g. record.title)
-    if (!Object.prototype.hasOwnProperty.call(this.prototype, name)) {
-      Object.defineProperty(this.prototype, name, {
-        get(this: Model) {
-          return this.readAttribute(name);
-        },
-        set(this: Model, value: unknown) {
-          this.writeAttribute(name, value);
-        },
-        configurable: true,
-      });
-    }
-  }
+  static attribute = attribute;
 
   static attributeNames(): string[] {
     return Array.from(this._attributeDefinitions.keys());
@@ -109,17 +96,7 @@ export class Model {
    *
    * Mirrors: ActiveModel::AttributeMethods.alias_attribute
    */
-  static aliasAttribute(newName: string, originalName: string): void {
-    Object.defineProperty(this.prototype, newName, {
-      get(this: Model) {
-        return this.readAttribute(originalName);
-      },
-      set(this: Model, value: unknown) {
-        this.writeAttribute(originalName, value);
-      },
-      configurable: true,
-    });
-  }
+  static aliasAttribute = aliasAttribute;
 
   // -- Normalizations --
   static _normalizations: Map<
@@ -669,41 +646,7 @@ export class Model {
    *
    * Mirrors: ActiveModel::Callbacks.define_model_callbacks
    */
-  static defineModelCallbacks(...eventNames: string[]): void {
-    for (const event of eventNames) {
-      const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
-
-      // before<Event>
-      Object.defineProperty(this, `before${capitalizedEvent}`, {
-        value: function (fn: CallbackFn, conditions?: CallbackConditions) {
-          this._ensureOwnCallbacks();
-          this._callbackChain.register("before", event, fn, conditions);
-        },
-        writable: true,
-        configurable: true,
-      });
-
-      // after<Event>
-      Object.defineProperty(this, `after${capitalizedEvent}`, {
-        value: function (fn: CallbackFn, conditions?: CallbackConditions) {
-          this._ensureOwnCallbacks();
-          this._callbackChain.register("after", event, fn, conditions);
-        },
-        writable: true,
-        configurable: true,
-      });
-
-      // around<Event>
-      Object.defineProperty(this, `around${capitalizedEvent}`, {
-        value: function (fn: AroundCallbackFn, conditions?: CallbackConditions) {
-          this._ensureOwnCallbacks();
-          this._callbackChain.register("around", event, fn, conditions);
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
-  }
+  static defineModelCallbacks = defineModelCallbacks;
 
   /**
    * Convert an attribute name to a human-readable form.
@@ -740,105 +683,10 @@ export class Model {
     return "activemodel";
   }
 
-  /**
-   * Define attribute methods with a prefix.
-   * For each registered attribute, creates `{prefix}{attribute}` methods.
-   *
-   * Mirrors: ActiveModel::AttributeMethods.attribute_method_prefix
-   */
-  static attributeMethodPrefix(...prefixes: string[]): void {
-    if (!Object.hasOwn(this, "_attributeMethodPrefixes")) {
-      this._attributeMethodPrefixes = [...(this._attributeMethodPrefixes || [])];
-    }
-    this._attributeMethodPrefixes.push(...prefixes);
-    this._defineAffixMethods();
-  }
-
-  /**
-   * Define attribute methods with a suffix.
-   * For each registered attribute, creates `{attribute}{suffix}` methods.
-   *
-   * Mirrors: ActiveModel::AttributeMethods.attribute_method_suffix
-   */
-  static attributeMethodSuffix(...suffixes: string[]): void {
-    if (!Object.hasOwn(this, "_attributeMethodSuffixes")) {
-      this._attributeMethodSuffixes = [...(this._attributeMethodSuffixes || [])];
-    }
-    this._attributeMethodSuffixes.push(...suffixes);
-    this._defineAffixMethods();
-  }
-
-  /**
-   * Define attribute methods with both prefix and suffix.
-   *
-   * Mirrors: ActiveModel::AttributeMethods.attribute_method_affix
-   */
-  static attributeMethodAffix(...affixes: Array<{ prefix: string; suffix: string }>): void {
-    if (!Object.hasOwn(this, "_attributeMethodAffixes")) {
-      this._attributeMethodAffixes = [...(this._attributeMethodAffixes || [])];
-    }
-    this._attributeMethodAffixes.push(...affixes);
-    this._defineAffixMethods();
-  }
-
-  static _attributeMethodPrefixes: string[] = [];
-  static _attributeMethodSuffixes: string[] = [];
-  static _attributeMethodAffixes: Array<{ prefix: string; suffix: string }> = [];
-
-  private static _defineAffixMethods(): void {
-    for (const [name] of this._attributeDefinitions) {
-      for (const prefix of this._attributeMethodPrefixes) {
-        const methodName = `${prefix}${name}`;
-        if (!(this.prototype as AnyRecord)[methodName]) {
-          Object.defineProperty(this.prototype, methodName, {
-            value: function (this: Model) {
-              return this.readAttribute(name);
-            },
-            writable: true,
-            configurable: true,
-          });
-        }
-      }
-      for (const suffix of this._attributeMethodSuffixes) {
-        const methodName = `${name}${suffix}`;
-        if (!(this.prototype as AnyRecord)[methodName]) {
-          Object.defineProperty(this.prototype, methodName, {
-            value: function (this: Model) {
-              return this.readAttribute(name);
-            },
-            writable: true,
-            configurable: true,
-          });
-        }
-      }
-      for (const { prefix, suffix } of this._attributeMethodAffixes) {
-        const methodName = `${prefix}${name}${suffix}`;
-        if (!(this.prototype as AnyRecord)[methodName]) {
-          Object.defineProperty(this.prototype, methodName, {
-            value: function (this: Model) {
-              return this.readAttribute(name);
-            },
-            writable: true,
-            configurable: true,
-          });
-        }
-      }
-    }
-  }
-
-  static undefineAttributeMethods(): void {
-    for (const [name] of this._attributeDefinitions) {
-      for (const prefix of this._attributeMethodPrefixes) {
-        delete (this.prototype as AnyRecord)[`${prefix}${name}`];
-      }
-      for (const suffix of this._attributeMethodSuffixes) {
-        delete (this.prototype as AnyRecord)[`${name}${suffix}`];
-      }
-      for (const { prefix, suffix } of this._attributeMethodAffixes) {
-        delete (this.prototype as AnyRecord)[`${prefix}${name}${suffix}`];
-      }
-    }
-  }
+  static attributeMethodPrefix = attributeMethodPrefix;
+  static attributeMethodSuffix = attributeMethodSuffix;
+  static attributeMethodAffix = attributeMethodAffix;
+  static undefineAttributeMethods = undefineAttributeMethods;
 
   // -- Naming (Phase 1300) --
 
@@ -861,38 +709,32 @@ export class Model {
   errors: Errors = new Errors(this);
   _dirty: DirtyTracker = new DirtyTracker();
 
+  /**
+   * Mirrors: ActiveModel::API#initialize → ActiveModel::Attributes#initialize
+   *
+   * Rails pattern:
+   *   Attributes#initialize: @attributes = self.class._default_attributes.deep_dup
+   *   API#initialize:        assign_attributes(attributes); super()
+   */
   constructor(attrs: Record<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
-    const defs = ctor._attributeDefinitions;
-    const attrMap = new Map<string, Attribute>();
 
-    for (const [name, def] of defs) {
-      if (name in attrs) {
-        let castValue = def.type.cast(attrs[name]);
-        castValue = ctor._applyNormalization(name, castValue);
-        castValue = this._applyNullifyBlanks(name, castValue);
-        attrMap.set(name, Attribute.fromUserWithValue(name, attrs[name], castValue, def.type));
-      } else {
-        const defVal =
-          typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
-        attrMap.set(name, Attribute.withCastValue(name, defVal ?? null, def.type));
-      }
+    // Attributes#initialize — deep-dup class defaults
+    this._attributes = initAttrs(ctor._attributeDefinitions);
+
+    // API#initialize — assign through Model.writeAttribute (casting, normalization).
+    // Uses Model.prototype directly so subclass overrides (e.g. Base's encryption)
+    // don't interfere during construction — subclass constructors handle their own
+    // post-init concerns (e.g. Base encrypts after super()).
+    for (const [key, value] of Object.entries(attrs)) {
+      Model.prototype.writeAttribute.call(this, key, value);
     }
 
-    // Also set any extra keys passed in (for confirmation fields, etc.)
-    for (const key of Object.keys(attrs)) {
-      if (!attrMap.has(key)) {
-        const type = typeRegistry.lookup("value");
-        attrMap.set(key, Attribute.fromUser(key, attrs[key], type));
-      }
-    }
-
-    this._attributes = new AttributeSet(attrMap);
+    // Snapshot after construction — the initial state is "clean"
     this._dirty.snapshot(this._attributes);
 
     // Fire after_initialize callbacks
-    const ctor2 = this.constructor as typeof Model;
-    ctor2._callbackChain.runAfterSync("initialize", this);
+    ctor._callbackChain.runAfterSync("initialize", this);
   }
 
   // -- Attribute access --

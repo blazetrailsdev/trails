@@ -66,7 +66,7 @@ class I18nService {
       return interpolate(options.defaultValue, options ?? {});
     }
 
-    if (raiseOnMissingTranslations) {
+    if (raiseOnMissingTranslations()) {
       throw new Error(`Translation missing: ${key}`);
     }
     return key;

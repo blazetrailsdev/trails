@@ -17,6 +17,52 @@ export interface CallbacksClassMethods {
 export type Callbacks = CallbacksClassMethods;
 
 /**
+ * Core implementation of define_model_callbacks.
+ * Creates beforeX(), afterX(), and aroundX() class methods for each event name.
+ *
+ * Mirrors: ActiveModel::Callbacks.define_model_callbacks
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function defineModelCallbacks(this: any, ...eventNames: string[]): void {
+  for (const event of eventNames) {
+    const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
+
+    Object.defineProperty(this, `before${capitalizedEvent}`, {
+      value: function (fn: CallbackFn, conditions?: CallbackConditions) {
+        if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
+          this._callbackChain = this._callbackChain.clone();
+        }
+        this._callbackChain.register("before", event, fn, conditions);
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    Object.defineProperty(this, `after${capitalizedEvent}`, {
+      value: function (fn: CallbackFn, conditions?: CallbackConditions) {
+        if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
+          this._callbackChain = this._callbackChain.clone();
+        }
+        this._callbackChain.register("after", event, fn, conditions);
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    Object.defineProperty(this, `around${capitalizedEvent}`, {
+      value: function (fn: AroundCallbackFn, conditions?: CallbackConditions) {
+        if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
+          this._callbackChain = this._callbackChain.clone();
+        }
+        this._callbackChain.register("around", event, fn, conditions);
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+}
+
+/**
  * Callback types.
  */
 export type CallbackFn = (record: AnyRecord) => void | boolean | Promise<void | boolean>;

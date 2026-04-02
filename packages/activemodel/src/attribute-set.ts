@@ -203,4 +203,43 @@ export class AttributeSet {
   entries(): IterableIterator<[string, unknown]> {
     return this[Symbol.iterator]();
   }
+
+  castTypes(): Record<string, import("./type/value.js").Type> {
+    const result: Record<string, import("./type/value.js").Type> = {};
+    for (const [name, attr] of this.attributes) {
+      result[name] = attr.type;
+    }
+    return result;
+  }
+
+  isKey(name: string): boolean {
+    const attr = this.attributes.get(name);
+    return attr !== undefined && attr.isInitialized();
+  }
+
+  accessed(): string[] {
+    const result: string[] = [];
+    for (const [name, attr] of this.attributes) {
+      if (attr.hasBeenRead()) result.push(name);
+    }
+    return result;
+  }
+
+  map(fn: (attr: Attribute) => Attribute): AttributeSet {
+    const newAttrs = new Map<string, Attribute>();
+    for (const [name, attr] of this.attributes) {
+      newAttrs.set(name, fn(attr));
+    }
+    return new AttributeSet(newAttrs);
+  }
+
+  reverseMergeBang(target: AttributeSet): this {
+    const cache = new Map<Attribute, Attribute>();
+    target.forEach((attr, name) => {
+      if (!this.isKey(name)) {
+        this.attributes.set(name, this.cloneAttribute(attr, cache));
+      }
+    });
+    return this;
+  }
 }

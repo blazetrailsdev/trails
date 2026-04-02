@@ -136,6 +136,65 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
       }
     });
 
+    // Extract members from mixin functions that return a class (constructor type).
+    // e.g., `export function Attributes<T>(Base: T) { class M { constructor(); get attributes() {} } return M; }`
+    // The inner class is invisible to the top-level walker, but TypeScript's return
+    // type inference gives us access to its members.
+    ts.forEachChild(sourceFile, (node) => {
+      if (!ts.isFunctionDeclaration(node) || !node.name || !isExported(node)) return;
+      const sig = checker.getSignatureFromDeclaration(node);
+      if (!sig) return;
+      const returnType = checker.getReturnTypeOfSignature(sig);
+      const constructSigs = returnType.getConstructSignatures();
+      if (constructSigs.length === 0) return;
+
+      const instanceType = constructSigs[0].getReturnType();
+      const mixinKey = `${relPath}:${node.name.text}__mixin`;
+      const mixinMethods: MethodInfo[] = [];
+
+      for (const prop of instanceType.getProperties()) {
+        if (prop.name.startsWith("_") || prop.name.startsWith("#")) continue;
+        if (prop.flags & ts.SymbolFlags.Prototype) continue;
+        const decl = prop.valueDeclaration ?? prop.declarations?.[0];
+        if (!decl) continue;
+        if (hasModifier(decl, ts.SyntaxKind.PrivateKeyword)) continue;
+        if (hasModifier(decl, ts.SyntaxKind.ProtectedKeyword)) continue;
+        const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
+        mixinMethods.push({
+          name: prop.name,
+          visibility: "public",
+          params: [],
+          isStatic: false,
+          line,
+          file: relPath,
+        });
+      }
+
+      // Add constructor
+      if (constructSigs.length > 0) {
+        mixinMethods.push({
+          name: "constructor",
+          visibility: "public",
+          params: [],
+          isStatic: false,
+          line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+          file: relPath,
+        });
+      }
+
+      if (mixinMethods.length > 0) {
+        info.modules[mixinKey] = {
+          name: `${node.name.text}__mixin`,
+          file: relPath,
+          includes: [],
+          extends: [],
+          instanceMethods: mixinMethods,
+          classMethods: [],
+        };
+        fileHasClassOrModule = true;
+      }
+    });
+
     // Also capture functions exported via `export { foo, bar }` (named export lists).
     // Resolve aliases so ExportSpecifier nodes reach the underlying FunctionDeclaration.
     const moduleSymbol = checker.getSymbolAtLocation(sourceFile);

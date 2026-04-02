@@ -1,5 +1,7 @@
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
+import { Attribute } from "./attribute.js";
+import { AttributeSet } from "./attribute-set.js";
 
 export interface AttributeDefinition {
   name: string;
@@ -7,24 +9,8 @@ export interface AttributeDefinition {
   defaultValue: unknown;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Constructor<T = object> = new (...args: any[]) => T;
-
 /**
- * Attributes mixin — declares typed attributes with defaults and casting.
- *
- * Mirrors: ActiveModel::Attributes
- *
- * @example
- *   class User extends Model {
- *     static {
- *       this.attribute("name", "string");
- *       this.attribute("age", "integer", { default: 0 });
- *     }
- *   }
- */
-/**
- * Attributes mixin contract — declares typed attributes with defaults and casting.
+ * Attributes module contract.
  *
  * Mirrors: ActiveModel::Attributes
  */
@@ -33,85 +19,83 @@ export interface Attributes {
   attributeNames(): string[];
 }
 
-export interface AttributesStatic {
-  _attributeDefinitions: Map<string, AttributeDefinition>;
-  attribute(name: string, typeName: string, options?: { default?: unknown }): void;
-  attributeNames(): string[];
-}
+// ---------------------------------------------------------------------------
+// Class methods — Mirrors: ActiveModel::Attributes::ClassMethods
+// ---------------------------------------------------------------------------
 
-export interface AttributesInstance {
-  _attributes: Map<string, unknown>;
-  readAttribute(name: string): unknown;
-  writeAttribute(name: string, value: unknown): void;
-  attributes: Record<string, unknown>;
-  attributePresent(name: string): boolean;
-}
-
-export function Attributes<TBase extends Constructor>(Base: TBase) {
-  class AttributesMixin extends Base implements AttributesInstance {
-    static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
-
-    static attribute(name: string, typeName: string, options?: { default?: unknown }): void {
-      const type = typeRegistry.lookup(typeName);
-      const defaultValue = options?.default ?? null;
-      this._attributeDefinitions.set(name, { name, type, defaultValue });
-    }
-
-    static attributeNames(): string[] {
-      return Array.from(this._attributeDefinitions.keys());
-    }
-
-    _attributes: Map<string, unknown> = new Map();
-    #initialized = false;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    constructor(...args: any[]) {
-      super(...args);
-      this.#initAttributes((args[0] as Record<string, unknown>) ?? {});
-    }
-
-    #initAttributes(initial: Record<string, unknown>) {
-      if (this.#initialized) return;
-      this.#initialized = true;
-      const ctor = this.constructor as typeof AttributesMixin;
-      const defs: Map<string, AttributeDefinition> = ctor._attributeDefinitions ?? new Map();
-
-      for (const [name, def] of defs) {
-        if (name in initial) {
-          this._attributes.set(name, def.type.cast(initial[name]));
-        } else {
-          const defVal =
-            typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
-          this._attributes.set(name, defVal);
-        }
-      }
-    }
-
-    readAttribute(name: string): unknown {
-      return this._attributes.get(name) ?? null;
-    }
-
-    writeAttribute(name: string, value: unknown): void {
-      const ctor = this.constructor as typeof AttributesMixin;
-      const def = ctor._attributeDefinitions?.get(name);
-      this._attributes.set(name, def ? def.type.cast(value) : value);
-    }
-
-    get attributes(): Record<string, unknown> {
-      const result: Record<string, unknown> = {};
-      for (const [k, v] of this._attributes) {
-        result[k] = v;
-      }
-      return result;
-    }
-
-    attributePresent(name: string): boolean {
-      const value = this._attributes.get(name);
-      if (value === null || value === undefined) return false;
-      if (typeof value === "string" && value.trim() === "") return false;
-      return true;
-    }
+/**
+ * Declare a typed attribute with an optional default.
+ *
+ * Mirrors: ActiveModel::Attributes::ClassMethods#attribute
+ *
+ * Model.attribute() delegates here. This is the canonical implementation
+ * of the class-level `attribute` declaration.
+ */
+export function attribute(
+  this: { _attributeDefinitions: Map<string, AttributeDefinition>; prototype: object },
+  name: string,
+  typeName: string,
+  options?: { default?: unknown },
+): void {
+  const type = typeRegistry.lookup(typeName);
+  const defaultValue = options?.default ?? null;
+  if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
+    this._attributeDefinitions = new Map(this._attributeDefinitions);
   }
+  this._attributeDefinitions.set(name, { name, type, defaultValue });
 
-  return AttributesMixin;
+  if (!Object.prototype.hasOwnProperty.call(this.prototype, name)) {
+    Object.defineProperty(this.prototype, name, {
+      get(this: { readAttribute(n: string): unknown }) {
+        return this.readAttribute(name);
+      },
+      set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
+        this.writeAttribute(name, value);
+      },
+      configurable: true,
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Instance methods — Mirrors: ActiveModel::Attributes instance methods
+// ---------------------------------------------------------------------------
+
+/**
+ * Build default AttributeSet from class definitions.
+ *
+ * Mirrors: ActiveModel::AttributeRegistration._default_attributes
+ */
+export function buildDefaultAttributes(defs: Map<string, AttributeDefinition>): AttributeSet {
+  const attrMap = new Map<string, Attribute>();
+  for (const [name, def] of defs) {
+    let defVal = typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
+    if (defVal !== null && typeof defVal === "object") {
+      defVal = structuredClone(defVal);
+    }
+    attrMap.set(name, Attribute.withCastValue(name, defVal ?? null, def.type));
+  }
+  return new AttributeSet(attrMap);
+}
+
+/**
+ * Initialize instance attributes by deep-duping class defaults.
+ *
+ * Mirrors: ActiveModel::Attributes#initialize
+ *
+ * In Rails, Attributes#initialize deep-dups a cached class-level default.
+ * Here we build a fresh AttributeSet per instance (with object defaults
+ * cloned via structuredClone), so no additional dup is needed.
+ */
+export function constructor(defs: Map<string, AttributeDefinition>): AttributeSet {
+  return buildDefaultAttributes(defs);
+}
+
+/**
+ * Return all attributes as a plain hash.
+ *
+ * Mirrors: ActiveModel::Attributes#attributes
+ */
+export function attributes(attrs: AttributeSet): Record<string, unknown> {
+  return attrs.toHash();
 }

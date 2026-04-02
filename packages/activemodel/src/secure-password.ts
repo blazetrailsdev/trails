@@ -6,9 +6,9 @@ const MIN_COST = 4;
 const DEFAULT_COST = 12;
 const textEncoder = new TextEncoder();
 
-export const SecurePassword: { minCost: boolean } = {
-  minCost: false,
-};
+export class SecurePassword {
+  static minCost: boolean = false;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace SecurePassword {

@@ -2,6 +2,16 @@ import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 
+// Lazy reference to avoid circular import: attribute.ts ↔ user-provided-default.ts
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _UserProvidedDefaultCtor: (new (...args: any[]) => Attribute) | null = null;
+
+/** Called by user-provided-default.ts to register itself after loading. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function _registerUserProvidedDefault(ctor: new (...args: any[]) => Attribute): void {
+  _UserProvidedDefaultCtor = ctor;
+}
+
 /**
  * Wraps a single attribute value with its type, tracking the original
  * value before type cast and memoizing the cast result.
@@ -126,7 +136,33 @@ export abstract class Attribute {
     );
   }
 
-  protected abstract typeCast(value: unknown): unknown;
+  abstract typeCast(value: unknown): unknown;
+
+  isSerializable(): boolean {
+    return this.type.isSerializable(this.value);
+  }
+
+  originalValueForDatabase(): unknown {
+    if (this.originalAttribute !== null) {
+      return this.originalAttribute.originalValueForDatabase();
+    }
+    return this.type.serialize(this.originalValue);
+  }
+
+  withUserDefault(value: unknown): Attribute {
+    if (!_UserProvidedDefaultCtor) {
+      throw new Error(
+        "UserProvidedDefault not loaded. Import '@blazetrails/activemodel' " +
+          "or './attribute/user-provided-default.js' before calling withUserDefault().",
+      );
+    }
+    return new _UserProvidedDefaultCtor(
+      this.name,
+      value,
+      this.type,
+      this instanceof FromDatabase ? this : this.originalAttribute,
+    );
+  }
 
   /** Access the original attribute for cloning. */
   getOriginalAttribute(): Attribute | null {
@@ -202,13 +238,13 @@ export abstract class Attribute {
 }
 
 export class FromDatabase extends Attribute {
-  protected typeCast(value: unknown): unknown {
+  typeCast(value: unknown): unknown {
     return this.type.deserialize(value);
   }
 }
 
 export class FromUser extends Attribute {
-  protected typeCast(value: unknown): unknown {
+  typeCast(value: unknown): unknown {
     return this.type.cast(value);
   }
 
@@ -218,7 +254,7 @@ export class FromUser extends Attribute {
 }
 
 export class WithCastValue extends Attribute {
-  protected typeCast(value: unknown): unknown {
+  typeCast(value: unknown): unknown {
     return value;
   }
 
@@ -232,7 +268,7 @@ export class Null extends Attribute {
     super(name, null, typeRegistry.lookup("value"));
   }
 
-  protected typeCast(): unknown {
+  typeCast(): unknown {
     return null;
   }
 
@@ -266,7 +302,7 @@ export class Uninitialized extends Attribute {
     return new Uninitialized(this.name, this.type);
   }
 
-  protected typeCast(): unknown {
+  typeCast(): unknown {
     return undefined;
   }
 }

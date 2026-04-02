@@ -9,7 +9,6 @@
  * express the contract here as an interface for the static side.
  */
 export interface TranslationClassMethods {
-  raiseOnMissingTranslations?: boolean;
   readonly i18nScope: string;
   lookupAncestors(): unknown[];
   humanAttributeName(attr: string): string;
@@ -17,5 +16,11 @@ export interface TranslationClassMethods {
 
 export type Translation = TranslationClassMethods;
 
-// eslint-disable-next-line prefer-const -- must be mutable for runtime configuration
-export let raiseOnMissingTranslations = false;
+let _raiseOnMissingTranslations = false;
+
+export function raiseOnMissingTranslations(value?: boolean): boolean {
+  if (value !== undefined) {
+    _raiseOnMissingTranslations = value;
+  }
+  return _raiseOnMissingTranslations;
+}
