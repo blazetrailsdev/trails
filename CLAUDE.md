@@ -37,7 +37,7 @@ This is a TypeScript monorepo. Packages live under `packages/`:
   the goal. Don't scan for easy tests to flip — build the feature, then
   unskip the tests that prove it works. Read the Rails source to understand
   the feature before implementing.
-- **Test-driven against Rails**: Progress is measured by `test:compare`,
+- **Test-driven against Rails**: Progress is measured by `api:compare`,
   which matches our test files and test names against the actual Rails test suite.
 
 ## Conventions
@@ -56,7 +56,7 @@ This is a TypeScript monorepo. Packages live under `packages/`:
   implementations with meaningful logic. If a feature isn't implemented yet,
   don't create an empty file for it.
 - **NEVER rename or reword test names.** Test names are derived from the Rails
-  test suite and are how `test:compare` matches our tests to Rails tests.
+  test suite and are how `api:compare` matches our tests to Rails tests.
   If a test is failing or the behavior doesn't match the name, fix the test body
   (the implementation under test), not the test name. Always look at the
   corresponding Rails test to understand the expected behavior before changing
@@ -64,11 +64,11 @@ This is a TypeScript monorepo. Packages live under `packages/`:
 
 ## Measuring Progress
 
-The primary measure of progress is the `test:compare` script output.
+The primary measure of progress is the `api:compare` script output.
 It compares our test files and test names against the Rails test suite:
 
 ```bash
-pnpm run test:compare
+pnpm run api:compare
 ```
 
 Run it to see current stats per package. Use `--package <name>` for a single package.
@@ -76,4 +76,4 @@ Run it to see current stats per package. Use `--package <name>` for a single pac
 "Misplaced" means tests that exist but are in the wrong file according to
 Rails conventions. These need to be moved, not rewritten.
 
-CI runs `test:compare` on every push to track regressions.
+CI runs `api:compare` on every push to track regressions.

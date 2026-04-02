@@ -883,7 +883,7 @@ export class Base extends Model {
         }
         const whereNodes = tuples.map((tuple) => ModelSchema.buildPkWhereNode(this, tuple));
         const orCondition = whereNodes.reduce((left, right) => new Nodes.Or(left, right));
-        const records = await this.all().where(orCondition).toArray();
+        const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();
         if (records.length !== tuples.length) {
           throw new RecordNotFound(
             `${this.name}: couldn't find all with composite primary key`,
