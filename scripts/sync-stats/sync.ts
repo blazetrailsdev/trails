@@ -1,12 +1,13 @@
 import { execSync } from "child_process";
+import { mkdirSync } from "fs";
+import { homedir } from "os";
 import { dirname, join } from "path";
-import { fileURLToPath } from "url";
 import { Base, MigrationContext } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 
 const REPO = "blazetrailsdev/blazetrails";
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = join(__dirname, "stats.db");
+const DB_PATH = join(homedir(), "github", "blazetrailsdev", "stats.db");
+mkdirSync(dirname(DB_PATH), { recursive: true });
 
 function gh(args: string): string {
   return execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
@@ -786,7 +787,10 @@ function extractStepLogs(rawLog: string): Map<string, string> {
 
     if (command.includes("api-compare/compare.ts")) {
       stepName = "api_compare";
-    } else if (command.includes("test-compare/test-compare.ts")) {
+    } else if (
+      command.includes("test-compare/test-compare.ts") ||
+      command.includes("test-compare/convention-compare.ts")
+    ) {
       stepName = "test_compare";
     }
 
@@ -1112,18 +1116,24 @@ async function printSummary(mode: "latest" | "refresh") {
 
 async function main() {
   const args = process.argv.slice(2);
-  const knownFlags = ["--latest", "--refresh"];
+  const knownFlags = ["--latest", "--refresh", "--compare-only"];
   const unknownFlags = args.filter((a) => a.startsWith("--") && !knownFlags.includes(a));
   if (unknownFlags.length > 0) {
     console.error(`Unknown flag(s): ${unknownFlags.join(", ")}`);
-    console.error("Usage: stats:sync [--latest | --refresh]");
+    console.error("Usage: stats:sync [--latest | --refresh | --compare-only]");
     process.exit(1);
   }
 
-  const mode: "latest" | "refresh" = args.includes("--refresh") ? "refresh" : "latest";
+  const mode: "latest" | "refresh" | "compare-only" = args.includes("--refresh")
+    ? "refresh"
+    : args.includes("--compare-only")
+      ? "compare-only"
+      : "latest";
 
   if (mode === "latest") {
     console.log("Running in latest mode (default). Use --refresh for full sync.\n");
+  } else if (mode === "compare-only") {
+    console.log("Running compare-only mode: syncing PRs, workflow runs, and compare logs.\n");
   } else {
     console.log("Running full refresh sync.\n");
   }
@@ -1134,8 +1144,10 @@ async function main() {
   try {
     await migrateDb(adapter);
 
+    const fetchMode = mode === "latest" ? "latest" : "refresh";
+
     console.log("=== Syncing PR data ===");
-    const prsSynced = await syncPullRequests(mode);
+    const prsSynced = await syncPullRequests(fetchMode);
 
     if (mode === "refresh") {
       console.log("\n=== Syncing PR files ===");
@@ -1149,10 +1161,10 @@ async function main() {
     }
 
     console.log("\n=== Syncing workflow runs ===");
-    const runsSynced = await syncWorkflowRuns(mode);
+    const runsSynced = await syncWorkflowRuns(fetchMode);
 
     console.log("\n=== Syncing compare stats from CI logs ===");
-    const logsParsed = await syncCompareStats(mode);
+    const logsParsed = await syncCompareStats(fetchMode);
 
     await SyncLog.create({
       synced_at: new Date().toISOString(),
@@ -1161,7 +1173,7 @@ async function main() {
       logs_parsed: logsParsed,
     });
 
-    await printSummary(mode);
+    await printSummary(mode === "refresh" ? "refresh" : "latest");
   } finally {
     adapter.close();
   }
