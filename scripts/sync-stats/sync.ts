@@ -166,6 +166,16 @@ class CompareLog extends Base {
   }
 }
 
+class RawJobLog extends Base {
+  static {
+    this.tableName = "raw_job_logs";
+    this.attribute("job_id", "integer");
+    this.attribute("merge_commit_sha", "string");
+    this.attribute("pr_number", "integer");
+    this.attribute("log_output", "text");
+  }
+}
+
 class SyncLog extends Base {
   static {
     this.tableName = "sync_log";
@@ -201,6 +211,15 @@ async function migrateDb(adapter: SQLite3Adapter) {
         t.string("step_name");
         t.text("log_output");
         t.index(["merge_commit_sha", "step_name"], { unique: true });
+      });
+    }
+    if (!(await tableExists(adapter, "raw_job_logs"))) {
+      await ctx.createTable("raw_job_logs", {}, (t) => {
+        t.integer("job_id");
+        t.string("merge_commit_sha");
+        t.integer("pr_number");
+        t.text("log_output");
+        t.index(["merge_commit_sha"], { unique: true });
       });
     }
     return;
@@ -333,6 +352,14 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.string("step_name");
       t.text("log_output");
       t.index(["merge_commit_sha", "step_name"], { unique: true });
+    });
+
+    await ctx.createTable("raw_job_logs", {}, (t) => {
+      t.integer("job_id");
+      t.string("merge_commit_sha");
+      t.integer("pr_number");
+      t.text("log_output");
+      t.index(["merge_commit_sha"], { unique: true });
     });
 
     await ctx.createTable("sync_log", {}, (t) => {
@@ -897,6 +924,21 @@ function parseApiCompareFromLogs(logs: string) {
       });
     }
   }
+  // Fall back to earliest format: "  arel: 100% (152/152)"
+  // Use [a-z] to match only lowercase package names, skipping PascalCase class-level lines
+  if (results.size === 0) {
+    const reEarliest = / {2}([a-z]\w*): ([\d.]+)% \((\d+)\/(\d+)\)/g;
+    while ((m = reEarliest.exec(logs)) !== null) {
+      if (m[1] === "Overall") continue;
+      results.set(m[1], {
+        matched: parseInt(m[3]),
+        total: parseInt(m[4]),
+        percent: parseFloat(m[2]),
+        misplaced: 0,
+        missing: parseInt(m[4]) - parseInt(m[3]),
+      });
+    }
+  }
   return results;
 }
 
@@ -923,6 +965,10 @@ async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
         LEFT JOIN compare_logs cl
           ON cl.merge_commit_sha = wr.head_sha AND cl.step_name = e.step_name
         WHERE cl.step_name IS NULL
+      )
+      OR NOT EXISTS (
+        SELECT 1 FROM raw_job_logs rjl
+        WHERE rjl.merge_commit_sha = wr.head_sha
       )
     )
     ORDER BY wr.pr_number DESC
@@ -951,6 +997,12 @@ async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
 
     try {
       const logs = gh(`api repos/${REPO}/actions/jobs/${jobId}/logs`);
+
+      // Store full raw job log for future re-parsing
+      await RawJobLog.upsertAll(
+        [{ job_id: jobId, merge_commit_sha: headSha, pr_number: prNumber, log_output: logs }],
+        { uniqueBy: ["merge_commit_sha"] },
+      );
 
       // Store raw step logs
       const stepLogs = extractStepLogs(logs);
@@ -1035,13 +1087,16 @@ async function printSummary(mode: "latest" | "refresh") {
     return (rows[0] as { cnt: number }).cnt;
   };
 
-  const [prCount, runCount, testStatCount, apiStatCount, logCount] = await Promise.all([
-    count("pull_requests"),
-    count("workflow_runs"),
-    countDistinct("test_compare_stats", "merge_commit_sha"),
-    countDistinct("api_compare_stats", "merge_commit_sha"),
-    countDistinct("compare_logs", "merge_commit_sha"),
-  ]);
+  const [prCount, runCount, testStatCount, apiStatCount, logCount, rawLogCount] = await Promise.all(
+    [
+      count("pull_requests"),
+      count("workflow_runs"),
+      countDistinct("test_compare_stats", "merge_commit_sha"),
+      countDistinct("api_compare_stats", "merge_commit_sha"),
+      countDistinct("compare_logs", "merge_commit_sha"),
+      count("raw_job_logs"),
+    ],
+  );
 
   console.log("\n=== Database Summary ===");
   console.log(`  PRs: ${prCount}`);
@@ -1063,6 +1118,7 @@ async function printSummary(mode: "latest" | "refresh") {
   console.log(`  Commits with test:compare stats: ${testStatCount}`);
   console.log(`  Commits with api:compare stats: ${apiStatCount}`);
   console.log(`  Commits with compare logs: ${logCount}`);
+  console.log(`  Raw job logs: ${rawLogCount}`);
   console.log(`  Database: ${DB_PATH}`);
 
   const latestTestStats = await TestCompareStat.findBySql(`
