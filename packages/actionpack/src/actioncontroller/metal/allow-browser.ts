@@ -29,6 +29,10 @@ export class BrowserBlocker {
     return this._parser;
   }
 
+  get versions(): Record<string, string | false> {
+    return { ...this._versions };
+  }
+
   get blocked(): boolean {
     if (!this._userAgent) return false;
     if (this._bot()) return false;

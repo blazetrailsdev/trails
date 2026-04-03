@@ -7,6 +7,7 @@
  */
 
 import { Metal } from "../metal.js";
+import { Renderer } from "../renderer.js";
 
 export const RENDER_FORMATS_IN_PRIORITY = ["body", "plain", "html"] as const;
 
@@ -40,4 +41,26 @@ export function processRenderOptions(options: Record<string, unknown>): {
     result.contentType = (options.contentType ?? options.content_type) as string;
   if (options.location) result.location = options.location as string;
   return result;
+}
+
+export function renderToBody(options: Record<string, unknown> = {}): string {
+  const body = renderInPriorities(options);
+  return body !== null ? String(body) : " ";
+}
+
+type ControllerClass = abstract new (...args: unknown[]) => unknown;
+
+const _renderers = new WeakMap<object, Renderer>();
+
+export function renderer(controller: ControllerClass): Renderer {
+  let r = _renderers.get(controller);
+  if (!r) {
+    r = Renderer.for(controller);
+    _renderers.set(controller, r);
+  }
+  return r;
+}
+
+export function setupRendererBang(controller: ControllerClass): void {
+  _renderers.set(controller, Renderer.for(controller));
 }

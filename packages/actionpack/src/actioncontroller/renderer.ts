@@ -72,4 +72,47 @@ export class Renderer {
   get controller(): unknown {
     return this._controller;
   }
+
+  withDefaults(defaults: Record<string, unknown>): Renderer {
+    return new Renderer(this._controller, { ...this._defaults, ...defaults });
+  }
+
+  renderToString(options: Record<string, unknown> = {}): string {
+    return this.render(options);
+  }
+
+  private static RACK_KEY_TRANSLATION: Record<string, string> = {
+    http_host: "HTTP_HOST",
+    https: "HTTPS",
+    method: "REQUEST_METHOD",
+    script_name: "SCRIPT_NAME",
+    input: "rack.input",
+  };
+
+  static normalizeEnv(env: Record<string, unknown>): Record<string, unknown> {
+    const newEnv: Record<string, unknown> = {};
+
+    for (const [key, rawValue] of Object.entries(env)) {
+      let value = rawValue;
+      if (key === "https") {
+        value = value ? "on" : "off";
+      } else if (key === "method") {
+        value = String(value).toUpperCase();
+      }
+
+      const rackKey = this.RACK_KEY_TRANSLATION[key] ?? key;
+      newEnv[rackKey] = value;
+    }
+
+    if (newEnv["HTTP_HOST"]) {
+      newEnv["HTTPS"] ??= "off";
+      newEnv["SCRIPT_NAME"] ??= "";
+    }
+
+    if (newEnv["HTTPS"]) {
+      newEnv["rack.url_scheme"] = newEnv["HTTPS"] === "on" ? "https" : "http";
+    }
+
+    return newEnv;
+  }
 }

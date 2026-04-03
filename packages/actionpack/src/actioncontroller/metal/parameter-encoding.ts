@@ -29,4 +29,8 @@ export class ParameterEncodingRegistry {
     const encodings = this._encodings.get(action);
     return encodings?.has("*") ?? false;
   }
+
+  setupParamEncode(): void {
+    this._encodings = new Map<string, Map<string, string>>();
+  }
 }

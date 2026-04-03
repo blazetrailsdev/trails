@@ -72,3 +72,12 @@ export function instrumentRender(
   notifier?.instrument("render.action_controller", { duration: viewRuntime });
   return { result, viewRuntime };
 }
+
+export function logProcessAction(payload: Record<string, unknown>): string[] {
+  const messages: string[] = [];
+  const viewRuntime = payload.view_runtime ?? payload.viewRuntime;
+  if (viewRuntime !== undefined && viewRuntime !== null) {
+    messages.push(`Views: ${Number(viewRuntime).toFixed(1)}ms`);
+  }
+  return messages;
+}

@@ -12,6 +12,7 @@ export class Response {
   private _charset: string | undefined;
   private _cookies: Map<string, CookieValue> = new Map();
   private _sending = false;
+  request: { host?: string; method?: string; path?: string } | null = null;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
     this._status = status;

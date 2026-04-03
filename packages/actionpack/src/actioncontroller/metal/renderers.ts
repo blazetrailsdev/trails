@@ -36,4 +36,20 @@ export class Renderers {
   static get(key: string): RendererProc | undefined {
     return this._registry.get(key);
   }
+
+  static renderToBody(options: Record<string, unknown>): string | null {
+    for (const name of RENDERERS) {
+      if (name in options) {
+        const renderer = this._registry.get(name);
+        if (renderer) return renderer(options[name], options);
+      }
+    }
+    return null;
+  }
+
+  static useRenderers(...renderers: string[]): void {
+    for (const name of renderers) {
+      RENDERERS.add(name);
+    }
+  }
 }

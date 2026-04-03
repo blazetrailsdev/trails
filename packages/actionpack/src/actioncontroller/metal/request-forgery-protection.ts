@@ -125,8 +125,17 @@ export class SessionStore {
     const token = session[this._tokenKey];
     return typeof token === "string" ? token : null;
   }
+  fetch(session: Record<string, unknown>): string | null {
+    return this.read(session);
+  }
   write(session: Record<string, unknown>, token: string): void {
     session[this._tokenKey] = token;
+  }
+  store(session: Record<string, unknown>, token: string): void {
+    this.write(session, token);
+  }
+  reset(session: Record<string, unknown>): void {
+    delete session[this._tokenKey];
   }
 }
 
@@ -138,7 +147,45 @@ export class CookieStore {
   read(cookies: Record<string, string>): string | null {
     return cookies[this._cookieName] ?? null;
   }
+  fetch(cookies: Record<string, string>): string | null {
+    return this.read(cookies);
+  }
   write(cookies: Record<string, string>, token: string): void {
     cookies[this._cookieName] = token;
   }
+  store(cookies: Record<string, string>, token: string): void {
+    this.write(cookies, token);
+  }
+  reset(cookies: Record<string, string>): void {
+    delete cookies[this._cookieName];
+  }
+}
+
+export function warningMessage(origin?: string | null, baseUrl?: string | null): string {
+  if (origin && baseUrl && origin !== baseUrl) {
+    return `HTTP Origin header (${origin}) didn't match request.base_url (${baseUrl})`;
+  }
+  return "Can't verify CSRF token authenticity.";
+}
+
+export interface CsrfTokenStore<TStorage> {
+  fetch(storage: TStorage): string | null;
+  store(storage: TStorage, token: string): void;
+  reset(storage: TStorage): void;
+}
+
+export function resetCsrfToken<T>(csrfStore: CsrfTokenStore<T>, storage: T): void {
+  csrfStore.reset(storage);
+}
+
+export function commitCsrfToken<T>(csrfStore: CsrfTokenStore<T>, storage: T, token: string): void {
+  csrfStore.store(storage, token);
+}
+
+export function skipForgeryProtection(
+  _controller: { skipBeforeAction?: (name: string, options?: Record<string, unknown>) => void },
+  options: Record<string, unknown> = {},
+): void {
+  const merged = { raise: false, ...options };
+  _controller.skipBeforeAction?.("verifyAuthenticityToken", merged);
 }

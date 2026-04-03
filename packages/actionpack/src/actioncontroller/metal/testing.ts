@@ -12,6 +12,10 @@ export function recycle(controller: Record<string, unknown>): void {
   controller.params = undefined;
 }
 
+export function recycleBang(controller: Record<string, unknown>): void {
+  recycle(controller);
+}
+
 export function clearInstanceVariablesBetweenRequests(
   controller: Record<string, unknown>,
   trackedVars: Set<string>,

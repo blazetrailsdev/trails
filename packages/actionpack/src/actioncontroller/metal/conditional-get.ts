@@ -75,3 +75,38 @@ export function buildCacheControl(options: {
 
   return parts.join(", ");
 }
+
+export interface ConditionalGetHost {
+  response: {
+    setHeader(name: string, value: string): void;
+    getHeader(name: string): string | undefined;
+  };
+}
+
+export function httpCacheForever(
+  this: ConditionalGetHost,
+  options: { public?: boolean } = {},
+  block?: () => void,
+): void {
+  const cc = buildCacheControl({
+    maxAge: 100 * 365.25 * 24 * 60 * 60, // 100 years in seconds
+    public: options.public ?? false,
+    immutable: true,
+  });
+  this.response.setHeader("cache-control", cc);
+  block?.();
+}
+
+export function noStore(this: ConditionalGetHost): void {
+  this.response.setHeader("cache-control", buildCacheControl({ noStore: true }));
+}
+
+const _etaggers: Array<(request: unknown) => string> = [];
+
+export function etag(block: (request: unknown) => string): void {
+  _etaggers.push(block);
+}
+
+export function getEtaggers(): ReadonlyArray<(request: unknown) => string> {
+  return _etaggers;
+}

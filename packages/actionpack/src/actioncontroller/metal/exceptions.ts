@@ -53,6 +53,16 @@ export class UrlGenerationError extends ActionControllerError {
     this.routeName = routeName;
     this.methodName = methodName;
   }
+
+  get corrections(): string[] {
+    if (!this.routeName || !this.routes) return [];
+    const namedRoutes = this.routes as { namedRoutes?: { helperNames?: string[] } };
+    const helpers = namedRoutes.namedRoutes?.helperNames ?? [];
+    const target = this.routeName.toLowerCase();
+    return helpers
+      .filter((name) => name !== this.methodName && name.toLowerCase().includes(target))
+      .slice(0, 5);
+  }
 }
 
 export class MethodNotAllowed extends ActionControllerError {

@@ -19,6 +19,16 @@ export class ParameterMissing extends Error {
     this.param = param;
     this.keys = keys;
   }
+
+  get corrections(): string[] {
+    if (!this.keys) return [];
+    const target = this.param.toLowerCase();
+    return this.keys.filter((k) => {
+      const candidate = k.toLowerCase();
+      if (candidate === target) return false;
+      return levenshteinDistance(target, candidate) <= 2;
+    });
+  }
 }
 
 export class ExpectedParameterMissing extends ParameterMissing {
@@ -55,6 +65,23 @@ export class InvalidParameterKey extends Error {
 
 // --- Scalar type guard ---
 
+function levenshteinDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
 function isPermittedScalar(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   const t = typeof value;
@@ -75,10 +102,15 @@ function isBlank(value: unknown): boolean {
 export class Parameters {
   private _data: Record<string, unknown>;
   private _permitted: boolean;
+  private _convertedArrays?: Set<string>;
 
   static permitAllParameters = false;
   static actionOnUnpermittedParameters: "log" | "raise" | false = false;
   static alwaysPermittedParameters: string[] = ["controller", "action"];
+
+  static hookIntoYamlLoading(): void {
+    // No-op in TypeScript — YAML deserialization is not a concern
+  }
 
   constructor(data: Record<string, unknown> = {}) {
     this._data = { ...data };
@@ -165,6 +197,10 @@ export class Parameters {
   }
 
   has(key: string): boolean {
+    return key in this._data;
+  }
+
+  isKey(key: string): boolean {
     return key in this._data;
   }
 
@@ -566,6 +602,19 @@ export class Parameters {
 
   toUnsafeHash(): Record<string, unknown> {
     return this._convertParametersToHashes(this._data, "toUnsafeHash") as Record<string, unknown>;
+  }
+
+  toUnsafeH(): Record<string, unknown> {
+    return this.toUnsafeHash();
+  }
+
+  stringifyKeys(): Parameters {
+    return this.deepDup();
+  }
+
+  get convertedArrays(): Set<string> {
+    this._convertedArrays ??= new Set<string>();
+    return this._convertedArrays;
   }
 
   toQuery(prefix?: string): string {

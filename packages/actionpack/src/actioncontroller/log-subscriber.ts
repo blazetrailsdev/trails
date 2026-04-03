@@ -52,4 +52,34 @@ export class LogSubscriber {
     const { status, location } = event.payload as { status: number | string; location: string };
     this._logger?.info(`Redirected to ${location} (${status})`);
   }
+
+  haltedCallback(event: Event): void {
+    const { filter } = event.payload as { filter: string };
+    this._logger?.info(`Filter chain halted as "${filter}" rendered or redirected`);
+  }
+
+  redirectTo(event: Event): void {
+    const { location } = event.payload as { location: string };
+    this._logger?.info(`Redirected to ${location}`);
+  }
+
+  unpermittedParameters(event: Event): void {
+    const { keys, context } = event.payload as {
+      keys: string[];
+      context?: Record<string, string>;
+    };
+    const displayKeys = keys.map((k) => `:${k}`).join(", ");
+    const contextStr = context
+      ? `. Context: { ${Object.entries(context)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ")} }`
+      : "";
+    this._logger?.debug?.(
+      `Unpermitted parameter${keys.length > 1 ? "s" : ""}: ${displayKeys}${contextStr}`,
+    );
+  }
+
+  get logger(): { info(msg: string): void; debug?(msg: string): void } | null {
+    return this._logger;
+  }
 }

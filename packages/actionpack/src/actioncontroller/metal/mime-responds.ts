@@ -14,7 +14,31 @@ import {
 import { UnknownFormat } from "./exceptions.js";
 export { type FormatHandler };
 
-export class Collector extends DispatchCollector {}
+export class Collector extends DispatchCollector {
+  private _anyResponse = false;
+
+  get format(): string | null {
+    return this.resolvedFormat;
+  }
+
+  override any(handler?: FormatHandler): this {
+    this._anyResponse = true;
+    return super.any(handler);
+  }
+
+  custom(mimeType: string, handler?: FormatHandler): this {
+    return this.on(mimeType, handler);
+  }
+
+  isAnyResponse(): boolean {
+    return this._anyResponse;
+  }
+
+  negotiateFormat(request: { accept?: string; format?: string }): string | null {
+    const result = this.negotiate({ accept: request.accept, format: request.format });
+    return result?.format ?? null;
+  }
+}
 
 export function respondTo(
   block: (collector: Collector) => void,
