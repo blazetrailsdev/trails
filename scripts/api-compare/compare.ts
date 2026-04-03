@@ -671,11 +671,8 @@ function printReport(
         );
 
         if (showMissing) {
-          for (const m of f.missingMethods.slice(0, 10)) {
+          for (const m of f.missingMethods) {
             console.log(`      - ${m.rubyName} → ${m.tsName}`);
-          }
-          if (f.missingMethods.length > 10) {
-            console.log(`      ... and ${f.missingMethods.length - 10} more`);
           }
         }
       }
