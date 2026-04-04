@@ -58,3 +58,10 @@ export function hasSecureToken(
     configurable: true,
   });
 }
+
+/**
+ * Mirrors: ActiveRecord::SecureToken::ClassMethods#generate_unique_secure_token
+ */
+export function generateUniqueSecureToken(length: number = 24): string {
+  return generateToken(length);
+}

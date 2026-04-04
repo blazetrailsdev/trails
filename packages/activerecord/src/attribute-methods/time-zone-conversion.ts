@@ -21,4 +21,10 @@ export class TimeZoneConverter {
   cast(value: unknown): unknown {
     return this.subtype.cast(value);
   }
+
+  deserialize(value: unknown): unknown {
+    return (this.subtype as any).deserialize
+      ? (this.subtype as any).deserialize(value)
+      : this.subtype.cast(value);
+  }
 }

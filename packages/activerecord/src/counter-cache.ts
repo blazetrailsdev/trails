@@ -156,3 +156,42 @@ function buildTouchClause(touch?: boolean | string | string[]): string {
   if (cols.length === 0) return "";
   return cols.map((c) => `, ${quoteIdentifier(c)} = CURRENT_TIMESTAMP`).join("");
 }
+
+/**
+ * Mirrors: ActiveRecord::CounterCache::ClassMethods#counter_cache_column?
+ */
+/**
+ * Rails: _counter_cache_columns.include?(name)
+ * Checks associations for belongs_to with counter_cache.
+ */
+export function isCounterCacheColumn(modelClass: typeof Base, columnName: string): boolean {
+  const counterCols = getCounterCacheColumns(modelClass);
+  return counterCols.has(columnName);
+}
+
+/**
+ * Rails: populates _counter_cache_columns from belongs_to reflections
+ * that have counter_cache enabled.
+ */
+export function loadSchemaBang(modelClass: typeof Base): void {
+  // Force population of counter cache columns set
+  getCounterCacheColumns(modelClass);
+}
+
+function getCounterCacheColumns(modelClass: typeof Base): Set<string> {
+  const cached = (modelClass as any)._counterCacheColumns;
+  if (cached) return cached;
+  const cols = new Set<string>();
+  const associations: any[] = (modelClass as any)._associations ?? [];
+  for (const assoc of associations) {
+    if (assoc.type === "belongsTo" && assoc.options?.counterCache) {
+      const col =
+        typeof assoc.options.counterCache === "string"
+          ? assoc.options.counterCache
+          : `${assoc.name}_count`;
+      cols.add(col);
+    }
+  }
+  (modelClass as any)._counterCacheColumns = cols;
+  return cols;
+}

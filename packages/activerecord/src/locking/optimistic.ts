@@ -70,3 +70,64 @@ function toInt(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
+
+// ---------------------------------------------------------------------------
+// Class methods — mirrors ActiveRecord::Locking::Optimistic::ClassMethods
+// ---------------------------------------------------------------------------
+
+const DEFAULT_LOCKING_COLUMN = "lock_version";
+
+interface LockingHost {
+  _lockingColumn: string;
+  lockOptimistically?: boolean;
+  updateCounters?(id: unknown, counters: Record<string, number>): Promise<number>;
+}
+
+/**
+ * Mirrors: ActiveRecord::Locking::Optimistic#increment!
+ */
+export async function incrementBang(
+  this: {
+    increment(attr: string, by?: number): any;
+    updateColumn(attr: string, value: unknown): Promise<any>;
+    readAttribute(attr: string): unknown;
+  },
+  attribute: string,
+  by: number = 1,
+): Promise<any> {
+  this.increment(attribute, by);
+  await this.updateColumn(attribute, this.readAttribute(attribute));
+  return this;
+}
+
+/**
+ * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#reset_locking_column
+ */
+export function resetLockingColumn(this: LockingHost): void {
+  this._lockingColumn = DEFAULT_LOCKING_COLUMN;
+}
+
+/**
+ * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#update_counters
+ * Adds locking_column increment when optimistic locking is enabled.
+ */
+export async function updateCounters(
+  this: LockingHost & { all?(): any; primaryKey?: string },
+  id: unknown,
+  counters: Record<string, number>,
+): Promise<number> {
+  if (lockingEnabled(this as any) && this._lockingColumn) {
+    counters = {
+      ...counters,
+      [this._lockingColumn]: (counters[this._lockingColumn] ?? 0) + 1,
+    };
+  }
+  // Rails calls super → CounterCache.update_counters → Relation#update_counters
+  const rel = this.all?.();
+  if (!rel?.where) return 0;
+  const scoped = rel.where({ [this.primaryKey ?? "id"]: id });
+  if (typeof scoped.updateCounters === "function") {
+    return scoped.updateCounters(counters);
+  }
+  return 0;
+}

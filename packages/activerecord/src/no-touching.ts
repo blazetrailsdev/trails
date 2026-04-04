@@ -49,3 +49,43 @@ export function isAppliedTo(modelClass: Function): boolean {
 export function isNoTouching(): boolean {
   return _noTouchingDepth.size > 0;
 }
+
+/**
+ * Mirrors: ActiveRecord::NoTouching#touch_later
+ */
+export async function touchLater(
+  this: { noTouching?(): boolean; touch(...args: any[]): Promise<any> },
+  ...args: any[]
+): Promise<any> {
+  if (this.noTouching?.()) return;
+  return this.touch(...args);
+}
+
+/**
+ * Mirrors: ActiveRecord::NoTouching.apply_to
+ */
+export function applyTo<R>(klass: any, fn: () => R | Promise<R>): R | Promise<R> {
+  const prev = _noTouchingDepth.get(klass) ?? 0;
+  _noTouchingDepth.set(klass, prev + 1);
+
+  const cleanup = () => {
+    const current = _noTouchingDepth.get(klass) ?? 1;
+    if (current <= 1) {
+      _noTouchingDepth.delete(klass);
+    } else {
+      _noTouchingDepth.set(klass, current - 1);
+    }
+  };
+
+  try {
+    const result = fn();
+    if (result && typeof (result as any).then === "function") {
+      return Promise.resolve(result).finally(cleanup) as Promise<R>;
+    }
+    cleanup();
+    return result;
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+}

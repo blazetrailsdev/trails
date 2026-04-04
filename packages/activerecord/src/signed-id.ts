@@ -66,9 +66,7 @@ export function setSignedIdVerifier(modelClass: typeof Base, verifier: MessageVe
 }
 
 function combinePurposes(modelClass: typeof Base, purpose?: string): string | undefined {
-  const parts = [underscore(modelClass.name)];
-  if (purpose) parts.push(purpose);
-  const combined = parts.filter(Boolean).join("/");
+  const combined = combineSignedIdPurposes(modelClass, purpose);
   return combined || undefined;
 }
 
@@ -137,4 +135,15 @@ export async function findSignedBang(
     purpose: combinePurposes(modelClass, options?.purpose),
   });
   return modelClass.find(id);
+}
+
+/**
+ * Mirrors: ActiveRecord::SignedId::ClassMethods#combine_signed_id_purposes
+ */
+export function combineSignedIdPurposes(modelClass: typeof Base, purpose?: string): string {
+  // Rails: base_class.name.underscore
+  const base = (modelClass as any).baseClass ?? modelClass;
+  const parts = [underscore(base.name)];
+  if (purpose) parts.push(String(purpose));
+  return parts.filter(Boolean).join("/");
 }

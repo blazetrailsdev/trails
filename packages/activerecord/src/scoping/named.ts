@@ -32,3 +32,40 @@ export class Named {
     });
   }
 }
+
+interface NamedHost {
+  currentScope?: any;
+  _defaultScope?: (rel: any) => any;
+  all?(): any;
+  relation?(): any;
+}
+
+/**
+ * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#scope_for_association
+ */
+export function scopeForAssociation(this: NamedHost, scope?: any): any {
+  const rel = scope ?? this.relation?.() ?? this.all?.();
+  if (this.currentScope && !this.currentScope.isEmptyScope) {
+    return defaultScoped.call(this, rel);
+  }
+  return rel;
+}
+
+/**
+ * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#default_scoped
+ */
+export function defaultScoped(this: NamedHost, scope?: any): any {
+  const rel = scope ?? this.relation?.() ?? this.all?.();
+  if (this._defaultScope) {
+    return this._defaultScope(rel);
+  }
+  return rel;
+}
+
+/**
+ * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#default_extensions
+ */
+export function defaultExtensions(this: NamedHost): any[] {
+  const scope = scopeForAssociation.call(this) ?? defaultScoped.call(this);
+  return scope?.extensions ?? [];
+}

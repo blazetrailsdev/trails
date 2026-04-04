@@ -26,12 +26,28 @@ export class Default {
  */
 export class DefaultScope {
   readonly modelClass: any;
+  readonly allQueries: boolean;
 
-  constructor(modelClass: any) {
+  constructor(modelClass: any, allQueries = false) {
     this.modelClass = modelClass;
+    this.allQueries = allQueries;
   }
 
   get scope(): ((rel: any) => any) | null {
     return this.modelClass._defaultScope ?? null;
   }
+}
+
+/**
+ * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#default_scopes?
+ */
+export function isDefaultScopes(
+  this: { defaultScopes?: DefaultScope[] },
+  options?: { allQueries?: boolean },
+): boolean {
+  const scopes = this.defaultScopes ?? [];
+  if (options?.allQueries) {
+    return scopes.some((s) => s.allQueries);
+  }
+  return scopes.length > 0;
 }

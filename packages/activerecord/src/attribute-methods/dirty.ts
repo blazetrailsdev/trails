@@ -121,3 +121,15 @@ export function changesToSave(record: DirtyRecord): Record<string, [unknown, unk
 export function changedAttributeNamesToSave(record: DirtyRecord): string[] {
   return Object.keys(record.changes);
 }
+
+/**
+ * Returns a hash of attributes that will be written to the database if saved.
+ * Mirrors: ActiveRecord::AttributeMethods::Dirty#attributes_in_database
+ */
+export function attributesInDatabase(record: DirtyRecord): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, [_old, newVal]] of Object.entries(record.changes)) {
+    result[key] = newVal;
+  }
+  return result;
+}
