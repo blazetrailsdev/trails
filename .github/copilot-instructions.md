@@ -43,6 +43,7 @@ ActiveRecord's power comes from Arel. When building queries, subqueries, or SQL 
 - Use `vi.spyOn` and `vi.restoreAllMocks()` for mocking instead of manual save/restore patterns.
 - Notification tests should clean up subscribers with `afterEach(() => Notifications.unsubscribeAll())`.
 - Use fixed dates in tests instead of `new Date()` to avoid time-dependent flakiness.
+- Be suspiscious of all Regexs - make sure that is how rails solves the problem as well.
 
 ## Measuring progress
 
