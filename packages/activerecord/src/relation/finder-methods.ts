@@ -361,3 +361,18 @@ export async function performCreateOrFindByBang(
     throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
   }
 }
+
+export function raiseRecordNotFoundExceptionBang(
+  this: FinderRelation,
+  message?: string,
+  modelName?: string,
+  primaryKey?: string,
+  id?: unknown,
+): never {
+  throw new RecordNotFound(
+    message ?? `Couldn't find ${this._modelClass.name}`,
+    modelName ?? this._modelClass.name,
+    primaryKey ?? String(this._modelClass.primaryKey),
+    id,
+  );
+}

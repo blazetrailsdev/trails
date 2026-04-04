@@ -9,9 +9,11 @@
 
 export class FromClause {
   readonly value: string | null;
+  readonly name: string | null;
 
-  constructor(value: string | null = null) {
+  constructor(value: string | null = null, name: string | null = null) {
     this.value = value;
+    this.name = name;
   }
 
   static empty(): FromClause {
@@ -28,7 +30,7 @@ export class FromClause {
   }
 
   equals(other: FromClause): boolean {
-    return this.value === other.value;
+    return this.value === other.value && this.name === other.name;
   }
 }
 

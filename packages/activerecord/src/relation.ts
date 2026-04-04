@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
-import { RecordNotFound, IrreversibleOrderError } from "./errors.js";
+import { RecordNotFound } from "./errors.js";
 import { modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
@@ -22,12 +22,18 @@ import {
 
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
 export { Range };
-import { WhereChain } from "./relation/query-methods.js";
+import { WhereChain, QueryMethodBangs } from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
-import { performSpawn, performMerge } from "./relation/spawn-methods.js";
+import {
+  performSpawn,
+  performMerge,
+  mergeBang as performMergeBang,
+} from "./relation/spawn-methods.js";
 import { wrapWithScopeProxy } from "./relation/delegation.js";
 import { InsertAll } from "./insert-all.js";
+import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
+import { include, type Included } from "@blazetrails/activesupport";
 import {
   performCount,
   performSum,
@@ -64,6 +70,7 @@ import {
   performThirdToLastBang,
   performFindOrCreateByBang,
   performCreateOrFindByBang,
+  raiseRecordNotFoundExceptionBang,
 } from "./relation/finder-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { WhereClause } from "./relation/where-clause.js";
@@ -108,6 +115,8 @@ export class Relation<T extends Base> {
   private _createWithAttrs: Record<string, unknown> = {};
   private _extending: Array<Record<string, Function>> = [];
   private _ctes: Array<{ name: string; sql: string; recursive: boolean }> = [];
+  private _skipPreloading = false;
+  private _skipQueryCache = false;
   private _loaded = false;
   private _records: T[] = [];
 
@@ -431,9 +440,8 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#or
    */
   or(other: Relation<T>): Relation<T> {
-    const rel = this._clone();
-    rel._orRelations = [...rel._orRelations, other];
-    return rel;
+    if (this._isNone) return other._clone();
+    return this._clone().orBang(other);
   }
 
   /**
@@ -443,9 +451,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#and
    */
   and(other: Relation<T>): Relation<T> {
-    const rel = this._clone();
-    rel._whereClause = rel._whereClause.merge(other._whereClause);
-    return rel;
+    return this._clone().andBang(other);
   }
 
   /**
@@ -496,7 +502,7 @@ export class Relation<T extends Base> {
   excluding(...records: T[]): Relation<T> {
     const ids = records.map((r) => r.id).filter((id) => id != null);
     if (ids.length === 0) return this;
-    return this.whereNot({ [this._modelClass.primaryKey as string]: ids });
+    return this._clone().excludingBang(ids);
   }
 
   /**
@@ -514,27 +520,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#order
    */
   order(...args: Array<string | Record<string, "asc" | "desc">>): Relation<T> {
-    const rel = this._clone();
-    let i = 0;
-    while (i < args.length) {
-      const arg = args[i];
-      if (typeof arg === "string") {
-        // Check if the next arg is a bare direction: order("title", "asc")
-        const next = args[i + 1];
-        if (typeof next === "string" && /^(asc|desc)$/i.test(next)) {
-          rel._orderClauses.push([arg, next.toLowerCase() as "asc" | "desc"]);
-          i += 2;
-          continue;
-        }
-        rel._orderClauses.push(arg);
-      } else {
-        for (const [col, dir] of Object.entries(arg)) {
-          rel._orderClauses.push([col, dir]);
-        }
-      }
-      i++;
-    }
-    return rel;
+    return this._clone().orderBang(...args);
   }
 
   /**
@@ -543,18 +529,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#limit
    */
   limit(value: number | null): Relation<T> {
-    if (value == null) {
-      const rel = this._clone();
-      rel._limitValue = null;
-      return rel;
-    }
-    const num = Number(value);
-    if (!Number.isSafeInteger(num) || num < 0) {
-      throw new Error(`Invalid limit value: ${String(value)}`);
-    }
-    const rel = this._clone();
-    rel._limitValue = num;
-    return rel;
+    return this._clone().limitBang(value);
   }
 
   /**
@@ -563,9 +538,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#offset
    */
   offset(value: number): Relation<T> {
-    const rel = this._clone();
-    rel._offsetValue = value;
-    return rel;
+    return this._clone().offsetBang(value);
   }
 
   /**
@@ -584,9 +557,8 @@ export class Relation<T extends Base> {
     if (args.length === 1 && typeof args[0] === "function") {
       return this.toArray().then((records) => records.filter(args[0]));
     }
-    const rel = this._clone();
-    rel._selectColumns = args.map((a: any) => (a instanceof Nodes.SqlLiteral ? a : String(a)));
-    return rel;
+    const columns = args.map((a: any) => (a instanceof Nodes.SqlLiteral ? a : String(a)));
+    return this._clone().reselectBang(...columns);
   }
 
   /**
@@ -595,9 +567,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reselect
    */
   reselect(...columns: (string | Nodes.SqlLiteral)[]): Relation<T> {
-    const rel = this._clone();
-    rel._selectColumns = columns.map((c) => (c instanceof Nodes.SqlLiteral ? c : String(c)));
-    return rel;
+    return this._clone().reselectBang(...columns);
   }
 
   /**
@@ -606,9 +576,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#distinct
    */
   distinct(): Relation<T> {
-    const rel = this._clone();
-    rel._isDistinct = true;
-    return rel;
+    return this._clone().distinctBang();
   }
 
   /**
@@ -629,35 +597,16 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#group
    */
   group(...columns: string[]): Relation<T> {
-    const rel = this._clone();
-    rel._groupColumns.push(...columns);
-    return rel;
+    return this._clone().groupBang(...columns);
   }
 
   /**
    * Add HAVING clause. Accepts raw SQL string or hash form.
    *
    * Mirrors: ActiveRecord::Relation#having
-   *
-   * Examples:
-   *   having("COUNT(*) > 5")
-   *   having({ count: 5 }) // having COUNT(*) = 5
    */
   having(condition: string | Record<string, unknown>): Relation<T> {
-    const rel = this._clone();
-    if (typeof condition === "string") {
-      rel._havingClauses.push(condition);
-    } else {
-      // Hash form: convert to SQL conditions
-      for (const [key, value] of Object.entries(condition)) {
-        if (typeof value === "number") {
-          rel._havingClauses.push(`${key} = ${value}`);
-        } else {
-          rel._havingClauses.push(`${key} = '${String(value).replace(/'/g, "''")}'`);
-        }
-      }
-    }
-    return rel;
+    return this._clone().havingBang(condition);
   }
 
   /**
@@ -666,9 +615,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#regroup
    */
   regroup(...columns: string[]): Relation<T> {
-    const rel = this._clone();
-    rel._groupColumns = [...columns];
-    return rel;
+    return this._clone().regroupBang(...columns);
   }
 
   /**
@@ -677,18 +624,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reorder
    */
   reorder(...args: Array<string | Record<string, "asc" | "desc">>): Relation<T> {
-    const rel = this._clone();
-    rel._orderClauses = [];
-    for (const arg of args) {
-      if (typeof arg === "string") {
-        rel._orderClauses.push(arg);
-      } else {
-        for (const [col, dir] of Object.entries(arg)) {
-          rel._orderClauses.push([col, dir]);
-        }
-      }
-    }
-    return rel;
+    return this._clone().reorderBang(...args);
   }
 
   /**
@@ -697,28 +633,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reverse_order
    */
   reverseOrder(): Relation<T> {
-    const rel = this._clone();
-    rel._orderClauses = rel._orderClauses.map((clause) => {
-      if (typeof clause === "string") {
-        // Parse "column ASC/DESC" before reversing
-        const match = clause.match(/^([\w.]+)\s+(ASC|DESC)$/i);
-        if (match) {
-          const col = match[1];
-          const dir = match[2].toUpperCase() === "ASC" ? "desc" : "asc";
-          return [col, dir] as [string, "asc" | "desc"];
-        }
-        // Complex expressions (functions, CASE, subqueries) can't be reversed
-        if (/[(),]/.test(clause) || /\bCASE\b/i.test(clause)) {
-          throw new IrreversibleOrderError(
-            `Relation has a non-reversible order and cannot be reversed: ${clause}`,
-          );
-        }
-        return [clause, "desc" as const];
-      }
-      const [col, dir] = clause;
-      return [col, dir === "asc" ? "desc" : "asc"] as [string, "asc" | "desc"];
-    });
-    return rel;
+    return this._clone().reverseOrderBang();
   }
 
   /**
@@ -755,9 +670,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#invert_where
    */
   invertWhere(): Relation<T> {
-    const rel = this._clone();
-    rel._whereClause = rel._whereClause.invert();
-    return rel;
+    return this._clone().invertWhereBang();
   }
 
   /**
@@ -811,9 +724,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#none
    */
   none(): Relation<T> {
-    const rel = this._clone();
-    rel._isNone = true;
-    return rel;
+    return this._clone().noneBang();
   }
 
   /**
@@ -822,9 +733,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#lock
    */
   lock(clause: string | boolean = true): Relation<T> {
-    const rel = this._clone();
-    rel._lockValue = clause === true ? "FOR UPDATE" : clause === false ? null : clause;
-    return rel;
+    return this._clone().lockBang(clause);
   }
 
   /**
@@ -833,9 +742,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#readonly
    */
   readonly(value = true): Relation<T> {
-    const rel = this._clone();
-    rel._isReadonly = value;
-    return rel;
+    return this._clone().readonlyBang(value);
   }
 
   /**
@@ -862,9 +769,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#strict_loading
    */
   strictLoading(value = true): Relation<T> {
-    const rel = this._clone();
-    rel._isStrictLoading = value;
-    return rel;
+    return this._clone().strictLoadingBang(value);
   }
 
   /**
@@ -873,9 +778,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#annotate
    */
   annotate(...comments: string[]): Relation<T> {
-    const rel = this._clone();
-    rel._annotations.push(...comments);
-    return rel;
+    return this._clone().annotateBang(...comments);
   }
 
   /**
@@ -884,9 +787,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#optimizer_hints
    */
   optimizerHints(...hints: string[]): Relation<T> {
-    const rel = this._clone();
-    rel._optimizerHints.push(...hints);
-    return rel;
+    return this._clone().optimizerHintsBang(...hints);
   }
 
   // merge and spawn are mixed in from spawn-methods.ts
@@ -896,10 +797,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#from
    */
-  from(source: string): Relation<T> {
-    const rel = this._clone();
-    rel._fromClause = new FromClause(source);
-    return rel;
+  from(source: string, subqueryName?: string): Relation<T> {
+    return this._clone().fromBang(source, subqueryName);
   }
 
   /**
@@ -908,9 +807,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#create_with
    */
   createWith(attrs: Record<string, unknown>): Relation<T> {
-    const rel = this._clone();
-    rel._createWithAttrs = { ...rel._createWithAttrs, ...attrs };
-    return rel;
+    return this._clone().createWithBang(attrs);
   }
 
   /**
@@ -933,45 +830,7 @@ export class Relation<T extends Base> {
       | "from"
     >
   ): Relation<T> {
-    const rel = this._clone();
-    for (const type of types) {
-      switch (type) {
-        case "where":
-          rel._whereClause = WhereClause.empty();
-          break;
-        case "order":
-          rel._orderClauses = [];
-          break;
-        case "limit":
-          rel._limitValue = null;
-          break;
-        case "offset":
-          rel._offsetValue = null;
-          break;
-        case "group":
-          rel._groupColumns = [];
-          break;
-        case "having":
-          rel._havingClauses = [];
-          break;
-        case "select":
-          rel._selectColumns = null;
-          break;
-        case "distinct":
-          rel._isDistinct = false;
-          break;
-        case "lock":
-          rel._lockValue = null;
-          break;
-        case "readonly":
-          rel._isReadonly = false;
-          break;
-        case "from":
-          rel._fromClause = FromClause.empty();
-          break;
-      }
-    }
-    return rel;
+    return this._clone().unscopeBang(...types);
   }
 
   /**
@@ -1031,16 +890,7 @@ export class Relation<T extends Base> {
    */
   extending(mod?: Record<string, Function> | ((rel: Relation<T>) => void)): Relation<T> {
     if (!mod) return this._clone();
-    const rel = this._clone();
-    if (typeof mod === "function") {
-      mod(rel);
-    } else {
-      rel._extending.push(mod);
-      for (const [name, fn] of Object.entries(mod)) {
-        (rel as any)[name] = fn.bind(rel);
-      }
-    }
-    return rel;
+    return this._clone().extendingBang(mod);
   }
 
   /**
@@ -1379,9 +1229,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#includes
    */
   includes(...associations: string[]): Relation<T> {
-    const rel = this._clone();
-    rel._includesAssociations.push(...associations);
-    return rel;
+    return this._clone().includesBang(...associations);
   }
 
   /**
@@ -1390,9 +1238,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#preload
    */
   preload(...associations: string[]): Relation<T> {
-    const rel = this._clone();
-    rel._preloadAssociations.push(...associations);
-    return rel;
+    return this._clone().preloadBang(...associations);
   }
 
   /**
@@ -1401,9 +1247,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#eager_load
    */
   eagerLoad(...associations: string[]): Relation<T> {
-    const rel = this._clone();
-    rel._eagerLoadAssociations.push(...associations);
-    return rel;
+    return this._clone().eagerLoadBang(...associations);
   }
 
   // -- Relation state --
@@ -3433,15 +3277,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#with
    */
-  with(..._ctes: Array<Record<string, Relation<any> | string>>): Relation<T> {
-    const rel = this._clone();
-    for (const cte of _ctes) {
-      for (const [name, query] of Object.entries(cte)) {
-        const sql = typeof query === "string" ? query : query.toSql();
-        rel._ctes.push({ name, sql, recursive: false });
-      }
-    }
-    return rel;
+  with(...ctes: Array<Record<string, Relation<any> | string>>): Relation<T> {
+    return this._clone().withBang(...ctes);
   }
 
   /**
@@ -3450,14 +3287,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#with_recursive
    */
   withRecursive(...ctes: Array<Record<string, Relation<any> | string>>): Relation<T> {
-    const rel = this._clone();
-    for (const cte of ctes) {
-      for (const [name, query] of Object.entries(cte)) {
-        const sql = typeof query === "string" ? query : query.toSql();
-        rel._ctes.push({ name, sql, recursive: true });
-      }
-    }
-    return rel;
+    return this._clone().withRecursiveBang(...ctes);
   }
 
   // -- Other query methods --
@@ -3467,10 +3297,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#references
    */
-  references(..._tables: string[]): Relation<T> {
-    // In our implementation, references is a hint for the query planner.
-    // We store them but they don't affect SQL generation directly.
-    return this._clone();
+  references(...tables: string[]): Relation<T> {
+    return this._clone().referencesBang(...tables);
   }
 
   /**
@@ -3733,6 +3561,162 @@ export class Relation<T extends Base> {
     return records.some((r) => r.isEqual(record));
   }
 
+  // ---------------------------------------------------------------------------
+  // Missing relation.rb methods — accessors, cache keys, scoping
+  // ---------------------------------------------------------------------------
+
+  private _predicateBuilder: PredicateBuilder | null = null;
+
+  get predicateBuilder(): PredicateBuilder {
+    if (!this._predicateBuilder) {
+      this._predicateBuilder = new PredicateBuilder(this._modelClass.arelTable);
+    }
+    return this._predicateBuilder;
+  }
+
+  get skipPreloadingValue(): boolean {
+    return this._skipPreloading;
+  }
+
+  get isScheduled(): boolean {
+    return false;
+  }
+
+  get isEagerLoading(): boolean {
+    return (
+      this._eagerLoadAssociations.length > 0 ||
+      (this._includesAssociations.length > 0 && this._joinClauses.length > 0)
+    );
+  }
+
+  get joinedIncludesValues(): string[] {
+    if (this._joinClauses.length === 0) return [];
+    return this._includesAssociations.filter((assoc) =>
+      this._joinClauses.some((j) => j.table === assoc),
+    );
+  }
+
+  values(): Record<string, unknown> {
+    return {
+      includes: [...this._includesAssociations],
+      eagerLoad: [...this._eagerLoadAssociations],
+      preload: [...this._preloadAssociations],
+      select: this._selectColumns ? [...this._selectColumns] : null,
+      group: [...this._groupColumns],
+      order: [...this._orderClauses],
+      joins: [...this._joinClauses],
+      where: this._whereClause.clone(),
+      having: [...this._havingClauses],
+      limit: this._limitValue,
+      offset: this._offsetValue,
+      lock: this._lockValue,
+      readonly: this._isReadonly,
+      distinct: this._isDistinct,
+      strictLoading: this._isStrictLoading,
+      from: this._fromClause,
+      annotations: [...this._annotations],
+      optimizerHints: [...this._optimizerHints],
+      extending: [...this._extending],
+      with: [...this._ctes],
+      createWith: { ...this._createWithAttrs },
+    };
+  }
+
+  valuesForQueries(): Record<string, unknown> {
+    return this.values();
+  }
+
+  get isEmptyScope(): boolean {
+    return (
+      this._whereClause.isEmpty() &&
+      this._orderClauses.length === 0 &&
+      this._limitValue === null &&
+      this._offsetValue === null &&
+      this._selectColumns === null &&
+      !this._isDistinct &&
+      this._groupColumns.length === 0 &&
+      this._havingClauses.length === 0 &&
+      this._joinClauses.length === 0 &&
+      this._rawJoins.length === 0 &&
+      this._includesAssociations.length === 0 &&
+      this._eagerLoadAssociations.length === 0 &&
+      this._preloadAssociations.length === 0 &&
+      this._lockValue === null &&
+      this._fromClause.isEmpty() &&
+      this._ctes.length === 0 &&
+      this._annotations.length === 0 &&
+      this._optimizerHints.length === 0
+    );
+  }
+
+  get hasLimitOrOffset(): boolean {
+    return this._limitValue !== null || this._offsetValue !== null;
+  }
+
+  aliasTracker(): Record<string, number> {
+    const tracker: Record<string, number> = {};
+    for (const join of this._joinClauses) {
+      tracker[join.table] = (tracker[join.table] ?? 0) + 1;
+    }
+    return tracker;
+  }
+
+  preloadAssociations(): string[] {
+    return [...this._preloadAssociations, ...this._includesAssociations];
+  }
+
+  bindAttribute(column: string, value: unknown): unknown {
+    return this.predicateBuilder.build(this._modelClass.arelTable.get(column), value);
+  }
+
+  async scoping<R>(callback: () => R | Promise<R>): Promise<R> {
+    const modelClass = this._modelClass as any;
+    const prev = ScopeRegistry.currentScope(modelClass);
+    ScopeRegistry.setCurrentScope(modelClass, this as any);
+    try {
+      return await callback();
+    } finally {
+      ScopeRegistry.setCurrentScope(modelClass, prev);
+    }
+  }
+
+  cacheKey(): string {
+    return this.computeCacheKey();
+  }
+
+  computeCacheKey(): string {
+    const tableName = this._modelClass.tableName;
+    const sql = this.toSql();
+    let hash = 0;
+    for (let i = 0; i < sql.length; i++) {
+      const ch = sql.charCodeAt(i);
+      hash = ((hash << 5) - hash + ch) | 0;
+    }
+    return `${tableName}/query-${(hash >>> 0).toString(36)}`;
+  }
+
+  async cacheVersion(): Promise<string> {
+    return this.computeCacheVersion();
+  }
+
+  async computeCacheVersion(): Promise<string> {
+    try {
+      const col = "updated_at";
+      const result = await (this as any).maximum(col);
+      if (result instanceof Date) return String(result.getTime());
+      if (result) return String(result);
+    } catch {
+      // Fall through if updated_at column doesn't exist
+    }
+    return "";
+  }
+
+  async cacheKeyWithVersion(): Promise<string> {
+    const key = this.cacheKey();
+    const version = await this.cacheVersion();
+    return version ? `${key}-${version}` : key;
+  }
+
   /** @internal */
   _clone(): Relation<T> {
     const rel = new Relation<T>(this._modelClass);
@@ -3763,6 +3747,8 @@ export class Relation<T extends Base> {
     rel._createWithAttrs = { ...this._createWithAttrs };
     rel._extending = [...this._extending];
     rel._ctes = [...this._ctes];
+    rel._skipPreloading = this._skipPreloading;
+    rel._skipQueryCache = this._skipQueryCache;
     return wrapWithScopeProxy(rel);
   }
 }
@@ -3783,7 +3769,6 @@ export interface Relation<T extends Base> extends CalculationMethods {
   ): Promise<T[] | TResult>;
   finally(onfinally?: (() => void) | null): Promise<T[]>;
   // Finder methods — typed with T to preserve generics through the interface merge.
-  // Implementations are in finder-methods.ts, wired via prototype assignment below.
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;
@@ -3825,7 +3810,21 @@ export interface Relation<T extends Base> extends CalculationMethods {
   // SpawnMethods
   spawn(): Relation<T>;
   merge<U extends Base>(other: Relation<U>): Relation<T>;
+  mergeBang(other: any): Relation<T>;
+  // FinderMethods
+  raiseRecordNotFoundExceptionBang(
+    message?: string,
+    modelName?: string,
+    primaryKey?: string,
+    id?: unknown,
+  ): never;
+  // QueryMethods bang variants (mixed in from query-methods.ts)
 }
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Relation<T extends Base> extends Included<typeof QueryMethodBangs> {}
+
+// Mix in modules — mirrors Rails' `include QueryMethods, FinderMethods, ...`
+include(Relation, QueryMethodBangs);
 
 const def = { writable: true, configurable: true, enumerable: false };
 Object.defineProperties(Relation.prototype, {
@@ -3866,6 +3865,8 @@ Object.defineProperties(Relation.prototype, {
   // SpawnMethods
   spawn: { ...def, value: performSpawn },
   merge: { ...def, value: performMerge },
+  mergeBang: { ...def, value: performMergeBang },
+  raiseRecordNotFoundExceptionBang: { ...def, value: raiseRecordNotFoundExceptionBang },
 });
 
 // Thenable: make Relation directly awaitable (delegates to toArray).

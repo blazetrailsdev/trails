@@ -6,11 +6,13 @@
  */
 export class Merger {
   readonly relation: any;
+  readonly values: Record<string, unknown>;
   readonly other: any;
 
   constructor(relation: any, other: any) {
     this.relation = relation;
     this.other = other;
+    this.values = typeof other.values === "function" ? other.values() : {};
   }
 
   merge(): any {

@@ -82,6 +82,11 @@ export class Model {
 - **Subclass-safe.** `this` resolves to the actual calling class at runtime
   (e.g., `User` not `Model`), just like Ruby's `self`.
 
+For **instance methods** mixed in bulk (like Rails' `include QueryMethods`),
+use `include()` and `Included<>` from `@blazetrails/activesupport`.
+See `activesupport/src/include.ts` for the API and
+`relation.ts` + `relation/query-methods.ts` for usage.
+
 ### When NOT to use this
 
 - **Ruby lifecycle hooks** (`extended`, `included`, `inherited`) have no TS

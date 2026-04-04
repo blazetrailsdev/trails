@@ -89,6 +89,10 @@ export class ArrayHandler {
     }
     return result as Nodes.Node;
   }
+
+  or(left: Nodes.Node, right: Nodes.Node): Nodes.Node {
+    return groupedOr(left, right);
+  }
 }
 
 function groupedOr(left: Nodes.Node, right: Nodes.Node): Nodes.Grouping {

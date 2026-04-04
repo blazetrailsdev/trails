@@ -15,19 +15,32 @@ interface BatchRelation {
   deleteAll(): Promise<number>;
   updateAll(updates: Record<string, unknown>): Promise<number>;
   destroyAll(): Promise<any[]>;
+  touchAll?(...names: string[]): Promise<number>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BatchEnumerator<T extends BatchRelation> {
   private _generator: () => AsyncGenerator<T>;
   readonly ofSize: number;
+  readonly start: unknown;
+  readonly finish: unknown;
+  readonly relation: any;
+  readonly batchSize: number;
 
-  constructor(generator: () => AsyncGenerator<T>, ofSize: number) {
+  constructor(
+    generator: () => AsyncGenerator<T>,
+    ofSize: number,
+    options?: { start?: unknown; finish?: unknown; relation?: any },
+  ) {
     if (!Number.isInteger(ofSize) || ofSize < 1) {
       throw new Error("Batch size must be a positive integer");
     }
     this._generator = generator;
     this.ofSize = ofSize;
+    this.batchSize = ofSize;
+    this.start = options?.start ?? null;
+    this.finish = options?.finish ?? null;
+    this.relation = options?.relation ?? null;
   }
 
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
@@ -94,6 +107,22 @@ export class BatchEnumerator<T extends BatchRelation> {
       destroyed.push(...records);
     }
     return destroyed;
+  }
+
+  async touchAll(...names: string[]): Promise<number> {
+    let total = 0;
+    for await (const batchRelation of this) {
+      if (typeof batchRelation.touchAll === "function") {
+        total += await batchRelation.touchAll(...names);
+      }
+    }
+    return total;
+  }
+
+  each(): AsyncGenerator<T>;
+  each(fn: (batch: T) => void | Promise<void>): Promise<void>;
+  each(fn?: (batch: T) => void | Promise<void>): AsyncGenerator<T> | Promise<void> {
+    return this.eachBatch(fn as any);
   }
 
   async toArray(): Promise<T[]> {

@@ -85,6 +85,47 @@ export class DelegateCache {
  * Constrained to `object` because Relation._modelClass is private;
  * internal access uses `any` casts.
  */
+const _delegatedClasses = new Set<Function>();
+const _uncacheableMethods = new Set<string>(["to_a", "to_ary", "records", "inspect"]);
+const _delegateCache = new DelegateCache();
+
+export function delegatedClasses(): Set<Function> {
+  return _delegatedClasses;
+}
+
+export function uncacheableMethods(): Set<string> {
+  return _uncacheableMethods;
+}
+
+export function delegateBaseMethods(klass: Function): void {
+  _delegatedClasses.add(klass);
+  _delegateCache.initialize(klass);
+}
+
+export function relationDelegateClass(klass: Function): Function {
+  _delegatedClasses.add(klass);
+  return klass;
+}
+
+export function initializeRelationDelegateCache(): void {
+  _delegateCache.initialize(Object);
+}
+
+export function generateRelationMethod(name: string, fn: Function): void {
+  const methods = new GeneratedRelationMethods();
+  methods.generate(name, fn);
+}
+
+export function generateMethod(name: string): Function {
+  return function (this: any, ...args: any[]) {
+    return this[name]?.(...args);
+  };
+}
+
+export function name(): string {
+  return "Delegation";
+}
+
 export function wrapWithScopeProxy<T extends object>(rel: T): T {
   return new Proxy(rel, {
     get(target: any, prop: string | symbol, receiver: any) {

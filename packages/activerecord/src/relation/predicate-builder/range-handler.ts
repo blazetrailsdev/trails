@@ -14,6 +14,8 @@ import type { Range } from "../../connection-adapters/postgresql/oid/range.js";
  *   where({ created_at: new Range(null, end) })     → created_at <= end
  */
 export class RangeHandler {
+  constructor() {}
+
   call(attribute: Nodes.Attribute, value: Range): Nodes.Node {
     const beginVal = value.begin;
     const endVal = value.end;

@@ -12,6 +12,8 @@ import { Nodes } from "@blazetrails/arel";
  *   where({ active: true })  → active = true
  */
 export class BasicObjectHandler {
+  constructor() {}
+
   call(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
     return attribute.eq(value);
   }

@@ -97,6 +97,41 @@ export class WhereClause {
     );
   }
 
+  or(other: WhereClause): WhereClause {
+    if (this.isEmpty()) return other.clone();
+    if (other.isEmpty()) return this.clone();
+
+    // Rails builds an Arel::Nodes::Or from the two sides' ASTs.
+    // We represent each side as its AST string, then combine with OR.
+    const left = this.ast;
+    const right = other.ast;
+    return new WhereClause([], [], [`(${left}) OR (${right})`]);
+  }
+
+  get ast(): string {
+    return clauseToAstString(this);
+  }
+
+  isContradiction(): boolean {
+    for (const cond of this.conditions) {
+      for (const value of Object.values(cond)) {
+        if (Array.isArray(value) && value.length === 0) return true;
+      }
+    }
+    return false;
+  }
+
+  extractAttributes(): string[] {
+    const attrs: string[] = [];
+    for (const cond of this.conditions) {
+      attrs.push(...Object.keys(cond));
+    }
+    for (const cond of this.notConditions) {
+      attrs.push(...Object.keys(cond));
+    }
+    return attrs;
+  }
+
   toH(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const cond of this.conditions) {
@@ -104,4 +139,23 @@ export class WhereClause {
     }
     return result;
   }
+}
+
+function clauseToAstString(clause: WhereClause): string {
+  const parts: string[] = [];
+  for (const cond of clause.conditions) {
+    for (const [k, v] of Object.entries(cond)) {
+      parts.push(`${k} = ${JSON.stringify(v)}`);
+    }
+  }
+  for (const cond of clause.notConditions) {
+    for (const [k, v] of Object.entries(cond)) {
+      parts.push(`${k} != ${JSON.stringify(v)}`);
+    }
+  }
+  parts.push(...clause.rawClauses);
+  for (const node of clause.arelNodes) {
+    parts.push(String(node));
+  }
+  return parts.length <= 1 ? (parts[0] ?? "") : parts.join(" AND ");
 }

@@ -1,7 +1,7 @@
 # ActiveRecord Relation: Road to 100%
 
-Current: **163/253 methods matched** across relation files (64%).
-6 files already at 100%. 13 files need work.
+Current: **253/253 methods matched** across relation files (100%).
+All 21 relation files at 100%.
 
 ## The problem: methods live in the wrong file
 

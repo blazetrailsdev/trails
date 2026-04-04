@@ -98,7 +98,20 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
         if (!isExported(node)) return;
         const name = node.name.text;
         const modKey = `${relPath}:${name}`;
-        info.modules[modKey] = extractInterface(node, relPath);
+        const extracted = extractInterface(node, checker, relPath);
+        const existing = info.modules[modKey];
+        if (existing) {
+          // Merge declaration-merged interfaces (same name, same file)
+          const existingNames = new Set(existing.instanceMethods.map((m) => m.name));
+          for (const m of extracted.instanceMethods) {
+            if (!existingNames.has(m.name)) existing.instanceMethods.push(m);
+          }
+          for (const e of extracted.extends) {
+            if (!existing.extends.includes(e)) existing.extends.push(e);
+          }
+        } else {
+          info.modules[modKey] = extracted;
+        }
         fileHasClassOrModule = true;
       } else if (ts.isModuleDeclaration(node) && node.name) {
         if (!isExported(node)) return;
@@ -403,7 +416,11 @@ function extractClass(
   };
 }
 
-function extractInterface(node: ts.InterfaceDeclaration, file: string): ClassInfo {
+function extractInterface(
+  node: ts.InterfaceDeclaration,
+  checker: ts.TypeChecker,
+  file: string,
+): ClassInfo {
   const name = node.name.text;
   const instanceMethods: MethodInfo[] = [];
   const extendsArr: string[] = [];
@@ -412,7 +429,31 @@ function extractInterface(node: ts.InterfaceDeclaration, file: string): ClassInf
     for (const clause of node.heritageClauses) {
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
         for (const type of clause.types) {
-          extendsArr.push(type.expression.getText());
+          const exprText = type.expression.getText();
+          extendsArr.push(exprText);
+
+          // Resolve mapped/generic types (e.g. Included<typeof X>) via
+          // the type checker so their computed properties appear as methods.
+          try {
+            const resolved = checker.getTypeAtLocation(type);
+            for (const prop of resolved.getProperties()) {
+              const propName = prop.getName();
+              if (propName.startsWith("_")) continue;
+              const propType = checker.getTypeOfSymbolAtLocation(prop, type);
+              const signatures = propType.getCallSignatures();
+              if (signatures.length > 0) {
+                instanceMethods.push({
+                  name: propName,
+                  visibility: "public",
+                  params: [],
+                  line: 0,
+                  file,
+                });
+              }
+            }
+          } catch {
+            // If type resolution fails, fall back to extends-based resolution
+          }
         }
       }
     }

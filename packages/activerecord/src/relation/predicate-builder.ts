@@ -25,6 +25,7 @@ export class PredicateBuilder {
   private basicObjectHandler: BasicObjectHandler;
   private relationHandler: RelationHandler;
   private associationMap: Map<string, AssociationMapping> = new Map();
+  private handlers: Array<[any, { call(attr: Nodes.Attribute, value: any): Nodes.Node }]> = [];
 
   constructor(table: Table) {
     this.table = table;
@@ -183,6 +184,11 @@ export class PredicateBuilder {
     if (value === null || value === undefined) {
       return attribute.isNull();
     }
+    for (const [klass, handler] of this.handlers) {
+      if (value instanceof klass) {
+        return handler.call(attribute, value);
+      }
+    }
     if (value instanceof Range) {
       return this.rangeHandler.call(attribute, value);
     }
@@ -201,6 +207,45 @@ export class PredicateBuilder {
 
   resolveColumn(key: string): Nodes.Attribute {
     return PredicateBuilder.resolveColumn(this.table, key);
+  }
+
+  registerHandler(
+    klass: any,
+    handler: { call(attr: Nodes.Attribute, value: any): Nodes.Node },
+  ): void {
+    this.handlers.push([klass, handler]);
+  }
+
+  buildBindAttribute(columnName: string, value: unknown): Nodes.Node {
+    const attr = this.resolveColumn(columnName);
+    return this.build(attr, value);
+  }
+
+  resolveArelAttribute(tableName: string, columnName: string): Nodes.Attribute {
+    return new Table(tableName).get(columnName);
+  }
+
+  with(context: any): PredicateBuilder {
+    const builder = new PredicateBuilder(this.table);
+    builder.setAssociationMap(this.associationMap);
+    builder.handlers = [...this.handlers];
+    (builder as any)._context = context;
+    return builder;
+  }
+
+  static references(conditions: Record<string, unknown>): string[] {
+    const refs: string[] = [];
+    for (const key of Object.keys(conditions)) {
+      const dot = key.indexOf(".");
+      if (dot !== -1) {
+        refs.push(key.slice(0, dot));
+      }
+    }
+    return refs;
+  }
+
+  references(): string[] {
+    return [];
   }
 
   static resolveColumn(table: Table, key: string): Nodes.Attribute {
