@@ -111,9 +111,19 @@ export function initializeRelationDelegateCache(): void {
   _delegateCache.initialize(Object);
 }
 
-export function generateRelationMethod(name: string, fn: Function): void {
-  const methods = new GeneratedRelationMethods();
-  methods.generate(name, fn);
+const _generatedMethodsByModel = new WeakMap<Function, GeneratedRelationMethods>();
+
+function generatedMethodsFor(modelClass: Function): GeneratedRelationMethods {
+  let methods = _generatedMethodsByModel.get(modelClass);
+  if (!methods) {
+    methods = new GeneratedRelationMethods();
+    _generatedMethodsByModel.set(modelClass, methods);
+  }
+  return methods;
+}
+
+export function generateRelationMethod(modelClass: Function, name: string, fn: Function): void {
+  generatedMethodsFor(modelClass).generate(name, fn);
 }
 
 export function generateMethod(name: string): Function {
@@ -135,6 +145,13 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       if (prop in target) return value;
 
       const modelClass = target._modelClass as typeof Base;
+
+      // Check generated relation methods scoped to this model (mirrors Rails' GeneratedRelationMethods)
+      const genMethods = _generatedMethodsByModel.get(modelClass as any);
+      if (genMethods?.has(prop as string)) {
+        const fn = genMethods.get(prop as string)!;
+        return (...args: any[]) => fn.apply(target, args);
+      }
       if (modelClass._scopes.has(prop as string)) {
         return (...args: any[]) => {
           const scopeFn = modelClass._scopes.get(prop as string)!;

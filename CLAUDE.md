@@ -99,6 +99,7 @@ See `activesupport/src/include.ts` for the API and
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 - Do NOT add "Co-Authored-By" lines to commit messages.
+- Do NOT add "Generated with Claude Code" lines to PR descriptions.
 - Tests live next to source files as `*.test.ts`.
 - Prefer small, focused modules over large files.
 - Do NOT use subagents unless explicitly requested. Do the work directly.

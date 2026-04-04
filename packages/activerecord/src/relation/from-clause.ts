@@ -8,10 +8,10 @@
  */
 
 export class FromClause {
-  readonly value: string | null;
+  readonly value: any;
   readonly name: string | null;
 
-  constructor(value: string | null = null, name: string | null = null) {
+  constructor(value: any = null, name: string | null = null) {
     this.value = value;
     this.name = name;
   }
@@ -21,7 +21,7 @@ export class FromClause {
   }
 
   isEmpty(): boolean {
-    return this.value === null;
+    return this.value == null;
   }
 
   merge(other: FromClause): FromClause {

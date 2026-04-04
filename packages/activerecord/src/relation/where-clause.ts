@@ -7,7 +7,8 @@
  * Mirrors: ActiveRecord::Relation::WhereClause
  */
 
-import type { Nodes } from "@blazetrails/arel";
+import { Visitors, type Nodes } from "@blazetrails/arel";
+import { quote, quoteTableName } from "../connection-adapters/abstract/quoting.js";
 
 export class WhereClause {
   conditions: Array<Record<string, unknown>>;
@@ -141,21 +142,59 @@ export class WhereClause {
   }
 }
 
+const visitor = new Visitors.ToSql();
+
 function clauseToAstString(clause: WhereClause): string {
   const parts: string[] = [];
   for (const cond of clause.conditions) {
     for (const [k, v] of Object.entries(cond)) {
-      parts.push(`${k} = ${JSON.stringify(v)}`);
+      const col = quoteTableName(k);
+      if (v === null || v === undefined) {
+        parts.push(`${col} IS NULL`);
+      } else if (Array.isArray(v)) {
+        const nonNull = v.filter((x) => x !== null && x !== undefined);
+        const hasNull = nonNull.length !== v.length;
+        if (nonNull.length === 0 && !hasNull) {
+          parts.push("1=0");
+        } else {
+          const sub: string[] = [];
+          if (nonNull.length > 0)
+            sub.push(`${col} IN (${nonNull.map((x) => quote(x)).join(", ")})`);
+          if (hasNull) sub.push(`${col} IS NULL`);
+          parts.push(sub.length === 1 ? sub[0] : `(${sub.join(" OR ")})`);
+        }
+      } else {
+        parts.push(`${col} = ${quote(v)}`);
+      }
     }
   }
   for (const cond of clause.notConditions) {
     for (const [k, v] of Object.entries(cond)) {
-      parts.push(`${k} != ${JSON.stringify(v)}`);
+      const col = quoteTableName(k);
+      if (v === null || v === undefined) {
+        parts.push(`${col} IS NOT NULL`);
+      } else if (Array.isArray(v)) {
+        const nonNull = v.filter((x) => x !== null && x !== undefined);
+        const hasNull = nonNull.length !== v.length;
+        if (nonNull.length === 0 && !hasNull) {
+          parts.push("1=1");
+        } else {
+          if (nonNull.length > 0)
+            parts.push(`${col} NOT IN (${nonNull.map((x) => quote(x)).join(", ")})`);
+          if (hasNull) parts.push(`${col} IS NOT NULL`);
+        }
+      } else {
+        parts.push(`${col} != ${quote(v)}`);
+      }
     }
   }
   parts.push(...clause.rawClauses);
   for (const node of clause.arelNodes) {
-    parts.push(String(node));
+    try {
+      parts.push(visitor.compile(node));
+    } catch {
+      parts.push(String(node));
+    }
   }
   return parts.length <= 1 ? (parts[0] ?? "") : parts.join(" AND ");
 }

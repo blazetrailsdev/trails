@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   Table,
   SelectManager,
@@ -797,7 +798,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#from
    */
-  from(source: string, subqueryName?: string): Relation<T> {
+  from(source: string | Relation<any>, subqueryName?: string): Relation<T> {
     return this._clone().fromBang(source, subqueryName);
   }
 
@@ -2444,7 +2445,19 @@ export class Relation<T extends Base> {
 
     // Replace FROM clause if from() was used
     if (!this._fromClause.isEmpty()) {
-      sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${this._fromClause.value}`);
+      const raw = this._fromClause.value;
+      const alias = this._fromClause.name;
+      let fromExpr: string;
+      if (raw instanceof Relation) {
+        const subSql = raw.toSql();
+        const name = alias ?? "subquery";
+        fromExpr = `(${subSql}) "${name.replace(/"/g, '""')}"`;
+      } else if (alias) {
+        fromExpr = `${raw} "${alias.replace(/"/g, '""')}"`;
+      } else {
+        fromExpr = raw;
+      }
+      sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${fromExpr}`);
     }
 
     // Append SQL comments from annotate()
@@ -3687,12 +3700,8 @@ export class Relation<T extends Base> {
   computeCacheKey(): string {
     const tableName = this._modelClass.tableName;
     const sql = this.toSql();
-    let hash = 0;
-    for (let i = 0; i < sql.length; i++) {
-      const ch = sql.charCodeAt(i);
-      hash = ((hash << 5) - hash + ch) | 0;
-    }
-    return `${tableName}/query-${(hash >>> 0).toString(36)}`;
+    const digest = createHash("md5").update(sql).digest("hex");
+    return `${tableName}/query-${digest}`;
   }
 
   async cacheVersion(): Promise<string> {
