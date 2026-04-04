@@ -235,6 +235,14 @@ export interface CalculationMethods {
  *
  * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
  */
+export const Calculations = {
+  count: performCount,
+  sum: performSum,
+  average: performAverage,
+  minimum: performMinimum,
+  maximum: performMaximum,
+} as const;
+
 export class ColumnAliasTracker {
   private _aliases: Map<string, number> = new Map();
 

@@ -25,54 +25,14 @@ import { Range } from "./connection-adapters/postgresql/oid/range.js";
 export { Range };
 import { WhereChain, QueryMethodBangs } from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
-import {
-  performSpawn,
-  performMerge,
-  mergeBang as performMergeBang,
-} from "./relation/spawn-methods.js";
 import { wrapWithScopeProxy } from "./relation/delegation.js";
 import { InsertAll } from "./insert-all.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
-import {
-  performCount,
-  performSum,
-  performAverage,
-  performMinimum,
-  performMaximum,
-  type CalculationMethods,
-} from "./relation/calculations.js";
-import {
-  performFind,
-  performFindBy,
-  performFindByBang,
-  performFindSoleBy,
-  performFirst,
-  performFirstBang,
-  performLast,
-  performLastBang,
-  performSole,
-  performTake,
-  performTakeBang,
-  performSecond,
-  performThird,
-  performFourth,
-  performFifth,
-  performFortyTwo,
-  performSecondToLast,
-  performThirdToLast,
-  performSecondBang,
-  performThirdBang,
-  performFourthBang,
-  performFifthBang,
-  performFortyTwoBang,
-  performSecondToLastBang,
-  performThirdToLastBang,
-  performFindOrCreateByBang,
-  performCreateOrFindByBang,
-  raiseRecordNotFoundExceptionBang,
-} from "./relation/finder-methods.js";
+import { Calculations } from "./relation/calculations.js";
+import { FinderMethods } from "./relation/finder-methods.js";
+import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { WhereClause } from "./relation/where-clause.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
@@ -3763,12 +3723,10 @@ export class Relation<T extends Base> {
 }
 
 // ---------------------------------------------------------------------------
-// Mixin: calculation methods via interface merge + prototype assignment.
-// The interface merge declares proper method signatures in .d.ts output.
-// The prototype assignment wires the implementations from calculations.ts.
+// Mixin: mirrors Rails' include QueryMethods, FinderMethods, Calculations, SpawnMethods
 // ---------------------------------------------------------------------------
 
-export interface Relation<T extends Base> extends CalculationMethods {
+export interface Relation<T extends Base> {
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
@@ -3777,7 +3735,14 @@ export interface Relation<T extends Base> extends CalculationMethods {
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
   ): Promise<T[] | TResult>;
   finally(onfinally?: (() => void) | null): Promise<T[]>;
-  // Finder methods — typed with T to preserve generics through the interface merge.
+}
+
+// QueryMethodBangs and Calculations don't involve T — Included<> works fine.
+// FinderMethods and SpawnMethods return T-typed values — explicit signatures needed.
+
+export interface Relation<T extends Base>
+  extends Included<typeof QueryMethodBangs>, Included<typeof Calculations> {}
+export interface Relation<T extends Base> {
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;
@@ -3816,67 +3781,21 @@ export interface Relation<T extends Base> extends CalculationMethods {
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T>;
-  // SpawnMethods
-  spawn(): Relation<T>;
-  merge<U extends Base>(other: Relation<U>): Relation<T>;
-  mergeBang(other: any): Relation<T>;
-  // FinderMethods
   raiseRecordNotFoundExceptionBang(
     message?: string,
     modelName?: string,
     primaryKey?: string,
     id?: unknown,
   ): never;
-  // QueryMethods bang variants (mixed in from query-methods.ts)
+  spawn(): Relation<T>;
+  merge<U extends Base>(other: Relation<U>): Relation<T>;
+  mergeBang(other: any): Relation<T>;
 }
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Relation<T extends Base> extends Included<typeof QueryMethodBangs> {}
 
-// Mix in modules — mirrors Rails' `include QueryMethods, FinderMethods, ...`
 include(Relation, QueryMethodBangs);
-
-const def = { writable: true, configurable: true, enumerable: false };
-Object.defineProperties(Relation.prototype, {
-  // Calculations
-  count: { ...def, value: performCount },
-  sum: { ...def, value: performSum },
-  average: { ...def, value: performAverage },
-  minimum: { ...def, value: performMinimum },
-  maximum: { ...def, value: performMaximum },
-  // Finders
-  find: { ...def, value: performFind },
-  findBy: { ...def, value: performFindBy },
-  findByBang: { ...def, value: performFindByBang },
-  findSoleBy: { ...def, value: performFindSoleBy },
-  first: { ...def, value: performFirst },
-  firstBang: { ...def, value: performFirstBang },
-  last: { ...def, value: performLast },
-  lastBang: { ...def, value: performLastBang },
-  sole: { ...def, value: performSole },
-  take: { ...def, value: performTake },
-  takeBang: { ...def, value: performTakeBang },
-  second: { ...def, value: performSecond },
-  third: { ...def, value: performThird },
-  fourth: { ...def, value: performFourth },
-  fifth: { ...def, value: performFifth },
-  fortyTwo: { ...def, value: performFortyTwo },
-  secondToLast: { ...def, value: performSecondToLast },
-  thirdToLast: { ...def, value: performThirdToLast },
-  secondBang: { ...def, value: performSecondBang },
-  thirdBang: { ...def, value: performThirdBang },
-  fourthBang: { ...def, value: performFourthBang },
-  fifthBang: { ...def, value: performFifthBang },
-  fortyTwoBang: { ...def, value: performFortyTwoBang },
-  secondToLastBang: { ...def, value: performSecondToLastBang },
-  thirdToLastBang: { ...def, value: performThirdToLastBang },
-  findOrCreateByBang: { ...def, value: performFindOrCreateByBang },
-  createOrFindByBang: { ...def, value: performCreateOrFindByBang },
-  // SpawnMethods
-  spawn: { ...def, value: performSpawn },
-  merge: { ...def, value: performMerge },
-  mergeBang: { ...def, value: performMergeBang },
-  raiseRecordNotFoundExceptionBang: { ...def, value: raiseRecordNotFoundExceptionBang },
-});
+include(Relation, FinderMethods);
+include(Relation, Calculations);
+include(Relation, SpawnMethods);
 
 // Thenable: make Relation directly awaitable (delegates to toArray).
 applyThenable(Relation.prototype);
