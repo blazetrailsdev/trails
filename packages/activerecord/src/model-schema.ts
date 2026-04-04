@@ -124,7 +124,7 @@ export function columnsHash(
   }
   const result: Record<string, { name: string; type: string; default: unknown }> = {};
   for (const [name, def] of modelClass._attributeDefinitions) {
-    result[name] = { name, type: def.type.name, default: def.defaultValue };
+    result[name] = { name, type: def.type.name, default: def.defaultValue ?? null };
   }
   return result;
 }
@@ -277,4 +277,188 @@ export async function createTable(modelClass: typeof Base): Promise<void> {
   await modelClass.adapter.executeMutation(
     `CREATE TABLE IF NOT EXISTS ${quoteTableName(table, adapterName)} (${colDefs.join(", ")})`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Missing ClassMethods from api:compare
+// ---------------------------------------------------------------------------
+
+interface SchemaHost {
+  name: string;
+  tableName: string;
+  primaryKey: string | string[];
+  _tableName: string | null;
+  _tableNamePrefix: string;
+  _tableNameSuffix: string;
+  _sequenceName: string | null;
+  _inheritanceColumn?: string;
+  _abstractClass?: boolean;
+  _ignoredColumns?: string[];
+  _attributeDefinitions: Map<string, any>;
+  _columnsHash?: Record<string, any>;
+  _columns?: any[];
+  _attributesBuilder?: any;
+  _schemaLoaded?: boolean;
+  adapter: any;
+  superclass?: SchemaHost;
+}
+
+export function deriveJoinTableName(this: SchemaHost, otherTableName: string): string {
+  const tables = [underscore(this.name), otherTableName].sort();
+  return tables.join("_");
+}
+
+export function quotedTableName(this: SchemaHost): string {
+  return quoteTableName(this.tableName, detectAdapterName(this.adapter));
+}
+
+/**
+ * Rails: resets and recomputes table name, handling abstract classes
+ * and STI inheritance.
+ */
+export function resetTableName(this: SchemaHost): string {
+  this._tableName = null;
+  if (this.name === "Base") {
+    return "";
+  }
+  if (this._abstractClass) {
+    const parent = Object.getPrototypeOf(this) as SchemaHost | null;
+    if (parent?.tableName != null) {
+      this._tableName = parent.tableName;
+      return this._tableName!;
+    }
+  }
+  const name = resolveTableName(this as any);
+  this._tableName = name;
+  return name;
+}
+
+export function fullTableNamePrefix(this: SchemaHost): string {
+  return this._tableNamePrefix ?? "";
+}
+
+export function fullTableNameSuffix(this: SchemaHost): string {
+  return this._tableNameSuffix ?? "";
+}
+
+export function realInheritanceColumn(this: SchemaHost, value: string): void {
+  this._inheritanceColumn = value;
+}
+
+export function resetSequenceName(this: SchemaHost): void {
+  this._sequenceName = null;
+}
+
+export function isPrefetchPrimaryKey(this: SchemaHost): boolean {
+  return false;
+}
+
+export function nextSequenceValue(this: SchemaHost): null {
+  return null;
+}
+
+/**
+ * Rails: builds an AttributeSet::Builder with defaults from attribute
+ * definitions, excluding PK columns from defaults.
+ */
+export function attributesBuilder(this: SchemaHost): {
+  buildFromDatabase(values: Record<string, unknown>): Record<string, unknown>;
+} {
+  if (this._attributesBuilder) return this._attributesBuilder;
+
+  const host = this;
+  this._attributesBuilder = {
+    buildFromDatabase(values: Record<string, unknown>): Record<string, unknown> {
+      const result: Record<string, unknown> = {};
+      const pk = host.primaryKey;
+      const pkSet = new Set(Array.isArray(pk) ? pk : [pk]);
+      for (const [name, def] of host._attributeDefinitions) {
+        if (!pkSet.has(name) && def.defaultValue !== undefined) {
+          result[name] =
+            typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
+        }
+      }
+      Object.assign(result, values);
+      return result;
+    },
+  };
+  return this._attributesBuilder;
+}
+
+/**
+ * Rails: @columns ||= columns_hash.values.freeze
+ */
+export function columns(this: SchemaHost): any[] {
+  if (this._columns) return this._columns;
+  loadSchema.call(this);
+  const hash = getColumnsHash(this);
+  this._columns = Object.values(hash);
+  return this._columns!;
+}
+
+export function yamlEncoder(this: SchemaHost): { encode(value: unknown): string } {
+  return {
+    encode(value: unknown): string {
+      return JSON.stringify(value);
+    },
+  };
+}
+
+/**
+ * Rails: columns_hash.fetch(name) { NullColumn.new(name) }
+ */
+export function columnForAttribute(this: SchemaHost, name: string): any {
+  loadSchema.call(this);
+  const hash = getColumnsHash(this);
+  return hash[name] ?? { name, null: true, type: null };
+}
+
+/**
+ * Rails: column_names.index_by(&:to_sym)[name_symbol]
+ */
+export function symbolColumnToString(this: SchemaHost, name: string): string | undefined {
+  loadSchema.call(this);
+  const hash = getColumnsHash(this);
+  return hash[name] ? name : undefined;
+}
+
+/**
+ * Rails: clears column cache, schema cache, reloads schema.
+ */
+export function resetColumnInformation(this: SchemaHost): void {
+  this._columnsHash = undefined;
+  this._columns = undefined;
+  this._attributesBuilder = undefined;
+  this._schemaLoaded = false;
+}
+
+/**
+ * Rails: loads schema from schema cache if not already loaded.
+ * Our schema is defined via attribute() calls, so loading is
+ * checking that _columnsHash is populated from attribute definitions.
+ */
+export function loadSchema(this: SchemaHost): void {
+  if (this._schemaLoaded) return;
+  this._schemaLoaded = true;
+
+  if (!this._columnsHash && this._attributeDefinitions.size > 0) {
+    const hash: Record<string, any> = {};
+    const ignored = new Set(this._ignoredColumns ?? []);
+    for (const [name, def] of this._attributeDefinitions) {
+      if (ignored.has(name)) continue;
+      hash[name] = {
+        name,
+        type: def.type?.name ?? null,
+        default: def.defaultValue ?? null,
+      };
+    }
+    this._columnsHash = hash;
+  }
+}
+
+function getColumnsHash(host: SchemaHost): Record<string, any> {
+  if (host._columnsHash != null) return host._columnsHash;
+  const ch = (host as any).columnsHash;
+  if (typeof ch === "function") return ch.call(host) ?? {};
+  return {};
 }
