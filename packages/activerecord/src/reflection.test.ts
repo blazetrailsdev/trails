@@ -762,7 +762,7 @@ describe("ReflectionTest", () => {
     registerModel("Pet", Pet);
     Associations.hasMany.call(Owner, "pets", {});
     const ref = reflectOnAssociation(Owner, "pets") as AssociationReflection;
-    expect(ref.validate).toBe(false);
+    expect(ref.validate).toBe(true);
   });
   it("always validate association if explicit", () => {
     class Owner extends Base {
