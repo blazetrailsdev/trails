@@ -60,6 +60,7 @@ import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import * as Translation from "./translation.js";
 import { sanitizeSqlArray, sanitizeSqlLike } from "./sanitization.js";
+import * as Querying from "./querying.js";
 import {
   hasAttribute as _hasAttribute,
   attributePresent as _attributePresent,
@@ -1628,15 +1629,10 @@ export class Base extends Model {
     return record;
   }
 
-  /**
-   * Execute raw SQL and return model instances.
-   *
-   * Mirrors: ActiveRecord::Base.find_by_sql
-   */
-  static async findBySql(sql: string): Promise<Base[]> {
-    const rows = await this.adapter.execute(sql);
-    return rows.map((row) => this._instantiate(row));
-  }
+  static findBySql = Querying.findBySql;
+  static asyncFindBySql = Querying.asyncFindBySql;
+  static countBySql = Querying.countBySql;
+  static asyncCountBySql = Querying.asyncCountBySql;
 
   /**
    * Increment counter columns for a record by primary key.
