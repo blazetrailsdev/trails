@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100%
 
-Current: **45.6% API** (1,294 / 2,835 methods). **All relation files at 100%.**
+Current: **47.9% API** (1,359 / 2,835 methods). **All relation files at 100%. All core association classes at 100%.**
 
 ```bash
 pnpm run api:compare -- --package activerecord
@@ -82,6 +82,18 @@ All relation files at 100%: `relation.rb`, `query_methods.rb`,
 `persistence.rb` (100%), `core.rb` (100%), `model_schema.rb` (100%),
 `scoping.rb` (100%).
 
+### Association class files (7/7)
+
+All core association classes at 100%: `association.rb` (29/29),
+`collection_association.rb` (24/24), `belongs_to_association.rb` (11/11),
+`belongs_to_polymorphic_association.rb` (4/4),
+`has_many_association.rb` (2/2), `has_one_association.rb` (2/2),
+`singular_association.rb` (5/5).
+
+Also at 100%: `join_dependency/join_association.rb`,
+`join_dependency/join_base.rb`, `join_dependency/join_part.rb`,
+`nested_error.rb`, `preloader/batch.rb`.
+
 ---
 
 ## Remaining module files (~80 methods across 21 files)
@@ -112,8 +124,8 @@ All relation files at 100%: `relation.rb`, `query_methods.rb`,
 
 ## Bigger gaps (not in scope yet)
 
-| Area                | Missing | Notes                                                  |
-| ------------------- | ------- | ------------------------------------------------------ |
-| Connection adapters | ~400    | Abstract adapter, schema statements, pool, transaction |
-| Associations        | ~120    | belongs_to, collection, builder, preloader             |
-| Migration           | ~50     | Command recorder, schema migration                     |
+| Area                | Missing | Notes                                                                               |
+| ------------------- | ------- | ----------------------------------------------------------------------------------- |
+| Connection adapters | ~400    | Abstract adapter, schema statements, pool, transaction                              |
+| Associations        | ~116    | Builders (0-33%), preloader (16-44%), collection_proxy (68%), join_dependency (11%) |
+| Migration           | ~50     | Command recorder, schema migration                                                  |
