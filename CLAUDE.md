@@ -37,6 +37,20 @@ This is a TypeScript monorepo. Packages live under `packages/`:
   the goal. Don't scan for easy tests to flip — build the feature, then
   unskip the tests that prove it works. Read the Rails source to understand
   the feature before implementing.
+- **Read existing code before writing new code**: Before implementing a new
+  class or module, trace how the existing codebase already handles the same
+  concern. Check Base for the actual persistence API (`isNewRecord()`,
+  `isPersisted()`, `readAttribute()`, `writeAttribute()` — not `_persisted`
+  or direct property access). Check existing load/build functions before
+  duplicating logic. Check how existing code handles composite primary keys
+  (`primaryKey` can be `string | string[]`). Methods should delegate to
+  existing infrastructure, not reimplement it.
+- **Ship behavior, not signatures**: Never commit methods that match an API
+  surface but return null/undefined or only manipulate in-memory state when
+  the Rails equivalent hits the database. If a method can't be fully
+  implemented yet, don't add it — a missing method is better than a
+  misleading one. `api:compare` coverage is a side effect of correct
+  implementation, not a goal to optimize for.
 - **Test-driven against Rails**: Progress is measured by `api:compare`,
   which matches our test files and test names against the actual Rails test suite.
 
