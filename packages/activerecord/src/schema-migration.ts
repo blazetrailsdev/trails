@@ -5,6 +5,7 @@
  */
 
 import type { DatabaseAdapter } from "./adapter.js";
+import { Table as ArelTable } from "@blazetrails/arel";
 import { detectAdapterName } from "./adapter-name.js";
 
 export class NullSchemaMigration {
@@ -88,5 +89,45 @@ export class SchemaMigration {
 
   async deleteAllVersions(): Promise<void> {
     await this._adapter.executeMutation(`DELETE FROM ${this._quotedTable}`);
+  }
+
+  // --- Methods matching Rails public API names ---
+
+  async createVersion(version: string): Promise<void> {
+    return this.recordVersion(version);
+  }
+
+  get primaryKey(): string {
+    return "version";
+  }
+
+  get tableName(): string {
+    return SchemaMigration.TABLE_NAME;
+  }
+
+  get arelTable(): ArelTable {
+    return new ArelTable(SchemaMigration.TABLE_NAME);
+  }
+
+  static normalizeMigrationNumber(number: string | number): string {
+    const n = parseInt(String(number), 10);
+    return String(isNaN(n) ? 0 : n).padStart(3, "0");
+  }
+
+  async normalizedVersions(): Promise<string[]> {
+    const vers = await this.versions();
+    return vers.map((v) => SchemaMigration.normalizeMigrationNumber(v));
+  }
+
+  async versions(): Promise<string[]> {
+    return this.allVersions();
+  }
+
+  async integerVersions(): Promise<number[]> {
+    const vers = await this.allVersions();
+    return vers.map((v) => {
+      const n = parseInt(v, 10);
+      return isNaN(n) ? 0 : n;
+    });
   }
 }

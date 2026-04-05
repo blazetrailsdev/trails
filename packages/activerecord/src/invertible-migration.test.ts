@@ -165,8 +165,34 @@ describe("InvertibleMigrationTest", () => {
     expect(tableExists("items")).toBe(false);
   });
 
-  it.skip("migrate revert change column default", () => {
-    /* changeColumnDefault reversal not supported */
+  it.skip("migrate revert change column default", async () => {
+    // ALTER COLUMN SET DEFAULT not supported in SQLite/MemoryAdapter
+    class CreateHorses extends Migration {
+      async change() {
+        await this.createTable("horses", {}, (t) => {
+          t.string("name", { default: "Sekitoba" });
+        });
+      }
+    }
+
+    class ChangeDefault extends Migration {
+      async change() {
+        await this.changeColumnDefault("horses", "name", {
+          from: "Sekitoba",
+          to: "Diomed",
+        });
+      }
+    }
+
+    const m1 = makeMigration(new (CreateHorses as any)());
+    await m1.migrate("up");
+    expect(tableExists("horses")).toBe(true);
+
+    const m2 = makeMigration(new (ChangeDefault as any)());
+    await m2.migrate("up");
+    await m2.migrate("down");
+    // If reversal works, changeColumnDefault(from: "Diomed", to: "Sekitoba") ran
+    expect(tableExists("horses")).toBe(true);
   });
   it.skip("migrate revert change column comment", () => {
     /* comments not supported */

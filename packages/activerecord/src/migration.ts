@@ -135,6 +135,8 @@ export abstract class Migration {
   private _recorder = new CommandRecorder();
   private _name?: string;
   private _version?: string;
+  verbose = true;
+  private static _disableDdlTransaction = false;
 
   /** Determine adapter type from the adapter class name. */
   protected get _adapterName(): "sqlite" | "postgres" | "mysql" {
@@ -280,6 +282,20 @@ export abstract class Migration {
       case "renameIndex":
         await this.renameIndex(args[0] as string, args[2] as string, args[1] as string);
         break;
+      case "changeColumnDefault": {
+        const [cdTable, cdCol, cdOpts] = args as [string, string, { from?: unknown; to: unknown }];
+        if (cdOpts && typeof cdOpts === "object" && "from" in cdOpts) {
+          await this.changeColumnDefault(cdTable, cdCol, { from: cdOpts.to, to: cdOpts.from });
+        } else {
+          throw new IrreversibleMigration("Cannot reverse changeColumnDefault without from/to");
+        }
+        break;
+      }
+      case "changeColumnNull": {
+        const [cnTable, cnCol, cnAllow, cnDefault] = args as [string, string, boolean, unknown?];
+        await this.changeColumnNull(cnTable, cnCol, !cnAllow, cnDefault);
+        break;
+      }
       case "changeColumn":
         throw new IrreversibleMigration("Cannot reverse changeColumn without previous type info");
       case "addForeignKey": {
@@ -738,11 +754,12 @@ export abstract class Migration {
    * Mirrors: ActiveRecord::Migration#migrate
    */
   async migrate(direction: "up" | "down"): Promise<void> {
-    if (direction === "up") {
-      await this.up();
-    } else {
-      await this.down();
-    }
+    this.announce(direction === "up" ? "migrating" : "reverting");
+    const start = Date.now();
+    await this.execMigration(this.adapter, direction);
+    const elapsed = ((Date.now() - start) / 1000).toFixed(4);
+    this.announce(`${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
+    this.write();
   }
 
   /**
@@ -793,6 +810,173 @@ export abstract class Migration {
    */
   get version(): string {
     return (this.constructor as any).version ?? this.constructor.name;
+  }
+
+  // --- Logging (Rails: Migration#write, #announce, #say, #say_with_time, #suppress_messages) ---
+
+  write(text = ""): void {
+    if (this.verbose) {
+      process.stdout.write(text + "\n");
+    }
+  }
+
+  announce(message: string): void {
+    const text = `${this.version} ${this.name}: ${message}`;
+    const pad = Math.max(0, 75 - text.length);
+    this.write(`== ${text} ${"=".repeat(pad)}`);
+  }
+
+  say(message: string, subitem = false): void {
+    this.write(`${subitem ? "   ->" : "--"} ${message}`);
+  }
+
+  async sayWithTime<T>(message: string, fn: () => Promise<T>): Promise<T> {
+    this.say(message);
+    const start = Date.now();
+    const result = await fn();
+    const elapsed = ((Date.now() - start) / 1000).toFixed(4);
+    this.say(`${elapsed}s`, true);
+    if (typeof result === "number") {
+      this.say(`${result} rows`, true);
+    }
+    return result;
+  }
+
+  async suppressMessages(fn: () => Promise<void>): Promise<void> {
+    const was = this.verbose;
+    this.verbose = false;
+    try {
+      await fn();
+    } finally {
+      this.verbose = was;
+    }
+  }
+
+  // --- Connection (Rails: Migration#connection, #connection_pool) ---
+
+  get connection(): DatabaseAdapter {
+    return this.adapter;
+  }
+
+  get connectionPool(): DatabaseAdapter {
+    return this.adapter;
+  }
+
+  // --- Execution (Rails: Migration#exec_migration, #execution_strategy, etc.) ---
+
+  async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
+    this.adapter = conn;
+    try {
+      if (direction === "up") {
+        await this.up();
+      } else {
+        await this.down();
+      }
+    } finally {
+      this._schema = undefined;
+    }
+  }
+
+  get executionStrategy(): ExecutionStrategy {
+    return new DefaultStrategy();
+  }
+
+  get disableDdlTransaction(): boolean {
+    return (this.constructor as typeof Migration)._disableDdlTransaction;
+  }
+
+  static disableDdlTransactionBang(): void {
+    this._disableDdlTransaction = true;
+  }
+
+  compatibleTableDefinition(t: unknown): unknown {
+    return t;
+  }
+
+  // --- Class methods (Rails: Migration.copy, .proper_table_name, etc.) ---
+
+  static isValidVersionFormat(version: string): boolean {
+    return /^\d{3,}$/.test(version);
+  }
+
+  static nextMigrationNumber(_number?: number): string {
+    return new Date()
+      .toISOString()
+      .replace(/[-T:Z.]/g, "")
+      .slice(0, 14);
+  }
+
+  static properTableName(
+    name: string,
+    options: { tableNamePrefix?: string; tableNameSuffix?: string } = {},
+  ): string {
+    const prefix = options.tableNamePrefix ?? "";
+    const suffix = options.tableNameSuffix ?? "";
+    return `${prefix}${name}${suffix}`;
+  }
+
+  static tableNameOptions(): { tableNamePrefix: string; tableNameSuffix: string } {
+    return { tableNamePrefix: "", tableNameSuffix: "" };
+  }
+
+  static async copy(
+    destination: string,
+    sources: Record<string, string>,
+    _options: Record<string, unknown> = {},
+  ): Promise<string[]> {
+    // Rails copies migration files from source directories to destination.
+    // In our TS implementation, migrations are registered programmatically,
+    // not via filesystem discovery. This returns the list of copied files
+    // (empty when there's nothing to copy).
+    const { existsSync, mkdirSync, copyFileSync, readdirSync } = await import("fs");
+    const { join, basename } = await import("path");
+
+    if (!existsSync(destination)) {
+      mkdirSync(destination, { recursive: true });
+    }
+
+    const copied: string[] = [];
+    for (const [, sourcePath] of Object.entries(sources)) {
+      if (!existsSync(sourcePath)) continue;
+      const files = readdirSync(sourcePath).filter((f) => f.endsWith(".ts") || f.endsWith(".js"));
+      for (const file of files) {
+        const dest = join(destination, file);
+        if (!existsSync(dest)) {
+          copyFileSync(join(sourcePath, file), dest);
+          copied.push(dest);
+        }
+      }
+    }
+    return copied;
+  }
+
+  // --- Pending checks (Rails class methods) ---
+
+  static async checkPendingMigrations(): Promise<void> {
+    // In a full Rails app this would check all database configs.
+    // Here it's a no-op; use Migrator.pendingMigrations() directly.
+  }
+
+  static async checkAllPendingBang(): Promise<void> {
+    await this.checkPendingMigrations();
+  }
+
+  static async loadSchemaIfPendingBang(): Promise<void> {
+    await this.checkPendingMigrations();
+  }
+
+  static async maintainTestSchemaBang(): Promise<void> {
+    await this.checkPendingMigrations();
+  }
+
+  // --- Delegation (Rails: Migration#nearest_delegate, #delegate) ---
+
+  get delegate(): DatabaseAdapter {
+    return this.adapter;
+  }
+
+  get nearestDelegate(): DatabaseAdapter {
+    return this.adapter;
   }
 }
 
@@ -1560,6 +1744,72 @@ export class Migrator {
   get internalMetadata(): InternalMetadata {
     return this._internalMetadata;
   }
+
+  // --- MigrationContext-style methods (Rails: MigrationContext) ---
+
+  get migrationsPaths(): string[] {
+    return [...Migrator.migrationsPaths];
+  }
+
+  get schemaMigration(): SchemaMigration {
+    return this._schemaMigration;
+  }
+
+  open(): Migrator {
+    return this;
+  }
+
+  async needsMigration(): Promise<boolean> {
+    const pending = await this.pendingMigrations();
+    return pending.length > 0;
+  }
+
+  async pendingMigrationVersions(): Promise<string[]> {
+    const pending = await this.pendingMigrations();
+    return pending.map((m) => m.version);
+  }
+
+  get currentEnvironment(): string {
+    return this._environment;
+  }
+
+  async isProtectedEnvironment(): Promise<boolean> {
+    try {
+      await this.checkProtectedEnvironments();
+      return false;
+    } catch (error) {
+      if (error instanceof ProtectedEnvironmentError) {
+        return true;
+      }
+      throw error;
+    }
+  }
+
+  async lastStoredEnvironment(): Promise<string | null> {
+    await this._ensureSchemaTable();
+    return this._internalMetadata.get("environment");
+  }
+
+  async currentMigration(): Promise<MigrationProxy | null> {
+    const version = await this.currentVersion();
+    if (version === 0) return null;
+    const versionStr = String(version);
+    return this._migrations.find((m) => m.version === versionStr) ?? null;
+  }
+
+  async runnable(): Promise<MigrationProxy[]> {
+    return this.pendingMigrations();
+  }
+
+  async migrated(): Promise<Set<string>> {
+    return this._appliedVersions();
+  }
+
+  async loadMigrated(): Promise<Set<string>> {
+    return this._appliedVersions();
+  }
+
+  static migrationsPaths: string[] = [];
 }
 
 /**

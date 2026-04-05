@@ -15,6 +15,12 @@ export interface MigrationLike {
 }
 
 export abstract class ExecutionStrategy {
+  protected migration: unknown;
+
+  constructor(migration?: unknown) {
+    this.migration = migration ?? null;
+  }
+
   abstract exec(
     direction: "up" | "down",
     migration: MigrationLike,
