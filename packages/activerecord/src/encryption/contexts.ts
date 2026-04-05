@@ -6,6 +6,8 @@ import {
   type EncryptionContext,
 } from "./context.js";
 
+let _defaultContext: EncryptionContext = {};
+
 /**
  * Class-based API for managing encryption contexts. Delegates to the
  * existing AsyncLocalStorage-based context system in context.ts.
@@ -27,5 +29,18 @@ export class Contexts {
 
   static protectingEncryptedData<T>(fn: () => T): T {
     return _protecting(fn);
+  }
+
+  static get currentCustomContext(): EncryptionContext | null {
+    const ctx = getEncryptionContext();
+    return ctx ?? null;
+  }
+
+  static get defaultContext(): EncryptionContext {
+    return _defaultContext;
+  }
+
+  static resetDefaultContext(): void {
+    _defaultContext = {};
   }
 }

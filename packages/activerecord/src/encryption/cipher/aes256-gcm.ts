@@ -15,6 +15,14 @@ export class Cipher {
   static keyLength = KEY_LENGTH;
   static ivLength = IV_LENGTH;
 
+  readonly secret?: string;
+  readonly deterministic: boolean;
+
+  constructor(secret?: string, options?: { deterministic?: boolean }) {
+    this.secret = secret;
+    this.deterministic = options?.deterministic ?? false;
+  }
+
   encrypt(
     data: string,
     key: string,
@@ -23,7 +31,7 @@ export class Cipher {
     this._validateKeyLength(key);
     const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
     let iv: Buffer;
-    if (options?.deterministic) {
+    if (options?.deterministic ?? this.deterministic) {
       iv = crypto.createHash("sha256").update(data).update(key).digest().subarray(0, IV_LENGTH);
     } else {
       iv = crypto.randomBytes(IV_LENGTH);

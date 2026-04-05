@@ -29,6 +29,24 @@ export class Config {
     "keyDerivationSalt",
   ]);
 
+  constructor() {}
+
+  get excludedFromFilterParameters(): string[] {
+    return this.excludeFromFilterParameters;
+  }
+
+  set previous(schemes: Record<string, unknown>[]) {
+    for (const props of schemes) {
+      this.previousSchemes.push(props);
+    }
+  }
+
+  set supportSha1ForNonDeterministicEncryption(value: boolean) {
+    if (value && this.primaryKey) {
+      this.previousSchemes.push({ hashDigestClass: "SHA1" });
+    }
+  }
+
   get(key: string): unknown {
     const value = (this as any)[key];
     if (value === undefined && this._requiredKeys.has(key)) {

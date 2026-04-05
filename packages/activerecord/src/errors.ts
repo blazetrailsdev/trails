@@ -386,3 +386,27 @@ export class NameError extends Error {
     this.name = "NameError";
   }
 }
+
+export class SQLWarning extends AdapterError {
+  readonly code: string | null;
+  readonly level: string | null;
+  sql?: string;
+
+  constructor(message?: string, code?: string | null, level?: string | null, sql?: string) {
+    super(message ?? "SQL Warning");
+    this.name = "SQLWarning";
+    this.code = code ?? null;
+    this.level = level ?? null;
+    this.sql = sql;
+  }
+}
+
+export class MultiparameterAssignmentErrors extends ActiveRecordError {
+  readonly errors: Error[];
+
+  constructor(errors: Error[] = []) {
+    super("Multiparameter assignment errors");
+    this.name = "MultiparameterAssignmentErrors";
+    this.errors = errors;
+  }
+}

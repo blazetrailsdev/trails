@@ -123,6 +123,8 @@ export {
   DangerousAttributeError,
   UnknownAttributeError,
   NameError,
+  SQLWarning,
+  MultiparameterAssignmentErrors,
   SerializationTypeMismatch,
   ConnectionNotDefined,
   DatabaseConnectionError,
