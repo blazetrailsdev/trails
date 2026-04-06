@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "crypto";
+import { getCrypto } from "./crypto-adapter.js";
 
 class ArgumentError extends Error {
   constructor(message: string) {
@@ -16,7 +16,7 @@ export class SecurityUtils {
       throw new ArgumentError("string length mismatch.");
     }
 
-    return timingSafeEqual(aBuf, bBuf);
+    return getCrypto().timingSafeEqual(aBuf, bBuf);
   }
 
   static secureCompare(a: string, b: string): boolean {
@@ -27,6 +27,6 @@ export class SecurityUtils {
       return false;
     }
 
-    return timingSafeEqual(aBuf, bBuf);
+    return getCrypto().timingSafeEqual(aBuf, bBuf);
   }
 }

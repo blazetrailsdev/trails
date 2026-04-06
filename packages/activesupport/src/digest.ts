@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { getCrypto } from "./crypto-adapter.js";
 
 type HashDigestClass = {
   hexdigest(data: string): string;
@@ -6,7 +6,7 @@ type HashDigestClass = {
 
 const MD5: HashDigestClass = {
   hexdigest(data: string): string {
-    return createHash("md5").update(data).digest("hex");
+    return getCrypto().createHash("md5").update(data).digest("hex");
   },
 };
 

@@ -5,15 +5,15 @@
  * @see https://api.rubyonrails.org/classes/ActionController/ConditionalGet.html
  */
 
-import { createHash } from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 
 export function generateWeakEtag(seed: string): string {
-  const hash = createHash("sha256").update(seed).digest("hex").slice(0, 32);
+  const hash = getCrypto().createHash("sha256").update(seed).digest("hex").slice(0, 32);
   return `W/"${hash}"`;
 }
 
 export function generateStrongEtag(seed: string): string {
-  const hash = createHash("sha256").update(seed).digest("hex").slice(0, 32);
+  const hash = getCrypto().createHash("sha256").update(seed).digest("hex").slice(0, 32);
   return `"${hash}"`;
 }
 

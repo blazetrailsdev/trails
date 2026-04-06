@@ -1,10 +1,8 @@
 /**
- * Encryption contexts — async-safe context stack using AsyncLocalStorage.
+ * Encryption contexts — context stack for encryption settings.
  *
  * Mirrors: ActiveRecord::Encryption::Contexts
  */
-
-import { AsyncLocalStorage } from "async_hooks";
 
 export interface EncryptionContext {
   encryptionDisabled?: boolean;
@@ -13,15 +11,37 @@ export interface EncryptionContext {
   [key: string]: unknown;
 }
 
-const storage = new AsyncLocalStorage<EncryptionContext>();
+const contextStack: EncryptionContext[] = [];
 
 function currentContext(): EncryptionContext {
-  return storage.getStore() ?? {};
+  return contextStack.length > 0 ? contextStack[contextStack.length - 1] : {};
 }
 
 export function withEncryptionContext<T>(overrides: EncryptionContext, fn: () => T): T {
   const previous = currentContext();
-  return storage.run({ ...previous, ...overrides }, fn);
+  contextStack.push({ ...previous, ...overrides });
+  let result: T;
+  try {
+    result = fn();
+  } catch (e) {
+    contextStack.pop();
+    throw e;
+  }
+  // If fn returned a Promise, defer the pop until it settles
+  if (result && typeof (result as any).then === "function") {
+    return (result as any).then(
+      (val: any) => {
+        contextStack.pop();
+        return val;
+      },
+      (err: any) => {
+        contextStack.pop();
+        throw err;
+      },
+    ) as unknown as T;
+  }
+  contextStack.pop();
+  return result;
 }
 
 export function withoutEncryption<T>(fn: () => T): T {

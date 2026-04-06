@@ -4,7 +4,7 @@
  * Session store backed by encrypted/signed cookies.
  */
 
-import { createCipheriv, createDecipheriv, createHmac, randomBytes } from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 
 export interface CookieStoreOptions {
   /** Secret key for signing/encryption (must be at least 32 bytes) */
@@ -68,7 +68,7 @@ export class CookieStore {
 
   /** Generate a new session ID. */
   generateSessionId(): string {
-    return randomBytes(16).toString("hex");
+    return Buffer.from(getCrypto().randomBytes(16)).toString("hex");
   }
 
   /** Load session data from a cookie value. Returns null if invalid/tampered. */
@@ -168,31 +168,40 @@ export class CookieStore {
   }
 
   private encrypt(data: string): string {
+    const crypto = getCrypto();
     const key = Buffer.from(this.secret.slice(0, 32), "utf-8");
-    const iv = randomBytes(16);
-    const cipher = createCipheriv("aes-256-cbc", key, iv);
+    const iv = Buffer.from(crypto.randomBytes(16));
+    const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
     let encrypted = cipher.update(data, "utf-8", "base64");
     encrypted += cipher.final("base64");
     const payload = iv.toString("base64") + "--" + encrypted;
-    const hmac = createHmac("sha256", key).update(payload).digest("base64");
+    const hmac = crypto.createHmac("sha256", key).update(payload).digest("base64");
     return payload + "--" + hmac;
   }
 
   private decrypt(value: string): string | null {
+    const crypto = getCrypto();
     const parts = value.split("--");
     if (parts.length !== 3) return null;
     const [ivB64, encrypted, hmac] = parts;
     const key = Buffer.from(this.secret.slice(0, 32), "utf-8");
 
     // Verify HMAC
-    const expectedHmac = createHmac("sha256", key)
+    const expectedHmac = crypto
+      .createHmac("sha256", key)
       .update(ivB64 + "--" + encrypted)
       .digest("base64");
-    if (hmac !== expectedHmac) return null;
+    const hmacBytes = Buffer.from(hmac, "base64");
+    const expectedBytes = Buffer.from(expectedHmac, "base64");
+    if (
+      hmacBytes.length !== expectedBytes.length ||
+      !crypto.timingSafeEqual(hmacBytes, expectedBytes)
+    )
+      return null;
 
     try {
       const iv = Buffer.from(ivB64, "base64");
-      const decipher = createDecipheriv("aes-256-cbc", key, iv);
+      const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
       let decrypted = decipher.update(encrypted, "base64", "utf-8");
       decrypted += decipher.final("utf-8");
       return decrypted;

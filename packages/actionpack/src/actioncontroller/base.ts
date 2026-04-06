@@ -15,7 +15,7 @@ import { UnknownFormat } from "./metal/exceptions.js";
 import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract-controller.js";
 import { LookupContext } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../actiondispatch/routing/route-helpers.js";
-import { createHash } from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { Notifications } from "@blazetrails/activesupport";
 
@@ -539,7 +539,8 @@ export class Base extends Metal {
   }
 
   private _generateEtag(seed: string): string {
-    const hash = createHash("sha256").update(seed).digest("hex").slice(0, 32);
+    const crypto = getCrypto();
+    const hash = crypto.createHash("sha256").update(seed).digest("hex").slice(0, 32);
     return `W/"${hash}"`;
   }
 

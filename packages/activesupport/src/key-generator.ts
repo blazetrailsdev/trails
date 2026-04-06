@@ -3,7 +3,7 @@
  * Mirrors Rails ActiveSupport::KeyGenerator.
  */
 
-import { pbkdf2Sync, randomBytes } from "crypto";
+import { getCrypto } from "./crypto-adapter.js";
 
 export class KeyGenerator {
   private readonly secret: string;
@@ -19,7 +19,7 @@ export class KeyGenerator {
    * Returns the key as a Buffer.
    */
   generateKey(salt: string, keySize: number = 64): Buffer {
-    return pbkdf2Sync(this.secret, salt, this.iterations, keySize, "sha1");
+    return Buffer.from(getCrypto().pbkdf2Sync(this.secret, salt, this.iterations, keySize, "sha1"));
   }
 
   inspect(): string {
@@ -54,7 +54,7 @@ const BASE58_CHARS = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz
 const BASE36_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 function randomCharFrom(chars: string): string {
-  const bytes = randomBytes(1);
+  const bytes = getCrypto().randomBytes(1);
   return chars[bytes[0] % chars.length];
 }
 

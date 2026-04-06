@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Key
  */
 
-import * as crypto from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import { KeyGenerator } from "./key-generator.js";
 
 export class Key {
@@ -17,7 +17,7 @@ export class Key {
   }
 
   get id(): string {
-    return crypto.createHash("sha256").update(this.secret).digest("hex").slice(0, 8);
+    return getCrypto().createHash("sha256").update(this.secret).digest("hex").slice(0, 8);
   }
 
   static deriveFrom(password: string): Key {

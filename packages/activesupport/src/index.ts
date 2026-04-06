@@ -9,7 +9,13 @@ export {
 export type { FsAdapter, PathAdapter } from "./fs-adapter.js";
 
 export { registerCryptoAdapter, getCrypto, cryptoAdapterConfig } from "./crypto-adapter.js";
-export type { CryptoAdapter, HashAdapter, HmacAdapter } from "./crypto-adapter.js";
+export type {
+  CryptoAdapter,
+  HashAdapter,
+  HmacAdapter,
+  CipherAdapter,
+  DecipherAdapter,
+} from "./crypto-adapter.js";
 
 import { fsAdapterConfig } from "./fs-adapter.js";
 import { cryptoAdapterConfig } from "./crypto-adapter.js";

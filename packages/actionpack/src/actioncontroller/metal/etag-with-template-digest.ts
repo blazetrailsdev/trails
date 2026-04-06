@@ -6,10 +6,10 @@
  * @see https://api.rubyonrails.org/classes/ActionController/EtagWithTemplateDigest.html
  */
 
-import { createHash } from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 
 export function templateDigest(template: string): string {
-  return createHash("md5").update(template).digest("hex");
+  return getCrypto().createHash("md5").update(template).digest("hex");
 }
 
 export function templateEtagger(

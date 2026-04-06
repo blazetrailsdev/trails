@@ -4,7 +4,7 @@
  * HTTP Basic, Digest, and Token authentication helpers.
  */
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 
 // =============================================================================
 // Basic Authentication
@@ -193,8 +193,9 @@ export const DigestAuth = {
 
   /** Generate a nonce for digest auth. */
   generateNonce(secret: string): string {
+    const crypto = getCrypto();
     const timestamp = Date.now().toString();
-    const hash = createHmac("sha256", secret).update(timestamp).digest("hex");
+    const hash = crypto.createHmac("sha256", secret).update(timestamp).digest("hex");
     return Buffer.from(`${timestamp}:${hash}`).toString("base64");
   },
 
@@ -204,8 +205,9 @@ export const DigestAuth = {
       const decoded = Buffer.from(nonce, "base64").toString("utf-8");
       const [timestamp, hash] = decoded.split(":");
       if (!timestamp || !hash) return false;
-      const expected = createHmac("sha256", secret).update(timestamp).digest("hex");
-      if (!timingSafeEqual(Buffer.from(hash), Buffer.from(expected))) return false;
+      const crypto = getCrypto();
+      const expected = crypto.createHmac("sha256", secret).update(timestamp).digest("hex");
+      if (!crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expected))) return false;
       const age = Date.now() - parseInt(timestamp, 10);
       return age >= 0 && age < maxAge;
     } catch {
@@ -220,19 +222,21 @@ export const DigestAuth = {
     ha1: string,
     params: { nonce: string; nc: string; cnonce: string; qop?: string },
   ): string {
-    const ha2 = createHash("md5").update(`${method}:${uri}`).digest("hex");
+    const crypto = getCrypto();
+    const ha2 = crypto.createHash("md5").update(`${method}:${uri}`).digest("hex");
     let responseStr: string;
     if (params.qop === "auth") {
       responseStr = `${ha1}:${params.nonce}:${params.nc}:${params.cnonce}:${params.qop}:${ha2}`;
     } else {
       responseStr = `${ha1}:${params.nonce}:${ha2}`;
     }
-    return createHash("md5").update(responseStr).digest("hex");
+    return crypto.createHash("md5").update(responseStr).digest("hex");
   },
 
   /** Calculate HA1 for a user. */
   ha1(username: string, realm: string, password: string): string {
-    return createHash("md5").update(`${username}:${realm}:${password}`).digest("hex");
+    const crypto = getCrypto();
+    return crypto.createHash("md5").update(`${username}:${realm}:${password}`).digest("hex");
   },
 
   /** Check if the authorization header contains Digest credentials. */
@@ -247,7 +251,8 @@ export const DigestAuth = {
     options: { qop?: string; opaque?: string } = {},
   ): [number, Record<string, string>, string] {
     const nonce = DigestAuth.generateNonce(secret);
-    const opaque = options.opaque ?? randomBytes(16).toString("hex");
+    const crypto = getCrypto();
+    const opaque = options.opaque ?? Buffer.from(crypto.randomBytes(16)).toString("hex");
     const qop = options.qop ?? "auth";
     return [
       401,

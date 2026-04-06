@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Cipher::Aes256Gcm
  */
 
-import * as crypto from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import { ConfigError, DecryptionError } from "../errors.js";
 
 const KEY_LENGTH = 32;
@@ -29,18 +29,28 @@ export class Cipher {
     options?: { deterministic?: boolean },
   ): { payload: string; iv: string; authTag: string } {
     this._validateKeyLength(key);
+    const crypto = getCrypto();
     const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
     let iv: Buffer;
     if (options?.deterministic ?? this.deterministic) {
-      iv = crypto.createHash("sha256").update(data).update(key).digest().subarray(0, IV_LENGTH);
+      iv = Buffer.from(crypto.createHash("sha256").update(data).update(key).digest()).subarray(
+        0,
+        IV_LENGTH,
+      );
     } else {
-      iv = crypto.randomBytes(IV_LENGTH);
+      iv = Buffer.from(crypto.randomBytes(IV_LENGTH));
     }
     const cipher = crypto.createCipheriv("aes-256-gcm", keyBuf, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
-    const encrypted = Buffer.concat([cipher.update(data, "utf-8"), cipher.final()]);
-    const authTag = cipher.getAuthTag();
+    const encrypted = Buffer.concat([
+      Buffer.from(cipher.update(Buffer.from(data, "utf-8"))),
+      Buffer.from(cipher.final()),
+    ]);
+    if (!cipher.getAuthTag) {
+      throw new ConfigError("Crypto adapter does not support GCM auth tags (getAuthTag)");
+    }
+    const authTag = Buffer.from(cipher.getAuthTag());
 
     return {
       payload: encrypted.toString("base64"),
@@ -55,16 +65,24 @@ export class Cipher {
     const authTagBuf = Buffer.from(authTag, "base64");
     const encryptedBuf = Buffer.from(payload, "base64");
 
+    const crypto = getCrypto();
     for (const key of keyList) {
       try {
         const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
         const decipher = crypto.createDecipheriv("aes-256-gcm", keyBuf, ivBuf, {
           authTagLength: AUTH_TAG_LENGTH,
         });
+        if (!decipher.setAuthTag) {
+          throw new ConfigError("Crypto adapter does not support GCM auth tags (setAuthTag)");
+        }
         decipher.setAuthTag(authTagBuf);
-        const decrypted = Buffer.concat([decipher.update(encryptedBuf), decipher.final()]);
+        const decrypted = Buffer.concat([
+          Buffer.from(decipher.update(encryptedBuf)),
+          Buffer.from(decipher.final()),
+        ]);
         return decrypted.toString("utf-8");
-      } catch {
+      } catch (e) {
+        if (e instanceof ConfigError) throw e;
         continue;
       }
     }

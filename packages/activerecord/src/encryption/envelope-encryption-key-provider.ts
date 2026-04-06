@@ -5,7 +5,7 @@
  * Mirrors: ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider
  */
 
-import * as crypto from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import { Key } from "./key.js";
 import { Encryptor } from "./encryptor.js";
 import { KeyProvider } from "./key-provider.js";
@@ -43,6 +43,6 @@ export class EnvelopeEncryptionKeyProvider {
   }
 
   generateRandomEncryptionKey(): string {
-    return crypto.randomBytes(32).toString("base64");
+    return Buffer.from(getCrypto().randomBytes(32)).toString("base64");
   }
 }

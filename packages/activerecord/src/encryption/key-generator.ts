@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::KeyGenerator
  */
 
-import * as crypto from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 
 const DEFAULT_KEY_LENGTH = 32; // AES-256
 
@@ -16,17 +16,20 @@ export class KeyGenerator {
   }
 
   generateRandomKey(length: number = DEFAULT_KEY_LENGTH): string {
-    return crypto.randomBytes(length).toString("base64");
+    const crypto = getCrypto();
+    return Buffer.from(crypto.randomBytes(length)).toString("base64");
   }
 
   generateRandomHexKey(length: number = DEFAULT_KEY_LENGTH): string {
-    return crypto.randomBytes(length).toString("hex");
+    const crypto = getCrypto();
+    return Buffer.from(crypto.randomBytes(length)).toString("hex");
   }
 
   deriveKey(password: string, length: number = DEFAULT_KEY_LENGTH, salt?: string): string {
+    const crypto = getCrypto();
     const effectiveSalt = salt ?? "";
     const digest = this._hashDigestClass.toLowerCase().replace(/-/g, "");
     const derived = crypto.pbkdf2Sync(password, effectiveSalt, 2 ** 16, length, digest);
-    return derived.toString("base64");
+    return Buffer.from(derived).toString("base64");
   }
 }

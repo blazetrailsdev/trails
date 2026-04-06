@@ -6,6 +6,18 @@ export interface CryptoAdapter {
   randomBytes(size: number): Uint8Array;
   createHash(algorithm: string): HashAdapter;
   createHmac(algorithm: string, key: string | Uint8Array): HmacAdapter;
+  createCipheriv(
+    algorithm: string,
+    key: Uint8Array,
+    iv: Uint8Array,
+    options?: Record<string, unknown>,
+  ): CipherAdapter;
+  createDecipheriv(
+    algorithm: string,
+    key: Uint8Array,
+    iv: Uint8Array,
+    options?: Record<string, unknown>,
+  ): DecipherAdapter;
   pbkdf2Sync(
     password: string | Uint8Array,
     salt: string | Uint8Array,
@@ -18,24 +30,68 @@ export interface CryptoAdapter {
 
 export interface HashAdapter {
   update(data: string | Uint8Array): HashAdapter;
+  digest(): Uint8Array;
   digest(encoding: "hex" | "base64"): string;
 }
 
 export interface HmacAdapter {
   update(data: string | Uint8Array): HmacAdapter;
+  digest(): Uint8Array;
   digest(encoding: "hex" | "base64"): string;
+}
+
+export interface CipherAdapter {
+  update(data: string, inputEncoding: string, outputEncoding: string): string;
+  update(data: Uint8Array): Uint8Array;
+  final(outputEncoding: string): string;
+  final(): Uint8Array;
+  getAuthTag?(): Uint8Array;
+}
+
+export interface DecipherAdapter {
+  update(data: string, inputEncoding: string, outputEncoding: string): string;
+  update(data: Uint8Array): Uint8Array;
+  final(outputEncoding: string): string;
+  final(): Uint8Array;
+  setAuthTag?(tag: Uint8Array): void;
 }
 
 function wrapNodeCrypto(nodeCrypto: typeof import("node:crypto")): CryptoAdapter {
   return {
     randomBytes(size: number): Uint8Array {
-      return new Uint8Array(nodeCrypto.randomBytes(size));
+      return nodeCrypto.randomBytes(size);
     },
     createHash(algorithm: string): HashAdapter {
-      return nodeCrypto.createHash(algorithm);
+      return nodeCrypto.createHash(algorithm) as unknown as HashAdapter;
     },
     createHmac(algorithm: string, key: string | Uint8Array): HmacAdapter {
-      return nodeCrypto.createHmac(algorithm, key);
+      return nodeCrypto.createHmac(algorithm, key) as unknown as HmacAdapter;
+    },
+    createCipheriv(
+      algorithm: string,
+      key: Uint8Array,
+      iv: Uint8Array,
+      options?: Record<string, unknown>,
+    ): CipherAdapter {
+      return nodeCrypto.createCipheriv(
+        algorithm,
+        key,
+        iv,
+        options as any,
+      ) as unknown as CipherAdapter;
+    },
+    createDecipheriv(
+      algorithm: string,
+      key: Uint8Array,
+      iv: Uint8Array,
+      options?: Record<string, unknown>,
+    ): DecipherAdapter {
+      return nodeCrypto.createDecipheriv(
+        algorithm,
+        key,
+        iv,
+        options as any,
+      ) as unknown as DecipherAdapter;
     },
     pbkdf2Sync(password, salt, iterations, keylen, digest): Uint8Array {
       return new Uint8Array(nodeCrypto.pbkdf2Sync(password, salt, iterations, keylen, digest));

@@ -4,7 +4,7 @@
  * Cookie jar implementation mirroring Rails cookie handling.
  */
 
-import { createHmac, createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 
 export interface CookieJarOptions {
   secret?: string;
@@ -224,7 +224,8 @@ export class SignedCookieJar {
   }
 
   private sign(value: string): string {
-    const hmac = createHmac(this.digest, this.secret).update(value).digest("hex");
+    const crypto = getCrypto();
+    const hmac = crypto.createHmac(this.digest, this.secret).update(value).digest("hex");
     return `${value}--${hmac}`;
   }
 
@@ -233,7 +234,8 @@ export class SignedCookieJar {
     if (idx === -1) return undefined;
     const value = signedValue.slice(0, idx);
     const sig = signedValue.slice(idx + 2);
-    const expected = createHmac(this.digest, this.secret).update(value).digest("hex");
+    const crypto = getCrypto();
+    const expected = crypto.createHmac(this.digest, this.secret).update(value).digest("hex");
     if (sig.length !== expected.length) return undefined;
     // Constant-time comparison
     let match = true;
@@ -270,12 +272,13 @@ export class EncryptedCookieJar {
   }
 
   private encrypt(value: string): string {
+    const crypto = getCrypto();
     const key = Buffer.from(this.secret.padEnd(32, "0").slice(0, 32));
-    const iv = randomBytes(16);
-    const cipher = createCipheriv("aes-256-cbc", key, iv);
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv("aes-256-cbc", key, Buffer.from(iv));
     let encrypted = cipher.update(value, "utf8", "hex");
     encrypted += cipher.final("hex");
-    return `${iv.toString("hex")}--${encrypted}`;
+    return `${Buffer.from(iv).toString("hex")}--${encrypted}`;
   }
 
   private decrypt(encryptedValue: string): string | undefined {
@@ -284,7 +287,8 @@ export class EncryptedCookieJar {
       if (!ivHex || !encrypted) return undefined;
       const key = Buffer.from(this.secret.padEnd(32, "0").slice(0, 32));
       const iv = Buffer.from(ivHex, "hex");
-      const decipher = createDecipheriv("aes-256-cbc", key, iv);
+      const crypto = getCrypto();
+      const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
       let decrypted = decipher.update(encrypted, "hex", "utf8");
       decrypted += decipher.final("utf8");
       return decrypted;

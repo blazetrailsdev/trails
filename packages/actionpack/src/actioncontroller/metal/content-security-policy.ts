@@ -6,11 +6,11 @@
  * @see https://api.rubyonrails.org/classes/ActionController/ContentSecurityPolicy.html
  */
 
-import { randomBytes } from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import { deleteHeaderCaseInsensitive } from "./header-utils.js";
 
 export function contentSecurityPolicyNonce(): string {
-  return randomBytes(16).toString("base64");
+  return Buffer.from(getCrypto().randomBytes(16)).toString("base64");
 }
 
 export function hasContentSecurityPolicy(response: {
