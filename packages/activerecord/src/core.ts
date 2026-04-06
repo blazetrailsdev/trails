@@ -220,7 +220,7 @@ type ConnectedToEntry = {
   role?: string;
   shard?: string;
   klasses: Set<any>;
-  prevent_writes?: boolean;
+  preventWrites?: boolean;
 };
 
 const _connectedToStack: ConnectedToEntry[] = [];
@@ -267,8 +267,8 @@ export function currentPreventingWrites(this: CoreHost): boolean {
   const connClass = connectionClassForSelf.call(this);
   for (let i = _connectedToStack.length - 1; i >= 0; i--) {
     const entry = _connectedToStack[i];
-    if (entry.prevent_writes !== undefined && matchesStack(entry, connClass)) {
-      return entry.prevent_writes;
+    if (entry.preventWrites !== undefined && matchesStack(entry, connClass)) {
+      return entry.preventWrites;
     }
   }
   return false;
@@ -277,12 +277,12 @@ export function currentPreventingWrites(this: CoreHost): boolean {
 export function isPreventingWrites(this: CoreHost, className?: string): boolean {
   for (let i = _connectedToStack.length - 1; i >= 0; i--) {
     const entry = _connectedToStack[i];
-    if (entry.prevent_writes === undefined) continue;
-    if (klassesInclude(entry.klasses, "Base")) return entry.prevent_writes;
+    if (entry.preventWrites === undefined) continue;
+    if (klassesInclude(entry.klasses, "Base")) return entry.preventWrites;
     if (className) {
       for (const klass of entry.klasses) {
         if (typeof klass === "function" && klass.name === className) {
-          return entry.prevent_writes;
+          return entry.preventWrites;
         }
       }
     }
