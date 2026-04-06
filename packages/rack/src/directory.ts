@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import { getFs, getPath } from "@blazetrails/activesupport";
+import type { FsStatResult, FsDirent } from "@blazetrails/activesupport";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import { Files } from "./files.js";
 
@@ -9,7 +9,7 @@ export class Directory {
   private fileServer: Files;
 
   constructor(root: string, app?: any) {
-    this.root = path.resolve(root);
+    this.root = getPath().resolve(root);
     this.app = app || new Files(root);
     this.fileServer = new Files(root);
   }
@@ -24,17 +24,18 @@ export class Directory {
       return [400, { [CONTENT_TYPE]: "text/plain" }, ["Bad Request"]];
     }
 
-    const fullPath = path.join(this.root, decodedPath);
-    const resolved = path.resolve(fullPath);
+    const fullPath = getPath().join(this.root, decodedPath);
+    const resolved = getPath().resolve(fullPath);
 
-    // Directory traversal check
-    if (!resolved.startsWith(this.root)) {
+    // Directory traversal check — use separator-aware boundary to prevent
+    // sibling prefix bypass (e.g. /var/www vs /var/www_public)
+    if (resolved !== this.root && !resolved.startsWith(this.root + getPath().sep)) {
       return [404, { [CONTENT_TYPE]: "text/plain" }, ["Not Found"]];
     }
 
-    let stat: fs.Stats;
+    let stat: FsStatResult;
     try {
-      stat = fs.statSync(resolved);
+      stat = getFs().statSync(resolved);
     } catch {
       return [404, { [CONTENT_TYPE]: "text/plain" }, ["Not Found"]];
     }
@@ -48,9 +49,9 @@ export class Directory {
     }
 
     // Directory listing
-    let entries: fs.Dirent[];
+    let entries: FsDirent[];
     try {
-      entries = fs.readdirSync(resolved, { withFileTypes: true });
+      entries = getFs().readdirSync(resolved, { withFileTypes: true });
     } catch {
       return [404, { [CONTENT_TYPE]: "text/plain" }, ["Not Found"]];
     }
@@ -70,7 +71,7 @@ export class Directory {
     reqPath: string,
     scriptName: string,
     dirPath: string,
-    entries: fs.Dirent[],
+    entries: FsDirent[],
   ): string {
     const escapedScript = this.escapeHtml(scriptName);
     const escapedPath = this.escapeHtml(reqPath);
@@ -79,21 +80,21 @@ export class Directory {
     body += `<body><h1>Directory: ${escapedScript}${escapedPath}</h1><hr><table>`;
 
     if (reqPath !== "/") {
-      const parent = path.dirname(reqPath);
+      const parent = getPath().dirname(reqPath);
       const parentUri = encodeURI(scriptName + parent);
       body += `<tr><td><a href="${parentUri}">../</a></td><td></td><td></td></tr>`;
     }
 
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
       const name = entry.name;
-      const fullEntryPath = path.join(dirPath, name);
+      const fullEntryPath = getPath().join(dirPath, name);
       const displayName = entry.isDirectory() ? name + "/" : name;
-      const uri = encodeURI(scriptName + path.join(reqPath, name).replace(/\\/g, "/"));
+      const uri = encodeURI(scriptName + getPath().join(reqPath, name).replace(/\\/g, "/"));
 
       let size: string;
       let mtime: string;
       try {
-        const stat = fs.statSync(fullEntryPath);
+        const stat = getFs().statSync(fullEntryPath);
         size = entry.isDirectory() ? "-" : String(stat.size);
         mtime = stat.mtime.toISOString();
       } catch {

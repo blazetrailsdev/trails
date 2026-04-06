@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import type { DatabaseAdapter } from "../adapter.js";
+import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   ReadOnlyError,
@@ -27,14 +28,18 @@ import {
   BigIntegerType,
   DecimalType,
 } from "@blazetrails/activemodel";
+import { getFs } from "@blazetrails/activesupport";
+import { quoteString, quoteTableName, quoteColumnName } from "./sqlite3/quoting.js";
 
 /**
  * SQLite adapter — connects ActiveRecord to a real SQLite database.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter
  */
-export class SQLite3Adapter implements DatabaseAdapter {
-  readonly adapterName = "SQLite";
+export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
+  override get adapterName(): string {
+    return "SQLite";
+  }
 
   private db: Database.Database;
   private _inTransaction = false;
@@ -42,8 +47,13 @@ export class SQLite3Adapter implements DatabaseAdapter {
   private _readonly: boolean;
   private _preventWrites = false;
   private _nativeTypeMap: TypeMap;
+  private _memoryDatabase: boolean;
+  private _filename: string;
 
   constructor(filename: string | ":memory:" = ":memory:", options?: { readonly?: boolean }) {
+    super();
+    this._filename = filename;
+    this._memoryDatabase = filename === ":memory:";
     this._readonly = options?.readonly ?? false;
     try {
       this.db = new Database(filename, { readonly: this._readonly });
@@ -54,9 +64,7 @@ export class SQLite3Adapter implements DatabaseAdapter {
       });
     }
     if (!this._readonly) {
-      // Enable WAL mode for better concurrent read performance
       this.db.pragma("journal_mode = WAL");
-      // Enable foreign keys
       this.db.pragma("foreign_keys = ON");
     }
     this._nativeTypeMap = SQLite3Adapter._buildTypeMap();
@@ -260,6 +268,510 @@ export class SQLite3Adapter implements DatabaseAdapter {
     map.registerType(/blob/i, undefined, () => new BinaryType());
     map.registerType(/real|floa|doub/i, undefined, () => new FloatType());
     return map;
+  }
+
+  // --- Capability overrides (Rails: SQLite3Adapter returns true for these) ---
+
+  override supportsDdlTransactions(): boolean {
+    return true;
+  }
+
+  override supportsSavepoints(): boolean {
+    return true;
+  }
+
+  override supportsTransactionIsolation(): boolean {
+    return true;
+  }
+
+  override supportsPartialIndex(): boolean {
+    return true;
+  }
+
+  supportsExpressionIndex(): boolean {
+    return this.databaseVersion.gte("3.9.0");
+  }
+
+  override supportsForeignKeys(): boolean {
+    return true;
+  }
+
+  override supportsCheckConstraints(): boolean {
+    return true;
+  }
+
+  override supportsViews(): boolean {
+    return true;
+  }
+
+  override supportsDatetimeWithPrecision(): boolean {
+    return true;
+  }
+
+  override supportsJson(): boolean {
+    return true;
+  }
+
+  override supportsCommonTableExpressions(): boolean {
+    return this.databaseVersion.gte("3.8.3");
+  }
+
+  supportsInsertReturning(): boolean {
+    return this.databaseVersion.gte("3.35.0");
+  }
+
+  supportsInsertOnConflict(): boolean {
+    return this.databaseVersion.gte("3.24.0");
+  }
+
+  override supportsConcurrentConnections(): boolean {
+    return !this._memoryDatabase;
+  }
+
+  override supportsVirtualColumns(): boolean {
+    return this.databaseVersion.gte("3.31.0");
+  }
+
+  override supportsIndexSortOrder(): boolean {
+    return true;
+  }
+
+  override supportsExplain(): boolean {
+    return true;
+  }
+
+  override supportsLazyTransactions(): boolean {
+    return true;
+  }
+
+  override supportsDeferrableConstraints(): boolean {
+    return true;
+  }
+
+  override requiresReloading(): boolean {
+    return false;
+  }
+
+  // --- Connection lifecycle ---
+
+  override isConnected(): boolean {
+    return this.db.open;
+  }
+
+  isActive(): boolean {
+    return this.db.open;
+  }
+
+  override disconnectBang(): void {
+    super.disconnectBang();
+    if (this.db.open) {
+      this.db.close();
+    }
+  }
+
+  // --- Database info ---
+
+  private resolveSqlType(type: string): string {
+    const known = this.nativeDatabaseTypes[type];
+    if (known) return known.name;
+    // Validate: only allow alphanumeric type names (with optional parenthesized precision)
+    if (!/^[A-Za-z_][A-Za-z0-9_ ]*(\(\d+(,\s*\d+)?\))?$/.test(type)) {
+      throw new Error(`Invalid column type: ${type}`);
+    }
+    return type.toUpperCase();
+  }
+
+  get nativeDatabaseTypes(): Record<string, { name: string; limit?: number }> {
+    return {
+      primary_key: { name: "integer" },
+      string: { name: "varchar", limit: 255 },
+      text: { name: "text" },
+      integer: { name: "integer" },
+      float: { name: "float" },
+      decimal: { name: "decimal" },
+      datetime: { name: "datetime" },
+      time: { name: "time" },
+      date: { name: "date" },
+      binary: { name: "blob" },
+      blob: { name: "blob" },
+      boolean: { name: "boolean" },
+      json: { name: "json" },
+    };
+  }
+
+  get encoding(): string {
+    const result = this.db.pragma("encoding") as Array<{ encoding: string }>;
+    return result[0]?.encoding ?? "UTF-8";
+  }
+
+  isSharedCache(): boolean {
+    const SQLITE_OPEN_SHAREDCACHE = 0x00020000;
+    const flags = this._config.flags;
+    if (typeof flags === "number") {
+      return (flags & SQLITE_OPEN_SHAREDCACHE) !== 0;
+    }
+    const qIdx = this._filename.indexOf("?");
+    if (qIdx === -1) return false;
+    return this._filename.slice(qIdx).includes("cache=shared");
+  }
+
+  override getDatabaseVersion(): Version {
+    const row = this.db.prepare("SELECT sqlite_version() AS v").get() as any;
+    return new Version(row?.v ?? "0.0.0");
+  }
+
+  override checkVersion(): void {
+    if (this.databaseVersion.lt("3.8.0")) {
+      throw new Error(
+        `Your version of SQLite (${this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.0.`,
+      );
+    }
+  }
+
+  static isDatabaseExists(config: { database?: string }): boolean {
+    if (!config.database || config.database === ":memory:") return true;
+    try {
+      return getFs().existsSync(config.database);
+    } catch {
+      return false;
+    }
+  }
+
+  static newClient(config: { database?: string; readonly?: boolean }): SQLite3Adapter {
+    return new SQLite3Adapter(config.database ?? ":memory:", { readonly: config.readonly });
+  }
+
+  static override dbconsole(config?: { database?: string }): void {
+    const db = config?.database ?? ":memory:";
+    console.log(`sqlite3 ${db}`);
+  }
+
+  // --- Schema operations ---
+
+  async primaryKeys(tableName: string): Promise<string[]> {
+    const rows = await this.execute(`PRAGMA table_info(${quoteTableName(tableName)})`);
+    return rows.filter((r) => r.pk).map((r) => String(r.name));
+  }
+
+  async removeIndex(
+    tableName: string,
+    columnOrOptions?: string | string[] | { name?: string; column?: string | string[] },
+  ): Promise<void> {
+    let indexName: string;
+    if (typeof columnOrOptions === "string") {
+      indexName = `index_${tableName}_on_${columnOrOptions}`;
+    } else if (Array.isArray(columnOrOptions)) {
+      indexName = `index_${tableName}_on_${columnOrOptions.join("_and_")}`;
+    } else if (columnOrOptions?.name) {
+      indexName = columnOrOptions.name;
+    } else if (columnOrOptions?.column) {
+      const cols = Array.isArray(columnOrOptions.column)
+        ? columnOrOptions.column.join("_and_")
+        : columnOrOptions.column;
+      indexName = `index_${tableName}_on_${cols}`;
+    } else {
+      throw new Error("No index name or column specified");
+    }
+    await this.executeMutation(`DROP INDEX IF EXISTS ${quoteColumnName(indexName)}`);
+  }
+
+  async virtualTables(): Promise<string[]> {
+    const rows = await this.execute(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND sql LIKE '%VIRTUAL%'",
+    );
+    return rows.map((r) => String(r.name));
+  }
+
+  override async createVirtualTable(tableName: string, options?: unknown): Promise<void> {
+    const opts = (options ?? {}) as { moduleName?: unknown; values?: unknown };
+    const moduleName = opts.moduleName;
+    if (typeof moduleName !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(moduleName)) {
+      throw new Error("createVirtualTable requires a valid moduleName");
+    }
+    const values = opts.values;
+    const cols = Array.isArray(values)
+      ? values.map((v) => quoteColumnName(String(v))).join(", ")
+      : "";
+    await this.executeMutation(
+      `CREATE VIRTUAL TABLE ${quoteTableName(tableName)} USING ${moduleName}(${cols})`,
+    );
+  }
+
+  async dropVirtualTable(
+    tableName: string,
+    _moduleName?: string,
+    _values?: string[],
+  ): Promise<void> {
+    await this.executeMutation(`DROP TABLE IF EXISTS ${quoteTableName(tableName)}`);
+  }
+
+  async renameTable(tableName: string, newName: string): Promise<void> {
+    this.schemaCache.clear();
+    await this.executeMutation(
+      `ALTER TABLE ${quoteTableName(tableName)} RENAME TO ${quoteTableName(newName)}`,
+    );
+  }
+
+  async addColumn(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    const sqlType = this.resolveSqlType(type);
+    let sql = `ALTER TABLE ${quoteTableName(tableName)} ADD COLUMN ${quoteColumnName(columnName)} ${sqlType}`;
+    if (options?.null === false) sql += " NOT NULL";
+    if (options?.default !== undefined) {
+      const def = options.default;
+      sql += ` DEFAULT ${def === null ? "NULL" : typeof def === "string" ? quoteString(def) : def}`;
+    }
+    await this.executeMutation(sql);
+  }
+
+  async removeColumn(tableName: string, columnName: string, _type?: string): Promise<void> {
+    await this.alterTable(tableName, (columns) => {
+      delete columns[columnName];
+    });
+  }
+
+  async removeColumns(tableName: string, ...columnNames: string[]): Promise<void> {
+    await this.alterTable(tableName, (columns) => {
+      for (const col of columnNames) {
+        delete columns[col];
+      }
+    });
+  }
+
+  async changeColumnDefault(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<void> {
+    const newDefault =
+      typeof defaultOrChanges === "object" && defaultOrChanges !== null
+        ? (defaultOrChanges as any).to
+        : defaultOrChanges;
+    await this.alterTable(tableName, (columns) => {
+      if (columns[columnName]) {
+        columns[columnName].dflt_value = newDefault === null ? null : String(newDefault);
+      }
+    });
+  }
+
+  async changeColumnNull(
+    tableName: string,
+    columnName: string,
+    allowNull: boolean,
+    defaultValue?: unknown,
+  ): Promise<void> {
+    if (!allowNull && defaultValue !== undefined) {
+      const quotedDefault =
+        defaultValue === null
+          ? "NULL"
+          : typeof defaultValue === "string"
+            ? quoteString(defaultValue)
+            : String(defaultValue);
+      await this.executeMutation(
+        `UPDATE ${quoteTableName(tableName)} SET ${quoteColumnName(columnName)} = ${quotedDefault} WHERE ${quoteColumnName(columnName)} IS NULL`,
+      );
+    }
+    await this.alterTable(tableName, (columns) => {
+      if (columns[columnName]) {
+        columns[columnName].notnull = allowNull ? 0 : 1;
+      }
+    });
+  }
+
+  async changeColumn(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    const sqlType = this.resolveSqlType(type);
+    await this.alterTable(tableName, (columns) => {
+      if (columns[columnName]) {
+        columns[columnName].type = sqlType;
+        if (options?.null !== undefined) columns[columnName].notnull = options.null ? 0 : 1;
+        if (options?.default !== undefined)
+          columns[columnName].dflt_value =
+            options.default === null ? null : String(options.default);
+      }
+    });
+  }
+
+  async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
+    await this.executeMutation(
+      `ALTER TABLE ${quoteTableName(tableName)} RENAME COLUMN ${quoteColumnName(columnName)} TO ${quoteColumnName(newColumnName)}`,
+    );
+  }
+
+  async addTimestamps(tableName: string, options?: Record<string, unknown>): Promise<void> {
+    const opts = {
+      null: false,
+      ...options,
+    };
+    await this.addColumn(tableName, "created_at", "datetime", opts);
+    await this.addColumn(tableName, "updated_at", "datetime", opts);
+  }
+
+  async addReference(
+    tableName: string,
+    refName: string,
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    const type = (options?.type as string) ?? "integer";
+    await this.addColumn(tableName, `${refName}_id`, type, options);
+  }
+
+  async foreignKeys(tableName: string): Promise<
+    Array<{
+      column: string | string[];
+      primaryKey: string | string[];
+      toTable: string;
+      onDelete: string | null;
+      onUpdate: string | null;
+    }>
+  > {
+    const rows = await this.execute(`PRAGMA foreign_key_list(${quoteTableName(tableName)})`);
+    const grouped = new Map<number, Array<Record<string, unknown>>>();
+    for (const row of rows) {
+      const id = row.id as number;
+      if (!grouped.has(id)) grouped.set(id, []);
+      grouped.get(id)!.push(row);
+    }
+
+    const results: Array<{
+      column: string | string[];
+      primaryKey: string | string[];
+      toTable: string;
+      onDelete: string | null;
+      onUpdate: string | null;
+    }> = [];
+
+    for (const group of grouped.values()) {
+      group.sort((a, b) => (a.seq as number) - (b.seq as number));
+      const first = group[0];
+      const onDelete = first.on_delete === "NO ACTION" ? null : (first.on_delete as string);
+      const onUpdate = first.on_update === "NO ACTION" ? null : (first.on_update as string);
+
+      if (group.length === 1) {
+        results.push({
+          column: first.from as string,
+          primaryKey: first.to as string,
+          toTable: first.table as string,
+          onDelete,
+          onUpdate,
+        });
+      } else {
+        results.push({
+          column: group.map((r) => r.from as string),
+          primaryKey: group.map((r) => r.to as string),
+          toTable: first.table as string,
+          onDelete,
+          onUpdate,
+        });
+      }
+    }
+    return results;
+  }
+
+  override buildInsertSql(insert: {
+    into?: string;
+    valuesList?: string;
+    skipDuplicates?: boolean;
+    conflictTarget?: string;
+    update?: string;
+    returning?: string;
+  }): string | null {
+    if (!insert.into) {
+      if (insert.skipDuplicates) return "OR IGNORE";
+      if (insert.update) return "ON CONFLICT DO UPDATE SET";
+      return null;
+    }
+
+    let sql = `INSERT ${insert.into} ${insert.valuesList ?? ""}`;
+    if (insert.skipDuplicates) {
+      sql += ` ON CONFLICT ${insert.conflictTarget ?? ""} DO NOTHING`;
+    } else if (insert.update) {
+      sql += ` ON CONFLICT ${insert.conflictTarget ?? ""} DO UPDATE SET ${insert.update}`;
+    }
+    if (insert.returning) {
+      sql += ` RETURNING ${insert.returning}`;
+    }
+    return sql;
+  }
+
+  override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
+    const oldForeignKeys = (this.db.pragma("foreign_keys") as any[])[0]?.foreign_keys;
+    const oldDefer = (this.db.pragma("defer_foreign_keys") as any[])[0]?.defer_foreign_keys;
+    try {
+      this.db.pragma("defer_foreign_keys = ON");
+      this.db.pragma("foreign_keys = OFF");
+      await fn();
+    } finally {
+      this.db.pragma(`defer_foreign_keys = ${oldDefer ?? 0}`);
+      this.db.pragma(`foreign_keys = ${oldForeignKeys ?? 1}`);
+    }
+  }
+
+  override async checkAllForeignKeysValidBang(): Promise<void> {
+    const violations = this.db.pragma("foreign_key_check") as Array<Record<string, unknown>>;
+    if (violations.length > 0) {
+      const tables = violations.map((r) => r.table).join(", ");
+      throw new StatementInvalid(`Foreign key violations found: ${tables}`, {
+        sql: "PRAGMA foreign_key_check",
+        binds: [],
+      });
+    }
+  }
+
+  // --- Private: alter_table copy strategy (Rails: SQLite3Adapter#alter_table) ---
+
+  private async alterTable(
+    tableName: string,
+    modify: (columns: Record<string, Record<string, unknown>>) => void,
+  ): Promise<void> {
+    const tableInfo = this.db
+      .prepare(`PRAGMA table_info(${quoteTableName(tableName)})`)
+      .all() as Array<Record<string, unknown>>;
+
+    const columns: Record<string, Record<string, unknown>> = {};
+    for (const col of tableInfo) {
+      columns[col.name as string] = { ...col };
+    }
+
+    modify(columns);
+
+    const tmpTable = `_alter_tmp_${tableName}`;
+    const quotedTmp = quoteTableName(tmpTable);
+    const quotedTable = quoteTableName(tableName);
+    const colNames = Object.keys(columns);
+    const colDefs = colNames.map((name) => {
+      const col = columns[name];
+      let def = `${quoteColumnName(name)} ${col.type ?? "TEXT"}`;
+      if (col.pk) def += " PRIMARY KEY";
+      if (col.notnull) def += " NOT NULL";
+      if (col.dflt_value !== null && col.dflt_value !== undefined) {
+        def += ` DEFAULT ${col.dflt_value}`;
+      }
+      return def;
+    });
+
+    const originalColNames = tableInfo
+      .map((c) => c.name as string)
+      .filter((n) => colNames.includes(n));
+
+    this.db.exec(`CREATE TABLE ${quotedTmp} (${colDefs.join(", ")})`);
+    if (originalColNames.length > 0) {
+      const selectCols = originalColNames.map((n) => quoteColumnName(n)).join(", ");
+      this.db.exec(
+        `INSERT INTO ${quotedTmp} (${selectCols}) SELECT ${selectCols} FROM ${quotedTable}`,
+      );
+    }
+    this.db.exec(`DROP TABLE ${quotedTable}`);
+    this.db.exec(`ALTER TABLE ${quotedTmp} RENAME TO ${quotedTable}`);
+    this.schemaCache.clear();
   }
 
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {

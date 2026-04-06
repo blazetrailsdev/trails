@@ -6,7 +6,7 @@ export {
   getPathAsync,
   fsAdapterConfig,
 } from "./fs-adapter.js";
-export type { FsAdapter, PathAdapter } from "./fs-adapter.js";
+export type { FsAdapter, FsStatResult, FsDirent, PathAdapter } from "./fs-adapter.js";
 
 export { registerCryptoAdapter, getCrypto, cryptoAdapterConfig } from "./crypto-adapter.js";
 export type {
@@ -208,14 +208,14 @@ export type { LogLevel, LoggerOutput, TaggedLogger } from "./logger.js";
 export { MemoryStore } from "./cache/memory-store.js";
 export { DupCoder } from "./cache/memory-store.js";
 export { NullStore } from "./cache/null-store.js";
-// FileStore requires node:fs — import from "@blazetrails/activesupport/cache/file-store"
+// FileStore uses getFs()/getPath() adapters but is kept as a subpath import for tree-shaking
 export type { CacheOptions, CacheStore } from "./cache/index.js";
 
 export { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
 export type { DeprecationBehavior } from "./deprecation.js";
 
 export * from "./time-ext.js";
-// MessageEncryptor/MessageVerifier require node:crypto — use subpath imports:
+// MessageEncryptor/MessageVerifier use getCrypto() adapter but are kept as subpath imports:
 //   import { MessageVerifier } from "@blazetrails/activesupport/message-verifier"
 //   import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor"
 
@@ -264,7 +264,7 @@ export {
   xmlNameEscape,
   isHtmlSafe,
 } from "./core-ext/string/output-safety.js";
-// KeyGenerator requires node:crypto — import from "@blazetrails/activesupport/key-generator"
+// KeyGenerator uses getCrypto() adapter — import from "@blazetrails/activesupport/key-generator"
 export { BacktraceCleaner } from "./backtrace-cleaner.js";
 export { OrderedHash } from "./ordered-hash.js";
 export { ErrorReporter } from "./error-reporter.js";
@@ -305,7 +305,7 @@ export { objectWith } from "./core-ext/object/with.js";
 export { ArrayInquirer, arrayInquiry } from "./array-inquirer.js";
 export { tryCall, tryWith, tryBang } from "./try.js";
 export { OrderedOptions, InheritableOptions } from "./ordered-options.js";
-// Digest/SecurityUtils/ConfigurationFile require node:crypto/node:fs — use subpath imports:
+// Digest/SecurityUtils/ConfigurationFile use adapter pattern — kept as subpath imports:
 //   import { Digest } from "@blazetrails/activesupport/digest"
 //   import { SecurityUtils } from "@blazetrails/activesupport/security-utils"
 //   import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file"

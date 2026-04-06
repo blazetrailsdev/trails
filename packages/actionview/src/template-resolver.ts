@@ -19,8 +19,7 @@
  *   }
  */
 
-import * as fs from "fs";
-import * as path from "path";
+import { getFs, getPath } from "@blazetrails/activesupport";
 import type { Template } from "./template.js";
 
 /**
@@ -63,14 +62,14 @@ export class FileSystemResolver implements TemplateResolver {
   constructor(private basePath: string) {}
 
   find(name: string, prefix: string, format: string, extensions: string[]): Template | null {
-    const dir = path.join(this.basePath, prefix);
+    const dir = getPath().join(this.basePath, prefix);
 
     for (const ext of extensions) {
       // Try format-specific first: index.html.ejs
-      const formatPath = path.join(dir, `${name}.${format}.${ext}`);
-      if (fs.existsSync(formatPath)) {
+      const formatPath = getPath().join(dir, `${name}.${format}.${ext}`);
+      if (getFs().existsSync(formatPath)) {
         return {
-          source: fs.readFileSync(formatPath, "utf-8"),
+          source: getFs().readFileSync(formatPath, "utf-8"),
           extension: ext,
           identifier: `${prefix}/${name}`,
           format,
@@ -80,10 +79,10 @@ export class FileSystemResolver implements TemplateResolver {
       }
 
       // Fallback: index.ejs
-      const plainPath = path.join(dir, `${name}.${ext}`);
-      if (fs.existsSync(plainPath)) {
+      const plainPath = getPath().join(dir, `${name}.${ext}`);
+      if (getFs().existsSync(plainPath)) {
         return {
-          source: fs.readFileSync(plainPath, "utf-8"),
+          source: getFs().readFileSync(plainPath, "utf-8"),
           extension: ext,
           identifier: `${prefix}/${name}`,
           format,

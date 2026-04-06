@@ -68,7 +68,7 @@ export class CookieStore {
 
   /** Generate a new session ID. */
   generateSessionId(): string {
-    return Buffer.from(getCrypto().randomBytes(16)).toString("hex");
+    return getCrypto().randomBytes(16).toString("hex");
   }
 
   /** Load session data from a cookie value. Returns null if invalid/tampered. */
@@ -170,7 +170,7 @@ export class CookieStore {
   private encrypt(data: string): string {
     const crypto = getCrypto();
     const key = Buffer.from(this.secret.slice(0, 32), "utf-8");
-    const iv = Buffer.from(crypto.randomBytes(16));
+    const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
     let encrypted = cipher.update(data, "utf-8", "base64");
     encrypted += cipher.final("base64");

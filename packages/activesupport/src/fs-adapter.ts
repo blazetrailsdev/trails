@@ -2,16 +2,46 @@
  * Filesystem adapter — mirrors the Rails adapter pattern.
  */
 
+export interface FsStatResult {
+  isDirectory(): boolean;
+  isFile(): boolean;
+  size: number;
+  mtime: Date;
+}
+
+export interface FsDirent {
+  name: string;
+  isDirectory(): boolean;
+  isFile(): boolean;
+}
+
 export interface FsAdapter {
-  readFileSync(path: string, encoding: "utf-8"): string;
-  writeFileSync(path: string, content: string, options?: { mode?: number }): void;
+  readFileSync(path: string, encoding: "utf-8" | "utf8" | "latin1"): string;
+  readFileSync(path: string): Buffer;
+  writeFileSync(
+    path: string,
+    content: string | Buffer | Uint8Array,
+    options?: { mode?: number } | string,
+  ): void;
   existsSync(path: string): boolean;
   mkdirSync(path: string, options?: { recursive?: boolean }): void;
   appendFileSync(path: string, content: string): void;
   unlinkSync(path: string): void;
   readdirSync(path: string): string[];
+  readdirSync(path: string, options: { withFileTypes: true }): FsDirent[];
   rmSync(path: string, options?: { recursive?: boolean; force?: boolean }): void;
-  statSync(path: string): { isDirectory(): boolean; isFile(): boolean };
+  rmdirSync(path: string): void;
+  statSync(path: string): FsStatResult;
+  openSync(path: string, flags: string): number;
+  readSync(
+    fd: number,
+    buffer: Buffer | Uint8Array,
+    offset: number,
+    length: number,
+    position: number | null,
+  ): number;
+  closeSync(fd: number): void;
+  copyFileSync(src: string, dest: string): void;
 }
 
 export interface PathAdapter {
@@ -20,6 +50,7 @@ export interface PathAdapter {
   basename(p: string): string;
   resolve(...parts: string[]): string;
   extname(p: string): string;
+  sep: string;
 }
 
 interface FsRegistration {

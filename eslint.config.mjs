@@ -5,6 +5,7 @@ import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 import unusedImports from "eslint-plugin-unused-imports";
 import vitest from "@vitest/eslint-plugin";
+import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
 
 export default defineConfig(
   {
@@ -47,6 +48,37 @@ export default defineConfig(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+
+  // ── no-node-builtins (browser compat) ──
+  {
+    files: [
+      "packages/arel/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+      "packages/activerecord/src/**/*.ts",
+      "packages/activesupport/src/**/*.ts",
+      "packages/rack/src/**/*.ts",
+      "packages/actionpack/src/**/*.ts",
+      "packages/actionview/src/**/*.ts",
+    ],
+    ignores: [
+      "**/*.test.ts",
+      // Adapter implementations — these ARE the abstraction layer
+      "packages/activesupport/src/fs-adapter.ts",
+      "packages/activesupport/src/crypto-adapter.ts",
+      // Node-only modules exposed via subpath imports (no browser equivalent)
+      "packages/activesupport/src/gzip.ts",
+      "packages/rack/src/deflater.ts",
+      "packages/activerecord/src/encryption/config.ts",
+      "packages/activerecord/src/encryption/context.ts",
+      "packages/activerecord/src/connection-handling.ts",
+    ],
+    plugins: {
+      blazetrails: { rules: { "no-node-builtins": noNodeBuiltins } },
+    },
+    rules: {
+      "blazetrails/no-node-builtins": "error",
     },
   },
 

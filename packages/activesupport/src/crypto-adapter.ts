@@ -2,8 +2,27 @@
  * Crypto adapter — mirrors the Rails adapter pattern.
  */
 
+export interface CipherAdapter {
+  update(data: string, inputEncoding: string, outputEncoding: string): string;
+  update(data: string | Uint8Array, inputEncoding?: string): Buffer;
+  final(outputEncoding: string): string;
+  final(): Buffer;
+  setAAD?(buffer: Uint8Array): this;
+  getAuthTag?(): Buffer;
+  setAuthTag?(tag: Uint8Array): this;
+}
+
+export interface DecipherAdapter {
+  update(data: string, inputEncoding: string, outputEncoding: string): string;
+  update(data: Uint8Array): Uint8Array;
+  final(outputEncoding: string): string;
+  final(): Uint8Array;
+  setAuthTag?(tag: Uint8Array): void;
+}
+
 export interface CryptoAdapter {
-  randomBytes(size: number): Uint8Array;
+  randomBytes(size: number): Buffer;
+  randomUUID(): string;
   createHash(algorithm: string): HashAdapter;
   createHmac(algorithm: string, key: string | Uint8Array): HmacAdapter;
   createCipheriv(
@@ -24,42 +43,29 @@ export interface CryptoAdapter {
     iterations: number,
     keylen: number,
     digest: string,
-  ): Uint8Array;
+  ): Buffer;
   timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
 }
 
 export interface HashAdapter {
   update(data: string | Uint8Array): HashAdapter;
-  digest(): Uint8Array;
-  digest(encoding: "hex" | "base64"): string;
+  digest(): Buffer;
+  digest(encoding: string): string;
 }
 
 export interface HmacAdapter {
   update(data: string | Uint8Array): HmacAdapter;
-  digest(): Uint8Array;
-  digest(encoding: "hex" | "base64"): string;
-}
-
-export interface CipherAdapter {
-  update(data: string, inputEncoding: string, outputEncoding: string): string;
-  update(data: Uint8Array): Uint8Array;
-  final(outputEncoding: string): string;
-  final(): Uint8Array;
-  getAuthTag?(): Uint8Array;
-}
-
-export interface DecipherAdapter {
-  update(data: string, inputEncoding: string, outputEncoding: string): string;
-  update(data: Uint8Array): Uint8Array;
-  final(outputEncoding: string): string;
-  final(): Uint8Array;
-  setAuthTag?(tag: Uint8Array): void;
+  digest(): Buffer;
+  digest(encoding: string): string;
 }
 
 function wrapNodeCrypto(nodeCrypto: typeof import("node:crypto")): CryptoAdapter {
   return {
-    randomBytes(size: number): Uint8Array {
+    randomBytes(size: number): Buffer {
       return nodeCrypto.randomBytes(size);
+    },
+    randomUUID(): string {
+      return nodeCrypto.randomUUID();
     },
     createHash(algorithm: string): HashAdapter {
       return nodeCrypto.createHash(algorithm) as unknown as HashAdapter;
@@ -93,8 +99,8 @@ function wrapNodeCrypto(nodeCrypto: typeof import("node:crypto")): CryptoAdapter
         options as any,
       ) as unknown as DecipherAdapter;
     },
-    pbkdf2Sync(password, salt, iterations, keylen, digest): Uint8Array {
-      return new Uint8Array(nodeCrypto.pbkdf2Sync(password, salt, iterations, keylen, digest));
+    pbkdf2Sync(password, salt, iterations, keylen, digest): Buffer {
+      return nodeCrypto.pbkdf2Sync(password, salt, iterations, keylen, digest);
     },
     timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
       return nodeCrypto.timingSafeEqual(a, b);

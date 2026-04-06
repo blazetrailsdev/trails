@@ -19,7 +19,7 @@ export class KeyGenerator {
    * Returns the key as a Buffer.
    */
   generateKey(salt: string, keySize: number = 64): Buffer {
-    return Buffer.from(getCrypto().pbkdf2Sync(this.secret, salt, this.iterations, keySize, "sha1"));
+    return getCrypto().pbkdf2Sync(this.secret, salt, this.iterations, keySize, "sha1");
   }
 
   inspect(): string {

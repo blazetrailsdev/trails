@@ -235,8 +235,7 @@ export const DigestAuth = {
 
   /** Calculate HA1 for a user. */
   ha1(username: string, realm: string, password: string): string {
-    const crypto = getCrypto();
-    return crypto.createHash("md5").update(`${username}:${realm}:${password}`).digest("hex");
+    return getCrypto().createHash("md5").update(`${username}:${realm}:${password}`).digest("hex");
   },
 
   /** Check if the authorization header contains Digest credentials. */
@@ -251,8 +250,7 @@ export const DigestAuth = {
     options: { qop?: string; opaque?: string } = {},
   ): [number, Record<string, string>, string] {
     const nonce = DigestAuth.generateNonce(secret);
-    const crypto = getCrypto();
-    const opaque = options.opaque ?? Buffer.from(crypto.randomBytes(16)).toString("hex");
+    const opaque = options.opaque ?? getCrypto().randomBytes(16).toString("hex");
     const qop = options.qop ?? "auth";
     return [
       401,

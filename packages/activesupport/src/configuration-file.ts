@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { getFs } from "./fs-adapter.js";
 import { parse as yamlParse } from "yaml";
 
 export class FormatError extends Error {
@@ -14,7 +14,7 @@ export class ConfigurationFile {
 
   constructor(contentPath: string) {
     this.contentPath = contentPath;
-    this.content = readFileSync(contentPath, "utf8");
+    this.content = getFs().readFileSync(contentPath, "utf8");
   }
 
   static parse(contentPath: string): Record<string, unknown> {

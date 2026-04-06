@@ -6,8 +6,7 @@
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
-import * as fs from "fs";
-import * as path from "path";
+import { getFs, getPath } from "@blazetrails/activesupport";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -29,7 +28,7 @@ export class Static {
 
   constructor(app: RackApp, options: StaticOptions) {
     this.app = app;
-    this.root = path.resolve(options.root);
+    this.root = getPath().resolve(options.root);
     this.index = options.index ?? "index.html";
     this.headers = options.headers ?? {};
     this.gzip = options.gzip !== false;
@@ -68,13 +67,13 @@ export class Static {
   private tryServe(requestPath: string, env: RackEnv): RackResponse | null {
     let filePath: string;
     try {
-      filePath = path.join(this.root, decodeURIComponent(requestPath));
+      filePath = getPath().join(this.root, decodeURIComponent(requestPath));
     } catch {
       return null;
     }
 
     // Security: ensure resolved path is within root
-    const resolved = path.resolve(filePath);
+    const resolved = getPath().resolve(filePath);
     if (!resolved.startsWith(this.root)) {
       return null;
     }
@@ -113,7 +112,7 @@ export class Static {
 
     // Try directory index
     if (this.isDirectory(filePath)) {
-      const indexPath = path.join(filePath, this.index);
+      const indexPath = getPath().join(filePath, this.index);
       if (this.isFile(indexPath)) {
         return this.serveFile(indexPath, indexPath);
       }
@@ -133,7 +132,7 @@ export class Static {
     originalPath: string,
     extraHeaders: Record<string, string> = {},
   ): RackResponse {
-    const content = fs.readFileSync(actualPath);
+    const content = getFs().readFileSync(actualPath);
     const contentType = this.getMimeType(originalPath);
 
     const headers: Record<string, string> = {
@@ -148,7 +147,7 @@ export class Static {
 
   private isFile(p: string): boolean {
     try {
-      return fs.statSync(p).isFile();
+      return getFs().statSync(p).isFile();
     } catch {
       return false;
     }
@@ -156,14 +155,14 @@ export class Static {
 
   private isDirectory(p: string): boolean {
     try {
-      return fs.statSync(p).isDirectory();
+      return getFs().statSync(p).isDirectory();
     } catch {
       return false;
     }
   }
 
   private getMimeType(filePath: string): string {
-    const ext = path.extname(filePath).toLowerCase();
+    const ext = getPath().extname(filePath).toLowerCase();
     return MIME_TYPES[ext] ?? "application/octet-stream";
   }
 }

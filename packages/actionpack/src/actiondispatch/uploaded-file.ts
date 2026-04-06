@@ -4,8 +4,8 @@
  * Represents a file uploaded via multipart form data.
  */
 
-import * as path from "path";
-import * as fs from "fs";
+import { getPath } from "@blazetrails/activesupport";
+import { getFs } from "@blazetrails/activesupport";
 
 export interface UploadedFileOptions {
   filename?: string;
@@ -41,7 +41,7 @@ export class UploadedFile {
 
   /** The file extension (including dot). */
   get extname(): string {
-    return path.extname(this.originalFilename);
+    return getPath().extname(this.originalFilename);
   }
 
   /** The file size in bytes. */
@@ -49,7 +49,7 @@ export class UploadedFile {
     if (this._content) return this._content.length;
     if (this._tempfile) {
       try {
-        return fs.statSync(this._tempfile).size;
+        return getFs().statSync(this._tempfile).size;
       } catch {
         return 0;
       }
@@ -61,7 +61,7 @@ export class UploadedFile {
   read(): Buffer {
     if (this._content) return this._content;
     if (this._tempfile) {
-      return fs.readFileSync(this._tempfile);
+      return getFs().readFileSync(this._tempfile);
     }
     return Buffer.alloc(0);
   }
@@ -91,11 +91,11 @@ export class UploadedFile {
     if (unlink && this._tempfile) {
       const tempPath = this._tempfile;
       try {
-        fs.unlinkSync(tempPath);
+        getFs().unlinkSync(tempPath);
         this._tempfile = null;
       } catch {
         try {
-          if (!fs.existsSync(tempPath)) {
+          if (!getFs().existsSync(tempPath)) {
             this._tempfile = null;
           }
         } catch {

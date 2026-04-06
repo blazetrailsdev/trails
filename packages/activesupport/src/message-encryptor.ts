@@ -3,13 +3,7 @@
  * Mirrors ActiveSupport::MessageEncryptor.
  */
 
-import {
-  createCipheriv,
-  createDecipheriv,
-  randomBytes,
-  createHmac,
-  timingSafeEqual,
-} from "node:crypto";
+import { getCrypto } from "./crypto-adapter.js";
 
 export class InvalidMessage extends Error {
   constructor(message = "Invalid message") {
@@ -107,9 +101,9 @@ export class MessageEncryptor {
     const keyLength = this.keyLength();
     const key = this.secret.slice(0, keyLength);
     const ivLength = this.ivLength();
-    const iv = randomBytes(ivLength);
+    const iv = getCrypto().randomBytes(ivLength);
 
-    const cipher = createCipheriv(this.cipher, key, iv);
+    const cipher = getCrypto().createCipheriv(this.cipher, key, iv);
     const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
 
     const encryptedB64 = encrypted.toString("base64");
@@ -138,7 +132,7 @@ export class MessageEncryptor {
     const key = this.secret.slice(0, keyLength);
 
     try {
-      const decipher = createDecipheriv(this.cipher, key, iv);
+      const decipher = getCrypto().createDecipheriv(this.cipher, key, iv);
       const decrypted = Buffer.concat([decipher.update(encryptedBuf), decipher.final()]);
       return decrypted.toString("utf8");
     } catch {
@@ -147,7 +141,7 @@ export class MessageEncryptor {
   }
 
   private sign(data: string): string {
-    return createHmac(this.digest, this.signSecret).update(data).digest("hex");
+    return getCrypto().createHmac(this.digest, this.signSecret).update(data).digest("hex");
   }
 
   private verifySignature(data: string, signature: string): boolean {
@@ -156,7 +150,7 @@ export class MessageEncryptor {
       const expectedBuf = Buffer.from(expected, "hex");
       const sigBuf = Buffer.from(signature, "hex");
       if (sigBuf.length !== expectedBuf.length) return false;
-      return timingSafeEqual(sigBuf, expectedBuf);
+      return getCrypto().timingSafeEqual(sigBuf, expectedBuf);
     } catch {
       return false;
     }

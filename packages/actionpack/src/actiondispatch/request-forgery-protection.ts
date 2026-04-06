@@ -61,8 +61,7 @@ export class RequestForgeryProtection {
 
   /** Generate a new random CSRF token (base64-encoded). */
   static generateToken(): string {
-    const crypto = getCrypto();
-    return Buffer.from(crypto.randomBytes(AUTHENTICITY_TOKEN_LENGTH)).toString("base64");
+    return getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH).toString("base64");
   }
 
   /** Get or create the real (unmasked) token stored in the session. */
@@ -78,8 +77,7 @@ export class RequestForgeryProtection {
   /** Create a masked version of the token for embedding in forms/meta tags. */
   maskToken(rawToken: string): string {
     const tokenBytes = Buffer.from(rawToken, "base64");
-    const crypto = getCrypto();
-    const otp = Buffer.from(crypto.randomBytes(AUTHENTICITY_TOKEN_LENGTH));
+    const otp = getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH);
     const masked = Buffer.alloc(AUTHENTICITY_TOKEN_LENGTH * 2);
     otp.copy(masked, 0);
     for (let i = 0; i < AUTHENTICITY_TOKEN_LENGTH; i++) {
@@ -98,8 +96,7 @@ export class RequestForgeryProtection {
     const normalizedPath = this.normalizePath(actionPath);
     const normalizedMethod = method.toUpperCase();
     const message = `${normalizedPath}#${normalizedMethod}`;
-    const crypto = getCrypto();
-    const hmac = Buffer.from(crypto.createHmac("sha256", realToken).update(message).digest());
+    const hmac = getCrypto().createHmac("sha256", realToken).update(message).digest();
     // Take first AUTHENTICITY_TOKEN_LENGTH bytes and mask
     const perFormToken = hmac.subarray(0, AUTHENTICITY_TOKEN_LENGTH).toString("base64");
     return this.maskToken(perFormToken);
@@ -146,8 +143,7 @@ export class RequestForgeryProtection {
       const normalizedPath = this.normalizePath(options.actionPath);
       const normalizedMethod = options.method.toUpperCase();
       const message = `${normalizedPath}#${normalizedMethod}`;
-      const crypto = getCrypto();
-      const hmac = Buffer.from(crypto.createHmac("sha256", realToken).update(message).digest());
+      const hmac = getCrypto().createHmac("sha256", realToken).update(message).digest();
       const expectedPerForm = hmac.subarray(0, AUTHENTICITY_TOKEN_LENGTH).toString("base64");
       if (this.secureCompare(unmasked, expectedPerForm)) return true;
     }

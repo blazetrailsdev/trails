@@ -1,5 +1,4 @@
-import * as fs from "fs";
-import * as path from "path";
+import { getFs, getPath } from "@blazetrails/activesupport";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
 
@@ -27,7 +26,7 @@ export class Static {
   constructor(app: any, opts: StaticOptions = {}) {
     this.app = app;
     this.urls = opts.urls || ["/"];
-    this.root = opts.root ? path.resolve(opts.root) : process.cwd();
+    this.root = opts.root ? getPath().resolve(opts.root) : process.cwd();
     this.index = opts.index || null;
     this.cascade = opts.cascade || false;
     this.headerRules = opts.header_rules || [];
@@ -52,13 +51,13 @@ export class Static {
     // Try gzip version first
     if (this.gzip && this.acceptsGzip(env)) {
       const gzPath = servePath + ".gz";
-      const fullGzPath = path.join(this.root, gzPath);
-      if (fs.existsSync(fullGzPath) && !fs.statSync(fullGzPath).isDirectory()) {
+      const fullGzPath = getPath().join(this.root, gzPath);
+      if (getFs().existsSync(fullGzPath) && !getFs().statSync(fullGzPath).isDirectory()) {
         const [status, headers, body] = this.fileServer.serving(env, gzPath);
         if (status === 200 || status === 304) {
           headers["content-encoding"] = "gzip";
           // Use original content type
-          const origExt = path.extname(servePath);
+          const origExt = getPath().extname(servePath);
           if (origExt) {
             const mime = mimeType(origExt, "text/plain");
             if (mime) headers["content-type"] = mime;

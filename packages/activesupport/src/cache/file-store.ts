@@ -1,14 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  unlinkSync,
-  readdirSync,
-  statSync,
-  rmdirSync,
-} from "node:fs";
-import { join, dirname } from "node:path";
+import { getFs, getPath } from "../fs-adapter.js";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { type CacheEntry, namespaceKey, isExpired } from "./entry.js";
 
@@ -45,13 +35,13 @@ export class FileStore implements CacheStore {
         safeParts.push(remaining);
       }
     }
-    return join(this.cacheDir, ...safeParts);
+    return getPath().join(this.cacheDir, ...safeParts);
   }
 
   private readFile(filePath: string): CacheEntry | null {
     try {
-      if (!existsSync(filePath)) return null;
-      const data = readFileSync(filePath, "utf-8");
+      if (!getFs().existsSync(filePath)) return null;
+      const data = getFs().readFileSync(filePath, "utf-8");
       return JSON.parse(data) as CacheEntry;
     } catch {
       return null;
@@ -59,9 +49,9 @@ export class FileStore implements CacheStore {
   }
 
   private writeFile(filePath: string, entry: CacheEntry): void {
-    const dir = dirname(filePath);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(filePath, JSON.stringify(entry), "utf-8");
+    const dir = getPath().dirname(filePath);
+    getFs().mkdirSync(dir, { recursive: true });
+    getFs().writeFileSync(filePath, JSON.stringify(entry), "utf-8");
   }
 
   read(key: string, options?: CacheOptions): unknown {
@@ -71,7 +61,7 @@ export class FileStore implements CacheStore {
     if (!entry) return null;
     if (isExpired(entry)) {
       try {
-        unlinkSync(filePath);
+        getFs().unlinkSync(filePath);
       } catch {}
       return null;
     }
@@ -98,8 +88,8 @@ export class FileStore implements CacheStore {
     const rk = this.resolveKey(key, options);
     const filePath = this.keyToPath(rk);
     try {
-      if (existsSync(filePath)) {
-        unlinkSync(filePath);
+      if (getFs().existsSync(filePath)) {
+        getFs().unlinkSync(filePath);
         return true;
       }
     } catch {}
@@ -137,25 +127,25 @@ export class FileStore implements CacheStore {
   }
 
   clear(): void {
-    if (!existsSync(this.cacheDir)) return;
+    if (!getFs().existsSync(this.cacheDir)) return;
     this.clearDir(this.cacheDir, true);
   }
 
   private clearDir(dir: string, isRoot: boolean): void {
     try {
-      const entries = readdirSync(dir);
+      const entries = getFs().readdirSync(dir);
       for (const entry of entries) {
         if (isRoot && (entry === ".gitkeep" || entry === ".keep")) continue;
-        const fullPath = join(dir, entry);
-        const stat = statSync(fullPath);
+        const fullPath = getPath().join(dir, entry);
+        const stat = getFs().statSync(fullPath);
         if (stat.isDirectory()) {
           this.clearDir(fullPath, false);
           try {
-            rmdirSync(fullPath);
+            getFs().rmdirSync(fullPath);
           } catch {}
         } else {
           try {
-            unlinkSync(fullPath);
+            getFs().unlinkSync(fullPath);
           } catch {}
         }
       }
@@ -163,23 +153,23 @@ export class FileStore implements CacheStore {
   }
 
   cleanup(): void {
-    if (!existsSync(this.cacheDir)) return;
+    if (!getFs().existsSync(this.cacheDir)) return;
     this.cleanupDir(this.cacheDir);
   }
 
   private cleanupDir(dir: string): void {
     try {
-      const entries = readdirSync(dir);
+      const entries = getFs().readdirSync(dir);
       for (const entry of entries) {
-        const fullPath = join(dir, entry);
+        const fullPath = getPath().join(dir, entry);
         try {
-          const stat = statSync(fullPath);
+          const stat = getFs().statSync(fullPath);
           if (stat.isDirectory()) {
             this.cleanupDir(fullPath);
           } else {
             const data = this.readFile(fullPath);
             if (data && isExpired(data)) {
-              unlinkSync(fullPath);
+              getFs().unlinkSync(fullPath);
             }
           }
         } catch {}
@@ -211,24 +201,24 @@ export class FileStore implements CacheStore {
   }
 
   deleteMatched(pattern: string | RegExp): void {
-    if (!existsSync(this.cacheDir)) return;
+    if (!getFs().existsSync(this.cacheDir)) return;
     const re = typeof pattern === "string" ? new RegExp(pattern) : pattern;
     this.deleteMatchedInDir(this.cacheDir, re);
   }
 
   private deleteMatchedInDir(dir: string, re: RegExp): void {
     try {
-      const entries = readdirSync(dir);
+      const entries = getFs().readdirSync(dir);
       for (const entry of entries) {
-        const fullPath = join(dir, entry);
+        const fullPath = getPath().join(dir, entry);
         try {
-          const stat = statSync(fullPath);
+          const stat = getFs().statSync(fullPath);
           if (stat.isDirectory()) {
             this.deleteMatchedInDir(fullPath, re);
           } else {
             const relPath = fullPath.slice(this.cacheDir.length + 1);
             if (re.test(relPath)) {
-              unlinkSync(fullPath);
+              getFs().unlinkSync(fullPath);
             }
           }
         } catch {}

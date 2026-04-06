@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import {
   Table,
   SelectManager,
@@ -3660,7 +3660,7 @@ export class Relation<T extends Base> {
   computeCacheKey(): string {
     const tableName = this._modelClass.tableName;
     const sql = this.toSql();
-    const digest = createHash("md5").update(sql).digest("hex");
+    const digest = getCrypto().createHash("md5").update(sql).digest("hex");
     return `${tableName}/query-${digest}`;
   }
 

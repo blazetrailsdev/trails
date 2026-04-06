@@ -1,5 +1,4 @@
-import * as fs from "fs";
-import * as path from "path";
+import { getFs, getPath } from "@blazetrails/activesupport";
 
 export class MultipartPartLimitError extends Error {
   constructor(message = "exceeded multipart part limit") {
@@ -543,12 +542,12 @@ export class UploadedFile {
     opts: { binary?: boolean; content_type?: string } = {},
   ) {
     if (typeof pathOrOpts === "string") {
-      if (!fs.existsSync(pathOrOpts)) {
+      if (!getFs().existsSync(pathOrOpts)) {
         throw new Error(`no such file to load -- ${pathOrOpts}`);
       }
       this.path = pathOrOpts;
       this._io = null;
-      this.filename = path.basename(pathOrOpts);
+      this.filename = getPath().basename(pathOrOpts);
       this.contentType = opts.content_type || "text/plain";
       this._binary = opts.binary || false;
     } else {
@@ -566,7 +565,7 @@ export class UploadedFile {
       return String(this._io);
     }
     if (this.path) {
-      return fs.readFileSync(this.path, this._binary ? "latin1" : "utf-8");
+      return getFs().readFileSync(this.path, this._binary ? "latin1" : "utf-8");
     }
     return "";
   }

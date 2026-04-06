@@ -1,4 +1,4 @@
-import { randomBytes, pbkdf2Sync } from "node:crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 /**
@@ -18,8 +18,8 @@ const KEY_LENGTH = 32;
 const SALT_LENGTH = 16;
 
 function hashPassword(password: string): string {
-  const salt = randomBytes(SALT_LENGTH);
-  const hash = pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, "sha256");
+  const salt = getCrypto().randomBytes(SALT_LENGTH);
+  const hash = getCrypto().pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, "sha256");
   return `${salt.toString("hex")}:${hash.toString("hex")}`;
 }
 
@@ -27,7 +27,7 @@ function verifyPassword(password: string, digest: string): boolean {
   const [saltHex, hashHex] = digest.split(":");
   if (!saltHex || !hashHex) return false;
   const salt = Buffer.from(saltHex, "hex");
-  const hash = pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, "sha256");
+  const hash = getCrypto().pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, "sha256");
   return hash.toString("hex") === hashHex;
 }
 

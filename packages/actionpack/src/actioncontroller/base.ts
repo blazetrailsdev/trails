@@ -5,8 +5,7 @@
  * flash, CSRF, content negotiation, caching, rescue, and more.
  */
 
-import * as fs from "fs";
-import * as path from "path";
+import { getFs, getPath, getCrypto, Notifications } from "@blazetrails/activesupport";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../actiondispatch/flash.js";
 import { RequestForgeryProtection } from "../actiondispatch/request-forgery-protection.js";
@@ -15,9 +14,7 @@ import { UnknownFormat } from "./metal/exceptions.js";
 import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract-controller.js";
 import { LookupContext } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../actiondispatch/routing/route-helpers.js";
-import { getCrypto } from "@blazetrails/activesupport";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
-import { Notifications } from "@blazetrails/activesupport";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -435,9 +432,9 @@ export class Base extends Metal {
     filePath: string,
     options: { type?: string; disposition?: string; filename?: string } = {},
   ): void {
-    const content = fs.readFileSync(filePath);
-    const filename = options.filename ?? path.basename(filePath);
-    const ext = path.extname(filename).toLowerCase();
+    const content = getFs().readFileSync(filePath);
+    const filename = options.filename ?? getPath().basename(filePath);
+    const ext = getPath().extname(filename).toLowerCase();
 
     this.contentType = options.type ?? SEND_FILE_MIME_TYPES[ext] ?? "application/octet-stream";
     this.body = content.toString();
@@ -461,7 +458,7 @@ export class Base extends Metal {
 
     let guessedType = "application/octet-stream";
     if (options.filename) {
-      const ext = path.extname(options.filename).toLowerCase();
+      const ext = getPath().extname(options.filename).toLowerCase();
       guessedType = SEND_FILE_MIME_TYPES[ext] ?? "application/octet-stream";
     }
     this.contentType = options.type ?? guessedType;
@@ -539,8 +536,7 @@ export class Base extends Metal {
   }
 
   private _generateEtag(seed: string): string {
-    const crypto = getCrypto();
-    const hash = crypto.createHash("sha256").update(seed).digest("hex").slice(0, 32);
+    const hash = getCrypto().createHash("sha256").update(seed).digest("hex").slice(0, 32);
     return `W/"${hash}"`;
   }
 

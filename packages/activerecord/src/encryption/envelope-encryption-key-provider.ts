@@ -43,6 +43,6 @@ export class EnvelopeEncryptionKeyProvider {
   }
 
   generateRandomEncryptionKey(): string {
-    return Buffer.from(getCrypto().randomBytes(32)).toString("base64");
+    return getCrypto().randomBytes(32).toString("base64");
   }
 }

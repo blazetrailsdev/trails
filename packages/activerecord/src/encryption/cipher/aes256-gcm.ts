@@ -33,14 +33,11 @@ export class Cipher {
     const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
     let iv: Buffer;
     if (options?.deterministic ?? this.deterministic) {
-      iv = Buffer.from(crypto.createHash("sha256").update(data).update(key).digest()).subarray(
-        0,
-        IV_LENGTH,
-      );
+      iv = crypto.createHash("sha256").update(data).update(key).digest().subarray(0, IV_LENGTH);
     } else {
-      iv = Buffer.from(crypto.randomBytes(IV_LENGTH));
+      iv = crypto.randomBytes(IV_LENGTH);
     }
-    const cipher = crypto.createCipheriv("aes-256-gcm", keyBuf, iv, {
+    const cipher = getCrypto().createCipheriv("aes-256-gcm", keyBuf, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
     const encrypted = Buffer.concat([
@@ -69,7 +66,7 @@ export class Cipher {
     for (const key of keyList) {
       try {
         const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
-        const decipher = crypto.createDecipheriv("aes-256-gcm", keyBuf, ivBuf, {
+        const decipher = getCrypto().createDecipheriv("aes-256-gcm", keyBuf, ivBuf, {
           authTagLength: AUTH_TAG_LENGTH,
         });
         if (!decipher.setAuthTag) {

@@ -117,7 +117,11 @@ importers:
 
   packages/arel: {}
 
-  packages/rack: {}
+  packages/rack:
+    dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
 
   packages/railties:
     dependencies:

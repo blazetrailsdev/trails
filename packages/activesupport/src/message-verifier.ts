@@ -3,7 +3,7 @@
  * Mirrors ActiveSupport::MessageVerifier.
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { getCrypto } from "./crypto-adapter.js";
 
 export class InvalidSignature extends Error {
   constructor(message = "Invalid signature") {
@@ -140,14 +140,14 @@ export class MessageVerifier {
       const expectedBuf = Buffer.from(expectedSig, "hex");
 
       if (sigBuf.length !== expectedBuf.length) return false;
-      return timingSafeEqual(sigBuf, expectedBuf);
+      return getCrypto().timingSafeEqual(sigBuf, expectedBuf);
     } catch {
       return false;
     }
   }
 
   private sign(data: string): string {
-    return createHmac(this.digest, this.secret).update(data).digest("hex");
+    return getCrypto().createHmac(this.digest, this.secret).update(data).digest("hex");
   }
 
   private encode(buf: Buffer): string {

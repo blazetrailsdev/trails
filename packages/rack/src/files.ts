@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import { getFs, getPath } from "@blazetrails/activesupport";
+import type { FsStatResult } from "@blazetrails/activesupport";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import { mimeType } from "./mime.js";
 
@@ -13,7 +13,7 @@ export class Files {
     headers: Record<string, string> = {},
     defaultMime: string | null = "text/plain",
   ) {
-    this.root = root ? path.resolve(root) : "";
+    this.root = root ? getPath().resolve(root) : "";
     this.headers = headers;
     this.defaultMime = defaultMime;
   }
@@ -41,17 +41,17 @@ export class Files {
       return [400, { [CONTENT_TYPE]: "text/plain" }, ["Bad Request"]];
     }
 
-    const filePath = this.root ? path.join(this.root, decodedPath) : decodedPath;
-    const resolved = path.resolve(filePath);
+    const filePath = this.root ? getPath().join(this.root, decodedPath) : decodedPath;
+    const resolved = getPath().resolve(filePath);
 
-    // Directory traversal check
-    if (this.root && !resolved.startsWith(this.root)) {
+    // Directory traversal check — separator-aware boundary
+    if (this.root && resolved !== this.root && !resolved.startsWith(this.root + getPath().sep)) {
       return [404, { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: "10" }, ["Not Found\n"]];
     }
 
-    let stat: fs.Stats;
+    let stat: FsStatResult;
     try {
-      stat = fs.statSync(resolved);
+      stat = getFs().statSync(resolved);
     } catch {
       return [404, { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: "10" }, ["Not Found\n"]];
     }
@@ -64,7 +64,7 @@ export class Files {
     const headers: Record<string, string> = { ...this.headers };
 
     // MIME type
-    const ext = path.extname(resolved);
+    const ext = getPath().extname(resolved);
     const mime = mimeType(ext, this.defaultMime);
     if (mime) {
       headers[CONTENT_TYPE] = mime;
@@ -126,9 +126,9 @@ export class Files {
       }
 
       const buf = Buffer.alloc(len);
-      const fd = fs.openSync(filePath, "r");
-      fs.readSync(fd, buf, 0, len, start);
-      fs.closeSync(fd);
+      const fd = getFs().openSync(filePath, "r");
+      getFs().readSync(fd, buf, 0, len, start);
+      getFs().closeSync(fd);
       return [206, headers, [buf.toString()]];
     }
 
@@ -139,9 +139,9 @@ export class Files {
     for (const [start, end] of ranges) {
       const len = end - start + 1;
       const buf = Buffer.alloc(len);
-      const fd = fs.openSync(filePath, "r");
-      fs.readSync(fd, buf, 0, len, start);
-      fs.closeSync(fd);
+      const fd = getFs().openSync(filePath, "r");
+      getFs().readSync(fd, buf, 0, len, start);
+      getFs().closeSync(fd);
       parts.push(
         `\r\n--${boundary}\r\ncontent-type: ${ct}\r\ncontent-range: bytes ${start}-${end}/${size}\r\n\r\n${buf.toString()}`,
       );
@@ -194,7 +194,7 @@ class FileBody {
   }
 
   forEach(cb: (chunk: string) => void): void {
-    const data = fs.readFileSync(this.path, "utf-8");
+    const data = getFs().readFileSync(this.path, "utf-8");
     cb(data);
   }
 
@@ -205,7 +205,7 @@ class FileBody {
   close(): void {}
 
   [Symbol.iterator](): Iterator<string> {
-    const data = fs.readFileSync(this.path, "utf-8");
+    const data = getFs().readFileSync(this.path, "utf-8");
     let done = false;
     return {
       next() {

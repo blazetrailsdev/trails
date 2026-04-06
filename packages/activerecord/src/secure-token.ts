@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 /**
@@ -7,7 +7,7 @@ import type { Base } from "./base.js";
  * Mirrors: SecureRandom.base58(24) used by has_secure_token
  */
 function generateToken(length: number = 24): string {
-  const bytes = randomBytes(length);
+  const bytes = getCrypto().randomBytes(length);
   // Base36 encoding (0-9, a-z) for URL-safe tokens
   return Array.from(bytes)
     .map((b) => b.toString(36).padStart(2, "0").slice(-2))

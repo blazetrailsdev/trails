@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 /**
@@ -99,7 +99,7 @@ function _generateToken(record: Base, purpose: string): string {
   const timestamp = Date.now();
   const payload = JSON.stringify({ pk, purpose, digest, timestamp });
   const encoded = Buffer.from(payload).toString("base64url");
-  const sig = createHmac("sha256", SECRET).update(encoded).digest("base64url");
+  const sig = getCrypto().createHmac("sha256", SECRET).update(encoded).digest("base64url");
   return `${encoded}.${sig}`;
 }
 
@@ -116,7 +116,7 @@ async function _findByToken(
   const [encoded, sig] = parts;
 
   // Verify signature
-  const expectedSig = createHmac("sha256", SECRET).update(encoded).digest("base64url");
+  const expectedSig = getCrypto().createHmac("sha256", SECRET).update(encoded).digest("base64url");
   if (sig !== expectedSig) return null;
 
   let payload: any;

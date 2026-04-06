@@ -1,5 +1,5 @@
 import { ETAG, CACHE_CONTROL } from "./constants.js";
-import { createHash } from "crypto";
+import { getCrypto } from "@blazetrails/activesupport";
 import type { RackApp } from "./mock-request.js";
 
 const DEFAULT_CACHE_CONTROL = "max-age=0, private, must-revalidate";
@@ -27,7 +27,7 @@ export class ETag {
       !headers[ETAG] &&
       !headers["last-modified"]
     ) {
-      const sha = createHash("sha256");
+      const sha = getCrypto().createHash("sha256");
       let hasContent = false;
       for (const part of body) {
         if (part.length > 0) {

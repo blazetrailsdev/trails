@@ -1,3 +1,4 @@
+import { getFs, getPath } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   TableDefinition,
@@ -928,21 +929,23 @@ export abstract class Migration {
     // In our TS implementation, migrations are registered programmatically,
     // not via filesystem discovery. This returns the list of copied files
     // (empty when there's nothing to copy).
-    const { existsSync, mkdirSync, copyFileSync, readdirSync } = await import("fs");
-    const { join, basename } = await import("path");
+    const fs = getFs();
+    const path = getPath();
 
-    if (!existsSync(destination)) {
-      mkdirSync(destination, { recursive: true });
+    if (!fs.existsSync(destination)) {
+      fs.mkdirSync(destination, { recursive: true });
     }
 
     const copied: string[] = [];
     for (const [, sourcePath] of Object.entries(sources)) {
-      if (!existsSync(sourcePath)) continue;
-      const files = readdirSync(sourcePath).filter((f) => f.endsWith(".ts") || f.endsWith(".js"));
+      if (!fs.existsSync(sourcePath)) continue;
+      const files = fs
+        .readdirSync(sourcePath)
+        .filter((f) => f.endsWith(".ts") || f.endsWith(".js"));
       for (const file of files) {
-        const dest = join(destination, file);
-        if (!existsSync(dest)) {
-          copyFileSync(join(sourcePath, file), dest);
+        const dest = path.join(destination, file);
+        if (!fs.existsSync(dest)) {
+          fs.copyFileSync(path.join(sourcePath, file), dest);
           copied.push(dest);
         }
       }

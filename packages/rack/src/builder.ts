@@ -1,4 +1,4 @@
-import { readFileSync } from "fs";
+import { getFs } from "@blazetrails/activesupport";
 import { URLMap } from "./urlmap.js";
 
 type RackApp = (env: Record<string, any>) => any;
@@ -23,7 +23,7 @@ export class Builder {
   }
 
   static parseFile(path: string): RackApp {
-    let content = readFileSync(path, "utf-8");
+    let content = getFs().readFileSync(path, "utf-8");
 
     if (content.charCodeAt(0) === 0xfeff) {
       content = content.slice(1);
