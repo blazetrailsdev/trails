@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Sanitization
  */
 
+import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { quote, quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { PreparedStatementInvalid } from "./errors.js";
 
@@ -64,9 +65,14 @@ export function sanitizeSqlForAssignment(
 /**
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_for_order
  */
-export function sanitizeSqlForOrder(condition: string | [string, ...unknown[]]): string {
+export function sanitizeSqlForOrder(
+  condition: string | [string, ...unknown[]] | Nodes.Node,
+): string | Nodes.Node {
+  if (condition instanceof Nodes.Node) return condition;
   if (Array.isArray(condition) && condition[0]?.toString().includes("?")) {
-    return sanitizeSqlArray(condition[0], ...condition.slice(1));
+    const sanitized = sanitizeSqlArray(condition[0], ...condition.slice(1));
+    disallowRawSqlBang([sanitized]);
+    return arelSql(sanitized);
   }
   return typeof condition === "string" ? condition : condition[0];
 }
@@ -102,13 +108,13 @@ export function sanitizeSqlHashForAssignment(
 /**
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#disallow_raw_sql!
  */
-export function disallowRawSqlBang(args: (string | symbol)[], permit?: RegExp): void {
-  // Rails: adapter_class.column_name_matcher — allows table.column, quoted, directions
+export function disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], permit?: RegExp): void {
   const columnMatcher =
     permit ?? /^(?:"?\w+"?\.)?"?\w+"?(?:\s+(?:ASC|DESC))?(?:\s+NULLS\s+(?:FIRST|LAST))?$/i;
   const unexpected: string[] = [];
   for (const arg of args) {
     if (typeof arg === "symbol") continue;
+    if (arg instanceof Nodes.Node) continue;
     if (!columnMatcher.test(arg.toString().trim())) {
       unexpected.push(arg.toString());
     }
