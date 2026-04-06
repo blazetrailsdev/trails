@@ -6416,7 +6416,7 @@ describe("AssociationProxyTest", () => {
     const { APPost } = setupProxyModels();
     const post = new APPost({ title: "no prepend" });
     const proxy = association(post, "apComments");
-    expect((proxy as any).prepend).toBeUndefined();
+    expect(() => (proxy as any).prepend()).toThrow(/prepend on association is not defined/);
   });
 
   it("load does load target", async () => {

@@ -2,7 +2,7 @@ import type { Base } from "../base.js";
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
-import { StrictLoadingViolationError } from "../errors.js";
+import { StrictLoadingViolationError, RecordInvalid, RecordNotSaved } from "../errors.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
   HasManyThroughNestedAssociationsAreReadonly,
@@ -347,7 +347,7 @@ export class CollectionProxy {
     }
   }
 
-  private async _pushThrough(records: Base[]): Promise<void> {
+  private async _pushThrough(records: Base[], skipCallbacks = false): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
@@ -361,13 +361,27 @@ export class CollectionProxy {
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
     const throughModel = resolveModel(throughClassName);
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+    if (Array.isArray(ownerFk)) {
+      throw new Error(
+        `Through associations do not support composite foreign keys on "${this._assocName}".`,
+      );
+    }
     const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
-    const pkValue = this._record.readAttribute(primaryKey as string);
+    if (Array.isArray(primaryKey)) {
+      throw new Error(
+        `Through associations do not support composite primary keys on "${this._assocName}".`,
+      );
+    }
+    const pkValue = this._record.readAttribute(primaryKey);
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
 
     for (const record of records) {
-      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) continue;
+      if (
+        !skipCallbacks &&
+        !fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)
+      )
+        continue;
       // Save the target record if it's new
       if (record.isNewRecord()) {
         const saved = await record.save();
@@ -376,7 +390,15 @@ export class CollectionProxy {
       // Create the join record
       const joinAttrs: Record<string, unknown> = {
         [ownerFk as string]: pkValue,
-        [sourceFk]: record.readAttribute((record.constructor as typeof Base).primaryKey as string),
+        [sourceFk]: (() => {
+          const targetPk = (record.constructor as typeof Base).primaryKey;
+          if (Array.isArray(targetPk)) {
+            throw new Error(
+              `Through associations do not support composite primary keys on target model for "${this._assocName}".`,
+            );
+          }
+          return record.readAttribute(targetPk);
+        })(),
       };
       // Handle polymorphic through (as option on through association)
       if (throughAssoc.options.as) {
@@ -388,7 +410,9 @@ export class CollectionProxy {
       const joinRecord = await throughModel.create(joinAttrs);
       if (joinRecord.isPersisted()) {
         this._target.push(record);
-        fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+        if (!skipCallbacks) {
+          fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+        }
       }
     }
   }
@@ -499,6 +523,66 @@ export class CollectionProxy {
     this._removeFromTarget(removed);
   }
 
+  private async _deleteThroughAllSql(): Promise<void> {
+    const ctor = this._record.constructor as typeof Base;
+    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
+    if (!throughAssoc) return;
+
+    const throughClassName =
+      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
+    const throughModel = resolveModel(throughClassName);
+    const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+    if (Array.isArray(primaryKey)) {
+      throw new Error(
+        `deleteAll does not support composite primary keys for through associations on "${this._assocName}".`,
+      );
+    }
+    const pkValue = this._record.readAttribute(primaryKey);
+    if (pkValue == null) return;
+    const throughAs = throughAssoc.options.as;
+    const conditions: Record<string, unknown> = {};
+    if (throughAs) {
+      conditions[`${underscore(throughAs)}_id`] = pkValue;
+      conditions[`${underscore(throughAs)}_type`] = ctor.name;
+    } else {
+      const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+      if (Array.isArray(ownerFk)) {
+        throw new Error(
+          `deleteAll does not support composite foreign keys for through associations on "${this._assocName}".`,
+        );
+      }
+      conditions[ownerFk] = pkValue;
+    }
+    if (this._assocDef.options.sourceType) {
+      const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+      conditions[`${underscore(sourceName)}_type`] = this._assocDef.options.sourceType;
+    }
+    await (throughModel as any).where(conditions).deleteAll();
+  }
+
+  private _buildNullifyUpdates(): Record<string, null> {
+    const ctor = this._record.constructor as typeof Base;
+    const asName = this._assocDef.options.as;
+    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
+    const foreignKey =
+      this._assocDef.options.foreignKey ??
+      this._assocDef.options.queryConstraints ??
+      (asName
+        ? `${underscore(asName)}_id`
+        : Array.isArray(primaryKey)
+          ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+          : `${underscore(ctor.name)}_id`);
+    const updates: Record<string, null> = {};
+    if (Array.isArray(foreignKey)) {
+      for (const fk of foreignKey) updates[fk] = null;
+    } else {
+      updates[foreignKey as string] = null;
+    }
+    if (asName) updates[`${underscore(asName)}_type`] = null;
+    return updates;
+  }
+
   /**
    * Destroy associated records (runs callbacks and deletes from DB).
    *
@@ -545,10 +629,41 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#include?
    */
   async includes(record: Base): Promise<boolean> {
-    const records = await this.toArray();
-    const pk = (record.constructor as typeof Base).primaryKey;
-    const targetId = record.readAttribute(pk as string);
-    return records.some((r) => r.readAttribute(pk as string) === targetId);
+    if (this._loaded) {
+      const targetId = this._identityFor(record);
+      if (targetId != null) {
+        return this._target.some((r) => this._identityFor(r) === targetId);
+      }
+      return this._target.includes(record);
+    }
+
+    const primaryKey = (record.constructor as typeof Base).primaryKey;
+    const s = this.scope();
+    if (typeof s.exists === "function") {
+      if (Array.isArray(primaryKey)) {
+        const condition: Record<string, unknown> = {};
+        let allPresent = true;
+        for (const key of primaryKey) {
+          const value = record.readAttribute(key);
+          if (value == null) {
+            allPresent = false;
+            break;
+          }
+          condition[key] = value;
+        }
+        if (allPresent) return s.exists(condition);
+      } else {
+        const pkValue = record.readAttribute(primaryKey);
+        if (pkValue != null) return s.exists({ [primaryKey]: pkValue });
+      }
+    }
+
+    const loaded = await this.loadTarget();
+    const targetId = this._identityFor(record);
+    if (targetId != null) {
+      return loaded.some((r) => this._identityFor(r) === targetId);
+    }
+    return loaded.includes(record);
   }
 
   /**
@@ -894,6 +1009,227 @@ export class CollectionProxy {
       if (this._assocDef.options.scope) rel = this._assocDef.options.scope(rel);
       return rel;
     }
+  }
+
+  /**
+   * Load and return the target records array.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#load_target
+   */
+  async loadTarget(): Promise<Base[]> {
+    await this.load();
+    return this._target;
+  }
+
+  /**
+   * Build and save a new associated record, raising on validation failure.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#create!
+   */
+  async createBang(attrs: Record<string, unknown> = {}): Promise<Base> {
+    this._ensureThroughWritable();
+    if (this._isThrough) {
+      const ctor = this._record.constructor as typeof Base;
+      if (this._record.isNewRecord()) {
+        throw new RecordNotSaved(
+          `Cannot create through association on an unpersisted ${ctor.name}`,
+        );
+      }
+      const record = this._buildThrough(attrs);
+      if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
+        throw new RecordNotSaved("Callback prevented record creation", record);
+      }
+      const saved = await record.save();
+      if (!saved) throw new RecordInvalid(record);
+      const targetBefore = this._target.length;
+      await this._pushThrough([record], true);
+      if (this._target.length === targetBefore) {
+        throw new RecordNotSaved("Failed to create join record for through association", record);
+      }
+      fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+      return record;
+    }
+    const record = this._buildRaw(attrs);
+    if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
+      throw new RecordNotSaved("Callback prevented record creation", record);
+    }
+    const saved = await record.save();
+    if (!saved) throw new RecordInvalid(record);
+    this._target.push(record);
+    fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
+    return record;
+  }
+
+  /**
+   * Delete all records from the collection according to the dependent strategy.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#delete_all
+   */
+  async deleteAll(dependent?: string): Promise<void> {
+    this._ensureThroughWritable();
+    // Rails normalizes dependent: :destroy → :delete_all for deleteAll,
+    // because deleteAll should never run destroy callbacks (use destroyAll for that).
+    const raw = dependent ?? (this._assocDef.options.dependent as string | undefined);
+    let strategy: "delete_all" | "nullify";
+    switch (raw) {
+      case undefined:
+      case "delete_all":
+      case "deleteAll":
+      case "delete":
+      case "destroy":
+        strategy = "delete_all";
+        break;
+      case "nullify":
+        strategy = "nullify";
+        break;
+      default:
+        throw new Error(
+          `deleteAll only accepts "nullify", "delete_all", "deleteAll", "delete", or "destroy". Received: "${raw}"`,
+        );
+    }
+
+    if (strategy === "delete_all") {
+      if (this._isThrough) {
+        // For through associations, delete join rows via SQL — not the target records
+        await this._deleteThroughAllSql();
+      } else {
+        await this.scope().deleteAll();
+      }
+    } else {
+      // Nullify: set-based SQL update to null FKs (no per-record callbacks)
+      if (this._isThrough) {
+        await this._deleteThroughAllSql();
+      } else {
+        const nullUpdates = this._buildNullifyUpdates();
+        await this.scope().updateAll(nullUpdates);
+      }
+    }
+    this._target = [];
+    this._loaded = true;
+    this.resetScope();
+  }
+
+  /**
+   * Perform a calculation on the association scope.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#calculate
+   */
+  async calculate(operation: string, columnName?: string): Promise<unknown> {
+    const op =
+      operation === "avg"
+        ? "average"
+        : operation === "min"
+          ? "minimum"
+          : operation === "max"
+            ? "maximum"
+            : operation;
+
+    if (op !== "count" && columnName == null) {
+      throw new Error(`Column name is required for calculation operation: ${op}`);
+    }
+    const s = this.scope();
+    if (op === "count" && columnName == null && typeof s.count === "function") {
+      return s.count();
+    }
+    if (typeof s.calculate === "function") {
+      return s.calculate(op, columnName);
+    }
+    // Fallback: compute in-memory from loaded records
+    const records = await this.loadTarget();
+    if (op === "count") return records.length;
+    if (columnName == null) {
+      throw new Error(`Column name is required for calculation operation: ${op}`);
+    }
+    const values = records
+      .map((r) => r.readAttribute(columnName))
+      .filter((v) => v != null) as number[];
+    switch (op) {
+      case "sum":
+        return values.reduce((a, b) => Number(a) + Number(b), 0);
+      case "average":
+        return values.length > 0
+          ? values.reduce((a, b) => Number(a) + Number(b), 0) / values.length
+          : null;
+      case "minimum":
+        return values.length > 0 ? Math.min(...values.map(Number)) : null;
+      case "maximum":
+        return values.length > 0 ? Math.max(...values.map(Number)) : null;
+      default:
+        throw new Error(`Unknown calculation operation: ${op}`);
+    }
+  }
+
+  /**
+   * Check if the collection includes a given record.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#include?
+   */
+  async isInclude(record: Base): Promise<boolean> {
+    return this.includes(record);
+  }
+
+  /**
+   * Returns the underlying association object.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#proxy_association
+   */
+  get proxyAssociation(): {
+    readonly owner: Base;
+    readonly reflection: any;
+    readonly target: Base[];
+    readonly loaded: boolean;
+    reset: () => void;
+  } {
+    const proxy = this;
+    return {
+      owner: this._record,
+      reflection: this._assocDef,
+      get target() {
+        return proxy._target;
+      },
+      get loaded() {
+        return proxy._loaded;
+      },
+      reset: () => this.reset(),
+    };
+  }
+
+  /**
+   * Returns the loaded records array (loading if needed).
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#records
+   */
+  async records(): Promise<Base[]> {
+    return this.loadTarget();
+  }
+
+  /**
+   * Alias for push/<<.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#append
+   */
+  async append(...records: Base[]): Promise<void> {
+    return this.push(...records);
+  }
+
+  /**
+   * Raises an error — prepend is not supported on associations.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#prepend
+   */
+  prepend(..._args: any[]): never {
+    throw new Error("prepend on association is not defined. Please use <<, push or append");
+  }
+
+  /**
+   * Reset cached scope state.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#reset_scope
+   */
+  resetScope(): this {
+    // No-op: scope() rebuilds the relation each call, so there's nothing
+    // cached to clear. Rails resets @scope/@offsets/@take here.
+    return this;
   }
 }
 
