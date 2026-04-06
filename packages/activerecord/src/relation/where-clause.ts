@@ -1,31 +1,20 @@
 /**
- * WhereClause — manages the collection of WHERE conditions on a Relation.
+ * WhereClause — manages WHERE predicates on a Relation.
  *
- * Encapsulates the four parallel condition arrays that Relation uses:
- * object conditions, negated conditions, raw SQL strings, and Arel nodes.
+ * Stores a single array of Arel nodes, matching Rails' WhereClause which
+ * holds a flat `predicates` array. All condition types (hash, raw SQL,
+ * NOT, Arel nodes) are converted to nodes at insertion time.
  *
  * Mirrors: ActiveRecord::Relation::WhereClause
  */
 
 import { Visitors, Nodes } from "@blazetrails/arel";
-import { quote, quoteTableName } from "../connection-adapters/abstract/quoting.js";
 
 export class WhereClause {
-  conditions: Array<Record<string, unknown>>;
-  notConditions: Array<Record<string, unknown>>;
-  rawClauses: string[];
-  arelNodes: Nodes.Node[];
+  predicates: Nodes.Node[];
 
-  constructor(
-    conditions: Array<Record<string, unknown>> = [],
-    notConditions: Array<Record<string, unknown>> = [],
-    rawClauses: string[] = [],
-    arelNodes: Nodes.Node[] = [],
-  ) {
-    this.conditions = conditions;
-    this.notConditions = notConditions;
-    this.rawClauses = rawClauses;
-    this.arelNodes = arelNodes;
+  constructor(predicates: Nodes.Node[] = []) {
+    this.predicates = predicates;
   }
 
   static empty(): WhereClause {
@@ -33,86 +22,49 @@ export class WhereClause {
   }
 
   isEmpty(): boolean {
-    return (
-      this.conditions.length === 0 &&
-      this.notConditions.length === 0 &&
-      this.rawClauses.length === 0 &&
-      this.arelNodes.length === 0
-    );
+    return this.predicates.length === 0;
   }
 
   merge(other: WhereClause): WhereClause {
-    return new WhereClause(
-      [...this.conditions, ...other.conditions],
-      [...this.notConditions, ...other.notConditions],
-      [...this.rawClauses, ...other.rawClauses],
-      [...this.arelNodes, ...other.arelNodes],
-    );
+    // Rails: remove predicates from self that conflict with other's attributes,
+    // then union with other's predicates (other wins on conflict)
+    const filtered = exceptPredicates(this.predicates, other.extractAttributes());
+    return new WhereClause(unionNodes(filtered, other.predicates));
   }
 
   invert(): WhereClause {
-    const allPredicates = this.predicateNodes();
-    if (allPredicates.length === 0) return this.clone();
-    if (allPredicates.length === 1) {
-      return new WhereClause([], [], [], [invertPredicate(allPredicates[0])]);
+    if (this.predicates.length === 0) return this.clone();
+    if (this.predicates.length === 1) {
+      return new WhereClause([invertPredicate(this.predicates[0])]);
     }
-    const ast = new Nodes.And(allPredicates);
-    return new WhereClause([], [], [], [new Nodes.Not(ast)]);
+    return new WhereClause([new Nodes.Not(this.ast)]);
   }
 
-  except(...columns: string[]): WhereClause {
-    const colSet = new Set(columns);
-    const filtered = this.conditions
-      .map((clause) => {
-        const kept: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(clause)) {
-          if (!colSet.has(k)) kept[k] = v;
-        }
-        return kept;
-      })
-      .filter((clause) => Object.keys(clause).length > 0);
-    const filteredNot = this.notConditions
-      .map((clause) => {
-        const kept: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(clause)) {
-          if (!colSet.has(k)) kept[k] = v;
-        }
-        return kept;
-      })
-      .filter((clause) => Object.keys(clause).length > 0);
-    return new WhereClause(filtered, filteredNot, [...this.rawClauses], [...this.arelNodes]);
+  except(...columns: (string | Nodes.Attribute)[]): WhereClause {
+    return new WhereClause(exceptPredicates(this.predicates, columns));
   }
 
   clear(): void {
-    this.conditions.length = 0;
-    this.notConditions.length = 0;
-    this.rawClauses.length = 0;
-    this.arelNodes.length = 0;
+    this.predicates.length = 0;
   }
 
   clone(): WhereClause {
-    return new WhereClause(
-      [...this.conditions],
-      [...this.notConditions],
-      [...this.rawClauses],
-      [...this.arelNodes],
-    );
+    return new WhereClause([...this.predicates]);
   }
 
   or(other: WhereClause): WhereClause {
     if (this.isEmpty()) return other.clone();
     if (other.isEmpty()) return this.clone();
 
-    // Rails: extract common predicates, OR only the differing ones
-    const selfPreds = this.predicateNodes();
-    const otherPreds = other.predicateNodes();
+    const selfPreds = this.predicates;
+    const otherPreds = other.predicates;
 
     const leftOnly = subtractNodes(selfPreds, otherPreds);
     const common = subtractNodes(selfPreds, leftOnly);
     const rightOnly = subtractNodes(otherPreds, common);
 
     if (leftOnly.length === 0 || rightOnly.length === 0) {
-      return new WhereClause([], [], [], common);
+      return new WhereClause([...common]);
     }
 
     let leftAst: Nodes.Node = leftOnly.length === 1 ? leftOnly[0] : new Nodes.And(leftOnly);
@@ -126,39 +78,23 @@ export class WhereClause {
         ? new Nodes.Or([...leftAst.children, rightAst])
         : new Nodes.Or([leftAst, rightAst]);
 
-    return new WhereClause([], [], [], [...common, new Nodes.Grouping(orNode)]);
+    return new WhereClause([...common, new Nodes.Grouping(orNode)]);
   }
 
-  get ast(): string {
-    return clauseToAstString(this);
+  get ast(): Nodes.Node {
+    const wrapped = predicatesWithWrappedSqlLiterals(this.predicates);
+    return wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
   }
 
-  astNode(): Nodes.Node {
-    const predicates = this.predicateNodes();
-    return predicates.length === 1 ? predicates[0] : new Nodes.And(predicates);
-  }
-
-  predicateNodes(): Nodes.Node[] {
-    const nodes: Nodes.Node[] = [];
-    for (const cond of this.conditions) {
-      for (const [k, v] of Object.entries(cond)) {
-        nodes.push(conditionToArelNode(k, v, false));
-      }
-    }
-    for (const cond of this.notConditions) {
-      for (const [k, v] of Object.entries(cond)) {
-        nodes.push(conditionToArelNode(k, v, true));
-      }
-    }
-    for (const raw of this.rawClauses) {
-      nodes.push(new Nodes.SqlLiteral(raw));
-    }
-    nodes.push(...this.arelNodes);
-    return nodes;
+  toSql(): string {
+    const wrapped = predicatesWithWrappedSqlLiterals(this.predicates);
+    if (wrapped.length === 0) return "";
+    const node = wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
+    return visitor.compile(node);
   }
 
   isContradiction(): boolean {
-    for (const node of this.predicateNodes()) {
+    for (const node of this.predicates) {
       if (node instanceof Nodes.In) {
         const right = (node as any).right;
         if (Array.isArray(right) && right.length === 0) return true;
@@ -172,24 +108,33 @@ export class WhereClause {
     return false;
   }
 
-  extractAttributes(): string[] {
-    const attrs: string[] = [];
-    for (const cond of this.conditions) {
-      attrs.push(...Object.keys(cond));
-    }
-    for (const cond of this.notConditions) {
-      attrs.push(...Object.keys(cond));
+  extractAttributes(): (string | Nodes.Attribute)[] {
+    const attrs: (string | Nodes.Attribute)[] = [];
+    for (const node of this.predicates) {
+      const attr = fetchAttributeNode(node);
+      if (attr !== null) attrs.push(attr);
     }
     return attrs;
   }
 
-  toH(): Record<string, unknown> {
+  toH(tableName?: string): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    for (const cond of this.conditions) {
-      Object.assign(result, cond);
+    for (const node of equalities(this.predicates)) {
+      const attr = fetchAttributeNode(node);
+      if (attr === null) continue;
+      if (tableName !== undefined && attr.relation.name !== tableName) continue;
+      result[attr.name] = extractNodeValue((node as any).right);
     }
     return result;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+function invertPredicate(node: Nodes.Node): Nodes.Node {
+  return node.invert();
 }
 
 function subtractNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
@@ -202,79 +147,85 @@ function subtractNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
   return result;
 }
 
-function conditionToArelNode(key: string, value: unknown, negate: boolean): Nodes.Node {
-  const col = new Nodes.SqlLiteral(quoteTableName(key));
-  if (value === null || value === undefined) {
-    // Wrap null in Quoted so the visitor produces IS NULL / IS NOT NULL
-    const eq = new Nodes.Equality(col, new Nodes.Quoted(null));
-    return negate ? eq.invert() : eq;
+function fetchAttributeNode(node: Nodes.Node): Nodes.Attribute | null {
+  let found: Nodes.Attribute | null = null;
+  node.fetchAttribute?.((attr: Nodes.Node) => {
+    if (attr instanceof Nodes.Attribute) {
+      if (found !== null && !found.eql(attr)) {
+        // Multiple different attributes — return null like Rails
+        found = null;
+        return false;
+      }
+      found = attr;
+    }
+    return true;
+  });
+  if (found) return found;
+  if (node instanceof Nodes.Not) {
+    return fetchAttributeNode((node as any).expr);
   }
-  if (Array.isArray(value)) {
-    const quoted = value.map((v) => new Nodes.Quoted(v));
-    const node = new Nodes.In(col, quoted as any);
-    return negate ? node.invert() : node;
-  }
-  const eq = new Nodes.Equality(col, new Nodes.Quoted(value));
-  return negate ? eq.invert() : eq;
+  return null;
 }
 
-function invertPredicate(node: Nodes.Node): Nodes.Node {
-  return node.invert();
+function equalities(predicates: Nodes.Node[]): Nodes.Node[] {
+  const result: Nodes.Node[] = [];
+  for (const node of predicates) {
+    if (typeof (node as any).isEquality === "function" && (node as any).isEquality()) {
+      result.push(node);
+    } else if (node instanceof Nodes.And) {
+      result.push(...equalities((node as any).children));
+    }
+  }
+  return result;
+}
+
+function extractNodeValue(node: unknown): unknown {
+  if (node instanceof Nodes.Quoted) return node.value;
+  if (Array.isArray(node)) return node.map((v) => extractNodeValue(v));
+  return node;
+}
+
+function exceptPredicates(
+  predicates: Nodes.Node[],
+  columns: (string | Nodes.Attribute | Nodes.Node)[],
+): Nodes.Node[] {
+  // Rails: separate Attribute objects from string column names.
+  // Attributes compared via eql() (table-qualified), strings by name only.
+  const attrNodes: Nodes.Attribute[] = [];
+  const colStrings = new Set<string>();
+  for (const c of columns) {
+    if (typeof c === "string") colStrings.add(c);
+    else if (c instanceof Nodes.Attribute) attrNodes.push(c);
+  }
+  return predicates.filter((node) => {
+    const attr = fetchAttributeNode(node);
+    if (attr === null) return true;
+    if (attrNodes.some((a) => a.eql(attr))) return false;
+    if (colStrings.has(attr.name)) return false;
+    // Match qualified "table.column" strings against the attribute's relation + name
+    const qualified = `${attr.relation.name}.${attr.name}`;
+    if (colStrings.has(qualified)) return false;
+    return true;
+  });
+}
+
+function unionNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
+  const result = [...a];
+  for (const node of b) {
+    if (!result.some((existing) => existing.eql(node))) {
+      result.push(node);
+    }
+  }
+  return result;
+}
+
+export function predicatesWithWrappedSqlLiterals(predicates: Nodes.Node[]): Nodes.Node[] {
+  return predicates
+    .filter((n) => !(n instanceof Nodes.SqlLiteral && n.value === ""))
+    .map((node) => {
+      if (node instanceof Nodes.SqlLiteral) return new Nodes.Grouping(node);
+      return node;
+    });
 }
 
 const visitor = new Visitors.ToSql();
-
-function clauseToAstString(clause: WhereClause): string {
-  const parts: string[] = [];
-  for (const cond of clause.conditions) {
-    for (const [k, v] of Object.entries(cond)) {
-      const col = quoteTableName(k);
-      if (v === null || v === undefined) {
-        parts.push(`${col} IS NULL`);
-      } else if (Array.isArray(v)) {
-        const nonNull = v.filter((x) => x !== null && x !== undefined);
-        const hasNull = nonNull.length !== v.length;
-        if (nonNull.length === 0 && !hasNull) {
-          parts.push("1=0");
-        } else {
-          const sub: string[] = [];
-          if (nonNull.length > 0)
-            sub.push(`${col} IN (${nonNull.map((x) => quote(x)).join(", ")})`);
-          if (hasNull) sub.push(`${col} IS NULL`);
-          parts.push(sub.length === 1 ? sub[0] : `(${sub.join(" OR ")})`);
-        }
-      } else {
-        parts.push(`${col} = ${quote(v)}`);
-      }
-    }
-  }
-  for (const cond of clause.notConditions) {
-    for (const [k, v] of Object.entries(cond)) {
-      const col = quoteTableName(k);
-      if (v === null || v === undefined) {
-        parts.push(`${col} IS NOT NULL`);
-      } else if (Array.isArray(v)) {
-        const nonNull = v.filter((x) => x !== null && x !== undefined);
-        const hasNull = nonNull.length !== v.length;
-        if (nonNull.length === 0 && !hasNull) {
-          parts.push("1=1");
-        } else {
-          if (nonNull.length > 0)
-            parts.push(`${col} NOT IN (${nonNull.map((x) => quote(x)).join(", ")})`);
-          if (hasNull) parts.push(`${col} IS NOT NULL`);
-        }
-      } else {
-        parts.push(`${col} != ${quote(v)}`);
-      }
-    }
-  }
-  parts.push(...clause.rawClauses);
-  for (const node of clause.arelNodes) {
-    try {
-      parts.push(visitor.compile(node));
-    } catch {
-      parts.push(String(node));
-    }
-  }
-  return parts.length <= 1 ? (parts[0] ?? "") : parts.join(" AND ");
-}

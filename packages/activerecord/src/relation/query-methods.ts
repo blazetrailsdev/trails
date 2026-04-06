@@ -121,6 +121,7 @@ interface QueryMethodsHost {
   _skipPreloading: boolean;
   _skipQueryCache: boolean;
   _modelClass: any;
+  predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
   _castWhereValue(key: string, value: unknown): unknown;
 }
 
@@ -305,9 +306,9 @@ function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
     } else {
       sql = opts;
     }
-    this._whereClause.rawClauses.push(sql);
+    if (sql.trim()) this._whereClause.predicates.push(new Nodes.SqlLiteral(sql));
   } else if (opts instanceof Nodes.Node) {
-    this._whereClause.arelNodes.push(opts);
+    this._whereClause.predicates.push(opts);
   } else if (typeof opts === "object" && opts !== null) {
     const castConditions: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(opts as Record<string, unknown>)) {
@@ -315,7 +316,7 @@ function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
         ? value.map((v) => this._castWhereValue(key, v))
         : this._castWhereValue(key, value);
     }
-    this._whereClause.conditions.push(castConditions);
+    this._whereClause.predicates.push(...this.predicateBuilder.buildFromHash(castConditions));
   }
   return this;
 }
@@ -375,7 +376,7 @@ function lockBang(this: QueryMethodsHost, locks: string | boolean = true): any {
 
 function noneBang(this: QueryMethodsHost): any {
   if (!this._isNone) {
-    this._whereClause.rawClauses.push("1=0");
+    this._whereClause.predicates.push(new Nodes.SqlLiteral("1=0"));
     this._isNone = true;
   }
   return this;
@@ -479,10 +480,13 @@ function uniqBang(this: QueryMethodsHost, _name?: string): any {
 }
 
 function excludingBang(this: QueryMethodsHost, records: any[]): any {
-  const pk = this._modelClass.primaryKey as string;
+  const primaryKey = this._modelClass.primaryKey;
+  if (Array.isArray(primaryKey)) {
+    throw new Error("excluding does not support models with composite primary keys");
+  }
+  const pk = primaryKey as string;
   const ids = records.map((r: any) => (typeof r === "object" && r !== null ? (r.id ?? r) : r));
-  const notConditions: Record<string, unknown> = { [pk]: ids };
-  this._whereClause.notConditions.push(notConditions);
+  this._whereClause.predicates.push(...this.predicateBuilder.buildNegatedFromHash({ [pk]: ids }));
   return this;
 }
 
