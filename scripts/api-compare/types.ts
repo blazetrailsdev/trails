@@ -15,6 +15,8 @@ export interface MethodInfo {
   line?: number;
   file?: string;
   isStatic?: boolean;
+  deps?: string[];
+  depRefs?: Record<string, string[]>;
 }
 
 export interface ClassInfo {

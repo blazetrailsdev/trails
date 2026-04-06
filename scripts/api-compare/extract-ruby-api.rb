@@ -8,6 +8,7 @@ require "ripper"
 require "json"
 require "pathname"
 require "time"
+require "set"
 
 SCRIPT_DIR = File.dirname(__FILE__)
 RAILS_DIR = File.join(SCRIPT_DIR, ".rails-source")
@@ -103,6 +104,16 @@ def ident_name(node)
   end
   nil
 end
+
+# ---- Dependency detection patterns ----
+# Each entry maps a dependency name to the constants and identifiers that
+# indicate usage. Adding a new dependency is just adding a new key here.
+DEPENDENCY_PATTERNS = {
+  "arel" => {
+    constants: %w[Arel].to_set,
+    identifiers: %w[arel_table arel_attribute resolve_arel_attribute arel_column].to_set,
+  },
+}
 
 # ---- AST walker ----
 
@@ -286,12 +297,17 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
+    body = node[3]
+    dep_info = detect_deps(body)
+
     method_info = {
       name: name,
       visibility: vis.to_s,
       params: params,
       file: @current_file,
     }
+    method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
+    method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
 
     if @in_sclass
       target[:classMethods] << method_info
@@ -317,12 +333,19 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    target[:classMethods] << {
+    body = node[5]
+    dep_info = detect_deps(body)
+
+    method_info = {
       name: name,
       visibility: vis.to_s,
       params: params,
       file: @current_file,
     }
+    method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
+    method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
+
+    target[:classMethods] << method_info
 
     maybe_update_module_file(fqn, target)
   end
@@ -575,6 +598,46 @@ class ApiExtractor
 
   def process_delegate(args)
     # delegate :method_name, to: :association — skip, too complex
+  end
+
+  # ---- Dependency detection ----
+
+  def detect_deps(body_node)
+    deps = []
+    dep_refs = {}
+
+    DEPENDENCY_PATTERNS.each do |dep_name, patterns|
+      refs = []
+      collect_dep_refs(body_node, patterns[:constants], patterns[:identifiers], refs)
+      unless refs.empty?
+        deps << dep_name
+        dep_refs[dep_name] = refs.uniq
+      end
+    end
+
+    { deps: deps, depRefs: dep_refs }
+  end
+
+  def collect_dep_refs(node, constants, identifiers, refs)
+    return unless node.is_a?(Array)
+
+    case node[0]
+    when :const_path_ref
+      name = const_name(node)
+      if name
+        root = name.split("::").first
+        refs << name if constants.include?(root)
+      end
+      return
+    when :@const
+      refs << node[1] if constants.include?(node[1])
+      return
+    when :@ident
+      refs << node[1] if identifiers.include?(node[1])
+      return
+    end
+
+    node.each { |child| collect_dep_refs(child, constants, identifiers, refs) if child.is_a?(Array) }
   end
 
   # ---- Helpers ----

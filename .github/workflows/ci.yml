@@ -172,5 +172,7 @@ jobs:
         run: cd scripts/test-compare && ruby extract-ruby-tests.rb
       - name: API comparison
         run: pnpm exec tsx scripts/api-compare/extract-ts-api.ts && pnpm exec tsx scripts/api-compare/compare.ts
+      - name: Dependency lint
+        run: pnpm exec tsx scripts/api-compare/lint-deps.ts
       - name: Test comparison
         run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts
