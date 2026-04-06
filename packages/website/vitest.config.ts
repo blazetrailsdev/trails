@@ -15,8 +15,15 @@ const aliases = {
     __dirname,
     "../activerecord/src/migration.ts",
   ),
+  "@blazetrails/activerecord/base": path.resolve(__dirname, "../activerecord/src/base.ts"),
+  "@blazetrails/activerecord/migration-runner": path.resolve(
+    __dirname,
+    "../activerecord/src/migration-runner.ts",
+  ),
+  "@blazetrails/activerecord/schema": path.resolve(__dirname, "../activerecord/src/schema.ts"),
   "@blazetrails/activerecord": path.resolve(__dirname, "../activerecord/src/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "../rack/src/index.ts"),
+  "@blazetrails/actionview": path.resolve(__dirname, "../actionview/src/index.ts"),
   "@blazetrails/actionpack": path.resolve(__dirname, "../actionpack/src/index.ts"),
   "@blazetrails/railties/generators": path.resolve(
     __dirname,

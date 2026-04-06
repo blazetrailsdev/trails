@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm run build:sw",
     "dev": "vite dev --host",
-    "build": "vite build",
+    "build:sw": "vite build --config vite.sw.config.ts",
+    "build": "pnpm run build:sw && vite build",
     "preview": "vite preview",
     "test": "vitest run"
   },
