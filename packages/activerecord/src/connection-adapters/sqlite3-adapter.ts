@@ -50,10 +50,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _memoryDatabase: boolean;
   private _filename: string;
 
+  private static _isMemoryFilename(filename: string): boolean {
+    if (filename === ":memory:") return true;
+    if (!filename.startsWith("file:")) return false;
+    return filename.startsWith("file::memory:") || filename.includes("mode=memory");
+  }
+
   constructor(filename: string | ":memory:" = ":memory:", options?: { readonly?: boolean }) {
     super();
     this._filename = filename;
-    this._memoryDatabase = filename === ":memory:";
+    this._memoryDatabase = SQLite3Adapter._isMemoryFilename(filename);
     this._readonly = options?.readonly ?? false;
     try {
       this.db = new Database(filename, { readonly: this._readonly });
@@ -348,7 +354,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return true;
   }
 
-  override requiresReloading(): boolean {
+  isRequiresReloading(): boolean {
     return false;
   }
 
@@ -370,16 +376,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   // --- Database info ---
-
-  private resolveSqlType(type: string): string {
-    const known = this.nativeDatabaseTypes[type];
-    if (known) return known.name;
-    // Validate: only allow alphanumeric type names (with optional parenthesized precision)
-    if (!/^[A-Za-z_][A-Za-z0-9_ ]*(\(\d+(,\s*\d+)?\))?$/.test(type)) {
-      throw new Error(`Invalid column type: ${type}`);
-    }
-    return type.toUpperCase();
-  }
 
   get nativeDatabaseTypes(): Record<string, { name: string; limit?: number }> {
     return {
@@ -415,9 +411,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._filename.slice(qIdx).includes("cache=shared");
   }
 
+  private _databaseVersion: Version | null = null;
+
   override getDatabaseVersion(): Version {
-    const row = this.db.prepare("SELECT sqlite_version() AS v").get() as any;
-    return new Version(row?.v ?? "0.0.0");
+    if (!this._databaseVersion) {
+      const row = this.db.prepare("SELECT sqlite_version() AS v").get() as any;
+      this._databaseVersion = new Version(row?.v ?? "0.0.0");
+    }
+    return this._databaseVersion;
   }
 
   override checkVersion(): void {
@@ -449,8 +450,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // --- Schema operations ---
 
   async primaryKeys(tableName: string): Promise<string[]> {
-    const rows = await this.execute(`PRAGMA table_info(${quoteTableName(tableName)})`);
-    return rows.filter((r) => r.pk).map((r) => String(r.name));
+    const { schema, bare } = this._splitTableName(tableName);
+    const prefix = schema ? `${quoteColumnName(schema)}.` : "";
+    const rows = await this.execute(`PRAGMA ${prefix}table_info(${quoteColumnName(bare)})`);
+    return rows
+      .filter((r) => Number(r.pk) > 0)
+      .sort((a, b) => Number(a.pk) - Number(b.pk))
+      .map((r) => String(r.name));
+  }
+
+  private _splitTableName(tableName: string): { schema: string; bare: string } {
+    const dot = tableName.lastIndexOf(".");
+    return dot === -1
+      ? { schema: "", bare: tableName }
+      : { schema: tableName.slice(0, dot), bare: tableName.slice(dot + 1) };
   }
 
   async removeIndex(
@@ -482,18 +495,34 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return rows.map((r) => String(r.name));
   }
 
-  override async createVirtualTable(tableName: string, options?: unknown): Promise<void> {
-    const opts = (options ?? {}) as { moduleName?: unknown; values?: unknown };
-    const moduleName = opts.moduleName;
-    if (typeof moduleName !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(moduleName)) {
-      throw new Error("createVirtualTable requires a valid moduleName");
+  override async createVirtualTable(
+    tableName: string,
+    optionsOrModuleName?: unknown,
+    values?: unknown,
+  ): Promise<void> {
+    // Support both (name, options) and (name, moduleName, values) signatures
+    const opts =
+      optionsOrModuleName !== null &&
+      typeof optionsOrModuleName === "object" &&
+      !Array.isArray(optionsOrModuleName)
+        ? (optionsOrModuleName as Record<string, unknown>)
+        : undefined;
+
+    const moduleName = opts?.moduleName ?? (opts ? undefined : optionsOrModuleName);
+    const virtualValues = opts?.values ?? values;
+
+    const mod = String(moduleName ?? "");
+    const safeIdent = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    if (!safeIdent.test(mod)) {
+      throw new Error("moduleName must be a valid SQLite identifier");
     }
-    const values = opts.values;
-    const cols = Array.isArray(values)
-      ? values.map((v) => quoteColumnName(String(v))).join(", ")
-      : "";
+    // Virtual table module arguments are passed through as-is (e.g. FTS
+    // tokenize='porter', content='posts'). Only the module name is validated
+    // as an identifier since it occupies a SQL keyword position.
+    const args = Array.isArray(virtualValues) ? virtualValues.map(String) : [];
+    const rawArgs = args.join(", ");
     await this.executeMutation(
-      `CREATE VIRTUAL TABLE ${quoteTableName(tableName)} USING ${moduleName}(${cols})`,
+      `CREATE VIRTUAL TABLE IF NOT EXISTS ${quoteTableName(tableName)} USING ${mod}(${rawArgs})`,
     );
   }
 
@@ -518,12 +547,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
-    const sqlType = this.resolveSqlType(type);
+    const sqlType = this.typeToSql(type, options);
     let sql = `ALTER TABLE ${quoteTableName(tableName)} ADD COLUMN ${quoteColumnName(columnName)} ${sqlType}`;
     if (options?.null === false) sql += " NOT NULL";
     if (options?.default !== undefined) {
-      const def = options.default;
-      sql += ` DEFAULT ${def === null ? "NULL" : typeof def === "string" ? quoteString(def) : def}`;
+      sql += ` DEFAULT ${this.quoteDefault(options.default)}`;
     }
     await this.executeMutation(sql);
   }
@@ -553,7 +581,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         : defaultOrChanges;
     await this.alterTable(tableName, (columns) => {
       if (columns[columnName]) {
-        columns[columnName].dflt_value = newDefault === null ? null : String(newDefault);
+        columns[columnName].dflt_value = newDefault === null ? null : this.quoteDefault(newDefault);
       }
     });
   }
@@ -565,12 +593,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     defaultValue?: unknown,
   ): Promise<void> {
     if (!allowNull && defaultValue !== undefined) {
-      const quotedDefault =
-        defaultValue === null
-          ? "NULL"
-          : typeof defaultValue === "string"
-            ? quoteString(defaultValue)
-            : String(defaultValue);
+      const quotedDefault = this.quoteDefault(defaultValue);
       await this.executeMutation(
         `UPDATE ${quoteTableName(tableName)} SET ${quoteColumnName(columnName)} = ${quotedDefault} WHERE ${quoteColumnName(columnName)} IS NULL`,
       );
@@ -588,14 +611,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
-    const sqlType = this.resolveSqlType(type);
+    const sqlType = this.typeToSql(type, options);
     await this.alterTable(tableName, (columns) => {
       if (columns[columnName]) {
         columns[columnName].type = sqlType;
         if (options?.null !== undefined) columns[columnName].notnull = options.null ? 0 : 1;
         if (options?.default !== undefined)
           columns[columnName].dflt_value =
-            options.default === null ? null : String(options.default);
+            options.default === null ? null : this.quoteDefault(options.default);
       }
     });
   }
@@ -633,7 +656,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       onUpdate: string | null;
     }>
   > {
-    const rows = await this.execute(`PRAGMA foreign_key_list(${quoteTableName(tableName)})`);
+    const { schema, bare } = this._splitTableName(tableName);
+    const prefix = schema ? `${quoteColumnName(schema)}.` : "";
+    const rows = await this.execute(`PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`);
     const grouped = new Map<number, Array<Record<string, unknown>>>();
     for (const row of rows) {
       const id = row.id as number;
@@ -678,23 +703,23 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override buildInsertSql(insert: {
     into?: string;
-    valuesList?: string;
-    skipDuplicates?: boolean;
-    conflictTarget?: string;
+    values_list?: string;
+    skip_duplicates?: boolean;
+    conflict_target?: string;
     update?: string;
     returning?: string;
   }): string | null {
     if (!insert.into) {
-      if (insert.skipDuplicates) return "OR IGNORE";
+      if (insert.skip_duplicates) return "OR IGNORE";
       if (insert.update) return "ON CONFLICT DO UPDATE SET";
       return null;
     }
 
-    let sql = `INSERT ${insert.into} ${insert.valuesList ?? ""}`;
-    if (insert.skipDuplicates) {
-      sql += ` ON CONFLICT ${insert.conflictTarget ?? ""} DO NOTHING`;
+    let sql = `INSERT ${insert.into} ${insert.values_list ?? ""}`;
+    if (insert.skip_duplicates) {
+      sql += ` ON CONFLICT ${insert.conflict_target ?? ""} DO NOTHING`;
     } else if (insert.update) {
-      sql += ` ON CONFLICT ${insert.conflictTarget ?? ""} DO UPDATE SET ${insert.update}`;
+      sql += ` ON CONFLICT ${insert.conflict_target ?? ""} DO UPDATE SET ${insert.update}`;
     }
     if (insert.returning) {
       sql += ` RETURNING ${insert.returning}`;
@@ -726,14 +751,46 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
+  private typeToSql(type: string, options?: Record<string, unknown>): string {
+    const raw = this.nativeDatabaseTypes[type]?.name ?? type.toUpperCase();
+    // Validate: only allow safe SQL type identifiers (letters, digits, underscores, spaces)
+    if (!/^[A-Za-z_][A-Za-z0-9_ ]*$/.test(raw)) {
+      throw new Error(`Invalid SQL type: ${raw}`);
+    }
+    const base = raw;
+    const precision =
+      typeof options?.precision === "number" ? Math.floor(options.precision) : undefined;
+    const scale = typeof options?.scale === "number" ? Math.floor(options.scale) : undefined;
+    const limit = typeof options?.limit === "number" ? Math.floor(options.limit) : undefined;
+    if (precision !== undefined && scale !== undefined) return `${base}(${precision},${scale})`;
+    if (precision !== undefined) return `${base}(${precision})`;
+    if (limit !== undefined) return `${base}(${limit})`;
+    return base;
+  }
+
+  private quoteDefault(value: unknown): string {
+    if (value === null) return "NULL";
+    if (typeof value === "string") return quoteString(value);
+    if (typeof value === "number") return String(value);
+    if (typeof value === "boolean") return value ? "1" : "0";
+    if (typeof value === "function") return String(value());
+    if (value instanceof globalThis.Date) return quoteString(value.toISOString());
+    // SqlLiteral or objects with toSql
+    if (typeof (value as any)?.toSql === "function") return String((value as any).toSql());
+    return quoteString(String(value));
+  }
+
   // --- Private: alter_table copy strategy (Rails: SQLite3Adapter#alter_table) ---
 
   private async alterTable(
     tableName: string,
     modify: (columns: Record<string, Record<string, unknown>>) => void,
   ): Promise<void> {
+    const { schema, bare: bareTable } = this._splitTableName(tableName);
+    const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
+    const qTable = quoteTableName(tableName);
     const tableInfo = this.db
-      .prepare(`PRAGMA table_info(${quoteTableName(tableName)})`)
+      .prepare(`PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bareTable)})`)
       .all() as Array<Record<string, unknown>>;
 
     const columns: Record<string, Record<string, unknown>> = {};
@@ -743,34 +800,79 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     modify(columns);
 
-    const tmpTable = `_alter_tmp_${tableName}`;
-    const quotedTmp = quoteTableName(tmpTable);
-    const quotedTable = quoteTableName(tableName);
+    // Collect existing indexes to recreate after table rebuild
+    const indexList = this.db
+      .prepare(`PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bareTable)})`)
+      .all() as Array<Record<string, unknown>>;
+    const indexDefs: string[] = [];
+    for (const idx of indexList) {
+      const idxName = idx.name as string;
+      // Skip auto-created indexes (sqlite_autoindex_*)
+      if (idxName.startsWith("sqlite_autoindex_")) continue;
+      const createSql = this.db
+        .prepare(
+          `SELECT sql FROM ${pragmaPrefix}sqlite_master WHERE type='index' AND name=${quoteString(idxName)}`,
+        )
+        .get() as { sql: string } | undefined;
+      if (createSql?.sql) {
+        indexDefs.push(createSql.sql);
+      }
+    }
+
+    const prefix = schema ? `${schema}.` : "";
+    const tmpTable = `${prefix}_alter_tmp_${bareTable}`;
+    const qTmp = quoteTableName(tmpTable);
     const colNames = Object.keys(columns);
+
+    // Detect composite primary keys
+    const pkColumns = colNames
+      .map((name) => ({ name, pk: Number(columns[name].pk) || 0 }))
+      .filter((c) => c.pk > 0)
+      .sort((a, b) => a.pk - b.pk)
+      .map((c) => c.name);
+    const compositePk = pkColumns.length > 1;
+
     const colDefs = colNames.map((name) => {
       const col = columns[name];
       let def = `${quoteColumnName(name)} ${col.type ?? "TEXT"}`;
-      if (col.pk) def += " PRIMARY KEY";
+      if (!compositePk && col.pk) def += " PRIMARY KEY";
       if (col.notnull) def += " NOT NULL";
       if (col.dflt_value !== null && col.dflt_value !== undefined) {
         def += ` DEFAULT ${col.dflt_value}`;
       }
       return def;
     });
+    if (compositePk) {
+      colDefs.push(`PRIMARY KEY(${pkColumns.map((n) => quoteColumnName(n)).join(", ")})`);
+    }
 
     const originalColNames = tableInfo
       .map((c) => c.name as string)
       .filter((n) => colNames.includes(n));
 
-    this.db.exec(`CREATE TABLE ${quotedTmp} (${colDefs.join(", ")})`);
+    this.db.exec(`CREATE TABLE ${qTmp} (${colDefs.join(", ")})`);
     if (originalColNames.length > 0) {
       const selectCols = originalColNames.map((n) => quoteColumnName(n)).join(", ");
-      this.db.exec(
-        `INSERT INTO ${quotedTmp} (${selectCols}) SELECT ${selectCols} FROM ${quotedTable}`,
-      );
+      this.db.exec(`INSERT INTO ${qTmp} (${selectCols}) SELECT ${selectCols} FROM ${qTable}`);
     }
-    this.db.exec(`DROP TABLE ${quotedTable}`);
-    this.db.exec(`ALTER TABLE ${quotedTmp} RENAME TO ${quotedTable}`);
+    this.db.exec(`DROP TABLE ${qTable}`);
+    // RENAME TO requires unqualified name
+    this.db.exec(`ALTER TABLE ${qTmp} RENAME TO ${quoteColumnName(bareTable)}`);
+
+    // Recreate indexes, adjusting table name references
+    for (const sql of indexDefs) {
+      // Index SQL references the original table name — no adjustment needed
+      // since we renamed tmpTable back to tableName
+      try {
+        this.db.exec(sql);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        if (!msg.includes("no such column") && !msg.includes("already exists")) {
+          throw err;
+        }
+      }
+    }
+
     this.schemaCache.clear();
   }
 
