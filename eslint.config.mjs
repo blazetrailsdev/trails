@@ -67,6 +67,7 @@ export default defineConfig(
       // Adapter implementations — these ARE the abstraction layer
       "packages/activesupport/src/fs-adapter.ts",
       "packages/activesupport/src/crypto-adapter.ts",
+      "packages/activesupport/src/async-context-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
       "packages/activesupport/src/gzip.ts",
       "packages/rack/src/deflater.ts",

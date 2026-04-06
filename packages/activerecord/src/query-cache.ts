@@ -240,6 +240,10 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return this.inner.rollbackToSavepoint(name);
   }
 
+  get inTransaction(): boolean {
+    return this.inner.inTransaction;
+  }
+
   async explain(sql: string): Promise<string> {
     if (typeof (this.inner as any).explain === "function") {
       return (this.inner as any).explain(sql);

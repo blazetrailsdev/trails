@@ -53,6 +53,11 @@ export interface DatabaseAdapter {
   rollbackToSavepoint(name: string): Promise<void>;
 
   /**
+   * Whether the adapter is currently inside a transaction.
+   */
+  readonly inTransaction: boolean;
+
+  /**
    * Return the query execution plan.
    * Optional — not all adapters support this.
    */

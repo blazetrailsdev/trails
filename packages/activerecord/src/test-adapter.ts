@@ -401,10 +401,24 @@ class SchemaAdapter implements DatabaseAdapter {
     sql = this.fixSqliteCompat(sql);
     let lastError: unknown;
     for (let attempt = 0; attempt < 5; attempt++) {
+      // In PG, errors inside a transaction abort it. Use a savepoint so we
+      // can rollback the failed statement and retry after auto-creating the
+      // missing table/column.
+      const useSp = isPg() && this.inTransaction;
+      const sp = useSp ? `_sr_${attempt}` : "";
       try {
-        return await this.inner.execute(sql, binds);
+        if (useSp) await this.inner.createSavepoint(sp);
+        const result = await this.inner.execute(sql, binds);
+        if (useSp) await this.inner.releaseSavepoint(sp);
+        return result;
       } catch (e: any) {
         lastError = e;
+        if (useSp) {
+          try {
+            await this.inner.rollbackToSavepoint(sp);
+            await this.inner.releaseSavepoint(sp);
+          } catch {}
+        }
         if (await this.handleMissingSchemaError(e, sql)) {
           continue;
         }
@@ -444,10 +458,21 @@ class SchemaAdapter implements DatabaseAdapter {
 
     let lastError: unknown;
     for (let attempt = 0; attempt < 5; attempt++) {
+      const useSp = isPg() && this.inTransaction;
+      const sp = useSp ? `_sr_m_${attempt}` : "";
       try {
-        return await this.inner.executeMutation(sql, binds);
+        if (useSp) await this.inner.createSavepoint(sp);
+        const result = await this.inner.executeMutation(sql, binds);
+        if (useSp) await this.inner.releaseSavepoint(sp);
+        return result;
       } catch (e: any) {
         lastError = e;
+        if (useSp) {
+          try {
+            await this.inner.rollbackToSavepoint(sp);
+            await this.inner.releaseSavepoint(sp);
+          } catch {}
+        }
         if (await this.handleMissingSchemaError(e, sql)) {
           continue;
         }
@@ -572,6 +597,9 @@ class SchemaAdapter implements DatabaseAdapter {
   }
   async rollbackToSavepoint(name: string): Promise<void> {
     return this.inner.rollbackToSavepoint(name);
+  }
+  get inTransaction(): boolean {
+    return this.inner.inTransaction;
   }
 
   async exec(sql: string): Promise<void> {
