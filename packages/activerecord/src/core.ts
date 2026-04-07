@@ -4,6 +4,8 @@
  * Mirrors: ActiveRecord::Core
  */
 
+import { Notifications, ParameterFilter } from "@blazetrails/activesupport";
+
 /**
  * The Core module interface — methods mixed into every AR model.
  *
@@ -340,9 +342,12 @@ export function strictLoadingViolationBang(
   owner: string,
   association: string,
 ): never {
-  throw new Error(
-    `${owner} is marked for strict_loading. The ${association} association cannot be lazily loaded.`,
-  );
+  const message = `${owner} is marked for strict_loading. The ${association} association cannot be lazily loaded.`;
+  Notifications.instrument("strict_loading_violation.active_record", {
+    owner,
+    reflection: association,
+  });
+  throw new Error(message);
 }
 
 export function initializeFindByCache(this: CoreHost): void {
@@ -384,25 +389,16 @@ export function filterAttributes(this: CoreHost, value?: string[]): string[] {
  * We approximate with a filter function that checks attribute names against
  * the filter list and replaces matching values with [FILTERED].
  */
-export function inspectionFilter(this: CoreHost): {
-  filter(params: Record<string, unknown>): Record<string, unknown>;
-} {
+export function inspectionFilter(this: CoreHost): ParameterFilter {
   if (this._inspectionFilter) return this._inspectionFilter;
   if (this._filterAttributes === undefined) {
     const parent = parentClass(this);
     if (parent) return inspectionFilter.call(parent);
   }
-  const attrSet = new Set(this._filterAttributes ?? []);
   const mask = new InspectionMask();
-  this._inspectionFilter = {
-    filter(params: Record<string, unknown>): Record<string, unknown> {
-      const result: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(params)) {
-        result[key] = attrSet.has(key) ? mask.toString() : value;
-      }
-      return result;
-    },
-  };
+  this._inspectionFilter = new ParameterFilter(this._filterAttributes ?? [], {
+    mask: mask.toString(),
+  });
   return this._inspectionFilter;
 }
 

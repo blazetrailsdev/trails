@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 
 /**
  * Tracks stored attributes per model class.
@@ -42,6 +43,14 @@ export class HashAccessor {
     const val = object.readAttribute(attribute);
     if (val === null || val === undefined) {
       object.writeAttribute(attribute, "{}");
+    } else if (
+      typeof val === "object" &&
+      !Array.isArray(val) &&
+      !(val instanceof HashWithIndifferentAccess) &&
+      (Object.getPrototypeOf(val) === Object.prototype || Object.getPrototypeOf(val) === null)
+    ) {
+      const hwia = new HashWithIndifferentAccess(val as Record<string, unknown>);
+      object.writeAttribute(attribute, hwia.toHash());
     }
   }
 

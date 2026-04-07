@@ -10,6 +10,7 @@
  */
 
 import type { Base } from "../base.js";
+import { Delegation as ASDelegation } from "@blazetrails/activesupport";
 
 /**
  * The Delegation module interface.
@@ -127,8 +128,11 @@ export function generateRelationMethod(modelClass: Function, name: string, fn: F
 }
 
 export function generateMethod(name: string): Function {
+  const holder = { model: null } as any;
+  ASDelegation.generate(holder, [name], { to: "model", allowNil: true });
+  if (typeof holder[name] === "function") return holder[name];
   return function (this: any, ...args: any[]) {
-    return this[name]?.(...args);
+    return this.model?.[name]?.(...args);
   };
 }
 

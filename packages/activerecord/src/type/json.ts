@@ -2,6 +2,7 @@
  * Mirrors: ActiveRecord::Type::Json
  */
 import { Type } from "@blazetrails/activemodel";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
 
 export class Json extends Type<unknown> {
   readonly name = "json";
@@ -21,7 +22,7 @@ export class Json extends Type<unknown> {
   deserialize(value: unknown): unknown {
     if (typeof value === "string") {
       try {
-        return JSON.parse(value);
+        return ActiveSupportJSON.decode(value);
       } catch {
         return null;
       }
@@ -31,8 +32,7 @@ export class Json extends Type<unknown> {
 
   serialize(value: unknown): string | null {
     if (value === null || value === undefined) return null;
-    const json = JSON.stringify(value);
-    return json === undefined ? null : json;
+    return ActiveSupportJSON.encode(value);
   }
 
   changedInPlace(rawOldValue: unknown, newValue: unknown): boolean {

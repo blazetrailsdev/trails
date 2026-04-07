@@ -1,4 +1,5 @@
 import type { DatabaseAdapter } from "../../adapter.js";
+import { Notifications } from "@blazetrails/activesupport";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::TransactionState
@@ -83,6 +84,7 @@ export class TransactionInstrumenter {
     }
     this._started = true;
     this._startTime = Date.now();
+    Notifications.instrument("start_transaction.active_record", {});
   }
 
   finish(): number {

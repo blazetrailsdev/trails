@@ -4,6 +4,8 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Interval
  */
 
+import { Duration } from "@blazetrails/activesupport";
+
 export interface IntervalValue {
   years?: number;
   months?: number;
@@ -32,6 +34,12 @@ export class Interval {
 
   serialize(value: unknown): string | null {
     if (value == null) return null;
+    if (value instanceof Duration) {
+      return value.iso8601();
+    }
+    if (typeof value === "number") {
+      return Duration.build(value).iso8601();
+    }
     if (typeof value === "string") return value;
     if (typeof value === "object" && value !== null) {
       const v = value as IntervalValue;

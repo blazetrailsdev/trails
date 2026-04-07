@@ -117,6 +117,10 @@ DEPENDENCY_PATTERNS = {
     constants: %w[ActiveModel].to_set,
     identifiers: Set.new,
   },
+  "activesupport" => {
+    constants: %w[ActiveSupport].to_set,
+    identifiers: Set.new,
+  },
 }
 
 # ---- AST walker ----

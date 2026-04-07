@@ -10,6 +10,7 @@ import { HashConfig } from "../../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../../database-configurations.js";
 import type { DatabaseAdapter } from "../../adapter.js";
 import { AdapterNotSpecified } from "../../errors.js";
+import { Notifications } from "@blazetrails/activesupport";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler::ConnectionDescriptor
@@ -68,6 +69,12 @@ export class ConnectionHandler {
     });
 
     this._pools.set(poolKey, pool);
+
+    Notifications.instrument("!connection.active_record", {
+      spec_name: owner,
+      shard,
+    });
+
     return pool;
   }
 

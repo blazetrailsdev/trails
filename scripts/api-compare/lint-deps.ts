@@ -26,6 +26,7 @@ interface DepRule {
   dependency: string;
   tsImport: string;
   tsIdentifiers: string[];
+  blocking: boolean;
 }
 
 const RULES: DepRule[] = [
@@ -34,12 +35,21 @@ const RULES: DepRule[] = [
     dependency: "arel",
     tsImport: "@blazetrails/arel",
     tsIdentifiers: ["arelTable", "_compileArelNode"],
+    blocking: true,
   },
   {
     package: "activerecord",
     dependency: "activemodel",
     tsImport: "@blazetrails/activemodel",
     tsIdentifiers: [],
+    blocking: true,
+  },
+  {
+    package: "activerecord",
+    dependency: "activesupport",
+    tsImport: "@blazetrails/activesupport",
+    tsIdentifiers: [],
+    blocking: false,
   },
 ];
 
@@ -489,8 +499,11 @@ function main() {
 
   printReport(allResults);
 
-  const totalViolations = allResults.reduce((sum, r) => sum + r.violations.length, 0);
-  if (totalViolations > 0) {
+  const blockingViolations = allResults.reduce(
+    (sum, r) => sum + (r.rule.blocking ? r.violations.length : 0),
+    0,
+  );
+  if (blockingViolations > 0) {
     process.exit(1);
   }
 }
