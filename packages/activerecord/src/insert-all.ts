@@ -1,4 +1,5 @@
 import { Nodes, Visitors } from "@blazetrails/arel";
+import { SerializeCastValue } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { quoteSqlValue } from "./base.js";
 import type { Relation } from "./relation.js";
@@ -230,7 +231,25 @@ export class Builder {
   }
 
   valuesList(): Nodes.ValuesList {
-    return new Nodes.ValuesList(this._valuesRows());
+    const arrayCols = this._arrayColumnSet();
+    const model = this._insertAll.model;
+    const rows = this._insertAll.mapKeyWithValue<Nodes.Node>((key, value) => {
+      if (value instanceof Nodes.SqlLiteral) return value;
+      // Cast then serialize via the column type if available, falling back
+      // to SerializeCastValue.serializeCastValue (identity) when no type exists
+      const def = model._attributeDefinitions.get(key) as any;
+      const type = def?.type ?? def;
+      const castValue = type && typeof type.cast === "function" ? type.cast(value) : value;
+      if (type && typeof type.serializeCastValue === "function") {
+        value = type.serializeCastValue(castValue);
+      } else if (type && typeof type.serialize === "function") {
+        value = type.serialize(castValue);
+      } else {
+        value = SerializeCastValue.serializeCastValue(castValue);
+      }
+      return new Nodes.SqlLiteral(quoteSqlValue(value, arrayCols.has(key)));
+    });
+    return new Nodes.ValuesList(rows);
   }
 
   conflictTarget(): string {
@@ -336,14 +355,6 @@ export class Builder {
     }
 
     return assignments;
-  }
-
-  private _valuesRows(): Nodes.Node[][] {
-    const arrayCols = this._arrayColumnSet();
-    return this._insertAll.mapKeyWithValue<Nodes.Node>((key, value) => {
-      if (value instanceof Nodes.SqlLiteral) return value;
-      return new Nodes.SqlLiteral(quoteSqlValue(value, arrayCols.has(key)));
-    });
   }
 
   private _visitor(): Visitors.ToSql {

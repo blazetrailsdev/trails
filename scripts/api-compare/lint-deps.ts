@@ -35,6 +35,12 @@ const RULES: DepRule[] = [
     tsImport: "@blazetrails/arel",
     tsIdentifiers: ["arelTable", "_compileArelNode"],
   },
+  {
+    package: "activerecord",
+    dependency: "activemodel",
+    tsImport: "@blazetrails/activemodel",
+    tsIdentifiers: [],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -69,11 +75,17 @@ function collectRubyDepMethods(ruby: ApiManifest, pkg: string, dep: string): Rub
   if (!rubyPkg) return [];
 
   const results: RubyDepMethod[] = [];
+  const seen = new Set<string>();
+
   const scan = (entities: Record<string, unknown>) => {
     for (const [fqn, raw] of Object.entries(entities)) {
       const info = raw as ClassInfo;
+
       for (const m of [...info.instanceMethods, ...info.classMethods]) {
         if (m.deps?.includes(dep)) {
+          const key = `${fqn}:${m.file || info.file}:${m.name}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
           results.push({
             rubyName: m.name,
             rubyModule: fqn,
@@ -139,8 +151,7 @@ function analyzeTsDepUsage(pkgSrcDir: string, tsImport: string, tsIdentifiers: s
       }
     }
 
-    // For each method, check if body OR signature references any import or known identifier.
-    // Multiple declarations with the same name are merged: true wins.
+    // Check each method's signature and body for dependency references.
     const methodMap = new Map<string, boolean>();
     visitMethodDeclarations(sourceFile, (name, methodNode) => {
       const uses = methodUsesDepImport(methodNode, importedNames, knownIds);

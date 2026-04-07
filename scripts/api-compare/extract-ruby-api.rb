@@ -113,6 +113,10 @@ DEPENDENCY_PATTERNS = {
     constants: %w[Arel].to_set,
     identifiers: %w[arel_table arel_attribute resolve_arel_attribute arel_column].to_set,
   },
+  "activemodel" => {
+    constants: %w[ActiveModel].to_set,
+    identifiers: Set.new,
+  },
 }
 
 # ---- AST walker ----

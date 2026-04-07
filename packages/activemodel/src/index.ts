@@ -98,3 +98,5 @@ export {
   SecurePassword,
   InstanceMethodsOnActivation,
 } from "./secure-password.js";
+export { SerializeCastValue } from "./type/serialize-cast-value.js";
+export { Builder as AttributeSetBuilder } from "./attribute-set/builder.js";

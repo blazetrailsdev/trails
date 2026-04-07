@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
+import { Attribute, AttributeSetBuilder, YAMLEncoder } from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
 import { quote, quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { detectAdapterName } from "./adapter-name.js";
@@ -361,27 +362,23 @@ export function nextSequenceValue(this: SchemaHost): null {
  * Rails: builds an AttributeSet::Builder with defaults from attribute
  * definitions, excluding PK columns from defaults.
  */
-export function attributesBuilder(this: SchemaHost): {
-  buildFromDatabase(values: Record<string, unknown>): Record<string, unknown>;
-} {
+export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
   if (this._attributesBuilder) return this._attributesBuilder;
 
-  const host = this;
-  this._attributesBuilder = {
-    buildFromDatabase(values: Record<string, unknown>): Record<string, unknown> {
-      const result: Record<string, unknown> = {};
-      const pk = host.primaryKey;
-      const pkSet = new Set(Array.isArray(pk) ? pk : [pk]);
-      for (const [name, def] of host._attributeDefinitions) {
-        if (!pkSet.has(name) && def.defaultValue !== undefined) {
-          result[name] =
-            typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
-        }
-      }
-      Object.assign(result, values);
-      return result;
-    },
-  };
+  const pk = this.primaryKey;
+  const pkSet = new Set(Array.isArray(pk) ? pk : [pk]);
+  const types = new Map<string, any>();
+  const defaults = new Map<string, Attribute>();
+  for (const [name, def] of this._attributeDefinitions) {
+    const type = def.type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v };
+    types.set(name, type);
+    if (!pkSet.has(name) && def.defaultValue !== undefined) {
+      const val = typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
+      defaults.set(name, Attribute.withCastValue(name, val, type));
+    }
+  }
+
+  this._attributesBuilder = new AttributeSetBuilder(types, defaults);
   return this._attributesBuilder;
 }
 
@@ -396,12 +393,8 @@ export function columns(this: SchemaHost): any[] {
   return this._columns!;
 }
 
-export function yamlEncoder(this: SchemaHost): { encode(value: unknown): string } {
-  return {
-    encode(value: unknown): string {
-      return JSON.stringify(value);
-    },
-  };
+export function yamlEncoder(this: SchemaHost): YAMLEncoder {
+  return new YAMLEncoder();
 }
 
 /**

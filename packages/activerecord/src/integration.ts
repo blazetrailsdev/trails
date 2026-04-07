@@ -4,6 +4,8 @@
  * Mirrors: ActiveRecord::Integration
  */
 
+import { MissingAttributeError } from "@blazetrails/activemodel";
+
 interface Identifiable {
   id: unknown;
   isNewRecord(): boolean;
@@ -41,11 +43,8 @@ export function cacheKey(this: Identifiable): string {
  */
 export function cacheKeyWithVersion(this: Identifiable): string {
   const base = cacheKey.call(this);
-  const updatedAt = this.readAttribute("updated_at");
-  if (updatedAt instanceof Date) {
-    return `${base}-${updatedAt.toISOString().replace(/[^0-9]/g, "")}`;
-  }
-  return base;
+  const version = cacheVersion.call(this);
+  return version ? `${base}-${version}` : base;
 }
 
 /**
@@ -54,9 +53,16 @@ export function cacheKeyWithVersion(this: Identifiable): string {
  * Mirrors: ActiveRecord::Integration#cache_version
  */
 export function cacheVersion(this: Identifiable): string | null {
-  const updatedAt = this.readAttribute("updated_at");
-  if (updatedAt instanceof Date) {
-    return updatedAt.toISOString().replace(/[^0-9]/g, "");
+  if ((this as any).hasAttribute?.("updated_at")) {
+    const updatedAt = this.readAttribute("updated_at");
+    if (updatedAt instanceof Date) {
+      return updatedAt.toISOString().replace(/[^0-9]/g, "");
+    }
+    return null;
+  } else if ((this.constructor as any).hasAttribute?.("updated_at")) {
+    throw new MissingAttributeError(
+      `missing attribute 'updated_at' for ${(this.constructor as any).name}`,
+    );
   }
   return null;
 }
