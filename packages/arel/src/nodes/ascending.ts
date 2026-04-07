@@ -1,6 +1,6 @@
-import { Unary } from "./unary.js";
+import { Ordering } from "./ordering.js";
 
-export class Ascending extends Unary {
+export class Ascending extends Ordering {
   get direction(): "asc" {
     return "asc";
   }

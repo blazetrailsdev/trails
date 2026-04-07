@@ -142,9 +142,11 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.Cube) return this.visitCube(node);
     if (node instanceof Nodes.Rollup) return this.visitRollup(node);
     if (node instanceof Nodes.GroupingSet) return this.visitGroupingSet(node);
+    if (node instanceof Nodes.Group) return this.visitGroup(node);
     if (node instanceof Nodes.GroupingElement) return this.visitGroupingElement(node);
     if (node instanceof Nodes.Lateral) return this.visitLateral(node);
     if (node instanceof Nodes.Comment) return this.visitComment(node);
+    if (node instanceof Nodes.HomogeneousIn) return this.visitHomogeneousIn(node);
 
     // Boolean literals
     if (node instanceof Nodes.True) return this.visitTrue(node);
@@ -288,7 +290,8 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitUpdateStatement(node: Nodes.UpdateStatement): SQLString {
+  private visitUpdateStatement(o: Nodes.UpdateStatement): SQLString {
+    const node = this.prepareUpdateStatement(o);
     this.collector.retryable = false;
     this.collector.append("UPDATE ");
     if (node.relation) this.visit(node.relation);
@@ -322,9 +325,30 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitDeleteStatement(node: Nodes.DeleteStatement): SQLString {
+  protected visitDeleteStatement(o: Nodes.DeleteStatement): SQLString {
+    const node = this.prepareDeleteStatement(o);
     this.collector.retryable = false;
-    this.collector.append("DELETE FROM ");
+    this.collector.append("DELETE ");
+    if (this.hasJoinSources(node)) {
+      const joinSource = node.relation as Nodes.JoinSource;
+      if (joinSource.left) {
+        const table = joinSource.left;
+        if (table instanceof Nodes.TableAlias) {
+          this.collector.append(`"${table.name}"`);
+        } else if (table instanceof Table && table.tableAlias) {
+          this.collector.append(`"${table.tableAlias}"`);
+        } else if (table instanceof Table) {
+          this.collector.append(`"${table.name}"`);
+        } else {
+          this.visit(table);
+        }
+        this.collector.append(" FROM ");
+      } else {
+        this.collector.append("FROM ");
+      }
+    } else {
+      this.collector.append("FROM ");
+    }
     if (node.relation) this.visit(node.relation);
 
     if (node.wheres.length > 0) {
@@ -344,6 +368,85 @@ export class ToSql implements NodeVisitor<SQLString> {
     }
 
     return this.collector;
+  }
+
+  protected prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement {
+    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
+      const stmt = o.clone();
+      stmt.limit = null;
+      stmt.offset = null;
+      stmt.orders = [];
+      const key = this.subselectKey(o.key);
+      const columns = new Nodes.Grouping(key);
+      stmt.wheres = [new Nodes.In(columns, this.buildSubselect(key, o))];
+      if (this.hasJoinSources(o)) {
+        stmt.relation = (o.relation as Nodes.JoinSource).left;
+      }
+      return stmt;
+    }
+    return o;
+  }
+
+  protected prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
+    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
+      const stmt = o.clone();
+      stmt.limit = null;
+      stmt.offset = null;
+      stmt.orders = [];
+      const rawKey = Array.isArray(o.key) ? o.key[0] : o.key;
+      const key = this.subselectKey(rawKey);
+      const columns = new Nodes.Grouping(key);
+      stmt.wheres = [new Nodes.In(columns, this.buildSubselect(key, o))];
+      if (this.hasJoinSources(o)) {
+        stmt.relation = (o.relation as Nodes.JoinSource).left;
+      }
+      return stmt;
+    }
+    return o;
+  }
+
+  private buildSubselect(
+    key: Node,
+    o: {
+      relation: Node | null;
+      wheres: Node[];
+      groups: Node[];
+      havings: Node[];
+      limit: Node | null;
+      offset: Node | null;
+      orders: Node[];
+    },
+  ): Nodes.SelectStatement {
+    const stmt = new Nodes.SelectStatement();
+    const core = stmt.cores[0];
+    if (o.relation) core.source = new Nodes.JoinSource(o.relation);
+    core.wheres = [...o.wheres];
+    core.projections = [key];
+    core.groups = [...o.groups];
+    core.havings = [...o.havings];
+    stmt.limit = o.limit;
+    stmt.offset = o.offset;
+    stmt.orders = [...o.orders];
+    return stmt;
+  }
+
+  private subselectKey(key: Node): Node {
+    if (key instanceof Nodes.Equality) {
+      return key.left as Node;
+    }
+    return key;
+  }
+
+  private hasJoinSources(o: { relation: Node | null }): boolean {
+    return o.relation instanceof Nodes.JoinSource && o.relation.right.length > 0;
+  }
+
+  private hasLimitOrOffsetOrOrders(o: {
+    limit: Node | null;
+    offset: Node | null;
+    orders: Node[];
+  }): boolean {
+    return !!(o.limit || o.offset || o.orders.length > 0);
   }
 
   // -- Joins --
@@ -503,6 +606,22 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
+  private visitHomogeneousIn(node: Nodes.HomogeneousIn): SQLString {
+    if (node.values.length === 0) {
+      this.collector.append(node.type === "in" ? "1=0" : "1=1");
+      return this.collector;
+    }
+    this.visit(node.attribute);
+    this.collector.append(node.type === "in" ? " IN (" : " NOT IN (");
+    const values = node.right;
+    for (let i = 0; i < values.length; i++) {
+      if (i > 0) this.collector.append(", ");
+      this.visit(values[i]);
+    }
+    this.collector.append(")");
+    return this.collector;
+  }
+
   private visitBetween(node: Nodes.Between): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(" BETWEEN ");
@@ -562,9 +681,13 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   private visitGrouping(node: Nodes.Grouping): SQLString {
     this.collector.append("(");
-    let inner: Node = node.expr;
+    let inner = node.expr;
     while (inner instanceof Nodes.Grouping) inner = inner.expr;
-    this.visit(inner);
+    if (inner instanceof Node) {
+      this.visit(inner);
+    } else if (inner !== null && inner !== undefined) {
+      this.collector.append(String(inner));
+    }
     this.collector.append(")");
     return this.collector;
   }
@@ -706,10 +829,10 @@ export class ToSql implements NodeVisitor<SQLString> {
   }
 
   private visitOver(node: Nodes.Over): SQLString {
-    this.visit(node.left);
+    this.visitNodeOrValue(node.left);
     this.collector.append(" OVER ");
     if (node.right) {
-      this.visit(node.right);
+      this.visitNodeOrValue(node.right);
     } else {
       this.collector.append("()");
     }
@@ -767,15 +890,15 @@ export class ToSql implements NodeVisitor<SQLString> {
       this.collector.append(" ");
       this.visit(node.case);
     }
-    for (const cond of node.conditions) {
+    for (const when of node.conditions) {
       this.collector.append(" WHEN ");
-      this.visit(cond.when);
+      this.visitNodeOrValue(when.left);
       this.collector.append(" THEN ");
-      this.visit(cond.then);
+      this.visitNodeOrValue(when.right);
     }
     if (node.default) {
       this.collector.append(" ELSE ");
-      this.visit(node.default);
+      this.visitNodeOrValue(node.default.expr);
     }
     this.collector.append(" END");
     return this.collector;
@@ -820,7 +943,11 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   private visitExtract(node: Nodes.Extract): SQLString {
     this.collector.append(`EXTRACT(${node.field} FROM `);
-    this.visit(node.expr);
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else if (node.expr !== null && node.expr !== undefined) {
+      this.collector.append(String(node.expr));
+    }
     this.collector.append(")");
     return this.collector;
   }
@@ -950,6 +1077,14 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
+  private visitGroup(node: Nodes.Group): SQLString {
+    if (node.expr instanceof Node) {
+      return this.visit(node.expr);
+    }
+    this.collector.append(String(node.expr));
+    return this.collector;
+  }
+
   private visitLateral(node: Nodes.Lateral): SQLString {
     this.collector.append("LATERAL (");
     this.visit(node.subquery);
@@ -959,7 +1094,8 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   private visitComment(node: Nodes.Comment): SQLString {
     for (const value of node.values) {
-      this.collector.append(` /* ${value} */`);
+      const sanitized = value.replace(/\/\*/g, "").replace(/\*\//g, "").replace(/\s+/g, " ").trim();
+      this.collector.append(` /* ${sanitized} */`);
     }
     return this.collector;
   }
@@ -988,13 +1124,13 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   // -- NullsFirst / NullsLast --
 
-  private visitNullsFirst(node: Nodes.NullsFirst): SQLString {
+  protected visitNullsFirst(node: Nodes.NullsFirst): SQLString {
     if (node.expr instanceof Node) this.visit(node.expr);
     this.collector.append(" NULLS FIRST");
     return this.collector;
   }
 
-  private visitNullsLast(node: Nodes.NullsLast): SQLString {
+  protected visitNullsLast(node: Nodes.NullsLast): SQLString {
     if (node.expr instanceof Node) this.visit(node.expr);
     this.collector.append(" NULLS LAST");
     return this.collector;
@@ -1026,9 +1162,9 @@ export class ToSql implements NodeVisitor<SQLString> {
   // -- Filter --
 
   private visitFilter(node: Nodes.Filter): SQLString {
-    this.visit(node.expression);
+    this.visitNodeOrValue(node.left);
     this.collector.append(" FILTER (WHERE ");
-    this.visit(node.filter);
+    this.visitNodeOrValue(node.right);
     this.collector.append(")");
     return this.collector;
   }

@@ -71,6 +71,40 @@ describe("MysqlTest", () => {
     });
   });
 
+  describe("Nodes::NullsFirst / NullsLast (MySQL emulation)", () => {
+    it("emulates NULLS FIRST with IS NOT NULL", () => {
+      const visitor = new Visitors.MySQL();
+      const node = users.get("id").asc().nullsFirst();
+      const sql = visitor.compile(node);
+      expect(sql).toContain('"users"."id" IS NOT NULL');
+      expect(sql).toContain('"users"."id" ASC');
+    });
+
+    it("emulates NULLS LAST with IS NULL", () => {
+      const visitor = new Visitors.MySQL();
+      const node = users.get("id").asc().nullsLast();
+      const sql = visitor.compile(node);
+      expect(sql).toContain('"users"."id" IS NULL');
+      expect(sql).toContain('"users"."id" ASC');
+    });
+
+    it("emulates NULLS FIRST with DESC ordering", () => {
+      const visitor = new Visitors.MySQL();
+      const node = users.get("id").desc().nullsFirst();
+      const sql = visitor.compile(node);
+      expect(sql).toContain('"users"."id" IS NOT NULL');
+      expect(sql).toContain('"users"."id" DESC');
+    });
+
+    it("emulates NULLS LAST with DESC ordering", () => {
+      const visitor = new Visitors.MySQL();
+      const node = users.get("id").desc().nullsLast();
+      const sql = visitor.compile(node);
+      expect(sql).toContain('"users"."id" IS NULL');
+      expect(sql).toContain('"users"."id" DESC');
+    });
+  });
+
   it("defaults limit to 18446744073709551615", () => {
     const mgr = users.project(star).skip(5);
     const sql = new Visitors.MySQL().compile(mgr.ast);

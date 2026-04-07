@@ -1,20 +1,17 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
+import { Binary } from "./binary.js";
 
-export class Over extends Node {
-  readonly left: Node;
-  readonly right: Node | null;
-
+/**
+ * Over node — OVER (window) clause.
+ *
+ * Mirrors: Arel::Nodes::Over (extends Binary)
+ */
+export class Over extends Binary {
   constructor(left: Node, right: Node | null = null) {
-    super();
-    this.left = left;
-    this.right = right;
+    super(left, right);
   }
 
   get operator(): string {
     return "OVER";
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

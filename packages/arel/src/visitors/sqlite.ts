@@ -46,6 +46,11 @@ export class SQLite extends ToSql {
     return this.collector;
   }
 
+  protected override visitLock(_node: Nodes.Lock): SQLString {
+    // SQLite does not support locking — silently ignore.
+    return this.collector;
+  }
+
   protected override visitTrue(_node: Nodes.True): SQLString {
     this.collector.append("1");
     return this.collector;

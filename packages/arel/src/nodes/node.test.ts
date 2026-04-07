@@ -36,9 +36,10 @@ describe("TestNode", () => {
     const c1 = new Nodes.Case();
     const c2 = c1.when(new Nodes.SqlLiteral("a"), new Nodes.SqlLiteral("b"));
     const c3 = c2.else(new Nodes.SqlLiteral("c"));
-    expect(c1.conditions.length).toBe(0);
-    expect(c2.conditions.length).toBe(1);
-    expect(c2.default).toBeNull();
+    // Rails mutates in-place — c1, c2, c3 are the same object
+    expect(c1).toBe(c2);
+    expect(c2).toBe(c3);
+    expect(c1.conditions.length).toBe(1);
     expect(c3.default).not.toBeNull();
   });
 

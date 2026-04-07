@@ -2,7 +2,7 @@ import { Node } from "./nodes/node.js";
 import { UpdateStatement } from "./nodes/update-statement.js";
 import { Assignment } from "./nodes/binary.js";
 import { Quoted } from "./nodes/casted.js";
-import { Limit } from "./nodes/unary.js";
+import { Limit, Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
 import { ToSql } from "./visitors/to-sql.js";
@@ -90,9 +90,9 @@ export class UpdateManager {
     const columns = [column, ...rest];
     for (const c of columns) {
       if (typeof c === "string") {
-        this.ast.groups.push(new SqlLiteral(c));
+        this.ast.groups.push(new Group(new SqlLiteral(c)));
       } else {
-        this.ast.groups.push(c);
+        this.ast.groups.push(new Group(c));
       }
     }
     return this;

@@ -3,7 +3,7 @@ import { SelectStatement } from "./nodes/select-statement.js";
 import { SelectCore } from "./nodes/select-core.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Distinct } from "./nodes/terminal.js";
-import { Offset, Limit, Lock, On, DistinctOn } from "./nodes/unary.js";
+import { Offset, Limit, Lock, On, DistinctOn, Group } from "./nodes/unary.js";
 import { CrossJoin } from "./nodes/binary.js";
 import type { Join } from "./nodes/binary.js";
 import { InnerJoin } from "./nodes/inner-join.js";
@@ -160,9 +160,9 @@ export class SelectManager {
   group(...exprs: (Node | string)[]): this {
     for (const e of exprs) {
       if (typeof e === "string") {
-        this.core.groups.push(new SqlLiteral(e));
+        this.core.groups.push(new Group(new SqlLiteral(e)));
       } else {
-        this.core.groups.push(e);
+        this.core.groups.push(new Group(e));
       }
     }
     return this;
@@ -348,7 +348,7 @@ export class SelectManager {
    * Mirrors: Arel::SelectManager#as
    */
   as(alias: string): TableAlias {
-    return new TableAlias(this.ast, alias);
+    return new TableAlias(new Grouping(this.ast), alias);
   }
 
   /**

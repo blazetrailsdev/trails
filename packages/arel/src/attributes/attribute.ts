@@ -1,5 +1,4 @@
 import { Node, NodeVisitor } from "../nodes/node.js";
-import type { Table } from "../table.js";
 import {
   NotEqual,
   GreaterThan,
@@ -69,13 +68,21 @@ export interface TypeCaster {
   typeCastForDatabase(value: unknown): unknown;
 }
 
+export interface RelationLike {
+  name: string;
+  tableAlias?: string | null;
+  typeCastForDatabase?: (attrName: string, value: unknown) => unknown;
+  typeForAttribute?: (name: string) => unknown;
+  isAbleToTypeCast?: () => boolean;
+}
+
 export class Attribute extends Node {
   readonly [ATTRIBUTE_BRAND] = true;
-  readonly relation: Table;
+  readonly relation: RelationLike;
   readonly name: string;
   readonly caster?: TypeCaster;
 
-  constructor(relation: Table, name: string, caster?: TypeCaster) {
+  constructor(relation: RelationLike, name: string, caster?: TypeCaster) {
     super();
     this.relation = relation;
     this.name = name;
@@ -83,20 +90,19 @@ export class Attribute extends Node {
   }
 
   get typeCaster(): unknown {
-    const rel = this.relation as unknown as { typeForAttribute?: (n: string) => unknown };
-    return rel?.typeForAttribute ? rel.typeForAttribute(this.name) : undefined;
+    return this.relation.typeForAttribute ? this.relation.typeForAttribute(this.name) : undefined;
   }
 
   typeCastForDatabase(value: unknown): unknown {
-    const rel = this.relation as unknown as {
-      typeCastForDatabase?: (n: string, v: unknown) => unknown;
-    };
-    return rel?.typeCastForDatabase ? rel.typeCastForDatabase(this.name, value) : value;
+    return this.relation.typeCastForDatabase
+      ? this.relation.typeCastForDatabase(this.name, value)
+      : value;
   }
 
   isAbleToTypeCast(): boolean {
-    const rel = this.relation as unknown as { isAbleToTypeCast?: () => boolean };
-    return typeof rel?.isAbleToTypeCast === "function" ? rel.isAbleToTypeCast() : false;
+    return typeof this.relation.isAbleToTypeCast === "function"
+      ? this.relation.isAbleToTypeCast()
+      : false;
   }
 
   private castValue(value: unknown): unknown {
@@ -113,7 +119,7 @@ export class Attribute extends Node {
   }
 
   notEq(other: unknown): NotEqual {
-    return new NotEqual(this, buildQuoted(other));
+    return new NotEqual(this, buildQuoted(this.castValue(other)));
   }
 
   gt(other: unknown): GreaterThan {

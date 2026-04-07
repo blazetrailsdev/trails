@@ -1,25 +1,16 @@
-import { Node, NodeVisitor } from "./node.js";
-import { As } from "./binary.js";
+import { Node } from "./node.js";
+import { Binary } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Over } from "./over.js";
 
 /**
  * Filter — FILTER (WHERE ...) clause for aggregate functions.
  *
- * Mirrors: Arel::Nodes::Filter
+ * Mirrors: Arel::Nodes::Filter (extends Binary)
  */
-export class Filter extends Node {
-  readonly expression: Node;
-  readonly filter: Node;
-
-  constructor(expression: Node, filter: Node) {
-    super();
-    this.expression = expression;
-    this.filter = filter;
-  }
-
-  as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName));
+export class Filter extends Binary {
+  constructor(left: Node, right: Node) {
+    super(left, right);
   }
 
   over(windowOrName?: Node | string): Over {
@@ -27,9 +18,5 @@ export class Filter extends Node {
       return new Over(this, new SqlLiteral(`"${windowOrName}"`));
     }
     return new Over(this, windowOrName ?? null);
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }

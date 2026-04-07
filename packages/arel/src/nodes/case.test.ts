@@ -27,13 +27,11 @@ describe("NodesTest", () => {
       const c1 = base.when("active", "A");
       const c2 = c1.else("Z");
 
-      expect(c1).not.toBe(base);
-      expect(c2).not.toBe(c1);
+      // Rails mutates in-place and returns self
+      expect(c1).toBe(base);
+      expect(c2).toBe(c1);
 
-      expect(base.conditions.length).toBe(0);
-      expect(c1.conditions.length).toBe(1);
-      expect(c1.default).toBeNull();
-      expect(c2.conditions.length).toBe(1);
+      expect(base.conditions.length).toBe(1);
       expect(c2.default).not.toBeNull();
     });
 
@@ -91,7 +89,7 @@ describe("NodesTest", () => {
 
       it("sets default case from second argument", () => {
         const node = new Nodes.Case(undefined, new Nodes.Quoted("bar"));
-        expect(node.default).toBeInstanceOf(Nodes.Quoted);
+        expect(node.default).toBeInstanceOf(Nodes.Else);
       });
     });
   });

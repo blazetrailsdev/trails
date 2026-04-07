@@ -1,6 +1,6 @@
 import { Node } from "./nodes/node.js";
 import { DeleteStatement } from "./nodes/delete-statement.js";
-import { Limit } from "./nodes/unary.js";
+import { Limit, Group } from "./nodes/unary.js";
 import { Quoted } from "./nodes/casted.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
@@ -68,9 +68,9 @@ export class DeleteManager {
     const columns = [column, ...rest];
     for (const c of columns) {
       if (typeof c === "string") {
-        this.ast.groups.push(new SqlLiteral(c));
+        this.ast.groups.push(new Group(new SqlLiteral(c)));
       } else {
-        this.ast.groups.push(c);
+        this.ast.groups.push(new Group(c));
       }
     }
     return this;

@@ -1,6 +1,6 @@
 import { Node, NodeVisitor } from "./node.js";
-import { SqlLiteral } from "./sql-literal.js";
 import { Cte } from "./cte.js";
+import { Attribute } from "../attributes/attribute.js";
 
 interface TypeCastable {
   name?: string;
@@ -19,8 +19,8 @@ export class TableAlias extends Node {
     this.name = name;
   }
 
-  get(columnName: string): Node {
-    return new SqlLiteral(`"${this.name}"."${columnName}"`);
+  get(columnName: string): Attribute {
+    return new Attribute(this, columnName);
   }
 
   get tableName(): string {

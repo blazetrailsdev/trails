@@ -1,20 +1,17 @@
-import { Node, NodeVisitor } from "./node.js";
+import { Node } from "./node.js";
+import { Unary } from "./unary.js";
 
 /**
  * With — WITH clause for common table expressions.
  *
- * Mirrors: Arel::Nodes::With
+ * Mirrors: Arel::Nodes::With (extends Unary)
  */
-export class With extends Node {
+export class With extends Unary {
   readonly children: Node[];
 
   constructor(children: Node[]) {
-    super();
+    super(null);
     this.children = children;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
   }
 }
 
