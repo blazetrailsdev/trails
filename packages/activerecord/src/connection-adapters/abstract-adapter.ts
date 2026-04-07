@@ -5,6 +5,7 @@
  */
 
 import type { DatabaseAdapter } from "../adapter.js";
+import type { Nodes } from "@blazetrails/arel";
 import { ReadOnlyError } from "../errors.js";
 import { SchemaCache } from "./schema-cache.js";
 
@@ -576,8 +577,8 @@ export class AbstractAdapter {
     return null;
   }
 
-  caseSensitiveComparison(_attribute: unknown, _value: unknown): unknown {
-    return null;
+  caseSensitiveComparison(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+    return attribute.eq(value);
   }
 
   caseInsensitiveComparison(_attribute: unknown, _value: unknown): unknown {

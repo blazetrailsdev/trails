@@ -9,6 +9,7 @@
  */
 
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
+import type { Nodes } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import { quoteString as mysqlQuoteString } from "./mysql/quoting.js";
 
@@ -385,10 +386,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return [];
   }
 
-  caseSensitiveComparison(attribute: unknown, value: unknown): unknown {
-    void attribute;
-    void value;
-    return null;
+  caseSensitiveComparison(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+    // TODO: Rails checks column.collation && !column.case_sensitive? and wraps
+    // in Arel::Nodes::Bin for case-insensitive collations. Add when schema
+    // column introspection supports collation detection.
+    return super.caseSensitiveComparison(attribute, value);
   }
 
   canPerformCaseInsensitiveComparisonFor(column: { collation?: string | null }): boolean {
