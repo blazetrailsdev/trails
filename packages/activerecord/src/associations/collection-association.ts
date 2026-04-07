@@ -129,15 +129,24 @@ export class CollectionAssociation extends Association {
    */
   async concat(...records: Base[]): Promise<Base[]> {
     const flattened = records.flat() as Base[];
-    for (const record of flattened) {
-      const added = this.addToTarget(record);
-      if (!added) continue;
-      if (this.owner.isPersisted() && typeof (record as any).save === "function") {
-        this.setOwnerAttributes(record);
-        await (record as any).save();
-      }
+    if (this.owner.isNewRecord()) {
+      await this.loadTarget();
+      await this.concatRecords(flattened);
+    } else {
+      await this.concatRecords(flattened);
     }
     return flattened;
+  }
+
+  private async concatRecords(records: Base[]): Promise<void> {
+    for (const record of records) {
+      this.setOwnerAttributes(record);
+      const added = this.addToTarget(record);
+      if (!added) continue;
+      if (!this.owner.isNewRecord() && typeof (added as any).save === "function") {
+        await (added as any).save();
+      }
+    }
   }
 
   /**
@@ -200,11 +209,19 @@ export class CollectionAssociation extends Association {
   }
 
   get size(): number {
-    if (this.isLoaded()) {
+    if (!this.findTargetNeeded() || this.isLoaded()) {
       return this.target.length;
     }
     if (this._associationIds) {
       return this._associationIds.length;
+    }
+    return this.target.length;
+  }
+
+  async countRecords(): Promise<number> {
+    const rel = this.scope();
+    if (rel && typeof rel.count === "function") {
+      return await rel.count();
     }
     return this.target.length;
   }
@@ -214,6 +231,18 @@ export class CollectionAssociation extends Association {
       return this.size === 0;
     }
     return this.target.length === 0;
+  }
+
+  async isEmptyAsync(): Promise<boolean> {
+    if (this.isLoaded() || this._associationIds) {
+      return this.size === 0;
+    }
+    if (this.target.length > 0) return false;
+    const rel = this.scope();
+    if (rel && typeof rel.exists === "function") {
+      return !(await rel.exists());
+    }
+    return true;
   }
 
   /**
@@ -385,8 +414,29 @@ export class CollectionAssociation extends Association {
     return true;
   }
 
-  get reader(): Base[] {
+  override get reader(): Base[] {
+    this.ensureKlassExists();
     return this.target;
+  }
+
+  async asyncReader(): Promise<Base[]> {
+    this.ensureKlassExists();
+
+    if (this.isStaleTarget()) {
+      await this.reload();
+    }
+
+    return this.target;
+  }
+
+  private ensureKlassExists(): void {
+    try {
+      void this.klass;
+    } catch (error) {
+      throw new Error(`Association ${this.reflection.name}: target class does not exist`, {
+        cause: error,
+      });
+    }
   }
 
   // --- Protected helpers ---
