@@ -14,16 +14,6 @@ symbols, operator overloading, etc.) that have no TS equivalent are omitted.
 
 - `param_key` doesn't use namespace-aware logic (ActiveRecord isolate_namespace concern)
 
-## Missing validation features
-
-### acceptance.ts
-
-- Missing `setup!()` to define attributes on class
-
-### confirmation.ts
-
-- Missing `setup!()` for confirmation attribute definition
-
 ## Add when needed (low priority)
 
 ### callbacks.ts

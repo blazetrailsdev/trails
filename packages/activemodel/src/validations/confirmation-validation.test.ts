@@ -115,4 +115,28 @@ describe("ConfirmationValidationTest", () => {
     expect(p.errors.get("titleConfirmation")[0]).toBe("doesn't match Custom Title");
     I18n.reset();
   });
+
+  it("setup! auto-defines confirmation attribute", () => {
+    class Person extends Model {
+      static {
+        this.attribute("email", "string");
+        this.validates("email", { confirmation: true });
+      }
+    }
+    expect(Person._attributeDefinitions.has("emailConfirmation")).toBe(true);
+    const p = new Person({ email: "a@b.com", emailConfirmation: "x@y.com" });
+    expect(p.isValid()).toBe(false);
+    expect(p.errors.get("emailConfirmation")).toContain("doesn't match Email");
+  });
+
+  it("setup! does not override explicitly declared confirmation attribute", () => {
+    class Person extends Model {
+      static {
+        this.attribute("email", "string");
+        this.attribute("emailConfirmation", "string");
+        this.validates("email", { confirmation: true });
+      }
+    }
+    expect(Person._attributeDefinitions.has("emailConfirmation")).toBe(true);
+  });
 });

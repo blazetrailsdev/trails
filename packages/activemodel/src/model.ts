@@ -332,11 +332,18 @@ export class Model {
 
     if (rules.acceptance) {
       const opts = rules.acceptance === true ? {} : (rules.acceptance as AnyRecord);
+      if (!this._attributeDefinitions.has(attribute)) {
+        this.attribute(attribute, "string");
+      }
       push(new AcceptanceValidator(opts));
     }
 
     if (rules.confirmation) {
       const opts = rules.confirmation === true ? {} : (rules.confirmation as AnyRecord);
+      const confirmationAttr = `${attribute}Confirmation`;
+      if (!this._attributeDefinitions.has(confirmationAttr)) {
+        this.attribute(confirmationAttr, "string");
+      }
       push(new ConfirmationValidator(opts));
     }
 

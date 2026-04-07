@@ -112,4 +112,26 @@ describe("AcceptanceValidationTest", () => {
     const p2 = new Person({ terms: "1" });
     expect(p2.isValid()).toBe(true);
   });
+
+  it("setup! auto-defines attribute when not explicitly declared", () => {
+    class Agreement extends Model {
+      static {
+        this.validates("terms", { acceptance: true });
+      }
+    }
+    expect(Agreement._attributeDefinitions.has("terms")).toBe(true);
+    const a = new Agreement({ terms: "1" });
+    expect(a.isValid()).toBe(true);
+    expect(a.readAttribute("terms")).toBe("1");
+  });
+
+  it("setup! does not override explicitly declared attribute", () => {
+    class Agreement extends Model {
+      static {
+        this.attribute("terms", "boolean");
+        this.validates("terms", { acceptance: true });
+      }
+    }
+    expect(Agreement._attributeDefinitions.get("terms")!.type.name).toBe("boolean");
+  });
 });
