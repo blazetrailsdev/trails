@@ -98,7 +98,8 @@ export class ModelName {
     this._humanFallback = humanize(lower);
     this.collection = this.plural;
     this.paramKey = lower;
-    this.routeKey = this.plural;
+    // Rails: uncountable nouns get _index suffix on route_key
+    this.routeKey = this.singular === this.plural ? `${this.plural}_index` : this.plural;
     this.i18nKey = lower;
   }
 

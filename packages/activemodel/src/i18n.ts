@@ -148,6 +148,9 @@ const messages: TranslationTree = {
   empty: "can't be empty",
   not_a_date: "is not a valid date",
   required: "must exist",
+  password_too_long: "is too long",
+  in: "must be in %{count}",
+  model_invalid: "Validation failed: %{errors}",
 };
 
 const defaultEnTranslations: TranslationTree = {

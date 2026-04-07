@@ -55,7 +55,7 @@ describe("ConfirmationValidationTest", () => {
     }
     const p = new Person({ title: "A", titleConfirmation: "B" });
     expect(p.isValid()).toBe(false);
-    expect(p.errors.get("title")).toContain("doesn't match Title");
+    expect(p.errors.get("titleConfirmation")).toContain("doesn't match Title");
   });
 
   it("title confirmation", () => {
@@ -112,7 +112,7 @@ describe("ConfirmationValidationTest", () => {
     const p = new Person({ title: "We the People" });
     p._attributes.set("titleConfirmation", "We the Robots");
     expect(p.isValid()).toBe(false);
-    expect(p.errors.get("title")[0]).toBe("doesn't match Custom Title");
+    expect(p.errors.get("titleConfirmation")[0]).toBe("doesn't match Custom Title");
     I18n.reset();
   });
 });

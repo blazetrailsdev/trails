@@ -226,7 +226,7 @@ describe("I18nValidationTest", () => {
     const p = new Person({ title: "A" });
     p._attributes.set("titleConfirmation", "B");
     expect(p.isValid()).toBe(false);
-    expect(p.errors.get("title")[0]).toMatch(/doesn't match/);
+    expect(p.errors.get("titleConfirmation")[0]).toMatch(/doesn't match/);
   });
 
   it("validates_acceptance_of on generated message", () => {

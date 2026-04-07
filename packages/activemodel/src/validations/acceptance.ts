@@ -8,6 +8,7 @@ import { shouldValidate } from "../validator.js";
 
 export interface AcceptanceOptions extends ConditionalOptions {
   accept?: unknown[];
+  allowNil?: boolean;
   message?: string;
 }
 
@@ -50,8 +51,9 @@ export class AcceptanceValidator implements Validator {
 
   validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
     const errs = errors ?? record.errors;
-    if (value === null || value === undefined) return;
-    const accepted = this.options.accept ?? [true, "true", "1", 1, "yes"];
+    const allowNil = this.options.allowNil ?? true;
+    if (allowNil && (value === null || value === undefined)) return;
+    const accepted = this.options.accept ?? ["1", "true", true];
     if (!accepted.includes(value)) {
       errs.add(attribute, "accepted", { message: this.options.message });
     }

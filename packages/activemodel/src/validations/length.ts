@@ -45,37 +45,69 @@ export class LengthValidator implements Validator {
     const errs = errors ?? record.errors;
     if (!shouldValidate(record, this.options)) return;
     if (value === null || value === undefined) {
-      if (this.options.allowNil !== false) return;
-      // If allowNil is explicitly false, we still skip (length can't be computed on nil)
-      return;
+      // Rails: nil is always skipped for maximum-only validations
+      const maximumOnly =
+        this.options.maximum !== undefined &&
+        this.options.minimum === undefined &&
+        this.options.is === undefined &&
+        this.options.in === undefined;
+      if (this.options.allowNil !== false || maximumOnly) return;
+      // allowNil is explicitly false and not maximum-only — fall through to validate
     }
     if (this.options.allowBlank && isBlank(value)) return;
-    const length =
-      typeof value === "string" ? value.length : Array.isArray(value) ? value.length : 0;
+
+    // Rails: handle any object with a length property
+    let length: number;
+    if (typeof value === "string" || Array.isArray(value)) {
+      length = value.length;
+    } else if (
+      typeof value === "object" &&
+      value !== null &&
+      "length" in value &&
+      typeof (value as { length: unknown }).length === "number"
+    ) {
+      length = (value as { length: number }).length;
+    } else {
+      length = 0;
+    }
 
     const resolveNum = (v: number | (() => number) | undefined): number | undefined => {
       if (v === undefined) return undefined;
       return typeof v === "function" ? v() : v;
     };
-    const min = this.options.in ? this.options.in[0] : resolveNum(this.options.minimum);
+    let min = this.options.in ? this.options.in[0] : resolveNum(this.options.minimum);
     const max = this.options.in ? this.options.in[1] : resolveNum(this.options.maximum);
+
+    // Rails: implicit minimum: 1 when allow_blank is false and no explicit constraints
+    if (
+      min === undefined &&
+      max === undefined &&
+      this.options.allowBlank === false &&
+      this.options.is === undefined &&
+      this.options.in === undefined
+    ) {
+      min = 1;
+    }
 
     if (min !== undefined && length < min) {
       errs.add(attribute, "too_short", {
         message: this.options.tooShort ?? this.options.message,
         count: min,
+        value,
       });
     }
     if (max !== undefined && length > max) {
       errs.add(attribute, "too_long", {
         message: this.options.tooLong ?? this.options.message,
         count: max,
+        value,
       });
     }
     if (this.options.is !== undefined && length !== this.options.is) {
       errs.add(attribute, "wrong_length", {
         message: this.options.wrongLength ?? this.options.message,
         count: this.options.is,
+        value,
       });
     }
   }

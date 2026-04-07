@@ -37,7 +37,7 @@ export class ConfirmationValidator implements Validator {
       const humanAttr = modelClass?.humanAttributeName
         ? modelClass.humanAttributeName(attribute)
         : humanize(attribute);
-      errs.add(attribute, "confirmation", {
+      errs.add(confirmationAttr, "confirmation", {
         message: this.options.message,
         attribute: humanAttr,
       });

@@ -32,6 +32,7 @@ export class BooleanType extends Type<boolean> {
 
   cast(value: unknown): boolean | null {
     if (value === null || value === undefined) return null;
+    if (value === "") return null;
     if (BooleanType.TRUE_VALUES.has(value)) return true;
     if (BooleanType.FALSE_VALUES.has(value)) return false;
     return null;

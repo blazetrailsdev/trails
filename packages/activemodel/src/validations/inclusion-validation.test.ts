@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "../index.js";
+import { InclusionValidator } from "./inclusion.js";
 
 describe("InclusionValidationTest", () => {
   it("validates inclusion of with within option", () => {
@@ -163,6 +164,43 @@ describe("InclusionValidationTest", () => {
       static {
         this.attribute("role", "string");
         this.validates("role", { inclusion: { in: () => ["admin", "user"] } });
+      }
+    }
+    expect(new Person({ role: "admin" }).isValid()).toBe(true);
+    expect(new Person({ role: "guest" }).isValid()).toBe(false);
+  });
+
+  it("validates inclusion of with within alias", () => {
+    class Person extends Model {
+      static {
+        this.attribute("role", "string");
+        this.validates("role", { inclusion: { within: ["admin", "user"] } });
+      }
+    }
+    expect(new Person({ role: "admin" }).isValid()).toBe(true);
+    expect(new Person({ role: "guest" }).isValid()).toBe(false);
+  });
+
+  it("validates inclusion of array value checks all elements", () => {
+    class Item extends Model {
+      static {
+        this.attribute("tags", "string");
+      }
+    }
+    const validator = new InclusionValidator({ in: ["a", "b", "c"] });
+    const r1 = new Item();
+    validator.validateEach(r1, "tags", ["a", "b"], r1.errors);
+    expect(r1.errors.size).toBe(0);
+    const r2 = new Item();
+    validator.validateEach(r2, "tags", ["a", "z"], r2.errors);
+    expect(r2.errors.size).toBeGreaterThan(0);
+  });
+
+  it("validates inclusion of with Set collection", () => {
+    class Person extends Model {
+      static {
+        this.attribute("role", "string");
+        this.validates("role", { inclusion: { in: () => new Set(["admin", "user"]) } });
       }
     }
     expect(new Person({ role: "admin" }).isValid()).toBe(true);

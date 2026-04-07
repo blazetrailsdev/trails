@@ -6,19 +6,6 @@ symbols, operator overloading, etc.) that have no TS equivalent are omitted.
 
 ## Bugs (wrong behavior)
 
-### boolean.ts
-
-- Empty string `""` should return `null`; currently returns truthy
-
-### confirmation.ts
-
-- Error added to base attribute; Rails adds to `#{attr}_confirmation`
-
-### acceptance.ts
-
-- Default accept values: `[true, "true", "1", 1, "yes"]` vs Rails `["1", true]`
-- Missing `allow_nil: true` default
-
 ### attribute.ts
 
 - `value_for_database` caches without re-checking `type.changed_in_place?` — can return stale serialized value
@@ -26,46 +13,9 @@ symbols, operator overloading, etc.) that have no TS equivalent are omitted.
 
 ### naming.ts
 
-- Missing `_index` suffix on route_key for uncountable nouns
-- `param_key` doesn't use namespace-aware logic
-
-### i18n.ts
-
-- Missing error messages: `password_too_long`, `in`, `model_invalid`
-
-## Missing `value:` in error options (affects i18n interpolation)
-
-These validators don't include `value:` in the options passed to error messages,
-which means `%{value}` interpolation in custom error messages won't work:
-
-- comparability.ts (`errorOptions` only returns `count`)
-- comparison.ts
-- exclusion.ts
-- format.ts
-- inclusion.ts
-- numericality.ts
+- `param_key` doesn't use namespace-aware logic (ActiveRecord isolate_namespace concern)
 
 ## Missing validation features
-
-### clusivity.ts
-
-- Missing `:within` alias for `:in`
-- Missing Array value handling (`value.all?` check for array membership)
-
-### length.ts
-
-- Missing `minimum: 1` when `allow_blank: false` with no constraint
-- Nil-skip logic differs (Rails has special case for maximum only)
-- Only handles string/array length; Rails handles any `respond_to?(:length)`
-
-### comparison.ts
-
-- Missing `value.blank?` check with blank error
-
-### numericality.ts
-
-- `:in` uses `[min, max]` array; Rails uses Range
-- Doesn't reject hexadecimal literals
 
 ### acceptance.ts
 

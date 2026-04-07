@@ -67,7 +67,7 @@ export abstract class Attribute {
   }
 
   get valueForDatabase(): unknown {
-    if (!this._hasValueForDatabase) {
+    if (!this._hasValueForDatabase || this.changedInPlace()) {
       this._valueForDatabase = this.type.serialize(this.value);
       this._hasValueForDatabase = true;
     }

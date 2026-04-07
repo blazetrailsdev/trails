@@ -126,7 +126,7 @@ describe("NamingHelpersTest", () => {
 
   it("uncountable route key", () => {
     const name = new ModelName("Sheep");
-    expect(name.routeKey).toBe("sheep");
+    expect(name.routeKey).toBe("sheep_index");
   });
 
   it("to model called on record", () => {

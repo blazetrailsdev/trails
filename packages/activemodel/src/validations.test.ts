@@ -300,7 +300,7 @@ describe("ValidationsTest", () => {
     it("rejects mismatched password and confirmation", () => {
       const s = new Signup({ password: "secret", passwordConfirmation: "wrong" });
       expect(s.isValid()).toBe(false);
-      expect(s.errors.get("password")).toContain("doesn't match Password");
+      expect(s.errors.get("passwordConfirmation")).toContain("doesn't match Password");
     });
   });
 

@@ -10,9 +10,13 @@
 import { resolveValue } from "./resolve-value.js";
 
 export interface Comparability {
-  errorOptions(value: unknown, record: unknown): Record<string, unknown>;
+  errorOptions(optionValue: unknown, record: unknown, value?: unknown): Record<string, unknown>;
 }
 
-export function errorOptions(optionValue: unknown, record: unknown): Record<string, unknown> {
-  return { count: resolveValue(record, optionValue) };
+export function errorOptions(
+  optionValue: unknown,
+  record: unknown,
+  value?: unknown,
+): Record<string, unknown> {
+  return { count: resolveValue(record, optionValue), value };
 }

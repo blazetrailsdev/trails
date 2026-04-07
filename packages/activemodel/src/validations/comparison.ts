@@ -5,6 +5,7 @@ import type {
   ValidatorContract as Validator,
 } from "../validator.js";
 import { shouldValidate } from "../validator.js";
+import { isBlank } from "@blazetrails/activesupport";
 
 export interface ComparisonOptions extends ConditionalOptions {
   greaterThan?: unknown | ((record: AnyRecord) => unknown);
@@ -54,11 +55,19 @@ export class ComparisonValidator implements Validator {
   validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
     const errs = errors ?? record.errors;
     if (value === null || value === undefined) return;
+    if (typeof value === "string" && isBlank(value)) {
+      errs.add(attribute, "blank", { value, message: this.options.message });
+      return;
+    }
 
     if (this.options.greaterThan !== undefined) {
       const target = this.resolve(this.options.greaterThan, record);
       if (this.compare(value, target) <= 0) {
-        errs.add(attribute, "greater_than", { count: target, message: this.options.message });
+        errs.add(attribute, "greater_than", {
+          count: target,
+          value,
+          message: this.options.message,
+        });
       }
     }
     if (this.options.greaterThanOrEqualTo !== undefined) {
@@ -66,6 +75,7 @@ export class ComparisonValidator implements Validator {
       if (this.compare(value, target) < 0) {
         errs.add(attribute, "greater_than_or_equal_to", {
           count: target,
+          value,
           message: this.options.message,
         });
       }
@@ -73,7 +83,7 @@ export class ComparisonValidator implements Validator {
     if (this.options.lessThan !== undefined) {
       const target = this.resolve(this.options.lessThan, record);
       if (this.compare(value, target) >= 0) {
-        errs.add(attribute, "less_than", { count: target, message: this.options.message });
+        errs.add(attribute, "less_than", { count: target, value, message: this.options.message });
       }
     }
     if (this.options.lessThanOrEqualTo !== undefined) {
@@ -81,6 +91,7 @@ export class ComparisonValidator implements Validator {
       if (this.compare(value, target) > 0) {
         errs.add(attribute, "less_than_or_equal_to", {
           count: target,
+          value,
           message: this.options.message,
         });
       }
@@ -88,13 +99,13 @@ export class ComparisonValidator implements Validator {
     if (this.options.equalTo !== undefined) {
       const target = this.resolve(this.options.equalTo, record);
       if (this.compare(value, target) !== 0) {
-        errs.add(attribute, "equal_to", { count: target, message: this.options.message });
+        errs.add(attribute, "equal_to", { count: target, value, message: this.options.message });
       }
     }
     if (this.options.otherThan !== undefined) {
       const target = this.resolve(this.options.otherThan, record);
       if (this.compare(value, target) === 0) {
-        errs.add(attribute, "other_than", { count: target, message: this.options.message });
+        errs.add(attribute, "other_than", { count: target, value, message: this.options.message });
       }
     }
   }

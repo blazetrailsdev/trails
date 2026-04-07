@@ -72,61 +72,69 @@ export class NumericalityValidator implements Validator {
   validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
     const errs = errors ?? record.errors;
     if (value === null || value === undefined) {
-      if (this.options.allowNil) return;
-      // Default: skip nil (Rails default for numericality)
+      if (this.options.allowNil !== false) return;
+      errs.add(attribute, "not_a_number", { value, message: this.options.message });
       return;
     }
     if (this.options.allowBlank && isBlank(value)) return;
 
+    // Rails rejects hex literals (0x...) — JS Number() accepts them
+    if (typeof value === "string" && /^\s*[+-]?0x/i.test(value)) {
+      errs.add(attribute, "not_a_number", { value, message: this.options.message });
+      return;
+    }
+
     const num = Number(value);
     if (isNaN(num)) {
-      errs.add(attribute, "not_a_number", { message: this.options.message });
+      errs.add(attribute, "not_a_number", { value, message: this.options.message });
       return;
     }
 
     if (this.options.onlyInteger && !Number.isInteger(num)) {
-      errs.add(attribute, "not_an_integer", { message: this.options.message });
+      errs.add(attribute, "not_an_integer", { value, message: this.options.message });
       return;
     }
 
+    const msg = this.options.message;
     const gt = this.resolveNumeric(this.options.greaterThan, record);
     if (gt !== undefined && !(num > gt)) {
-      errs.add(attribute, "greater_than", { count: gt });
+      errs.add(attribute, "greater_than", { count: gt, value, message: msg });
     }
     const gte = this.resolveNumeric(this.options.greaterThanOrEqualTo, record);
     if (gte !== undefined && !(num >= gte)) {
-      errs.add(attribute, "greater_than_or_equal_to", { count: gte });
+      errs.add(attribute, "greater_than_or_equal_to", { count: gte, value, message: msg });
     }
     const lt = this.resolveNumeric(this.options.lessThan, record);
     if (lt !== undefined && !(num < lt)) {
-      errs.add(attribute, "less_than", { count: lt });
+      errs.add(attribute, "less_than", { count: lt, value, message: msg });
     }
     const lte = this.resolveNumeric(this.options.lessThanOrEqualTo, record);
     if (lte !== undefined && !(num <= lte)) {
-      errs.add(attribute, "less_than_or_equal_to", { count: lte });
+      errs.add(attribute, "less_than_or_equal_to", { count: lte, value, message: msg });
     }
     const eq = this.resolveNumeric(this.options.equalTo, record);
     if (eq !== undefined && num !== eq) {
-      errs.add(attribute, "equal_to", { count: eq });
+      errs.add(attribute, "equal_to", { count: eq, value, message: msg });
     }
     const ot = this.resolveNumeric(this.options.otherThan, record);
     if (ot !== undefined && num === ot) {
-      errs.add(attribute, "other_than", { count: ot });
+      errs.add(attribute, "other_than", { count: ot, value, message: msg });
     }
     if (this.options.in !== undefined) {
       const [min, max] = this.options.in;
       if (num < min || num > max) {
-        errs.add(attribute, "not_in_range", {
-          message: this.options.message,
+        errs.add(attribute, "in", {
+          message: msg,
+          value,
           count: `${min}..${max}`,
         });
       }
     }
     if (this.options.odd && num % 2 === 0) {
-      errs.add(attribute, "odd");
+      errs.add(attribute, "odd", { value, message: msg });
     }
     if (this.options.even && num % 2 !== 0) {
-      errs.add(attribute, "even");
+      errs.add(attribute, "even", { value, message: msg });
     }
   }
 }

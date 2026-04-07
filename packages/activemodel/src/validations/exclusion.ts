@@ -6,10 +6,11 @@ import type {
 } from "../validator.js";
 import { shouldValidate } from "../validator.js";
 import { isBlank } from "@blazetrails/activesupport";
+import { isExcluded, checkClusivityValidity } from "./clusivity.js";
 
 export interface ExclusionOptions extends ConditionalOptions {
-  in?: unknown[] | (() => unknown[]);
-  within?: unknown[] | (() => unknown[]);
+  in?: Iterable<unknown> | (() => Iterable<unknown>);
+  within?: Iterable<unknown> | (() => Iterable<unknown>);
   allowNil?: boolean;
   allowBlank?: boolean;
   message?: string;
@@ -17,6 +18,10 @@ export interface ExclusionOptions extends ConditionalOptions {
 
 export class ExclusionValidator implements Validator {
   constructor(private options: ExclusionOptions) {}
+
+  checkValidityBang(): void {
+    checkClusivityValidity(this.options);
+  }
 
   validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
     if (!shouldValidate(record, this.options)) return;
@@ -29,9 +34,9 @@ export class ExclusionValidator implements Validator {
     if (this.options.allowBlank && isBlank(value)) return;
     const inOpt = this.options.in ?? this.options.within;
     if (!inOpt) return;
-    const list = typeof inOpt === "function" ? inOpt() : inOpt;
-    if (list.includes(value)) {
-      errs.add(attribute, "exclusion", { message: this.options.message });
+    const collection = typeof inOpt === "function" ? inOpt() : inOpt;
+    if (isExcluded(collection, value)) {
+      errs.add(attribute, "exclusion", { value, message: this.options.message });
     }
   }
 }

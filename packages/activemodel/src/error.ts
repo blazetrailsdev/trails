@@ -161,10 +161,10 @@ export class Error {
       : humanize(attribute);
 
     const i18nOptions: Record<string, unknown> = {
-      ...options,
       model: modelKey,
       attribute: humanAttr,
       value: base && attribute !== "base" ? base[attribute] : undefined,
+      ...options,
     };
 
     const defaults: Array<{ key: string } | { message: string }> = [];

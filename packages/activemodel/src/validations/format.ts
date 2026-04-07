@@ -44,13 +44,13 @@ export class FormatValidator implements Validator {
     if (this.options.with) {
       const re = this.resolveRegexp(this.options.with, record);
       if (!re.test(str)) {
-        errs.add(attribute, "invalid", { message: this.options.message });
+        errs.add(attribute, "invalid", { value, message: this.options.message });
       }
     }
     if (this.options.without) {
       const re = this.resolveRegexp(this.options.without, record);
       if (re.test(str)) {
-        errs.add(attribute, "invalid", { message: this.options.message });
+        errs.add(attribute, "invalid", { value, message: this.options.message });
       }
     }
   }

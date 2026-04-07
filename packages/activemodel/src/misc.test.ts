@@ -445,7 +445,7 @@ describe("ActiveModel", () => {
           passwordConfirmation: "wrong",
         });
         expect(w.isValid()).toBe(false);
-        expect(w.errors.get("password")).toContain("doesn't match Password");
+        expect(w.errors.get("passwordConfirmation")).toContain("doesn't match Password");
       });
     });
 
