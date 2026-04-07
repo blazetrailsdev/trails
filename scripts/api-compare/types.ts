@@ -17,6 +17,7 @@ export interface MethodInfo {
   isStatic?: boolean;
   deps?: string[];
   depRefs?: Record<string, string[]>;
+  calls?: string[];
 }
 
 export interface ClassInfo {

@@ -307,6 +307,7 @@ class ApiExtractor
 
     body = node[3]
     dep_info = detect_deps(body)
+    calls = collect_method_calls(body)
 
     method_info = {
       name: name,
@@ -316,6 +317,7 @@ class ApiExtractor
     }
     method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
+    method_info[:calls] = calls unless calls.empty?
 
     if @in_sclass
       target[:classMethods] << method_info
@@ -343,6 +345,7 @@ class ApiExtractor
 
     body = node[5]
     dep_info = detect_deps(body)
+    calls = collect_method_calls(body)
 
     method_info = {
       name: name,
@@ -352,6 +355,7 @@ class ApiExtractor
     }
     method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
+    method_info[:calls] = calls unless calls.empty?
 
     target[:classMethods] << method_info
 
@@ -624,6 +628,35 @@ class ApiExtractor
     end
 
     { deps: deps, depRefs: dep_refs }
+  end
+
+  def collect_method_calls(body_node)
+    calls = []
+    walk_for_calls(body_node, calls)
+    calls.uniq
+  end
+
+  def walk_for_calls(node, calls)
+    return unless node.is_a?(Array)
+
+    case node[0]
+    when :fcall, :vcall
+      # Unqualified method call: foo() or foo
+      name = ident_name(node[1])
+      calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
+    when :call
+      # Qualified method call: obj.foo
+      name = ident_name(node[3]) if node[3]
+      calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
+    when :command
+      name = ident_name(node[1])
+      calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
+    when :command_call
+      name = ident_name(node[3]) if node[3]
+      calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
+    end
+
+    node.each { |child| walk_for_calls(child, calls) if child.is_a?(Array) }
   end
 
   def collect_dep_refs(node, constants, identifiers, refs)
