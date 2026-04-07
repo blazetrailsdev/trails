@@ -7,6 +7,7 @@ export interface AttributeDefinition {
   name: string;
   type: Type;
   defaultValue: unknown;
+  virtual?: boolean;
 }
 
 /**
@@ -35,14 +36,14 @@ export function attribute(
   this: { _attributeDefinitions: Map<string, AttributeDefinition>; prototype: object },
   name: string,
   typeName: string,
-  options?: { default?: unknown },
+  options?: { default?: unknown; virtual?: boolean },
 ): void {
   const type = typeRegistry.lookup(typeName);
   const defaultValue = options?.default ?? null;
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     this._attributeDefinitions = new Map(this._attributeDefinitions);
   }
-  this._attributeDefinitions.set(name, { name, type, defaultValue });
+  this._attributeDefinitions.set(name, { name, type, defaultValue, virtual: options?.virtual });
 
   if (!Object.prototype.hasOwnProperty.call(this.prototype, name)) {
     Object.defineProperty(this.prototype, name, {

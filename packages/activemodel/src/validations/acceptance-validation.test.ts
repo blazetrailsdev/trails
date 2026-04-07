@@ -125,6 +125,21 @@ describe("AcceptanceValidationTest", () => {
     expect(a.readAttribute("terms")).toBe("1");
   });
 
+  it("setup! virtual attribute excluded from attributeNames and serialization", () => {
+    class Agreement extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("terms", { acceptance: true });
+      }
+    }
+    expect(Agreement.attributeNames()).toContain("name");
+    expect(Agreement.attributeNames()).not.toContain("terms");
+    const a = new Agreement({ name: "test", terms: "1" });
+    const hash = a.serializableHash();
+    expect(hash).toHaveProperty("name");
+    expect(hash).not.toHaveProperty("terms");
+  });
+
   it("setup! does not override explicitly declared attribute", () => {
     class Agreement extends Model {
       static {
@@ -133,5 +148,6 @@ describe("AcceptanceValidationTest", () => {
       }
     }
     expect(Agreement._attributeDefinitions.get("terms")!.type.name).toBe("boolean");
+    expect(Agreement._attributeDefinitions.get("terms")!.virtual).toBeUndefined();
   });
 });

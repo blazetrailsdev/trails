@@ -14,6 +14,19 @@ symbols, operator overloading, etc.) that have no TS equivalent are omitted.
 
 - `param_key` doesn't use namespace-aware logic (ActiveRecord isolate_namespace concern)
 
+## Known deviations from Rails
+
+### acceptance/confirmation virtual attributes
+
+Rails uses `method_missing` + `LazilyDefineAttributes` to lazily define
+acceptance/confirmation attributes only when accessed. TypeScript has no
+`method_missing` equivalent, so we define them eagerly at validator
+registration time via `attribute(name, "string", { virtual: true })`.
+The `virtual` flag excludes them from `attributeNames()` and
+`serializableHash()`, matching Rails' behavior where these attributes
+are invisible to introspection and serialization. The only difference
+is timing: Rails defines on first access, we define at registration.
+
 ## Add when needed (low priority)
 
 ### callbacks.ts

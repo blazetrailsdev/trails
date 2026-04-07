@@ -89,7 +89,9 @@ export class Model {
   static attribute = attribute;
 
   static attributeNames(): string[] {
-    return Array.from(this._attributeDefinitions.keys());
+    return Array.from(this._attributeDefinitions.entries())
+      .filter(([, def]) => !def.virtual)
+      .map(([name]) => name);
   }
 
   /**
@@ -333,7 +335,7 @@ export class Model {
     if (rules.acceptance) {
       const opts = rules.acceptance === true ? {} : (rules.acceptance as AnyRecord);
       if (!this._attributeDefinitions.has(attribute)) {
-        this.attribute(attribute, "string");
+        this.attribute(attribute, "string", { virtual: true });
       }
       push(new AcceptanceValidator(opts));
     }
@@ -342,7 +344,7 @@ export class Model {
       const opts = rules.confirmation === true ? {} : (rules.confirmation as AnyRecord);
       const confirmationAttr = `${attribute}Confirmation`;
       if (!this._attributeDefinitions.has(confirmationAttr)) {
-        this.attribute(confirmationAttr, "string");
+        this.attribute(confirmationAttr, "string", { virtual: true });
       }
       push(new ConfirmationValidator(opts));
     }

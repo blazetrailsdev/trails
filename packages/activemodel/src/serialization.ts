@@ -42,6 +42,14 @@ export function serializableHash(
     keys = [];
   }
 
+  // Exclude virtual attributes (e.g., acceptance/confirmation) from serialization
+  const defs = record.constructor?._attributeDefinitions as
+    | Map<string, { virtual?: boolean }>
+    | undefined;
+  if (defs) {
+    keys = keys.filter((k) => !defs.get(k)?.virtual);
+  }
+
   if (options.only) {
     keys = keys.filter((k) => options.only!.includes(k));
   } else if (options.except) {
