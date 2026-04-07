@@ -33,7 +33,7 @@ const RULES: DepRule[] = [
     package: "activerecord",
     dependency: "arel",
     tsImport: "@blazetrails/arel",
-    tsIdentifiers: ["arelTable"],
+    tsIdentifiers: ["arelTable", "_compileArelNode"],
   },
 ];
 
@@ -139,11 +139,11 @@ function analyzeTsDepUsage(pkgSrcDir: string, tsImport: string, tsIdentifiers: s
       }
     }
 
-    // For each method, check if body references any import or known identifier.
+    // For each method, check if body OR signature references any import or known identifier.
     // Multiple declarations with the same name are merged: true wins.
     const methodMap = new Map<string, boolean>();
-    visitMethodDeclarations(sourceFile, (name, bodyNode) => {
-      const uses = bodyNode !== undefined && bodyReferencesDep(bodyNode, importedNames, knownIds);
+    visitMethodDeclarations(sourceFile, (name, methodNode) => {
+      const uses = methodUsesDepImport(methodNode, importedNames, knownIds);
       const existing = methodMap.get(name);
       if (existing === undefined || uses) methodMap.set(name, uses);
     });
@@ -155,34 +155,34 @@ function analyzeTsDepUsage(pkgSrcDir: string, tsImport: string, tsIdentifiers: s
 
 function visitMethodDeclarations(
   sourceFile: ts.SourceFile,
-  callback: (name: string, body: ts.Node | undefined) => void,
+  callback: (name: string, node: ts.Node) => void,
 ) {
   const visit = (node: ts.Node) => {
     if (ts.isMethodDeclaration(node) && node.name && ts.isIdentifier(node.name)) {
-      callback(node.name.text, node.body);
+      callback(node.name.text, node);
       return;
     }
     if (ts.isGetAccessorDeclaration(node) && node.name && ts.isIdentifier(node.name)) {
-      callback(node.name.text, node.body);
+      callback(node.name.text, node);
       return;
     }
     if (ts.isSetAccessorDeclaration(node) && node.name && ts.isIdentifier(node.name)) {
-      callback(node.name.text, node.body);
+      callback(node.name.text, node);
       return;
     }
     if (ts.isConstructorDeclaration(node)) {
-      callback("constructor", node.body);
+      callback("constructor", node);
       return;
     }
     if (ts.isFunctionDeclaration(node) && node.name) {
-      callback(node.name.text, node.body);
+      callback(node.name.text, node);
       return;
     }
     if (ts.isVariableStatement(node)) {
       for (const decl of node.declarationList.declarations) {
         if (ts.isIdentifier(decl.name) && decl.initializer) {
           if (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer)) {
-            callback(decl.name.text, decl.initializer.body);
+            callback(decl.name.text, decl.initializer);
           }
         }
       }
@@ -193,7 +193,7 @@ function visitMethodDeclarations(
         node.initializer &&
         (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
       ) {
-        callback(node.name.text, node.initializer.body);
+        callback(node.name.text, node.initializer);
         return;
       }
     }
@@ -203,24 +203,42 @@ function visitMethodDeclarations(
   ts.forEachChild(sourceFile, visit);
 }
 
-function bodyReferencesDep(
-  body: ts.Node,
+function methodUsesDepImport(
+  node: ts.Node,
   importedNames: Set<string>,
   knownIdentifiers: Set<string>,
 ): boolean {
+  // Check the entire method declaration: parameter types, return type, and body.
+  // Skip identifiers in declaration name positions (param names, method names)
+  // to avoid false positives from names that happen to match import names.
   let found = false;
-  const check = (node: ts.Node) => {
+  const check = (n: ts.Node) => {
     if (found) return;
-    if (ts.isIdentifier(node)) {
-      if (importedNames.has(node.text) || knownIdentifiers.has(node.text)) {
+    if (ts.isIdentifier(n)) {
+      if (isDeclarationName(n)) return;
+      if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
         found = true;
         return;
       }
     }
-    ts.forEachChild(node, check);
+    ts.forEachChild(n, check);
   };
-  check(body);
+  check(node);
   return found;
+}
+
+function isDeclarationName(id: ts.Identifier): boolean {
+  const parent = id.parent;
+  if (!parent) return false;
+  if (ts.isParameter(parent) && parent.name === id) return true;
+  if (ts.isMethodDeclaration(parent) && parent.name === id) return true;
+  if (ts.isFunctionDeclaration(parent) && parent.name === id) return true;
+  if (ts.isVariableDeclaration(parent) && parent.name === id) return true;
+  if (ts.isPropertyDeclaration(parent) && parent.name === id) return true;
+  if (ts.isGetAccessorDeclaration(parent) && parent.name === id) return true;
+  if (ts.isSetAccessorDeclaration(parent) && parent.name === id) return true;
+  if (ts.isTypeParameterDeclaration(parent) && parent.name === id) return true;
+  return false;
 }
 
 function getAllTsFiles(dir: string): string[] {
@@ -459,6 +477,11 @@ function main() {
   fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2));
 
   printReport(allResults);
+
+  const totalViolations = allResults.reduce((sum, r) => sum + r.violations.length, 0);
+  if (totalViolations > 0) {
+    process.exit(1);
+  }
 }
 
 main();
