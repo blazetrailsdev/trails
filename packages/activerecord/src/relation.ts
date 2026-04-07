@@ -1234,7 +1234,7 @@ export class Relation<T extends Base> {
    */
   async reload(): Promise<this> {
     this.reset();
-    await this.toArray();
+    await this.load();
     return stripThenable(this);
   }
 
@@ -1244,7 +1244,8 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#records
    */
   async records(): Promise<T[]> {
-    return this.toArray();
+    await this.load();
+    return this._records;
   }
 
   /**
@@ -1853,11 +1854,12 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#destroy_all
    */
   async destroyAll(): Promise<T[]> {
-    const records = await this.toArray();
-    for (const record of records) {
+    const recs = await this.records();
+    for (const record of recs) {
       await record.destroy();
     }
-    return records;
+    this.reset();
+    return recs;
   }
 
   /**
@@ -1938,8 +1940,8 @@ export class Relation<T extends Base> {
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T> {
-    const records = await this.where(conditions).limit(1).toArray();
-    if (records.length > 0) return records[0];
+    const existing = await this.findBy(conditions);
+    if (existing) return existing;
     return new (this._modelClass as any)({
       ...this._scopeAttributes(),
       ...conditions,
@@ -1977,9 +1979,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#first_or_create
    */
   async firstOrCreate(extra?: Record<string, unknown>): Promise<T> {
-    const records = await this.limit(1).toArray();
-    if (records.length > 0) return records[0];
-    return this._modelClass.create({ ...this._scopeAttributes(), ...extra }) as Promise<T>;
+    const first = await this.first();
+    if (first) return first;
+    return this.create(extra);
   }
 
   /**
@@ -1988,9 +1990,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#first_or_create!
    */
   async firstOrCreateBang(extra?: Record<string, unknown>): Promise<T> {
-    const records = await this.limit(1).toArray();
-    if (records.length > 0) return records[0];
-    return this._modelClass.createBang({ ...this._scopeAttributes(), ...extra }) as Promise<T>;
+    const first = await this.first();
+    if (first) return first;
+    return this.createBang(extra);
   }
 
   /**
@@ -3277,9 +3279,21 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#delete
    */
   async delete(id: unknown): Promise<number> {
-    const table = this._modelClass.arelTable;
-    const dm = new DeleteManager().from(table).where(this._modelClass._buildPkWhereNode(id));
-    return this._modelClass.adapter.executeMutation(dm.toSql());
+    if (id == null) return 0;
+    if (Array.isArray(id) && id.length === 0) return 0;
+
+    const primaryKey = this._modelClass.primaryKey;
+    if (Array.isArray(primaryKey)) {
+      const idArr = Array.isArray(id) ? id : [id];
+      if (idArr.length !== primaryKey.length) return 0;
+      const conditions: Record<string, unknown> = {};
+      for (let i = 0; i < primaryKey.length; i++) {
+        conditions[primaryKey[i]] = idArr[i];
+      }
+      return this.where(conditions).deleteAll();
+    }
+
+    return this.where({ [primaryKey]: id }).deleteAll();
   }
 
   /**
