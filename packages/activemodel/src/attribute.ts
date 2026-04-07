@@ -249,7 +249,7 @@ export class FromUser extends Attribute {
   }
 
   cameFromUser(): boolean {
-    return true;
+    return !this.type.isValueConstructedByMassAssignment(this.valueBeforeTypeCast);
   }
 }
 

@@ -6,10 +6,6 @@ symbols, operator overloading, etc.) that have no TS equivalent are omitted.
 
 ## Bugs (wrong behavior)
 
-### attribute.ts
-
-- `FromUser.came_from_user?` always returns `true`; Rails checks `value_constructed_by_mass_assignment?`
-
 ### naming.ts
 
 - `param_key` doesn't use namespace-aware logic (ActiveRecord isolate_namespace concern)
