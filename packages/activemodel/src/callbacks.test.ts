@@ -208,6 +208,28 @@ describe("CallbacksTest", () => {
     expect(log).toContain("before");
     expect(log).toContain("after");
   });
+
+  it("define_model_callbacks with only option limits timing types", () => {
+    class Job extends Model {
+      static {
+        this.defineModelCallbacks("process", { only: ["before", "after"] });
+      }
+    }
+    expect(typeof (Job as any).beforeProcess).toBe("function");
+    expect(typeof (Job as any).afterProcess).toBe("function");
+    expect((Job as any).aroundProcess).toBeUndefined();
+  });
+
+  it("define_model_callbacks with only: ['before'] creates only before", () => {
+    class Task extends Model {
+      static {
+        this.defineModelCallbacks("execute", { only: ["before"] });
+      }
+    }
+    expect(typeof (Task as any).beforeExecute).toBe("function");
+    expect((Task as any).afterExecute).toBeUndefined();
+    expect((Task as any).aroundExecute).toBeUndefined();
+  });
 });
 
 describe("CallbackChain.runAsync", () => {

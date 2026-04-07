@@ -1,6 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = any;
 
+import { ArgumentError } from "./attribute-assignment.js";
+
 /**
  * Callbacks mixin contract — defines model callback registration.
  *
@@ -10,55 +12,118 @@ type AnyRecord = any;
  * define_model_callbacks which creates before/after/around hooks.
  * Model already implements this via defineModelCallbacks().
  */
+export interface DefineModelCallbacksOptions {
+  only?: CallbackTiming[];
+}
+
 export interface CallbacksClassMethods {
-  defineModelCallbacks(...eventNames: string[]): void;
+  defineModelCallbacks(
+    ...args: [string, ...string[]] | [string, ...string[], DefineModelCallbacksOptions]
+  ): void;
 }
 
 export type Callbacks = CallbacksClassMethods;
 
 /**
  * Core implementation of define_model_callbacks.
- * Creates beforeX(), afterX(), and aroundX() class methods for each event name.
+ * Creates beforeX(), afterX(), and/or aroundX() class methods for each event
+ * name. Pass `{ only: ["before"] }` as the last argument to limit which
+ * timing types are created (defaults to all three).
  *
  * Mirrors: ActiveModel::Callbacks.define_model_callbacks
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function defineModelCallbacks(this: any, ...eventNames: string[]): void {
+/* eslint-disable @typescript-eslint/no-explicit-any -- mixin `this` must accept any class constructor */
+export function defineModelCallbacks(this: any, event: string, ...rest: string[]): void;
+export function defineModelCallbacks(
+  this: any,
+  event: string,
+  ...rest: [...string[], DefineModelCallbacksOptions]
+): void;
+export function defineModelCallbacks(this: any, ...args: unknown[]): void {
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  let options: DefineModelCallbacksOptions = {};
+  const eventNames: string[] = [];
+
+  const validTimings: CallbackTiming[] = ["before", "after", "around"];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (typeof arg === "string") {
+      eventNames.push(arg);
+    } else if (
+      i === args.length - 1 &&
+      arg !== undefined &&
+      arg !== null &&
+      typeof arg === "object" &&
+      !Array.isArray(arg)
+    ) {
+      options = arg as DefineModelCallbacksOptions;
+      const knownKeys = new Set(["only"]);
+      for (const key of Object.keys(options)) {
+        if (!knownKeys.has(key)) {
+          throw new ArgumentError(`Unknown option: ${key}`);
+        }
+      }
+      if (options.only) {
+        for (const t of options.only) {
+          if (!validTimings.includes(t)) {
+            throw new ArgumentError(
+              `Invalid callback type: ${t}. Must be one of: ${validTimings.join(", ")}`,
+            );
+          }
+        }
+      }
+    } else if (typeof arg !== "string") {
+      throw new ArgumentError(`Expected event name (string), got ${typeof arg}`);
+    }
+  }
+
+  if (eventNames.length === 0) {
+    throw new ArgumentError("At least one event name must be provided to defineModelCallbacks");
+  }
+
+  const timings: CallbackTiming[] = options.only ?? ["before", "after", "around"];
+
   for (const event of eventNames) {
     const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
 
-    Object.defineProperty(this, `before${capitalizedEvent}`, {
-      value: function (fn: CallbackFn, conditions?: CallbackConditions) {
-        if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-          this._callbackChain = this._callbackChain.clone();
-        }
-        this._callbackChain.register("before", event, fn, conditions);
-      },
-      writable: true,
-      configurable: true,
-    });
+    if (timings.includes("before")) {
+      Object.defineProperty(this, `before${capitalizedEvent}`, {
+        value: function (fn: CallbackFn, conditions?: CallbackConditions) {
+          if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
+            this._callbackChain = this._callbackChain.clone();
+          }
+          this._callbackChain.register("before", event, fn, conditions);
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
 
-    Object.defineProperty(this, `after${capitalizedEvent}`, {
-      value: function (fn: CallbackFn, conditions?: CallbackConditions) {
-        if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-          this._callbackChain = this._callbackChain.clone();
-        }
-        this._callbackChain.register("after", event, fn, conditions);
-      },
-      writable: true,
-      configurable: true,
-    });
+    if (timings.includes("after")) {
+      Object.defineProperty(this, `after${capitalizedEvent}`, {
+        value: function (fn: CallbackFn, conditions?: CallbackConditions) {
+          if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
+            this._callbackChain = this._callbackChain.clone();
+          }
+          this._callbackChain.register("after", event, fn, conditions);
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
 
-    Object.defineProperty(this, `around${capitalizedEvent}`, {
-      value: function (fn: AroundCallbackFn, conditions?: CallbackConditions) {
-        if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-          this._callbackChain = this._callbackChain.clone();
-        }
-        this._callbackChain.register("around", event, fn, conditions);
-      },
-      writable: true,
-      configurable: true,
-    });
+    if (timings.includes("around")) {
+      Object.defineProperty(this, `around${capitalizedEvent}`, {
+        value: function (fn: AroundCallbackFn, conditions?: CallbackConditions) {
+          if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
+            this._callbackChain = this._callbackChain.clone();
+          }
+          this._callbackChain.register("around", event, fn, conditions);
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
   }
 }
 

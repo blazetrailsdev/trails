@@ -8,7 +8,6 @@ symbols, operator overloading, etc.) that have no TS equivalent are omitted.
 
 ### attribute.ts
 
-- `value_for_database` caches without re-checking `type.changed_in_place?` — can return stale serialized value
 - `FromUser.came_from_user?` always returns `true`; Rails checks `value_constructed_by_mass_assignment?`
 
 ### naming.ts
@@ -29,12 +28,11 @@ symbols, operator overloading, etc.) that have no TS equivalent are omitted.
 
 ### callbacks.ts
 
-- Missing `:only` option to limit callback types
 - Only function callbacks; Rails also supports class-based
 
 ### secure-password.ts
 
-- Missing: `password_salt`, `password_challenge`, `generates_token_for`
+- Missing: `password_salt`, `generates_token_for`
 
 ### translation.ts
 
@@ -47,8 +45,3 @@ symbols, operator overloading, etc.) that have no TS equivalent are omitted.
 ### attribute-set/builder.ts
 
 - `LazyAttributeSet` not actually lazy (performance issue on large schemas)
-
-### uuid.ts
-
-- Doesn't accept braced `{...}` or dashless UUID formats
-- Missing `format_uuid()` normalization
