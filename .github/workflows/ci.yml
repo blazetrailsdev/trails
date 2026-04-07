@@ -144,7 +144,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @blazetrails/website exec svelte-kit sync
-      - run: pnpm --filter @blazetrails/website run build
+      - name: Build SvelteKit
+        run: pnpm --filter @blazetrails/website run build:sw && pnpm --filter @blazetrails/website exec vite build
+      - name: Build docs (typedoc + VitePress)
+        run: pnpm --filter @blazetrails/website run docs:build
 
   rails-comparison:
     name: Rails API/Test Comparison

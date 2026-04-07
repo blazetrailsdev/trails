@@ -1,0 +1,23 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "../arel",
+    "../activemodel",
+    "../activerecord",
+    "../activesupport",
+    "../rack",
+    "../actionpack"
+  ],
+  "entryPointStrategy": "packages",
+  "out": "docs/api",
+  "plugin": ["typedoc-plugin-markdown"],
+  "readme": "none",
+  "githubPages": false,
+  "outputFileStrategy": "modules",
+  "expandObjects": true,
+  "parametersFormat": "table",
+  "enumMembersFormat": "table",
+  "packageOptions": {
+    "entryPoints": ["src/index.ts"]
+  }
+}
