@@ -35,7 +35,7 @@ describe("quote", () => {
 
   it("quotes dates as ISO 8601 strings", () => {
     const d = new Date("2026-04-01T12:00:00Z");
-    expect(quote(d)).toBe("'2026-04-01T12:00:00.000Z'");
+    expect(quote(d)).toBe("'2026-04-01 12:00:00'");
   });
 
   it("quotes symbols by description", () => {

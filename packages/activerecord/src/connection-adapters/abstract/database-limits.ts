@@ -4,22 +4,22 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseLimits
  */
 
-export function tableName_length(): number {
-  return maxIdentifier_length();
-}
-
-export function tableAlias_length(): number {
-  return maxIdentifier_length();
-}
-
-export function columnName_length(): number {
-  return maxIdentifier_length();
-}
-
-export function indexName_length(): number {
-  return maxIdentifier_length();
-}
-
-export function maxIdentifier_length(): number {
+export function maxIdentifierLength(): number {
   return 64;
+}
+
+export function tableNameLength(): number {
+  return maxIdentifierLength();
+}
+
+export function tableAliasLength(): number {
+  return maxIdentifierLength();
+}
+
+export function indexNameLength(): number {
+  return maxIdentifierLength();
+}
+
+export function bindParamsLength(): number {
+  return 65535;
 }

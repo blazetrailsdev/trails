@@ -5,6 +5,7 @@
  */
 
 import type { SqlTypeMetadata } from "./sql-type-metadata.js";
+import { humanize } from "@blazetrails/activesupport";
 
 export class Column {
   readonly name: string;
@@ -68,6 +69,51 @@ export class Column {
 
   get isNullable(): boolean {
     return this.null;
+  }
+
+  /**
+   * Whether this column is a bigint type.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Column#bigint?
+   */
+  isBigint(): boolean {
+    return this.sqlType != null && /^bigint\b/i.test(this.sqlType);
+  }
+
+  /**
+   * Returns the human-readable form of the column name.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Column#human_name
+   */
+  humanName(): string {
+    return humanize(this.name);
+  }
+
+  /**
+   * Whether the column is auto-populated by the database using a sequence.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Column#auto_incremented_by_db?
+   */
+  isAutoIncrementedByDb(): boolean {
+    return false;
+  }
+
+  /**
+   * Whether the column is auto-populated (auto-increment or has a default function).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Column#auto_populated?
+   */
+  isAutoPopulated(): boolean {
+    return this.isAutoIncrementedByDb() || this.defaultFunction !== null;
+  }
+
+  /**
+   * Whether this is a virtual/generated column.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Column#virtual?
+   */
+  isVirtual(): boolean {
+    return false;
   }
 
   toString(): string {

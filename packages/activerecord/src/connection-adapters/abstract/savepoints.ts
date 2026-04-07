@@ -1,5 +1,5 @@
 /**
- * Savepoints — savepoint SQL generation.
+ * Savepoints — savepoint SQL generation and execution.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Savepoints
  */
@@ -36,4 +36,43 @@ export function nextSavepointName(): string {
 
 export function resetSavepointNumber(): void {
   _currentSavepointNumber = 0;
+}
+
+/**
+ * Host interface for savepoint mixin methods.
+ * Adapters that include Savepoints must provide internalExecute.
+ */
+export interface SavepointHost {
+  internalExecute(sql: string, name: string): Promise<unknown>;
+  currentSavepointName?(): string;
+}
+
+/**
+ * Create a savepoint. Uses current_savepoint_name by default.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Savepoints#create_savepoint
+ */
+export async function createSavepoint(this: SavepointHost, name?: string): Promise<void> {
+  const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
+  await this.internalExecute(createSavepointSql(spName), "TRANSACTION");
+}
+
+/**
+ * Rollback to a savepoint. Uses current_savepoint_name by default.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Savepoints#exec_rollback_to_savepoint
+ */
+export async function execRollbackToSavepoint(this: SavepointHost, name?: string): Promise<void> {
+  const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
+  await this.internalExecute(execRollbackToSavepointSql(spName), "TRANSACTION");
+}
+
+/**
+ * Release a savepoint. Uses current_savepoint_name by default.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Savepoints#release_savepoint
+ */
+export async function releaseSavepoint(this: SavepointHost, name?: string): Promise<void> {
+  const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
+  await this.internalExecute(releaseSavepointSql(spName), "TRANSACTION");
 }
