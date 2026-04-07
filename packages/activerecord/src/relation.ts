@@ -81,8 +81,14 @@ export class Relation<T extends Base> {
   private _loaded = false;
   private _records: T[] = [];
 
-  constructor(modelClass: typeof Base) {
+  private _table: Table | null = null;
+
+  constructor(modelClass: typeof Base, table?: Table) {
     this._modelClass = modelClass;
+    if (table) {
+      this._table = table;
+      this._predicateBuilder = new PredicateBuilder(table);
+    }
   }
 
   /**
@@ -3342,8 +3348,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#table
    */
-  get table(): any {
-    return this._modelClass.arelTable;
+  get table(): Table {
+    return this._table ?? this._modelClass.arelTable;
   }
 
   /**
@@ -3400,7 +3406,7 @@ export class Relation<T extends Base> {
 
   get predicateBuilder(): PredicateBuilder {
     if (!this._predicateBuilder) {
-      this._predicateBuilder = new PredicateBuilder(this._modelClass.arelTable);
+      this._predicateBuilder = new PredicateBuilder(this.table);
     }
     return this._predicateBuilder;
   }
@@ -3526,16 +3532,88 @@ export class Relation<T extends Base> {
     return this.computeCacheVersion();
   }
 
-  async computeCacheVersion(): Promise<string> {
-    try {
-      const col = "updated_at";
-      const result = await (this as any).maximum(col);
-      if (result instanceof Date) return String(result.getTime());
-      if (result) return String(result);
-    } catch {
-      // Fall through if updated_at column doesn't exist
+  async computeCacheVersion(timestampColumn: string = "updated_at"): Promise<string> {
+    let size = 0;
+    let timestamp: unknown = null;
+
+    if (this._loaded) {
+      size = this._records.length;
+      if (size > 0) {
+        timestamp = this._records
+          .map((r) => (r as any).readAttribute(timestampColumn))
+          .reduce((max: unknown, val: unknown) => {
+            if (max == null) return val;
+            if (val == null) return max;
+            return val > max ? val : max;
+          }, null);
+      }
+    } else {
+      try {
+        const collection: Relation<T> = this;
+        const column = this.table.get(timestampColumn);
+        const columnSql = this._compileArelNode(column);
+        const selectTemplate = `COUNT(*) AS "size", MAX(%s) AS "timestamp"`;
+
+        if (this._limitValue !== null || (this._offsetValue ?? 0) > 0) {
+          // Has limit/offset — wrap in a subquery like Rails' build_subquery
+          const subqueryAlias = "subquery_for_cache_key";
+          const inner = collection._clone();
+          inner._selectColumns = [`${columnSql} AS collection_cache_key_timestamp`];
+          if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
+            inner._selectColumns = [
+              this._compileArelNode(this.table.star),
+              ...inner._selectColumns!,
+            ];
+          }
+          const innerSql = inner.toSql();
+          const subqueryColumn = `"${subqueryAlias}"."collection_cache_key_timestamp"`;
+          const sql = `SELECT ${selectTemplate.replace("%s", subqueryColumn)} FROM (${innerSql}) AS "${subqueryAlias}"`;
+          const rows = await this._modelClass.adapter.execute(sql);
+          size = Number(rows[0]?.size ?? 0);
+          timestamp = rows[0]?.timestamp;
+        } else {
+          // No limit/offset — single query with COUNT + MAX
+          const query = collection._clone();
+          query._orderClauses = [];
+          query._rawOrderClauses = [];
+          query._selectColumns = [selectTemplate.replace("%s", columnSql)];
+          const rows = await this._modelClass.adapter.execute(query.toSql());
+          size = Number(rows[0]?.size ?? 0);
+          timestamp = rows[0]?.timestamp;
+        }
+      } catch {
+        // Timestamp column doesn't exist — compute count-only
+        try {
+          const query = this._clone();
+          query._orderClauses = [];
+          query._rawOrderClauses = [];
+          query._selectColumns = [`COUNT(*) AS "size"`];
+          const rows = await this._modelClass.adapter.execute(query.toSql());
+          size = Number(rows[0]?.size ?? 0);
+        } catch {
+          // Fall through with size = 0
+        }
+      }
     }
-    return "";
+
+    if (timestamp != null) {
+      let ts: Date | null = null;
+      if (timestamp instanceof Date) {
+        ts = timestamp;
+      } else if (typeof timestamp === "string") {
+        // Normalize timezone-less timestamps (e.g., SQLite "YYYY-MM-DD HH:MM:SS") to UTC
+        const bare = timestamp.trim();
+        const m = bare.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/);
+        ts = m ? new Date(`${m[1]}T${m[2]}Z`) : new Date(bare);
+      } else if (typeof timestamp === "number") {
+        ts = new Date(timestamp);
+      }
+      if (ts && !isNaN(ts.getTime())) {
+        return `${size}-${ts.toISOString().replace(/\.\d{3}Z$/, "Z")}`;
+      }
+      return `${size}-${String(timestamp)}`;
+    }
+    return `${size}`;
   }
 
   async cacheKeyWithVersion(): Promise<string> {
@@ -3547,6 +3625,7 @@ export class Relation<T extends Base> {
   /** @internal */
   _clone(): Relation<T> {
     const rel = new Relation<T>(this._modelClass);
+    rel._table = this._table;
     rel._whereClause = this._whereClause.clone();
     rel._orderClauses = [...this._orderClauses];
     rel._rawOrderClauses = [...this._rawOrderClauses];
