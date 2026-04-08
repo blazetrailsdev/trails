@@ -455,13 +455,7 @@ export class AssociationReflection extends MacroReflection {
     const name = this.inverseName();
     if (!name) return null;
     if (this._inverseOfCache !== undefined) return this._inverseOfCache;
-    const targetAssocs: any[] = (this.klass as any)._associations ?? [];
-    const assocDef = targetAssocs.find((a: any) => a.name === name);
-    if (!assocDef) {
-      this._inverseOfCache = null;
-      return null;
-    }
-    this._inverseOfCache = createReflection(assocDef, this.klass);
+    this._inverseOfCache = _reflectOnAssociation(this.klass, name);
     return this._inverseOfCache;
   }
 
@@ -488,14 +482,11 @@ export class AssociationReflection extends MacroReflection {
 
     let reflection: AssociationReflection | ThroughReflection | null | false;
     try {
-      const targetAssocs: any[] = (this.klass as any)._associations ?? [];
-      let assocDef = targetAssocs.find((a: any) => a.name === inverseName);
-      reflection = assocDef ? createReflection(assocDef, this.klass) : null;
+      reflection = _reflectOnAssociation(this.klass, inverseName);
 
       if (!reflection && this.activeRecord.automaticallyInvertPluralAssociations) {
         const pluralInverseName = pluralize(inverseName);
-        assocDef = targetAssocs.find((a: any) => a.name === pluralInverseName);
-        reflection = assocDef ? createReflection(assocDef, this.klass) : null;
+        reflection = _reflectOnAssociation(this.klass, pluralInverseName);
       }
     } catch (e: unknown) {
       // Rails: rescue NameError => error; raise unless error.name.to_s == class_name
@@ -675,14 +666,13 @@ export class AssociationReflection extends MacroReflection {
     if (this.hasInverse()) {
       const name = this.inverseName();
       if (!name) return null;
-      const assocs: any[] = (associatedClass as any)._associations ?? [];
-      const assocDef = assocs.find((a: any) => a.name === name);
-      if (!assocDef) {
+      const inverseRelationship = _reflectOnAssociation(associatedClass, name);
+      if (!inverseRelationship) {
         throw new Error(
           `Could not find the inverse association for ${this.name} (:${name} in ${associatedClass.name})`,
         );
       }
-      return createReflection(assocDef, associatedClass);
+      return inverseRelationship;
     }
     return null;
   }
@@ -927,10 +917,9 @@ export class ThroughReflection extends AbstractReflection {
     const throughRef = this.throughReflection;
     if (throughRef) {
       try {
-        const throughAssocs: any[] = (throughRef.klass as any)._associations ?? [];
         const singular = singularize(this.name);
-        if (throughAssocs.some((a: any) => a.name === singular)) return singular;
-        if (throughAssocs.some((a: any) => a.name === this.name)) return this.name;
+        if (_reflectOnAssociation(throughRef.klass, singular)) return singular;
+        if (_reflectOnAssociation(throughRef.klass, this.name)) return this.name;
       } catch {
         /* klass resolution may fail */
       }
@@ -951,14 +940,8 @@ export class ThroughReflection extends AbstractReflection {
       return null;
     }
     try {
-      const throughAssocs: any[] = (throughRef.klass as any)._associations ?? [];
-      const sourceDef = throughAssocs.find((a: any) => a.name === srcName);
-      if (sourceDef) {
-        this._sourceReflectionCache = createReflection(sourceDef, throughRef.klass);
-        return this._sourceReflectionCache;
-      }
-      this._sourceReflectionCache = null;
-      return null;
+      this._sourceReflectionCache = _reflectOnAssociation(throughRef.klass, srcName);
+      return this._sourceReflectionCache;
     } catch {
       this._sourceReflectionCache = null;
       return null;
@@ -967,13 +950,7 @@ export class ThroughReflection extends AbstractReflection {
 
   get throughReflection(): AssociationReflection | ThroughReflection | null {
     if (this._throughReflectionCache !== undefined) return this._throughReflectionCache;
-    const ownerAssocs: any[] = (this.activeRecord as any)._associations ?? [];
-    const throughDef = ownerAssocs.find((a: any) => a.name === this.through);
-    if (!throughDef) {
-      this._throughReflectionCache = null;
-      return null;
-    }
-    this._throughReflectionCache = createReflection(throughDef, this.activeRecord);
+    this._throughReflectionCache = _reflectOnAssociation(this.activeRecord, this.through);
     return this._throughReflectionCache;
   }
 
@@ -1067,10 +1044,9 @@ export class ThroughReflection extends AbstractReflection {
     }
 
     try {
-      const throughAssocs: any[] = (throughRef.klass as any)._associations ?? [];
       const singular = singularize(this.name);
       const candidates = [...new Set([singular, this.name])];
-      const matching = candidates.filter((n) => throughAssocs.some((a: any) => a.name === n));
+      const matching = candidates.filter((n) => _reflectOnAssociation(throughRef.klass, n) != null);
 
       if (matching.length > 1) {
         throw new AmbiguousSourceReflectionForThroughAssociation(
@@ -1522,22 +1498,27 @@ export function contentColumns(modelClass: typeof Base): ColumnReflection[] {
   return columns(modelClass).filter((col) => contentNames.has(col.name));
 }
 
+export function _reflectOnAssociation(
+  modelClass: typeof Base,
+  name: string,
+): AssociationReflection | ThroughReflection | null {
+  const rawReflections: Record<string, any> = (modelClass as any)._reflections ?? {};
+  return rawReflections[name] ?? null;
+}
+
 export function reflectOnAssociation(
   modelClass: typeof Base,
   name: string,
 ): AssociationReflection | ThroughReflection | null {
-  const associations: any[] = (modelClass as any)._associations ?? [];
-  const assocDef = associations.find((a: any) => a.name === name);
-  if (!assocDef) return null;
-  return createReflection(assocDef, modelClass);
+  const normalized = normalizedReflections(modelClass);
+  return normalized[name] ?? null;
 }
 
 export function reflectOnAllAssociations(
   modelClass: typeof Base,
   macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany",
 ): Array<AssociationReflection | ThroughReflection> {
-  const associations: any[] = (modelClass as any)._associations ?? [];
-  const allReflections = associations.map((assocDef) => createReflection(assocDef, modelClass));
+  const allReflections = Object.values(normalizedReflections(modelClass));
 
   if (!macro) return allReflections;
 

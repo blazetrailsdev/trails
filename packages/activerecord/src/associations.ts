@@ -13,6 +13,7 @@ import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
+import * as Reflection from "./reflection.js";
 
 /**
  * Association options.
@@ -896,6 +897,17 @@ function createHabtmJoinModel(
     options: { className: targetClassName, foreignKey: targetFk },
   });
   (JoinModel as any)._associations = joinAssocs;
+
+  for (const assocDef of joinAssocs) {
+    const ref = Reflection.create(
+      assocDef.type as any,
+      assocDef.name,
+      null,
+      assocDef.options as Record<string, unknown>,
+      JoinModel,
+    );
+    Reflection.addReflection(JoinModel, assocDef.name, ref as any);
+  }
 
   return JoinModel;
 }

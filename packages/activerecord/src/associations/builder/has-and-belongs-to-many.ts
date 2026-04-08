@@ -6,6 +6,7 @@ import {
   demodulize,
 } from "@blazetrails/activesupport";
 import { beforeDestroy } from "../../callbacks.js";
+import * as Reflection from "../../reflection.js";
 
 /**
  * Builder for has_and_belongs_to_many associations. Internally creates
@@ -179,29 +180,42 @@ export class HasAndBelongsToMany {
     deps.modelRegistry.set(registryKey, JoinModel);
 
     const middleName = [pluralize(model.name.toLowerCase()), name].sort().join("_");
+    const middleOptions: Record<string, unknown> = {
+      className: registryKey,
+      foreignKey: ownerFk,
+      dependent: "delete",
+    };
     model._associations.push({
       type: "hasMany",
       name: middleName,
-      options: {
-        className: registryKey,
-        foreignKey: ownerFk,
-        dependent: "delete",
-      },
+      options: middleOptions,
     });
+    const middleReflection = Reflection.create("hasMany", middleName, null, middleOptions, model);
+    Reflection.addReflection(model, middleName, middleReflection as any);
 
     beforeDestroy(model, (record: any) => {
       return record.association(middleName).handleDependency();
     });
 
+    const habtmOptions: Record<string, unknown> = {
+      ...options,
+      joinTable: joinTableName,
+      through: middleName,
+      source: (options.source as string) ?? singularize(name),
+    };
     model._associations.push({
       type: "hasAndBelongsToMany",
       name,
-      options: {
-        ...options,
-        joinTable: joinTableName,
-        through: middleName,
-        source: (options.source as string) ?? singularize(name),
-      },
+      options: habtmOptions,
     });
+    const { through: _through, ...habtmReflectionOptions } = habtmOptions;
+    const habtmReflection = Reflection.create(
+      "hasAndBelongsToMany" as any,
+      name,
+      null,
+      habtmReflectionOptions,
+      model,
+    );
+    Reflection.addReflection(model, name, habtmReflection as any);
   }
 }

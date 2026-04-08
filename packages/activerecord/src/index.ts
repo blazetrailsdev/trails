@@ -191,6 +191,7 @@ export {
   columns,
   columnNames,
   contentColumns,
+  _reflectOnAssociation,
   reflectOnAssociation,
   reflectOnAllAssociations,
   reflectOnAllAggregations,
