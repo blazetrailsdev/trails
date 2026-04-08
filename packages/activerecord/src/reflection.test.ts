@@ -1588,8 +1588,104 @@ describe("ReflectionTest", () => {
     expect(ref!.options.primaryKey).toBe("custom_id");
   });
 
-  it.skip("belongs to reflection with query constraints infers correct foreign key", () => {
-    // Requires query constraints feature
+  it("belongs to reflection with query constraints infers correct foreign key", () => {
+    class BlogPost extends Base {
+      static _primaryKey: string | string[] = ["blog_id", "id"];
+      static {
+        this.attribute("blog_id", "integer");
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Comment extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("blog_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(BlogPost);
+    registerModel(Comment);
+    Associations.belongsTo.call(Comment, "blogPost", { className: "BlogPost" });
+
+    const ref = reflectOnAssociation(Comment, "blogPost")!;
+    expect(ref.foreignKey).toBe("blog_post_id");
+    // BelongsTo with composite PK target should infer "id" from [:blog_id, :id]
+    expect(ref.associationPrimaryKey).toBe("id");
+  });
+
+  it("active record primary key infers id from composite key", () => {
+    class Tenant extends Base {
+      static _primaryKey: string | string[] = ["tenant_id", "id"];
+      static {
+        this.attribute("tenant_id", "integer");
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Item extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("tenant_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Tenant);
+    registerModel(Item);
+    Associations.hasMany.call(Tenant, "items", {});
+    Associations.belongsTo.call(Item, "tenant", {});
+
+    const ref = reflectOnAssociation(Tenant, "items")!;
+    // hasMany on composite PK model should infer activeRecordPrimaryKey as "id"
+    expect(ref.activeRecordPrimaryKey).toBe("id");
+  });
+
+  it("array foreign key is converted to query constraints", () => {
+    class Order extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class LineItem extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("shop_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Order);
+    registerModel(LineItem);
+    Associations.hasMany.call(Order, "lineItems", {
+      className: "LineItem",
+      foreignKey: ["order_id", "shop_id"],
+    });
+
+    const ref = reflectOnAssociation(Order, "lineItems")!;
+    expect(ref.foreignKey).toEqual(["order_id", "shop_id"]);
+    expect(ref.options.queryConstraints).toEqual(["order_id", "shop_id"]);
+    expect(ref.options.foreignKey).toBeUndefined();
+  });
+
+  it("query constraints option raises error", () => {
+    class Org extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Team extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Org);
+    registerModel(Team);
+    expect(() => {
+      Associations.hasMany.call(Org, "teams", { queryConstraints: ["org_id", "tenant_id"] });
+    }).toThrow("queryConstraints");
   });
 });
 

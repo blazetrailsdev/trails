@@ -9,6 +9,11 @@ import {
 } from "@blazetrails/activesupport";
 import { Table } from "@blazetrails/arel";
 import { modelRegistry } from "./associations.js";
+import {
+  hasQueryConstraints,
+  queryConstraintsList,
+  compositeQueryConstraintsList,
+} from "./persistence.js";
 import { BelongsToAssociation } from "./associations/belongs-to-association.js";
 import { BelongsToPolymorphicAssociation } from "./associations/belongs-to-polymorphic-association.js";
 import { HasManyAssociation } from "./associations/has-many-association.js";
@@ -411,16 +416,116 @@ export class AggregateReflection extends MacroReflection {
  */
 export class AssociationReflection extends MacroReflection {
   parentReflection: AssociationReflection | ThroughReflection | null = null;
+  private _foreignKeyCache: string | string[] | null = null;
+  private _activeRecordPrimaryKeyCache: string | string[] | null = null;
+
+  constructor(
+    name: string,
+    scope: ((...args: any[]) => any) | null,
+    options: Record<string, unknown>,
+    activeRecord: typeof Base,
+  ) {
+    const opts = { ...options };
+
+    if (opts.queryConstraints) {
+      throw new Error(
+        `Setting \`queryConstraints:\` option on \`${activeRecord.name}.${name}\` is not allowed. ` +
+          `To get the same behavior, use the \`foreignKey\` option instead.`,
+      );
+    }
+
+    if (Array.isArray(opts.foreignKey)) {
+      opts.queryConstraints = opts.foreignKey;
+      delete opts.foreignKey;
+    }
+
+    if (opts.className && typeof opts.className === "function") {
+      throw new Error("A class was passed to `:className` but we are expecting a string.");
+    }
+
+    super(name, scope, opts, activeRecord);
+  }
 
   get macro(): MacroType {
     throw new Error("Subclass must implement macro");
   }
 
   get foreignKey(): string | string[] {
-    if (this.options.foreignKey) return this.options.foreignKey as string | string[];
+    return this.computeForeignKey();
+  }
+
+  computeForeignKey(inferFromInverseOf = true): string | string[] {
+    if (this._foreignKeyCache !== null) return this._foreignKeyCache;
+
+    if (this.options.foreignKey) {
+      const fk = this.options.foreignKey;
+      this._foreignKeyCache = Array.isArray(fk) ? fk.map(String) : String(fk);
+    } else if (this.options.queryConstraints) {
+      this._foreignKeyCache = (this.options.queryConstraints as string[]).map(String);
+    } else {
+      let derivedFk: string | string[] = this.deriveForeignKey(inferFromInverseOf);
+
+      if (hasQueryConstraints.call(this.activeRecord as any)) {
+        derivedFk = this.deriveFkQueryConstraints(derivedFk as string);
+      }
+
+      this._foreignKeyCache = derivedFk;
+    }
+
+    return this._foreignKeyCache;
+  }
+
+  private deriveForeignKey(inferFromInverseOf = true): string {
     if (this.belongsTo()) return `${underscore(this.name)}_id`;
     if (this.options.as) return `${underscore(this.options.as as string)}_id`;
+    if (this.options.inverseOf && inferFromInverseOf) {
+      const inv = this.inverseOf();
+      if (inv) return String((inv as any).computeForeignKey?.(false) ?? (inv as any).foreignKey);
+    }
     return `${underscore(this.activeRecord.name)}_id`;
+  }
+
+  private deriveFkQueryConstraints(foreignKey: string): string | string[] {
+    const primaryQueryConstraints = queryConstraintsList.call(this.activeRecord as any);
+    if (!primaryQueryConstraints) return foreignKey;
+
+    const ownerPk = this.activeRecord.primaryKey;
+    const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
+
+    if (primaryQueryConstraints.length > 2) {
+      throw new Error(
+        `The query constraints list on the \`${this.activeRecord.name}\` model has more than 2 ` +
+          `attributes. Active Record is unable to derive the query constraints ` +
+          `for the association. You need to explicitly define the query constraints ` +
+          `for this association.`,
+      );
+    }
+
+    if (ownerPkStr && !primaryQueryConstraints.includes(ownerPkStr)) {
+      throw new Error(
+        `The query constraints on the \`${this.activeRecord.name}\` model do not include the primary ` +
+          `key so Active Record is unable to derive the foreign key constraints for ` +
+          `the association. You need to explicitly define the query constraints for this ` +
+          `association.`,
+      );
+    }
+
+    if (primaryQueryConstraints.includes(foreignKey)) return foreignKey;
+
+    const [firstKey, lastKey] = primaryQueryConstraints;
+
+    if (firstKey === ownerPkStr) {
+      return [foreignKey, lastKey];
+    } else if (lastKey === ownerPkStr) {
+      return [firstKey, foreignKey];
+    }
+
+    throw new Error(
+      `Active Record couldn't correctly interpret the query constraints ` +
+        `for the \`${this.activeRecord.name}\` model. The query constraints on \`${this.activeRecord.name}\` are ` +
+        `\`${primaryQueryConstraints}\` and the foreign key is \`${foreignKey}\`. ` +
+        `You need to explicitly set the query constraints for this association.`,
+    );
   }
 
   get foreignType(): string | null {
@@ -556,8 +661,12 @@ export class AssociationReflection extends MacroReflection {
     }
   }
 
+  associationPrimaryKeyFor(klass?: typeof Base): string | string[] {
+    return this.primaryKeyForModel(klass || this.klass);
+  }
+
   get associationPrimaryKey(): string | string[] {
-    return this.klass.primaryKey;
+    return this.associationPrimaryKeyFor();
   }
 
   get associationForeignKey(): string {
@@ -584,10 +693,33 @@ export class AssociationReflection extends MacroReflection {
   }
 
   get activeRecordPrimaryKey(): string | string[] {
-    if (this.options.primaryKey !== undefined) {
-      return this.options.primaryKey as string | string[];
+    if (this._activeRecordPrimaryKeyCache !== null) return this._activeRecordPrimaryKeyCache;
+
+    const customPk = this.options.primaryKey;
+    if (customPk !== undefined) {
+      this._activeRecordPrimaryKeyCache = Array.isArray(customPk)
+        ? customPk.map(String)
+        : String(customPk);
+    } else if (
+      hasQueryConstraints.call(this.activeRecord as any) ||
+      this.options.queryConstraints
+    ) {
+      this._activeRecordPrimaryKeyCache =
+        queryConstraintsList.call(this.activeRecord as any) ?? this.activeRecord.primaryKey;
+    } else if ((this.activeRecord as any).compositePrimaryKey) {
+      const pk = this.primaryKeyForModel(this.activeRecord);
+      this._activeRecordPrimaryKeyCache = Array.isArray(pk) && pk.includes("id") ? "id" : pk;
+    } else {
+      this._activeRecordPrimaryKeyCache = this.primaryKeyForModel(this.activeRecord);
     }
-    return this.activeRecord.primaryKey;
+
+    return this._activeRecordPrimaryKeyCache;
+  }
+
+  protected primaryKeyForModel(klass: typeof Base): string | string[] {
+    const pk = klass.primaryKey;
+    if (!pk) throw new Error(`Unknown primary key for ${klass.name}`);
+    return pk;
   }
 
   associationScopeCache(klass: typeof Base, _owner: any, block: () => any): any {
@@ -597,14 +729,18 @@ export class AssociationReflection extends MacroReflection {
   checkValidityBang(): void {
     this.checkValidityOfInverseBang();
 
-    if (!this.isPolymorphic()) {
-      const arPk = this.activeRecordPrimaryKey;
+    if (
+      !this.isPolymorphic() &&
+      ((this.klass as any).compositePrimaryKey ||
+        (this.activeRecord as any).compositePrimaryKey ||
+        Array.isArray(this.foreignKey))
+    ) {
       const fk = this.foreignKey;
       if (this.hasOne() || this.isCollection()) {
-        if (arrayLen(arPk) !== arrayLen(fk)) {
+        if (arrayLen(this.activeRecordPrimaryKey) !== arrayLen(fk)) {
           throw new Error(
             `Association ${this.name}: composite primary key / foreign key length mismatch ` +
-              `(${arrayLen(arPk)} primary key column(s) vs ${arrayLen(fk)} foreign key column(s))`,
+              `(${arrayLen(this.activeRecordPrimaryKey)} primary key column(s) vs ${arrayLen(fk)} foreign key column(s))`,
           );
         }
       } else if (this.belongsTo()) {
@@ -787,13 +923,45 @@ export class BelongsToReflection extends AssociationReflection {
     return super.canFindInverseOfAutomatically(reflection, inverseReflection);
   }
 
+  associationPrimaryKeyFor(klass?: typeof Base): string | string[] {
+    const targetKlass = klass || this.klass;
+    const pk = this.options.primaryKey;
+    if (pk !== undefined) {
+      return Array.isArray(pk) ? pk.map(String) : String(pk);
+    }
+
+    if (hasQueryConstraints.call(targetKlass as any) || this.options.queryConstraints) {
+      return compositeQueryConstraintsList.call(targetKlass as any);
+    }
+
+    if ((targetKlass as any).compositePrimaryKey) {
+      const primaryKey = targetKlass.primaryKey;
+      if (Array.isArray(primaryKey) && primaryKey.includes("id")) return "id";
+      return primaryKey;
+    }
+
+    return this.primaryKeyForModel(targetKlass);
+  }
+
   get associationPrimaryKey(): string | string[] {
-    if (this.options.primaryKey) return this.options.primaryKey as string | string[];
-    return this.klass.primaryKey ?? "id";
+    return this.associationPrimaryKeyFor();
+  }
+
+  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
+    return this.isPolymorphic()
+      ? this.associationPrimaryKeyFor(klass)
+      : this.associationPrimaryKeyFor();
   }
 
   get joinPrimaryKey(): string | string[] {
-    return this.associationPrimaryKey;
+    if (this.isPolymorphic()) {
+      const pk = this.options.primaryKey;
+      if (pk !== undefined) {
+        return Array.isArray(pk) ? pk.map(String) : String(pk);
+      }
+      return "id";
+    }
+    return this.joinPrimaryKeyFor();
   }
 
   get joinForeignKey(): string | string[] {
