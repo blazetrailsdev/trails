@@ -442,15 +442,25 @@ export class Model {
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_presence_of
    */
-  static validatesPresenceOf(...attributes: string[]): void {
-    for (const attr of attributes) this.validates(attr, { presence: true });
+  static validatesPresenceOf(...args: (string | Record<string, unknown>)[]): void {
+    const last = args[args.length - 1];
+    const opts =
+      typeof last === "object" && last !== null ? (args.pop() as Record<string, unknown>) : {};
+    const { message, ...rest } = opts;
+    const presenceValue = message != null ? { message } : true;
+    for (const attr of args as string[]) this.validates(attr, { presence: presenceValue, ...rest });
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_absence_of
    */
-  static validatesAbsenceOf(...attributes: string[]): void {
-    for (const attr of attributes) this.validates(attr, { absence: true });
+  static validatesAbsenceOf(...args: (string | Record<string, unknown>)[]): void {
+    const last = args[args.length - 1];
+    const opts =
+      typeof last === "object" && last !== null ? (args.pop() as Record<string, unknown>) : {};
+    const { message, ...rest } = opts;
+    const absenceValue = message != null ? { message } : true;
+    for (const attr of args as string[]) this.validates(attr, { absence: absenceValue, ...rest });
   }
 
   /**
