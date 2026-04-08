@@ -175,30 +175,52 @@ async function processPendingModels(inner: any): Promise<void> {
       }
 
       try {
-        await inner.exec(createSql);
+        await execDdlWithSavepoint(inner, createSql);
         _createdTables.add(tableName);
         _createdColumns.set(
           tableName,
           cpkCols ? new Set(columns.keys()) : new Set(["id", ...columns.keys()]),
         );
       } catch (e: any) {
-        // Log but don't add to _createdTables so we retry next time
-        console.error(`[test-adapter] Failed to create table "${tableName}": ${e?.message}`);
+        const msg = String(e?.message ?? "").toLowerCase();
+        const code = String(e?.code ?? "");
+        const constraint = String(e?.constraint ?? "");
+        // On PG, concurrent CREATE TABLE IF NOT EXISTS can race on the
+        // pg_type unique index (error 23505). If the table was created
+        // by another connection, treat it as success.
+        const isPgCreateTableRace =
+          isPg() &&
+          ((code === "23505" && constraint === "pg_type_typname_nsp_index") ||
+            (msg.includes("pg_type") && msg.includes("duplicate key")));
+        if (isPgCreateTableRace || msg.includes("already exists")) {
+          _createdTables.add(tableName);
+          // Fall through to add missing columns below
+        } else {
+          console.error(`[test-adapter] Failed to create table "${tableName}": ${e?.message}`);
+        }
       }
-    } else {
-      // Table exists — add missing columns
+    }
+
+    // Ensure all expected columns exist (covers both the normal path
+    // where CREATE TABLE succeeded and the race-recovery path where
+    // another connection created the table with a possibly different
+    // column set).
+    if (_createdTables.has(tableName)) {
       let known = _createdColumns.get(tableName);
       if (!known) {
-        known = new Set(["id"]);
+        const cpkCols = _pendingCpk.get(tableName);
+        known = cpkCols ? new Set<string>() : new Set(["id"]);
         _createdColumns.set(tableName, known);
       }
       for (const [col, type] of columns) {
         if (known.has(col)) continue;
         try {
-          const alterSql = isMysql()
-            ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` ${type}`
-            : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" ${type}`;
-          await inner.exec(alterSql);
+          await execDdlWithSavepoint(
+            inner,
+            isMysql()
+              ? `ALTER TABLE \`${tableName}\` ADD COLUMN \`${col}\` ${type}`
+              : `ALTER TABLE "${tableName}" ADD COLUMN "${col}" ${type}`,
+          );
           known.add(col);
         } catch {
           // Column might already exist in the real DB
@@ -209,6 +231,32 @@ async function processPendingModels(inner: any): Promise<void> {
   }
   _pendingModels.clear();
   _pendingCpk.clear();
+}
+
+let _ddlSpCounter = 0;
+
+/**
+ * Execute a DDL statement, wrapping it in a savepoint on PostgreSQL when
+ * inside a transaction. PG aborts the entire transaction on any error
+ * (even from CREATE TABLE IF NOT EXISTS when there's a type catalog race),
+ * so we need savepoints to isolate DDL failures and allow rollback+retry.
+ */
+async function execDdlWithSavepoint(inner: any, sql: string): Promise<void> {
+  const useSp = isPg() && inner.inTransaction;
+  const sp = useSp ? `_ddl_sp_${++_ddlSpCounter}` : "";
+  try {
+    if (useSp) await inner.createSavepoint(sp);
+    await inner.exec(sql);
+    if (useSp) await inner.releaseSavepoint(sp);
+  } catch (e) {
+    if (useSp) {
+      try {
+        await inner.rollbackToSavepoint(sp);
+        await inner.releaseSavepoint(sp);
+      } catch {}
+    }
+    throw e;
+  }
 }
 
 /**
@@ -519,7 +567,7 @@ class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements Databas
         const alterSql = isMysql()
           ? `ALTER TABLE \`${colTableName}\` ADD COLUMN \`${colName}\` ${colType}`
           : `ALTER TABLE "${colTableName}" ADD COLUMN "${colName}" ${colType}`;
-        await this.inner.exec(alterSql);
+        await execDdlWithSavepoint(this.inner, alterSql);
         let known = _createdColumns.get(colTableName);
         if (!known) {
           known = new Set(["id"]);
@@ -621,7 +669,7 @@ class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements Databas
     if (/DROP\s+TABLE\s+(?!IF)/i.test(sql)) {
       sql = sql.replace(/DROP\s+TABLE\s+/i, "DROP TABLE IF EXISTS ");
     }
-    return this.inner.exec(sql);
+    return execDdlWithSavepoint(this.inner, sql);
   }
 
   async explain(sql: string): Promise<string> {
