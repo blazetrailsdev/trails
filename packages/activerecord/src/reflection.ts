@@ -21,6 +21,7 @@ import {
   HasManyThroughAssociationPolymorphicThroughError,
   HasManyThroughAssociationPolymorphicSourceError,
   HasManyThroughAssociationPointlessSourceTypeError,
+  HasManyThroughOrderError,
   HasManyThroughSourceAssociationNotFoundError,
   HasOneAssociationPolymorphicThroughError,
   HasOneThroughCantAssociateThroughCollection,
@@ -162,20 +163,18 @@ export class AbstractReflection {
 
   counterCacheColumn(): string | null {
     const counterCache = (this as any).options?.counterCache;
-    const explicitColumn =
-      typeof counterCache === "string"
-        ? counterCache
-        : counterCache && typeof counterCache === "object" && counterCache.column
-          ? (counterCache.column as string)
-          : null;
+    if (!counterCache) {
+      if (this.belongsTo()) return null;
+      return `${(this as any).name}_count`;
+    }
+
+    const column: string | null =
+      counterCache && typeof counterCache === "object" ? (counterCache.column ?? null) : null;
 
     if (this.belongsTo()) {
-      if (!counterCache) return null;
-      return (
-        explicitColumn || `${pluralize(underscore((this as any).activeRecord?.name ?? ""))}_count`
-      );
+      return column || `${pluralize(underscore((this as any).activeRecord?.name ?? ""))}_count`;
     }
-    return explicitColumn || `${(this as any).name}_count`;
+    return column || `${(this as any).name}_count`;
   }
 
   checkValidityOfInverseBang(): void {
@@ -294,9 +293,16 @@ export class MacroReflection extends AbstractReflection {
     super();
     this.name = name;
     this._scope = scope;
-    this.options = options;
+    this.options = this.normalizeOptions(options);
     this.activeRecord = activeRecord;
     this.pluralName = pluralize(name);
+  }
+
+  equals(other: unknown): boolean {
+    if (this === other) return true;
+    if (!(other instanceof (this.constructor as typeof MacroReflection))) return false;
+    const o = other as MacroReflection;
+    return this.name === o.name && o.options != null && this.activeRecord === o.activeRecord;
   }
 
   set autosave(value: boolean) {
@@ -342,9 +348,28 @@ export class MacroReflection extends AbstractReflection {
 
   scopeFor(relation: any, owner?: any): any {
     if (this._scope) {
-      return this._scope.call(null, relation, owner) || relation;
+      return this._scope.call(relation, owner) || relation;
     }
     return relation;
+  }
+
+  private normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
+    const counterCache = options.counterCache;
+    if (counterCache) {
+      let active = true;
+      let column: string | null = null;
+
+      if (typeof counterCache === "string") {
+        column = counterCache;
+      } else if (typeof counterCache === "object" && counterCache !== null) {
+        const cc = counterCache as Record<string, unknown>;
+        active = cc.active !== undefined ? !!cc.active : true;
+        column = cc.column != null ? String(cc.column) : null;
+      }
+
+      options = { ...options, counterCache: { active, column } };
+    }
+    return options;
   }
 }
 
@@ -1119,6 +1144,19 @@ export class ThroughReflection extends AbstractReflection {
       );
     }
 
+    if (!(this._delegate as any).parentReflection) {
+      const refs = Object.keys(normalizedReflections(this.activeRecord));
+      const throughIdx = refs.indexOf((this.throughReflection as any).name);
+      const selfIdx = refs.indexOf(this.name);
+      if (throughIdx > selfIdx) {
+        throw new HasManyThroughOrderError(
+          this.activeRecord.name,
+          this.name,
+          (this.throughReflection as any).name,
+        );
+      }
+    }
+
     this.checkValidityOfInverseBang();
   }
 
@@ -1363,9 +1401,7 @@ export function createReflection(
       assocDef.type === "hasManyThrough" ||
       assocDef.type === "hasOneThrough")
   ) {
-    const through = new ThroughReflection(reflection);
-    reflection.parentReflection = through;
-    return through;
+    return new ThroughReflection(reflection);
   }
 
   return reflection;
@@ -1387,9 +1423,7 @@ export function create(
   const ReflectionClass = reflectionClassFor(macro);
   const reflection = new ReflectionClass(name, scope, options, activeRecord);
   if (options.through) {
-    const through = new ThroughReflection(reflection);
-    reflection.parentReflection = through;
-    return through;
+    return new ThroughReflection(reflection);
   }
   return reflection;
 }
@@ -1438,9 +1472,17 @@ export function reflections(modelClass: typeof Base): Record<string, any> {
   return normalizedReflections(modelClass);
 }
 
+const _normalizedReflectionsCache = new WeakMap<
+  typeof Base,
+  Record<string, AssociationReflection | ThroughReflection>
+>();
+
 export function normalizedReflections(
   modelClass: typeof Base,
 ): Record<string, AssociationReflection | ThroughReflection> {
+  const cached = _normalizedReflectionsCache.get(modelClass);
+  if (cached) return cached;
+
   const rawReflections: Record<string, any> = (modelClass as any)._reflections ?? {};
   const result: Record<string, any> = {};
   for (const [name, ref] of Object.entries(rawReflections)) {
@@ -1451,13 +1493,14 @@ export function normalizedReflections(
       result[name] = ref;
     }
   }
+
+  Object.freeze(result);
+  _normalizedReflectionsCache.set(modelClass, result);
   return result;
 }
 
-export function clearReflectionsCache(_modelClass: typeof Base): void {
-  // No-op until normalizedReflections adds memoization.
-  // Rails clears @__reflections here so the next call to normalized_reflections
-  // recomputes the collapsed reflection map.
+export function clearReflectionsCache(modelClass: typeof Base): void {
+  _normalizedReflectionsCache.delete(modelClass);
 }
 
 // ---------------------------------------------------------------------------

@@ -237,7 +237,7 @@ describe("ReflectionTest", () => {
     }
     Associations.belongsTo.call(Post, "author", { counterCache: true, foreignKey: "author_id" });
     const ref = reflectOnAssociation(Post, "author");
-    expect(ref!.options.counterCache).toBe(true);
+    expect(ref!.options.counterCache).toEqual({ active: true, column: null });
     expect(ref!.options.foreignKey).toBe("author_id");
   });
 

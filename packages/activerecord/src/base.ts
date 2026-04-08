@@ -168,6 +168,8 @@ export class Base extends Model {
   static _tableNameSuffix = "";
   static _protectedEnvironments: string[] = ["production"];
   static _lockingColumn: string = "lock_version";
+  static automaticScopeInversing = false;
+  static automaticallyInvertPluralAssociations = false;
 
   /**
    * List of environments where destructive actions are prohibited.
