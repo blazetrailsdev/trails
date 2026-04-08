@@ -295,6 +295,31 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(normalCount).toBe(2);
   });
 
+  it("exists on through association with no conditions", async () => {
+    const { author } = await setupData();
+    expect(await association(author, "djRatings").exists()).toBe(true);
+    const emptyAuthor = await DjAuthor.create({ name: "NoRatings" });
+    expect(await association(emptyAuthor, "djRatings").exists()).toBe(false);
+  });
+
+  it("exists on through association with hash conditions", async () => {
+    const { author } = await setupData();
+    expect(await association(author, "djRatings").exists({ value: 8 })).toBe(true);
+    expect(await association(author, "djRatings").exists({ value: 999 })).toBe(false);
+  });
+
+  it("exists on through association with primary key", async () => {
+    const { author, rating1 } = await setupData();
+    expect(await association(author, "djRatings").exists(rating1.id)).toBe(true);
+    expect(await association(author, "djRatings").exists(-1)).toBe(false);
+  });
+
+  it("exists on through association with array of ids", async () => {
+    const { author, rating1, rating2 } = await setupData();
+    expect(await association(author, "djRatings").exists([rating1.id, rating2.id])).toBe(true);
+    expect(await association(author, "djRatings").exists([-1, -2])).toBe(false);
+  });
+
   it.skip("polymophic disable joins through ordering", () => {});
   it.skip("polymorphic disable joins through reordering", () => {});
   it.skip("polymorphic disable joins through ordered scopes", () => {});

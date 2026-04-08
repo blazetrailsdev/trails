@@ -7791,4 +7791,41 @@ describe("CollectionProxyDelegation", () => {
     expect(result).toBeDefined();
     expect(typeof result.toSql).toBe("function");
   });
+
+  it("for await iterates over associated records", async () => {
+    const { DlgPost, DlgComment } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "async iter" });
+    await DlgComment.create({ body: "a", dlg_post_id: post.id });
+    await DlgComment.create({ body: "b", dlg_post_id: post.id });
+
+    const proxy = association(post, "dlgComments");
+    const bodies: string[] = [];
+    for await (const record of proxy) {
+      bodies.push(record.readAttribute("body") as string);
+    }
+    expect(bodies.sort()).toEqual(["a", "b"]);
+  });
+
+  it("select with block filters loaded records", async () => {
+    const { DlgPost, DlgComment } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "select block" });
+    await DlgComment.create({ body: "yes", active: true, dlg_post_id: post.id });
+    await DlgComment.create({ body: "no", active: false, dlg_post_id: post.id });
+
+    const proxy = association(post, "dlgComments");
+    await proxy.load();
+    const filtered = await proxy.select((r: any) => r.readAttribute("active") === true);
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].readAttribute("body")).toBe("yes");
+  });
+
+  it("select with columns delegates to Relation", async () => {
+    const { DlgPost, DlgComment } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "select cols" });
+    await DlgComment.create({ body: "hi", dlg_post_id: post.id });
+
+    const proxy = association(post, "dlgComments");
+    const rel = proxy.select("body");
+    expect(typeof rel.toSql).toBe("function");
+  });
 });

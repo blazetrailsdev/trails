@@ -2,6 +2,7 @@ import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import { Table as ArelTable } from "@blazetrails/arel";
+import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { StrictLoadingViolationError, RecordInvalid, RecordNotSaved } from "../errors.js";
 import {
@@ -44,7 +45,6 @@ type DelegatedQueryMethods = Pick<
   | "order"
   | "limit"
   | "offset"
-  | "select"
   | "reselect"
   | "distinct"
   | "group"
@@ -787,6 +787,27 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#exists?
    */
   async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
+    if (this._isThrough) {
+      const records = (await this.loadTarget()).filter((r) => !r.isNewRecord());
+      if (conditions === undefined) return records.length > 0;
+      if (typeof conditions === "object" && conditions !== null && !Array.isArray(conditions)) {
+        const entries = Object.entries(conditions as Record<string, unknown>);
+        return records.some((r) => entries.every(([k, v]) => r.readAttribute(k) === v));
+      }
+      const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
+      const targetModel = resolveModel(className);
+      const pk = targetModel.primaryKey;
+      if (Array.isArray(pk)) {
+        throw new Error(
+          `CollectionProxy#exists does not support composite primary keys for through associations on "${this._assocName}".`,
+        );
+      }
+      if (Array.isArray(conditions)) {
+        const idSet = new Set(conditions);
+        return records.some((r) => idSet.has(r.readAttribute(pk)));
+      }
+      return records.some((r) => r.readAttribute(pk) === conditions);
+    }
     this._checkStrictLoading();
     return this.scope().exists(conditions);
   }
@@ -1260,6 +1281,33 @@ export class CollectionProxy {
     // No-op: scope() rebuilds the relation each call, so there's nothing
     // cached to clear. Rails resets @scope/@offsets/@take here.
     return this;
+  }
+
+  /**
+   * Select columns (delegates to Relation) or filter with a block function.
+   * The block form loads records and filters in-memory, matching Rails behavior.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#select
+   */
+  select(fn: (record: Base) => boolean): Promise<Base[]>;
+  select(...columns: (string | Nodes.SqlLiteral)[]): Relation<Base>;
+  select(...args: any[]): Promise<Base[]> | Relation<Base> {
+    if (args.length === 1 && typeof args[0] === "function") {
+      return this.loadTarget().then((records: Base[]) => records.filter(args[0]));
+    }
+    return this.scope().select(...args);
+  }
+
+  /**
+   * Async iterator — allows `for await (const record of proxy)`.
+   *
+   * Mirrors: Ruby's Enumerable#each on CollectionProxy
+   */
+  async *[Symbol.asyncIterator](): AsyncIterableIterator<Base> {
+    const records = await this.loadTarget();
+    for (const record of records) {
+      yield record;
+    }
   }
 }
 
