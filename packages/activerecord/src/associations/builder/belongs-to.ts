@@ -1,6 +1,7 @@
 import { underscore } from "@blazetrails/activesupport";
 import { SingularAssociation } from "./singular-association.js";
-import { beforeValidation, afterDestroy } from "../../callbacks.js";
+import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
+import { resolveModel } from "../../associations.js";
 
 /**
  * Mirrors: ActiveRecord::Associations::Builder::BelongsTo
@@ -57,57 +58,156 @@ export class BelongsTo extends SingularAssociation {
     // follow-up to avoid double-counting with the centralized handler.
   }
 
+  private static resolvePk(reflection: any, klass: any): string | string[] {
+    const configuredPk = reflection?.options?.primaryKey;
+    if (configuredPk != null) return configuredPk;
+    const apk = reflection?.associationPrimaryKey;
+    if (typeof apk === "function") return apk.call(reflection, klass);
+    if (apk != null) return apk;
+    return klass?.primaryKey ?? "id";
+  }
+
+  private static async touchParent(target: any, touch: any): Promise<void> {
+    if (Array.isArray(touch) && touch.length === 0) return;
+    const touchFn = target.touchLater ?? target.touch;
+    if (typeof touchFn !== "function") return;
+    if (touch === true) {
+      await touchFn.call(target);
+    } else if (Array.isArray(touch)) {
+      await touchFn.call(target, ...touch);
+    } else {
+      await touchFn.call(target, touch);
+    }
+  }
+
+  private static buildFindConditions(
+    pk: string | string[],
+    fkValue: any,
+  ): Record<string, any> | null {
+    if (Array.isArray(pk)) {
+      const values = Array.isArray(fkValue) ? fkValue : [fkValue];
+      if (pk.length !== values.length) return null;
+      if (values.some((v) => v == null)) return null;
+      return Object.fromEntries(pk.map((key, i) => [key, values[i]]));
+    }
+    if (fkValue == null) return null;
+    return { [pk]: fkValue };
+  }
+
   static async touchRecord(
     record: any,
     changes: Record<string, any>,
-    foreignKey: string,
+    foreignKey: string | string[],
     name: string,
     touch: any,
   ): Promise<void> {
-    const oldForeignId = changes[foreignKey]?.[0];
+    const fkColumns = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
 
-    if (oldForeignId != null) {
+    // Fill missing old FK parts from current attributes for composite keys —
+    // unchanged columns have the same old/new value.
+    const oldFkValues = fkColumns.map((col) => {
+      const change = changes[col];
+      if (change) return change[0];
+      return typeof record.readAttribute === "function" ? record.readAttribute(col) : record[col];
+    });
+    const foreignTypeCol = `${underscore(name)}_type`;
+    const hasOldFk =
+      fkColumns.some((col) => changes[col] != null) || changes[foreignTypeCol] != null;
+
+    if (hasOldFk) {
       const association =
         typeof record.association === "function" ? record.association(name) : null;
       if (association) {
         const reflection = association.reflection;
         let klass: any;
-        if (reflection?.isPolymorphic?.()) {
-          const foreignType = reflection.foreignType;
-          const typeName = changes[foreignType]?.[0] ?? record[foreignType];
-          klass = record.constructor.polymorphicClassFor?.(typeName) ?? null;
+        const isPolymorphic =
+          reflection?.options?.polymorphic ??
+          (typeof reflection?.isPolymorphic === "function" && reflection.isPolymorphic());
+        if (isPolymorphic) {
+          const foreignType =
+            reflection?.foreignType ??
+            reflection?.options?.foreignType ??
+            `${underscore(name)}_type`;
+          const typeName =
+            changes[foreignType]?.[0] ??
+            (typeof record.readAttribute === "function"
+              ? record.readAttribute(foreignType)
+              : record[foreignType]);
+          try {
+            klass = typeName ? resolveModel(typeName) : null;
+          } catch {
+            klass = null;
+          }
         } else {
           klass = association.klass;
         }
         if (klass) {
-          const pk = reflection?.associationPrimaryKey?.(klass) ?? "id";
-          const oldRecord =
-            typeof klass.findBy === "function" ? await klass.findBy({ [pk]: oldForeignId }) : null;
-          if (oldRecord) {
-            const touchFn = oldRecord.touchLater ?? oldRecord.touch;
-            if (typeof touchFn === "function") {
-              await (touch !== true ? touchFn.call(oldRecord, touch) : touchFn.call(oldRecord));
-            }
+          const pk = BelongsTo.resolvePk(reflection, klass);
+          const oldFkValue = fkColumns.length === 1 ? oldFkValues[0] : oldFkValues;
+          const conditions = BelongsTo.buildFindConditions(pk, oldFkValue);
+          if (conditions && typeof klass.findBy === "function") {
+            const oldRecord = await klass.findBy(conditions);
+            if (oldRecord) await BelongsTo.touchParent(oldRecord, touch);
           }
         }
       }
     }
 
-    const related = typeof record[name] === "function" ? record[name]() : record[name];
-    if (related && typeof related.isPersisted === "function" && related.isPersisted()) {
-      const touchFn = related.touchLater ?? related.touch;
-      if (typeof touchFn === "function") {
-        await (touch !== true ? touchFn.call(related, touch) : touchFn.call(related));
+    // Touch the current parent by looking it up via FK value.
+    const currentFkValues = fkColumns.map((col) =>
+      typeof record.readAttribute === "function" ? record.readAttribute(col) : record[col],
+    );
+    if (currentFkValues.every((v) => v != null)) {
+      const association =
+        typeof record.association === "function" ? record.association(name) : null;
+      if (association) {
+        const klass = association.klass;
+        if (klass && typeof klass.findBy === "function") {
+          const pk = BelongsTo.resolvePk(association.reflection, klass);
+          const fkValue = fkColumns.length === 1 ? currentFkValues[0] : currentFkValues;
+          const conditions = BelongsTo.buildFindConditions(pk, fkValue);
+          if (conditions) {
+            const parent = await klass.findBy(conditions);
+            if (parent) await BelongsTo.touchParent(parent, touch);
+          }
+        }
       }
     }
   }
 
-  static addTouchCallbacks(_model: any, _reflection: any): void {
-    // Touch callbacks are handled by touchBelongsToParents() in
-    // associations.ts, called from Base#_createOrUpdate and Base#_destroyRow.
-    // Migrating to per-association afterCreate/afterUpdate/afterDestroy
-    // callbacks is tracked as a follow-up to avoid double-touching with
-    // the centralized handler.
+  static addTouchCallbacks(model: any, reflection: any): void {
+    const foreignKey =
+      reflection.foreignKey ??
+      reflection.options?.foreignKey ??
+      reflection.options?.queryConstraints;
+    const name = reflection.name;
+    const touch = reflection.options?.touch;
+
+    const makeCallback = (changesMethod: string) => async (record: any) => {
+      const raw = record[changesMethod];
+      const changes = (typeof raw === "function" ? raw.call(record) : raw) ?? {};
+      await BelongsTo.touchRecord(record, changes, foreignKey, name, touch);
+    };
+
+    afterCreate(model, makeCallback("savedChanges"));
+    afterUpdate(model, makeCallback("savedChanges"));
+    afterDestroy(model, async (record: any) => {
+      if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
+        await BelongsTo.touchRecord(record, {}, foreignKey, name, touch);
+      }
+    });
+
+    if (typeof model.afterTouch === "function") {
+      model.afterTouch(async (record: any) => {
+        if ((record as any)._touchingAssociations) return;
+        (record as any)._touchingAssociations = true;
+        try {
+          await makeCallback("changesToSave")(record);
+        } finally {
+          (record as any)._touchingAssociations = false;
+        }
+      });
+    }
   }
 
   static addDefaultCallbacks(model: any, reflection: any): void {

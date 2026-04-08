@@ -1,4 +1,5 @@
 import { SingularAssociation } from "./singular-association.js";
+import { afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
 
 /**
  * Mirrors: ActiveRecord::Associations::Builder::HasOne
@@ -84,19 +85,53 @@ export class HasOne extends SingularAssociation {
   }
 
   static async touchRecord(record: any, name: string, touch: any): Promise<void> {
-    const instance = typeof record[name] === "function" ? record[name]() : record[name];
+    let instance: any;
+    if (typeof record.association === "function") {
+      const assoc = record.association(name);
+      instance = typeof assoc.loadTarget === "function" ? await assoc.loadTarget() : assoc.target;
+    } else {
+      instance = typeof record[name] === "function" ? record[name]() : record[name];
+    }
+
     if (instance && typeof instance.isPersisted === "function" && instance.isPersisted()) {
-      if (touch !== true && typeof instance.touch === "function") {
-        await instance.touch(touch);
-      } else if (typeof instance.touch === "function") {
-        await instance.touch();
+      const touchFn = instance.touchLater ?? instance.touch;
+      if (typeof touchFn !== "function") return;
+      if (touch === true) {
+        await touchFn.call(instance);
+      } else if (Array.isArray(touch)) {
+        if (touch.length === 0) return;
+        await touchFn.call(instance, ...touch);
+      } else {
+        await touchFn.call(instance, touch);
       }
     }
   }
 
-  static addTouchCallbacks(_model: any, _reflection: any): void {
-    // Touch callbacks are handled by touchBelongsToParents() in
-    // associations.ts (from the child's belongsTo side). Migrating to
-    // per-association callbacks registered here is a follow-up.
+  static addTouchCallbacks(model: any, reflection: any): void {
+    const name = reflection.name ?? reflection;
+    const touch = reflection.options?.touch;
+
+    const callback = async (record: any) => {
+      await HasOne.touchRecord(record, name, touch);
+    };
+
+    afterCreate(model, callback);
+    afterUpdate(model, callback);
+    afterDestroy(model, async (record: any) => {
+      if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
+        await HasOne.touchRecord(record, name, touch);
+      }
+    });
+    if (typeof model.afterTouch === "function") {
+      model.afterTouch(async (record: any) => {
+        if ((record as any)._touchingAssociations) return;
+        (record as any)._touchingAssociations = true;
+        try {
+          await HasOne.touchRecord(record, name, touch);
+        } finally {
+          (record as any)._touchingAssociations = false;
+        }
+      });
+    }
   }
 }
