@@ -1,4 +1,5 @@
 import type { Base } from "../base.js";
+import type { Relation } from "../relation.js";
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
@@ -20,6 +21,7 @@ import {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CollectionProxy {
+  // Thenable — makes CollectionProxy awaitable (delegates to toArray)
   then<TResult1 = Base[], TResult2 = never>(
     onfulfilled?: ((value: Base[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
@@ -29,6 +31,55 @@ export interface CollectionProxy {
   ): Promise<Base[] | TResult>;
   finally(onfinally?: (() => void) | null): Promise<Base[]>;
 }
+
+/**
+ * Query methods available on a wrapped CollectionProxy (returned by association()).
+ * These delegate to the underlying Relation via the JS Proxy at runtime.
+ * Separated from CollectionProxy so that unwrapped instances (e.g. new CollectionProxy())
+ * don't advertise methods that only exist through the Proxy wrapper.
+ */
+type DelegatedQueryMethods = Pick<
+  Relation<Base>,
+  | "where"
+  | "order"
+  | "limit"
+  | "offset"
+  | "select"
+  | "reselect"
+  | "distinct"
+  | "group"
+  | "having"
+  | "reorder"
+  | "reverseOrder"
+  | "inOrderOf"
+  | "rewhere"
+  | "none"
+  | "unscope"
+  | "lock"
+  | "readonly"
+  | "joins"
+  | "leftOuterJoins"
+  | "includes"
+  | "preload"
+  | "eagerLoad"
+  | "references"
+  | "extending"
+  | "annotate"
+  | "optimizerHints"
+  | "from"
+  | "createWith"
+  | "excluding"
+  | "without"
+>;
+
+/**
+ * A CollectionProxy wrapped with a JS Proxy that delegates query methods
+ * and named scopes to the underlying Relation. Returned by association().
+ * The generic parameter allows typing extend-option methods; defaults to
+ * an open index signature so named scopes and extensions work without casts.
+ */
+export type AssociationProxy<TExtensions extends Record<string, any> = Record<string, any>> =
+  CollectionProxy & DelegatedQueryMethods & TExtensions;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CollectionProxy {
@@ -117,6 +168,12 @@ export class CollectionProxy {
 
   private get _isThrough(): boolean {
     return !!this._assocDef.options.through;
+  }
+
+  private _checkStrictLoading(): void {
+    if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
+      throw StrictLoadingViolationError.forAssociation(this._record, this._assocName);
+    }
   }
 
   private _ensureThroughWritable(): void {
@@ -628,7 +685,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#include?
    */
-  async includes(record: Base): Promise<boolean> {
+  async isInclude(record: Base): Promise<boolean> {
     if (this._loaded) {
       const targetId = this._identityFor(record);
       if (targetId != null) {
@@ -711,7 +768,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#none?
    */
-  async none(): Promise<boolean> {
+  async isNone(): Promise<boolean> {
     return (await this.count()) === 0;
   }
 
@@ -729,24 +786,9 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#exists?
    */
-  async exists(conditions: Record<string, unknown> = {}): Promise<boolean> {
-    const records = await this.toArray();
-    if (Object.keys(conditions).length === 0) return records.length > 0;
-    return records.some((r) =>
-      Object.entries(conditions).every(([k, v]) => r.readAttribute(k) === v),
-    );
-  }
-
-  /**
-   * Filter the collection by conditions. Returns matching records.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#where
-   */
-  async where(conditions: Record<string, unknown>): Promise<Base[]> {
-    const records = await this.toArray();
-    return records.filter((r) =>
-      Object.entries(conditions).every(([k, v]) => r.readAttribute(k) === v),
-    );
+  async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
+    this._checkStrictLoading();
+    return this.scope().exists(conditions);
   }
 
   /**
@@ -755,7 +797,8 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#first_or_initialize
    */
   async firstOrInitialize(conditions: Record<string, unknown> = {}): Promise<Base> {
-    const matches = await this.where(conditions);
+    this._checkStrictLoading();
+    const matches = await this.scope().where(conditions).toArray();
     if (matches.length > 0) return matches[0];
     return this.build(conditions);
   }
@@ -766,7 +809,8 @@ export class CollectionProxy {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#first_or_create
    */
   async firstOrCreate(conditions: Record<string, unknown> = {}): Promise<Base> {
-    const matches = await this.where(conditions);
+    this._checkStrictLoading();
+    const matches = await this.scope().where(conditions).toArray();
     if (matches.length > 0) return matches[0];
     return this.create(conditions);
   }
@@ -776,13 +820,11 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#first_or_create!
    */
-  async firstOrCreate_(conditions: Record<string, unknown> = {}): Promise<Base> {
-    const matches = await this.where(conditions);
+  async firstOrCreateBang(conditions: Record<string, unknown> = {}): Promise<Base> {
+    this._checkStrictLoading();
+    const matches = await this.scope().where(conditions).toArray();
     if (matches.length > 0) return matches[0];
-    const record = this.build(conditions);
-    await record.save();
-    if (record.isNewRecord()) throw new Error("Failed to create record");
-    return record;
+    return this.createBang(conditions);
   }
 
   /**
@@ -838,34 +880,31 @@ export class CollectionProxy {
     await this.replace(records);
   }
 
-  private async _resolveRecords(): Promise<Base[]> {
-    if (this._loaded) return this._target;
-    if (this._record._strictLoading && !this._record._strictLoadingBypassCount) {
-      throw StrictLoadingViolationError.forAssociation(this._record, this._assocName);
-    }
-    // For through associations, scope() may not handle all cases (nested through).
-    // Fall back to loading via the loader, filtering to persisted records only
-    // so pluck/pick don't include unsaved in-memory records.
-    if (this._isThrough) {
-      const all = await this.toArray();
-      return all.filter((r) => !r.isNewRecord());
-    }
-    return this.scope().toArray();
-  }
-
   async pluck(...columns: string[]): Promise<unknown[]> {
-    const records = this._loaded ? this._target : await this._resolveRecords();
-    if (columns.length === 1) {
-      return records.map((r) => r.readAttribute(columns[0]));
+    if (this._isThrough || this._loaded) {
+      const records = (this._isThrough ? await this.toArray() : this._target).filter(
+        (r) => !r.isNewRecord(),
+      );
+      if (columns.length === 1) {
+        return records.map((r) => r.readAttribute(columns[0]));
+      }
+      return records.map((r) => columns.map((c) => r.readAttribute(c)));
     }
-    return records.map((r) => columns.map((c) => r.readAttribute(c)));
+    this._checkStrictLoading();
+    return this.scope().pluck(...columns);
   }
 
   async pick(...columns: string[]): Promise<unknown> {
-    const records = this._loaded ? this._target : await this._resolveRecords();
-    if (records.length === 0) return null;
-    if (columns.length === 1) return records[0].readAttribute(columns[0]);
-    return columns.map((c) => records[0].readAttribute(c));
+    if (this._isThrough || this._loaded) {
+      const records = (this._isThrough ? await this.toArray() : this._target).filter(
+        (r) => !r.isNewRecord(),
+      );
+      if (records.length === 0) return null;
+      if (columns.length === 1) return records[0].readAttribute(columns[0]);
+      return columns.map((c) => records[0].readAttribute(c));
+    }
+    this._checkStrictLoading();
+    return this.scope().pick(...columns);
   }
 
   async reload(): Promise<this> {
@@ -1157,15 +1196,6 @@ export class CollectionProxy {
       default:
         throw new Error(`Unknown calculation operation: ${op}`);
     }
-  }
-
-  /**
-   * Check if the collection includes a given record.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#include?
-   */
-  async isInclude(record: Base): Promise<boolean> {
-    return this.includes(record);
   }
 
   /**

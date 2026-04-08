@@ -777,8 +777,8 @@ describe("CollectionProxy", () => {
     const jordan = await Player.create({ name: "Jordan", team_id: team.id });
     const magic = await Player.create({ name: "Magic", team_id: 999 });
     const proxy = association(team, "players");
-    expect(await proxy.includes(jordan)).toBe(true);
-    expect(await proxy.includes(magic)).toBe(false);
+    expect(await proxy.isInclude(jordan)).toBe(true);
+    expect(await proxy.isInclude(magic)).toBe(false);
   });
 
   // Rails: test_to_array
@@ -3482,8 +3482,8 @@ describe("CollectionProxy enhancements", () => {
     const post = await Post.create({ title: "Mine", author_id: author.id });
     const other = await Post.create({ title: "Other", author_id: 999 });
     const proxy = association(author, "posts");
-    expect(await proxy.includes(post)).toBe(true);
-    expect(await proxy.includes(other)).toBe(false);
+    expect(await proxy.isInclude(post)).toBe(true);
+    expect(await proxy.isInclude(other)).toBe(false);
   });
 });
 
@@ -5609,7 +5609,7 @@ describe("HasManyAssociationsTest", () => {
     await Client.create({ name: "Other", firm_id: 99999 });
 
     const proxy = association(firm, "clients");
-    expect(await proxy.includes(client)).toBe(true);
+    expect(await proxy.isInclude(client)).toBe(true);
   });
 
   it("included in collection for new records", async () => {
@@ -5619,7 +5619,7 @@ describe("HasManyAssociationsTest", () => {
     const unsaved = new Client({ name: "New" });
 
     const proxy = association(firm, "clients");
-    expect(await proxy.includes(unsaved)).toBe(false);
+    expect(await proxy.isInclude(unsaved)).toBe(false);
   });
 
   // -------------------------------------------------------------------------
@@ -5823,7 +5823,7 @@ describe("HasManyAssociationsTest", () => {
     const { Firm } = makeFirmClients(adapter);
     const firm = await Firm.create({ name: "Empty" });
 
-    expect(await association(firm, "clients").none()).toBe(true);
+    expect(await association(firm, "clients").isNone()).toBe(true);
   });
 
   it("calling none should return false if any", async () => {
@@ -5831,7 +5831,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = await Firm.create({ name: "Corp" });
     await Client.create({ name: "A", firm_id: firm.id });
 
-    expect(await association(firm, "clients").none()).toBe(false);
+    expect(await association(firm, "clients").isNone()).toBe(false);
   });
 
   it("calling one should return false if zero", async () => {
@@ -5905,7 +5905,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = await Firm.create({ name: "Corp" });
 
     const proxy = association(firm, "clients");
-    const client = await proxy.firstOrCreate_({ name: "New Client" });
+    const client = await proxy.firstOrCreateBang({ name: "New Client" });
 
     expect(client.isNewRecord()).toBe(false);
     expect(client.firm_id).toBe(firm.id);
@@ -5974,7 +5974,7 @@ describe("HasManyAssociationsTest", () => {
     const built = proxy.build({ name: "Built" });
     await built.save();
 
-    expect(await proxy.includes(built)).toBe(true);
+    expect(await proxy.isInclude(built)).toBe(true);
   });
 
   // -------------------------------------------------------------------------
@@ -6023,7 +6023,7 @@ describe("HasManyAssociationsTest", () => {
     await Client.create({ name: "Apple", firm_id: firm.id });
 
     const proxy = association(firm, "clients");
-    const matches = await proxy.where({ name: "Microsoft" });
+    const matches = await proxy.where({ name: "Microsoft" }).toArray();
     expect(matches.length).toBe(1);
     expect(matches[0].name).toBe("Microsoft");
   });
@@ -6035,7 +6035,7 @@ describe("HasManyAssociationsTest", () => {
     await Client.create({ name: "Beta", firm_id: firm.id });
 
     const proxy = association(firm, "clients");
-    const matches = await proxy.where({ name: "Alpha" });
+    const matches = await proxy.where({ name: "Alpha" }).toArray();
     expect(matches.length).toBe(1);
   });
 
@@ -6248,7 +6248,7 @@ describe("HasManyAssociationsTest", () => {
 
     const proxy = association(firm, "clients");
     await proxy.toArray(); // load
-    expect(await proxy.includes(a)).toBe(true);
+    expect(await proxy.isInclude(a)).toBe(true);
   });
 
   it("include returns false for non matching record to verify scoping", async () => {
@@ -6258,7 +6258,7 @@ describe("HasManyAssociationsTest", () => {
     await Client.create({ name: "A", firm_id: firm.id });
     const outside = await Client.create({ name: "B", firm_id: other.id });
 
-    expect(await association(firm, "clients").includes(outside)).toBe(false);
+    expect(await association(firm, "clients").isInclude(outside)).toBe(false);
   });
 
   // -------------------------------------------------------------------------
@@ -6461,7 +6461,7 @@ describe("AssociationProxyTest", () => {
     await APComment.create({ body: "match", ap_post_id: post.id });
     await APComment.create({ body: "other", ap_post_id: post.id });
     const proxy = association(post, "apComments");
-    const filtered = await proxy.where({ body: "match" });
+    const filtered = await proxy.where({ body: "match" }).toArray();
     expect(filtered.length).toBe(1);
     expect(filtered[0].body).toBe("match");
   });
@@ -6562,7 +6562,6 @@ describe("AssociationProxyTest", () => {
     const comment = await APComment.create({ body: "plucked", ap_post_id: post.id });
     const proxy = association(post, "apComments");
     await proxy.load();
-    // Mutate DB after loading — pluck should still see loaded data
     const reloaded = await APComment.find(comment.id);
     reloaded.body = "changed";
     await reloaded.save();
@@ -7799,5 +7798,147 @@ describe("WithAnnotationsTest", () => {
     }
     const sql = Post.all().annotate("eager-hmt-hint").toSql();
     expect(sql).toContain("eager-hmt-hint");
+  });
+});
+
+// ==========================================================================
+// CollectionProxy delegation via Proxy
+// ==========================================================================
+
+describe("CollectionProxyDelegation", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function setupDelegationModels() {
+    class DlgComment extends Base {
+      static {
+        this._tableName = "dlg_comments";
+        this.attribute("body", "string");
+        this.attribute("active", "boolean");
+        this.attribute("dlg_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class DlgPost extends Base {
+      static {
+        this._tableName = "dlg_posts";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(DlgPost, "dlgComments", {
+      foreignKey: "dlg_post_id",
+      className: "DlgComment",
+    });
+    Associations.belongsTo.call(DlgComment, "dlgPost", {
+      foreignKey: "dlg_post_id",
+      className: "DlgPost",
+    });
+    registerModel("DlgPost", DlgPost);
+    registerModel("DlgComment", DlgComment);
+    return { DlgPost, DlgComment };
+  }
+
+  it("delegates query methods to scope", async () => {
+    const { DlgPost } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "delegation test" });
+    const proxy = association(post, "dlgComments");
+    const result = proxy.order("body");
+    expect(result).toBeDefined();
+    expect(typeof result.toSql).toBe("function");
+  });
+
+  it("delegates named scopes to scope", async () => {
+    const { DlgPost, DlgComment } = setupDelegationModels();
+    DlgComment.scope("active", (rel: any) => rel.where({ active: true }));
+
+    const post = await DlgPost.create({ title: "scope delegation" });
+    const proxy = association(post, "dlgComments");
+    const result = (proxy as any).active(); // named scopes are dynamic, must use any
+    expect(result).toBeDefined();
+    expect(typeof result.toSql).toBe("function");
+    expect(result.toSql()).toContain("active");
+  });
+
+  it("CollectionProxy own methods take priority over delegation", async () => {
+    const { DlgPost, DlgComment } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "priority test" });
+    await DlgComment.create({ body: "c1", dlg_post_id: post.id });
+
+    const proxy = association(post, "dlgComments");
+    const count = await proxy.count();
+    expect(count).toBe(1);
+  });
+
+  it("thenable is preserved through Proxy wrapper", async () => {
+    const { DlgPost, DlgComment } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "thenable test" });
+    await DlgComment.create({ body: "c1", dlg_post_id: post.id });
+
+    const records = await association(post, "dlgComments");
+    expect(Array.isArray(records)).toBe(true);
+    expect((records as Base[]).length).toBe(1);
+  });
+
+  it("extend option methods take priority over delegation", async () => {
+    const { DlgPost, DlgComment } = setupDelegationModels();
+    // Re-register with extend option
+    (DlgPost as any)._associations = [];
+    Associations.hasMany.call(DlgPost, "dlgComments", {
+      foreignKey: "dlg_post_id",
+      className: "DlgComment",
+      extend: {
+        custom() {
+          return "from-extend";
+        },
+      },
+    });
+    const post = await DlgPost.create({ title: "extend test" });
+    const proxy = association(post, "dlgComments") as any;
+    expect(proxy.custom()).toBe("from-extend");
+  });
+
+  it("unknown properties return undefined", async () => {
+    const { DlgPost } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "unknown prop test" });
+    const proxy = association(post, "dlgComments") as any;
+    expect(proxy.completelyNonExistent).toBeUndefined();
+  });
+
+  it("where delegates to Relation and returns a chainable Relation", async () => {
+    const { DlgPost, DlgComment } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "where delegation" });
+    await DlgComment.create({ body: "yes", active: true, dlg_post_id: post.id });
+    await DlgComment.create({ body: "no", active: false, dlg_post_id: post.id });
+
+    const proxy = association(post, "dlgComments");
+    const rel = proxy.where({ active: true });
+    expect(typeof rel.toSql).toBe("function");
+    expect(typeof rel.order).toBe("function");
+    const results = await rel.toArray();
+    expect(results.length).toBe(1);
+    expect(results[0].body).toBe("yes");
+  });
+
+  it("none delegates to Relation (null relation), not predicate", async () => {
+    const { DlgPost } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "none test" });
+    const proxy = association(post, "dlgComments");
+    const rel = proxy.none();
+    expect(typeof rel.toSql).toBe("function");
+    const results = await rel.toArray();
+    expect(results).toEqual([]);
+  });
+
+  it("chaining query methods works", async () => {
+    const { DlgPost } = setupDelegationModels();
+    const post = await DlgPost.create({ title: "chain test" });
+    const proxy = association(post, "dlgComments");
+    const result = proxy.order("body").limit(5);
+    expect(result).toBeDefined();
+    expect(typeof result.toSql).toBe("function");
   });
 });

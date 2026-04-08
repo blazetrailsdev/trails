@@ -4085,7 +4085,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await IncBPost.create({ title: "Hello" });
     const proxy = association(person, "incBPosts");
     await proxy.push(post);
-    expect(await proxy.includes(post)).toBe(true);
+    expect(await proxy.isInclude(post)).toBe(true);
   });
   it("include method in association through should return true for instance added with nested builds", async () => {
     class IncNPost extends Base {
@@ -4134,7 +4134,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await IncNPost.create({ title: "Hello" });
     const proxy = association(person, "incNPosts");
     await proxy.push(post);
-    expect(await proxy.includes(post)).toBe(true);
+    expect(await proxy.isInclude(post)).toBe(true);
   });
   it("through association readonly should be false", async () => {
     class HmtRoOwner extends Base {
@@ -6277,7 +6277,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await IncPost.create({ title: "Hello" });
     const proxy = association(person, "incPosts");
     await proxy.push(post);
-    expect(await proxy.includes(post)).toBe(true);
+    expect(await proxy.isInclude(post)).toBe(true);
   });
   it("has many association through a belongs to association", async () => {
     class HmtBtAuthor extends Base {

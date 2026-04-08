@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { Table as ArelTable } from "@blazetrails/arel";
-import { CollectionProxy } from "./associations/collection-proxy.js";
+import { CollectionProxy, type AssociationProxy } from "./associations/collection-proxy.js";
 import { StrictLoadingViolationError, ConfigurationError } from "./errors.js";
 import {
   DeleteRestrictionError,
@@ -1271,8 +1271,8 @@ export async function createThroughAssociation(
  * Factory to get a CollectionProxy for a has_many association.
  * Returns a cached proxy if one exists on the record.
  */
-export function association(record: Base, assocName: string): CollectionProxy {
-  const existing = record._collectionProxies.get(assocName) as CollectionProxy | undefined;
+export function association(record: Base, assocName: string): AssociationProxy {
+  const existing = record._collectionProxies.get(assocName) as AssociationProxy | undefined;
   if (existing) {
     // Hydrate from preloaded data if proxy was cached before preloading ran
     if (!existing.loaded) {
@@ -1300,8 +1300,40 @@ export function association(record: Base, assocName: string): CollectionProxy {
     proxy._hydrateFromPreload(records as Base[]);
   }
 
-  record._collectionProxies.set(assocName, proxy);
-  return proxy;
+  const wrapped = wrapCollectionProxy(proxy);
+  record._collectionProxies.set(assocName, wrapped);
+  return wrapped;
+}
+
+/**
+ * Wrap a CollectionProxy in a Proxy that delegates unknown property access
+ * to the underlying Relation (via scope()). This mirrors Ruby's
+ * CollectionProxy#method_missing which delegates to the association scope.
+ *
+ * Priority:
+ * 1. Own/prototype properties (CollectionProxy methods, extend methods)
+ * 2. Relation query methods + named scopes (via scope()'s own proxy)
+ */
+function wrapCollectionProxy(proxy: CollectionProxy): AssociationProxy {
+  return new Proxy(proxy, {
+    get(target: any, prop: string | symbol, receiver: any) {
+      const value = Reflect.get(target, prop, receiver);
+      if (value !== undefined) return value;
+      if (prop in target) return value;
+      if (typeof prop === "symbol") return value;
+
+      if (target._record._strictLoading && !target._record._strictLoadingBypassCount) {
+        throw StrictLoadingViolationError.forAssociation(target._record, target._assocName);
+      }
+
+      const scope = target.scope();
+      const scopeVal = Reflect.get(scope, prop, scope);
+      if (typeof scopeVal === "function") {
+        return (...args: any[]) => scopeVal.apply(scope, args);
+      }
+      return scopeVal;
+    },
+  });
 }
 
 /**
