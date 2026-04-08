@@ -34,52 +34,25 @@ export interface CollectionProxy {
 }
 
 /**
- * Query methods available on a wrapped CollectionProxy (returned by association()).
- * These delegate to the underlying Relation via the JS Proxy at runtime.
- * Separated from CollectionProxy so that unwrapped instances (e.g. new CollectionProxy())
- * don't advertise methods that only exist through the Proxy wrapper.
+ * All Relation methods not already defined on CollectionProxy. These are
+ * delegated to the underlying Relation via the JS Proxy at runtime.
+ * Using Omit instead of Pick means new Relation methods are automatically
+ * available on AssociationProxy without manual maintenance.
  */
-type DelegatedQueryMethods = Pick<
-  Relation<Base>,
-  | "where"
-  | "order"
-  | "limit"
-  | "offset"
-  | "reselect"
-  | "distinct"
-  | "group"
-  | "having"
-  | "reorder"
-  | "reverseOrder"
-  | "inOrderOf"
-  | "rewhere"
-  | "none"
-  | "unscope"
-  | "lock"
-  | "readonly"
-  | "joins"
-  | "leftOuterJoins"
-  | "includes"
-  | "preload"
-  | "eagerLoad"
-  | "references"
-  | "extending"
-  | "annotate"
-  | "optimizerHints"
-  | "from"
-  | "createWith"
-  | "excluding"
-  | "without"
->;
+type DelegatedRelationMethods = {
+  [K in keyof Omit<Relation<Base>, keyof CollectionProxy> as K extends `_${string}`
+    ? never
+    : K]: Omit<Relation<Base>, keyof CollectionProxy>[K];
+};
 
 /**
- * A CollectionProxy wrapped with a JS Proxy that delegates query methods
+ * A CollectionProxy wrapped with a JS Proxy that delegates methods
  * and named scopes to the underlying Relation. Returned by association().
  * The generic parameter allows typing extend-option methods; defaults to
  * an open index signature so named scopes and extensions work without casts.
  */
 export type AssociationProxy<TExtensions extends Record<string, any> = Record<string, any>> =
-  CollectionProxy & DelegatedQueryMethods & TExtensions;
+  CollectionProxy & DelegatedRelationMethods & TExtensions;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CollectionProxy {
