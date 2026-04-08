@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { loadBelongsTo } from "../associations.js";
+import { loadBelongsTo, resolveModel } from "../associations.js";
 import { underscore, pluralize } from "@blazetrails/activesupport";
 import { SingularAssociation } from "./singular-association.js";
 
@@ -91,24 +91,63 @@ export class BelongsToAssociation extends SingularAssociation {
    * Decrement counters for the previously associated record (before last save).
    */
   async decrementCountersBeforeLastSave(): Promise<void> {
-    const fk = this.foreignKeyName();
-    const foreignKeyWas =
-      typeof this.owner.attributeBeforeLastSave === "function"
-        ? (this.owner as any).attributeBeforeLastSave(fk)
-        : undefined;
-
-    if (foreignKeyWas != null) {
-      const counterCol = this.counterCacheColumn();
-      if (!counterCol) return;
-
-      const Klass = this.klass;
-      if (Klass && typeof (Klass as any).where === "function") {
-        const pk = (Klass as any).primaryKey ?? "id";
-        const scope = (Klass as any).where({ [pk]: foreignKeyWas });
-        if (typeof scope.updateCounters === "function") {
-          await scope.updateCounters({ [counterCol]: -1 });
+    let modelWas: any;
+    if (this.reflection.options.polymorphic) {
+      const foreignType =
+        (this.reflection as any).foreignType ??
+        (this.reflection.options as any).foreignType ??
+        `${underscore(this.reflection.name)}_type`;
+      const modelTypeWas =
+        typeof this.owner.attributeBeforeLastSave === "function"
+          ? this.owner.attributeBeforeLastSave(foreignType)
+          : undefined;
+      if (modelTypeWas) {
+        try {
+          modelWas = resolveModel(modelTypeWas as string);
+        } catch {
+          return;
         }
       }
+    } else {
+      modelWas = this.klass;
+    }
+
+    const fkNames = this.foreignKeyNames();
+    const foreignKeyWas = fkNames.map((fk) =>
+      typeof this.owner.attributeBeforeLastSave === "function"
+        ? this.owner.attributeBeforeLastSave(fk)
+        : undefined,
+    );
+
+    if (foreignKeyWas.some((v) => v != null) && modelWas) {
+      const counterCol = this.counterCacheColumn();
+      if (!counterCol) return;
+      await this.updateCountersViaScope(modelWas, foreignKeyWas, -1);
+    }
+  }
+
+  private async updateCountersViaScope(
+    klass: any,
+    foreignKeyValues: any[],
+    by: number,
+  ): Promise<void> {
+    const counterCol = this.counterCacheColumn();
+    if (!counterCol) return;
+    if (typeof klass.where !== "function") return;
+
+    const configuredPk = (this.reflection.options as any).primaryKey;
+    const rawPk = configuredPk ?? klass.primaryKey ?? "id";
+    const pks = Array.isArray(rawPk) ? rawPk : [rawPk];
+    if (pks.length !== foreignKeyValues.length) return;
+    const conditions: Record<string, unknown> = {};
+    for (let i = 0; i < pks.length; i++) {
+      if (foreignKeyValues[i] == null) return;
+      conditions[pks[i]] = foreignKeyValues[i];
+    }
+
+    const scope = klass.where(conditions);
+    if (typeof scope.updateCounters === "function") {
+      await scope.updateCounters({ [counterCol]: by });
     }
   }
 

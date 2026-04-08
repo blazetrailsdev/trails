@@ -2005,11 +2005,9 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await CcAsgCompany.create({ name: "Old", accounts_count: 0 });
     const co2 = await CcAsgCompany.create({ name: "New", accounts_count: 0 });
     const account = await CcAsgAccount.create({ company_id: co1.id });
-    // Reassign
-    await updateCounterCaches(account, "decrement");
+    // Reassign — builder's afterUpdate callback handles counter cache
     account.company_id = co2.id;
     await account.save();
-    await updateCounterCaches(account, "increment");
     const reloaded1 = await CcAsgCompany.find(co1.id!);
     const reloaded2 = await CcAsgCompany.find(co2.id!);
     expect((reloaded1 as any).accounts_count).toBe(0);
@@ -2039,10 +2037,8 @@ describe("BelongsToAssociationsTest", () => {
     const co1 = await NsCcCompany.create({ name: "Old", accounts_count: 0 });
     const co2 = await NsCcCompany.create({ name: "New", accounts_count: 0 });
     const account = await NsCcAccount.create({ company_id: co1.id });
-    await updateCounterCaches(account, "decrement");
     account.company_id = co2.id;
     await account.save();
-    await updateCounterCaches(account, "increment");
     const reloaded2 = await NsCcCompany.find(co2.id!);
     expect((reloaded2 as any).accounts_count).toBe(1);
   });

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "./index.js";
-import { Associations, association, updateCounterCaches } from "./associations.js";
+import { Associations, association } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -77,7 +77,7 @@ describe("CounterCacheTest", () => {
     const after = await Topic.find(topic.id);
     expect(after.replies_count).toBe(1);
 
-    await updateCounterCaches(reply, "decrement");
+    await reply.destroy();
     const after2 = await Topic.find(topic.id);
     expect(after2.replies_count).toBe(0);
   });
@@ -435,7 +435,7 @@ describe("CounterCacheTest", () => {
     const r = await Reply.create({ content: "reply", topic_id: t.id });
     const t1 = await Topic.find(t.id);
     expect(t1.replies_count).toBe(1);
-    await updateCounterCaches(r, "decrement");
+    await r.destroy();
     const t2 = await Topic.find(t.id);
     expect(t2.replies_count).toBe(0);
   });
@@ -631,7 +631,7 @@ describe("CounterCacheTest", () => {
     const r = await Reply.create({ content: "reply", topic_id: t.id });
     const t1 = await Topic.find(t.id);
     expect(t1.replies_count).toBe(1);
-    await updateCounterCaches(r, "decrement");
+    await r.destroy();
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(0);
   });
@@ -659,10 +659,8 @@ describe("CounterCacheTest", () => {
     const r = await Reply.create({ content: "reply", topic_id: t1.id });
     expect((await Topic.find(t1.id)).replies_count).toBe(1);
     expect((await Topic.find(t2.id)).replies_count).toBe(0);
-    await updateCounterCaches(r, "decrement");
     r.topic_id = t2.id;
     await r.save();
-    await updateCounterCaches(r, "increment");
     expect((await Topic.find(t1.id)).replies_count).toBe(0);
     expect((await Topic.find(t2.id)).replies_count).toBe(1);
   });
@@ -896,7 +894,7 @@ describe("CounterCacheTest", () => {
     const r = await Reply.create({ content: "a", topic_id: t.id });
     let reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(1);
-    await updateCounterCaches(r, "decrement");
+    await r.destroy();
     reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(0);
   });

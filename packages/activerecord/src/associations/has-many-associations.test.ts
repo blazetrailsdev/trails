@@ -18,7 +18,6 @@ import {
   loadHasMany,
   loadHasManyThrough,
   processDependentAssociations,
-  updateCounterCaches,
 } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 
@@ -4496,10 +4495,8 @@ describe("HasManyAssociationsTest", () => {
     const author2 = await CcUpdIdAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcUpdIdPost.create({ author_id: author1.id, title: "A" });
     // Move post to author2
-    await updateCounterCaches(post, "decrement");
     post.author_id = author2.id;
     await post.save();
-    await updateCounterCaches(post, "increment");
     const reloaded1 = await CcUpdIdAuthor.find(author1.id!);
     const reloaded2 = await CcUpdIdAuthor.find(author2.id!);
     expect((reloaded1 as any).posts_count).toBe(0);
@@ -4530,10 +4527,8 @@ describe("HasManyAssociationsTest", () => {
     const author1 = await CcChgAuthor.create({ name: "Alice", posts_count: 0 });
     const author2 = await CcChgAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcChgPost.create({ author_id: author1.id, title: "A" });
-    await updateCounterCaches(post, "decrement");
     post.author_id = author2.id;
     await post.save();
-    await updateCounterCaches(post, "increment");
     const reloaded1 = await CcChgAuthor.find(author1.id!);
     const reloaded2 = await CcChgAuthor.find(author2.id!);
     expect((reloaded1 as any).posts_count).toBe(0);
@@ -4564,10 +4559,8 @@ describe("HasManyAssociationsTest", () => {
     const author1 = await CcInvAuthor.create({ name: "Alice", posts_count: 0 });
     const author2 = await CcInvAuthor.create({ name: "Bob", posts_count: 0 });
     const post = await CcInvPost.create({ author_id: author1.id, title: "A" });
-    await updateCounterCaches(post, "decrement");
     post.author_id = author2.id;
     await post.save();
-    await updateCounterCaches(post, "increment");
     const reloaded2 = await CcInvAuthor.find(author2.id!);
     expect((reloaded2 as any).posts_count).toBe(1);
   });

@@ -51,11 +51,19 @@ export class BelongsTo extends SingularAssociation {
     }
   }
 
-  static addCounterCacheCallbacks(_model: any, _reflection: any): void {
-    // Counter cache is handled by updateCounterCaches() in associations.ts,
-    // called from Base#_createOrUpdate and Base#_destroyRow. Migrating to
-    // per-association afterCreate/afterUpdate callbacks is tracked as a
-    // follow-up to avoid double-counting with the centralized handler.
+  static addCounterCacheCallbacks(model: any, reflection: any): void {
+    const name = reflection.name;
+
+    // Rails only registers after_update in add_counter_cache_callbacks.
+    // Create/destroy counter handling is done by updateCounterCaches()
+    // in associations.ts (called from Base#_createOrUpdate and _destroyRow).
+    afterUpdate(model, async (record: any) => {
+      const assoc = record.association(name);
+      if (assoc.isSavedChangeToTarget()) {
+        await assoc.incrementCounters();
+        await assoc.decrementCountersBeforeLastSave();
+      }
+    });
   }
 
   private static resolvePk(reflection: any, klass: any): string | string[] {
