@@ -29,10 +29,6 @@ is timing: Rails defines on first access, we define at registration.
 
 - Missing: `generates_token_for`
 
-### translation.ts
-
-- Missing full lookup chains with namespace handling
-
 ### attribute-registration.ts
 
 - Missing `resolve_attribute_name`, `resolve_type_name`, `hook_attribute_type` hooks

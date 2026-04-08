@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Errors } from "./index.js";
+import { Errors, Model } from "./index.js";
+import { I18n } from "./i18n.js";
+import { Error as ModelError } from "./error.js";
 
 describe("ErrorTest", () => {
   it("full_message uses default format", () => {
@@ -208,5 +210,46 @@ describe("ErrorTest", () => {
     const e = new Errors(null);
     e.add("name", "blank");
     expect(e.fullMessages[0]).toBe("Name can't be blank");
+  });
+
+  it("generateMessage walks ancestor lookup chain", () => {
+    class Parent extends Model {
+      static i18nScope = "activemodel";
+      static lookupAncestors() {
+        return [this];
+      }
+    }
+    class Child extends Parent {
+      static override lookupAncestors() {
+        return [this, Parent];
+      }
+    }
+
+    I18n.storeTranslations("en", {
+      activemodel: {
+        errors: {
+          models: {
+            parent: { attributes: { name: { blank: "parent-level blank" } } },
+          },
+        },
+      },
+    });
+
+    try {
+      const record = new Child({ name: "" }) as any;
+      const msg = ModelError.generateMessage("name", "blank", record);
+      expect(msg).toBe("parent-level blank");
+    } finally {
+      I18n.reset();
+    }
+  });
+
+  it("generateMessage falls back to activemodel scope for non-activemodel i18nScope", () => {
+    class ARModel extends Model {
+      static i18nScope = "activerecord";
+    }
+    const record = new ARModel({}) as any;
+    const msg = ModelError.generateMessage("name", "blank", record);
+    expect(msg).toBe("can't be blank");
   });
 });
