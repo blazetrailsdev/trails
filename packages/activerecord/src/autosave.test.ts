@@ -11,6 +11,7 @@ import {
   isMarkedForDestruction,
   isDestroyable,
 } from "./autosave-association.js";
+import { Associations } from "./associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -115,9 +116,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       writable: true,
       configurable: true,
     });
-    (Author as any)._associations = [
-      { type: "hasMany", name: "books", options: { autosave: true } },
-    ];
+    Associations.hasMany.call(Author, "books", { autosave: true });
 
     const author = await Author.create({ name: "Dean" });
     const book = new Book({ title: "My Book" });
@@ -160,9 +159,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     registerModel("Company", Company);
     registerModel("Account", Account);
 
-    (Company as any)._associations = [
-      { type: "hasOne", name: "account", options: { autosave: true } },
-    ];
+    Associations.hasOne.call(Company, "account", { autosave: true });
   });
 
   it("test_should_save_parent_but_not_invalid_child", async () => {
@@ -193,13 +190,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     registerModel("StrictAccount", StrictAccount);
 
     const company2 = new Company({ name: "Corp" });
-    (Company as any)._associations = [
-      {
-        type: "hasOne",
-        name: "strictAccount",
-        options: { autosave: true, className: "StrictAccount" },
-      },
-    ];
+    Associations.hasOne.call(Company, "strictAccount", {
+      autosave: true,
+      className: "StrictAccount",
+    });
 
     const badAccount = new StrictAccount({});
     (company2 as any)._cachedAssociations = new Map();
@@ -258,9 +252,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     registerModel("Post", Post);
     registerModel("Author", Author);
 
-    (Post as any)._associations = [
-      { type: "belongsTo", name: "author", options: { autosave: true } },
-    ];
+    Associations.belongsTo.call(Post, "author", { autosave: true });
   });
 
   it("test_should_save_parent_but_not_invalid_child", async () => {
@@ -333,9 +325,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     registerModel("Company", Company);
     registerModel("Employee", Employee);
 
-    (Company as any)._associations = [
-      { type: "hasMany", name: "employees", options: { autosave: true } },
-    ];
+    Associations.hasMany.call(Company, "employees", { autosave: true });
   });
 
   it("test_invalid_adding — parent fails to save when child is invalid", async () => {
@@ -418,7 +408,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     registerModel("Ship", Ship);
     registerModel("Part", Part);
 
-    (Ship as any)._associations = [{ type: "hasMany", name: "parts", options: { autosave: true } }];
+    Associations.hasMany.call(Ship, "parts", { autosave: true });
   });
 
   it("should destroy the associated models when marked for destruction", async () => {
@@ -466,9 +456,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     registerModel("Pirate", Pirate);
     registerModel("PirateShip", PirateShip);
 
-    (Pirate as any)._associations = [
-      { type: "hasOne", name: "pirateShip", options: { autosave: true } },
-    ];
+    Associations.hasOne.call(Pirate, "pirateShip", { autosave: true });
 
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await PirateShip.create({ name: "Black Pearl", pirate_id: pirate.id });

@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { association, loadHasMany } from "../associations.js";
+import { Associations, association, loadHasMany } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -78,108 +78,89 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     registerModel("DjMember", DjMember);
     registerModel("DjMemberType", DjMemberType);
 
-    (DjAuthor as any)._associations = [
-      {
-        type: "hasMany",
-        name: "djPosts",
-        options: { className: "DjPost", foreignKey: "dj_author_id" },
-      },
-      {
-        type: "hasMany",
-        name: "djComments",
-        options: { className: "DjComment", through: "djPosts", source: "djComments" },
-      },
-      {
-        type: "hasMany",
-        name: "noJoinsDjComments",
-        options: {
-          className: "DjComment",
-          through: "djPosts",
-          source: "djComments",
-          disableJoins: true,
-        },
-      },
-      {
-        type: "hasMany",
-        name: "djRatings",
-        options: { className: "DjRating", through: "djComments", source: "djRatings" },
-      },
-      {
-        type: "hasMany",
-        name: "noJoinsDjRatings",
-        options: {
-          className: "DjRating",
-          through: "djComments",
-          source: "djRatings",
-          disableJoins: true,
-        },
-      },
-      {
-        type: "hasMany",
-        name: "djMembers",
-        options: {
-          className: "DjMember",
-          through: "djComments",
-          source: "origin",
-          sourceType: "DjMember",
-        },
-      },
-      {
-        type: "hasMany",
-        name: "noJoinsDjMembers",
-        options: {
-          className: "DjMember",
-          through: "djComments",
-          source: "origin",
-          sourceType: "DjMember",
-          disableJoins: true,
-        },
-      },
-    ];
-    (DjPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "djAuthor",
-        options: { className: "DjAuthor", foreignKey: "dj_author_id" },
-      },
-      {
-        type: "hasMany",
-        name: "djComments",
-        options: { className: "DjComment", foreignKey: "dj_post_id" },
-      },
-    ];
-    (DjComment as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "djPost",
-        options: { className: "DjPost", foreignKey: "dj_post_id" },
-      },
-      {
-        type: "hasMany",
-        name: "djRatings",
-        options: { className: "DjRating", foreignKey: "dj_comment_id" },
-      },
-      {
-        type: "belongsTo",
-        name: "origin",
-        options: { className: "DjMember", foreignKey: "origin_id", polymorphic: true },
-      },
-    ];
-    (DjRating as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "djComment",
-        options: { className: "DjComment", foreignKey: "dj_comment_id" },
-      },
-    ];
-    (DjMember as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "djMemberType",
-        options: { className: "DjMemberType", foreignKey: "dj_member_type_id" },
-      },
-    ];
+    (DjAuthor as any)._associations = [];
+    (DjPost as any)._associations = [];
+    (DjComment as any)._associations = [];
+    (DjRating as any)._associations = [];
+    (DjMember as any)._associations = [];
     (DjMemberType as any)._associations = [];
+    Associations.hasMany.call(DjAuthor, "djPosts", {
+      className: "DjPost",
+      foreignKey: "dj_author_id",
+    });
+
+    Associations.hasMany.call(DjAuthor, "djComments", {
+      className: "DjComment",
+      through: "djPosts",
+      source: "djComments",
+    });
+
+    Associations.hasMany.call(DjAuthor, "noJoinsDjComments", {
+      className: "DjComment",
+      through: "djPosts",
+      source: "djComments",
+      disableJoins: true,
+    });
+
+    Associations.hasMany.call(DjAuthor, "djRatings", {
+      className: "DjRating",
+      through: "djComments",
+      source: "djRatings",
+    });
+
+    Associations.hasMany.call(DjAuthor, "noJoinsDjRatings", {
+      className: "DjRating",
+      through: "djComments",
+      source: "djRatings",
+      disableJoins: true,
+    });
+
+    Associations.hasMany.call(DjAuthor, "djMembers", {
+      className: "DjMember",
+      through: "djComments",
+      source: "origin",
+      sourceType: "DjMember",
+    });
+
+    Associations.hasMany.call(DjAuthor, "noJoinsDjMembers", {
+      className: "DjMember",
+      through: "djComments",
+      source: "origin",
+      sourceType: "DjMember",
+      disableJoins: true,
+    });
+    Associations.belongsTo.call(DjPost, "djAuthor", {
+      className: "DjAuthor",
+      foreignKey: "dj_author_id",
+    });
+
+    Associations.hasMany.call(DjPost, "djComments", {
+      className: "DjComment",
+      foreignKey: "dj_post_id",
+    });
+    Associations.belongsTo.call(DjComment, "djPost", {
+      className: "DjPost",
+      foreignKey: "dj_post_id",
+    });
+
+    Associations.hasMany.call(DjComment, "djRatings", {
+      className: "DjRating",
+      foreignKey: "dj_comment_id",
+    });
+
+    Associations.belongsTo.call(DjComment, "origin", {
+      className: "DjMember",
+      foreignKey: "origin_id",
+      polymorphic: true,
+    });
+    Associations.belongsTo.call(DjRating, "djComment", {
+      className: "DjComment",
+      foreignKey: "dj_comment_id",
+    });
+    Associations.belongsTo.call(DjMember, "djMemberType", {
+      className: "DjMemberType",
+      foreignKey: "dj_member_type_id",
+    });
   });
 
   async function setupData() {

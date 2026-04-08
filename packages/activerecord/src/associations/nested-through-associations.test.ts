@@ -5,7 +5,13 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { loadBelongsTo, loadHasOne, loadHasMany, loadHasManyThrough } from "../associations.js";
+import {
+  Associations,
+  loadBelongsTo,
+  loadHasOne,
+  loadHasMany,
+  loadHasManyThrough,
+} from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -115,29 +121,24 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has many with has many through source reflection preload", async () => {
     // Author -> posts -> taggings -> tags (nested through, preload strategy)
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "DHH" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     const tag = await Tag.create({ name: "ruby" });
@@ -151,29 +152,24 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has many with has many through source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "DHH" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     const tag = await Tag.create({ name: "ruby" });
@@ -217,21 +213,17 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has many through with has many source reflection preload", async () => {
     // Author -> posts -> taggings (nested through, source is hasMany not through)
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", through: "posts", source: "taggings" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "taggings", {
+      className: "Tagging",
+      through: "posts",
+      source: "taggings",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
     const author = await Author.create({ name: "Nested" });
     const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
     const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
@@ -247,21 +239,17 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has many through with has many source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", through: "posts", source: "taggings" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "taggings", {
+      className: "Tagging",
+      through: "posts",
+      source: "taggings",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
     const author = await Author.create({ name: "Nested" });
     const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
     const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
@@ -300,29 +288,17 @@ describe("NestedThroughAssociationsTest", () => {
     // Author -> posts (hasMany) -> tagging (hasOne per post) -> tag (belongsTo)
     // Author has_many :tags, through: :posts, source: :tag
     // Post has_one :tag, through: :tagging
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tag" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasOne",
-        name: "tagging",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasOne",
-        name: "tag",
-        options: { className: "Tag", through: "tagging", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tag",
+    });
+    Associations.hasOne.call(Post, "tagging", { className: "Tagging", foreignKey: "taggable_id" });
+
+    Associations.hasOne.call(Post, "tag", { className: "Tag", through: "tagging", source: "tag" });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "HasOneThrough" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     const tag = await Tag.create({ name: "ruby" });
@@ -336,29 +312,17 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has one with has one through source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tag" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasOne",
-        name: "tagging",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasOne",
-        name: "tag",
-        options: { className: "Tag", through: "tagging", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tag",
+    });
+    Associations.hasOne.call(Post, "tagging", { className: "Tagging", foreignKey: "taggable_id" });
+
+    Associations.hasOne.call(Post, "tag", { className: "Tag", through: "tagging", source: "tag" });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Test" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     const tag = await Tag.create({ name: "ruby" });
@@ -401,29 +365,17 @@ describe("NestedThroughAssociationsTest", () => {
     // Author -> posts (hasMany) -> each post has_one tagging -> tag (belongsTo on tagging)
     // Post has_one :tag, through: :tagging (source is belongsTo, a hasOne through)
     // Author has_many :tags, through: :posts, source: :tag
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tag" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasOne",
-        name: "tagging",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasOne",
-        name: "tag",
-        options: { className: "Tag", through: "tagging", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tag",
+    });
+    Associations.hasOne.call(Post, "tagging", { className: "Tagging", foreignKey: "taggable_id" });
+
+    Associations.hasOne.call(Post, "tag", { className: "Tag", through: "tagging", source: "tag" });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "NestedHasOne" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     const tag = await Tag.create({ name: "nested" });
@@ -437,29 +389,17 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has one through with has one source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tag" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasOne",
-        name: "tagging",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasOne",
-        name: "tag",
-        options: { className: "Tag", through: "tagging", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tag",
+    });
+    Associations.hasOne.call(Post, "tagging", { className: "Tagging", foreignKey: "taggable_id" });
+
+    Associations.hasOne.call(Post, "tag", { className: "Tag", through: "tagging", source: "tag" });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Test" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     const tag = await Tag.create({ name: "nested" });
@@ -496,29 +436,24 @@ describe("NestedThroughAssociationsTest", () => {
   it("has many through has one with has many through source reflection preload", async () => {
     // Author -> posts -> taggings (where Post has_many :tags, through: :taggings)
     // Author has_many :tags through posts, source is a through association
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "MixedThrough" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     const t1 = await Tag.create({ name: "mix1" });
@@ -533,29 +468,24 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has one with has many through source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Test" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     const t1 = await Tag.create({ name: "mix1" });
@@ -595,21 +525,17 @@ describe("NestedThroughAssociationsTest", () => {
   it("has many through has one through with has many source reflection preload", async () => {
     // Author -> posts -> taggings (Post has_many :taggings directly)
     // Author has_many :taggings, through: :posts
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", through: "posts", source: "taggings" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "taggings", {
+      className: "Tagging",
+      through: "posts",
+      source: "taggings",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
     const author = await Author.create({ name: "HasOneHasMany" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     const t1 = await Tag.create({ name: "s1" });
@@ -626,21 +552,17 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has one through with has many source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", through: "posts", source: "taggings" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "taggings", {
+      className: "Tagging",
+      through: "posts",
+      source: "taggings",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
     const author = await Author.create({ name: "Test" });
     const post = await Post.create({ author_id: author.id, title: "T", body: "B" });
     await Tagging.create({ tag_id: 1, taggable_id: post.id, taggable_type: "Post" });
@@ -688,29 +610,24 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has many with has and belongs to many source reflection preload", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "HABTMSource" });
     const post = await Post.create({ author_id: author.id, title: "HS", body: "B" });
     const t1 = await Tag.create({ name: "hs_tag1" });
@@ -728,29 +645,24 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has many with has and belongs to many source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Test" });
     const post = await Post.create({ author_id: author.id, title: "HS", body: "B" });
     const t1 = await Tag.create({ name: "hs_tag1" });
@@ -793,25 +705,14 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has and belongs to many with has many source reflection preload", async () => {
-    (Tag as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "tag_id" },
-      },
-      {
-        type: "hasMany",
-        name: "posts",
-        options: { className: "Post", through: "taggings", source: "post" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "post",
-        options: { className: "Post", foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasMany.call(Tag, "taggings", { className: "Tagging", foreignKey: "tag_id" });
+
+    Associations.hasMany.call(Tag, "posts", {
+      className: "Post",
+      through: "taggings",
+      source: "post",
+    });
+    Associations.belongsTo.call(Tagging, "post", { className: "Post", foreignKey: "taggable_id" });
     const tag = await Tag.create({ name: "habtm_hm_tag" });
     const post1 = await Post.create({ title: "HM1", body: "B" });
     const post2 = await Post.create({ title: "HM2", body: "B" });
@@ -828,25 +729,14 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has and belongs to many with has many source reflection preload via joins", async () => {
-    (Tag as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "tag_id" },
-      },
-      {
-        type: "hasMany",
-        name: "posts",
-        options: { className: "Post", through: "taggings", source: "post" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "post",
-        options: { className: "Post", foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasMany.call(Tag, "taggings", { className: "Tagging", foreignKey: "tag_id" });
+
+    Associations.hasMany.call(Tag, "posts", {
+      className: "Post",
+      through: "taggings",
+      source: "post",
+    });
+    Associations.belongsTo.call(Tagging, "post", { className: "Post", foreignKey: "taggable_id" });
     const tag = await Tag.create({ name: "test" });
     const post1 = await Post.create({ title: "HM1", body: "B" });
     const post2 = await Post.create({ title: "HM2", body: "B" });
@@ -896,29 +786,24 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has many with has many through habtm source reflection preload", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "HABTMChain" });
     const post = await Post.create({ author_id: author.id, title: "HC", body: "B" });
     const tag1 = await Tag.create({ name: "hc1" });
@@ -935,29 +820,24 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has many with has many through habtm source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Test" });
     const post = await Post.create({ author_id: author.id, title: "HC", body: "B" });
     const t1 = await Tag.create({ name: "hc1" });
@@ -1001,29 +881,24 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has many through with belongs to source reflection preload", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "BelongsToSource" });
     const post = await Post.create({ author_id: author.id, title: "T1", body: "B" });
     const tag = await Tag.create({ name: "bt_tag" });
@@ -1037,29 +912,24 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through has many through with belongs to source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Test" });
     const post = await Post.create({ author_id: author.id, title: "T1", body: "B" });
     const tag = await Tag.create({ name: "bt_tag" });
@@ -1100,26 +970,19 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through belongs to with has many through source reflection preload", async () => {
     // Post belongs_to Author -> Author has_many tags through posts -> taggings -> tags
-    (Post as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "author",
-        options: { className: "Author", foreignKey: "author_id" },
-      },
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.belongsTo.call(Post, "author", { className: "Author", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "BtThrough" });
     const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
     const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
@@ -1134,26 +997,19 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through belongs to with has many through source reflection preload via joins", async () => {
-    (Post as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "author",
-        options: { className: "Author", foreignKey: "author_id" },
-      },
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.belongsTo.call(Post, "author", { className: "Author", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Test" });
     const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
     const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
@@ -1199,29 +1055,13 @@ describe("NestedThroughAssociationsTest", () => {
     // Author has_one :post -> Post has_one :tagging -> Tagging belongs_to :tag
     // Post has_one :tag, through: :tagging
     // Author has_one :tag, through: :post, source: :tag
-    (Author as any)._associations = [
-      { type: "hasOne", name: "post", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasOne",
-        name: "tag",
-        options: { className: "Tag", through: "post", source: "tag" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasOne",
-        name: "tagging",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasOne",
-        name: "tag",
-        options: { className: "Tag", through: "tagging", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasOne.call(Author, "post", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasOne.call(Author, "tag", { className: "Tag", through: "post", source: "tag" });
+    Associations.hasOne.call(Post, "tagging", { className: "Tagging", foreignKey: "taggable_id" });
+
+    Associations.hasOne.call(Post, "tag", { className: "Tag", through: "tagging", source: "tag" });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "HasOneChain" });
     const post = await Post.create({ author_id: author.id, title: "HOC", body: "B" });
     const tag = await Tag.create({ name: "hoc_tag" });
@@ -1235,29 +1075,13 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has one through has one with has one through source reflection preload via joins", async () => {
-    (Author as any)._associations = [
-      { type: "hasOne", name: "post", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasOne",
-        name: "tag",
-        options: { className: "Tag", through: "post", source: "tag" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasOne",
-        name: "tagging",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasOne",
-        name: "tag",
-        options: { className: "Tag", through: "tagging", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasOne.call(Author, "post", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasOne.call(Author, "tag", { className: "Tag", through: "post", source: "tag" });
+    Associations.hasOne.call(Post, "tagging", { className: "Tagging", foreignKey: "taggable_id" });
+
+    Associations.hasOne.call(Post, "tag", { className: "Tag", through: "tagging", source: "tag" });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Test" });
     const post = await Post.create({ author_id: author.id, title: "HOC", body: "B" });
     const tag = await Tag.create({ name: "hoc_tag" });
@@ -1297,21 +1121,14 @@ describe("NestedThroughAssociationsTest", () => {
   it("has one through has one through with belongs to source reflection preload", async () => {
     // Tag has_one :tagging -> Tagging belongs_to :post
     // Tag has_one :post, through: :tagging
-    (Tag as any)._associations = [
-      { type: "hasOne", name: "tagging", options: { className: "Tagging", foreignKey: "tag_id" } },
-      {
-        type: "hasOne",
-        name: "post",
-        options: { className: "Post", through: "tagging", source: "post" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "post",
-        options: { className: "Post", foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasOne.call(Tag, "tagging", { className: "Tagging", foreignKey: "tag_id" });
+
+    Associations.hasOne.call(Tag, "post", {
+      className: "Post",
+      through: "tagging",
+      source: "post",
+    });
+    Associations.belongsTo.call(Tagging, "post", { className: "Post", foreignKey: "taggable_id" });
     const author = await Author.create({ name: "BelongsChain" });
     const post = await Post.create({ author_id: author.id, title: "BC", body: "B" });
     const tag = await Tag.create({ name: "bc_tag" });
@@ -1325,21 +1142,14 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has one through has one through with belongs to source reflection preload via joins", async () => {
-    (Tag as any)._associations = [
-      { type: "hasOne", name: "tagging", options: { className: "Tagging", foreignKey: "tag_id" } },
-      {
-        type: "hasOne",
-        name: "post",
-        options: { className: "Post", through: "tagging", source: "post" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "post",
-        options: { className: "Post", foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasOne.call(Tag, "tagging", { className: "Tagging", foreignKey: "tag_id" });
+
+    Associations.hasOne.call(Tag, "post", {
+      className: "Post",
+      through: "tagging",
+      source: "post",
+    });
+    Associations.belongsTo.call(Tagging, "post", { className: "Post", foreignKey: "taggable_id" });
     const author = await Author.create({ name: "Test" });
     const post = await Post.create({ author_id: author.id, title: "BC", body: "B" });
     const tag = await Tag.create({ name: "bc_tag" });
@@ -1355,29 +1165,24 @@ describe("NestedThroughAssociationsTest", () => {
   it("distinct has many through a has many through association on source reflection", async () => {
     // Author -> posts -> taggings -> tags, but same tag appears via multiple taggings
     // distinct_tags should deduplicate
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "posts", source: "tags" },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+
+    Associations.hasMany.call(Author, "tags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "David" });
     const post1 = await Post.create({ author_id: author.id, title: "P1", body: "B" });
     const post2 = await Post.create({ author_id: author.id, title: "P2", body: "B" });
@@ -1420,25 +1225,20 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (FkThrAuthor as any)._associations = [
-      {
-        type: "hasMany",
-        name: "fkThrPosts",
-        options: { className: "FkThrPost", foreignKey: "writer_id" },
-      },
-      {
-        type: "hasManyThrough",
-        name: "fkThrComments",
-        options: { through: "fkThrPosts", source: "fkThrComments", className: "FkThrComment" },
-      },
-    ];
-    (FkThrPost as any)._associations = [
-      {
-        type: "hasMany",
-        name: "fkThrComments",
-        options: { className: "FkThrComment", foreignKey: "fk_thr_post_id" },
-      },
-    ];
+    Associations.hasMany.call(FkThrAuthor, "fkThrPosts", {
+      className: "FkThrPost",
+      foreignKey: "writer_id",
+    });
+
+    Associations.hasMany.call(FkThrAuthor, "fkThrComments", {
+      through: "fkThrPosts",
+      source: "fkThrComments",
+      className: "FkThrComment",
+    });
+    Associations.hasMany.call(FkThrPost, "fkThrComments", {
+      className: "FkThrComment",
+      foreignKey: "fk_thr_post_id",
+    });
     registerModel("FkThrAuthor", FkThrAuthor);
     registerModel("FkThrPost", FkThrPost);
     registerModel("FkThrComment", FkThrComment);
@@ -1477,25 +1277,20 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (FkSrcAuthor as any)._associations = [
-      {
-        type: "hasMany",
-        name: "fkSrcPosts",
-        options: { className: "FkSrcPost", foreignKey: "fk_src_author_id" },
-      },
-      {
-        type: "hasManyThrough",
-        name: "fkSrcComments",
-        options: { through: "fkSrcPosts", source: "fkSrcComments", className: "FkSrcComment" },
-      },
-    ];
-    (FkSrcPost as any)._associations = [
-      {
-        type: "hasMany",
-        name: "fkSrcComments",
-        options: { className: "FkSrcComment", foreignKey: "article_id" },
-      },
-    ];
+    Associations.hasMany.call(FkSrcAuthor, "fkSrcPosts", {
+      className: "FkSrcPost",
+      foreignKey: "fk_src_author_id",
+    });
+
+    Associations.hasMany.call(FkSrcAuthor, "fkSrcComments", {
+      through: "fkSrcPosts",
+      source: "fkSrcComments",
+      className: "FkSrcComment",
+    });
+    Associations.hasMany.call(FkSrcPost, "fkSrcComments", {
+      className: "FkSrcComment",
+      foreignKey: "article_id",
+    });
     registerModel("FkSrcAuthor", FkSrcAuthor);
     registerModel("FkSrcPost", FkSrcPost);
     registerModel("FkSrcComment", FkSrcComment);
@@ -1543,29 +1338,20 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (StiThrClub as any)._associations = [
-      {
-        type: "hasMany",
-        name: "stiThrMemberships",
-        options: { className: "StiThrMembership", foreignKey: "sti_thr_club_id" },
-      },
-      {
-        type: "hasManyThrough",
-        name: "stiThrMembers",
-        options: {
-          through: "stiThrMemberships",
-          source: "stiThrMember",
-          className: "StiThrMember",
-        },
-      },
-    ];
-    (StiThrMembership as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "stiThrMember",
-        options: { className: "StiThrMember", foreignKey: "sti_thr_member_id" },
-      },
-    ];
+    Associations.hasMany.call(StiThrClub, "stiThrMemberships", {
+      className: "StiThrMembership",
+      foreignKey: "sti_thr_club_id",
+    });
+
+    Associations.hasMany.call(StiThrClub, "stiThrMembers", {
+      through: "stiThrMemberships",
+      source: "stiThrMember",
+      className: "StiThrMember",
+    });
+    Associations.belongsTo.call(StiThrMembership, "stiThrMember", {
+      className: "StiThrMember",
+      foreignKey: "sti_thr_member_id",
+    });
     registerModel("StiThrClub", StiThrClub);
     registerModel("StiThrMembership", StiThrMembership);
     registerModel("StiThrMember", StiThrMember);
@@ -1617,37 +1403,30 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (NwrAuthor as any)._associations = [
-      {
-        type: "hasMany",
-        name: "nwrPosts",
-        options: { className: "NwrPost", foreignKey: "nwr_author_id" },
-      },
-      {
-        type: "hasManyThrough",
-        name: "nwrTaggings",
-        options: { through: "nwrPosts", source: "nwrTaggings", className: "NwrTagging" },
-      },
-      {
-        type: "hasManyThrough",
-        name: "nwrTags",
-        options: { through: "nwrTaggings", source: "nwrTag", className: "NwrTag" },
-      },
-    ];
-    (NwrPost as any)._associations = [
-      {
-        type: "hasMany",
-        name: "nwrTaggings",
-        options: { className: "NwrTagging", foreignKey: "nwr_post_id" },
-      },
-    ];
-    (NwrTagging as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "nwrTag",
-        options: { className: "NwrTag", foreignKey: "nwr_tag_id" },
-      },
-    ];
+    Associations.hasMany.call(NwrAuthor, "nwrPosts", {
+      className: "NwrPost",
+      foreignKey: "nwr_author_id",
+    });
+
+    Associations.hasMany.call(NwrAuthor, "nwrTaggings", {
+      through: "nwrPosts",
+      source: "nwrTaggings",
+      className: "NwrTagging",
+    });
+
+    Associations.hasMany.call(NwrAuthor, "nwrTags", {
+      through: "nwrTaggings",
+      source: "nwrTag",
+      className: "NwrTag",
+    });
+    Associations.hasMany.call(NwrPost, "nwrTaggings", {
+      className: "NwrTagging",
+      foreignKey: "nwr_post_id",
+    });
+    Associations.belongsTo.call(NwrTagging, "nwrTag", {
+      className: "NwrTag",
+      foreignKey: "nwr_tag_id",
+    });
     registerModel("NwrAuthor", NwrAuthor);
     registerModel("NwrPost", NwrPost);
     registerModel("NwrTagging", NwrTagging);
@@ -1687,30 +1466,26 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (NhoAuthor as any)._associations = [
-      {
-        type: "hasOne",
-        name: "nhoPost",
-        options: { className: "NhoPost", foreignKey: "nho_author_id" },
-      },
-      {
-        type: "hasOneThrough",
-        name: "nhoComment",
-        options: { through: "nhoPost", source: "nhoComment", className: "NhoComment" },
-      },
-      {
-        type: "hasOneThrough",
-        name: "nhoNestedComment",
-        options: { through: "nhoComment", source: "nhoComment", className: "NhoComment" },
-      },
-    ];
-    (NhoPost as any)._associations = [
-      {
-        type: "hasOne",
-        name: "nhoComment",
-        options: { className: "NhoComment", foreignKey: "nho_post_id" },
-      },
-    ];
+    Associations.hasOne.call(NhoAuthor, "nhoPost", {
+      className: "NhoPost",
+      foreignKey: "nho_author_id",
+    });
+
+    Associations.hasOne.call(NhoAuthor, "nhoComment", {
+      through: "nhoPost",
+      source: "nhoComment",
+      className: "NhoComment",
+    });
+
+    Associations.hasOne.call(NhoAuthor, "nhoNestedComment", {
+      through: "nhoComment",
+      source: "nhoComment",
+      className: "NhoComment",
+    });
+    Associations.hasOne.call(NhoPost, "nhoComment", {
+      className: "NhoComment",
+      foreignKey: "nho_post_id",
+    });
     registerModel("NhoAuthor", NhoAuthor);
     registerModel("NhoPost", NhoPost);
     registerModel("NhoComment", NhoComment);
@@ -1729,34 +1504,24 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("nested has many through with conditions on through associations", async () => {
     // Author -> posts (scoped to title LIKE 'Misc%') -> taggings -> tags
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "miscTags",
-        options: {
-          className: "Tag",
-          through: "posts",
-          source: "tags",
-          scope: (rel: any) => rel,
-        },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "miscTags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+      scope: (rel: any) => rel,
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Bob" });
     const miscPost = await Post.create({ author_id: author.id, title: "Misc Post", body: "B" });
     const otherPost = await Post.create({ author_id: author.id, title: "Other", body: "B" });
@@ -1789,34 +1554,24 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("nested has many through with conditions on through associations preload", async () => {
     // Scope on the outer through filters tags to only "blue" ones
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "blueThroughTags",
-        options: {
-          className: "Tag",
-          through: "posts",
-          source: "tags",
-          scope: (rel: any) => rel.where({ name: "blue" }),
-        },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "blueThroughTags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+      scope: (rel: any) => rel.where({ name: "blue" }),
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Bob" });
     const post = await Post.create({ author_id: author.id, title: "Misc", body: "B" });
     const blueTag = await Tag.create({ name: "blue" });
@@ -1836,34 +1591,24 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("nested has many through with conditions on source associations", async () => {
     // Same as above but conditions are on source (tag) side
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "blueTags",
-        options: {
-          className: "Tag",
-          through: "posts",
-          source: "tags",
-          scope: (rel: any) => rel.where({ name: "blue" }),
-        },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "blueTags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+      scope: (rel: any) => rel.where({ name: "blue" }),
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Bob" });
     const post = await Post.create({ author_id: author.id, title: "P1", body: "B" });
     const blueTag = await Tag.create({ name: "blue" });
@@ -1879,34 +1624,24 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("nested has many through with conditions on source associations preload", async () => {
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-      {
-        type: "hasMany",
-        name: "blueTags",
-        options: {
-          className: "Tag",
-          through: "posts",
-          source: "tags",
-          scope: (rel: any) => rel.where({ name: "blue" }),
-        },
-      },
-    ];
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "taggings",
-        options: { className: "Tagging", foreignKey: "taggable_id" },
-      },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { className: "Tag", through: "taggings", source: "tag" },
-      },
-    ];
-    (Tagging as any)._associations = [
-      { type: "belongsTo", name: "tag", options: { className: "Tag", foreignKey: "tag_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    Associations.hasMany.call(Author, "blueTags", {
+      className: "Tag",
+      through: "posts",
+      source: "tags",
+      scope: (rel: any) => rel.where({ name: "blue" }),
+    });
+    Associations.hasMany.call(Post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+    });
+
+    Associations.hasMany.call(Post, "tags", {
+      className: "Tag",
+      through: "taggings",
+      source: "tag",
+    });
+    Associations.belongsTo.call(Tagging, "tag", { className: "Tag", foreignKey: "tag_id" });
     const author = await Author.create({ name: "Bob" });
     const post = await Post.create({ author_id: author.id, title: "P1", body: "B" });
     const blueTag = await Tag.create({ name: "blue" });
@@ -1953,37 +1688,30 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (NfkOrganization as any)._associations = [
-      {
-        type: "hasMany",
-        name: "nfkAuthors",
-        options: { className: "NfkAuthor", foreignKey: "organization_id" },
-      },
-      {
-        type: "hasMany",
-        name: "nfkCategories",
-        options: { className: "NfkCategory", through: "nfkAuthors", source: "nfkCategories" },
-      },
-    ];
-    (NfkAuthor as any)._associations = [
-      {
-        type: "hasMany",
-        name: "nfkEssays",
-        options: { className: "NfkEssay", foreignKey: "writer_id" },
-      },
-      {
-        type: "hasMany",
-        name: "nfkCategories",
-        options: { className: "NfkCategory", through: "nfkEssays", source: "nfkCategory" },
-      },
-    ];
-    (NfkEssay as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "nfkCategory",
-        options: { className: "NfkCategory", foreignKey: "nfk_category_id" },
-      },
-    ];
+    Associations.hasMany.call(NfkOrganization, "nfkAuthors", {
+      className: "NfkAuthor",
+      foreignKey: "organization_id",
+    });
+
+    Associations.hasMany.call(NfkOrganization, "nfkCategories", {
+      className: "NfkCategory",
+      through: "nfkAuthors",
+      source: "nfkCategories",
+    });
+    Associations.hasMany.call(NfkAuthor, "nfkEssays", {
+      className: "NfkEssay",
+      foreignKey: "writer_id",
+    });
+
+    Associations.hasMany.call(NfkAuthor, "nfkCategories", {
+      className: "NfkCategory",
+      through: "nfkEssays",
+      source: "nfkCategory",
+    });
+    Associations.belongsTo.call(NfkEssay, "nfkCategory", {
+      className: "NfkCategory",
+      foreignKey: "nfk_category_id",
+    });
     registerModel("NfkOrganization", NfkOrganization);
     registerModel("NfkAuthor", NfkAuthor);
     registerModel("NfkEssay", NfkEssay);
@@ -2031,42 +1759,31 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (PhmtHotel as any)._associations = [
-      {
-        type: "hasMany",
-        name: "phmtDepartments",
-        options: { className: "PhmtDepartment", foreignKey: "phmt_hotel_id" },
-      },
-      {
-        type: "hasMany",
-        name: "phmtChefs",
-        options: { className: "PhmtChef", through: "phmtDepartments", source: "phmtChefs" },
-      },
-      {
-        type: "hasMany",
-        name: "phmtCakeDesigners",
-        options: {
-          className: "PhmtCakeDesigner",
-          through: "phmtChefs",
-          source: "employable",
-          sourceType: "PhmtCakeDesigner",
-        },
-      },
-    ];
-    (PhmtDepartment as any)._associations = [
-      {
-        type: "hasMany",
-        name: "phmtChefs",
-        options: { className: "PhmtChef", foreignKey: "phmt_department_id" },
-      },
-    ];
-    (PhmtChef as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "employable",
-        options: { polymorphic: true, foreignKey: "employable_id" },
-      },
-    ];
+    Associations.hasMany.call(PhmtHotel, "phmtDepartments", {
+      className: "PhmtDepartment",
+      foreignKey: "phmt_hotel_id",
+    });
+
+    Associations.hasMany.call(PhmtHotel, "phmtChefs", {
+      className: "PhmtChef",
+      through: "phmtDepartments",
+      source: "phmtChefs",
+    });
+
+    Associations.hasMany.call(PhmtHotel, "phmtCakeDesigners", {
+      className: "PhmtCakeDesigner",
+      through: "phmtChefs",
+      source: "employable",
+      sourceType: "PhmtCakeDesigner",
+    });
+    Associations.hasMany.call(PhmtDepartment, "phmtChefs", {
+      className: "PhmtChef",
+      foreignKey: "phmt_department_id",
+    });
+    Associations.belongsTo.call(PhmtChef, "employable", {
+      polymorphic: true,
+      foreignKey: "employable_id",
+    });
     registerModel("PhmtHotel", PhmtHotel);
     registerModel("PhmtDepartment", PhmtDepartment);
     registerModel("PhmtChef", PhmtChef);
@@ -2117,25 +1834,20 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (PhmtHotel2 as any)._associations = [
-      {
-        type: "hasMany",
-        name: "phmtDepartment2s",
-        options: { className: "PhmtDepartment2", foreignKey: "phmt_hotel2_id" },
-      },
-      {
-        type: "hasMany",
-        name: "phmtChef2s",
-        options: { className: "PhmtChef2", through: "phmtDepartment2s", source: "phmtChef2s" },
-      },
-    ];
-    (PhmtDepartment2 as any)._associations = [
-      {
-        type: "hasMany",
-        name: "phmtChef2s",
-        options: { className: "PhmtChef2", foreignKey: "phmt_department2_id" },
-      },
-    ];
+    Associations.hasMany.call(PhmtHotel2, "phmtDepartment2s", {
+      className: "PhmtDepartment2",
+      foreignKey: "phmt_hotel2_id",
+    });
+
+    Associations.hasMany.call(PhmtHotel2, "phmtChef2s", {
+      className: "PhmtChef2",
+      through: "phmtDepartment2s",
+      source: "phmtChef2s",
+    });
+    Associations.hasMany.call(PhmtDepartment2, "phmtChef2s", {
+      className: "PhmtChef2",
+      foreignKey: "phmt_department2_id",
+    });
     registerModel("PhmtHotel2", PhmtHotel2);
     registerModel("PhmtDepartment2", PhmtDepartment2);
     registerModel("PhmtChef2", PhmtChef2);

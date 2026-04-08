@@ -537,14 +537,13 @@ describe("HasManyThroughAssociations", () => {
     registerModel(Appointment);
     registerModel(Patient);
 
-    (Doctor as any)._associations = [
-      { type: "hasMany", name: "appointments", options: { className: "Appointment" } },
-      {
-        type: "hasMany",
-        name: "patients",
-        options: { through: "appointments", className: "Patient", source: "patient" },
-      },
-    ];
+    Associations.hasMany.call(Doctor, "appointments", { className: "Appointment" });
+
+    Associations.hasMany.call(Doctor, "patients", {
+      through: "appointments",
+      className: "Patient",
+      source: "patient",
+    });
   });
 
   // Rails: test_has_many_through
@@ -636,9 +635,7 @@ describe("CollectionProxy", () => {
     Player.adapter = adapter;
     registerModel(Team);
     registerModel(Player);
-    (Team as any)._associations = [
-      { type: "hasMany", name: "players", options: { className: "Player", foreignKey: "team_id" } },
-    ];
+    Associations.hasMany.call(Team, "players", { className: "Player", foreignKey: "team_id" });
   });
 
   // Rails: test_build
@@ -824,13 +821,11 @@ describe("DependentAssociations", () => {
         this.adapter = adapter;
       }
     }
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "comments",
-        options: { dependent: "destroy", className: "Comment", foreignKey: "post_id" },
-      },
-    ];
+    Associations.hasMany.call(Post, "comments", {
+      dependent: "destroy",
+      className: "Comment",
+      foreignKey: "post_id",
+    });
     registerModel(Post);
     registerModel(Comment);
 
@@ -857,13 +852,11 @@ describe("DependentAssociations", () => {
         this.adapter = adapter;
       }
     }
-    (Item as any)._associations = [
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { dependent: "delete", className: "Tag", foreignKey: "item_id" },
-      },
-    ];
+    Associations.hasMany.call(Item, "tags", {
+      dependent: "delete",
+      className: "Tag",
+      foreignKey: "item_id",
+    });
     registerModel(Item);
     registerModel(Tag);
 
@@ -888,13 +881,11 @@ describe("DependentAssociations", () => {
         this.adapter = adapter;
       }
     }
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "comments",
-        options: { dependent: "nullify", className: "Comment", foreignKey: "post_id" },
-      },
-    ];
+    Associations.hasMany.call(Post, "comments", {
+      dependent: "nullify",
+      className: "Comment",
+      foreignKey: "post_id",
+    });
     registerModel(Post);
     registerModel(Comment);
 
@@ -921,17 +912,11 @@ describe("DependentAssociations", () => {
         this.adapter = adapter;
       }
     }
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "comments",
-        options: {
-          dependent: "restrictWithException",
-          className: "Comment",
-          foreignKey: "post_id",
-        },
-      },
-    ];
+    Associations.hasMany.call(Post, "comments", {
+      dependent: "restrictWithException",
+      className: "Comment",
+      foreignKey: "post_id",
+    });
     registerModel(Post);
     registerModel(Comment);
 
@@ -955,17 +940,11 @@ describe("DependentAssociations", () => {
         this.adapter = adapter;
       }
     }
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "comments",
-        options: {
-          dependent: "restrictWithException",
-          className: "Comment",
-          foreignKey: "post_id",
-        },
-      },
-    ];
+    Associations.hasMany.call(Post, "comments", {
+      dependent: "restrictWithException",
+      className: "Comment",
+      foreignKey: "post_id",
+    });
     registerModel(Post);
     registerModel(Comment);
 
@@ -988,13 +967,11 @@ describe("DependentAssociations", () => {
         this.adapter = adapter;
       }
     }
-    (User as any)._associations = [
-      {
-        type: "hasOne",
-        name: "profile",
-        options: { dependent: "destroy", className: "Profile", foreignKey: "user_id" },
-      },
-    ];
+    Associations.hasOne.call(User, "profile", {
+      dependent: "destroy",
+      className: "Profile",
+      foreignKey: "user_id",
+    });
     registerModel(User);
     registerModel(Profile);
 
@@ -1019,13 +996,11 @@ describe("DependentAssociations", () => {
         this.adapter = adapter;
       }
     }
-    (User as any)._associations = [
-      {
-        type: "hasOne",
-        name: "profile",
-        options: { dependent: "nullify", className: "Profile", foreignKey: "user_id" },
-      },
-    ];
+    Associations.hasOne.call(User, "profile", {
+      dependent: "nullify",
+      className: "Profile",
+      foreignKey: "user_id",
+    });
     registerModel(User);
     registerModel(Profile);
 
@@ -1050,17 +1025,11 @@ describe("DependentAssociations", () => {
         this.adapter = adapter;
       }
     }
-    (User as any)._associations = [
-      {
-        type: "hasOne",
-        name: "profile",
-        options: {
-          dependent: "restrictWithException",
-          className: "Profile",
-          foreignKey: "user_id",
-        },
-      },
-    ];
+    Associations.hasOne.call(User, "profile", {
+      dependent: "restrictWithException",
+      className: "Profile",
+      foreignKey: "user_id",
+    });
     registerModel(User);
     registerModel(Profile);
 
@@ -1077,9 +1046,7 @@ describe("DependentAssociations", () => {
         this.adapter = adapter;
       }
     }
-    (Post as any)._associations = [
-      { type: "hasMany", name: "comments", options: { className: "Comment" } },
-    ];
+    Associations.hasMany.call(Post, "comments", { className: "Comment" });
     registerModel(Post);
     const post = await Post.create({ title: "Safe" });
     // Should not throw
@@ -1703,13 +1670,11 @@ describe("Rails-guided: association features", () => {
         this.adapter = adapter;
       }
     }
-    (Article as any)._associations = [
-      {
-        type: "hasMany",
-        name: "comments",
-        options: { dependent: "destroy", className: "Comment", foreignKey: "article_id" },
-      },
-    ];
+    Associations.hasMany.call(Article, "comments", {
+      dependent: "destroy",
+      className: "Comment",
+      foreignKey: "article_id",
+    });
     registerModel(Article);
     registerModel(Comment);
 
@@ -1735,13 +1700,11 @@ describe("Rails-guided: association features", () => {
         this.adapter = adapter;
       }
     }
-    (Category as any)._associations = [
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { dependent: "delete", className: "Tag", foreignKey: "category_id" },
-      },
-    ];
+    Associations.hasMany.call(Category, "tags", {
+      dependent: "delete",
+      className: "Tag",
+      foreignKey: "category_id",
+    });
     registerModel(Category);
     registerModel(Tag);
 
@@ -1771,14 +1734,13 @@ describe("Rails-guided: association features", () => {
         this.adapter = adapter;
       }
     }
-    (Student as any)._associations = [
-      { type: "hasMany", name: "enrollments", options: { className: "Enrollment" } },
-      {
-        type: "hasMany",
-        name: "skills",
-        options: { through: "enrollments", className: "Skill", source: "skill" },
-      },
-    ];
+    Associations.hasMany.call(Student, "enrollments", { className: "Enrollment" });
+
+    Associations.hasMany.call(Student, "skills", {
+      through: "enrollments",
+      className: "Skill",
+      source: "skill",
+    });
     registerModel(Student);
     registerModel(Enrollment);
     registerModel(Skill);
@@ -1811,9 +1773,7 @@ describe("Rails-guided: association features", () => {
         this.adapter = adapter;
       }
     }
-    (Machine as any)._associations = [
-      { type: "hasMany", name: "parts", options: { className: "Part", foreignKey: "machine_id" } },
-    ];
+    Associations.hasMany.call(Machine, "parts", { className: "Part", foreignKey: "machine_id" });
     registerModel(Machine);
     registerModel(Part);
 
@@ -1838,13 +1798,7 @@ describe("Rails-guided: association features", () => {
         this.adapter = adapter;
       }
     }
-    (Journal as any)._associations = [
-      {
-        type: "hasMany",
-        name: "entries",
-        options: { className: "Entry", foreignKey: "journal_id" },
-      },
-    ];
+    Associations.hasMany.call(Journal, "entries", { className: "Entry", foreignKey: "journal_id" });
     registerModel(Journal);
     registerModel(Entry);
 
@@ -1869,9 +1823,7 @@ describe("Rails-guided: association features", () => {
         this.adapter = adapter;
       }
     }
-    (Album as any)._associations = [
-      { type: "hasMany", name: "songs", options: { className: "Song", foreignKey: "album_id" } },
-    ];
+    Associations.hasMany.call(Album, "songs", { className: "Song", foreignKey: "album_id" });
     registerModel(Album);
     registerModel(Song);
 
@@ -2842,13 +2794,7 @@ describe("Associations: dependent", () => {
         this.adapter = adapter;
       }
     }
-    (Post as any)._associations = [
-      {
-        type: "hasMany",
-        name: "comments",
-        options: { dependent: "destroy", className: "Comment" },
-      },
-    ];
+    Associations.hasMany.call(Post, "comments", { dependent: "destroy", className: "Comment" });
 
     registerModel(Post);
     registerModel(Comment);
@@ -2879,13 +2825,11 @@ describe("Associations: dependent", () => {
         this.adapter = adapter;
       }
     }
-    (Thread as any)._associations = [
-      {
-        type: "hasMany",
-        name: "replies",
-        options: { dependent: "nullify", className: "Reply", foreignKey: "thread_id" },
-      },
-    ];
+    Associations.hasMany.call(Thread, "replies", {
+      dependent: "nullify",
+      className: "Reply",
+      foreignKey: "thread_id",
+    });
 
     registerModel(Thread);
     registerModel(Reply);
@@ -2919,9 +2863,7 @@ describe("CollectionProxy", () => {
         this.adapter = adapter;
       }
     }
-    (Order as any)._associations = [
-      { type: "hasMany", name: "items", options: { className: "Item", foreignKey: "order_id" } },
-    ];
+    Associations.hasMany.call(Order, "items", { className: "Item", foreignKey: "order_id" });
 
     registerModel(Order);
     registerModel(Item);
@@ -2952,13 +2894,10 @@ describe("CollectionProxy", () => {
         this.adapter = adapter;
       }
     }
-    (Invoice as any)._associations = [
-      {
-        type: "hasMany",
-        name: "lineItems",
-        options: { className: "LineItem", foreignKey: "invoice_id" },
-      },
-    ];
+    Associations.hasMany.call(Invoice, "lineItems", {
+      className: "LineItem",
+      foreignKey: "invoice_id",
+    });
 
     registerModel(Invoice);
     registerModel(LineItem);
@@ -2987,9 +2926,7 @@ describe("CollectionProxy", () => {
         this.adapter = adapter;
       }
     }
-    (Doc as any)._associations = [
-      { type: "hasMany", name: "notes", options: { className: "Note", foreignKey: "doc_id" } },
-    ];
+    Associations.hasMany.call(Doc, "notes", { className: "Note", foreignKey: "doc_id" });
 
     registerModel(Doc);
     registerModel(Note);
@@ -3018,9 +2955,7 @@ describe("CollectionProxy", () => {
         this.adapter = adapter;
       }
     }
-    (Project as any)._associations = [
-      { type: "hasMany", name: "tasks", options: { className: "Task", foreignKey: "project_id" } },
-    ];
+    Associations.hasMany.call(Project, "tasks", { className: "Task", foreignKey: "project_id" });
 
     registerModel(Project);
     registerModel(Task);
@@ -3267,17 +3202,6 @@ describe("dependent: restrictWithException", () => {
 
     class DPost extends Base {
       static _tableName = "d_posts";
-      static _associations: any[] = [
-        {
-          type: "hasMany",
-          name: "dComments",
-          options: {
-            dependent: "restrictWithException",
-            className: "DComment",
-            foreignKey: "d_post_id",
-          },
-        },
-      ];
     }
     DPost.attribute("id", "integer");
     DPost.attribute("title", "string");
@@ -3285,6 +3209,11 @@ describe("dependent: restrictWithException", () => {
 
     registerModel(DComment);
     registerModel(DPost);
+    Associations.hasMany.call(DPost, "dComments", {
+      dependent: "restrictWithException",
+      className: "DComment",
+      foreignKey: "d_post_id",
+    });
 
     const post = await DPost.create({ title: "Hello" });
     await DComment.create({ d_post_id: post.id, body: "Nice!" });
@@ -3306,17 +3235,6 @@ describe("dependent: restrictWithException", () => {
 
     class DArticle extends Base {
       static _tableName = "d_articles";
-      static _associations: any[] = [
-        {
-          type: "hasMany",
-          name: "dReviews",
-          options: {
-            dependent: "restrictWithException",
-            className: "DReview",
-            foreignKey: "d_article_id",
-          },
-        },
-      ];
     }
     DArticle.attribute("id", "integer");
     DArticle.attribute("title", "string");
@@ -3324,6 +3242,11 @@ describe("dependent: restrictWithException", () => {
 
     registerModel(DReview);
     registerModel(DArticle);
+    Associations.hasMany.call(DArticle, "dReviews", {
+      dependent: "restrictWithException",
+      className: "DReview",
+      foreignKey: "d_article_id",
+    });
 
     const article = await DArticle.create({ title: "Hello" });
     await article.destroy();
@@ -3351,9 +3274,7 @@ describe("CollectionProxy enhancements", () => {
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
 
     const author = await Author.create({ name: "Alice" });
     const post = await Post.create({ title: "Hello" });
@@ -3381,9 +3302,7 @@ describe("CollectionProxy enhancements", () => {
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
 
     const author = await Author.create({ name: "Alice" });
     await Post.create({ title: "P1", author_id: author.id });
@@ -3410,9 +3329,7 @@ describe("CollectionProxy enhancements", () => {
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
 
     const author = await Author.create({ name: "Alice" });
     const proxy = association(author, "posts");
@@ -3440,9 +3357,7 @@ describe("CollectionProxy enhancements", () => {
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
 
     const author = await Author.create({ name: "Alice" });
     await Post.create({ title: "First", author_id: author.id });
@@ -3474,9 +3389,7 @@ describe("CollectionProxy enhancements", () => {
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Author as any)._associations = [
-      { type: "hasMany", name: "posts", options: { className: "Post", foreignKey: "author_id" } },
-    ];
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
 
     const author = await Author.create({ name: "Alice" });
     const post = await Post.create({ title: "Mine", author_id: author.id });
@@ -6650,17 +6563,11 @@ describe("PreloaderTest", () => {
     }
     registerModel("PwsPost", PwsPost);
     registerModel("PwsComment", PwsComment);
-    (PwsPost as any)._associations = [
-      {
-        type: "hasMany",
-        name: "scopedComments",
-        options: {
-          className: "PwsComment",
-          foreignKey: "pws_post_id",
-          scope: (rel: any) => rel.where({ body: "Thank you" }),
-        },
-      },
-    ];
+    Associations.hasMany.call(PwsPost, "scopedComments", {
+      className: "PwsComment",
+      foreignKey: "pws_post_id",
+      scope: (rel: any) => rel.where({ body: "Thank you" }),
+    });
     const post = await PwsPost.create({ title: "Welcome" });
     await PwsComment.create({ pws_post_id: post.id, body: "Thank you" });
     await PwsComment.create({ pws_post_id: post.id, body: "Other" });
@@ -6685,13 +6592,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "pAuthor",
-        options: { className: "PAuthor", foreignKey: "p_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(PPost, "pAuthor", {
+      className: "PAuthor",
+      foreignKey: "p_author_id",
+    });
     registerModel("PAuthor", PAuthor);
     registerModel("PPost", PPost);
 
@@ -6721,13 +6625,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PRPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "prAuthor",
-        options: { className: "PRAuthor", foreignKey: "pr_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(PRPost, "prAuthor", {
+      className: "PRAuthor",
+      foreignKey: "pr_author_id",
+    });
     registerModel("PRAuthor", PRAuthor);
     registerModel("PRPost", PRPost);
 
@@ -6756,13 +6657,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PDAuthor as any)._associations = [
-      {
-        type: "hasMany",
-        name: "pdPosts",
-        options: { className: "PDPost", foreignKey: "pd_author_id" },
-      },
-    ];
+    Associations.hasMany.call(PDAuthor, "pdPosts", {
+      className: "PDPost",
+      foreignKey: "pd_author_id",
+    });
     registerModel("PDAuthor", PDAuthor);
     registerModel("PDPost", PDPost);
 
@@ -6801,30 +6699,20 @@ describe("PreloaderTest", () => {
     registerModel("HmtcPost", HmtcPost);
     registerModel("HmtcCategory", HmtcCategory);
     registerModel("HmtcCategorization", HmtcCategorization);
-    (HmtcPost as any)._associations = [
-      {
-        type: "hasMany",
-        name: "hmtcCategorizations",
-        options: { className: "HmtcCategorization", foreignKey: "hmtc_post_id" },
-      },
-      {
-        type: "hasMany",
-        name: "hmtSpecialCategories",
-        options: {
-          className: "HmtcCategory",
-          through: "hmtcCategorizations",
-          source: "hmtcCategory",
-          scope: (rel: any) => rel.where({ special: true }),
-        },
-      },
-    ];
-    (HmtcCategorization as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "hmtcCategory",
-        options: { className: "HmtcCategory", foreignKey: "hmtc_category_id" },
-      },
-    ];
+    Associations.hasMany.call(HmtcPost, "hmtcCategorizations", {
+      className: "HmtcCategorization",
+      foreignKey: "hmtc_post_id",
+    });
+    Associations.hasMany.call(HmtcPost, "hmtSpecialCategories", {
+      className: "HmtcCategory",
+      through: "hmtcCategorizations",
+      source: "hmtcCategory",
+      scope: (rel: any) => rel.where({ special: true }),
+    });
+    Associations.belongsTo.call(HmtcCategorization, "hmtcCategory", {
+      className: "HmtcCategory",
+      foreignKey: "hmtc_category_id",
+    });
     const post = await HmtcPost.create({ title: "Welcome" });
     const normalCat = await HmtcCategory.create({ name: "Normal", special: false });
     const specialCat = await HmtcCategory.create({ name: "Special", special: true });
@@ -6876,13 +6764,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (SAPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "saAuthor",
-        options: { className: "SAAuthor", foreignKey: "sa_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(SAPost, "saAuthor", {
+      className: "SAAuthor",
+      foreignKey: "sa_author_id",
+    });
     registerModel("SAAuthor", SAAuthor);
     registerModel("SAPost", SAPost);
 
@@ -6919,25 +6804,20 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PTPost as any)._associations = [
-      {
-        type: "hasMany",
-        name: "ptTaggings",
-        options: { className: "PTTagging", foreignKey: "pt_post_id" },
-      },
-      {
-        type: "hasManyThrough",
-        name: "ptTags",
-        options: { through: "ptTaggings", source: "ptTag", className: "PTTag" },
-      },
-    ];
-    (PTTagging as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "ptTag",
-        options: { className: "PTTag", foreignKey: "pt_tag_id" },
-      },
-    ];
+    Associations.hasMany.call(PTPost, "ptTaggings", {
+      className: "PTTagging",
+      foreignKey: "pt_post_id",
+    });
+
+    Associations.hasMany.call(PTPost, "ptTags", {
+      through: "ptTaggings",
+      source: "ptTag",
+      className: "PTTag",
+    });
+    Associations.belongsTo.call(PTTagging, "ptTag", {
+      className: "PTTag",
+      foreignKey: "pt_tag_id",
+    });
     registerModel("PTTag", PTTag);
     registerModel("PTTagging", PTTagging);
     registerModel("PTPost", PTPost);
@@ -6994,13 +6874,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PAPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "paAuthor",
-        options: { className: "PAAuthor", foreignKey: "pa_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(PAPost, "paAuthor", {
+      className: "PAAuthor",
+      foreignKey: "pa_author_id",
+    });
     registerModel("PAAuthor", PAAuthor);
     registerModel("PAPost", PAPost);
 
@@ -7033,13 +6910,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PSPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "psAuthor",
-        options: { className: "PSAuthor", foreignKey: "ps_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(PSPost, "psAuthor", {
+      className: "PSAuthor",
+      foreignKey: "ps_author_id",
+    });
     registerModel("PSAuthor", PSAuthor);
     registerModel("PSPost", PSPost);
 
@@ -7071,13 +6945,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PLPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "plAuthor",
-        options: { className: "PLAuthor", foreignKey: "pl_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(PLPost, "plAuthor", {
+      className: "PLAuthor",
+      foreignKey: "pl_author_id",
+    });
     registerModel("PLAuthor", PLAuthor);
     registerModel("PLPost", PLPost);
 
@@ -7123,18 +6994,15 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PMPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "pmAuthor",
-        options: { className: "PMAuthor", foreignKey: "pm_author_id" },
-      },
-      {
-        type: "hasMany",
-        name: "pmComments",
-        options: { className: "PMComment", foreignKey: "pm_post_id" },
-      },
-    ];
+    Associations.belongsTo.call(PMPost, "pmAuthor", {
+      className: "PMAuthor",
+      foreignKey: "pm_author_id",
+    });
+
+    Associations.hasMany.call(PMPost, "pmComments", {
+      className: "PMComment",
+      foreignKey: "pm_post_id",
+    });
     registerModel("PMAuthor", PMAuthor);
     registerModel("PMComment", PMComment);
     registerModel("PMPost", PMPost);
@@ -7174,13 +7042,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PUPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "puAuthor",
-        options: { className: "PUAuthor", foreignKey: "pu_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(PUPost, "puAuthor", {
+      className: "PUAuthor",
+      foreignKey: "pu_author_id",
+    });
     registerModel("PUAuthor", PUAuthor);
     registerModel("PUPost", PUPost);
 
@@ -7210,13 +7075,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PWPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "pwAuthor",
-        options: { className: "PWAuthor", foreignKey: "pw_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(PWPost, "pwAuthor", {
+      className: "PWAuthor",
+      foreignKey: "pw_author_id",
+    });
     registerModel("PWAuthor", PWAuthor);
     registerModel("PWPost", PWPost);
 
@@ -7330,13 +7192,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PKAuthor as any)._associations = [
-      {
-        type: "hasMany",
-        name: "pkPosts",
-        options: { className: "PKPost", foreignKey: "pk_author_id" },
-      },
-    ];
+    Associations.hasMany.call(PKAuthor, "pkPosts", {
+      className: "PKPost",
+      foreignKey: "pk_author_id",
+    });
     registerModel("PKAuthor", PKAuthor);
     registerModel("PKPost", PKPost);
 
@@ -7365,13 +7224,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PKQAuthor as any)._associations = [
-      {
-        type: "hasMany",
-        name: "pkqPosts",
-        options: { className: "PKQPost", foreignKey: "pkq_author_id" },
-      },
-    ];
+    Associations.hasMany.call(PKQAuthor, "pkqPosts", {
+      className: "PKQPost",
+      foreignKey: "pkq_author_id",
+    });
     registerModel("PKQAuthor", PKQAuthor);
     registerModel("PKQPost", PKQPost);
 
@@ -7400,13 +7256,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PKBPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "pkbAuthor",
-        options: { className: "PKBAuthor", foreignKey: "pkb_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(PKBPost, "pkbAuthor", {
+      className: "PKBAuthor",
+      foreignKey: "pkb_author_id",
+    });
     registerModel("PKBAuthor", PKBAuthor);
     registerModel("PKBPost", PKBPost);
 
@@ -7435,13 +7288,10 @@ describe("PreloaderTest", () => {
         this.adapter = adapter;
       }
     }
-    (PKBAPost as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "pkbaAuthor",
-        options: { className: "PKBAAuthor", foreignKey: "pkba_author_id" },
-      },
-    ];
+    Associations.belongsTo.call(PKBAPost, "pkbaAuthor", {
+      className: "PKBAAuthor",
+      foreignKey: "pkba_author_id",
+    });
     registerModel("PKBAAuthor", PKBAAuthor);
     registerModel("PKBAPost", PKBAPost);
 

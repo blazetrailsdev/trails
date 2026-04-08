@@ -2362,13 +2362,10 @@ describe("Nested Attributes (Rails-guided)", () => {
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
-    (Pirate as any)._associations = [
-      { type: "hasMany", name: "ships", options: { autosave: true } },
-    ];
-    (Ship as any)._associations = [
-      { type: "belongsTo", name: "pirate", options: {} },
-      { type: "hasMany", name: "parts", options: { autosave: true } },
-    ];
+    Associations.hasMany.call(Pirate, "ships", { autosave: true });
+    Associations.belongsTo.call(Ship, "pirate");
+
+    Associations.hasMany.call(Ship, "parts", { autosave: true });
     (Pirate as any)._associations.push({
       type: "hasOne",
       name: "ship",
@@ -2592,11 +2589,10 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
-    (Pirate as any)._associations = [{ type: "hasOne", name: "ship", options: { autosave: true } }];
-    (Ship as any)._associations = [
-      { type: "belongsTo", name: "pirate", options: {} },
-      { type: "hasOne", name: "part", options: { autosave: true } },
-    ];
+    Associations.hasOne.call(Pirate, "ship", { autosave: true });
+    Associations.belongsTo.call(Ship, "pirate");
+
+    Associations.hasOne.call(Ship, "part", { autosave: true });
     return { Pirate, Ship, Part };
   }
 
@@ -2793,13 +2789,10 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
-    (Pirate as any)._associations = [
-      { type: "hasMany", name: "ships", options: { autosave: true } },
-    ];
-    (Ship as any)._associations = [
-      { type: "belongsTo", name: "pirate", options: {} },
-      { type: "hasMany", name: "parts", options: { autosave: true } },
-    ];
+    Associations.hasMany.call(Pirate, "ships", { autosave: true });
+    Associations.belongsTo.call(Ship, "pirate");
+
+    Associations.hasMany.call(Ship, "parts", { autosave: true });
     return { Pirate, Ship, Part };
   }
 

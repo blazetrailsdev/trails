@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, association, registerModel } from "../index.js";
+import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -33,13 +34,11 @@ describe("AssociationCallbacksTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
-        (this as any)._associations = [
-          {
-            type: "hasMany",
-            name: "comments",
-            options: { className: commentName, foreignKey: "post_id", ...callbacks },
-          },
-        ];
+        Associations.hasMany.call(this, "comments", {
+          className: commentName,
+          foreignKey: "post_id",
+          ...callbacks,
+        });
       }
     }
     registerModel(commentName, Comment);
@@ -162,13 +161,11 @@ describe("AssociationCallbacksTest", () => {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
-        (this as any)._associations = [
-          {
-            type: "hasMany",
-            name: "comments",
-            options: { className: commentName, foreignKey: "post_id", ...callbacks },
-          },
-        ];
+        Associations.hasMany.call(this, "comments", {
+          className: commentName,
+          foreignKey: "post_id",
+          ...callbacks,
+        });
       }
     }
     registerModel(commentName, Comment);
@@ -261,19 +258,13 @@ describe("AssociationCallbacksTest", () => {
     }
     registerModel(`HOProfile${idx}`, Profile);
     registerModel(`HOUser${idx}`, User);
-    (User as any)._associations = [
-      {
-        type: "hasMany",
-        name: "profiles",
-        options: {
-          className: `HOProfile${idx}`,
-          foreignKey: "user_id",
-          afterAdd: (_owner: any, record: any) => {
-            log.push("added:" + (record.id ?? "<new>"));
-          },
-        },
+    Associations.hasMany.call(User, "profiles", {
+      className: `HOProfile${idx}`,
+      foreignKey: "user_id",
+      afterAdd: (_owner: any, record: any) => {
+        log.push("added:" + (record.id ?? "<new>"));
       },
-    ];
+    });
     const user = await User.create({ name: "Alice" });
     const proxy = association(user, "profiles");
     const profile = proxy.build({ bio: "Hello" });
@@ -300,22 +291,16 @@ describe("AssociationCallbacksTest", () => {
     }
     registerModel(`HORProfile${idx}`, Profile);
     registerModel(`HORUser${idx}`, User);
-    (User as any)._associations = [
-      {
-        type: "hasMany",
-        name: "profiles",
-        options: {
-          className: `HORProfile${idx}`,
-          foreignKey: "user_id",
-          beforeRemove: (_owner: any, record: any) => {
-            log.push("removing:" + record.id);
-          },
-          afterRemove: (_owner: any, record: any) => {
-            log.push("removed:" + record.id);
-          },
-        },
+    Associations.hasMany.call(User, "profiles", {
+      className: `HORProfile${idx}`,
+      foreignKey: "user_id",
+      beforeRemove: (_owner: any, record: any) => {
+        log.push("removing:" + record.id);
       },
-    ];
+      afterRemove: (_owner: any, record: any) => {
+        log.push("removed:" + record.id);
+      },
+    });
     const user = await User.create({ name: "Bob" });
     const profile = await Profile.create({ bio: "Hi", user_id: user.id });
     const proxy = association(user, "profiles");

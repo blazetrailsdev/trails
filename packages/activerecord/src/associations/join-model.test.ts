@@ -989,30 +989,21 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    (StTag as any)._associations = [
-      {
-        type: "hasMany",
-        name: "stTaggings",
-        options: { className: "StTagging", foreignKey: "st_tag_id" },
-      },
-      {
-        type: "hasMany",
-        name: "taggedPosts",
-        options: {
-          through: "stTaggings",
-          source: "taggable",
-          sourceType: "StPost",
-          className: "StPost",
-        },
-      },
-    ];
-    (StTagging as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "taggable",
-        options: { polymorphic: true, foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasMany.call(StTag, "stTaggings", {
+      className: "StTagging",
+      foreignKey: "st_tag_id",
+    });
+
+    Associations.hasMany.call(StTag, "taggedPosts", {
+      through: "stTaggings",
+      source: "taggable",
+      sourceType: "StPost",
+      className: "StPost",
+    });
+    Associations.belongsTo.call(StTagging, "taggable", {
+      polymorphic: true,
+      foreignKey: "taggable_id",
+    });
     registerModel("StTag", StTag);
     registerModel("StTagging", StTagging);
     registerModel("StPost", StPost);
@@ -1070,30 +1061,21 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    (EstTag as any)._associations = [
-      {
-        type: "hasMany",
-        name: "estTaggings",
-        options: { className: "EstTagging", foreignKey: "est_tag_id" },
-      },
-      {
-        type: "hasMany",
-        name: "taggedPosts",
-        options: {
-          through: "estTaggings",
-          source: "taggable",
-          sourceType: "EstPost",
-          className: "EstPost",
-        },
-      },
-    ];
-    (EstTagging as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "taggable",
-        options: { polymorphic: true, foreignKey: "taggable_id" },
-      },
-    ];
+    Associations.hasMany.call(EstTag, "estTaggings", {
+      className: "EstTagging",
+      foreignKey: "est_tag_id",
+    });
+
+    Associations.hasMany.call(EstTag, "taggedPosts", {
+      through: "estTaggings",
+      source: "taggable",
+      sourceType: "EstPost",
+      className: "EstPost",
+    });
+    Associations.belongsTo.call(EstTagging, "taggable", {
+      polymorphic: true,
+      foreignKey: "taggable_id",
+    });
     registerModel("EstTag", EstTag);
     registerModel("EstTagging", EstTagging);
     registerModel("EstPost", EstPost);

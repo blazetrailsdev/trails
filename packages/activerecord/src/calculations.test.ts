@@ -5620,17 +5620,6 @@ describe("CalculationsTest", () => {
     }
     class RGPost extends Base {
       static _tableName = "rg_posts";
-      static _associations: any[] = [
-        {
-          type: "hasMany",
-          name: "rgComments",
-          options: {
-            dependent: "restrictWithException",
-            className: "RGComment",
-            foreignKey: "rg_post_id",
-          },
-        },
-      ];
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
@@ -5639,6 +5628,11 @@ describe("CalculationsTest", () => {
     }
     registerModel(RGComment);
     registerModel(RGPost);
+    Associations.hasMany.call(RGPost, "rgComments", {
+      dependent: "restrictWithException",
+      className: "RGComment",
+      foreignKey: "rg_post_id",
+    });
 
     const post = await RGPost.create({ title: "Hello" });
     await RGComment.create({ rg_post_id: post.id });

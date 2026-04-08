@@ -101,13 +101,10 @@ describe("CascadedEagerLoadingTest", () => {
       }
     }
     registerModel(StiTopic);
-    (StiTopic as any)._associations = [
-      {
-        type: "hasMany",
-        name: "replies",
-        options: { className: "StiReply", foreignKey: "parent_id" },
-      },
-    ];
+    Associations.hasMany.call(StiTopic, "replies", {
+      className: "StiReply",
+      foreignKey: "parent_id",
+    });
 
     const topic1 = await StiTopic.create({ title: "First" });
     const topic2 = await StiTopic.create({ title: "Second" });
@@ -152,13 +149,10 @@ describe("CascadedEagerLoadingTest", () => {
       }
     }
     registerModel(StiTopic2);
-    (StiTopic2 as any)._associations = [
-      {
-        type: "hasMany",
-        name: "replies",
-        options: { className: "StiReply2", foreignKey: "parent_id" },
-      },
-    ];
+    Associations.hasMany.call(StiTopic2, "replies", {
+      className: "StiReply2",
+      foreignKey: "parent_id",
+    });
 
     const topic = await StiTopic2.create({ title: "First" });
     await StiReply2.create({ title: "Re: First", parent_id: topic.id });
@@ -190,13 +184,10 @@ describe("CascadedEagerLoadingTest", () => {
       }
     }
     registerModel(StiTopic3);
-    (StiReply3 as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "topic",
-        options: { className: "StiTopic3", foreignKey: "parent_id" },
-      },
-    ];
+    Associations.belongsTo.call(StiReply3, "topic", {
+      className: "StiTopic3",
+      foreignKey: "parent_id",
+    });
 
     const topic = await StiTopic3.create({ title: "First" });
     await StiReply3.create({ title: "Re: First", parent_id: topic.id });

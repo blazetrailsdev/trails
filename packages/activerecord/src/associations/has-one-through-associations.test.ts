@@ -49,31 +49,25 @@ describe("HasOneThroughAssociationsTest", () => {
     registerModel(Membership);
     registerModel(Member);
     // Set up associations: Member has_one :membership, has_one :club through :membership
-    (Member as any)._associations = [
-      {
-        type: "hasOne",
-        name: "membership",
-        options: { className: "Membership", foreignKey: "member_id" },
-      },
-      {
-        type: "hasOne",
-        name: "club",
-        options: { className: "Club", through: "membership", source: "club" },
-      },
-    ];
-    (Membership as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "member",
-        options: { className: "Member", foreignKey: "member_id" },
-      },
-      {
-        type: "belongsTo",
-        name: "club",
-        options: { className: "Club", foreignKey: "club_id" },
-      },
-    ];
+    (Member as any)._associations = [];
+    (Membership as any)._associations = [];
     (Club as any)._associations = [];
+    Associations.hasOne.call(Member, "membership", {
+      className: "Membership",
+      foreignKey: "member_id",
+    });
+
+    Associations.hasOne.call(Member, "club", {
+      className: "Club",
+      through: "membership",
+      source: "club",
+    });
+    Associations.belongsTo.call(Membership, "member", {
+      className: "Member",
+      foreignKey: "member_id",
+    });
+
+    Associations.belongsTo.call(Membership, "club", { className: "Club", foreignKey: "club_id" });
   });
 
   it("has one through with has one", async () => {
@@ -275,25 +269,16 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("has one through eager loading", async () => {
     // member -> membership (hasOne) -> club (hasOne through)
-    (Member as any)._associations = [
-      ...((Member as any)._associations?.filter(
-        (a: any) => a.name !== "membership" && a.name !== "club",
-      ) ?? []),
-      {
-        type: "hasOne",
-        name: "membership",
-        options: { className: "Membership", foreignKey: "member_id" },
-      },
-      {
-        type: "hasOne",
-        name: "club",
-        options: { className: "Club", through: "membership", source: "club" },
-      },
-    ];
-    (Membership as any)._associations = [
-      ...((Membership as any)._associations?.filter((a: any) => a.name !== "club") ?? []),
-      { type: "belongsTo", name: "club", options: { className: "Club", foreignKey: "club_id" } },
-    ];
+    Associations.hasOne.call(Member, "membership", {
+      className: "Membership",
+      foreignKey: "member_id",
+    });
+    Associations.hasOne.call(Member, "club", {
+      className: "Club",
+      through: "membership",
+      source: "club",
+    });
+    Associations.belongsTo.call(Membership, "club", { className: "Club", foreignKey: "club_id" });
     const club = await Club.create({ name: "Eager Club" });
     const member = await Member.create({ name: "Eager Member" });
     await Membership.create({ member_id: member.id, club_id: club.id });
@@ -451,25 +436,16 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("preloading has one through on belongs to", async () => {
     // member -> membership (hasOne) -> club (hasOne through)
-    (Member as any)._associations = [
-      ...((Member as any)._associations?.filter(
-        (a: any) => a.name !== "membership" && a.name !== "club",
-      ) ?? []),
-      {
-        type: "hasOne",
-        name: "membership",
-        options: { className: "Membership", foreignKey: "member_id" },
-      },
-      {
-        type: "hasOne",
-        name: "club",
-        options: { className: "Club", through: "membership", source: "club" },
-      },
-    ];
-    (Membership as any)._associations = [
-      ...((Membership as any)._associations?.filter((a: any) => a.name !== "club") ?? []),
-      { type: "belongsTo", name: "club", options: { className: "Club", foreignKey: "club_id" } },
-    ];
+    Associations.hasOne.call(Member, "membership", {
+      className: "Membership",
+      foreignKey: "member_id",
+    });
+    Associations.hasOne.call(Member, "club", {
+      className: "Club",
+      through: "membership",
+      source: "club",
+    });
+    Associations.belongsTo.call(Membership, "club", { className: "Club", foreignKey: "club_id" });
     const club = await Club.create({ name: "Preload Club" });
     const member = await Member.create({ name: "Preload Member" });
     await Membership.create({ member_id: member.id, club_id: club.id });

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { loadHasManyThrough } from "../associations.js";
+import { Associations, loadHasManyThrough } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -39,18 +39,16 @@ describe("HasManyThroughTest", () => {
         this.adapter = adapter;
       }
     }
-    (HmtPost as any)._associations = [
-      {
-        type: "hasMany",
-        name: "hmtTaggings",
-        options: { className: "HmtTagging", foreignKey: "post_id" },
-      },
-      {
-        type: "hasMany",
-        name: "hmtTags",
-        options: { through: "hmtTaggings", className: "HmtTag", source: "tag" },
-      },
-    ];
+    Associations.hasMany.call(HmtPost, "hmtTaggings", {
+      className: "HmtTagging",
+      foreignKey: "post_id",
+    });
+
+    Associations.hasMany.call(HmtPost, "hmtTags", {
+      through: "hmtTaggings",
+      className: "HmtTag",
+      source: "tag",
+    });
     registerModel("HmtTag", HmtTag);
     registerModel("HmtTagging", HmtTagging);
     registerModel("HmtPost", HmtPost);
@@ -100,14 +98,13 @@ describe("Associations: has_many through", () => {
         this.adapter = adapter;
       }
     }
-    (Post as any)._associations = [
-      { type: "hasMany", name: "taggings", options: { className: "Tagging" } },
-      {
-        type: "hasMany",
-        name: "tags",
-        options: { through: "taggings", className: "Tag", source: "tag" },
-      },
-    ];
+    Associations.hasMany.call(Post, "taggings", { className: "Tagging" });
+
+    Associations.hasMany.call(Post, "tags", {
+      through: "taggings",
+      className: "Tag",
+      source: "tag",
+    });
 
     registerModel(Post);
     registerModel(Tagging);

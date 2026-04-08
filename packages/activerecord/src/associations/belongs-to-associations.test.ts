@@ -1484,13 +1484,10 @@ describe("BelongsToAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (EagerPkAccount as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "eagerPkCompany",
-        options: { className: "EagerPkCompany", foreignKey: "company_id" },
-      },
-    ];
+    Associations.belongsTo.call(EagerPkAccount, "eagerPkCompany", {
+      className: "EagerPkCompany",
+      foreignKey: "company_id",
+    });
     registerModel(EagerPkCompany);
     registerModel(EagerPkAccount);
     const company = await EagerPkCompany.create({ name: "Eager Co" });
@@ -1514,13 +1511,10 @@ describe("BelongsToAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    (EagerSymAccount as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "eagerSymCompany",
-        options: { className: "EagerSymCompany", foreignKey: "company_id" },
-      },
-    ];
+    Associations.belongsTo.call(EagerSymAccount, "eagerSymCompany", {
+      className: "EagerSymCompany",
+      foreignKey: "company_id",
+    });
     registerModel(EagerSymCompany);
     registerModel(EagerSymAccount);
     const company = await EagerSymCompany.create({ name: "Sym Co" });

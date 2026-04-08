@@ -69,14 +69,12 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     registerModel("Ship", Ship);
     registerModel("Bird", Bird);
     registerModel("Part", Part);
-    (Pirate as any)._associations = [
-      { type: "hasOne", name: "ship", options: { autosave: true } },
-      { type: "hasMany", name: "birds", options: { autosave: true } },
-    ];
-    (Ship as any)._associations = [
-      { type: "belongsTo", name: "pirate", options: { autosave: true } },
-      { type: "hasMany", name: "parts", options: { autosave: true } },
-    ];
+    Associations.hasOne.call(Pirate, "ship", { autosave: true });
+
+    Associations.hasMany.call(Pirate, "birds", { autosave: true });
+    Associations.belongsTo.call(Ship, "pirate", { autosave: true });
+
+    Associations.hasMany.call(Ship, "parts", { autosave: true });
     return { Pirate, Ship, Bird, Part };
   }
 
@@ -447,9 +445,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     Client.adapter = adapter;
     registerModel("Company", Company);
     registerModel("Client", Client);
-    (Company as any)._associations = [
-      { type: "hasMany", name: "clients", options: { autosave: true } },
-    ];
+    Associations.hasMany.call(Company, "clients", { autosave: true });
     return { Company, Client };
   }
 
@@ -490,9 +486,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     }
     UnvalidatedClient.adapter = adapter;
     registerModel("UnvalidatedClient", UnvalidatedClient);
-    (Company as any)._associations = [
-      { type: "hasMany", name: "unvalidatedClients", options: { autosave: true } },
-    ];
+    Associations.hasMany.call(Company, "unvalidatedClients", { autosave: true });
     const company = await Company.create({ name: "Acme" });
     const client = new UnvalidatedClient({ name: "" });
     cacheAssoc(company, "unvalidatedClients", [client]);
@@ -604,25 +598,20 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
         this.adapter = adapter;
       }
     }
-    (AidFirm as any)._associations = [
-      {
-        type: "hasMany",
-        name: "aidContracts",
-        options: { className: "AidContract", foreignKey: "aid_firm_id" },
-      },
-      {
-        type: "hasMany",
-        name: "aidDevelopers",
-        options: { through: "aidContracts", source: "aidDeveloper", className: "AidDeveloper" },
-      },
-    ];
-    (AidContract as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "aidDeveloper",
-        options: { className: "AidDeveloper", foreignKey: "aid_developer_id" },
-      },
-    ];
+    Associations.hasMany.call(AidFirm, "aidContracts", {
+      className: "AidContract",
+      foreignKey: "aid_firm_id",
+    });
+
+    Associations.hasMany.call(AidFirm, "aidDevelopers", {
+      through: "aidContracts",
+      source: "aidDeveloper",
+      className: "AidDeveloper",
+    });
+    Associations.belongsTo.call(AidContract, "aidDeveloper", {
+      className: "AidDeveloper",
+      foreignKey: "aid_developer_id",
+    });
     registerModel("AidFirm", AidFirm);
     registerModel("AidContract", AidContract);
     registerModel("AidDeveloper", AidDeveloper);
@@ -742,9 +731,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     Account.adapter = adapter;
     registerModel("Firm", Firm);
     registerModel("Account", Account);
-    (Firm as any)._associations = [
-      { type: "hasOne", name: "account", options: { autosave: true } },
-    ];
+    Associations.hasOne.call(Firm, "account", { autosave: true });
     return { Firm, Account };
   }
 
@@ -767,9 +754,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
     LooseAccount.adapter = adapter;
     registerModel("LooseAccount", LooseAccount);
-    (Firm as any)._associations = [
-      { type: "hasOne", name: "looseAccount", options: { autosave: true } },
-    ];
+    Associations.hasOne.call(Firm, "looseAccount", { autosave: true });
     const firm = await Firm.create({ name: "Acme" });
     const account = new LooseAccount({});
     cacheAssoc(firm, "looseAccount", account);
@@ -860,13 +845,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     CbAccount.adapter = adapter;
     registerModel("CbFirm", CbFirm);
     registerModel("CbAccount", CbAccount);
-    (CbFirm as any)._associations = [
-      {
-        type: "hasOne",
-        name: "cbAccount",
-        options: { autosave: true, className: "CbAccount", foreignKey: "cb_firm_id" },
-      },
-    ];
+    Associations.hasOne.call(CbFirm, "cbAccount", {
+      autosave: true,
+      className: "CbAccount",
+      foreignKey: "cb_firm_id",
+    });
     const firm = new CbFirm({ name: "LLC" });
     const account = new CbAccount({ credit_limit: 100 });
     cacheAssoc(firm, "cbAccount", account);
@@ -907,13 +890,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     CuAccount.adapter = adapter;
     registerModel("CuFirm", CuFirm);
     registerModel("CuAccount", CuAccount);
-    (CuFirm as any)._associations = [
-      {
-        type: "hasOne",
-        name: "cuAccount",
-        options: { autosave: true, className: "CuAccount", foreignKey: "cu_firm_id" },
-      },
-    ];
+    Associations.hasOne.call(CuFirm, "cuAccount", {
+      autosave: true,
+      className: "CuAccount",
+      foreignKey: "cu_firm_id",
+    });
     const firm = await CuFirm.create({ name: "LLC" });
     log.length = 0;
     firm.name = "Updated LLC";
@@ -950,13 +931,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     CsAccount.adapter = adapter;
     registerModel("CsFirm", CsFirm);
     registerModel("CsAccount", CsAccount);
-    (CsFirm as any)._associations = [
-      {
-        type: "hasOne",
-        name: "csAccount",
-        options: { autosave: true, className: "CsAccount", foreignKey: "cs_firm_id" },
-      },
-    ];
+    Associations.hasOne.call(CsFirm, "csAccount", {
+      autosave: true,
+      className: "CsAccount",
+      foreignKey: "cs_firm_id",
+    });
     const firm = await CsFirm.create({ name: "LLC" });
     log.length = 0;
     const account = new CsAccount({ credit_limit: 10 });
@@ -988,13 +967,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     CbChild.adapter = adapter;
     registerModel("CbParent", CbParent);
     registerModel("CbChild", CbChild);
-    (CbParent as any)._associations = [
-      {
-        type: "hasOne",
-        name: "cbChild",
-        options: { autosave: true, className: "CbChild", foreignKey: "cb_parent_id" },
-      },
-    ];
+    Associations.hasOne.call(CbParent, "cbChild", {
+      autosave: true,
+      className: "CbChild",
+      foreignKey: "cb_parent_id",
+    });
     const parent = await CbParent.create({ name: "P" });
     const child = new CbChild({ value: "V" });
     cacheAssoc(parent, "cbChild", child);
@@ -1028,13 +1005,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     CbPet.adapter = adapter;
     registerModel("CbOwner", CbOwner);
     registerModel("CbPet", CbPet);
-    (CbPet as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "cbOwner",
-        options: { autosave: true, className: "CbOwner", foreignKey: "cb_owner_id" },
-      },
-    ];
+    Associations.belongsTo.call(CbPet, "cbOwner", {
+      autosave: true,
+      className: "CbOwner",
+      foreignKey: "cb_owner_id",
+    });
     const owner = new CbOwner({ name: "Alice" });
     const pet = new CbPet({ species: "cat" });
     cacheAssoc(pet, "cbOwner", owner);
@@ -1086,7 +1061,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     Ship.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
-    (Pirate as any)._associations = [{ type: "hasOne", name: "ship", options: { autosave: true } }];
+    Associations.hasOne.call(Pirate, "ship", { autosave: true });
     return { Pirate, Ship };
   }
 
@@ -1164,9 +1139,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     }
     FlexShip.adapter = adapter;
     registerModel("FlexShip", FlexShip);
-    (Pirate as any)._associations = [
-      { type: "hasOne", name: "flexShip", options: { autosave: true } },
-    ];
+    Associations.hasOne.call(Pirate, "flexShip", { autosave: true });
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = new FlexShip({ name: "" });
     cacheAssoc(pirate, "flexShip", ship);
@@ -1218,9 +1191,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("mark for destruction is ignored without autosave true", async () => {
     const { Pirate, Ship } = makeModels();
-    (Pirate as any)._associations = [
-      { type: "hasOne", name: "ship", options: { autosave: false } },
-    ];
+    (Pirate as any)._associations = (Pirate as any)._associations.filter(
+      (a: any) => a.name !== "ship",
+    );
+    Associations.hasOne.call(Pirate, "ship", { autosave: false });
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
     markForDestruction(ship);
@@ -1262,9 +1236,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     Post.adapter = adapter;
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Post as any)._associations = [
-      { type: "belongsTo", name: "author", options: { autosave: true } },
-    ];
+    Associations.belongsTo.call(Post, "author", { autosave: true });
     return { Author, Post };
   }
 
@@ -1302,9 +1274,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     }
     FlexPost.adapter = adapter;
     registerModel("FlexPost", FlexPost);
-    (FlexPost as any)._associations = [
-      { type: "belongsTo", name: "flexAuthor", options: { autosave: true } },
-    ];
+    Associations.belongsTo.call(FlexPost, "flexAuthor", { autosave: true });
     const author = new FlexAuthor({ name: "" });
     const post = new FlexPost({ title: "Test" });
     cacheAssoc(post, "flexAuthor", author);
@@ -1445,9 +1415,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     Ship.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
-    (Ship as any)._associations = [
-      { type: "belongsTo", name: "pirate", options: { autosave: true } },
-    ];
+    Associations.belongsTo.call(Ship, "pirate", { autosave: true });
     return { Pirate, Ship };
   }
 
@@ -1513,9 +1481,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     }
     FlexShip.adapter = adapter;
     registerModel("FlexShip", FlexShip);
-    (FlexShip as any)._associations = [
-      { type: "belongsTo", name: "flexPirate", options: { autosave: true } },
-    ];
+    Associations.belongsTo.call(FlexShip, "flexPirate", { autosave: true });
     const pirate = new FlexPirate({ catchphrase: "" });
     const ship = new FlexShip({ name: "NoValidation" });
     cacheAssoc(ship, "flexPirate", pirate);
@@ -1612,9 +1578,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     Bird.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Bird", Bird);
-    (Pirate as any)._associations = [
-      { type: "hasMany", name: "birds", options: { autosave: true } },
-    ];
+    Associations.hasMany.call(Pirate, "birds", { autosave: true });
     acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true });
     return { Pirate, Bird };
   }
@@ -1697,13 +1661,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("Ship", Ship);
     registerModel("Pirate", Pirate);
-    (Pirate as any)._associations = [
-      {
-        type: "hasOne",
-        name: "ship",
-        options: { autosave: true, foreignKey: "pirate_id", className: "Ship" },
-      },
-    ];
+    Associations.hasOne.call(Pirate, "ship", {
+      autosave: true,
+      foreignKey: "pirate_id",
+      className: "Ship",
+    });
 
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = new Ship({ name: "Pearl" });
@@ -1740,13 +1702,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("Book", Book);
     registerModel("Author", Author);
-    (Author as any)._associations = [
-      {
-        type: "hasMany",
-        name: "books",
-        options: { autosave: true, foreignKey: "author_id", className: "Book" },
-      },
-    ];
+    Associations.hasMany.call(Author, "books", {
+      autosave: true,
+      foreignKey: "author_id",
+      className: "Book",
+    });
 
     const author = await Author.create({ name: "Test" });
     const book = new Book({ title: "My Book" });
@@ -1779,13 +1739,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("Profile", Profile);
     registerModel("User", User);
-    (User as any)._associations = [
-      {
-        type: "hasOne",
-        name: "profile",
-        options: { autosave: true, foreignKey: "user_id", className: "Profile" },
-      },
-    ];
+    Associations.hasOne.call(User, "profile", {
+      autosave: true,
+      foreignKey: "user_id",
+      className: "Profile",
+    });
 
     const user = await User.create({ name: "Test" });
     const profile = new Profile({ bio: "Hello" });
@@ -1818,13 +1776,11 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Post as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "author",
-        options: { autosave: true, foreignKey: "author_id", className: "Author" },
-      },
-    ];
+    Associations.belongsTo.call(Post, "author", {
+      autosave: true,
+      foreignKey: "author_id",
+      className: "Author",
+    });
 
     const author = new Author({ name: "New Author" });
     const post = await Post.create({ title: "Test" });
@@ -1888,13 +1844,10 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
-    (Pirate as any)._associations = [
-      { type: "hasMany", name: "ships", options: { autosave: true } },
-    ];
-    (Ship as any)._associations = [
-      { type: "belongsTo", name: "pirate", options: {} },
-      { type: "hasMany", name: "parts", options: { autosave: true } },
-    ];
+    Associations.hasMany.call(Pirate, "ships", { autosave: true });
+    Associations.belongsTo.call(Ship, "pirate");
+
+    Associations.hasMany.call(Ship, "parts", { autosave: true });
     return { Pirate, Ship, Part };
   }
 
@@ -1982,13 +1935,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     }
     registerModel("VmParent", VmParent);
     registerModel("VmChild", VmChild);
-    (VmParent as any)._associations = [
-      {
-        type: "hasMany",
-        name: "vmChildren",
-        options: { className: "VmChild", foreignKey: "vm_parent_id", validate: true },
-      },
-    ];
+    Associations.hasMany.call(VmParent, "vmChildren", {
+      className: "VmChild",
+      foreignKey: "vm_parent_id",
+      validate: true,
+    });
     const parent = await VmParent.create({ name: "P" });
     const child = new VmChild({ val: "" });
     cacheAssoc(parent, "vmChildren", [child]);
@@ -2014,13 +1965,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     }
     registerModel("VoParent", VoParent);
     registerModel("VoChild", VoChild);
-    (VoParent as any)._associations = [
-      {
-        type: "hasOne",
-        name: "voChild",
-        options: { className: "VoChild", foreignKey: "vo_parent_id", validate: true },
-      },
-    ];
+    Associations.hasOne.call(VoParent, "voChild", {
+      className: "VoChild",
+      foreignKey: "vo_parent_id",
+      validate: true,
+    });
     const parent = await VoParent.create({ name: "P" });
     const child = new VoChild({ val: "" });
     cacheAssoc(parent, "voChild", child);
@@ -2046,13 +1995,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     }
     registerModel("NvParent", NvParent);
     registerModel("NvChild", NvChild);
-    (NvParent as any)._associations = [
-      {
-        type: "hasOne",
-        name: "nvChild",
-        options: { className: "NvChild", foreignKey: "nv_parent_id", validate: false },
-      },
-    ];
+    Associations.hasOne.call(NvParent, "nvChild", {
+      className: "NvChild",
+      foreignKey: "nv_parent_id",
+      validate: false,
+    });
     const parent = await NvParent.create({ name: "P" });
     const child = new NvChild({ val: "" });
     cacheAssoc(parent, "nvChild", child);
@@ -2078,13 +2025,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     }
     registerModel("BvOwner", BvOwner);
     registerModel("BvChild", BvChild);
-    (BvChild as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "bvOwner",
-        options: { className: "BvOwner", foreignKey: "bv_owner_id", validate: true },
-      },
-    ];
+    Associations.belongsTo.call(BvChild, "bvOwner", {
+      className: "BvOwner",
+      foreignKey: "bv_owner_id",
+      validate: true,
+    });
     const child = await BvChild.create({ val: "ok" });
     const owner = new BvOwner({ name: "" });
     cacheAssoc(child, "bvOwner", owner);
@@ -2110,13 +2055,11 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     }
     registerModel("NbOwner", NbOwner);
     registerModel("NbChild", NbChild);
-    (NbChild as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "nbOwner",
-        options: { className: "NbOwner", foreignKey: "nb_owner_id", validate: false },
-      },
-    ];
+    Associations.belongsTo.call(NbChild, "nbOwner", {
+      className: "NbOwner",
+      foreignKey: "nb_owner_id",
+      validate: false,
+    });
     const child = await NbChild.create({ val: "ok" });
     const owner = new NbOwner({ name: "" });
     cacheAssoc(child, "nbOwner", owner);
@@ -2188,8 +2131,8 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     registerModel("Pirate", Pirate);
     registerModel("Ship", Ship);
     registerModel("Part", Part);
-    (Pirate as any)._associations = [{ type: "hasOne", name: "ship", options: { autosave: true } }];
-    (Ship as any)._associations = [{ type: "hasOne", name: "part", options: { autosave: true } }];
+    Associations.hasOne.call(Pirate, "ship", { autosave: true });
+    Associations.hasOne.call(Ship, "part", { autosave: true });
     return { Pirate, Ship, Part };
   }
 
@@ -2241,13 +2184,11 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     }
     registerModel("Author", Author);
     registerModel("Post", Post);
-    (Post as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "author",
-        options: { autosave: false, foreignKey: "author_id", className: "Author" },
-      },
-    ];
+    Associations.belongsTo.call(Post, "author", {
+      autosave: false,
+      foreignKey: "author_id",
+      className: "Author",
+    });
 
     const author = new Author({ name: "Unsaved" });
     const post = await Post.create({ title: "test" });
@@ -2275,13 +2216,11 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     }
     registerModel("Profile", Profile);
     registerModel("User", User);
-    (User as any)._associations = [
-      {
-        type: "hasOne",
-        name: "profile",
-        options: { autosave: false, foreignKey: "user_id", className: "Profile" },
-      },
-    ];
+    Associations.hasOne.call(User, "profile", {
+      autosave: false,
+      foreignKey: "user_id",
+      className: "Profile",
+    });
 
     const user = await User.create({ name: "test" });
     const profile = new Profile({ bio: "Unsaved" });
@@ -2309,13 +2248,11 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     }
     registerModel("Book", Book);
     registerModel("Author", Author);
-    (Author as any)._associations = [
-      {
-        type: "hasMany",
-        name: "books",
-        options: { autosave: false, foreignKey: "author_id", className: "Book" },
-      },
-    ];
+    Associations.hasMany.call(Author, "books", {
+      autosave: false,
+      foreignKey: "author_id",
+      className: "Book",
+    });
 
     const author = await Author.create({ name: "test" });
     const book = new Book({ title: "Unsaved" });
@@ -2347,13 +2284,11 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     }
     registerModel("Ship", Ship);
     registerModel("Pirate", Pirate);
-    (Pirate as any)._associations = [
-      {
-        type: "hasOne",
-        name: "ship",
-        options: { autosave: true, foreignKey: "pirate_id", className: "Ship" },
-      },
-    ];
+    Associations.hasOne.call(Pirate, "ship", {
+      autosave: true,
+      foreignKey: "pirate_id",
+      className: "Ship",
+    });
 
     const pirate = new Pirate({ catchphrase: "Yarr" });
     const ship = new Ship({ name: "Pearl" });
@@ -2505,30 +2440,25 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     registerModel("HotOrg", HotOrg);
     registerModel("HotMember", HotMember);
     registerModel("HotDetail", HotDetail);
-    (HotMember as any)._associations = [
-      {
-        type: "hasOne",
-        name: "hotDetail",
-        options: { className: "HotDetail", foreignKey: "hot_member_id" },
-      },
-      {
-        type: "hasOne",
-        name: "hotOrg",
-        options: { className: "HotOrg", through: "hotDetail", source: "hotOrg" },
-      },
-    ];
-    (HotDetail as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "hotOrg",
-        options: { className: "HotOrg", foreignKey: "hot_org_id" },
-      },
-      {
-        type: "belongsTo",
-        name: "hotMember",
-        options: { className: "HotMember", foreignKey: "hot_member_id" },
-      },
-    ];
+    Associations.hasOne.call(HotMember, "hotDetail", {
+      className: "HotDetail",
+      foreignKey: "hot_member_id",
+    });
+
+    Associations.hasOne.call(HotMember, "hotOrg", {
+      className: "HotOrg",
+      through: "hotDetail",
+      source: "hotOrg",
+    });
+    Associations.belongsTo.call(HotDetail, "hotOrg", {
+      className: "HotOrg",
+      foreignKey: "hot_org_id",
+    });
+
+    Associations.belongsTo.call(HotDetail, "hotMember", {
+      className: "HotMember",
+      foreignKey: "hot_member_id",
+    });
     const org = await HotOrg.create({ name: "Org" });
     const member = await HotMember.create({ name: "M" });
     await HotDetail.create({ hot_org_id: org.id, hot_member_id: member.id });
@@ -2568,30 +2498,25 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     registerModel("RevOrg", RevOrg);
     registerModel("RevMember", RevMember);
     registerModel("RevDetail", RevDetail);
-    (RevOrg as any)._associations = [
-      {
-        type: "hasOne",
-        name: "revDetail",
-        options: { className: "RevDetail", foreignKey: "rev_org_id" },
-      },
-      {
-        type: "hasOne",
-        name: "revMember",
-        options: { className: "RevMember", through: "revDetail", source: "revMember" },
-      },
-    ];
-    (RevDetail as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "revOrg",
-        options: { className: "RevOrg", foreignKey: "rev_org_id" },
-      },
-      {
-        type: "belongsTo",
-        name: "revMember",
-        options: { className: "RevMember", foreignKey: "rev_member_id" },
-      },
-    ];
+    Associations.hasOne.call(RevOrg, "revDetail", {
+      className: "RevDetail",
+      foreignKey: "rev_org_id",
+    });
+
+    Associations.hasOne.call(RevOrg, "revMember", {
+      className: "RevMember",
+      through: "revDetail",
+      source: "revMember",
+    });
+    Associations.belongsTo.call(RevDetail, "revOrg", {
+      className: "RevOrg",
+      foreignKey: "rev_org_id",
+    });
+
+    Associations.belongsTo.call(RevDetail, "revMember", {
+      className: "RevMember",
+      foreignKey: "rev_member_id",
+    });
     const org = await RevOrg.create({ name: "Org" });
     const member = await RevMember.create({ name: "M" });
     await RevDetail.create({ rev_org_id: org.id, rev_member_id: member.id });
@@ -2658,13 +2583,11 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
     }
     registerModel("BtOwner", BtOwner);
     registerModel("BtRecord", BtRecord);
-    (BtRecord as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "btOwner",
-        options: { className: "BtOwner", foreignKey: "bt_owner_id", autosave: true },
-      },
-    ];
+    Associations.belongsTo.call(BtRecord, "btOwner", {
+      className: "BtOwner",
+      foreignKey: "bt_owner_id",
+      autosave: true,
+    });
     const owner = await BtOwner.create({ name: "Owner" });
     const record = new BtRecord({ value: "V", bt_owner_id: owner.id });
     cacheAssoc(record, "btOwner", owner);
@@ -2694,20 +2617,16 @@ describe("TestAutosaveAssociationWithTouch", () => {
     }
     registerModel("TchParent", TchParent);
     registerModel("TchChild", TchChild);
-    (TchParent as any)._associations = [
-      {
-        type: "hasMany",
-        name: "tchChildren",
-        options: { className: "TchChild", foreignKey: "tch_parent_id", autosave: true },
-      },
-    ];
-    (TchChild as any)._associations = [
-      {
-        type: "belongsTo",
-        name: "tchParent",
-        options: { className: "TchParent", foreignKey: "tch_parent_id", touch: true },
-      },
-    ];
+    Associations.hasMany.call(TchParent, "tchChildren", {
+      className: "TchChild",
+      foreignKey: "tch_parent_id",
+      autosave: true,
+    });
+    Associations.belongsTo.call(TchChild, "tchParent", {
+      className: "TchParent",
+      foreignKey: "tch_parent_id",
+      touch: true,
+    });
     const parent = await TchParent.create({ name: "P" });
     const child = new TchChild({ value: "C", tch_parent_id: parent.id });
     cacheAssoc(parent, "tchChildren", [child]);
@@ -2746,9 +2665,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     Bird.adapter = adapter;
     registerModel("Pirate", Pirate);
     registerModel("Bird", Bird);
-    (Pirate as any)._associations = [
-      { type: "hasMany", name: "birds", options: { autosave: true } },
-    ];
+    Associations.hasMany.call(Pirate, "birds", { autosave: true });
     acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true });
     return { Pirate, Bird };
   }
@@ -2793,13 +2710,11 @@ describe("should update children when autosave is true and parent is new but chi
     }
     registerModel("UcParent", UcParent);
     registerModel("UcChild", UcChild);
-    (UcParent as any)._associations = [
-      {
-        type: "hasMany",
-        name: "ucChildren",
-        options: { className: "UcChild", foreignKey: "uc_parent_id", autosave: true },
-      },
-    ];
+    Associations.hasMany.call(UcParent, "ucChildren", {
+      className: "UcChild",
+      foreignKey: "uc_parent_id",
+      autosave: true,
+    });
     // Child exists, parent is new
     const child = await UcChild.create({ val: "existing" });
     const parent = new UcParent({ name: "new parent" });

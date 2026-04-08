@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { Base, Relation, association, registerModel } from "../index.js";
+import { Associations } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
@@ -145,13 +146,10 @@ describe("Thenable", () => {
       };
       registerModel(ThenablePost);
       registerModel(ThenableComment);
-      (ThenablePost as any)._associations = [
-        {
-          type: "hasMany",
-          name: "thenableComments",
-          options: { className: "ThenableComment", foreignKey: "thenable_post_id" },
-        },
-      ];
+      Associations.hasMany.call(ThenablePost, "thenableComments", {
+        className: "ThenableComment",
+        foreignKey: "thenable_post_id",
+      });
     });
 
     it("CollectionProxy is directly awaitable", async () => {

@@ -2351,9 +2351,6 @@ export class Base extends Model {
 
     let didDelete = false;
     const halted = !(await ctor._callbackChain.run("destroy", this, async () => {
-      const { processDependentAssociations } = await import("./associations.js");
-      await processDependentAssociations(this);
-
       const table = ctor.arelTable;
       const pk = this.id;
       if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {

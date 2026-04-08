@@ -5,6 +5,7 @@ import {
   camelize,
   demodulize,
 } from "@blazetrails/activesupport";
+import { beforeDestroy } from "../../callbacks.js";
 
 /**
  * Builder for has_and_belongs_to_many associations. Internally creates
@@ -81,7 +82,7 @@ export class HasAndBelongsToMany {
   }
 
   middleReflection(joinModel: any): any {
-    const lhsModelName = underscore(this.lhsModel.name).replace(/\//g, "_").toLowerCase();
+    const lhsModelName = this.lhsModel.name.toLowerCase();
     const middleName = [pluralize(lhsModelName), this.associationName].sort().join("_");
 
     const middleOptions: Record<string, unknown> = {};
@@ -177,7 +178,7 @@ export class HasAndBelongsToMany {
 
     deps.modelRegistry.set(registryKey, JoinModel);
 
-    const middleName = [pluralize(underscore(model.name).toLowerCase()), name].sort().join("_");
+    const middleName = [pluralize(model.name.toLowerCase()), name].sort().join("_");
     model._associations.push({
       type: "hasMany",
       name: middleName,
@@ -186,6 +187,10 @@ export class HasAndBelongsToMany {
         foreignKey: ownerFk,
         dependent: "delete",
       },
+    });
+
+    beforeDestroy(model, (record: any) => {
+      return record.association(middleName).handleDependency();
     });
 
     model._associations.push({
