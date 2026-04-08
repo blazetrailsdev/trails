@@ -16,7 +16,9 @@ import {
   camelize as _camelize,
   singularize as _singularize,
 } from "@blazetrails/activesupport";
+import { sql as arelSql } from "@blazetrails/arel";
 import { modelRegistry } from "../associations.js";
+import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
 
 export interface JoinNode {
@@ -264,21 +266,102 @@ export class JoinDependency {
     return lastNode;
   }
 
-  buildSelectSql(): string {
+  private _buildSelectExpressions(): string[] {
     const aliasByIndex = new Map<number, string>();
     aliasByIndex.set(this._baseTableIndex, this._baseAlias);
     for (const node of this._nodes) aliasByIndex.set(node.tableIndex, node.tableAlias);
 
-    return this._aliases
-      .map((a) => {
-        const tableAlias = aliasByIndex.get(a.tableIndex)!;
-        return `"${tableAlias}"."${a.column}" AS "${a.alias}"`;
-      })
-      .join(", ");
+    return this._aliases.map((a) => {
+      const tableAlias = aliasByIndex.get(a.tableIndex)!;
+      return `"${tableAlias}"."${a.column}" AS "${a.alias}"`;
+    });
+  }
+
+  buildSelectSql(): string {
+    return this._buildSelectExpressions().join(", ");
   }
 
   buildJoinSql(): string {
     return this._nodes.map((n) => n.joinSql).join(" ");
+  }
+
+  get baseKlass(): typeof Base {
+    return this._baseModel;
+  }
+
+  get reflections(): any[] {
+    const modelByPath = new Map<string, any>();
+    return this._nodes
+      .map((node) => {
+        const parentModel = node.parentPath
+          ? (modelByPath.get(node.parentPath) ?? (this._baseModel as any))
+          : (this._baseModel as any);
+        const reflection = reflectOnAssociation(parentModel, node.immediateAssocName);
+        const nodePath = node.parentPath
+          ? `${node.parentPath}.${node.immediateAssocName}`
+          : node.immediateAssocName;
+        modelByPath.set(nodePath, node.modelClass as any);
+        return reflection;
+      })
+      .filter(Boolean);
+  }
+
+  joinConstraints(
+    joinsToAdd: JoinDependency[],
+    _aliasTracker?: any,
+    _references?: string[],
+  ): any[] {
+    const joins = this._nodes.map((n) => arelSql(n.joinSql));
+    for (const oj of joinsToAdd) {
+      joins.push(...oj._nodes.map((n) => arelSql(n.joinSql)));
+    }
+    return joins;
+  }
+
+  instantiate(resultSet: Record<string, unknown>[], _strictLoadingValue?: boolean): any[] {
+    const { parents } = this.instantiateFromRows(resultSet);
+    return parents;
+  }
+
+  applyColumnAliases(relation: any): any {
+    const selectExprs = this._buildSelectExpressions();
+    if (typeof relation.reselectBang === "function") {
+      relation.reselectBang(...selectExprs);
+      return relation;
+    } else if (typeof relation.select === "function") {
+      return relation.select(...selectExprs);
+    }
+    return relation;
+  }
+
+  each(callback: (node: JoinNode, index: number) => void): void {
+    this._nodes.forEach(callback);
+  }
+
+  [Symbol.iterator](): Iterator<JoinNode> {
+    return this._nodes[Symbol.iterator]();
+  }
+
+  static makeTree(associations: any): Record<PropertyKey, any> {
+    const hash: Record<PropertyKey, any> = Object.create(null);
+    JoinDependency.walkTree(associations, hash);
+    return hash;
+  }
+
+  static walkTree(associations: any, hash: Record<PropertyKey, any>): void {
+    if (typeof associations === "string" || typeof associations === "symbol") {
+      if (!hash[associations]) hash[associations] = Object.create(null);
+    } else if (Array.isArray(associations)) {
+      for (const assoc of associations) {
+        JoinDependency.walkTree(assoc, hash);
+      }
+    } else if (associations && typeof associations === "object") {
+      for (const key of Reflect.ownKeys(associations)) {
+        const value = associations[key];
+        if (!hash[key]) hash[key] = Object.create(null);
+        if (value != null) JoinDependency.walkTree(value, hash[key]);
+      }
+    }
   }
 
   private _addStiConstraint(joinOn: string, model: typeof Base, alias: string): string {
