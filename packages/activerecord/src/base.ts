@@ -162,6 +162,8 @@ export class Base extends Model {
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _configPath: string | null = null;
   static _abstractClass = false;
+  static automaticScopeInversing = false;
+  static automaticallyInvertPluralAssociations = false;
   static _tableNamePrefix = "";
   static _tableNameSuffix = "";
   static _protectedEnvironments: string[] = ["production"];

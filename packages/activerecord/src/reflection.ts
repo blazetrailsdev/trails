@@ -4,6 +4,7 @@ import {
   pluralize,
   singularize,
   camelize,
+  demodulize,
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
 import { Table } from "@blazetrails/arel";
@@ -422,17 +423,121 @@ export class AssociationReflection extends MacroReflection {
   }
 
   hasInverse(): boolean {
-    return this.options.inverseOf !== undefined && this.options.inverseOf !== false;
+    return !!this.inverseName();
   }
 
   inverseOf(): AssociationReflection | ThroughReflection | null {
-    if (this.options.inverseOf === false) return null;
-    const inverseName = this.options.inverseOf as string | undefined;
-    if (!inverseName) return null;
+    const name = this.inverseName();
+    if (!name) return null;
+    if (this._inverseOfCache !== undefined) return this._inverseOfCache;
     const targetAssocs: any[] = (this.klass as any)._associations ?? [];
-    const assocDef = targetAssocs.find((a: any) => a.name === inverseName);
-    if (!assocDef) return null;
-    return createReflection(assocDef, this.klass);
+    const assocDef = targetAssocs.find((a: any) => a.name === name);
+    if (!assocDef) {
+      this._inverseOfCache = null;
+      return null;
+    }
+    this._inverseOfCache = createReflection(assocDef, this.klass);
+    return this._inverseOfCache;
+  }
+
+  private _inverseNameCache: string | null | undefined = undefined;
+  private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
+
+  private inverseName(): string | null {
+    if (this._inverseNameCache !== undefined) return this._inverseNameCache;
+    const explicit = this.options.inverseOf;
+    if (explicit !== undefined) {
+      this._inverseNameCache = explicit === false ? null : (explicit as string);
+    } else {
+      this._inverseNameCache = this.automaticInverseOf();
+    }
+    return this._inverseNameCache;
+  }
+
+  private automaticInverseOf(): string | null {
+    if (!this.canFindInverseOfAutomatically(this)) return null;
+
+    const inverseName = this.options.as
+      ? underscore(this.options.as as string)
+      : underscore(demodulize(this.activeRecord.name));
+
+    let reflection: AssociationReflection | ThroughReflection | null | false;
+    try {
+      const targetAssocs: any[] = (this.klass as any)._associations ?? [];
+      let assocDef = targetAssocs.find((a: any) => a.name === inverseName);
+      reflection = assocDef ? createReflection(assocDef, this.klass) : null;
+
+      if (!reflection && this.activeRecord.automaticallyInvertPluralAssociations) {
+        const pluralInverseName = pluralize(inverseName);
+        assocDef = targetAssocs.find((a: any) => a.name === pluralInverseName);
+        reflection = assocDef ? createReflection(assocDef, this.klass) : null;
+      }
+    } catch (e: unknown) {
+      // Rails: rescue NameError => error; raise unless error.name.to_s == class_name
+      // Only swallow model-not-found errors from computeClass, re-raise anything else
+      if (e instanceof Error && e.message.startsWith("Could not find model")) {
+        reflection = false;
+      } else {
+        throw e;
+      }
+    }
+
+    if (this.validInverseReflection(reflection)) {
+      return (reflection as any).name;
+    }
+    return null;
+  }
+
+  private validInverseReflection(
+    reflection: AssociationReflection | ThroughReflection | null | false,
+  ): boolean {
+    if (!reflection) return false;
+    if (reflection === (this as any)) return false;
+
+    const reflFk = (reflection as any).foreignKey;
+    const thisFk = this.foreignKey;
+    if (JSON.stringify(reflFk) !== JSON.stringify(thisFk)) return false;
+
+    const reflActiveRecord = (reflection as any).activeRecord;
+    if (this.klass !== reflActiveRecord) {
+      let proto = Object.getPrototypeOf(this.klass);
+      let isSubclass = false;
+      while (proto) {
+        if (proto === reflActiveRecord) {
+          isSubclass = true;
+          break;
+        }
+        proto = Object.getPrototypeOf(proto);
+      }
+      if (!isSubclass) return false;
+    }
+
+    return this.canFindInverseOfAutomatically(reflection as AssociationReflection, true);
+  }
+
+  protected canFindInverseOfAutomatically(
+    reflection: AssociationReflection | ThroughReflection,
+    inverseReflection = false,
+  ): boolean {
+    if ((reflection as any).options?.inverseOf === false) return false;
+    if ((reflection as any).options?.through) return false;
+    if ((reflection as any).options?.foreignKey) return false;
+    return this.scopeAllowsAutomaticInverseOf(reflection, inverseReflection);
+  }
+
+  private scopeAllowsAutomaticInverseOf(
+    reflection: AssociationReflection | ThroughReflection,
+    inverseReflection: boolean,
+  ): boolean {
+    if (inverseReflection) {
+      return !(reflection as any).scope;
+    }
+    if (!(reflection as any).scope) return true;
+    try {
+      return !!(reflection as any).klass?.automaticScopeInversing;
+    } catch {
+      return false;
+    }
   }
 
   get associationPrimaryKey(): string | string[] {
@@ -543,12 +648,13 @@ export class AssociationReflection extends MacroReflection {
     associatedClass: typeof Base,
   ): AssociationReflection | ThroughReflection | null {
     if (this.hasInverse()) {
-      const inverseName = this.options.inverseOf as string;
+      const name = this.inverseName();
+      if (!name) return null;
       const assocs: any[] = (associatedClass as any)._associations ?? [];
-      const assocDef = assocs.find((a: any) => a.name === inverseName);
+      const assocDef = assocs.find((a: any) => a.name === name);
       if (!assocDef) {
         throw new Error(
-          `Could not find the inverse association for ${this.name} (:${this.options.inverseOf} in ${associatedClass.name})`,
+          `Could not find the inverse association for ${this.name} (:${name} in ${associatedClass.name})`,
         );
       }
       return createReflection(assocDef, associatedClass);
@@ -656,6 +762,14 @@ export class BelongsToReflection extends AssociationReflection {
 
   associationClass(): typeof BelongsToAssociation | typeof BelongsToPolymorphicAssociation {
     return this.isPolymorphic() ? BelongsToPolymorphicAssociation : BelongsToAssociation;
+  }
+
+  protected override canFindInverseOfAutomatically(
+    reflection: AssociationReflection | ThroughReflection,
+    inverseReflection = false,
+  ): boolean {
+    if (this.isPolymorphic()) return false;
+    return super.canFindInverseOfAutomatically(reflection, inverseReflection);
   }
 
   get associationPrimaryKey(): string | string[] {

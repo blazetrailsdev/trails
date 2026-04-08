@@ -23,7 +23,7 @@ export interface AssociationOptions {
   primaryKey?: string | string[];
   queryConstraints?: string[];
   dependent?: "destroy" | "nullify" | "delete" | "restrictWithException" | "restrictWithError";
-  inverseOf?: string;
+  inverseOf?: string | false;
   through?: string;
   source?: string;
   sourceType?: string;
