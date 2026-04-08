@@ -96,6 +96,16 @@ export function hasSecurePassword(
     configurable: true,
   });
 
+  const saltMethodName = `${attribute}Salt`;
+  Object.defineProperty(modelClass.prototype, saltMethodName, {
+    get(this: Model) {
+      const digest = this.readAttribute(digestAttr) as string | null;
+      if (!digest) return null;
+      return bcrypt.getSalt(digest);
+    },
+    configurable: true,
+  });
+
   const authMethodName =
     attribute === "password" ? "authenticate" : `authenticate${camelize(attribute)}`;
 

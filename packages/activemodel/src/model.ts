@@ -10,6 +10,7 @@ import {
   CallbackChain,
   CallbackFn,
   AroundCallbackFn,
+  type CallbackObject,
   CallbackConditions,
   defineModelCallbacks,
 } from "./callbacks.js";
@@ -514,89 +515,98 @@ export class Model {
 
   // -- Callbacks (Phase 1200) --
 
-  static beforeValidation(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static beforeValidation(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     this._ensureOwnCallbacks();
     this._callbackChain.register("before", "validation", fn, conditions);
   }
 
-  static afterValidation(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterValidation(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "validation", fn, conditions);
   }
 
-  static beforeSave(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static beforeSave(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("before", "save", fn, conditions);
   }
 
-  static afterSave(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterSave(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "save", fn, conditions);
   }
 
-  static beforeCreate(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static beforeCreate(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("before", "create", fn, conditions);
   }
 
-  static afterCreate(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterCreate(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "create", fn, conditions);
   }
 
-  static beforeUpdate(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static beforeUpdate(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("before", "update", fn, conditions);
   }
 
-  static afterUpdate(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterUpdate(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "update", fn, conditions);
   }
 
-  static beforeDestroy(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static beforeDestroy(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("before", "destroy", fn, conditions);
   }
 
-  static afterDestroy(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterDestroy(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "destroy", fn, conditions);
   }
 
-  static aroundSave(fn: AroundCallbackFn, conditions?: CallbackConditions): void {
+  static aroundSave(fn: AroundCallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("around", "save", fn, conditions);
   }
 
-  static aroundCreate(fn: AroundCallbackFn, conditions?: CallbackConditions): void {
+  static aroundCreate(
+    fn: AroundCallbackFn | CallbackObject,
+    conditions?: CallbackConditions,
+  ): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("around", "create", fn, conditions);
   }
 
-  static aroundUpdate(fn: AroundCallbackFn, conditions?: CallbackConditions): void {
+  static aroundUpdate(
+    fn: AroundCallbackFn | CallbackObject,
+    conditions?: CallbackConditions,
+  ): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("around", "update", fn, conditions);
   }
 
-  static aroundDestroy(fn: AroundCallbackFn, conditions?: CallbackConditions): void {
+  static aroundDestroy(
+    fn: AroundCallbackFn | CallbackObject,
+    conditions?: CallbackConditions,
+  ): void {
     _rejectOnOption(conditions);
     this._ensureOwnCallbacks();
     this._callbackChain.register("around", "destroy", fn, conditions);
   }
 
-  static afterCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterCommit(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
     }
@@ -604,23 +614,26 @@ export class Model {
     this._callbackChain.register("after", "commit", fn, conditions);
   }
 
-  static afterSaveCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterSaveCommit(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     this.afterCommit(fn, { ...conditions, on: ["create", "update"] });
   }
 
-  static afterCreateCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterCreateCommit(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     this.afterCommit(fn, { ...conditions, on: "create" });
   }
 
-  static afterUpdateCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterUpdateCommit(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     this.afterCommit(fn, { ...conditions, on: "update" });
   }
 
-  static afterDestroyCommit(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterDestroyCommit(
+    fn: CallbackFn | CallbackObject,
+    conditions?: CallbackConditions,
+  ): void {
     this.afterCommit(fn, { ...conditions, on: "destroy" });
   }
 
-  static afterRollback(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterRollback(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
     }
@@ -628,17 +641,17 @@ export class Model {
     this._callbackChain.register("after", "rollback", fn, conditions);
   }
 
-  static afterInitialize(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterInitialize(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "initialize", fn, conditions);
   }
 
-  static afterFind(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterFind(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "find", fn, conditions);
   }
 
-  static afterTouch(fn: CallbackFn, conditions?: CallbackConditions): void {
+  static afterTouch(fn: CallbackFn | CallbackObject, conditions?: CallbackConditions): void {
     this._ensureOwnCallbacks();
     this._callbackChain.register("after", "touch", fn, conditions);
   }

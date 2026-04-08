@@ -230,6 +230,84 @@ describe("CallbacksTest", () => {
     expect((Task as any).afterExecute).toBeUndefined();
     expect((Task as any).aroundExecute).toBeUndefined();
   });
+
+  it("class-based callback object with before method", () => {
+    const log: string[] = [];
+    const auditor = {
+      beforeValidation(record: any) {
+        log.push(`auditing ${record.readAttribute("name")}`);
+      },
+    };
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.beforeValidation(auditor);
+      }
+    }
+    const p = new Person({ name: "Alice" });
+    p.isValid();
+    expect(log).toContain("auditing Alice");
+  });
+
+  it("class-based callback object with snake_case method", () => {
+    const log: string[] = [];
+    const auditor = {
+      before_validation(record: any) {
+        log.push("snake_case called");
+      },
+    };
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.beforeValidation(auditor);
+      }
+    }
+    new Person({ name: "test" }).isValid();
+    expect(log).toContain("snake_case called");
+  });
+
+  it("class-based around callback object with proceed", () => {
+    const log: string[] = [];
+    const wrapper = {
+      aroundSave(record: any, proceed: () => void) {
+        log.push("around_before");
+        proceed();
+        log.push("around_after");
+      },
+    };
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.aroundSave(wrapper);
+      }
+    }
+    const p = new Person({ name: "test" });
+    p.runCallbacks("save", () => {
+      log.push("save");
+    });
+    expect(log).toEqual(["around_before", "save", "around_after"]);
+  });
+
+  it("class-based callback via defineModelCallbacks-generated methods", () => {
+    const log: string[] = [];
+    const observer = {
+      beforeProcess(record: any) {
+        log.push(`processing ${record.readAttribute("name")}`);
+      },
+    };
+    class Job extends Model {
+      static {
+        this.attribute("name", "string");
+        this.defineModelCallbacks("process");
+        (this as any).beforeProcess(observer);
+      }
+    }
+    const j = new Job({ name: "import" });
+    j.runCallbacks("process", () => {
+      log.push("executed");
+    });
+    expect(log).toEqual(["processing import", "executed"]);
+  });
 });
 
 describe("CallbackChain.runAsync", () => {
