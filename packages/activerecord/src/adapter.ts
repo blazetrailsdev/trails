@@ -62,4 +62,32 @@ export interface DatabaseAdapter {
    * Optional — not all adapters support this.
    */
   explain?(sql: string): Promise<string>;
+
+  // --- DatabaseStatements (Rails mixin) ---
+  // Mirrors ActiveRecord::ConnectionAdapters::DatabaseStatements.
+  // Default implementations delegate to execute()/executeMutation().
+
+  selectAll(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+  ): Promise<Record<string, unknown>[]>;
+  selectOne(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+  ): Promise<Record<string, unknown> | undefined>;
+  selectValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
+  selectValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
+  selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  execQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+  ): Promise<Record<string, unknown>[]>;
+  execInsert(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  isWriteQuery(sql: string): boolean;
+  emptyInsertStatementValue(pk?: string | null): string;
 }

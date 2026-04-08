@@ -1,5 +1,8 @@
 import mysql from "mysql2/promise";
 import type { DatabaseAdapter } from "../adapter.js";
+import { DatabaseStatementsMixin } from "../connection-adapters/database-statements-mixin.js";
+
+const AdapterBase = DatabaseStatementsMixin(class {});
 
 /**
  * MySQL adapter — connects ActiveRecord to a real MySQL/MariaDB database.
@@ -9,7 +12,7 @@ import type { DatabaseAdapter } from "../adapter.js";
  * Accepts either a connection URI (`mysql://...`) or a `mysql2` pool config
  * object. Uses a connection pool internally for concurrent access.
  */
-export class Mysql2Adapter implements DatabaseAdapter {
+export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
   readonly adapterName = "Mysql2";
 
   private pool: mysql.Pool;
@@ -17,6 +20,7 @@ export class Mysql2Adapter implements DatabaseAdapter {
   private _inTransaction = false;
 
   constructor(config: string | mysql.PoolOptions) {
+    super();
     if (typeof config === "string") {
       this.pool = mysql.createPool({ uri: config });
     } else {
@@ -221,6 +225,10 @@ export class Mysql2Adapter implements DatabaseAdapter {
    */
   get inTransaction(): boolean {
     return this._inTransaction;
+  }
+
+  override emptyInsertStatementValue(): string {
+    return "VALUES ()";
   }
 
   /**

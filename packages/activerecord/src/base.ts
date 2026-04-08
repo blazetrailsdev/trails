@@ -997,10 +997,10 @@ export class Base extends Model {
 
     manager.take(1);
     const sql = manager.toSql();
-    const rows = await this.adapter.execute(sql);
-    if (rows.length === 0) return null;
+    const row = await this.adapter.selectOne(sql, "Find");
+    if (!row) return null;
 
-    return this._instantiate(rows[0]);
+    return this._instantiate(row);
   }
 
   /**
@@ -2198,10 +2198,8 @@ export class Base extends Model {
 
     let sql: string;
     if (columns.length === 0) {
-      // PG supports DEFAULT VALUES, MySQL/SQLite need () VALUES ()
-      sql = process.env.MYSQL_TEST_URL
-        ? `INSERT INTO "${table.name}" () VALUES ()`
-        : `INSERT INTO "${table.name}" DEFAULT VALUES`;
+      const emptyValue = ctor.adapter.emptyInsertStatementValue();
+      sql = `INSERT INTO "${table.name}" ${emptyValue}`;
     } else {
       const im = new InsertManager(table);
       const insertValues: [InstanceType<typeof Nodes.Node>, unknown][] = columns.map((c, i) => {
@@ -2213,7 +2211,7 @@ export class Base extends Model {
       im.insert(insertValues);
       sql = im.toSql();
     }
-    this._pendingOperation = ctor.adapter.executeMutation(sql).then((insertedId) => {
+    this._pendingOperation = ctor.adapter.execInsert(sql, "Insert").then((insertedId) => {
       if (!Array.isArray(ctor.primaryKey) && this.id === null) {
         this._attributes.set(ctor.primaryKey, insertedId);
       }
@@ -2283,7 +2281,7 @@ export class Base extends Model {
       }
     }
 
-    this._pendingOperation = ctor.adapter.executeMutation(um.toSql()).then((affected) => {
+    this._pendingOperation = ctor.adapter.execUpdate(um.toSql(), "Update").then((affected) => {
       if (ctor.lockingEnabled && affected === 0) {
         throw new StaleObjectError(this, "update");
       }
@@ -2370,7 +2368,7 @@ export class Base extends Model {
           }
         }
 
-        const affected = await ctor.adapter.executeMutation(dm.toSql());
+        const affected = await ctor.adapter.execDelete(dm.toSql(), "Destroy");
         if (ctor.lockingEnabled && affected === 0) {
           throw new StaleObjectError(this, "destroy");
         }
@@ -2429,7 +2427,7 @@ export class Base extends Model {
     }
 
     const dm = new DeleteManager().from(table).where(ctor._buildPkWhereNode(pk));
-    await ctor.adapter.executeMutation(dm.toSql());
+    await ctor.adapter.execDelete(dm.toSql(), "Delete");
 
     this._destroyed = true;
     this._frozen = true;
@@ -2443,7 +2441,7 @@ export class Base extends Model {
    */
   static async delete(id: unknown): Promise<number> {
     const dm = new DeleteManager().from(this.arelTable).where(this._buildPkWhereNode(id));
-    return this.adapter.executeMutation(dm.toSql());
+    return this.adapter.execDelete(dm.toSql(), "Delete");
   }
 
   /**
@@ -2454,9 +2452,9 @@ export class Base extends Model {
   async reload(): Promise<this> {
     const ctor = this.constructor as typeof Base;
     const sm = ctor.arelTable.project(arelStar).where(ctor._buildPkWhereNode(this.id));
-    const row = await ctor.adapter.execute(sm.toSql());
+    const rows = await ctor.adapter.selectAll(sm.toSql(), "Reload");
 
-    if (row.length === 0) {
+    if (rows.length === 0) {
       throw new RecordNotFound(
         `${ctor.name} with ${ctor.primaryKey}=${this.id} not found`,
         ctor.name,
@@ -2465,7 +2463,7 @@ export class Base extends Model {
       );
     }
 
-    for (const [key, value] of Object.entries(row[0])) {
+    for (const [key, value] of Object.entries(rows[0])) {
       this._attributes.set(key, value);
     }
 
@@ -2647,7 +2645,7 @@ export class Base extends Model {
       .join(", ");
 
     const sql = `UPDATE "${table.name}" SET ${setClauses} WHERE ${ctor._buildPkWhere(this.id)}`;
-    await ctor.adapter.executeMutation(sql);
+    await ctor.adapter.execUpdate(sql, "Update Columns");
 
     // Reset dirty tracking to reflect the new persisted state
     this.changesApplied();

@@ -9,6 +9,9 @@ import {
   quoteString as pgQuoteString,
 } from "../connection-adapters/postgresql/quoting.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { DatabaseStatementsMixin } from "../connection-adapters/database-statements-mixin.js";
+
+const AdapterBase = DatabaseStatementsMixin(class {});
 
 /**
  * PostgreSQL adapter — connects ActiveRecord to a real PostgreSQL database.
@@ -18,7 +21,7 @@ import type { DatabaseAdapter } from "../adapter.js";
  * Accepts either a connection string (`postgres://...`) or a `pg.PoolConfig`
  * object. Uses a connection pool internally for concurrent access.
  */
-export class PostgreSQLAdapter implements DatabaseAdapter {
+export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
   readonly adapterName = "PostgreSQL";
 
   private static _spCounter = 0;
@@ -27,6 +30,7 @@ export class PostgreSQLAdapter implements DatabaseAdapter {
   private _inTransaction = false;
 
   constructor(config: string | pg.PoolConfig) {
+    super();
     if (typeof config === "string") {
       this.pool = new pg.Pool({ connectionString: config });
     } else {

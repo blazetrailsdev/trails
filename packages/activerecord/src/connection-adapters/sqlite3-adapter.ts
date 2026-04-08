@@ -30,13 +30,17 @@ import {
 } from "@blazetrails/activemodel";
 import { getFs } from "@blazetrails/activesupport";
 import { quoteString, quoteTableName, quoteColumnName } from "./sqlite3/quoting.js";
+import { DatabaseStatementsMixin } from "./database-statements-mixin.js";
 
 /**
  * SQLite adapter — connects ActiveRecord to a real SQLite database.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter
  */
-export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
+export class SQLite3Adapter
+  extends DatabaseStatementsMixin(AbstractAdapter)
+  implements DatabaseAdapter
+{
   override get adapterName(): string {
     return "SQLite";
   }

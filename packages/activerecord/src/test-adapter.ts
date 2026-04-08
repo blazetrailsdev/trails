@@ -17,6 +17,7 @@
  */
 
 import type { DatabaseAdapter } from "./adapter.js";
+import { DatabaseStatementsMixin } from "./connection-adapters/database-statements-mixin.js";
 import { _setOnAdapterSetHook } from "./base.js";
 
 const PG_TEST_URL = process.env.PG_TEST_URL;
@@ -298,7 +299,7 @@ export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void
  *   2. Creates tables from registered model attribute definitions
  *   3. Handles missing table/column errors as a fallback
  */
-class SchemaAdapter implements DatabaseAdapter {
+class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements DatabaseAdapter {
   get adapterName(): string {
     return this.inner?.adapterName ?? "SchemaAdapter";
   }
@@ -306,6 +307,7 @@ class SchemaAdapter implements DatabaseAdapter {
   private inner: any;
 
   constructor(inner: any) {
+    super();
     this.inner = inner;
   }
 
@@ -600,6 +602,14 @@ class SchemaAdapter implements DatabaseAdapter {
   }
   get inTransaction(): boolean {
     return this.inner.inTransaction;
+  }
+
+  override emptyInsertStatementValue(pk?: string | null): string {
+    return this.inner.emptyInsertStatementValue?.(pk) ?? super.emptyInsertStatementValue(pk);
+  }
+
+  override isWriteQuery(sql: string): boolean {
+    return this.inner.isWriteQuery?.(sql) ?? super.isWriteQuery(sql);
   }
 
   async exec(sql: string): Promise<void> {

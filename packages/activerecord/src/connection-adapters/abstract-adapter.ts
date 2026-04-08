@@ -8,6 +8,7 @@ import type { DatabaseAdapter } from "../adapter.js";
 import type { Nodes } from "@blazetrails/arel";
 import { ReadOnlyError } from "../errors.js";
 import { SchemaCache } from "./schema-cache.js";
+import { isWriteQuerySql, stripSqlComments } from "./sql-classification.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
@@ -215,38 +216,11 @@ export class AbstractAdapter {
   // --- Private helpers ---
 
   protected isWriteQuery(sql: string): boolean {
-    const stripped = this.stripSqlComments(sql).replace(/^\s*\(+\s*/, "");
-    const match = stripped.match(/^\s*([A-Z]+)\b/i);
-    if (!match) return true;
-    const stmt = match[1].toUpperCase();
-    if (this.isReadOnlyStatement(stmt)) return false;
-    if (stmt !== "WITH") return true;
-    // CTE: check the statement after the WITH clause
-    const afterWith = stripped.replace(/^\s*WITH\b/i, "").replace(/\([^)]*\)/g, "");
-    const innerMatch = afterWith.match(/\b(SELECT|INSERT|UPDATE|DELETE|MERGE)\b/i);
-    return !innerMatch || innerMatch[1].toUpperCase() !== "SELECT";
+    return isWriteQuerySql(sql);
   }
 
-  private isReadOnlyStatement(stmt: string): boolean {
-    return /^(SELECT|EXPLAIN|PRAGMA|SHOW|SET|RESET|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|DESCRIBE|DESC|USE|KILL)$/.test(
-      stmt,
-    );
-  }
-
-  private stripSqlComments(sql: string): string {
-    // Strip block comments
-    let result = sql.replace(/\/\*[\s\S]*?\*\//g, "");
-    // Strip line comments conservatively (-- must be preceded by whitespace
-    // or at start of line to avoid matching arithmetic like 1--1)
-    result = result
-      .split("\n")
-      .map((line) => {
-        const match = line.match(/(^|[\s])--.*/);
-        if (!match || match.index === undefined) return line;
-        return line.slice(0, match.index + match[1].length);
-      })
-      .join("\n");
-    return result;
+  protected stripSqlComments(sql: string): string {
+    return stripSqlComments(sql);
   }
 
   supportsDdlTransactions(): boolean {
