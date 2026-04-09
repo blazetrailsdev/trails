@@ -116,8 +116,8 @@ export class AbstractReflection {
     return [this];
   }
 
-  buildScope(_table?: Table): any {
-    return (this.klass as any).all();
+  buildScope(_table?: Table, _predicateBuilder?: any, klass?: typeof Base): any {
+    return ((klass ?? this.klass) as any).all();
   }
 
   joinScope(table: Table, foreignTable: Table, foreignKlass: typeof Base): any {
@@ -149,17 +149,17 @@ export class AbstractReflection {
     return scope;
   }
 
-  joinScopes(table: Table): any[] {
+  joinScopes(table: Table, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
     if (this.scope) {
-      const rel = this.buildScope(table);
-      const result = this.scope.call(null, rel);
+      const rel = this.buildScope(table, predicateBuilder, klass);
+      const result = (this as any).scopeFor?.(rel, record) ?? this.scope(rel);
       return [result || rel];
     }
     return [];
   }
 
-  klassJoinScope(_table?: Table): any {
-    return this.buildScope(_table);
+  klassJoinScope(_table?: Table, _predicateBuilder?: any): any {
+    return this.buildScope(_table, _predicateBuilder);
   }
 
   constraints(): Array<(...args: any[]) => any> {
@@ -1134,9 +1134,10 @@ export class ThroughReflection extends AbstractReflection {
     return this.sourceReflection?.joinForeignKey ?? this._delegate.joinForeignKey;
   }
 
-  joinScopes(table: Table): any[] {
-    const sourceScopes = this.sourceReflection?.joinScopes(table) ?? [];
-    return [...sourceScopes, ...super.joinScopes(table)];
+  joinScopes(table: Table, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
+    const sourceScopes =
+      this.sourceReflection?.joinScopes(table, predicateBuilder, klass, record) ?? [];
+    return [...sourceScopes, ...super.joinScopes(table, predicateBuilder, klass, record)];
   }
 
   collectJoinChain(): AbstractReflection[] {
@@ -1388,10 +1389,12 @@ export class PolymorphicReflection extends AbstractReflection {
     return (this._reflection as any).scopeFor?.(relation, owner) ?? relation;
   }
 
-  joinScopes(table: Table): any[] {
-    const scopes = super.joinScopes(table);
+  joinScopes(table: Table, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
+    const scopes = super.joinScopes(table, predicateBuilder, klass, record);
     if (!(this._previousReflection as any).isThroughReflection?.()) {
-      const prevScopes = (this._previousReflection as any).joinScopes?.(table) ?? [];
+      const prevScopes =
+        (this._previousReflection as any).joinScopes?.(table, predicateBuilder, klass, record) ??
+        [];
       scopes.push(...prevScopes);
     }
     return scopes;

@@ -9,7 +9,14 @@ import { Association } from "./association.js";
  * Mirrors: ActiveRecord::Associations::Preloader::ThroughAssociation
  */
 export class ThroughAssociation extends Association {
-  constructor(klass: typeof Base, owners: Base[], reflection: AssociationReflection) {
-    super(klass, owners, reflection);
+  constructor(
+    klass: typeof Base,
+    owners: Base[],
+    reflection: AssociationReflection,
+    preloadScope?: any,
+    reflectionScope?: any,
+    associateByDefault: boolean = true,
+  ) {
+    super(klass, owners, reflection, preloadScope, reflectionScope, associateByDefault);
   }
 }
