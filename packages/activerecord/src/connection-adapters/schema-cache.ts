@@ -41,6 +41,7 @@ export class SchemaCache {
       hash.set(col.name, col);
     }
     this._columnsHash.set(tableName, hash);
+    this._dataSourceExists.set(tableName, true);
   }
 
   primaryKeys(tableName: string): string | null | undefined {
