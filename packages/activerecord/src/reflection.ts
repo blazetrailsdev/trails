@@ -549,7 +549,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   isPolymorphic(): boolean {
-    return !!(this.options.polymorphic || this.options.as);
+    return !!this.options.polymorphic;
   }
 
   get validate(): boolean {
@@ -914,6 +914,10 @@ export class BelongsToReflection extends AssociationReflection {
 
   belongsTo(): boolean {
     return true;
+  }
+
+  get type(): string | null {
+    return null;
   }
 
   associationClass(): typeof BelongsToAssociation | typeof BelongsToPolymorphicAssociation {

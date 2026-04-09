@@ -1034,8 +1034,7 @@ describe("AssociationsJoinModelTest", () => {
     // Requires scope merging
   });
 
-  it.skip("eager has many polymorphic with source type", async () => {
-    // TODO: polymorphic source_type through preloader
+  it("eager has many polymorphic with source type", async () => {
     class EstTag extends Base {
       static {
         this.attribute("name", "string");
@@ -1937,8 +1936,7 @@ describe("AssociationsJoinModelTest", () => {
     // Requires preload polymorphic through
   });
 
-  it.skip("preload polymorph many types", async () => {
-    // TODO: polymorphic source_type through preloader
+  it("preload polymorph many types", async () => {
     // Preload polymorphic belongsTo with multiple types
     Associations.belongsTo.call(Tagging, "taggable", { polymorphic: true });
     const post = await Post.create({ title: "TypeA", body: "B" });

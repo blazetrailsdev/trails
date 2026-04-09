@@ -360,12 +360,12 @@ export class LoaderQuery {
     return this.scope.where({ [this.associationKeyName as string]: keys }).toArray();
   }
 
+  recordsFor(loaders: Association[]): Promise<Base[]> {
+    return new LoaderRecords(loaders, this).records();
+  }
+
   async loadRecordsInBatch(loaders: Association[]): Promise<void> {
-    const allKeys: unknown[] = [];
-    for (const loader of loaders) {
-      allKeys.push(...loader.ownersByKey.keys());
-    }
-    const rawRecords = await this.loadRecordsForKeys(allKeys);
+    const rawRecords = await this.recordsFor(loaders);
 
     for (const loader of loaders) {
       await loader.loadRecords(rawRecords);
@@ -407,11 +407,6 @@ export class LoaderRecords {
     }
 
     const loaded = await this.loaderQuery.loadRecordsForKeys([...keysToLoad]);
-    for (const record of loaded) {
-      for (const loader of this.loaders) {
-        loader.setInverse(record);
-      }
-    }
 
     return [...loaded, ...Array.from(alreadyLoadedByKey.values()).flat()];
   }
