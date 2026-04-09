@@ -1,47 +1,68 @@
 import type { Base } from "../base.js";
+import type { Association } from "./preloader/association.js";
+import { Branch } from "./preloader/branch.js";
+import { Batch } from "./preloader/batch.js";
 
-/**
- * Callback type for the actual preloading implementation.
- * This allows the Preloader to delegate to Relation's existing
- * _preloadAssociationsForRecords without a circular dependency.
- */
-export type PreloadFn = (records: Base[], associations: string[]) => Promise<void>;
+export interface PreloaderOptions {
+  records: Base[];
+  associations: any;
+  scope?: any;
+  availableRecords?: Base[];
+  associateByDefault?: boolean;
+}
 
 /**
  * Implements eager loading of associations. Given a set of records and
  * association names, loads all associated records in as few queries as
  * possible.
  *
- * In Rails, the Preloader orchestrates Branch and Association objects
- * to batch-load associations efficiently. Our implementation delegates
- * to Relation's _preloadAssociationsForRecords for the actual loading,
- * but routes through this class so the code path matches Rails' structure.
+ * Creates a Branch tree mirroring the requested association hierarchy,
+ * then uses Batch to walk the tree, find runnable loaders, and execute
+ * them in groups.
  *
  * Mirrors: ActiveRecord::Associations::Preloader
  */
 export class Preloader {
   readonly records: Base[];
-  readonly associations: string[];
-  private _preloadFn: PreloadFn | null;
+  readonly associations: any;
+  readonly scope: any;
+  readonly associateByDefault: boolean;
 
-  constructor(records: Base[], associations: string[], preloadFn?: PreloadFn) {
-    this.records = records;
-    this.associations = associations;
-    this._preloadFn = preloadFn ?? null;
+  private _tree: Branch;
+  private _availableRecords: Base[];
+
+  constructor(options: PreloaderOptions) {
+    this.records = options.records;
+    this.associations = options.associations;
+    this.scope = options.scope ?? null;
+    this.associateByDefault = options.associateByDefault ?? true;
+    this._availableRecords = options.availableRecords ?? [];
+
+    this._tree = new Branch({
+      parent: null,
+      association: null,
+      children: this.associations,
+      associateByDefault: this.associateByDefault,
+      scope: this.scope,
+    });
+    this._tree.preloadedRecords = this.records;
   }
 
-  async call(): Promise<void> {
-    if (this.records.length === 0 || this.associations.length === 0) return;
+  isEmpty(): boolean {
+    return this.associations == null || this.records.length === 0;
+  }
 
-    if (this._preloadFn) {
-      await this._preloadFn(this.records, this.associations);
-    } else {
-      // Fallback: load each association individually per record
-      for (const assocName of this.associations) {
-        for (const record of this.records) {
-          await (record as any)[assocName];
-        }
-      }
-    }
+  async call(): Promise<Association[]> {
+    const batch = new Batch([this], this._availableRecords);
+    await batch.call();
+    return this.loaders;
+  }
+
+  get branches(): Branch[] {
+    return this._tree.children;
+  }
+
+  get loaders(): Association[] {
+    return this.branches.flatMap((b) => b.loaders);
   }
 }

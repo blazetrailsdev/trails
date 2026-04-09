@@ -353,7 +353,12 @@ export class MacroReflection extends AbstractReflection {
 
   scopeFor(relation: any, owner?: any): any {
     if (this._scope) {
-      return this._scope.call(relation, owner) || relation;
+      // Match Rails instance_exec: 0-arity scopes run with this=relation,
+      // 1+-arity scopes receive relation as first arg
+      if (this._scope.length === 0) {
+        return this._scope.call(relation) || relation;
+      }
+      return this._scope.call(relation, relation, owner) || relation;
     }
     return relation;
   }

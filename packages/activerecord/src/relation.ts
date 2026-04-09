@@ -2531,13 +2531,34 @@ export class Relation<T extends Base> {
   }
 
   private async _preloadAssociationsForRecords(records: T[], assocNames: string[]): Promise<void> {
-    const { Preloader } = await import("./associations/preloader.js");
-    const preloader = new Preloader(
-      records as unknown as import("./base.js").Base[],
-      assocNames,
-      (recs, assocs) => this._doPreloadAssociations(recs as unknown as T[], assocs),
-    );
-    await preloader.call();
+    const { _reflectOnAssociation } = await import("./reflection.js");
+    const modelClass = this._modelClass as any;
+    const newAssocs: string[] = [];
+    const legacyAssocs: string[] = [];
+
+    for (const name of assocNames) {
+      const refl = _reflectOnAssociation(modelClass, name);
+      const needsLegacy =
+        refl?.isThroughReflection?.() && (refl as any).throughReflection?.isPolymorphic?.();
+      if (needsLegacy) {
+        legacyAssocs.push(name);
+      } else {
+        newAssocs.push(name);
+      }
+    }
+
+    if (newAssocs.length > 0) {
+      const { Preloader } = await import("./associations/preloader.js");
+      const preloader = new Preloader({
+        records: records as unknown as import("./base.js").Base[],
+        associations: newAssocs,
+      });
+      await preloader.call();
+    }
+
+    if (legacyAssocs.length > 0) {
+      await this._doPreloadAssociations(records, legacyAssocs);
+    }
   }
 
   private async _doPreloadAssociations(records: T[], assocNames: string[]): Promise<void> {
