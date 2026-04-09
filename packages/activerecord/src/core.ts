@@ -5,6 +5,7 @@
  */
 
 import { Notifications, ParameterFilter } from "@blazetrails/activesupport";
+import { PredicateBuilder } from "./relation/predicate-builder.js";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -405,14 +406,16 @@ export function inspectionFilter(this: CoreHost): ParameterFilter {
 /**
  * Rails: PredicateBuilder.new(TableMetadata.new(self, arel_table))
  * Memoized per class.
+ *
+ * Note: Rails passes a TableMetadata to PredicateBuilder. Our PredicateBuilder
+ * currently takes a Table directly. TableMetadata.predicateBuilder handles the
+ * full Rails flow when accessed from that path.
  */
 export function predicateBuilder(this: CoreHost): any {
   if (this._predicateBuilder) return this._predicateBuilder;
-  // PredicateBuilder is imported by relation.ts which loads before
-  // any model class calls this. Access via the relation module.
   const table = this.arelTable;
   if (!table) return null;
-  this._predicateBuilder = { table };
+  this._predicateBuilder = new PredicateBuilder(table);
   return this._predicateBuilder;
 }
 

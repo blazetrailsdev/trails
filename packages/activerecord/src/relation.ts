@@ -34,6 +34,7 @@ import { Calculations } from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
+import { TableMetadata } from "./table-metadata.js";
 import { WhereClause, predicatesWithWrappedSqlLiterals } from "./relation/where-clause.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 
@@ -83,11 +84,13 @@ export class Relation<T extends Base> {
 
   private _table: Table | null = null;
 
-  constructor(modelClass: typeof Base, table?: Table) {
+  constructor(modelClass: typeof Base, table?: Table, predicateBuilder?: PredicateBuilder) {
     this._modelClass = modelClass;
     if (table) {
       this._table = table;
-      this._predicateBuilder = new PredicateBuilder(table);
+    }
+    if (predicateBuilder) {
+      this._predicateBuilder = predicateBuilder;
     }
   }
 
@@ -3419,10 +3422,23 @@ export class Relation<T extends Base> {
   private _predicateBuilder: PredicateBuilder | null = null;
 
   get predicateBuilder(): PredicateBuilder {
-    if (!this._predicateBuilder) {
-      this._predicateBuilder = new PredicateBuilder(this.table);
+    if (this._predicateBuilder) {
+      return this._predicateBuilder;
     }
-    return this._predicateBuilder;
+    let pb: PredicateBuilder;
+    const modelPbAccessor = (this._modelClass as any).predicateBuilder;
+    const modelPb =
+      typeof modelPbAccessor === "function"
+        ? modelPbAccessor.call(this._modelClass)
+        : modelPbAccessor;
+    if (modelPb && typeof modelPb.with === "function") {
+      const metadata = new TableMetadata(this._modelClass, this.table);
+      pb = modelPb.with(metadata);
+    } else {
+      pb = new PredicateBuilder(this.table);
+    }
+    this._predicateBuilder = pb;
+    return pb;
   }
 
   get skipPreloadingValue(): boolean {

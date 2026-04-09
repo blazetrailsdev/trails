@@ -34,7 +34,7 @@ const RULES: DepRule[] = [
     package: "activerecord",
     dependency: "arel",
     tsImport: "@blazetrails/arel",
-    tsIdentifiers: ["arelTable", "_compileArelNode"],
+    tsIdentifiers: ["arelTable", "_arelTable", "_compileArelNode"],
     blocking: true,
   },
   {
