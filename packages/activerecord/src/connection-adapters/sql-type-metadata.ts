@@ -33,7 +33,35 @@ export class SqlTypeMetadata implements Deduplicable {
     return JSON.stringify([this.sqlType, this.type, this.limit, this.precision, this.scale]);
   }
 
+  toJSON(): SqlTypeMetadataJSON {
+    return {
+      sqlType: this.sqlType,
+      type: this.type,
+      limit: this.limit,
+      precision: this.precision,
+      scale: this.scale,
+    };
+  }
+
+  static fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata {
+    return new SqlTypeMetadata({
+      sqlType: data.sqlType,
+      type: data.type,
+      limit: data.limit,
+      precision: data.precision,
+      scale: data.scale,
+    });
+  }
+
   toString(): string {
     return this.sqlType;
   }
+}
+
+export interface SqlTypeMetadataJSON {
+  sqlType: string;
+  type: string;
+  limit: number | null;
+  precision: number | null;
+  scale: number | null;
 }

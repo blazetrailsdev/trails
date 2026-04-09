@@ -6,7 +6,8 @@
  */
 
 import { getFs, getPath } from "@blazetrails/activesupport";
-import type { Column } from "./column.js";
+import { Column } from "./column.js";
+import type { ColumnJSON } from "./column.js";
 
 // ---------------------------------------------------------------------------
 // Helper: run callback inside pool.withConnection if available
@@ -23,6 +24,41 @@ async function withConnection<T>(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: rehydrate a column from plain JSON or pass through if already Column
+// ---------------------------------------------------------------------------
+
+function serializeColumn(col: any): ColumnJSON {
+  if (typeof col.toJSON === "function") return col.toJSON();
+  // Fallback for adapter-specific Column classes (e.g. PostgreSQL::Column)
+  // that don't extend the base Column
+  return {
+    name: col.name,
+    default: col.default,
+    sqlTypeMetadata:
+      col.sqlTypeMetadata?.toJSON?.() ??
+      (col.sqlType != null
+        ? {
+            sqlType: col.sqlType,
+            type: col.type ?? col.sqlType,
+            limit: col.limit ?? null,
+            precision: col.precision ?? null,
+            scale: col.scale ?? null,
+          }
+        : null),
+    null: col.null ?? true,
+    defaultFunction: col.defaultFunction ?? null,
+    collation: col.collation ?? null,
+    comment: col.comment ?? null,
+    primaryKey: col.primaryKey ?? false,
+  };
+}
+
+function rehydrateColumn(data: unknown): Column {
+  if (data instanceof Column) return data;
+  return Column.fromJSON(data as ColumnJSON);
+}
+
+// ---------------------------------------------------------------------------
 // SchemaCache
 // ---------------------------------------------------------------------------
 
@@ -35,11 +71,11 @@ export class SchemaCache {
   private _version: string | number | null = null;
 
   static _loadFrom(filename: string): SchemaCache | null {
-    const fs = getFs();
-    if (!fs.existsSync(filename)) return null;
-    const data = SchemaCache.read(filename, (content) => content);
-    if (typeof data !== "string") return null;
     try {
+      const fs = getFs();
+      if (!fs.existsSync(filename)) return null;
+      const data = SchemaCache.read(filename, (content) => content);
+      if (typeof data !== "string") return null;
       const parsed = JSON.parse(data);
       const cache = new SchemaCache();
       cache.initWith(parsed);
@@ -68,7 +104,11 @@ export class SchemaCache {
 
   encodeWith(coder: Record<string, unknown>): void {
     const byKey = (a: [string, unknown], b: [string, unknown]) => a[0].localeCompare(b[0]);
-    coder["columns"] = Object.fromEntries([...this._columns].sort(byKey));
+    coder["columns"] = Object.fromEntries(
+      [...this._columns]
+        .sort(byKey)
+        .map(([table, cols]) => [table, cols.map((c) => serializeColumn(c))]),
+    );
     coder["primary_keys"] = Object.fromEntries([...this._primaryKeys].sort(byKey));
     coder["data_sources"] = Object.fromEntries([...this._dataSourceExists].sort(byKey));
     coder["indexes"] = Object.fromEntries([...this._indexes].sort(byKey));
@@ -79,7 +119,10 @@ export class SchemaCache {
     if (coder["columns"] instanceof Map) {
       this._columns = coder["columns"] as Map<string, Column[]>;
     } else if (coder["columns"] && typeof coder["columns"] === "object") {
-      this._columns = new Map(Object.entries(coder["columns"] as Record<string, Column[]>));
+      const entries = Object.entries(coder["columns"] as Record<string, unknown[]>);
+      this._columns = new Map(
+        entries.map(([table, cols]) => [table, cols.map((c) => rehydrateColumn(c))]),
+      );
     }
 
     if (coder["primary_keys"] instanceof Map) {
@@ -303,9 +346,12 @@ export class SchemaCache {
   }
 
   marshalDump(): unknown[] {
+    const columnsData = Object.fromEntries(
+      [...this._columns].map(([table, cols]) => [table, cols.map((c) => serializeColumn(c))]),
+    );
     return [
       this._version,
-      Object.fromEntries(this._columns),
+      columnsData,
       {},
       Object.fromEntries(this._primaryKeys),
       Object.fromEntries(this._dataSourceExists),
@@ -317,7 +363,10 @@ export class SchemaCache {
     const [version, columns, _columnsHash, primaryKeys, dataSources, indexes] = array;
     this._version = (version as string | number) ?? null;
 
-    this._columns = new Map(Object.entries((columns as Record<string, Column[]>) ?? {}));
+    const rawCols = (columns as Record<string, unknown[]>) ?? {};
+    this._columns = new Map(
+      Object.entries(rawCols).map(([table, cols]) => [table, cols.map((c) => rehydrateColumn(c))]),
+    );
     this._primaryKeys = new Map(
       Object.entries((primaryKeys as Record<string, string | null>) ?? {}),
     );
@@ -370,6 +419,7 @@ export class SchemaReflection {
 
   private _cache: SchemaCache | null;
   private _cachePath: string | null;
+  private _cachePromise: Promise<SchemaCache> | null = null;
 
   constructor(cachePath?: string | null, cache?: SchemaCache) {
     this._cache = cache ?? null;
@@ -378,59 +428,65 @@ export class SchemaReflection {
 
   clearBang(): void {
     this._cache = new SchemaCache();
+    this._cachePromise = null;
   }
 
-  loadBang(pool: unknown): this {
-    this.cache(pool);
+  async loadBang(pool: unknown): Promise<this> {
+    await this.cache(pool);
     return this;
   }
 
   async primaryKeys(pool: unknown, tableName: string): Promise<string | null | undefined> {
-    return this.cache(pool).primaryKeys(pool, tableName);
+    return (await this.cache(pool)).primaryKeys(pool, tableName);
   }
 
   async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
-    return this.cache(pool).dataSourceExists(pool, name);
+    return (await this.cache(pool)).dataSourceExists(pool, name);
   }
 
   async add(pool: unknown, name: string): Promise<void> {
-    return this.cache(pool).add(pool, name);
+    return (await this.cache(pool)).add(pool, name);
   }
 
   async dataSources(pool: unknown, name: string): Promise<boolean | undefined> {
-    return this.cache(pool).dataSourceExists(pool, name);
+    return (await this.cache(pool)).dataSourceExists(pool, name);
   }
 
   async columns(pool: unknown, tableName: string): Promise<Column[] | undefined> {
-    return this.cache(pool).columns(pool, tableName);
+    return (await this.cache(pool)).columns(pool, tableName);
   }
 
   async columnsHash(pool: unknown, tableName: string): Promise<Record<string, Column> | undefined> {
-    return this.cache(pool).columnsHash(pool, tableName);
+    return (await this.cache(pool)).columnsHash(pool, tableName);
   }
 
   isColumnsHashCached(pool: unknown, tableName: string): boolean {
-    return this.cache(pool).isColumnsHashCached(pool, tableName);
+    this.ensureSyncCache();
+    return this._cache?.isColumnsHashCached(pool, tableName) ?? false;
   }
 
   async indexes(pool: unknown, tableName: string): Promise<unknown[]> {
-    return this.cache(pool).indexes(pool, tableName);
+    return (await this.cache(pool)).indexes(pool, tableName);
   }
 
   async version(pool: unknown): Promise<string | number | null> {
-    return this.cache(pool).version(pool);
+    return (await this.cache(pool)).version(pool);
   }
 
   size(pool: unknown): number {
-    return this.cache(pool).size;
+    this.ensureSyncCache();
+    return this._cache?.size ?? 0;
   }
 
-  clearDataSourceCacheBang(pool: unknown, name: string): void {
-    if (!this._cache) return;
-    this.cache(pool).clearDataSourceCacheBang(pool, name);
+  // Rails: return if @cache.nil? && !possible_cache_available?
+  //        cache(pool).clear_data_source_cache!(pool, name)
+  async clearDataSourceCacheBang(pool: unknown, name: string): Promise<void> {
+    if (!this._cache && !this.possibleCacheAvailable()) return;
+    (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
 
   isCached(tableName: string): boolean {
+    this.ensureSyncCache();
     return this._cache?.isCached(tableName) ?? false;
   }
 
@@ -439,13 +495,86 @@ export class SchemaReflection {
     await freshCache.addAll(pool);
     freshCache.dumpTo(filename);
     this._cache = freshCache;
+    this._cachePromise = null;
   }
 
-  private cache(pool: unknown): SchemaCache {
-    if (!this._cache) {
-      this._cache = new SchemaCache();
+  private async cache(pool: unknown): Promise<SchemaCache> {
+    if (this._cache) return this._cache;
+
+    // Memoize in-flight load so concurrent callers share one disk read
+    if (!this._cachePromise) {
+      const promise = this.loadCache(pool).then((loaded) => {
+        // Guard against clearBang() racing with an in-flight load
+        if (this._cachePromise === promise) {
+          this._cache = loaded ?? new SchemaCache();
+          this._cachePromise = null;
+        }
+        return this._cache ?? new SchemaCache();
+      });
+      this._cachePromise = promise;
     }
-    return this._cache;
+    return this._cachePromise;
+  }
+
+  /**
+   * Attempt to populate _cache synchronously from disk when version
+   * checking is disabled. Used by sync-only paths (isCached, size,
+   * isColumnsHashCached) that can't await.
+   */
+  private ensureSyncCache(): void {
+    if (this._cache) return;
+    if (!SchemaReflection.checkSchemaCacheDumpVersion) {
+      this._cache = this.loadCacheFromDisk();
+    }
+  }
+
+  private possibleCacheAvailable(): boolean {
+    if (!SchemaReflection.useSchemaCacheDump) return false;
+    if (!this._cachePath) return false;
+    try {
+      const fs = getFs();
+      return fs.existsSync(this._cachePath);
+    } catch {
+      return false;
+    }
+  }
+
+  private loadCacheFromDisk(): SchemaCache | null {
+    if (!this.possibleCacheAvailable()) return null;
+    return SchemaCache._loadFrom(this._cachePath!);
+  }
+
+  private async loadCache(pool: unknown): Promise<SchemaCache | null> {
+    if (!this.possibleCacheAvailable()) return null;
+
+    const newCache = SchemaCache._loadFrom(this._cachePath!);
+    if (!newCache) return null;
+
+    if (SchemaReflection.checkSchemaCacheDumpVersion && pool) {
+      try {
+        const currentVersion = await withConnection(pool, async (connection) => {
+          if (typeof connection.schemaVersion === "function") {
+            return await connection.schemaVersion();
+          }
+          return null;
+        });
+
+        if (currentVersion !== null && newCache.schemaVersion !== currentVersion) {
+          console.warn(
+            `Ignoring ${this._cachePath} because it has expired. ` +
+              `The current schema version is ${currentVersion}, ` +
+              `but the one in the schema cache file is ${newCache.schemaVersion}.`,
+          );
+          return null;
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn(`Failed to validate the schema cache because of ${errorMessage}`);
+        return null;
+      }
+    }
+
+    return newCache;
   }
 }
 
@@ -476,8 +605,8 @@ export class BoundSchemaReflection {
     this._schemaReflection.clearBang();
   }
 
-  loadBang(): this {
-    this._schemaReflection.loadBang(this._pool);
+  async loadBang(): Promise<this> {
+    await this._schemaReflection.loadBang(this._pool);
     return this;
   }
 
@@ -525,8 +654,8 @@ export class BoundSchemaReflection {
     return this._schemaReflection.size(this._pool);
   }
 
-  clearDataSourceCacheBang(name: string): void {
-    this._schemaReflection.clearDataSourceCacheBang(this._pool, name);
+  async clearDataSourceCacheBang(name: string): Promise<void> {
+    return this._schemaReflection.clearDataSourceCacheBang(this._pool, name);
   }
 
   async dumpTo(filename: string): Promise<void> {

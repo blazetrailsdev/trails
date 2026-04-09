@@ -4,7 +4,8 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::Column
  */
 
-import type { SqlTypeMetadata } from "./sql-type-metadata.js";
+import { SqlTypeMetadata } from "./sql-type-metadata.js";
+import type { SqlTypeMetadataJSON } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
 
 export class Column {
@@ -116,9 +117,48 @@ export class Column {
     return false;
   }
 
+  toJSON(): ColumnJSON {
+    return {
+      name: this.name,
+      default: this.default,
+      sqlTypeMetadata: this.sqlTypeMetadata?.toJSON() ?? null,
+      null: this.null,
+      defaultFunction: this.defaultFunction,
+      collation: this.collation,
+      comment: this.comment,
+      primaryKey: this.primaryKey,
+    };
+  }
+
+  static fromJSON(data: ColumnJSON): Column {
+    return new Column(
+      data.name,
+      data.default,
+      data.sqlTypeMetadata ? SqlTypeMetadata.fromJSON(data.sqlTypeMetadata) : null,
+      data.null,
+      {
+        defaultFunction: data.defaultFunction,
+        collation: data.collation,
+        comment: data.comment,
+        primaryKey: data.primaryKey,
+      },
+    );
+  }
+
   toString(): string {
     return this.name;
   }
+}
+
+export interface ColumnJSON {
+  name: string;
+  default: unknown;
+  sqlTypeMetadata: SqlTypeMetadataJSON | null;
+  null: boolean;
+  defaultFunction: string | null;
+  collation: string | null;
+  comment: string | null;
+  primaryKey: boolean;
 }
 
 /**
