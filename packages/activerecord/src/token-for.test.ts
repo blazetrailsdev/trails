@@ -2,9 +2,9 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./index.js";
-import { generatesTokenFor } from "./generates-token-for.js";
+import { generatesTokenFor, setTokenForSecret } from "./generates-token-for.js";
 import { setSignedIdVerifierSecret } from "./signed-id.js";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -20,6 +20,11 @@ describe("TokenForTest", () => {
   beforeEach(() => {
     adapter = freshAdapter();
     setSignedIdVerifierSecret("blazetrails-test-secret");
+    setTokenForSecret("blazetrails-test-token-secret");
+  });
+
+  afterEach(() => {
+    setTokenForSecret(null);
   });
 
   function makeModel() {
@@ -129,7 +134,7 @@ describe("TokenForTest", () => {
     const { User } = makeModel();
     await expect(
       (User as any).findByTokenForBang("password_reset", "invalid-token"),
-    ).rejects.toThrow();
+    ).rejects.toThrow("Invalid signature");
   });
 
   it("does not find record when expires_in is different", async () => {
@@ -234,6 +239,14 @@ describe("TokenForTest", () => {
 });
 
 describe("TokenForTest", () => {
+  beforeEach(() => {
+    setTokenForSecret("blazetrails-test-token-secret");
+  });
+
+  afterEach(() => {
+    setTokenForSecret(null);
+  });
+
   it("generates and resolves a token", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
     const adapter = freshAdapter();

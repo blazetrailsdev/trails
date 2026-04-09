@@ -10,7 +10,7 @@ import { camelize } from "@blazetrails/activesupport";
 interface EnumDefinition {
   attribute: string;
   mapping: Map<string, number>;
-  reverseMapping: Map<number, string>;
+  type: EnumType;
 }
 
 /**
@@ -50,22 +50,20 @@ export function defineEnum(
   options?: { prefix?: boolean | string; suffix?: boolean | string },
 ): void {
   const mapping = new Map<string, number>();
-  const reverseMapping = new Map<number, string>();
 
   if (Array.isArray(valuesInput)) {
     valuesInput.forEach((name, index) => {
       mapping.set(name, index);
-      reverseMapping.set(index, name);
     });
   } else {
     for (const [name, value] of Object.entries(valuesInput)) {
       mapping.set(name, value);
-      reverseMapping.set(value, name);
     }
   }
 
   const defs = getEnumDefinitions(modelClass);
-  const def: EnumDefinition = { attribute, mapping, reverseMapping };
+  const enumType = new EnumType(attribute, mapping, "integer");
+  const def: EnumDefinition = { attribute, mapping, type: enumType };
   defs.set(attribute, def);
 
   // Compute prefix/suffix for method names
@@ -143,7 +141,103 @@ export function defineEnum(
 }
 
 /**
+ * EnumType — wraps an underlying type to handle enum cast/serialize/deserialize.
+ *
+ * Mirrors: ActiveRecord::Enum::EnumType
+ */
+export class EnumType {
+  private _name: string;
+  private _mapping: ReadonlyMap<string, number | string>;
+  private _reverseMapping: ReadonlyMap<number | string, string>;
+  private _raiseOnInvalidValues: boolean;
+  readonly subtype: string;
+
+  constructor(
+    name: string,
+    mapping: ReadonlyMap<string, number | string>,
+    subtype: string,
+    raiseOnInvalidValues = true,
+  ) {
+    this._name = name;
+    this._mapping = mapping;
+    const reverse = new Map<number | string, string>();
+    for (const [k, v] of mapping) {
+      reverse.set(v, k);
+    }
+    this._reverseMapping = reverse;
+    this._raiseOnInvalidValues = raiseOnInvalidValues;
+    this.subtype = subtype;
+  }
+
+  cast(value: unknown): string | null {
+    if (typeof value === "string" && this._mapping.has(value)) {
+      return value;
+    }
+    if (
+      (typeof value === "number" || typeof value === "string") &&
+      this._reverseMapping.has(value)
+    ) {
+      return this._reverseMapping.get(value)!;
+    }
+    if (value === null || value === undefined) return null;
+    return null;
+  }
+
+  deserialize(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    const result = this._reverseMapping.get(value as number | string);
+    if (result !== undefined) return result;
+    if (typeof value === "string" && value !== "" && this.subtype === "integer") {
+      const num = Number(value);
+      if (!Number.isNaN(num)) return this._reverseMapping.get(num) ?? null;
+    }
+    return null;
+  }
+
+  serialize(value: unknown): number | string | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "string" && this._mapping.has(value)) {
+      return this._mapping.get(value)!;
+    }
+    if (typeof value === "number" && this._reverseMapping.has(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value !== "" && this.subtype === "integer") {
+      const num = Number(value);
+      if (!Number.isNaN(num) && this._reverseMapping.has(num)) return num;
+    }
+    return null;
+  }
+
+  isSerializable(value: unknown): boolean {
+    if (value === null || value === undefined) return true;
+    if (typeof value === "string" && this._mapping.has(value)) return true;
+    if ((typeof value === "number" || typeof value === "string") && this._reverseMapping.has(value))
+      return true;
+    if (typeof value === "string" && value !== "" && this.subtype === "integer") {
+      const num = Number(value);
+      if (!Number.isNaN(num) && this._reverseMapping.has(num)) return true;
+    }
+    return false;
+  }
+
+  assertValidValue(value: unknown): void {
+    if (!this._raiseOnInvalidValues) return;
+    if (value === null || value === undefined || value === "") return;
+    if (typeof value === "string" && this._mapping.has(value)) return;
+    if ((typeof value === "number" || typeof value === "string") && this._reverseMapping.has(value))
+      return;
+    if (typeof value === "string" && this.subtype === "integer") {
+      const num = Number(value);
+      if (!Number.isNaN(num) && this._reverseMapping.has(num)) return;
+    }
+    throw new Error(`'${value}' is not a valid ${this._name}`);
+  }
+}
+
+/**
  * Get the human-readable enum value for an attribute.
+ * Delegates to EnumType.deserialize for the mapping lookup.
  */
 export function readEnumValue(record: Base, attribute: string): string | null {
   const ctor = record.constructor as typeof Base;
@@ -152,12 +246,12 @@ export function readEnumValue(record: Base, attribute: string): string | null {
   if (!def) return null;
 
   const numericValue = record.readAttribute(attribute);
-  if (numericValue === null || numericValue === undefined) return null;
-  return def.reverseMapping.get(Number(numericValue)) ?? null;
+  return def.type.deserialize(numericValue);
 }
 
 /**
  * Cast an enum value (string name or number) to its integer storage value.
+ * Delegates to EnumType.serialize for the mapping lookup.
  */
 export function castEnumValue(
   modelClass: typeof Base,
@@ -168,11 +262,5 @@ export function castEnumValue(
   const def = defs.get(attribute);
   if (!def) return null;
 
-  if (typeof value === "string") {
-    return def.mapping.get(value) ?? null;
-  }
-  if (typeof value === "number") {
-    return def.reverseMapping.has(value) ? value : null;
-  }
-  return null;
+  return def.type.serialize(value) as number | null;
 }

@@ -362,7 +362,16 @@ function crossReference(
       tsMethod: matchedTsName,
       rubyModule: rm.rubyModule,
     };
-    if (uses) compliant.push(entry);
+    // If the method name matches a Ruby depRef class name (case-insensitive),
+    // treat it as implementing that protocol (e.g., serializeCastValue
+    // implements ActiveModel::Type::SerializeCastValue).
+    const implementsProtocol =
+      !uses &&
+      rm.depRefs.some((ref) => {
+        const simpleName = ref.split("::").pop() ?? "";
+        return simpleName.toLowerCase() === matchedTsName!.toLowerCase();
+      });
+    if (uses || implementsProtocol) compliant.push(entry);
     else violations.push({ ...entry, depRefs: rm.depRefs });
   }
 
