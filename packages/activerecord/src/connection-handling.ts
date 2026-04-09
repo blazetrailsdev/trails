@@ -108,7 +108,7 @@ async function establishWithConfig(
   );
 
   modelClass.connectionHandler.establishConnection(dbConfig, {
-    owner: "primary",
+    owner: modelClass.connectionClassForSelf(),
     adapterFactory: () => new AdapterClass(adapterArg),
   });
 }

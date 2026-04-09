@@ -20,38 +20,38 @@ describe("Base.establishConnection", () => {
 
   it("creates a PostgresAdapter from a postgres:// URL", async () => {
     await Base.establishConnection("postgres://localhost:5432/testdb");
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool).toBeDefined();
     expect(pool!.checkout()).toBeInstanceOf(PostgreSQLAdapter);
   });
 
   it("creates a PostgresAdapter from a postgresql:// URL", async () => {
     await Base.establishConnection("postgresql://localhost:5432/testdb");
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(PostgreSQLAdapter);
   });
 
   it("creates a MysqlAdapter from a mysql:// URL", async () => {
     await Base.establishConnection("mysql://localhost:3306/testdb");
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(Mysql2Adapter);
   });
 
   it("creates a SqliteAdapter from a :memory: URL", async () => {
     await Base.establishConnection(":memory:");
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 
   it("creates a SqliteAdapter from a .sqlite3 file path", async () => {
     await Base.establishConnection(join(tmpdir(), "test.sqlite3"));
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 
   it("accepts a config object with adapter name", async () => {
     await Base.establishConnection({ adapter: "sqlite", database: ":memory:" });
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 
@@ -74,25 +74,25 @@ describe("Base.establishConnection", () => {
 
   it("accepts sqlite3 as an adapter name alias", async () => {
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 
   it("accepts postgres as an adapter name alias", async () => {
     await Base.establishConnection({ adapter: "postgres", url: "postgres://localhost/db" });
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(PostgreSQLAdapter);
   });
 
   it("accepts mysql2 as an adapter name alias", async () => {
     await Base.establishConnection({ adapter: "mysql2", url: "mysql://localhost/db" });
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(Mysql2Adapter);
   });
 
   it("parses sqlite:// URLs into file paths", async () => {
     await Base.establishConnection("sqlite3:///tmp/test.sqlite3");
-    const pool = Base.connectionHandler.retrieveConnectionPool("primary");
+    const pool = Base.connectionHandler.retrieveConnectionPool("Base");
     expect(pool!.checkout()).toBeInstanceOf(SQLite3Adapter);
   });
 });

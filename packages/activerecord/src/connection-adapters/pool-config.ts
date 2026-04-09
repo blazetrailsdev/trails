@@ -8,6 +8,7 @@ import type { DatabaseConfig } from "../database-configurations/database-config.
 import type { DatabaseAdapter } from "../adapter.js";
 import type { SchemaCache } from "./schema-cache.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
+import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-descriptor.js";
 
 export class PoolConfig {
   readonly role: string;
@@ -16,6 +17,7 @@ export class PoolConfig {
   readonly adapterFactory?: () => DatabaseAdapter;
   private _schemaCache: SchemaCache | null = null;
   private _pool: ConnectionPool | null = null;
+  private _connectionDescriptor: ConnectionDescriptor | null = null;
 
   constructor(
     dbConfig: DatabaseConfig,
@@ -70,6 +72,23 @@ export class PoolConfig {
 
   get poolKey(): string {
     return `${this.connectionSpecName}:${this.role}:${this.shard}`;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::PoolConfig#connection_descriptor=
+   */
+  get connectionDescriptor(): ConnectionDescriptor | null {
+    return this._connectionDescriptor;
+  }
+
+  set connectionDescriptor(value: ConnectionDescriptor | ConnectionOwner) {
+    if (value instanceof ConnectionDescriptor) {
+      this._connectionDescriptor = value;
+    } else {
+      const isPrimary = value.primaryClassQ();
+      const name = isPrimary ? "Base" : value.name;
+      this._connectionDescriptor = new ConnectionDescriptor(name, isPrimary);
+    }
   }
 
   discard(): void {
