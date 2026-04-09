@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -177,6 +177,97 @@ describe("ConnectionHandlerTest", () => {
     handler.removeConnection("child");
     expect(handler.retrieveConnectionPool("primary")).toBeTruthy();
     expect(handler.retrieveConnectionPool("child")).toBeUndefined();
+  });
+
+  it("establish connection returns same pool for same config", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    const pool1 = handler.establishConnection(config, {
+      owner: "primary",
+      adapterFactory: createTestAdapter,
+    });
+    const pool2 = handler.retrieveConnectionPool("primary");
+    expect(pool1).toBe(pool2);
+  });
+
+  it("supports multiple roles for the same owner", () => {
+    const writing = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "primary.db",
+    });
+    const reading = new HashConfig("development", "primary_replica", {
+      adapter: "sqlite3",
+      database: "replica.db",
+    });
+    handler.establishConnection(writing, {
+      owner: "primary",
+      role: "writing",
+      adapterFactory: createTestAdapter,
+    });
+    handler.establishConnection(reading, {
+      owner: "primary",
+      role: "reading",
+      adapterFactory: createTestAdapter,
+    });
+    const writingPool = handler.retrieveConnectionPool("primary", { role: "writing" });
+    const readingPool = handler.retrieveConnectionPool("primary", { role: "reading" });
+    expect(writingPool).toBeTruthy();
+    expect(readingPool).toBeTruthy();
+    expect(writingPool).not.toBe(readingPool);
+    expect(writingPool!.dbConfig.database).toBe("primary.db");
+    expect(readingPool!.dbConfig.database).toBe("replica.db");
+  });
+
+  it("supports multiple shards for the same owner and role", () => {
+    const shard1 = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "shard1.db",
+    });
+    const shard2 = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "shard2.db",
+    });
+    handler.establishConnection(shard1, {
+      owner: "primary",
+      shard: "one",
+      adapterFactory: createTestAdapter,
+    });
+    handler.establishConnection(shard2, {
+      owner: "primary",
+      shard: "two",
+      adapterFactory: createTestAdapter,
+    });
+    const pool1 = handler.retrieveConnectionPool("primary", { shard: "one" });
+    const pool2 = handler.retrieveConnectionPool("primary", { shard: "two" });
+    expect(pool1).toBeTruthy();
+    expect(pool2).toBeTruthy();
+    expect(pool1).not.toBe(pool2);
+  });
+
+  it("re-establishing connection disconnects old pool", () => {
+    const config1 = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "old.db",
+    });
+    const config2 = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "new.db",
+    });
+    const oldPool = handler.establishConnection(config1, {
+      owner: "primary",
+      adapterFactory: createTestAdapter,
+    });
+    const disconnectSpy = vi.spyOn(oldPool, "disconnect");
+    const newPool = handler.establishConnection(config2, {
+      owner: "primary",
+      adapterFactory: createTestAdapter,
+    });
+    expect(disconnectSpy).toHaveBeenCalled();
+    expect(newPool).not.toBe(oldPool);
+    expect(newPool.dbConfig.database).toBe("new.db");
+    expect(handler.connectionPools).toHaveLength(1);
   });
 
   it.skip("default handlers are writing and reading", () => {
