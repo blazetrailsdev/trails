@@ -4,9 +4,10 @@
  * Mirrors: ActiveRecord::TokenFor
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import type { Base } from "./base.js";
+
+export { InvalidSignature };
 
 let _tokenForSecret: string | (() => string) | null = null;
 
@@ -43,6 +44,7 @@ function resolveSecret(): string {
 export class TokenDefinition {
   readonly definingClass: typeof Base;
   readonly purpose: string;
+  /** Expiration in seconds, matching Rails Duration semantics. */
   readonly expiresIn: number | undefined;
   readonly block: ((record: any) => unknown) | undefined;
 
@@ -63,7 +65,7 @@ export class TokenDefinition {
   }
 
   messageVerifier(): MessageVerifier {
-    return new MessageVerifier(resolveSecret(), { digest: "sha256" });
+    return new MessageVerifier(resolveSecret());
   }
 
   payloadFor(model: Base): unknown[] {
@@ -72,63 +74,22 @@ export class TokenDefinition {
 
   generateToken(model: Base): string {
     const data = this.payloadFor(model);
-    const payload = JSON.stringify({
-      data,
+    return this.messageVerifier().generate(data, {
       purpose: this.fullPurpose(),
-      timestamp: Date.now(),
+      expiresIn: this.expiresIn,
     });
-    const encoded = Buffer.from(payload).toString("base64url");
-    const sig = getCrypto()
-      .createHmac("sha256", resolveSecret())
-      .update(encoded)
-      .digest("base64url");
-    return `${encoded}.${sig}`;
   }
 
   async resolveToken(
     token: string,
     finder: (id: unknown) => Promise<Base | null>,
   ): Promise<Base | null> {
-    const parts = token.split(".");
-    if (parts.length !== 2) return null;
-    const [encoded, sig] = parts;
-
-    const expectedSig = getCrypto()
-      .createHmac("sha256", resolveSecret())
-      .update(encoded)
-      .digest("base64url");
-
-    const sigBuf = Buffer.from(sig, "base64url");
-    const expectedBuf = Buffer.from(expectedSig, "base64url");
-    if (sigBuf.length !== expectedBuf.length) return null;
-    if (!getCrypto().timingSafeEqual(sigBuf, expectedBuf)) return null;
-
-    let payload: any;
-    try {
-      payload = JSON.parse(Buffer.from(encoded, "base64url").toString());
-    } catch {
-      return null;
-    }
-
-    if (payload.purpose !== this.fullPurpose()) return null;
-
-    if (this.expiresIn !== undefined) {
-      if (!Number.isFinite(payload.timestamp)) return null;
-      if (Date.now() - payload.timestamp > this.expiresIn) return null;
-    }
-
-    const data = payload.data as unknown[];
-    if (!Array.isArray(data) || data.length === 0) return null;
-
-    const record = await finder(data[0]);
-    if (!record) return null;
-
-    const currentPayload = this.payloadFor(record);
-    const a = Buffer.from(JSON.stringify(currentPayload));
-    const b = Buffer.from(JSON.stringify(data));
-    if (a.length !== b.length || !getCrypto().timingSafeEqual(a, b)) return null;
-
-    return record;
+    const verified = this.messageVerifier().verified(token, { purpose: this.fullPurpose() });
+    const payload = Array.isArray(verified) && verified.length > 0 ? verified : null;
+    const record = payload ? await finder(payload[0]) : null;
+    return record && JSON.stringify(this.payloadFor(record)) === JSON.stringify(payload)
+      ? record
+      : null;
   }
 }
 
@@ -228,12 +189,14 @@ export async function findByTokenFor(
 ): Promise<Base | null> {
   const def = getDefinition(modelClass, purpose);
   if (!def) return null;
+  const pk = modelClass.primaryKey;
   return def.resolveToken(token, async (id) => {
-    try {
-      return await modelClass.find(id);
-    } catch {
-      return null;
+    if (typeof pk === "string") {
+      return modelClass.findBy({ [pk]: id });
     }
+    if (!Array.isArray(id) || id.length !== pk.length) return null;
+    const conditions = Object.fromEntries(pk.map((key, i) => [key, id[i]]));
+    return modelClass.findBy(conditions);
   });
 }
 
@@ -247,9 +210,9 @@ export async function findByTokenForBang(
   purpose: string,
   token: string,
 ): Promise<Base> {
-  const record = await findByTokenFor(modelClass, purpose, token);
-  if (!record) {
-    throw new InvalidSignature();
-  }
-  return record;
+  const def = getDefinition(modelClass, purpose);
+  if (!def) throw new InvalidSignature();
+  const result = await def.resolveToken(token, (id) => modelClass.find(id));
+  if (!result) throw new InvalidSignature();
+  return result;
 }

@@ -36,7 +36,7 @@ describe("TokenForTest", () => {
       }
     }
     generatesTokenFor(User, "password_reset", {
-      expiresIn: 15 * 60 * 1000,
+      expiresIn: 15 * 60,
       generator: (r: any) => r.password_digest ?? "",
     });
     generatesTokenFor(User, "email_confirmation");
@@ -81,7 +81,7 @@ describe("TokenForTest", () => {
         this.adapter = adapter;
       }
     }
-    generatesTokenFor(UserShortExpiry, "quick", { expiresIn: 1, generator: () => "" });
+    generatesTokenFor(UserShortExpiry, "quick", { expiresIn: 0.001, generator: () => "" });
     const u = await UserShortExpiry.create({ name: "Bob", password_digest: "xyz" });
     const token = (u as any).generateTokenFor("quick");
     await new Promise((r) => setTimeout(r, 5));
@@ -145,7 +145,7 @@ describe("TokenForTest", () => {
         this.adapter = adapter;
       }
     }
-    generatesTokenFor(UserX, "quick_confirm", { expiresIn: 1, generator: () => "" });
+    generatesTokenFor(UserX, "quick_confirm", { expiresIn: 0.001, generator: () => "" });
     const u = await UserX.create({ name: "Alice" });
     const token = (u as any).generateTokenFor("quick_confirm");
     await new Promise((r) => setTimeout(r, 5));
