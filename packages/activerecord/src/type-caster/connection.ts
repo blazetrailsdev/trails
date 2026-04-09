@@ -39,10 +39,13 @@ export class Connection {
   }
 
   private resolveColumn(attrName: string): unknown | undefined {
-    // Primary path (Rails): schema cache keyed by table name
-    const schemaCache = this._klass?.adapter?.schemaCache;
-    if (schemaCache?.dataSourceExists(this._tableName)) {
-      const column = schemaCache.columnsHash(this._tableName)?.get(attrName);
+    // Only consult the schema cache when it's already populated — avoid
+    // triggering cache-miss paths that call async adapter methods.
+    const adapter = this._klass?.adapter;
+    const schemaCache = adapter?.schemaCache;
+    if (schemaCache?.isCached(this._tableName)) {
+      const hash = schemaCache.getCachedColumnsHash(this._tableName);
+      const column = hash?.[attrName];
       if (column) return column;
     }
 

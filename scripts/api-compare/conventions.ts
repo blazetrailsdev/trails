@@ -6,7 +6,11 @@
 import * as path from "path";
 
 export function snakeToCamel(name: string): string {
-  return name.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase());
+  // Preserve leading underscores (e.g., _load_from → _loadFrom)
+  const match = name.match(/^(_+)/);
+  const prefix = match ? match[1] : "";
+  const rest = name.slice(prefix.length);
+  return prefix + rest.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase());
 }
 
 /** Ruby file path → expected TS file path (kebab-case, .ts extension) */
@@ -103,8 +107,6 @@ export const SKIP = new Set([
 export function rubyMethodToTs(name: string): string[] | null {
   if (OPERATORS.has(name)) return null;
   if (SKIP.has(name)) return null;
-  if (name.startsWith("_")) return null;
-
   if (name === "initialize" || name === "new") return ["constructor"];
   if (name === "to_s" || name === "to_str") return ["toString"];
   if (name === "to_json") return ["toJSON"];
