@@ -90,4 +90,5 @@ export interface DatabaseAdapter {
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   isWriteQuery(sql: string): boolean;
   emptyInsertStatementValue(pk?: string | null): string;
+  getDatabaseVersion?(): unknown;
 }

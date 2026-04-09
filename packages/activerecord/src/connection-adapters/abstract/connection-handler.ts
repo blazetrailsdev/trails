@@ -63,19 +63,12 @@ export class ConnectionHandler {
     const role = options.role ?? "writing";
     const shard = options.shard ?? "default";
 
-    const poolConfig = new PoolConfig(dbConfig, {
-      role,
-      shard,
+    const connectionClass = ownerName ?? new ConnectionDescriptor(dbConfig.name);
+    const poolConfig = new PoolConfig(connectionClass, dbConfig, role, shard, {
       adapterFactory: options.adapterFactory,
     });
 
-    if (ownerName) {
-      poolConfig.connectionDescriptor = ownerName;
-    }
-
-    // Key the pool manager by the descriptor name (e.g. "Base" for primary,
-    // "MyModel" for custom connection classes, or the raw string owner).
-    const poolKey = poolConfig.connectionDescriptor?.name ?? dbConfig.name;
+    const poolKey = poolConfig.connectionDescriptor.name;
     const poolManager = this._setPoolManager(poolKey);
 
     const existingPoolConfig = poolManager.getPoolConfig(role, shard);

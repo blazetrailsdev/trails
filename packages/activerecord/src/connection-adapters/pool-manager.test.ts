@@ -1,17 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { PoolManager } from "./pool-manager.js";
 import { PoolConfig } from "./pool-config.js";
+import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 
 function makePoolConfig(name: string, opts: { role?: string; shard?: string } = {}): PoolConfig {
+  const role = opts.role ?? "writing";
+  const shard = opts.shard ?? "default";
   const dbConfig = new HashConfig("default", name, {
     adapter: "sqlite3",
     database: ":memory:",
   });
-  return new PoolConfig(dbConfig, {
-    role: opts.role ?? "writing",
-    shard: opts.shard ?? "default",
-  });
+  return new PoolConfig(new ConnectionDescriptor(name), dbConfig, role, shard);
 }
 
 describe("PoolManager", () => {
