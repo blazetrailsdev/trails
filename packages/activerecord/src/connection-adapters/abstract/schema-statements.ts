@@ -152,19 +152,22 @@ export class SchemaStatements {
       name?: string;
       where?: string;
       order?: Record<string, string>;
+      using?: string;
+      type?: string;
+      comment?: string;
       ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
     const indexName = options.name ?? this.indexName(tableName, { column: cols });
-    const indexDef = new IndexDefinition(
-      tableName,
-      indexName,
-      options.unique ?? false,
-      cols,
-      options.where,
-      options.order ?? {},
-    );
+    this._validateIndexLength(tableName, indexName);
+    const indexDef = new IndexDefinition(tableName, indexName, options.unique ?? false, cols, {
+      where: options.where,
+      orders: options.order ?? {},
+      using: options.using as string | undefined,
+      type: options.type as string | undefined,
+      comment: options.comment as string | undefined,
+    });
     const createDef = new CreateIndexDefinition(indexDef, options.ifNotExists ?? false);
     await this.adapter.executeMutation(this.schemaCreation.accept(createDef));
   }
@@ -980,13 +983,18 @@ export class SchemaStatements {
   ): CreateIndexDefinition {
     const columnNames = Array.isArray(columnName) ? columnName : [columnName];
     const indexName = options.name ?? this.indexName(tableName, { column: columnNames });
-    const idx = new IndexDefinition(
-      tableName,
-      indexName,
-      !!options.unique,
-      columnNames,
-      options.where,
-    );
+    this._validateIndexLength(tableName, indexName);
+    const idx = new IndexDefinition(tableName, indexName, !!options.unique, columnNames, {
+      where: options.where as string | undefined,
+      orders: (options.order ?? {}) as Record<string, string>,
+      lengths: (options.length ?? {}) as Record<string, number>,
+      opclasses: (options.opclass ?? {}) as Record<string, string>,
+      type: options.type as string | undefined,
+      using: options.using as string | undefined,
+      include: options.include as string[] | undefined,
+      nullsNotDistinct: options.nullsNotDistinct as boolean | undefined,
+      comment: options.comment as string | undefined,
+    });
     return new CreateIndexDefinition(idx, !!options.ifNotExists, options.algorithm);
   }
 
@@ -1136,31 +1144,71 @@ export class SchemaStatements {
     }
   }
 
-  columnsForDistinct(columns: string, _orders?: string[]): string {
+  columnsForDistinct(columns: string | string[], _orders?: string[]): string | string[] {
     return columns;
   }
 
-  distinctRelationForPrimaryKey(relation: {
+  async distinctRelationForPrimaryKey(relation: {
     primaryKey?: string | string[];
+    table?: { [key: string]: unknown };
     orderValues?: unknown[];
     reselect?: (...cols: unknown[]) => unknown;
     distinctBang?: () => unknown;
-  }): unknown {
+    noneBang?: () => void;
+    where?: (conditions: Record<string, unknown>) => unknown;
+    limitValue?: number | null;
+    offsetValue?: number | null;
+    arel?: unknown;
+  }): Promise<unknown> {
     const pk = relation.primaryKey;
     if (!pk) return relation;
 
     const pkColumns = Array.isArray(pk) ? pk : [pk];
-    const quotedPkColumns = pkColumns.map((col) => this._qi(col));
-    const values = this.columnsForDistinct(
-      quotedPkColumns.join(", "),
-      (relation.orderValues as string[]) ?? [],
-    );
+    const values = this.columnsForDistinct(pkColumns, (relation.orderValues as string[]) ?? []);
 
     let limited: any = relation;
-    if (limited.reselect) limited = limited.reselect(values);
+    const selectValues = Array.isArray(values) ? values : [values];
+    if (limited.reselect) limited = limited.reselect(...selectValues);
     if (limited.distinctBang) limited.distinctBang();
 
-    return limited;
+    // Execute the limited distinct query to get IDs
+    const arel = typeof limited.arel === "function" ? limited.arel() : limited;
+    const sql = typeof arel === "string" ? arel : (arel?.toSql?.() ?? String(arel));
+    const rows = await this.adapter.execute(sql);
+    const pkLen = pkColumns.length;
+
+    const limitedIds: unknown[][] = rows.map((row: Record<string, unknown>) => {
+      const vals = Object.values(row);
+      return vals.slice(-pkLen);
+    });
+
+    if (limitedIds.length === 0) {
+      if (typeof (relation as any).noneBang === "function") {
+        (relation as any).noneBang();
+      }
+    } else {
+      // Build {pk_col => [id1, id2, ...]} conditions
+      const transposed: unknown[][] = pkColumns.map((_, i) => limitedIds.map((row) => row[i]));
+      const conditions: Record<string, unknown> = {};
+      for (let i = 0; i < pkColumns.length; i++) {
+        conditions[pkColumns[i]] = transposed[i];
+      }
+      if (typeof (relation as any).where === "function") {
+        relation = (relation as any).where(conditions);
+      }
+    }
+
+    if (typeof (relation as any).limitBang === "function") {
+      (relation as any).limitBang(null);
+    } else {
+      (relation as any)._limitValue = null;
+    }
+    if (typeof (relation as any).offsetBang === "function") {
+      (relation as any).offsetBang(null);
+    } else {
+      (relation as any)._offsetValue = null;
+    }
+    return relation;
   }
 
   updateTableDefinition(tableName: string, base?: unknown): Table {
@@ -1183,14 +1231,24 @@ export class SchemaStatements {
     } = {},
   ): [IndexDefinition, string | undefined, boolean] {
     const columnNames = Array.isArray(columnName) ? columnName : [columnName];
-    const indexName = options.name ?? this.indexName(tableName, { column: columnNames });
-    const idx = new IndexDefinition(
-      tableName,
-      indexName,
-      !!options.unique,
-      columnNames,
-      options.where,
-    );
+    const indexName =
+      options.name?.toString() ?? this.indexName(tableName, { column: columnNames });
+
+    if (!options.internal) {
+      this._validateIndexLength(tableName, indexName);
+    }
+
+    const idx = new IndexDefinition(tableName, indexName, !!options.unique, columnNames, {
+      where: options.where,
+      using: options.using,
+      type: options.type,
+      lengths: (options.length ?? {}) as Record<string, number>,
+      orders: (options.order ?? {}) as Record<string, string>,
+      opclasses: (options.opclass ?? {}) as Record<string, string>,
+      include: options.include as string[] | undefined,
+      nullsNotDistinct: options.nullsNotDistinct as boolean | undefined,
+      comment: options.comment as string | undefined,
+    });
     return [idx, this.indexAlgorithm(options.algorithm), !!options.ifNotExists];
   }
 
@@ -1326,5 +1384,14 @@ export class SchemaStatements {
 
   maxIndexNameSize(): number {
     return 62;
+  }
+
+  private _validateIndexLength(tableName: string, indexName: string): void {
+    const limit = this.maxIndexNameSize();
+    if (indexName.length > limit) {
+      throw new Error(
+        `Index name '${indexName}' on table '${tableName}' is too long; the limit is ${limit} characters`,
+      );
+    }
   }
 }

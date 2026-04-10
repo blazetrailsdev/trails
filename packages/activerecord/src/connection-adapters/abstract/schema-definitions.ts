@@ -112,21 +112,47 @@ export class IndexDefinition {
   readonly columns: string[];
   readonly where?: string;
   readonly orders: Record<string, string>;
+  readonly lengths: Record<string, number>;
+  readonly opclasses: Record<string, string>;
+  readonly type?: string;
+  readonly using?: string;
+  readonly include?: string[];
+  readonly nullsNotDistinct?: boolean;
+  readonly comment?: string;
+  readonly valid: boolean;
 
   constructor(
     table: string,
     name: string,
     unique: boolean = false,
     columns: string[] = [],
-    where?: string,
-    orders: Record<string, string> = {},
+    options: {
+      where?: string;
+      orders?: Record<string, string>;
+      lengths?: Record<string, number>;
+      opclasses?: Record<string, string>;
+      type?: string;
+      using?: string;
+      include?: string[];
+      nullsNotDistinct?: boolean;
+      comment?: string;
+      valid?: boolean;
+    } = {},
   ) {
     this.table = table;
     this.name = name;
     this.unique = unique;
     this.columns = columns;
-    this.where = where;
-    this.orders = orders;
+    this.where = options.where;
+    this.orders = options.orders ?? {};
+    this.lengths = options.lengths ?? {};
+    this.opclasses = options.opclasses ?? {};
+    this.type = options.type;
+    this.using = options.using;
+    this.include = options.include;
+    this.nullsNotDistinct = options.nullsNotDistinct;
+    this.comment = options.comment;
+    this.valid = options.valid ?? true;
   }
 }
 

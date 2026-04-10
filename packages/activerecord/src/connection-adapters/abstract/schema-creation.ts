@@ -41,6 +41,18 @@ export class SchemaCreation {
     return this.adapterName !== "mysql";
   }
 
+  protected supportsIndexUsing(): boolean {
+    return this.adapterName === "postgres" || this.adapterName === "mysql";
+  }
+
+  protected supportsIndexInclude(): boolean {
+    return this.adapterName === "postgres";
+  }
+
+  protected supportsNullsNotDistinct(): boolean {
+    return this.adapterName === "postgres";
+  }
+
   accept(o: Definition): string {
     if (o instanceof TableDefinition) return this.visitTableDefinition(o);
     if (o instanceof AlterTable) return this.visitAlterTable(o);
@@ -119,18 +131,27 @@ export class SchemaCreation {
     parts.push("INDEX");
     if (o.algorithm) parts.push(o.algorithm);
     if (o.ifNotExists) parts.push("IF NOT EXISTS");
+    if (index.type) parts.push(index.type.toUpperCase());
     parts.push(
       `${quoteIdentifier(index.name, this.adapterName)} ON ${quoteTableName(index.table, this.adapterName)}`,
     );
+    if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     const columnsSql = index.columns.map((c) => {
       let col = quoteIdentifier(c, this.adapterName);
+      if (index.lengths[c]) col += `(${index.lengths[c]})`;
       if (this.supportsIndexSortOrder()) {
         const order = index.orders[c];
         if (order) col += ` ${order.toUpperCase()}`;
       }
+      if (this.adapterName === "postgres" && index.opclasses[c]) col += ` ${index.opclasses[c]}`;
       return col;
     });
     parts.push(`(${columnsSql.join(", ")})`);
+    if (this.supportsIndexInclude() && index.include && index.include.length > 0) {
+      const includeCols = index.include.map((c) => quoteIdentifier(c, this.adapterName));
+      parts.push(`INCLUDE (${includeCols.join(", ")})`);
+    }
+    if (this.supportsNullsNotDistinct() && index.nullsNotDistinct) parts.push("NULLS NOT DISTINCT");
     if (this.supportsPartialIndex() && index.where) parts.push(`WHERE ${index.where}`);
     return parts.join(" ");
   }
