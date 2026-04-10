@@ -7,6 +7,7 @@
 import { sql as arelSql, Nodes } from "@blazetrails/arel";
 import { TransactionIsolationError } from "../../errors.js";
 import { quote, quoteTableName, quoteColumnName } from "./quoting.js";
+import { TransactionManager } from "./transaction.js";
 
 /**
  * Host interface for DatabaseStatements mixin methods that need adapter context.
@@ -544,7 +545,7 @@ export async function transaction<T>(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#transaction_manager
  */
-export function transactionManager(this: DatabaseStatementsHost): unknown {
+export function transactionManager(this: DatabaseStatementsHost): TransactionManager | null {
   return (this as any)._transactionManager ?? null;
 }
 
@@ -900,6 +901,10 @@ export async function rawExecQuery(
   if (!this.rawExecute) {
     throw new Error("rawExecQuery requires rawExecute on the adapter");
   }
+  // Materialize lazy transactions before executing SQL, matching Rails'
+  // with_raw_connection which calls materialize_transactions.
+  const tm = (this as any)._transactionManager as TransactionManager | undefined;
+  if (tm) await tm.materializeTransactions();
   const rawResult = await this.rawExecute(sql, name ?? "SQL", binds);
   return this.castResult ? this.castResult(rawResult) : rawResult;
 }
@@ -916,6 +921,9 @@ export async function internalExecQuery(
   name?: string | null,
   binds?: unknown[],
 ): Promise<unknown> {
+  // Materialize lazy transactions before executing SQL
+  const tm = (this as any)._transactionManager as TransactionManager | undefined;
+  if (tm) await tm.materializeTransactions();
   if (this?.internalExecute) {
     const rawResult = await this.internalExecute(sql, name ?? "SQL", binds);
     return this.castResult ? this.castResult(rawResult) : rawResult;
