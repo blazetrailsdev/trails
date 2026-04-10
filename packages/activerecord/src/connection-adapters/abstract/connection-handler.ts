@@ -12,7 +12,8 @@ import { DatabaseConfigurations } from "../../database-configurations.js";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { DatabaseAdapter } from "../../adapter.js";
-import { AdapterNotSpecified } from "../../errors.js";
+import { AdapterNotSpecified, ConnectionNotDefined } from "../../errors.js";
+import type { QueryCachePool } from "./query-cache.js";
 import { Notifications } from "@blazetrails/activesupport";
 
 export { ConnectionDescriptor };
@@ -20,6 +21,15 @@ export type { ConnectionOwner };
 
 export class ConnectionHandler {
   private _connectionNameToPoolManager = new Map<string, PoolManager>();
+  private _preventWrites = false;
+
+  get preventWrites(): boolean {
+    return this._preventWrites;
+  }
+
+  set preventWrites(value: boolean) {
+    this._preventWrites = value;
+  }
 
   /**
    * Normalize an owner into a form suitable for PoolConfig.connectionDescriptor=.
@@ -34,6 +44,38 @@ export class ConnectionHandler {
       return new ConnectionDescriptor(owner);
     }
     return owner;
+  }
+
+  connectionPoolNames(): string[] {
+    return [...this._connectionNameToPoolManager.keys()];
+  }
+
+  connectionPoolList(role?: string | null): ConnectionPool[] {
+    const effectiveRole = role === "all" ? null : role;
+    const pools: ConnectionPool[] = [];
+    for (const manager of this._connectionNameToPoolManager.values()) {
+      const configs =
+        effectiveRole == null ? manager.poolConfigs() : manager.poolConfigs(effectiveRole);
+      for (const pc of configs) {
+        pools.push(pc.pool);
+      }
+    }
+    return pools;
+  }
+
+  get connectionPools(): ConnectionPool[] {
+    return this.connectionPoolList();
+  }
+
+  eachConnectionPool(role: string | null | undefined, cb: (pool: ConnectionPool) => void): void {
+    const effectiveRole = role === "all" ? null : role;
+    for (const manager of this._connectionNameToPoolManager.values()) {
+      const configs =
+        effectiveRole == null ? manager.poolConfigs() : manager.poolConfigs(effectiveRole);
+      for (const pc of configs) {
+        cb(pc.pool);
+      }
+    }
   }
 
   establishConnection(
@@ -79,63 +121,118 @@ export class ConnectionHandler {
     poolManager.setPoolConfig(role, shard, poolConfig);
 
     Notifications.instrument("!connection.active_record", {
-      spec_name: poolKey,
+      connection_name: poolKey,
+      role,
       shard,
+      config: dbConfig.configuration,
     });
 
     return poolConfig.pool;
   }
 
-  retrieveConnectionPool(
-    owner: string,
-    options?: { role?: string; shard?: string },
-  ): ConnectionPool | undefined {
-    const role = options?.role ?? "writing";
-    const shard = options?.shard ?? "default";
-    const poolManager = this._getPoolManager(owner);
-    return poolManager?.getPoolConfig(role, shard)?.pool;
-  }
-
-  get connectionPools(): ConnectionPool[] {
-    const pools: ConnectionPool[] = [];
-    for (const manager of this._connectionNameToPoolManager.values()) {
-      for (const poolConfig of manager.poolConfigs()) {
-        if (poolConfig.poolInitialized) {
-          pools.push(poolConfig.pool);
-        }
-      }
-    }
-    return pools;
+  activeConnectionsQ(role?: string | null): boolean {
+    const pools = this.connectionPoolList(role);
+    return pools.some((pool) => pool.activeConnection != null);
   }
 
   get activeConnections(): boolean {
-    for (const manager of this._connectionNameToPoolManager.values()) {
-      for (const poolConfig of manager.poolConfigs()) {
-        if (poolConfig.poolInitialized && poolConfig.pool.activeConnection) return true;
-      }
-    }
-    return false;
+    return this.activeConnectionsQ();
   }
 
-  removeConnection(owner: string, options?: { role?: string; shard?: string }): void {
+  clearActiveConnectionsBang(role?: string | null): void {
+    this.eachConnectionPool(role, (pool) => {
+      pool.releaseConnection();
+      (pool as unknown as QueryCachePool).disableQueryCacheBang?.();
+    });
+  }
+
+  clearReloadableConnectionsBang(role?: string | null): void {
+    this.eachConnectionPool(role, (pool) => {
+      pool.clearReloadableConnectionsBang();
+    });
+  }
+
+  clearAllConnectionsBang(role?: string | null): void {
+    this.eachConnectionPool(role, (pool) => {
+      pool.disconnectBang();
+    });
+  }
+
+  flushIdleConnectionsBang(role?: string | null): void {
+    this.eachConnectionPool(role, (pool) => {
+      pool.flushBang();
+    });
+  }
+
+  retrieveConnection(
+    connectionName: string,
+    options?: { role?: string; shard?: string },
+  ): DatabaseAdapter {
+    const pool = this.retrieveConnectionPool(connectionName, {
+      role: options?.role,
+      shard: options?.shard,
+      strict: true,
+    });
+    return pool!.leaseConnection();
+  }
+
+  isConnected(connectionName: string, options?: { role?: string; shard?: string }): boolean {
+    const pool = this.retrieveConnectionPool(connectionName, {
+      role: options?.role,
+      shard: options?.shard,
+    });
+    return pool != null && pool.isConnected();
+  }
+
+  removeConnectionPool(connectionName: string, options?: { role?: string; shard?: string }): void {
     const role = options?.role ?? "writing";
     const shard = options?.shard ?? "default";
-    const poolManager = this._getPoolManager(owner);
+    const poolManager = this._getPoolManager(connectionName);
     if (poolManager) {
       this._disconnectPoolFromPoolManager(poolManager, role, shard);
       if (poolManager.roleNames.length === 0) {
-        this._connectionNameToPoolManager.delete(owner);
+        this._connectionNameToPoolManager.delete(connectionName);
       }
     }
   }
 
-  clearAllConnections(): void {
-    for (const manager of this._connectionNameToPoolManager.values()) {
-      for (const poolConfig of manager.poolConfigs()) {
-        poolConfig.disconnect();
-      }
+  retrieveConnectionPool(
+    owner: string,
+    options?: { role?: string; shard?: string; strict?: boolean },
+  ): ConnectionPool | undefined {
+    const role = options?.role ?? "writing";
+    const shard = options?.shard ?? "default";
+    const strict = options?.strict ?? false;
+    const poolManager = this._getPoolManager(owner);
+    const pool = poolManager?.getPoolConfig(role, shard)?.pool;
+
+    if (strict && !pool) {
+      const parts: string[] = [];
+      if (shard !== "default") parts.push(`'${shard}' shard`);
+      if (role !== "writing") parts.push(`'${role}' role`);
+      const selector = parts.join(" and ");
+      const prefix = owner !== "Base" ? owner : "";
+      const full = [prefix, selector].filter(Boolean).join(" with ");
+      const suffix = full ? ` for ${full}` : "";
+      const message = `No database connection defined${suffix}.`;
+      throw new ConnectionNotDefined(message, {
+        connectionName: owner,
+        shard,
+        role,
+      });
     }
-    this._connectionNameToPoolManager.clear();
+
+    return pool;
+  }
+
+  /** @deprecated Use removeConnectionPool */
+  removeConnection(owner: string, options?: { role?: string; shard?: string }): void {
+    this.removeConnectionPool(owner, options);
+  }
+
+  /** @deprecated Use clearAllConnectionsBang */
+  clearAllConnections(): void {
+    this.clearAllConnectionsBang();
   }
 
   private _getPoolManager(connectionName: string): PoolManager | undefined {

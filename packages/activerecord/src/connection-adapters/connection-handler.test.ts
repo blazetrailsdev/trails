@@ -293,4 +293,173 @@ describe("ConnectionHandlerTest", () => {
   it.skip("pool from any process for uses most recent spec", () => {
     /* needs process forking */
   });
+
+  it("connection pool names", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    expect(handler.connectionPoolNames()).toContain("primary");
+  });
+
+  it("each connection pool", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    const pools: unknown[] = [];
+    handler.eachConnectionPool(null, (pool) => pools.push(pool));
+    expect(pools).toHaveLength(1);
+  });
+
+  it("clear active connections bang", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    const pool = handler.retrieveConnectionPool("primary")!;
+    pool.leaseConnection();
+    expect(pool.activeConnection).toBeTruthy();
+    handler.clearActiveConnectionsBang();
+    expect(pool.activeConnection).toBeNull();
+  });
+
+  it("clear all connections bang", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    const pool = handler.retrieveConnectionPool("primary")!;
+    pool.leaseConnection();
+    handler.clearAllConnectionsBang();
+    expect(pool.isConnected()).toBe(false);
+  });
+
+  it("prevent writes", () => {
+    expect(handler.preventWrites).toBe(false);
+    handler.preventWrites = true;
+    expect(handler.preventWrites).toBe(true);
+    handler.preventWrites = false;
+  });
+
+  it("retrieve connection returns a connection", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    const conn = handler.retrieveConnection("primary");
+    expect(conn).toBeTruthy();
+    expect(conn.adapterName).toBeTruthy();
+    handler.retrieveConnectionPool("primary")!.releaseConnection();
+  });
+
+  it("retrieve connection strict throws for missing pool", () => {
+    expect(() => handler.retrieveConnection("nonexistent")).toThrow(/No database connection/);
+  });
+
+  it("is connected", () => {
+    expect(handler.isConnected("primary")).toBe(false);
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    const pool = handler.retrieveConnectionPool("primary")!;
+    pool.leaseConnection();
+    expect(handler.isConnected("primary")).toBe(true);
+    pool.releaseConnection();
+  });
+
+  it("remove connection pool", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    expect(handler.retrieveConnectionPool("primary")).toBeTruthy();
+    handler.removeConnectionPool("primary");
+    expect(handler.retrieveConnectionPool("primary")).toBeUndefined();
+  });
+
+  it("flush idle connections bang", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    const pool = handler.retrieveConnectionPool("primary")!;
+    pool.leaseConnection();
+    pool.releaseConnection();
+    expect(pool.stat().idle).toBe(1);
+    handler.flushIdleConnectionsBang();
+    expect(pool.stat().connections).toBe(0);
+  });
+
+  it("connection pool list filtered by role", () => {
+    const config1 = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    const config2 = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev-read.db",
+    });
+    handler.establishConnection(config1, {
+      owner: "primary",
+      role: "writing",
+      adapterFactory: createTestAdapter,
+    });
+    handler.establishConnection(config2, {
+      owner: "primary",
+      role: "reading",
+      adapterFactory: createTestAdapter,
+    });
+    expect(handler.connectionPoolList("writing")).toHaveLength(1);
+    expect(handler.connectionPoolList("reading")).toHaveLength(1);
+    expect(handler.connectionPoolList("all")).toHaveLength(2);
+    expect(handler.connectionPoolList()).toHaveLength(2);
+  });
+
+  it("active connections filtered by role", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, {
+      owner: "primary",
+      role: "writing",
+      adapterFactory: createTestAdapter,
+    });
+    const pool = handler.retrieveConnectionPool("primary", { role: "writing" })!;
+    pool.leaseConnection();
+    expect(handler.activeConnectionsQ("writing")).toBe(true);
+    expect(handler.activeConnectionsQ("reading")).toBe(false);
+    pool.releaseConnection();
+  });
+
+  it("retrieve connection pool strict mode with role and shard", () => {
+    expect(() =>
+      handler.retrieveConnectionPool("primary", {
+        role: "reading",
+        shard: "shard_one",
+        strict: true,
+      }),
+    ).toThrow(/No database connection defined.*'shard_one' shard.*'reading' role/);
+  });
+
+  it("each connection pool with null role", () => {
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "dev.db",
+    });
+    handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
+    const pools: unknown[] = [];
+    handler.eachConnectionPool(null, (pool) => pools.push(pool));
+    expect(pools).toHaveLength(1);
+  });
 });
