@@ -84,11 +84,7 @@ export class PoolConfig {
 
   get pool(): ConnectionPool {
     if (!this._pool) {
-      this._pool = new ConnectionPool(this.dbConfig, {
-        role: this.role,
-        shard: this.shard,
-        adapterFactory: this.adapterFactory,
-      });
+      this._pool = new ConnectionPool(this);
     }
     return this._pool;
   }

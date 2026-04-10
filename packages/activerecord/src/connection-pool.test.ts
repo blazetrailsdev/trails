@@ -1,15 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
+import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
 
 function makePool(size: number = 5): ConnectionPool {
-  const config = new HashConfig("test", "primary", {
+  const dbConfig = new HashConfig("test", "primary", {
     adapter: "sqlite3",
     database: "test.db",
     pool: size,
   });
-  return new ConnectionPool(config, { adapterFactory: createTestAdapter });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+    adapterFactory: createTestAdapter,
+  });
+  return new ConnectionPool(pc);
 }
 
 describe("ConnectionPoolThreadTest", () => {
@@ -33,22 +38,49 @@ it("with connection", async () => {
     return "ok";
   });
   expect(result).toBe("ok");
-  expect(pool.busyCount).toBe(0);
-  expect(pool.idleCount).toBe(1);
+  expect(pool.stat().busy).toBe(0);
+  expect(pool.stat().idle).toBe(1);
 
   const asyncResult = await pool.withConnection(async (conn) => {
     expect(conn).toBeTruthy();
     return "async-ok";
   });
   expect(asyncResult).toBe("async-ok");
-  expect(pool.busyCount).toBe(0);
+  expect(pool.stat().busy).toBe(0);
 
   await expect(
     pool.withConnection(async () => {
       throw new Error("boom");
     }),
   ).rejects.toThrow("boom");
-  expect(pool.busyCount).toBe(0);
+  expect(pool.stat().busy).toBe(0);
+});
+
+it("with connection prevent permanent checkout releases connection", () => {
+  const pool = makePool();
+  pool.leaseConnection();
+  expect(pool.activeConnection).toBeTruthy();
+  pool.withConnection(
+    (conn) => {
+      expect(conn).toBeTruthy();
+    },
+    { preventPermanentCheckout: true },
+  );
+  // sticky was restored so connection is still leased
+  expect(pool.activeConnection).toBeTruthy();
+  pool.releaseConnection();
+});
+
+it("with connection prevent permanent checkout on fresh lease releases", () => {
+  const pool = makePool();
+  pool.withConnection(
+    (conn) => {
+      expect(conn).toBeTruthy();
+    },
+    { preventPermanentCheckout: true },
+  );
+  // No prior sticky lease, so connection should be released
+  expect(pool.activeConnection).toBeNull();
 });
 
 it.skip("new connection no query", () => {
@@ -57,11 +89,11 @@ it.skip("new connection no query", () => {
 
 it("active connection in use", () => {
   const pool = makePool();
-  expect(pool.activeConnection).toBe(false);
-  const conn = pool.checkout();
-  expect(pool.activeConnection).toBe(true);
-  pool.checkin(conn);
-  expect(pool.activeConnection).toBe(false);
+  expect(pool.activeConnection).toBeNull();
+  const conn = pool.leaseConnection();
+  expect(pool.activeConnection).toBe(conn);
+  pool.releaseConnection();
+  expect(pool.activeConnection).toBeNull();
 });
 
 it("full pool exception", () => {
@@ -102,20 +134,38 @@ it.skip("disable flush", () => {
   /* needs flush implementation */
 });
 
-it.skip("flush", () => {
-  /* needs flush implementation */
+it("flush", () => {
+  const pool = makePool(5);
+  const conn = pool.checkout();
+  pool.checkin(conn);
+  expect(pool.stat().connections).toBe(1);
+  expect(pool.stat().idle).toBe(1);
+  // Flush with high idle threshold — nothing removed
+  pool.flush(9999);
+  expect(pool.stat().connections).toBe(1);
+  // Flush with 0 threshold — removes all idle
+  pool.flush(0);
+  expect(pool.stat().connections).toBe(0);
 });
 
-it.skip("flush bang", () => {
-  /* needs flush implementation */
+it("flush bang", () => {
+  const pool = makePool(5);
+  const c1 = pool.checkout();
+  const c2 = pool.checkout();
+  pool.checkin(c1);
+  pool.checkin(c2);
+  expect(pool.stat().idle).toBe(2);
+  pool.flushBang();
+  expect(pool.stat().connections).toBe(0);
+  expect(pool.stat().idle).toBe(0);
 });
 
 it("remove connection", () => {
   const pool = makePool();
   const conn = pool.checkout();
-  expect(pool.connectedCount).toBe(1);
-  pool.removeConnection(conn);
-  expect(pool.connectedCount).toBe(0);
+  expect(pool.stat().connections).toBe(1);
+  pool.remove(conn);
+  expect(pool.stat().connections).toBe(0);
 });
 
 it.skip("remove connection for thread", () => {
@@ -124,10 +174,10 @@ it.skip("remove connection for thread", () => {
 
 it("active connection?", () => {
   const pool = makePool();
-  expect(pool.activeConnection).toBe(false);
-  const conn = pool.checkout();
-  expect(pool.activeConnection).toBe(true);
-  pool.checkin(conn);
+  expect(pool.activeConnection).toBeNull();
+  const conn = pool.leaseConnection();
+  expect(pool.activeConnection).toBe(conn);
+  pool.releaseConnection();
 });
 
 it("checkout behavior", () => {
@@ -229,15 +279,14 @@ it.skip("public connections access threadsafe", () => {
 });
 
 it("role and shard is returned", () => {
-  const config = new HashConfig("test", "primary", {
+  const dbConfig = new HashConfig("test", "primary", {
     adapter: "sqlite3",
     database: "test.db",
   });
-  const pool = new ConnectionPool(config, {
-    role: "reading",
-    shard: "shard_one",
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "reading", "shard_one", {
     adapterFactory: createTestAdapter,
   });
+  const pool = new ConnectionPool(pc);
   expect(pool.role).toBe("reading");
   expect(pool.shard).toBe("shard_one");
 });

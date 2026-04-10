@@ -120,9 +120,9 @@ describe("ConnectionHandlerTest", () => {
     });
     handler.establishConnection(config, { owner: "primary", adapterFactory: createTestAdapter });
     const pool = handler.retrieveConnectionPool("primary")!;
-    const conn = pool.checkout();
+    pool.leaseConnection();
     expect(handler.activeConnections).toBe(true);
-    pool.checkin(conn);
+    pool.releaseConnection();
   });
 
   it("retrieve connection pool", () => {

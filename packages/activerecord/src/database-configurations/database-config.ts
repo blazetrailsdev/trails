@@ -7,6 +7,9 @@ export interface DatabaseConfigOptions {
   password?: string;
   encoding?: string;
   pool?: number;
+  checkoutTimeout?: number;
+  idleTimeout?: number | null;
+  reapingFrequency?: number | null;
   url?: string;
   replicaOf?: string;
   replica?: boolean;
@@ -46,6 +49,22 @@ export class DatabaseConfig {
 
   get pool(): number {
     return this.configuration.pool ?? 5;
+  }
+
+  get checkoutTimeout(): number {
+    return (this.configuration.checkoutTimeout as number) ?? 5;
+  }
+
+  get idleTimeout(): number | null {
+    const val = this.configuration.idleTimeout;
+    if (val === null || val === 0) return null;
+    return (val as number) ?? 300;
+  }
+
+  get reapingFrequency(): number | null {
+    const val = this.configuration.reapingFrequency;
+    if (val === null || val === 0) return null;
+    return (val as number) ?? 60;
   }
 
   get replica(): boolean {
