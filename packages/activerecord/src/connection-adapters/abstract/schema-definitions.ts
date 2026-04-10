@@ -207,6 +207,11 @@ export class AlterTable {
   readonly foreignKeyDrops: string[] = [];
   readonly checkConstraintAdds: CheckConstraintDefinition[] = [];
   readonly checkConstraintDrops: string[] = [];
+  readonly constraintDrops: string[] = [];
+  readonly columnDefaultChanges: Array<{
+    columnName: string;
+    defaultValue: unknown;
+  }> = [];
 
   constructor(name: string) {
     this.name = name;
@@ -230,6 +235,14 @@ export class AlterTable {
 
   dropCheckConstraint(name: string): void {
     this.checkConstraintDrops.push(name);
+  }
+
+  dropConstraint(name: string): void {
+    this.constraintDrops.push(name);
+  }
+
+  changeColumnDefault(columnName: string, defaultValue: unknown): void {
+    this.columnDefaultChanges.push({ columnName, defaultValue });
   }
 }
 

@@ -12,6 +12,7 @@ import type { DatabaseAdapter } from "../../adapter.js";
 import {
   TableDefinition,
   Table,
+  AlterTable,
   IndexDefinition,
   ColumnDefinition,
   AddColumnDefinition,
@@ -24,10 +25,12 @@ import {
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { detectAdapterName } from "../../adapter-name.js";
-import { quoteIdentifier, quoteDefaultExpression } from "./quoting.js";
+import { quoteIdentifier, quoteDefaultExpression, quoteTableName, quote } from "./quoting.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
+import { singularize, getCrypto } from "@blazetrails/activesupport";
+import { SchemaDumper } from "./schema-dumper.js";
 
 export class SchemaStatements {
   private _schemaCreation?: SchemaCreation;
@@ -46,6 +49,10 @@ export class SchemaStatements {
 
   protected _qi(name: string): string {
     return quoteIdentifier(name, this.adapterName);
+  }
+
+  protected _qt(tableName: string): string {
+    return quoteTableName(tableName, this.adapterName);
   }
 
   async createTable(
@@ -806,5 +813,518 @@ export class SchemaStatements {
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     return this.schemaCreation.typeToSql(type, options);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Methods below match the Rails SchemaStatements API surface.
+  // ---------------------------------------------------------------------------
+
+  nativeDatabaseTypes(): Record<string, unknown> {
+    return {};
+  }
+
+  tableOptions(_tableName: string): Record<string, unknown> | null {
+    return null;
+  }
+
+  tableComment(_tableName: string): string | null {
+    return null;
+  }
+
+  tableAliasFor(tableName: string): string {
+    const maxLen = this.tableAliasLength();
+    return tableName.slice(0, maxLen).replace(/\./g, "_");
+  }
+
+  protected tableAliasLength(): number {
+    return 64;
+  }
+
+  async dataSources(): Promise<string[]> {
+    const t = await this.tables();
+    const v = await this.views();
+    return [...new Set([...t, ...v])];
+  }
+
+  async isDataSourceExists(name: string): Promise<boolean> {
+    if (!name) return false;
+    if (await this.tableExists(name)) return true;
+    return this.viewExists(name);
+  }
+
+  buildCreateTableDefinition(
+    tableName: string,
+    options: {
+      id?: boolean | "uuid" | false;
+      primaryKey?: string;
+      force?: boolean;
+      [key: string]: unknown;
+    } = {},
+    fn?: (td: TableDefinition) => void,
+  ): TableDefinition {
+    const hasCustomPk = !!options.primaryKey && options.id !== false;
+    const td = new TableDefinition(tableName, {
+      id: hasCustomPk ? false : options.id,
+      adapterName: this.adapterName,
+    });
+    if (hasCustomPk) {
+      const pkType = (typeof options.id === "string" ? options.id : "primary_key") as ColumnType;
+      td.columns.unshift(
+        new ColumnDefinition(options.primaryKey as string, pkType, { primaryKey: true }),
+      );
+    }
+    if (fn) fn(td);
+    return td;
+  }
+
+  buildCreateJoinTableDefinition(
+    table1: string,
+    table2: string,
+    options: {
+      columnOptions?: Record<string, unknown>;
+      tableName?: string;
+      [key: string]: unknown;
+    } = {},
+    fn?: (td: TableDefinition) => void,
+  ): TableDefinition {
+    const joinTableName = options.tableName ?? this._findJoinTableName(table1, table2);
+    const { columnOptions = {}, tableName: _, ...rest } = options;
+    const mergedColOpts = { null: false, index: false, ...columnOptions };
+
+    const t1Ref = this._referenceNameForTable(table1);
+    const t2Ref = this._referenceNameForTable(table2);
+
+    return this.buildCreateTableDefinition(joinTableName, { ...rest, id: false }, (td) => {
+      td.references(t1Ref, mergedColOpts);
+      td.references(t2Ref, mergedColOpts);
+      if (fn) fn(td);
+    });
+  }
+
+  private _findJoinTableName(table1: string, table2: string): string {
+    const unqualify = (name: string) => (name.split(".").at(-1) ?? name).replace(/\./g, "_");
+    const [t1, t2] = [unqualify(table1), unqualify(table2)].sort();
+    const parts1 = t1.split("_");
+    const parts2 = t2.split("_");
+    // Remove common prefix (Rails dedup: music_artists + music_records → music_artists_records)
+    let commonLen = 0;
+    while (
+      commonLen < parts1.length - 1 &&
+      commonLen < parts2.length - 1 &&
+      parts1[commonLen] === parts2[commonLen]
+    ) {
+      commonLen++;
+    }
+    if (commonLen > 0) {
+      const prefix = parts1.slice(0, commonLen).join("_");
+      const suffix1 = parts1.slice(commonLen).join("_");
+      const suffix2 = parts2.slice(commonLen).join("_");
+      return `${prefix}_${suffix1}_${suffix2}`;
+    }
+    return `${t1}_${t2}`;
+  }
+
+  private _referenceNameForTable(tableName: string): string {
+    const unqualified = tableName.split(".").at(-1) ?? tableName;
+    return singularize(unqualified);
+  }
+
+  async buildAddColumnDefinition(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions & { ifNotExists?: boolean } = {},
+  ): Promise<AlterTable | null> {
+    if (options.ifNotExists && (await this.columnExists(tableName, columnName))) {
+      return null;
+    }
+    const { ifNotExists: _, ...colOpts } = options;
+    const at = new AlterTable(tableName);
+    at.addColumn(columnName, type, colOpts);
+    return at;
+  }
+
+  buildChangeColumnDefaultDefinition(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): AlterTable {
+    let newDefault: unknown;
+    if (
+      defaultOrChanges != null &&
+      typeof defaultOrChanges === "object" &&
+      "to" in (defaultOrChanges as Record<string, unknown>)
+    ) {
+      newDefault = (defaultOrChanges as { to: unknown }).to;
+    } else {
+      newDefault = defaultOrChanges;
+    }
+    const at = new AlterTable(tableName);
+    at.changeColumnDefault(columnName, newDefault);
+    return at;
+  }
+
+  buildCreateIndexDefinition(
+    tableName: string,
+    columnName: string | string[],
+    options: {
+      name?: string;
+      unique?: boolean;
+      where?: string;
+      using?: string;
+      type?: string;
+      algorithm?: string;
+      ifNotExists?: boolean;
+      [key: string]: unknown;
+    } = {},
+  ): CreateIndexDefinition {
+    const columnNames = Array.isArray(columnName) ? columnName : [columnName];
+    const indexName = options.name ?? this.indexName(tableName, { column: columnNames });
+    const idx = new IndexDefinition(
+      tableName,
+      indexName,
+      !!options.unique,
+      columnNames,
+      options.where,
+    );
+    return new CreateIndexDefinition(idx, !!options.ifNotExists, options.algorithm);
+  }
+
+  async isIndexNameExists(tableName: string, indexName: string): Promise<boolean> {
+    const idxs = await this.indexes(tableName);
+    return idxs.some((idx) => idx.name === indexName);
+  }
+
+  foreignKeyColumnFor(tableName: string, columnName = "id"): string {
+    const name = tableName.replace(/^.*\./, "");
+    return `${singularize(name)}_${columnName}`;
+  }
+
+  foreignKeyOptions(
+    fromTable: string,
+    toTable: string,
+    options: Record<string, unknown> = {},
+  ): Record<string, unknown> {
+    const result = { ...options };
+
+    if (Array.isArray(result.primaryKey)) {
+      if (!result.column) {
+        result.column = (result.primaryKey as string[]).map((pk) =>
+          this.foreignKeyColumnFor(toTable, pk),
+        );
+      }
+    } else {
+      if (!result.column) {
+        const pk = typeof result.primaryKey === "string" ? result.primaryKey : "id";
+        result.column = this.foreignKeyColumnFor(toTable, pk);
+      }
+    }
+
+    if (!result.name) {
+      const unqualifiedFrom = (fromTable.split(".").at(-1) ?? fromTable).replace(/\./g, "_");
+      const cols = Array.isArray(result.column) ? result.column : [result.column];
+      const fullName = `fk_rails_${unqualifiedFrom}_${(cols as string[]).join("_")}`;
+      if (fullName.length > this.maxIndexNameSize()) {
+        const hex = getCrypto().createHash("sha256").update(fullName).digest("hex").slice(0, 10);
+        result.name = `fk_rails_${hex}`;
+      } else {
+        result.name = fullName;
+      }
+    }
+
+    return result;
+  }
+
+  async checkConstraints(_tableName: string): Promise<CheckConstraintDefinition[]> {
+    throw new Error("NotImplementedError: checkConstraints is not implemented");
+  }
+
+  checkConstraintOptions(
+    _tableName: string,
+    _expression: string,
+    options: Record<string, unknown> = {},
+  ): Record<string, unknown> {
+    return { ...options };
+  }
+
+  async isCheckConstraintExists(
+    tableName: string,
+    options: { name?: string; expression?: string },
+  ): Promise<boolean> {
+    if (!options.name && !options.expression) {
+      throw new Error("At least one of :name or :expression must be supplied");
+    }
+    try {
+      const constraints = await this.checkConstraints(tableName);
+      return constraints.some((c) => {
+        if (options.name && c.name === options.name) return true;
+        if (options.expression && c.expression === options.expression) return true;
+        return false;
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("NotImplementedError")) return false;
+      throw e;
+    }
+  }
+
+  async removeConstraint(tableName: string, constraintName: string): Promise<void> {
+    const at = new AlterTable(tableName);
+    at.dropConstraint(constraintName);
+    await this.adapter.executeMutation(this.schemaCreation.accept(at));
+  }
+
+  async dumpSchemaInformation(): Promise<string | null> {
+    const smTable = (this.adapter as any).pool?.schemaMigration;
+    if (!smTable) return null;
+    const versions: string[] =
+      typeof smTable.versions === "function" ? await smTable.versions() : (smTable.versions ?? []);
+    if (versions.length === 0) return null;
+    return this._insertVersionsSql(smTable.tableName ?? "schema_migrations", versions);
+  }
+
+  private _insertVersionsSql(tableName: string, versions: string | string[]): string {
+    const smTable = this._qt(tableName);
+    if (Array.isArray(versions)) {
+      const rows = versions.reverse().map((v) => `(${quote(v)})`);
+      return `INSERT INTO ${smTable} (version) VALUES\n${rows.join(",\n")};`;
+    }
+    return `INSERT INTO ${smTable} (version) VALUES (${quote(versions)});`;
+  }
+
+  internalStringOptionsForPrimaryKey(): Record<string, unknown> {
+    return { primaryKey: true };
+  }
+
+  async assumeMigratedUptoVersion(version: number | string): Promise<void> {
+    const ver = String(version);
+    if (!/^\d+$/.test(ver)) {
+      throw new Error(`Invalid migration version: ${version}`);
+    }
+    const verNum = parseInt(ver, 10);
+
+    const pool = (this.adapter as any).pool;
+    const smTableName = pool?.schemaMigration?.tableName ?? "schema_migrations";
+    const smTable = this._qt(smTableName);
+
+    const migrationContext = pool?.migrationContext;
+    const migrated: number[] = migrationContext
+      ? typeof migrationContext.getAllVersions === "function"
+        ? await migrationContext.getAllVersions()
+        : []
+      : [];
+    const allVersions: number[] = migrationContext
+      ? (migrationContext.migrations ?? []).map((m: { version: number }) => m.version)
+      : [];
+
+    // Insert the target version if not already migrated
+    if (!migrated.includes(verNum)) {
+      await this.adapter.executeMutation(`INSERT INTO ${smTable} (version) VALUES (${quote(ver)})`);
+    }
+
+    // Insert all known migration versions below the target that haven't been run
+    const inserting = allVersions.filter((v) => v < verNum && !migrated.includes(v));
+    if (inserting.length > 0) {
+      const duplicate = inserting.find((v) => inserting.filter((x) => x === v).length > 1);
+      if (duplicate !== undefined) {
+        throw new Error(
+          `Duplicate migration ${duplicate}. Please renumber your migrations to resolve the conflict.`,
+        );
+      }
+      await this.adapter.executeMutation(
+        this._insertVersionsSql(smTableName, inserting.map(String)),
+      );
+    }
+  }
+
+  columnsForDistinct(columns: string, _orders?: string[]): string {
+    return columns;
+  }
+
+  distinctRelationForPrimaryKey(relation: {
+    primaryKey?: string | string[];
+    orderValues?: unknown[];
+    reselect?: (...cols: unknown[]) => unknown;
+    distinctBang?: () => unknown;
+  }): unknown {
+    const pk = relation.primaryKey;
+    if (!pk) return relation;
+
+    const pkColumns = Array.isArray(pk) ? pk : [pk];
+    const quotedPkColumns = pkColumns.map((col) => this._qi(col));
+    const values = this.columnsForDistinct(
+      quotedPkColumns.join(", "),
+      (relation.orderValues as string[]) ?? [],
+    );
+
+    let limited: any = relation;
+    if (limited.reselect) limited = limited.reselect(values);
+    if (limited.distinctBang) limited.distinctBang();
+
+    return limited;
+  }
+
+  updateTableDefinition(tableName: string, base?: unknown): Table {
+    return new Table(tableName, (base ?? this) as SchemaStatements);
+  }
+
+  addIndexOptions(
+    tableName: string,
+    columnName: string | string[],
+    options: {
+      name?: string;
+      ifNotExists?: boolean;
+      internal?: boolean;
+      unique?: boolean;
+      where?: string;
+      using?: string;
+      type?: string;
+      algorithm?: string;
+      [key: string]: unknown;
+    } = {},
+  ): [IndexDefinition, string | undefined, boolean] {
+    const columnNames = Array.isArray(columnName) ? columnName : [columnName];
+    const indexName = options.name ?? this.indexName(tableName, { column: columnNames });
+    const idx = new IndexDefinition(
+      tableName,
+      indexName,
+      !!options.unique,
+      columnNames,
+      options.where,
+    );
+    return [idx, this.indexAlgorithm(options.algorithm), !!options.ifNotExists];
+  }
+
+  indexAlgorithm(algorithm?: string): string | undefined {
+    if (!algorithm) return undefined;
+    const normalized = algorithm.toLowerCase();
+    if (normalized === "default") return undefined;
+
+    const adapterAlgorithms =
+      typeof (this.adapter as any).indexAlgorithms === "function"
+        ? ((this.adapter as any).indexAlgorithms() as Record<string, string>)
+        : null;
+
+    if (adapterAlgorithms && normalized in adapterAlgorithms) {
+      return adapterAlgorithms[normalized];
+    }
+
+    const valid = adapterAlgorithms
+      ? ["default", ...Object.keys(adapterAlgorithms)]
+      : ["default", "concurrently"];
+    throw new Error(
+      `Algorithm must be one of the following: ${valid.map((a) => `'${a}'`).join(", ")}`,
+    );
+  }
+
+  quotedColumnsForIndex(columnNames: string[], _options: Record<string, unknown> = {}): string {
+    return columnNames.map((name) => this._qi(name)).join(", ");
+  }
+
+  isOptionsIncludeDefault(options: Record<string, unknown>): boolean {
+    return "default" in options && !(options.null === false && options.default == null);
+  }
+
+  async changeTableComment(
+    _tableName: string,
+    _commentOrChanges: string | null | { from?: string; to?: string },
+  ): Promise<void> {
+    throw new Error(
+      `NotImplementedError: ${this.adapterName} does not support changing table comments`,
+    );
+  }
+
+  async changeColumnComment(
+    _tableName: string,
+    _columnName: string,
+    _commentOrChanges: string | null | { from?: string; to?: string },
+  ): Promise<void> {
+    throw new Error(
+      `NotImplementedError: ${this.adapterName} does not support changing column comments`,
+    );
+  }
+
+  createSchemaDumper(options: Record<string, unknown> = {}): SchemaDumper {
+    return SchemaDumper.create(this as Parameters<typeof SchemaDumper.create>[0], options);
+  }
+
+  isUseForeignKeys(): boolean {
+    const adapter = this.adapter as any;
+    const supportsForeignKeys =
+      typeof adapter.supportsForeignKeys === "function" ? adapter.supportsForeignKeys() : true;
+    const foreignKeysEnabled =
+      typeof adapter.foreignKeysEnabled === "function" ? adapter.foreignKeysEnabled() : true;
+    return supportsForeignKeys && foreignKeysEnabled;
+  }
+
+  async bulkChangeTable(
+    tableName: string,
+    operations: Array<[string, string, ...unknown[]]>,
+  ): Promise<void> {
+    const sqlFragments: string[] = [];
+    const nonCombinable: Array<() => Promise<void>> = [];
+
+    for (const [command, table, ...arguments_] of operations) {
+      const forAlterMethod = (this as any)[`${command}ForAlter`];
+      if (typeof forAlterMethod === "function") {
+        const result = forAlterMethod.call(this, table, ...arguments_);
+        const results = Array.isArray(result) ? result : [result];
+        for (const r of results) {
+          if (typeof r === "string") {
+            sqlFragments.push(r);
+          } else if (typeof r === "function") {
+            nonCombinable.push(r);
+          }
+        }
+      } else {
+        if (sqlFragments.length > 0) {
+          await this.adapter.executeMutation(
+            `ALTER TABLE ${this._qt(tableName)} ${sqlFragments.join(", ")}`,
+          );
+          sqlFragments.length = 0;
+        }
+        for (const proc of nonCombinable) await proc();
+        nonCombinable.length = 0;
+
+        const method = (this as any)[command];
+        if (typeof method === "function") {
+          await method.call(this, table, ...arguments_);
+        } else {
+          throw new Error(`Unknown bulk change command: ${command}`);
+        }
+      }
+    }
+
+    if (sqlFragments.length > 0) {
+      await this.adapter.executeMutation(
+        `ALTER TABLE ${this._qt(tableName)} ${sqlFragments.join(", ")}`,
+      );
+    }
+    for (const proc of nonCombinable) await proc();
+  }
+
+  validTableDefinitionOptions(): string[] {
+    return ["temporary", "ifNotExists", "options", "as", "comment", "charset", "collation"];
+  }
+
+  validColumnDefinitionOptions(): string[] {
+    return [
+      "limit",
+      "precision",
+      "scale",
+      "default",
+      "null",
+      "collation",
+      "comment",
+      "primaryKey",
+      "ifNotExists",
+    ];
+  }
+
+  validPrimaryKeyOptions(): string[] {
+    return ["limit", "default", "precision"];
+  }
+
+  maxIndexNameSize(): number {
+    return 62;
   }
 }

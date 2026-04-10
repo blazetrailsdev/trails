@@ -13,6 +13,7 @@ import {
   type ReferentialAction,
   ColumnDefinition,
   AddColumnDefinition,
+  AlterTable,
   CreateIndexDefinition,
   ForeignKeyDefinition,
   CheckConstraintDefinition,
@@ -22,6 +23,7 @@ import { quoteIdentifier, quoteTableName, quoteDefaultExpression } from "./quoti
 
 type Definition =
   | TableDefinition
+  | AlterTable
   | ColumnDefinition
   | AddColumnDefinition
   | CreateIndexDefinition
@@ -41,6 +43,7 @@ export class SchemaCreation {
 
   accept(o: Definition): string {
     if (o instanceof TableDefinition) return this.visitTableDefinition(o);
+    if (o instanceof AlterTable) return this.visitAlterTable(o);
     if (o instanceof AddColumnDefinition) return this.visitAddColumnDefinition(o);
     if (o instanceof ColumnDefinition) return this.visitColumnDefinition(o);
     if (o instanceof CreateIndexDefinition) return this.visitCreateIndexDefinition(o);
@@ -73,6 +76,40 @@ export class SchemaCreation {
 
   protected visitAddColumnDefinition(o: AddColumnDefinition): string {
     return `ADD ${this.accept(o.column)}`;
+  }
+
+  protected visitAlterTable(o: AlterTable): string {
+    const table = quoteTableName(o.name, this.adapterName);
+    const parts: string[] = [];
+
+    for (const add of o.adds) {
+      parts.push(this.visitAddColumnDefinition(add));
+    }
+    for (const fk of o.foreignKeyAdds) {
+      parts.push(`ADD ${this.visitForeignKeyDefinition(fk)}`);
+    }
+    for (const name of o.foreignKeyDrops) {
+      parts.push(`DROP CONSTRAINT ${quoteIdentifier(name, this.adapterName)}`);
+    }
+    for (const chk of o.checkConstraintAdds) {
+      parts.push(`ADD ${this.visitCheckConstraintDefinition(chk)}`);
+    }
+    for (const name of o.checkConstraintDrops) {
+      parts.push(`DROP CONSTRAINT ${quoteIdentifier(name, this.adapterName)}`);
+    }
+    for (const name of o.constraintDrops) {
+      parts.push(`DROP CONSTRAINT ${quoteIdentifier(name, this.adapterName)}`);
+    }
+    for (const change of o.columnDefaultChanges) {
+      const col = quoteIdentifier(change.columnName, this.adapterName);
+      if (change.defaultValue == null) {
+        parts.push(`ALTER COLUMN ${col} DROP DEFAULT`);
+      } else {
+        parts.push(`ALTER COLUMN ${col} SET${quoteDefaultExpression(change.defaultValue)}`);
+      }
+    }
+
+    return `ALTER TABLE ${table} ${parts.join(", ")}`;
   }
 
   protected visitCreateIndexDefinition(o: CreateIndexDefinition): string {
