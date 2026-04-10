@@ -21,6 +21,7 @@ export class QueryCacheStore {
   private _map = new Map<string, Record<string, unknown>[]>();
   private _maxSize: number;
   enabled = false;
+  dirties = true;
 
   constructor(maxSize: number = DEFAULT_MAX_SIZE) {
     this._maxSize = maxSize;
@@ -125,11 +126,14 @@ export class QueryCacheAdapter implements DatabaseAdapter {
    */
   async withCache<T>(fn: () => Promise<T>): Promise<T> {
     const wasEnabled = this.cache.enabled;
+    const wasDirties = this.cache.dirties;
     this.cache.enabled = true;
+    this.cache.dirties = true;
     try {
       return await fn();
     } finally {
       this.cache.enabled = wasEnabled;
+      this.cache.dirties = wasDirties;
     }
   }
 
@@ -137,13 +141,17 @@ export class QueryCacheAdapter implements DatabaseAdapter {
    * Disable the query cache within a callback.
    * Mirrors: ActiveRecord::Base.uncached { ... }
    */
-  async uncached<T>(fn: () => Promise<T>): Promise<T> {
+  async uncached<T>(fn: () => Promise<T>, options: { dirties?: boolean } = {}): Promise<T> {
+    const { dirties = true } = options;
     const wasEnabled = this.cache.enabled;
+    const wasDirties = this.cache.dirties;
     this.cache.enabled = false;
+    this.cache.dirties = dirties;
     try {
       return await fn();
     } finally {
       this.cache.enabled = wasEnabled;
+      this.cache.dirties = wasDirties;
     }
   }
 
@@ -171,10 +179,6 @@ export class QueryCacheAdapter implements DatabaseAdapter {
   async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
     this._queryCount++;
 
-    if (!this.cache.enabled) {
-      return this.inner.execute(sql, binds);
-    }
-
     // Strip leading SQL comments (e.g. from QueryLogs prepend) before detecting statement type
     const trimmed = sql
       .trimStart()
@@ -182,12 +186,17 @@ export class QueryCacheAdapter implements DatabaseAdapter {
       .trimStart()
       .toUpperCase();
 
-    // Only cache SELECT and read-only WITH (CTE) queries.
-    // WITH can prefix write CTEs (WITH ... INSERT/UPDATE/DELETE), so check for those.
     const isSelect = trimmed.startsWith("SELECT");
     const isReadOnlyCte = trimmed.startsWith("WITH") && !/\b(INSERT|UPDATE|DELETE)\b/.test(trimmed);
+
+    // Write statements clear the cache regardless of whether caching is enabled,
+    // preventing stale results when the cache is re-enabled later.
     if (!isSelect && !isReadOnlyCte) {
-      this.cache.clear();
+      if (this.cache.dirties) this.cache.clear();
+      return this.inner.execute(sql, binds);
+    }
+
+    if (!this.cache.enabled) {
       return this.inner.execute(sql, binds);
     }
 
@@ -210,7 +219,7 @@ export class QueryCacheAdapter implements DatabaseAdapter {
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
     this._queryCount++;
-    this.cache.clear();
+    if (this.cache.dirties) this.cache.clear();
     return this.inner.executeMutation(sql, binds);
   }
 
@@ -223,7 +232,7 @@ export class QueryCacheAdapter implements DatabaseAdapter {
   }
 
   async rollback(): Promise<void> {
-    this.cache.clear();
+    if (this.cache.dirties) this.cache.clear();
     return this.inner.rollback();
   }
 
@@ -236,7 +245,7 @@ export class QueryCacheAdapter implements DatabaseAdapter {
   }
 
   async rollbackToSavepoint(name: string): Promise<void> {
-    this.cache.clear();
+    if (this.cache.dirties) this.cache.clear();
     return this.inner.rollbackToSavepoint(name);
   }
 

@@ -14,6 +14,16 @@ import {
   type Transaction,
   type NullTransaction,
 } from "./abstract/transaction.js";
+import {
+  Store,
+  queryCacheEnabled as queryCacheEnabledGet,
+  cache as cacheMixin,
+  enableQueryCacheBang as enableQueryCacheBangMixin,
+  uncached as uncachedMixin,
+  disableQueryCacheBang as disableQueryCacheBangMixin,
+  clearQueryCache as clearQueryCacheMixin,
+  type QueryCacheHost,
+} from "./abstract/query-cache.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
@@ -75,9 +85,59 @@ export class AbstractAdapter {
   protected _config: Record<string, unknown> = {};
   _transactionManager: TransactionManager = new TransactionManager(this as any);
 
+  _queryCache: Store | null = null;
+
   pool: unknown = null;
   logger: unknown = null;
   lock: unknown = null;
+
+  // --- QueryCache mixin (mirrors ActiveRecord::ConnectionAdapters::QueryCache) ---
+  // Single source of truth lives in abstract/query-cache.ts; these delegate.
+
+  private _ensureQueryCache(): Store {
+    if (!this._queryCache) {
+      this._queryCache = new Store();
+    }
+    return this._queryCache;
+  }
+
+  get queryCache(): Store | null {
+    return this._queryCache;
+  }
+
+  set queryCache(value: Store | null) {
+    this._queryCache = value;
+  }
+
+  get queryCacheEnabled(): boolean {
+    return queryCacheEnabledGet.call(this as unknown as QueryCacheHost);
+  }
+
+  async cache<T>(fn: () => T | Promise<T>): Promise<T> {
+    this._ensureQueryCache();
+    return cacheMixin.call(this as unknown as QueryCacheHost, fn) as Promise<T>;
+  }
+
+  enableQueryCacheBang(): void {
+    this._ensureQueryCache();
+    enableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
+  }
+
+  async uncached<T>(fn: () => T | Promise<T>, options: { dirties?: boolean } = {}): Promise<T> {
+    this._ensureQueryCache();
+    return uncachedMixin.call(this as unknown as QueryCacheHost, fn, options) as Promise<T>;
+  }
+
+  disableQueryCacheBang(): void {
+    this._ensureQueryCache();
+    disableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
+  }
+
+  clearQueryCache(): void {
+    clearQueryCacheMixin.call(this as unknown as QueryCacheHost);
+  }
+
+  // --- End QueryCache mixin ---
 
   get inUse(): boolean {
     return this._inUse;
