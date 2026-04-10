@@ -1,4 +1,5 @@
 import { quoteIdentifier, quoteTableName, quoteDefaultExpression } from "./quoting.js";
+import { singularize } from "@blazetrails/activesupport";
 
 /**
  * Column type mapping.
@@ -102,6 +103,29 @@ export interface ColumnOptions {
   array?: boolean;
 }
 
+export interface AddIndexOptions {
+  unique?: boolean;
+  name?: string;
+  where?: string;
+  order?: Record<string, string>;
+  using?: string;
+  type?: string;
+  comment?: string;
+  ifNotExists?: boolean;
+  length?: Record<string, number>;
+  opclass?: Record<string, string>;
+  include?: string[];
+  nullsNotDistinct?: boolean;
+  algorithm?: string;
+}
+
+export interface AddReferenceOptions extends ColumnOptions {
+  polymorphic?: boolean;
+  foreignKey?: boolean;
+  type?: ColumnType;
+  index?: boolean;
+}
+
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::IndexDefinition
  */
@@ -120,6 +144,8 @@ export class IndexDefinition {
   readonly nullsNotDistinct?: boolean;
   readonly comment?: string;
   readonly valid: boolean;
+  readonly algorithm?: string;
+  readonly ifNotExists?: boolean;
 
   constructor(
     table: string,
@@ -134,6 +160,8 @@ export class IndexDefinition {
       type?: string;
       using?: string;
       include?: string[];
+      algorithm?: string;
+      ifNotExists?: boolean;
       nullsNotDistinct?: boolean;
       comment?: string;
       valid?: boolean;
@@ -153,6 +181,51 @@ export class IndexDefinition {
     this.nullsNotDistinct = options.nullsNotDistinct;
     this.comment = options.comment;
     this.valid = options.valid ?? true;
+    this.algorithm = options.algorithm;
+    this.ifNotExists = options.ifNotExists;
+  }
+
+  columnOptions(): {
+    length: Record<string, number>;
+    order: Record<string, string>;
+    opclass: Record<string, string>;
+  } {
+    return {
+      length: this.lengths,
+      order: this.orders,
+      opclass: this.opclasses,
+    };
+  }
+
+  isDefinedFor(
+    columns?: string | string[],
+    options: {
+      name?: string;
+      unique?: boolean;
+      valid?: boolean;
+      include?: string[];
+      nullsNotDistinct?: boolean;
+    } = {},
+  ): boolean {
+    if (options.name && this.name !== options.name) return false;
+    if (options.unique !== undefined && this.unique !== options.unique) return false;
+    if (options.valid !== undefined && this.valid !== options.valid) return false;
+    if (options.include !== undefined) {
+      const a = (this.include ?? []).slice().sort();
+      const b = options.include.slice().sort();
+      if (a.length !== b.length || a.some((v, i) => v !== b[i])) return false;
+    }
+    if (
+      options.nullsNotDistinct !== undefined &&
+      this.nullsNotDistinct !== options.nullsNotDistinct
+    )
+      return false;
+    if (columns !== undefined) {
+      const cols = Array.isArray(columns) ? columns : [columns];
+      if (this.columns.length !== cols.length || this.columns.some((c, i) => c !== cols[i]))
+        return false;
+    }
+    return true;
   }
 }
 
@@ -281,20 +354,152 @@ export class TableDefinition {
   readonly tableName: string;
   readonly columns: ColumnDefinition[] = [];
   readonly indexes: IndexDefinition[] = [];
+  readonly foreignKeys: ForeignKeyDefinition[] = [];
+  readonly checkConstraints: CheckConstraintDefinition[] = [];
+  readonly temporary: boolean;
+  readonly ifNotExists: boolean;
+  readonly as?: string;
+  readonly options?: string;
+  readonly comment?: string;
   private _id: boolean | PrimaryKeyType;
   private _adapterName: "sqlite" | "postgres" | "mysql";
 
   constructor(
     tableName: string,
-    options: { id?: boolean | PrimaryKeyType; adapterName?: "sqlite" | "postgres" | "mysql" } = {},
+    tdOptions: {
+      id?: boolean | PrimaryKeyType;
+      adapterName?: "sqlite" | "postgres" | "mysql";
+      temporary?: boolean;
+      ifNotExists?: boolean;
+      as?: string;
+      options?: string;
+      comment?: string;
+    } = {},
   ) {
     this.tableName = tableName;
-    this._adapterName = options.adapterName ?? "sqlite";
-    this._id = options.id ?? true;
+    this._adapterName = tdOptions.adapterName ?? "sqlite";
+    this._id = tdOptions.id ?? true;
+    this.temporary = tdOptions.temporary ?? false;
+    this.ifNotExists = tdOptions.ifNotExists ?? false;
+    this.as = tdOptions.as;
+    this.options = tdOptions.options;
+    this.comment = tdOptions.comment;
 
     if (this._id !== false) {
       const pkType = (typeof this._id === "string" ? this._id : "primary_key") as ColumnType;
       this.columns.push(new ColumnDefinition("id", pkType, { primaryKey: true }));
+    }
+  }
+
+  setPrimaryKey(
+    _tableName: string,
+    id: ColumnType | false,
+    primaryKey?: string,
+    _options: Record<string, unknown> = {},
+  ): void {
+    // Remove all existing PK columns
+    for (let i = this.columns.length - 1; i >= 0; i--) {
+      if (this.columns[i].options.primaryKey) this.columns.splice(i, 1);
+    }
+
+    if (id === false) return;
+
+    const pkName = primaryKey ?? "id";
+    const pkType = (typeof id === "string" ? id : "primary_key") as ColumnType;
+    this.columns.unshift(new ColumnDefinition(pkName, pkType, { primaryKey: true }));
+  }
+
+  primaryKeys(name?: string): string[] {
+    if (name) {
+      const col = this.columns.find((c) => c.name === name && c.options.primaryKey);
+      return col ? [col.name] : [];
+    }
+    return this.columns.filter((c) => c.options.primaryKey).map((c) => c.name);
+  }
+
+  column(
+    name: string,
+    type: ColumnType,
+    options: Omit<ColumnOptions, "index"> & { index?: boolean | AddIndexOptions } = {},
+  ): this {
+    const { index, ...colOpts } = options;
+    this.columns.push(new ColumnDefinition(name, type, colOpts as ColumnOptions));
+    if (index) {
+      const indexOpts: AddIndexOptions = typeof index === "object" ? index : {};
+      this.index([name], indexOpts);
+    }
+    return this;
+  }
+
+  checkConstraint(expression: string, options: { name?: string; validate?: boolean } = {}): this {
+    this.checkConstraints.push(
+      new CheckConstraintDefinition(
+        this.tableName,
+        expression,
+        options.name ?? this._checkConstraintName(expression),
+        options.validate ?? true,
+      ),
+    );
+    return this;
+  }
+
+  private _checkConstraintName(expression: string): string {
+    let hash = 0;
+    for (let i = 0; i < expression.length; i++) {
+      hash = ((hash << 5) - hash + expression.charCodeAt(i)) | 0;
+    }
+    return `chk_${this.tableName}_${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  }
+
+  foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): this {
+    this.foreignKeys.push(this.newForeignKeyDefinition(toTable, options));
+    return this;
+  }
+
+  newForeignKeyDefinition(
+    toTable: string,
+    options: Partial<AddForeignKeyOptions> = {},
+  ): ForeignKeyDefinition {
+    const pk = options.primaryKey ?? "id";
+    const col = options.column ?? `${singularize(toTable.split(".").at(-1) ?? toTable)}_${pk}`;
+    return new ForeignKeyDefinition(
+      this.tableName,
+      toTable,
+      col,
+      pk,
+      options.name ?? `fk_${this.tableName}_${col}`,
+      options.onDelete,
+      options.onUpdate,
+    );
+  }
+
+  newCheckConstraintDefinition(
+    expression: string,
+    options: { name?: string; validate?: boolean } = {},
+  ): CheckConstraintDefinition {
+    return new CheckConstraintDefinition(
+      this.tableName,
+      expression,
+      options.name ?? this._checkConstraintName(expression),
+      options.validate ?? true,
+    );
+  }
+
+  static defineColumnMethods(...columnTypes: string[]): void {
+    // In Rails, this dynamically defines type-specific column methods.
+    // In TypeScript, these are defined statically on the class.
+    // This method exists for API parity — the column methods (string, text,
+    // integer, etc.) are already declared as instance methods above.
+    for (const type of columnTypes) {
+      if (!(type in TableDefinition.prototype)) {
+        (TableDefinition.prototype as any)[type] = function (
+          this: TableDefinition,
+          name: string,
+          options: ColumnOptions = {},
+        ) {
+          return this.column(name, type as ColumnType, options);
+        };
+      }
     }
   }
 
@@ -401,9 +606,23 @@ export class TableDefinition {
     return this;
   }
 
-  index(columns: string[], options: { unique?: boolean; name?: string } = {}): this {
+  index(columns: string[], options: AddIndexOptions = {}): this {
     const name = options.name ?? `index_${this.tableName}_on_${columns.join("_and_")}`;
-    this.indexes.push(new IndexDefinition(this.tableName, name, options.unique ?? false, columns));
+    this.indexes.push(
+      new IndexDefinition(this.tableName, name, options.unique ?? false, columns, {
+        where: options.where,
+        orders: options.order,
+        lengths: options.length,
+        opclasses: options.opclass,
+        type: options.type,
+        using: options.using,
+        include: options.include,
+        nullsNotDistinct: options.nullsNotDistinct,
+        comment: options.comment,
+        algorithm: options.algorithm,
+        ifNotExists: options.ifNotExists,
+      }),
+    );
     return this;
   }
 
@@ -508,7 +727,44 @@ export class TableDefinition {
       return parts.join(" ");
     });
 
-    return `CREATE TABLE ${quoteTableName(this.tableName, this._adapterName)} (${columnDefs.join(", ")})`;
+    let sql = "CREATE";
+    if (this.temporary) sql += " TEMPORARY";
+    sql += " TABLE";
+    if (this.ifNotExists) sql += " IF NOT EXISTS";
+    sql += ` ${quoteTableName(this.tableName, this._adapterName)}`;
+
+    if (this.as) {
+      sql += ` AS ${this.as}`;
+    } else {
+      const tableElements = [...columnDefs];
+      for (const chk of this.checkConstraints) {
+        let chkSql = `CONSTRAINT ${quoteIdentifier(chk.name, this._adapterName)} CHECK (${chk.expression})`;
+        if (!chk.validate) {
+          if (this._adapterName !== "postgres") {
+            throw new Error("Check constraint validate: false is only supported on PostgreSQL");
+          }
+          chkSql += " NOT VALID";
+        }
+        tableElements.push(chkSql);
+      }
+      for (const fk of this.foreignKeys) {
+        let fkSql = `CONSTRAINT ${quoteIdentifier(fk.name, this._adapterName)} FOREIGN KEY (${quoteIdentifier(fk.column, this._adapterName)}) REFERENCES ${quoteTableName(fk.toTable, this._adapterName)} (${quoteIdentifier(fk.primaryKey, this._adapterName)})`;
+        if (fk.onDelete)
+          fkSql += ` ON DELETE ${fk.onDelete.toUpperCase().replace("NULLIFY", "SET NULL").replace("NO_ACTION", "NO ACTION")}`;
+        if (fk.onUpdate)
+          fkSql += ` ON UPDATE ${fk.onUpdate.toUpperCase().replace("NULLIFY", "SET NULL").replace("NO_ACTION", "NO ACTION")}`;
+        tableElements.push(fkSql);
+      }
+      sql += ` (${tableElements.join(", ")})`;
+    }
+
+    if (this.options) sql += ` ${this.options}`;
+    if (this.comment && this._adapterName === "mysql") {
+      const escaped = this.comment.replace(/'/g, "''");
+      sql += ` COMMENT '${escaped}'`;
+    }
+
+    return sql;
   }
 }
 
@@ -562,23 +818,149 @@ export class Table {
   async rename(oldName: string, newName: string): Promise<void> {
     await this._schema.renameColumn(this._tableName, oldName, newName);
   }
-  async index(
-    columns: string | string[],
-    options?: { unique?: boolean; name?: string },
-  ): Promise<void> {
+  async index(columns: string | string[], options?: AddIndexOptions): Promise<void> {
     await this._schema.addIndex(this._tableName, columns, options);
   }
   async removeIndex(options: { column?: string | string[]; name?: string }): Promise<void> {
     await this._schema.removeIndex(this._tableName, options);
   }
-  async references(
-    name: string,
-    options?: ColumnOptions & { polymorphic?: boolean; foreignKey?: boolean },
-  ): Promise<void> {
+  async references(name: string, options?: AddReferenceOptions): Promise<void> {
     await this._schema.addReference(this._tableName, name, options);
   }
   async timestamps(options?: ColumnOptions): Promise<void> {
     await this._schema.addTimestamps(this._tableName, options);
+  }
+
+  get name(): string {
+    return this._tableName;
+  }
+
+  async column(
+    columnName: string,
+    type: ColumnType,
+    options: Omit<ColumnOptions, "index"> & { index?: boolean | AddIndexOptions } = {},
+  ): Promise<void> {
+    const { index: indexOpt, ...colOpts } = options;
+    await this._schema.addColumn(this._tableName, columnName, type, colOpts as ColumnOptions);
+    if (indexOpt) {
+      const opts: AddIndexOptions = typeof indexOpt === "object" ? indexOpt : {};
+      await this._schema.addIndex(this._tableName, columnName, opts);
+    }
+  }
+
+  async isColumnExists(columnName: string): Promise<boolean> {
+    return this._require("columnExists").call(this._schema, this._tableName, columnName);
+  }
+
+  private _require<K extends keyof SchemaStatementsLike>(
+    method: K,
+  ): NonNullable<SchemaStatementsLike[K]> {
+    const fn = this._schema[method];
+    if (!fn) throw new Error(`${method} is not supported by the current schema backend`);
+    return fn as NonNullable<SchemaStatementsLike[K]>;
+  }
+
+  async isIndexExists(
+    columnName: string | string[],
+    options?: Record<string, unknown>,
+  ): Promise<boolean> {
+    return this._require("indexExists").call(this._schema, this._tableName, columnName, options);
+  }
+
+  async renameIndex(oldName: string, newName: string): Promise<void> {
+    return this._require("renameIndex").call(this._schema, this._tableName, oldName, newName);
+  }
+
+  async change(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<void> {
+    return this._require("changeColumn").call(
+      this._schema,
+      this._tableName,
+      columnName,
+      type,
+      options,
+    );
+  }
+
+  async changeDefault(columnName: string, defaultOrChanges: unknown): Promise<void> {
+    return this._require("changeColumnDefault").call(
+      this._schema,
+      this._tableName,
+      columnName,
+      defaultOrChanges,
+    );
+  }
+
+  async changeNull(columnName: string, isNull: boolean, defaultValue?: unknown): Promise<void> {
+    return this._require("changeColumnNull").call(
+      this._schema,
+      this._tableName,
+      columnName,
+      isNull,
+      defaultValue,
+    );
+  }
+
+  async removeTimestamps(options?: ColumnOptions): Promise<void> {
+    return this._require("removeTimestamps").call(this._schema, this._tableName, options);
+  }
+
+  async removeReferences(name: string, options?: AddReferenceOptions): Promise<void> {
+    return this._require("removeReference").call(this._schema, this._tableName, name, options);
+  }
+
+  async foreignKey(toTable: string, options?: Partial<AddForeignKeyOptions>): Promise<void> {
+    return this._require("addForeignKey").call(this._schema, this._tableName, toTable, options);
+  }
+
+  async removeForeignKey(
+    toTableOrOptions?: string | { column?: string; name?: string },
+  ): Promise<void> {
+    return this._require("removeForeignKey").call(this._schema, this._tableName, toTableOrOptions);
+  }
+
+  async isForeignKeyExists(toTableOrOptions?: string | Record<string, unknown>): Promise<boolean> {
+    return this._require("foreignKeyExists").call(this._schema, this._tableName, toTableOrOptions);
+  }
+
+  async checkConstraint(expression: string, options?: Record<string, unknown>): Promise<void> {
+    return this._require("addCheckConstraint").call(
+      this._schema,
+      this._tableName,
+      expression,
+      options,
+    );
+  }
+
+  async removeCheckConstraint(
+    expressionOrOptions?: string | { name?: string },
+    options?: { name?: string },
+  ): Promise<void> {
+    if (typeof expressionOrOptions === "string") {
+      return this._require("removeCheckConstraint").call(
+        this._schema,
+        this._tableName,
+        options?.name ? options : expressionOrOptions,
+      );
+    }
+    return this._require("removeCheckConstraint").call(
+      this._schema,
+      this._tableName,
+      expressionOrOptions,
+    );
+  }
+
+  async isCheckConstraintExists(
+    options: { name?: string; expression?: string } = {},
+  ): Promise<boolean> {
+    return this._require("isCheckConstraintExists").call(this._schema, this._tableName, options);
+  }
+
+  async primaryKey(): Promise<string | null> {
+    return this._require("primaryKey").call(this._schema, this._tableName);
+  }
+
+  async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<void> {
+    return this._schema.addColumn(this._tableName, columnName, type, options);
   }
 }
 
@@ -599,24 +981,63 @@ export interface SchemaStatementsLike {
     options?: { ifExists?: boolean },
   ): Promise<void>;
   renameColumn(tableName: string, oldName: string, newName: string): Promise<void>;
-  addIndex(
-    tableName: string,
-    columns: string | string[],
-    options?: { unique?: boolean; name?: string },
-  ): Promise<void>;
+  addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;
   removeIndex(
     tableName: string,
     options?: { column?: string | string[]; name?: string },
   ): Promise<void>;
-  addReference(
-    tableName: string,
-    refName: string,
-    options?: ColumnOptions & {
-      polymorphic?: boolean;
-      foreignKey?: boolean;
-      type?: ColumnType;
-      index?: boolean;
-    },
-  ): Promise<void>;
+  addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
+  removeReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
   addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
+  removeTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
+  columnExists?(tableName: string, columnName: string, type?: ColumnType): Promise<boolean>;
+  indexExists?(
+    tableName: string,
+    columnName: string | string[],
+    options?: Record<string, unknown>,
+  ): Promise<boolean>;
+  renameIndex?(tableName: string, oldName: string, newName: string): Promise<void>;
+  changeColumn?(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options?: ColumnOptions,
+  ): Promise<void>;
+  changeColumnDefault?(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<void>;
+  changeColumnNull?(
+    tableName: string,
+    columnName: string,
+    isNull: boolean,
+    defaultValue?: unknown,
+  ): Promise<void>;
+  addForeignKey?(
+    tableName: string,
+    toTable: string,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
+  removeForeignKey?(
+    tableName: string,
+    toTableOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
+  foreignKeyExists?(
+    tableName: string,
+    toTableOrOptions?: string | Record<string, unknown>,
+  ): Promise<boolean>;
+  addCheckConstraint?(
+    tableName: string,
+    expression: string,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
+  removeCheckConstraint?(
+    tableName: string,
+    expressionOrOptions?: string | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
+  isCheckConstraintExists?(tableName: string, options?: Record<string, unknown>): Promise<boolean>;
+  primaryKey?(tableName: string): Promise<string | null>;
 }

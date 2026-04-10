@@ -20,6 +20,7 @@ import {
   ForeignKeyDefinition,
   CheckConstraintDefinition,
   type AddForeignKeyOptions,
+  type AddIndexOptions,
   type ColumnType,
   type ColumnOptions,
 } from "./schema-definitions.js";
@@ -100,7 +101,21 @@ export class SchemaStatements {
     await this.adapter.executeMutation(td.toSql());
 
     for (const idx of td.indexes) {
-      await this.addIndex(name, idx.columns, { unique: idx.unique, name: idx.name });
+      await this.addIndex(name, idx.columns, {
+        unique: idx.unique,
+        name: idx.name,
+        where: idx.where,
+        order: idx.orders,
+        using: idx.using,
+        type: idx.type,
+        comment: idx.comment,
+        length: idx.lengths,
+        opclass: idx.opclasses,
+        include: idx.include,
+        nullsNotDistinct: idx.nullsNotDistinct,
+        algorithm: idx.algorithm,
+        ifNotExists: idx.ifNotExists,
+      });
     }
   }
 
@@ -147,16 +162,7 @@ export class SchemaStatements {
   async addIndex(
     tableName: string,
     columns: string | string[],
-    options: {
-      unique?: boolean;
-      name?: string;
-      where?: string;
-      order?: Record<string, string>;
-      using?: string;
-      type?: string;
-      comment?: string;
-      ifNotExists?: boolean;
-    } = {},
+    options: AddIndexOptions = {},
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
     const indexName = options.name ?? this.indexName(tableName, { column: cols });
@@ -164,11 +170,19 @@ export class SchemaStatements {
     const indexDef = new IndexDefinition(tableName, indexName, options.unique ?? false, cols, {
       where: options.where,
       orders: options.order ?? {},
-      using: options.using as string | undefined,
-      type: options.type as string | undefined,
-      comment: options.comment as string | undefined,
+      lengths: options.length ?? {},
+      opclasses: options.opclass ?? {},
+      using: options.using,
+      type: options.type,
+      comment: options.comment,
+      include: options.include,
+      nullsNotDistinct: options.nullsNotDistinct,
     });
-    const createDef = new CreateIndexDefinition(indexDef, options.ifNotExists ?? false);
+    const createDef = new CreateIndexDefinition(
+      indexDef,
+      options.ifNotExists ?? false,
+      this.indexAlgorithm(options.algorithm),
+    );
     await this.adapter.executeMutation(this.schemaCreation.accept(createDef));
   }
 
@@ -348,8 +362,8 @@ export class SchemaStatements {
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
-    const column = options.column ?? `${toTable.replace(/s$/, "")}_id`;
     const pk = options.primaryKey ?? "id";
+    const column = options.column ?? this.foreignKeyColumnFor(toTable, pk);
     const name = options.name ?? `fk_${fromTable}_${column}`;
     const fkDef = new ForeignKeyDefinition(
       fromTable,
