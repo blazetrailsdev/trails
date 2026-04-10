@@ -6,6 +6,7 @@ import { Base, MigrationContext } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 
 const REPO = "blazetrailsdev/blazetrails";
+const [REPO_OWNER, REPO_NAME] = REPO.split("/");
 const DB_PATH = join(homedir(), "github", "blazetrailsdev", "stats.db");
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
@@ -44,6 +45,12 @@ class PullRequest extends Base {
     this.attribute("commit_count", "integer", { default: 0 });
     this.attribute("time_open_seconds", "integer");
     this.attribute("review_decision", "string");
+    this.attribute("state", "string");
+    this.attribute("is_draft", "integer");
+    this.attribute("reviewers_synced", "integer", { default: 0 });
+    this.attribute("linked_issues_synced", "integer", { default: 0 });
+    this.attribute("timeline_synced", "integer", { default: 0 });
+    this.attribute("reactions_synced", "integer", { default: 0 });
   }
 }
 
@@ -97,6 +104,49 @@ class PrReview extends Base {
   }
 }
 
+class PrRequestedReviewer extends Base {
+  static {
+    this.tableName = "pr_requested_reviewers";
+    this.attribute("pr_number", "integer");
+    this.attribute("reviewer", "string");
+    this.attribute("reviewer_type", "string");
+  }
+}
+
+class PrLinkedIssue extends Base {
+  static {
+    this.tableName = "pr_linked_issues";
+    this.attribute("pr_number", "integer");
+    this.attribute("issue_number", "integer");
+    this.attribute("issue_title", "string");
+    this.attribute("issue_state", "string");
+  }
+}
+
+class PrTimelineEvent extends Base {
+  static {
+    this.tableName = "pr_timeline_events";
+    this.attribute("pr_number", "integer");
+    this.attribute("event_type", "string");
+    this.attribute("actor", "string");
+    this.attribute("created_at", "string");
+    this.attribute("label_name", "string");
+    this.attribute("body", "string");
+  }
+}
+
+class PrReaction extends Base {
+  static {
+    this.tableName = "pr_reactions";
+    this.primaryKey = "reaction_id";
+    this.attribute("pr_number", "integer");
+    this.attribute("reaction_id", "integer");
+    this.attribute("user", "string");
+    this.attribute("content", "string");
+    this.attribute("created_at", "string");
+  }
+}
+
 class WorkflowRun extends Base {
   static {
     this.tableName = "workflow_runs";
@@ -110,6 +160,7 @@ class WorkflowRun extends Base {
     this.attribute("run_started_at", "string");
     this.attribute("duration_seconds", "integer");
     this.attribute("workflow_name", "string");
+    this.attribute("run_attempt", "integer");
   }
 }
 
@@ -123,6 +174,34 @@ class WorkflowJob extends Base {
     this.attribute("started_at", "string");
     this.attribute("completed_at", "string");
     this.attribute("duration_seconds", "integer");
+  }
+}
+
+class WorkflowStep extends Base {
+  static {
+    this.tableName = "workflow_steps";
+    this.attribute("job_id", "integer");
+    this.attribute("name", "string");
+    this.attribute("status", "string");
+    this.attribute("conclusion", "string");
+    this.attribute("number", "integer");
+    this.attribute("started_at", "string");
+    this.attribute("completed_at", "string");
+    this.attribute("duration_seconds", "integer");
+  }
+}
+
+class CheckAnnotation extends Base {
+  static {
+    this.tableName = "check_annotations";
+    this.attribute("run_id", "integer");
+    this.attribute("job_id", "integer");
+    this.attribute("path", "string");
+    this.attribute("start_line", "integer");
+    this.attribute("end_line", "integer");
+    this.attribute("annotation_level", "string");
+    this.attribute("message", "string");
+    this.attribute("title", "string");
   }
 }
 
@@ -169,7 +248,10 @@ class CompareLog extends Base {
 class RawJobLog extends Base {
   static {
     this.tableName = "raw_job_logs";
+    this.primaryKey = "job_id";
     this.attribute("job_id", "integer");
+    this.attribute("run_id", "integer");
+    this.attribute("job_name", "string");
     this.attribute("merge_commit_sha", "string");
     this.attribute("pr_number", "integer");
     this.attribute("log_output", "text");
@@ -198,6 +280,16 @@ async function tableExists(adapter: SQLite3Adapter, name: string): Promise<boole
   return rows.length > 0;
 }
 
+async function columnExists(
+  adapter: SQLite3Adapter,
+  table: string,
+  column: string,
+): Promise<boolean> {
+  const quoted = `"${table.replace(/"/g, '""')}"`;
+  const cols = await adapter.execute(`PRAGMA table_info(${quoted})`);
+  return cols.some((c: any) => c.name === column);
+}
+
 async function migrateDb(adapter: SQLite3Adapter) {
   const ctx = new MigrationContext(adapter);
 
@@ -213,15 +305,163 @@ async function migrateDb(adapter: SQLite3Adapter) {
         t.index(["merge_commit_sha", "step_name"], { unique: true });
       });
     }
-    if (!(await tableExists(adapter, "raw_job_logs"))) {
-      await ctx.createTable("raw_job_logs", {}, (t) => {
-        t.integer("job_id");
+    if (await tableExists(adapter, "raw_job_logs")) {
+      if (
+        !(await columnExists(adapter, "raw_job_logs", "run_id")) ||
+        !(await columnExists(adapter, "raw_job_logs", "job_name"))
+      ) {
+        await adapter.executeMutation(
+          `CREATE TABLE raw_job_logs_new (
+            job_id INTEGER PRIMARY KEY,
+            run_id INTEGER,
+            job_name TEXT,
+            merge_commit_sha TEXT,
+            pr_number INTEGER,
+            log_output TEXT
+          )`,
+        );
+        await adapter.executeMutation(
+          `INSERT OR IGNORE INTO raw_job_logs_new (job_id, merge_commit_sha, pr_number, log_output)
+           SELECT job_id, merge_commit_sha, pr_number, log_output FROM raw_job_logs`,
+        );
+        await adapter.executeMutation(`DROP TABLE raw_job_logs`);
+        await adapter.executeMutation(`ALTER TABLE raw_job_logs_new RENAME TO raw_job_logs`);
+        await adapter.executeMutation(
+          `CREATE INDEX index_raw_job_logs_on_merge_commit_sha ON raw_job_logs (merge_commit_sha)`,
+        );
+        await adapter.executeMutation(
+          `CREATE INDEX index_raw_job_logs_on_run_id ON raw_job_logs (run_id)`,
+        );
+      }
+      if (await tableExists(adapter, "workflow_jobs")) {
+        await adapter.executeMutation(
+          `UPDATE raw_job_logs SET
+            run_id = (SELECT wj.run_id FROM workflow_jobs wj WHERE wj.id = raw_job_logs.job_id),
+            job_name = (SELECT wj.name FROM workflow_jobs wj WHERE wj.id = raw_job_logs.job_id)
+          WHERE run_id IS NULL OR job_name IS NULL`,
+        );
+      }
+    } else {
+      await ctx.createTable("raw_job_logs", { id: false }, (t) => {
+        t.integer("job_id", { primaryKey: true });
+        t.integer("run_id");
+        t.string("job_name");
         t.string("merge_commit_sha");
         t.integer("pr_number");
         t.text("log_output");
-        t.index(["merge_commit_sha"], { unique: true });
+        t.index(["merge_commit_sha"]);
+        t.index(["run_id"]);
       });
     }
+
+    if (await tableExists(adapter, "pull_requests")) {
+      if (!(await columnExists(adapter, "pull_requests", "state"))) {
+        await adapter.executeMutation(
+          `ALTER TABLE pull_requests ADD COLUMN state TEXT DEFAULT 'merged'`,
+        );
+      }
+      if (!(await columnExists(adapter, "pull_requests", "is_draft"))) {
+        await adapter.executeMutation(
+          `ALTER TABLE pull_requests ADD COLUMN is_draft INTEGER DEFAULT 0`,
+        );
+      }
+      for (const col of [
+        "reviewers_synced",
+        "linked_issues_synced",
+        "timeline_synced",
+        "reactions_synced",
+      ]) {
+        if (!(await columnExists(adapter, "pull_requests", col))) {
+          await adapter.executeMutation(
+            `ALTER TABLE pull_requests ADD COLUMN ${col} INTEGER DEFAULT 0`,
+          );
+        }
+      }
+    }
+
+    if (await tableExists(adapter, "workflow_runs")) {
+      if (!(await columnExists(adapter, "workflow_runs", "run_attempt"))) {
+        await adapter.executeMutation(
+          `ALTER TABLE workflow_runs ADD COLUMN run_attempt INTEGER DEFAULT 1`,
+        );
+        await adapter.executeMutation(
+          `UPDATE workflow_runs SET run_attempt = 1 WHERE run_attempt IS NULL`,
+        );
+      }
+    }
+
+    if (!(await tableExists(adapter, "pr_requested_reviewers"))) {
+      await ctx.createTable("pr_requested_reviewers", {}, (t) => {
+        t.integer("pr_number");
+        t.string("reviewer");
+        t.string("reviewer_type");
+        t.index(["pr_number", "reviewer", "reviewer_type"], { unique: true });
+      });
+    }
+
+    if (!(await tableExists(adapter, "pr_linked_issues"))) {
+      await ctx.createTable("pr_linked_issues", {}, (t) => {
+        t.integer("pr_number");
+        t.integer("issue_number");
+        t.string("issue_title");
+        t.string("issue_state");
+        t.index(["pr_number", "issue_number"], { unique: true });
+      });
+    }
+
+    if (!(await tableExists(adapter, "pr_timeline_events"))) {
+      await ctx.createTable("pr_timeline_events", {}, (t) => {
+        t.integer("pr_number");
+        t.string("event_type");
+        t.string("actor");
+        t.string("created_at");
+        t.string("label_name");
+        t.text("body");
+        t.index(["pr_number"]);
+      });
+    }
+
+    if (!(await tableExists(adapter, "pr_reactions"))) {
+      await ctx.createTable("pr_reactions", { id: false }, (t) => {
+        t.integer("reaction_id", { primaryKey: true });
+        t.integer("pr_number");
+        t.string("user");
+        t.string("content");
+        t.string("created_at");
+        t.index(["reaction_id"], { unique: true });
+        t.index(["pr_number"]);
+      });
+    }
+
+    if (!(await tableExists(adapter, "check_annotations"))) {
+      await ctx.createTable("check_annotations", {}, (t) => {
+        t.integer("run_id");
+        t.integer("job_id");
+        t.string("path");
+        t.integer("start_line");
+        t.integer("end_line");
+        t.string("annotation_level");
+        t.text("message");
+        t.string("title");
+        t.index(["run_id"]);
+        t.index(["job_id"]);
+      });
+    }
+
+    if (!(await tableExists(adapter, "workflow_steps"))) {
+      await ctx.createTable("workflow_steps", {}, (t) => {
+        t.integer("job_id");
+        t.string("name");
+        t.string("status");
+        t.string("conclusion");
+        t.integer("number");
+        t.string("started_at");
+        t.string("completed_at");
+        t.integer("duration_seconds");
+        t.index(["job_id", "number"], { unique: true });
+      });
+    }
+
     return;
   }
 
@@ -247,6 +487,12 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.integer("commit_count", { default: 0 });
       t.integer("time_open_seconds");
       t.string("review_decision");
+      t.string("state", { default: "merged" });
+      t.integer("is_draft", { default: 0 });
+      t.integer("reviewers_synced", { default: 0 });
+      t.integer("linked_issues_synced", { default: 0 });
+      t.integer("timeline_synced", { default: 0 });
+      t.integer("reactions_synced", { default: 0 });
     });
 
     await ctx.createTable("pr_files", {}, (t) => {
@@ -293,6 +539,41 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.index(["pr_number"]);
     });
 
+    await ctx.createTable("pr_requested_reviewers", {}, (t) => {
+      t.integer("pr_number");
+      t.string("reviewer");
+      t.string("reviewer_type");
+      t.index(["pr_number", "reviewer", "reviewer_type"], { unique: true });
+    });
+
+    await ctx.createTable("pr_linked_issues", {}, (t) => {
+      t.integer("pr_number");
+      t.integer("issue_number");
+      t.string("issue_title");
+      t.string("issue_state");
+      t.index(["pr_number", "issue_number"], { unique: true });
+    });
+
+    await ctx.createTable("pr_timeline_events", {}, (t) => {
+      t.integer("pr_number");
+      t.string("event_type");
+      t.string("actor");
+      t.string("created_at");
+      t.string("label_name");
+      t.text("body");
+      t.index(["pr_number"]);
+    });
+
+    await ctx.createTable("pr_reactions", { id: false }, (t) => {
+      t.integer("reaction_id", { primaryKey: true });
+      t.integer("pr_number");
+      t.string("user");
+      t.string("content");
+      t.string("created_at");
+      t.index(["reaction_id"], { unique: true });
+      t.index(["pr_number"]);
+    });
+
     await ctx.createTable("workflow_runs", { id: false }, (t) => {
       t.integer("id", { primaryKey: true });
       t.string("head_sha");
@@ -305,6 +586,7 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.string("run_started_at");
       t.integer("duration_seconds");
       t.string("workflow_name");
+      t.integer("run_attempt", { default: 1 });
       t.index(["head_sha"]);
     });
 
@@ -318,6 +600,31 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.string("completed_at");
       t.integer("duration_seconds");
       t.index(["run_id", "name"]);
+    });
+
+    await ctx.createTable("workflow_steps", {}, (t) => {
+      t.integer("job_id");
+      t.string("name");
+      t.string("status");
+      t.string("conclusion");
+      t.integer("number");
+      t.string("started_at");
+      t.string("completed_at");
+      t.integer("duration_seconds");
+      t.index(["job_id", "number"], { unique: true });
+    });
+
+    await ctx.createTable("check_annotations", {}, (t) => {
+      t.integer("run_id");
+      t.integer("job_id");
+      t.string("path");
+      t.integer("start_line");
+      t.integer("end_line");
+      t.string("annotation_level");
+      t.text("message");
+      t.string("title");
+      t.index(["run_id"]);
+      t.index(["job_id"]);
     });
 
     await ctx.createTable("test_compare_stats", {}, (t) => {
@@ -354,12 +661,15 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.index(["merge_commit_sha", "step_name"], { unique: true });
     });
 
-    await ctx.createTable("raw_job_logs", {}, (t) => {
-      t.integer("job_id");
+    await ctx.createTable("raw_job_logs", { id: false }, (t) => {
+      t.integer("job_id", { primaryKey: true });
+      t.integer("run_id");
+      t.string("job_name");
       t.string("merge_commit_sha");
       t.integer("pr_number");
       t.text("log_output");
-      t.index(["merge_commit_sha"], { unique: true });
+      t.index(["merge_commit_sha"]);
+      t.index(["run_id"]);
     });
 
     await ctx.createTable("sync_log", {}, (t) => {
@@ -396,6 +706,7 @@ interface GhPrData {
   baseRefName: string;
   body: string;
   reviewDecision: string | null;
+  isDraft: boolean;
 }
 
 interface GhPrFile {
@@ -439,6 +750,35 @@ interface GhReview {
   submitted_at: string;
 }
 
+interface GhRequestedReviewers {
+  users: { login: string }[];
+  teams: { slug: string }[];
+}
+
+interface GhTimelineEvent {
+  event: string;
+  actor?: { login: string } | null;
+  created_at?: string;
+  label?: { name: string };
+  body?: string;
+}
+
+interface GhReactionData {
+  id: number;
+  user: { login: string } | null;
+  content: string;
+  created_at: string;
+}
+
+interface GhCheckAnnotation {
+  path: string;
+  start_line: number;
+  end_line: number;
+  annotation_level: string;
+  message: string;
+  title: string | null;
+}
+
 interface GhWorkflowRun {
   id: number;
   head_sha: string;
@@ -449,6 +789,16 @@ interface GhWorkflowRun {
   updated_at: string;
   run_started_at: string;
   name: string;
+  run_attempt: number;
+}
+
+interface GhWorkflowJobStep {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  number: number;
+  started_at: string | null;
+  completed_at: string | null;
 }
 
 interface GhWorkflowJob {
@@ -458,6 +808,7 @@ interface GhWorkflowJob {
   conclusion: string | null;
   started_at: string;
   completed_at: string;
+  steps?: GhWorkflowJobStep[];
 }
 
 // ---------------------------------------------------------------------------
@@ -485,46 +836,87 @@ async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
     "baseRefName",
     "body",
     "reviewDecision",
+    "isDraft",
   ].join(",");
 
-  const limit = mode === "latest" ? 10 : 1000;
+  const limit = mode === "latest" ? 100 : 5000;
   const allPrs = ghJson<GhPrData[]>(
-    `pr list --repo ${REPO} --state merged --limit ${limit} --json ${fields} --jq '[.[] | select(.number > ${lastSynced})]'`,
+    `pr list --repo ${REPO} --state all --limit ${limit} --json ${fields} --jq '[.[] | select(.number > ${lastSynced})]'`,
   );
 
-  console.log(`Found ${allPrs.length} new merged PRs to sync`);
+  console.log(`Found ${allPrs.length} new PRs to sync`);
+
+  const mapPr = (pr: GhPrData) => {
+    const endDate = pr.mergedAt ?? pr.closedAt;
+    const timeOpenMs =
+      endDate && pr.createdAt
+        ? new Date(endDate).getTime() - new Date(pr.createdAt).getTime()
+        : null;
+    return {
+      number: pr.number,
+      title: pr.title,
+      author: pr.author?.login ?? null,
+      branch: pr.headRefName,
+      base_branch: pr.baseRefName,
+      body: pr.body,
+      created_at: pr.createdAt,
+      merged_at: pr.mergedAt,
+      closed_at: pr.closedAt,
+      merge_commit_sha: pr.mergeCommit?.oid ?? null,
+      additions: pr.additions,
+      deletions: pr.deletions,
+      changed_files: pr.changedFiles,
+      labels: JSON.stringify(pr.labels.map((l) => l.name)),
+      review_count: -1,
+      comment_count: -1,
+      commit_count: 0,
+      time_open_seconds: timeOpenMs !== null ? Math.round(timeOpenMs / 1000) : null,
+      review_decision: pr.reviewDecision ?? null,
+      state: pr.mergedAt ? "merged" : pr.closedAt ? "closed" : "open",
+      is_draft: pr.isDraft ? 1 : 0,
+    };
+  };
 
   if (allPrs.length > 0) {
-    await PullRequest.upsertAll(
-      allPrs.map((pr) => {
-        const timeOpenMs =
-          pr.mergedAt && pr.createdAt
-            ? new Date(pr.mergedAt).getTime() - new Date(pr.createdAt).getTime()
-            : null;
-        return {
-          number: pr.number,
-          title: pr.title,
-          author: pr.author?.login ?? null,
-          branch: pr.headRefName,
-          base_branch: pr.baseRefName,
-          body: pr.body,
-          created_at: pr.createdAt,
-          merged_at: pr.mergedAt,
-          closed_at: pr.closedAt,
-          merge_commit_sha: pr.mergeCommit?.oid ?? null,
-          additions: pr.additions,
-          deletions: pr.deletions,
-          changed_files: pr.changedFiles,
-          labels: JSON.stringify(pr.labels.map((l) => l.name)),
-          review_count: -1,
-          comment_count: -1,
-          commit_count: 0,
-          time_open_seconds: timeOpenMs !== null ? Math.round(timeOpenMs / 1000) : null,
-          review_decision: pr.reviewDecision ?? null,
-        };
-      }),
-      { uniqueBy: "number" },
+    await PullRequest.upsertAll(allPrs.map(mapPr), { uniqueBy: "number" });
+  }
+
+  if (mode === "refresh") {
+    const staleCount = await Base.adapter.execute(
+      `SELECT COUNT(*) as cnt FROM pull_requests WHERE state IS NULL`,
     );
+    const cnt = (staleCount[0] as { cnt: number }).cnt;
+    if (cnt > 0) {
+      console.log(`Backfilling state for ${cnt} existing PRs from merged_at/closed_at...`);
+      await Base.adapter.executeMutation(
+        `UPDATE pull_requests SET state = CASE
+          WHEN merged_at IS NOT NULL THEN 'merged'
+          WHEN closed_at IS NOT NULL THEN 'closed'
+          ELSE 'open'
+        END WHERE state IS NULL`,
+      );
+      await Base.adapter.executeMutation(
+        `UPDATE pull_requests SET is_draft = 0 WHERE is_draft IS NULL`,
+      );
+    }
+
+    const openRows = await PullRequest.findBySql(
+      `SELECT number FROM pull_requests WHERE state = 'open' ORDER BY number DESC`,
+    );
+    if (openRows.length > 0) {
+      console.log(`Re-fetching ${openRows.length} open PRs to check for state changes...`);
+      for (const row of openRows) {
+        const num = row.readAttribute("number") as number;
+        try {
+          const pr = ghJson<GhPrData>(`pr view ${num} --repo ${REPO} --json ${fields}`);
+          await PullRequest.upsertAll([mapPr(pr)], { uniqueBy: "number" });
+        } catch (err) {
+          console.warn(
+            `  Failed to refresh PR #${num}: ${err instanceof Error ? err.message : err}`,
+          );
+        }
+      }
+    }
   }
 
   return allPrs.length;
@@ -686,6 +1078,173 @@ async function syncPrComments() {
   }
 }
 
+async function syncPrRequestedReviewers() {
+  const prsToSync = await PullRequest.findBySql(
+    `SELECT number FROM pull_requests WHERE reviewers_synced = 0 ORDER BY number`,
+  );
+
+  if (prsToSync.length === 0) return;
+  console.log(`Fetching requested reviewers for ${prsToSync.length} PRs...`);
+
+  for (const pr of prsToSync) {
+    const number = pr.readAttribute("number") as number;
+    try {
+      const resp = ghJson<GhRequestedReviewers>(
+        `api repos/${REPO}/pulls/${number}/requested_reviewers`,
+      );
+      const records: { pr_number: number; reviewer: string; reviewer_type: string }[] = [];
+      for (const user of resp.users) {
+        records.push({ pr_number: number, reviewer: user.login, reviewer_type: "user" });
+      }
+      for (const team of resp.teams) {
+        records.push({ pr_number: number, reviewer: team.slug, reviewer_type: "team" });
+      }
+      if (records.length > 0) {
+        await PrRequestedReviewer.upsertAll(records, {
+          uniqueBy: ["pr_number", "reviewer", "reviewer_type"],
+        });
+      }
+      await PullRequest.where({ number }).updateAll({ reviewers_synced: 1 });
+    } catch (err) {
+      console.warn(
+        `  Failed to fetch requested reviewers for PR #${number}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+}
+
+async function syncPrLinkedIssues() {
+  const prsToSync = await PullRequest.findBySql(
+    `SELECT number FROM pull_requests WHERE linked_issues_synced = 0 ORDER BY number`,
+  );
+
+  if (prsToSync.length === 0) return;
+  console.log(`Fetching linked issues for ${prsToSync.length} PRs...`);
+
+  for (const pr of prsToSync) {
+    const number = pr.readAttribute("number") as number;
+    try {
+      const nodes: { number: number; title: string; state: string }[] = [];
+      let after: string | null = null;
+      let hasNextPage = false;
+      do {
+        const afterArg = after ? `, after:"${after}"` : "";
+        const resp = ghJson<{
+          data: {
+            repository: {
+              pullRequest: {
+                closingIssuesReferences: {
+                  nodes: { number: number; title: string; state: string }[];
+                  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                };
+              };
+            };
+          };
+        }>(
+          `api graphql -f query='{ repository(owner:"${REPO_OWNER}", name:"${REPO_NAME}") { pullRequest(number: ${number}) { closingIssuesReferences(first:50${afterArg}) { nodes { number title state } pageInfo { hasNextPage endCursor } } } } }'`,
+        );
+        const connection = resp.data.repository.pullRequest.closingIssuesReferences;
+        nodes.push(...connection.nodes);
+        hasNextPage = connection.pageInfo.hasNextPage;
+        after = connection.pageInfo.endCursor;
+      } while (hasNextPage);
+
+      if (nodes.length > 0) {
+        await PrLinkedIssue.upsertAll(
+          nodes.map((n) => ({
+            pr_number: number,
+            issue_number: n.number,
+            issue_title: n.title,
+            issue_state: n.state,
+          })),
+          { uniqueBy: ["pr_number", "issue_number"] },
+        );
+      }
+      await PullRequest.where({ number }).updateAll({ linked_issues_synced: 1 });
+    } catch (err) {
+      console.warn(
+        `  Failed to fetch linked issues for PR #${number}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+}
+
+async function syncPrTimelineEvents() {
+  const prsToSync = await PullRequest.findBySql(
+    `SELECT number FROM pull_requests WHERE timeline_synced = 0 ORDER BY number`,
+  );
+
+  if (prsToSync.length === 0) return;
+  console.log(`Fetching timeline events for ${prsToSync.length} PRs...`);
+
+  for (const pr of prsToSync) {
+    const number = pr.readAttribute("number") as number;
+    try {
+      const events = ghJson<GhTimelineEvent[]>(
+        `api repos/${REPO}/issues/${number}/timeline --paginate`,
+      );
+      await PrTimelineEvent.adapter.executeMutation(
+        `DELETE FROM pr_timeline_events WHERE pr_number = ?`,
+        [number],
+      );
+      if (events.length > 0) {
+        await PrTimelineEvent.insertAll(
+          events.map((e) => ({
+            pr_number: number,
+            event_type: e.event,
+            actor: e.actor?.login ?? null,
+            created_at: e.created_at ?? null,
+            label_name: e.label?.name ?? null,
+            body: e.body ?? null,
+          })),
+        );
+      }
+      await PullRequest.where({ number }).updateAll({ timeline_synced: 1 });
+    } catch (err) {
+      console.warn(
+        `  Failed to fetch timeline events for PR #${number}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+}
+
+async function syncPrReactions() {
+  const prsToSync = await PullRequest.findBySql(
+    `SELECT number FROM pull_requests WHERE reactions_synced = 0 ORDER BY number`,
+  );
+
+  if (prsToSync.length === 0) return;
+  console.log(`Fetching reactions for ${prsToSync.length} PRs...`);
+
+  for (const pr of prsToSync) {
+    const number = pr.readAttribute("number") as number;
+    try {
+      const reactions = ghJson<GhReactionData[]>(
+        `api repos/${REPO}/issues/${number}/reactions --paginate`,
+      );
+      await PrReaction.adapter.executeMutation(`DELETE FROM pr_reactions WHERE pr_number = ?`, [
+        number,
+      ]);
+      if (reactions.length > 0) {
+        await PrReaction.insertAll(
+          reactions.map((r) => ({
+            reaction_id: r.id,
+            pr_number: number,
+            user: r.user?.login ?? null,
+            content: r.content,
+            created_at: r.created_at,
+          })),
+        );
+      }
+      await PullRequest.where({ number }).updateAll({ reactions_synced: 1 });
+    } catch (err) {
+      console.warn(
+        `  Failed to fetch reactions for PR #${number}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+}
+
 async function syncWorkflowRuns(mode: "latest" | "refresh"): Promise<number> {
   const limitClause = mode === "latest" ? "LIMIT 10" : "";
   const missingRuns = await PullRequest.findBySql(`
@@ -743,6 +1302,7 @@ async function syncWorkflowRuns(mode: "latest" | "refresh"): Promise<number> {
               run_started_at: run.run_started_at,
               duration_seconds: duration,
               workflow_name: run.name,
+              run_attempt: run.run_attempt,
             },
           ],
           { uniqueBy: "id" },
@@ -775,6 +1335,34 @@ async function syncWorkflowRuns(mode: "latest" | "refresh"): Promise<number> {
             }),
             { uniqueBy: "id" },
           );
+
+          for (const job of jobsResp.jobs) {
+            if (job.steps && job.steps.length > 0) {
+              await WorkflowStep.upsertAll(
+                job.steps.map((step) => {
+                  const stepDuration =
+                    step.started_at && step.completed_at
+                      ? Math.round(
+                          (new Date(step.completed_at).getTime() -
+                            new Date(step.started_at).getTime()) /
+                            1000,
+                        )
+                      : null;
+                  return {
+                    job_id: job.id,
+                    name: step.name,
+                    status: step.status,
+                    conclusion: step.conclusion,
+                    number: step.number,
+                    started_at: step.started_at,
+                    completed_at: step.completed_at,
+                    duration_seconds: stepDuration,
+                  };
+                }),
+                { uniqueBy: ["job_id", "number"] },
+              );
+            }
+          }
         }
 
         synced++;
@@ -942,36 +1530,152 @@ function parseApiCompareFromLogs(logs: string) {
   return results;
 }
 
+async function syncCheckAnnotations(mode: "latest" | "refresh") {
+  const limitClause = mode === "latest" ? "LIMIT 50" : "";
+  const jobsToSync = await Base.adapter.execute(`
+    SELECT wj.id as job_id, wr.id as run_id
+    FROM workflow_jobs wj
+    JOIN workflow_runs wr ON wr.id = wj.run_id
+    WHERE wj.conclusion IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM check_annotations ca WHERE ca.job_id = wj.id
+    )
+    ORDER BY wr.pr_number DESC, wj.id
+    ${limitClause}
+  `);
+
+  if (jobsToSync.length === 0) return;
+  console.log(`Backfilling annotations for ${jobsToSync.length} jobs...`);
+
+  for (const row of jobsToSync) {
+    const jobId = row.job_id as number;
+    const runId = row.run_id as number;
+    try {
+      const annotations = ghJson<GhCheckAnnotation[]>(
+        `api repos/${REPO}/check-runs/${jobId}/annotations --paginate`,
+      );
+      await CheckAnnotation.adapter.executeMutation(
+        `DELETE FROM check_annotations WHERE job_id = ?`,
+        [jobId],
+      );
+      if (annotations.length > 0) {
+        await CheckAnnotation.insertAll(
+          annotations.map((a) => ({
+            run_id: runId,
+            job_id: jobId,
+            path: a.path,
+            start_line: a.start_line,
+            end_line: a.end_line,
+            annotation_level: a.annotation_level,
+            message: a.message,
+            title: a.title ?? null,
+          })),
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `  Failed to fetch annotations for job ${jobId}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+}
+
+async function syncJobLogs(mode: "latest" | "refresh"): Promise<number> {
+  const limitClause = mode === "latest" ? "LIMIT 50" : "";
+  const jobsToFetch = await Base.adapter.execute(`
+    SELECT wj.id as job_id, wj.run_id, wj.name as job_name,
+           wr.head_sha, wr.pr_number
+    FROM workflow_jobs wj
+    JOIN workflow_runs wr ON wr.id = wj.run_id
+    WHERE wj.conclusion IS NOT NULL
+    AND wj.name = 'Rails API/Test Comparison'
+    AND NOT EXISTS (
+      SELECT 1 FROM raw_job_logs rjl WHERE rjl.job_id = wj.id
+    )
+    ORDER BY wr.pr_number DESC, wj.run_id, wj.id
+    ${limitClause}
+  `);
+
+  if (jobsToFetch.length === 0) {
+    console.log("All job logs already synced");
+    return 0;
+  }
+
+  console.log(`Fetching logs for ${jobsToFetch.length} jobs...`);
+  let fetched = 0;
+
+  for (const job of jobsToFetch) {
+    const jobId = job.job_id as number;
+    const runId = job.run_id as number;
+    const jobName = job.job_name as string;
+    const headSha = job.head_sha as string;
+    const prNumber = job.pr_number as number;
+
+    try {
+      const logs = gh(`api repos/${REPO}/actions/jobs/${jobId}/logs`);
+      await RawJobLog.upsertAll(
+        [
+          {
+            job_id: jobId,
+            run_id: runId,
+            job_name: jobName,
+            merge_commit_sha: headSha,
+            pr_number: prNumber,
+            log_output: logs,
+          },
+        ],
+        { uniqueBy: "job_id" },
+      );
+      fetched++;
+      if (fetched % 25 === 0) {
+        console.log(`  Fetched ${fetched}/${jobsToFetch.length} job logs...`);
+      }
+    } catch (err) {
+      console.warn(
+        `  Failed to fetch logs for job ${jobId} "${jobName}" (PR #${prNumber}): ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+
+  console.log(`  Fetched ${fetched} job logs`);
+  return fetched;
+}
+
 async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
-  const limitClause = mode === "latest" ? "LIMIT 10" : "";
-  const runsToProcess = await WorkflowRun.findBySql(`
-    SELECT DISTINCT wr.id, wr.head_sha, wr.pr_number
-    FROM workflow_runs wr
-    JOIN workflow_jobs wj ON wj.run_id = wr.id
+  const limitClause = mode === "latest" ? "LIMIT 50" : "";
+  const runsToProcess = await Base.adapter.execute(`
+    SELECT rjl.job_id, rjl.merge_commit_sha, rjl.pr_number
+    FROM raw_job_logs rjl
+    JOIN workflow_jobs wj ON wj.id = rjl.job_id
     WHERE wj.name = 'Rails API/Test Comparison'
     AND wj.conclusion = 'success'
+    AND rjl.job_id = (
+      SELECT rjl2.job_id FROM raw_job_logs rjl2
+      JOIN workflow_jobs wj2 ON wj2.id = rjl2.job_id
+      WHERE rjl2.merge_commit_sha = rjl.merge_commit_sha
+      AND wj2.name = 'Rails API/Test Comparison'
+      AND wj2.conclusion = 'success'
+      ORDER BY wj2.completed_at DESC
+      LIMIT 1
+    )
     AND (
       NOT EXISTS (
         SELECT 1 FROM test_compare_stats tcs
-        WHERE tcs.merge_commit_sha = wr.head_sha
+        WHERE tcs.merge_commit_sha = rjl.merge_commit_sha
       )
       OR NOT EXISTS (
         SELECT 1 FROM api_compare_stats acs
-        WHERE acs.merge_commit_sha = wr.head_sha
+        WHERE acs.merge_commit_sha = rjl.merge_commit_sha
       )
       OR EXISTS (
         WITH expected(step_name) AS (VALUES ('api_compare'), ('test_compare'))
         SELECT 1 FROM expected e
         LEFT JOIN compare_logs cl
-          ON cl.merge_commit_sha = wr.head_sha AND cl.step_name = e.step_name
+          ON cl.merge_commit_sha = rjl.merge_commit_sha AND cl.step_name = e.step_name
         WHERE cl.step_name IS NULL
       )
-      OR NOT EXISTS (
-        SELECT 1 FROM raw_job_logs rjl
-        WHERE rjl.merge_commit_sha = wr.head_sha
-      )
     )
-    ORDER BY wr.pr_number DESC
+    ORDER BY rjl.pr_number DESC
     ${limitClause}
   `);
 
@@ -980,92 +1684,77 @@ async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
     return 0;
   }
 
-  console.log(`Parsing CI logs for ${runsToProcess.length} workflow runs...`);
+  console.log(`Parsing compare stats from ${runsToProcess.length} job logs...`);
   let parsed = 0;
 
   for (const row of runsToProcess) {
-    const runId = row.readAttribute("id") as number;
-    const headSha = row.readAttribute("head_sha") as string;
-    const prNumber = row.readAttribute("pr_number") as number;
+    const jobId = row.job_id as number;
+    const headSha = row.merge_commit_sha as string;
+    const prNumber = row.pr_number as number;
 
-    const jobRows = await Base.adapter.execute(
-      `SELECT id FROM workflow_jobs WHERE run_id = ? AND name = ? AND conclusion = 'success' ORDER BY completed_at DESC LIMIT 1`,
-      [runId, "Rails API/Test Comparison"],
+    const logRows = await Base.adapter.execute(
+      `SELECT log_output FROM raw_job_logs WHERE job_id = ?`,
+      [jobId],
     );
-    if (jobRows.length === 0) continue;
-    const jobId = jobRows[0].id as number;
+    if (logRows.length === 0) continue;
+    const logs = logRows[0].log_output as string;
 
-    try {
-      const logs = gh(`api repos/${REPO}/actions/jobs/${jobId}/logs`);
-
-      // Store full raw job log for future re-parsing
-      await RawJobLog.upsertAll(
-        [{ job_id: jobId, merge_commit_sha: headSha, pr_number: prNumber, log_output: logs }],
-        { uniqueBy: ["merge_commit_sha"] },
+    const stepLogs = extractStepLogs(logs);
+    if (stepLogs.size > 0) {
+      await CompareLog.upsertAll(
+        [...stepLogs.entries()].map(([stepName, output]) => ({
+          merge_commit_sha: headSha,
+          pr_number: prNumber,
+          step_name: stepName,
+          log_output: output,
+        })),
+        { uniqueBy: ["merge_commit_sha", "step_name"] },
       );
+    }
 
-      // Store raw step logs
-      const stepLogs = extractStepLogs(logs);
-      if (stepLogs.size > 0) {
-        await CompareLog.upsertAll(
-          [...stepLogs.entries()].map(([stepName, output]) => ({
-            merge_commit_sha: headSha,
-            pr_number: prNumber,
-            step_name: stepName,
-            log_output: output,
-          })),
-          { uniqueBy: ["merge_commit_sha", "step_name"] },
-        );
-      }
+    const testStats = parseTestCompareFromLogs(logs);
+    if (testStats.size > 0) {
+      await TestCompareStat.upsertAll(
+        [...testStats.entries()].map(([pkg, s]) => ({
+          merge_commit_sha: headSha,
+          pr_number: prNumber,
+          package: pkg,
+          matched: s.matched,
+          total: s.total,
+          percent: s.percent,
+          skipped: s.skipped,
+          files_mapped: s.filesMapped,
+          files_total: s.filesTotal,
+          misplaced: s.misplaced,
+        })),
+        { uniqueBy: ["merge_commit_sha", "package"] },
+      );
+    }
 
-      const testStats = parseTestCompareFromLogs(logs);
-      if (testStats.size > 0) {
-        await TestCompareStat.upsertAll(
-          [...testStats.entries()].map(([pkg, s]) => ({
-            merge_commit_sha: headSha,
-            pr_number: prNumber,
-            package: pkg,
-            matched: s.matched,
-            total: s.total,
-            percent: s.percent,
-            skipped: s.skipped,
-            files_mapped: s.filesMapped,
-            files_total: s.filesTotal,
-            misplaced: s.misplaced,
-          })),
-          { uniqueBy: ["merge_commit_sha", "package"] },
-        );
-      }
+    const apiStats = parseApiCompareFromLogs(logs);
+    if (apiStats.size > 0) {
+      await ApiCompareStat.upsertAll(
+        [...apiStats.entries()].map(([pkg, s]) => ({
+          merge_commit_sha: headSha,
+          pr_number: prNumber,
+          package: pkg,
+          matched: s.matched,
+          total: s.total,
+          percent: s.percent,
+          misplaced: s.misplaced,
+          missing: s.missing,
+        })),
+        { uniqueBy: ["merge_commit_sha", "package"] },
+      );
+    }
 
-      const apiStats = parseApiCompareFromLogs(logs);
-      if (apiStats.size > 0) {
-        await ApiCompareStat.upsertAll(
-          [...apiStats.entries()].map(([pkg, s]) => ({
-            merge_commit_sha: headSha,
-            pr_number: prNumber,
-            package: pkg,
-            matched: s.matched,
-            total: s.total,
-            percent: s.percent,
-            misplaced: s.misplaced,
-            missing: s.missing,
-          })),
-          { uniqueBy: ["merge_commit_sha", "package"] },
-        );
-      }
-
-      if (stepLogs.size > 0 || testStats.size > 0 || apiStats.size > 0) {
-        parsed++;
-        const totalTests = [...testStats.values()].reduce((sum, s) => sum + s.matched, 0);
-        const totalApi = [...apiStats.values()].reduce((sum, s) => sum + s.matched, 0);
-        const logSteps = [...stepLogs.keys()].join(", ");
-        console.log(
-          `  PR #${prNumber}: ${testStats.size} test packages (${totalTests} matched), ${apiStats.size} api packages (${totalApi} matched), logs: [${logSteps}]`,
-        );
-      }
-    } catch (err) {
-      console.warn(
-        `  Failed to fetch logs for job ${jobId} (PR #${prNumber}): ${err instanceof Error ? err.message : err}`,
+    if (stepLogs.size > 0 || testStats.size > 0 || apiStats.size > 0) {
+      parsed++;
+      const totalTests = [...testStats.values()].reduce((sum, s) => sum + s.matched, 0);
+      const totalApi = [...apiStats.values()].reduce((sum, s) => sum + s.matched, 0);
+      const logSteps = [...stepLogs.keys()].join(", ");
+      console.log(
+        `  PR #${prNumber}: ${testStats.size} test packages (${totalTests} matched), ${apiStats.size} api packages (${totalApi} matched), logs: [${logSteps}]`,
       );
     }
   }
@@ -1087,38 +1776,73 @@ async function printSummary(mode: "latest" | "refresh") {
     return (rows[0] as { cnt: number }).cnt;
   };
 
-  const [prCount, runCount, testStatCount, apiStatCount, logCount, rawLogCount] = await Promise.all(
-    [
-      count("pull_requests"),
-      count("workflow_runs"),
-      countDistinct("test_compare_stats", "merge_commit_sha"),
-      countDistinct("api_compare_stats", "merge_commit_sha"),
-      countDistinct("compare_logs", "merge_commit_sha"),
-      count("raw_job_logs"),
-    ],
+  const [
+    prCount,
+    runCount,
+    jobCount,
+    stepCount,
+    testStatCount,
+    apiStatCount,
+    logCount,
+    rawLogCount,
+  ] = await Promise.all([
+    count("pull_requests"),
+    count("workflow_runs"),
+    count("workflow_jobs"),
+    count("workflow_steps"),
+    countDistinct("test_compare_stats", "merge_commit_sha"),
+    countDistinct("api_compare_stats", "merge_commit_sha"),
+    countDistinct("compare_logs", "merge_commit_sha"),
+    count("raw_job_logs"),
+  ]);
+
+  const stateRows = await Base.adapter.execute(
+    `SELECT state, COUNT(*) as cnt FROM pull_requests GROUP BY state ORDER BY state`,
   );
+  const stateParts = stateRows.map((r: any) => `${r.cnt} ${r.state}`).join(", ");
 
   console.log("\n=== Database Summary ===");
-  console.log(`  PRs: ${prCount}`);
+  console.log(`  PRs: ${prCount} (${stateParts})`);
 
   if (mode === "refresh") {
-    const [fileCount, commitCount, commentCount, reviewCount] = await Promise.all([
+    const [
+      fileCount,
+      commitCount,
+      commentCount,
+      reviewCount,
+      requestedReviewerCount,
+      linkedIssueCount,
+      timelineEventCount,
+      reactionCount,
+      annotationCount,
+    ] = await Promise.all([
       count("pr_files"),
       count("pr_commits"),
       count("pr_comments"),
       count("pr_reviews"),
+      count("pr_requested_reviewers"),
+      count("pr_linked_issues"),
+      count("pr_timeline_events"),
+      count("pr_reactions"),
+      count("check_annotations"),
     ]);
     console.log(`  PR files: ${fileCount}`);
     console.log(`  PR commits: ${commitCount}`);
     console.log(`  PR comments: ${commentCount}`);
     console.log(`  PR reviews: ${reviewCount}`);
+    console.log(`  PR requested reviewers: ${requestedReviewerCount}`);
+    console.log(`  PR linked issues: ${linkedIssueCount}`);
+    console.log(`  PR timeline events: ${timelineEventCount}`);
+    console.log(`  PR reactions: ${reactionCount}`);
+    console.log(`  Check annotations: ${annotationCount}`);
   }
 
   console.log(`  Workflow runs: ${runCount}`);
+  console.log(`  Workflow jobs: ${jobCount} (${rawLogCount} logs fetched)`);
+  console.log(`  Workflow steps: ${stepCount}`);
   console.log(`  Commits with test:compare stats: ${testStatCount}`);
   console.log(`  Commits with api:compare stats: ${apiStatCount}`);
   console.log(`  Commits with compare logs: ${logCount}`);
-  console.log(`  Raw job logs: ${rawLogCount}`);
   console.log(`  Database: ${DB_PATH}`);
 
   const latestTestStats = await TestCompareStat.findBySql(`
@@ -1214,10 +1938,28 @@ async function main() {
 
       console.log("\n=== Syncing PR comments & reviews ===");
       await syncPrComments();
+
+      console.log("\n=== Syncing PR requested reviewers ===");
+      await syncPrRequestedReviewers();
+
+      console.log("\n=== Syncing PR linked issues ===");
+      await syncPrLinkedIssues();
+
+      console.log("\n=== Syncing PR timeline events ===");
+      await syncPrTimelineEvents();
+
+      console.log("\n=== Syncing PR reactions ===");
+      await syncPrReactions();
     }
 
     console.log("\n=== Syncing workflow runs ===");
     const runsSynced = await syncWorkflowRuns(fetchMode);
+
+    console.log("\n=== Syncing check annotations ===");
+    await syncCheckAnnotations(fetchMode);
+
+    console.log("\n=== Syncing job logs ===");
+    const logsFetched = await syncJobLogs(fetchMode);
 
     console.log("\n=== Syncing compare stats from CI logs ===");
     const logsParsed = await syncCompareStats(fetchMode);
