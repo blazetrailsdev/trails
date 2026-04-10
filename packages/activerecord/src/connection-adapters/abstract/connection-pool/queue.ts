@@ -26,6 +26,8 @@ interface WaiterState {
   container: Array<(conn: DatabaseAdapter) => void>;
   timer: ReturnType<typeof setTimeout> | null;
   settled: boolean;
+  reject?: (err: Error) => void;
+  onSettle?: () => void;
 }
 
 export class BiasedConditionVariable {
@@ -44,23 +46,30 @@ export class BiasedConditionVariable {
     return this._waiters.length;
   }
 
-  wait(timeout: number): Promise<DatabaseAdapter> {
+  wait(timeout: number, onSettle?: () => void): Promise<DatabaseAdapter> {
     return new Promise((resolve, reject) => {
       const state: WaiterState = {
         container: this._waiters,
         timer: null,
         settled: false,
+        reject,
+        onSettle,
+      };
+
+      const settle = () => {
+        const idx = state.container.indexOf(waiter);
+        if (idx >= 0) state.container.splice(idx, 1);
+        if (state.timer != null) {
+          clearTimeout(state.timer);
+          state.timer = null;
+        }
+        state.onSettle?.();
       };
 
       const waiter = (conn: DatabaseAdapter) => {
         if (state.settled) return;
         state.settled = true;
-        if (state.timer != null) {
-          clearTimeout(state.timer);
-          state.timer = null;
-        }
-        const idx = state.container.indexOf(waiter);
-        if (idx >= 0) state.container.splice(idx, 1);
+        settle();
         resolve(conn);
       };
       (waiter as any)._state = state;
@@ -68,8 +77,7 @@ export class BiasedConditionVariable {
       state.timer = setTimeout(() => {
         if (state.settled) return;
         state.settled = true;
-        const idx = state.container.indexOf(waiter);
-        if (idx >= 0) state.container.splice(idx, 1);
+        settle();
         const msg =
           `could not obtain a connection from the pool within ${timeout.toFixed(3)} seconds; ` +
           `all pooled connections were in use`;
@@ -112,6 +120,23 @@ export class BiasedConditionVariable {
       i++;
     }
     return connections.slice(i);
+  }
+
+  rejectAll(error: Error): void {
+    while (this._waiters.length > 0) {
+      const waiter = this._waiters.shift()!;
+      const state = (waiter as any)._state as WaiterState | undefined;
+      if (state && !state.settled) {
+        state.settled = true;
+        if (state.timer != null) {
+          clearTimeout(state.timer);
+          state.timer = null;
+        }
+        state.onSettle?.();
+        state.reject?.(error);
+      }
+    }
+    this._otherCond?.rejectAll(error);
   }
 
   /**
@@ -236,6 +261,10 @@ export class Queue {
     return items;
   }
 
+  rejectAll(error: Error): void {
+    this._cond.rejectAll(error);
+  }
+
   protected internalPoll(timeout?: number): Promise<DatabaseAdapter> | DatabaseAdapter | undefined {
     const conn = this.noWaitPoll();
     if (conn) return conn;
@@ -256,7 +285,7 @@ export class Queue {
 
   private waitPoll(timeout: number): Promise<DatabaseAdapter> {
     this._numWaiting++;
-    return this._cond.wait(timeout).finally(() => {
+    return this._cond.wait(timeout, () => {
       this._numWaiting--;
     });
   }

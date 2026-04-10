@@ -11,6 +11,7 @@ import type { ConnectionDescriptor } from "./connection-descriptor.js";
 import { ConnectionNotEstablished, ConnectionTimeoutError } from "../../errors.js";
 import { SchemaReflection } from "../schema-cache.js";
 import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
+import { ConnectionLeasingQueue } from "./connection-pool/queue.js";
 import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
 import type { TransactionManager } from "./transaction.js";
 
@@ -23,6 +24,11 @@ interface TransactionAwareConnection extends DatabaseAdapter {
   transactionManager: TransactionManager;
   verifyBang(): void;
   resetBang(): void;
+}
+
+interface PoolManagedConnection {
+  lease?(): void;
+  expire?(): void;
 }
 
 let _contextIdCounter = 0;
@@ -198,13 +204,12 @@ export class ConnectionPool implements ReapablePool {
   checkoutTimeout: number;
 
   private _connections: DatabaseAdapter[] | null = [];
-  private _available: DatabaseAdapter[] | null = [];
+  private _available: ConnectionLeasingQueue | null;
   private _checkedOut = new Set<DatabaseAdapter>();
   private _leases: LeaseRegistry | null = new LeaseRegistry();
   private _idleTimeout: number | null;
   private _lastCheckinAt = new Map<DatabaseAdapter, number>();
-  private _pinnedConnection: DatabaseAdapter | null = null;
-  private _pinnedConnectionsDepth = 0;
+  private _pinnedConnections = new Map<number, { connection: DatabaseAdapter; depth: number }>();
 
   constructor(poolConfig: PoolConfig) {
     this.poolConfig = poolConfig;
@@ -215,6 +220,7 @@ export class ConnectionPool implements ReapablePool {
     this.size = this.dbConfig.pool;
     this.checkoutTimeout = this.dbConfig.checkoutTimeout;
     this._idleTimeout = this.dbConfig.idleTimeout;
+    this._available = new ConnectionLeasingQueue();
 
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
     this.reaper.run();
@@ -312,9 +318,19 @@ export class ConnectionPool implements ReapablePool {
   // --- Pin / Unpin ---
 
   async pinConnectionBang(_lockThread = false): Promise<void> {
+    const ctxId = executionContextId();
+    let pin = this._pinnedConnections.get(ctxId);
     const leasedConnection = this._connectionLease().connection;
-    const connection = this._pinnedConnection ?? leasedConnection ?? this.checkout();
-    const newlyCheckedOut = this._pinnedConnection === null && leasedConnection == null;
+    const connection = pin?.connection ?? leasedConnection ?? this._acquireConnection();
+    const newlyCheckedOut = !pin && leasedConnection == null;
+
+    // Record the pin before any async work to prevent concurrent
+    // pinConnectionBang calls in the same context from double-acquiring.
+    if (!pin) {
+      pin = { connection, depth: 0 };
+      this._pinnedConnections.set(ctxId, pin);
+    }
+    pin.depth++;
 
     try {
       if (this._connections && !this._connections.includes(connection)) {
@@ -329,24 +345,25 @@ export class ConnectionPool implements ReapablePool {
         });
       }
     } catch (error) {
-      if (newlyCheckedOut) {
-        this.checkin(connection);
+      pin.depth--;
+      if (pin.depth === 0) {
+        this._pinnedConnections.delete(ctxId);
+        if (newlyCheckedOut) {
+          this.checkin(connection);
+        }
       }
       throw error;
     }
-
-    if (!this._pinnedConnection) {
-      this._pinnedConnection = connection;
-    }
-    this._pinnedConnectionsDepth += 1;
   }
 
   async unpinConnectionBang(): Promise<boolean> {
-    if (!this._pinnedConnection) {
-      throw new Error(`There isn't a pinned connection`);
+    const ctxId = executionContextId();
+    const pin = this._pinnedConnections.get(ctxId);
+    if (!pin) {
+      throw new Error(`There isn't a pinned connection ${this.inspect()}`);
     }
 
-    const connection = this._pinnedConnection;
+    const connection = pin.connection;
     let clean = true;
 
     try {
@@ -359,9 +376,9 @@ export class ConnectionPool implements ReapablePool {
         }
       }
     } finally {
-      this._pinnedConnectionsDepth -= 1;
-      if (this._pinnedConnectionsDepth === 0) {
-        this._pinnedConnection = null;
+      pin.depth--;
+      if (pin.depth === 0) {
+        this._pinnedConnections.delete(ctxId);
         this.checkin(connection);
       }
     }
@@ -372,23 +389,73 @@ export class ConnectionPool implements ReapablePool {
   // --- Checkout / Checkin ---
 
   checkout(): DatabaseAdapter {
-    if (this._pinnedConnection) {
-      if (isTransactionAware(this._pinnedConnection)) {
-        this._pinnedConnection.verifyBang();
+    const pin = this._pinnedConnections.get(executionContextId());
+    if (pin) {
+      if (isTransactionAware(pin.connection)) {
+        pin.connection.verifyBang();
       }
-      if (this._connections && !this._connections.includes(this._pinnedConnection)) {
-        this._connections.push(this._pinnedConnection);
+      if (this._connections && !this._connections.includes(pin.connection)) {
+        this._connections.push(pin.connection);
       }
-      return this._pinnedConnection;
+      return pin.connection;
     }
+    return this._acquireConnection();
+  }
 
+  async checkoutAsync(timeout?: number): Promise<DatabaseAdapter> {
+    const pin = this._pinnedConnections.get(executionContextId());
+    if (pin) {
+      if (isTransactionAware(pin.connection)) {
+        pin.connection.verifyBang();
+      }
+      if (this._connections && !this._connections.includes(pin.connection)) {
+        this._connections.push(pin.connection);
+      }
+      return pin.connection;
+    }
+    const conn = this._tryAcquire();
+    if (conn) return conn;
+
+    const t = timeout ?? this.checkoutTimeout;
+    if (!this._available) {
+      throw new ConnectionNotEstablished("Connection pool has been discarded");
+    }
+    let c: DatabaseAdapter;
+    try {
+      const result = this._available.poll(t);
+      c = result instanceof Promise ? await result : result!;
+    } catch (err) {
+      if (err instanceof ConnectionTimeoutError) {
+        err.setPool(this);
+      }
+      throw err;
+    }
     if (this.isDiscarded()) {
       throw new ConnectionNotEstablished("Connection pool has been discarded");
     }
-    if (this._available && this._available.length > 0) {
-      const conn = this._available.pop()!;
-      this._checkedOut.add(conn);
-      return conn;
+    this._checkedOut.add(c);
+    return c;
+  }
+
+  private _acquireConnection(): DatabaseAdapter {
+    const conn = this._tryAcquire();
+    if (conn) return conn;
+    throw new ConnectionTimeoutError(
+      `Could not obtain a connection from the pool. All ${this.size} connections are in use.`,
+      { connectionPool: this },
+    );
+  }
+
+  private _tryAcquire(): DatabaseAdapter | undefined {
+    if (this.isDiscarded()) {
+      throw new ConnectionNotEstablished("Connection pool has been discarded");
+    }
+    if (this._available) {
+      const conn = this._available.poll();
+      if (conn) {
+        this._checkedOut.add(conn);
+        return conn;
+      }
     }
     if (this._connections && this._connections.length < this.size) {
       if (!this.automaticReconnect) {
@@ -400,20 +467,19 @@ export class ConnectionPool implements ReapablePool {
       const conn = this.newConnection();
       this._connections.push(conn);
       this._checkedOut.add(conn);
+      (conn as unknown as PoolManagedConnection).lease?.();
       return conn;
     }
-    throw new ConnectionTimeoutError(
-      `Could not obtain a connection from the pool. All ${this.size} connections are in use.`,
-      { connectionPool: this },
-    );
+    return undefined;
   }
 
   checkin(conn: DatabaseAdapter): void {
-    if (this._pinnedConnection === conn) return;
+    if (this._isConnectionPinned(conn)) return;
     this._connectionLease().clear(conn);
     if (this._checkedOut.has(conn)) {
       this._checkedOut.delete(conn);
-      this._available?.push(conn);
+      (conn as unknown as PoolManagedConnection).expire?.();
+      this._available?.add(conn);
       this._lastCheckinAt.set(conn, Date.now());
     }
   }
@@ -461,7 +527,7 @@ export class ConnectionPool implements ReapablePool {
   // --- Pool statistics ---
 
   numWaitingInQueue(): number {
-    return 0;
+    return this._available?.numWaiting() ?? 0;
   }
 
   stat(): {
@@ -485,10 +551,12 @@ export class ConnectionPool implements ReapablePool {
   // --- Lifecycle ---
 
   disconnect(): void {
-    this._pinnedConnection = null;
-    this._pinnedConnectionsDepth = 0;
+    this._pinnedConnections.clear();
     if (this._connections) this._connections.length = 0;
-    if (this._available) this._available.length = 0;
+    this._available?.rejectAll(
+      new ConnectionNotEstablished("Connection pool has been disconnected"),
+    );
+    this._available?.clear();
     this._checkedOut.clear();
     this._leases?.clear();
     this._lastCheckinAt.clear();
@@ -500,9 +568,10 @@ export class ConnectionPool implements ReapablePool {
 
   discardBang(): void {
     if (this.isDiscarded()) return;
-    this._pinnedConnection = null;
-    this._pinnedConnectionsDepth = 0;
+    this._pinnedConnections.clear();
     this._connections = null;
+    this._available?.rejectAll(new ConnectionNotEstablished("Connection pool has been discarded"));
+    this._available?.clear();
     this._available = null;
     this._leases = null;
     this._checkedOut.clear();
@@ -531,23 +600,18 @@ export class ConnectionPool implements ReapablePool {
 
     const now = Date.now();
     const minimumIdleMs = minimumIdle * 1000;
-    const toRemove: DatabaseAdapter[] = [];
 
-    for (const conn of this._available) {
-      if (this._checkedOut.has(conn)) continue;
+    const all = this._available.clear();
+    for (const conn of all) {
       const lastCheckin = this._lastCheckinAt.get(conn) ?? 0;
       const idleMs = now - lastCheckin;
       if (idleMs >= minimumIdleMs) {
-        toRemove.push(conn);
+        const connIdx = this._connections.indexOf(conn);
+        if (connIdx >= 0) this._connections.splice(connIdx, 1);
+        this._lastCheckinAt.delete(conn);
+      } else {
+        this._available.add(conn);
       }
-    }
-
-    for (const conn of toRemove) {
-      const availIdx = this._available.indexOf(conn);
-      if (availIdx >= 0) this._available.splice(availIdx, 1);
-      const connIdx = this._connections.indexOf(conn);
-      if (connIdx >= 0) this._connections.splice(connIdx, 1);
-      this._lastCheckinAt.delete(conn);
     }
   }
 
@@ -566,20 +630,33 @@ export class ConnectionPool implements ReapablePool {
   }
 
   remove(conn: DatabaseAdapter): void {
-    if (this._pinnedConnection === conn) {
-      this._pinnedConnection = null;
-      this._pinnedConnectionsDepth = 0;
-    }
     this._connectionLease().clear(conn);
     this._checkedOut.delete(conn);
     this._lastCheckinAt.delete(conn);
-    if (this._available) {
-      const availIdx = this._available.indexOf(conn);
-      if (availIdx >= 0) this._available.splice(availIdx, 1);
+    this._available?.delete(conn);
+
+    for (const [ctxId, pin] of this._pinnedConnections) {
+      if (pin.connection === conn) {
+        this._pinnedConnections.delete(ctxId);
+      }
     }
+
     if (this._connections) {
       const connIdx = this._connections.indexOf(conn);
       if (connIdx >= 0) this._connections.splice(connIdx, 1);
+    }
+
+    const needsNewConnection = this._available?.isAnyWaiting() ?? false;
+    if (
+      needsNewConnection &&
+      this.automaticReconnect &&
+      this._connections &&
+      this._connections.length < this.size
+    ) {
+      const newConn = this.newConnection();
+      this._connections.push(newConn);
+      this._lastCheckinAt.set(newConn, Date.now());
+      this._available?.add(newConn);
     }
   }
 
@@ -588,6 +665,13 @@ export class ConnectionPool implements ReapablePool {
   }
 
   // --- Private ---
+
+  private _isConnectionPinned(conn: DatabaseAdapter): boolean {
+    for (const pin of this._pinnedConnections.values()) {
+      if (pin.connection === conn) return true;
+    }
+    return false;
+  }
 
   private _connectionLease(): Lease {
     if (!this._leases) {

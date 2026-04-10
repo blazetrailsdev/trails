@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import {
+  ConnectionPool,
+  withExecutionContext,
+} from "./connection-adapters/abstract/connection-pool.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
@@ -183,16 +186,34 @@ it("full pool exception", () => {
   expect(() => pool.checkout()).toThrow(/Could not obtain a connection/);
 });
 
-it.skip("full pool blocks", () => {
-  /* needs async waiting/blocking */
+it("full pool async checkout timeout", async () => {
+  const pool = makePool(1);
+  pool.checkout();
+  await expect(pool.checkoutAsync(0.05)).rejects.toThrow(/could not obtain a connection/);
+});
+
+it("full pool blocks", async () => {
+  const pool = makePool(1);
+  const conn = pool.checkout();
+  const promise = pool.checkoutAsync(1);
+  pool.checkin(conn);
+  const conn2 = await promise;
+  expect(conn2).toBe(conn);
+  pool.checkin(conn2);
 });
 
 it.skip("full pool blocking shares load interlock", () => {
   /* needs thread interlock */
 });
 
-it.skip("removing releases latch", () => {
-  /* needs async waiting */
+it("removing releases latch", async () => {
+  const pool = makePool(1);
+  const conn = pool.checkout();
+  const promise = pool.checkoutAsync(1);
+  pool.remove(conn);
+  const conn2 = await promise;
+  expect(conn2).not.toBe(conn);
+  pool.checkin(conn2);
 });
 
 it("reap and active", () => {
@@ -552,6 +573,38 @@ it("pin connection reuses leased connection and checks in on unpin", async () =>
 
   // Pinning takes ownership — connection is checked in on final unpin (matches Rails)
   expect(pool.stat().idle).toBe(1);
+});
+
+it("pin connection isolation across execution contexts", async () => {
+  const pool = makeTransactionAwarePool(5);
+  let ctx1Conn: DatabaseAdapter | null = null;
+  let ctx2Conn: DatabaseAdapter | null = null;
+
+  await withExecutionContext(async () => {
+    await pool.pinConnectionBang();
+    ctx1Conn = pool.checkout();
+
+    // Nested context gets a different pin
+    await withExecutionContext(async () => {
+      await pool.pinConnectionBang();
+      ctx2Conn = pool.checkout();
+      expect(ctx2Conn).not.toBe(ctx1Conn);
+
+      // Checkin of ctx2's pinned connection is a no-op (still pinned)
+      pool.checkin(ctx2Conn!);
+      expect(pool.checkout()).toBe(ctx2Conn);
+
+      await pool.unpinConnectionBang();
+    });
+
+    // Back in ctx1 — still pinned to ctx1Conn
+    expect(pool.checkout()).toBe(ctx1Conn);
+    await pool.unpinConnectionBang();
+  });
+
+  expect(ctx1Conn).toBeTruthy();
+  expect(ctx2Conn).toBeTruthy();
+  expect(ctx1Conn).not.toBe(ctx2Conn);
 });
 
 it.skip("pin connection nesting lock", () => {
