@@ -464,6 +464,36 @@ export class Base extends Model {
     return ConnectionHandling.establishConnection(this, config);
   }
 
+  // --- ConnectionHandling mixin (static methods, wired via extend() after class) ---
+  declare static connectsTo: typeof ConnectionHandling.connectsTo;
+  declare static connectedTo: typeof ConnectionHandling.connectedTo;
+  declare static connectedToMany: typeof ConnectionHandling.connectedToMany;
+  declare static connectedToAllShards: typeof ConnectionHandling.connectedToAllShards;
+  declare static connectingTo: typeof ConnectionHandling.connectingTo;
+  declare static connectedToQ: typeof ConnectionHandling.connectedToQ;
+  declare static whilePreventingWrites: typeof ConnectionHandling.whilePreventingWrites;
+  declare static prohibitShardSwapping: typeof ConnectionHandling.prohibitShardSwapping;
+  declare static isShardSwappingProhibited: typeof ConnectionHandling.isShardSwappingProhibited;
+  declare static clearQueryCachesForCurrentThread: typeof ConnectionHandling.clearQueryCachesForCurrentThread;
+  declare static leaseConnection: typeof ConnectionHandling.leaseConnection;
+  declare static releaseConnection: typeof ConnectionHandling.releaseConnection;
+  declare static withConnection: typeof ConnectionHandling.withConnection;
+  declare static connectionPool: typeof ConnectionHandling.connectionPool;
+  declare static retrieveConnection: typeof ConnectionHandling.retrieveConnection;
+  declare static connectionDbConfig: typeof ConnectionHandling.connectionDbConfig;
+  static get connectionSpecificationName(): string {
+    return ConnectionHandling.connectionSpecificationName.call(this);
+  }
+  static set connectionSpecificationName(name: string) {
+    (this as any)._connectionSpecificationName = name;
+  }
+  declare static isConnectedQ: typeof ConnectionHandling.isConnectedQ;
+  declare static removeConnection: typeof ConnectionHandling.removeConnection;
+  declare static schemaCache: typeof ConnectionHandling.schemaCache;
+  declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;
+  declare static shardKeys: typeof ConnectionHandling.shardKeys;
+  declare static isSharded: typeof ConnectionHandling.isSharded;
+
   /**
    * Return the list of column names (attribute names).
    *
@@ -3074,6 +3104,33 @@ function mixin(target: object, methods: Record<string, Function>): void {
     });
   }
 }
+
+// ConnectionHandling: extend Base with static methods (non-enumerable, matching mixin pattern)
+import { extend } from "@blazetrails/activesupport";
+extend(Base, {
+  connectsTo: ConnectionHandling.connectsTo,
+  connectedTo: ConnectionHandling.connectedTo,
+  connectedToMany: ConnectionHandling.connectedToMany,
+  connectedToAllShards: ConnectionHandling.connectedToAllShards,
+  connectingTo: ConnectionHandling.connectingTo,
+  connectedToQ: ConnectionHandling.connectedToQ,
+  whilePreventingWrites: ConnectionHandling.whilePreventingWrites,
+  prohibitShardSwapping: ConnectionHandling.prohibitShardSwapping,
+  isShardSwappingProhibited: ConnectionHandling.isShardSwappingProhibited,
+  clearQueryCachesForCurrentThread: ConnectionHandling.clearQueryCachesForCurrentThread,
+  leaseConnection: ConnectionHandling.leaseConnection,
+  releaseConnection: ConnectionHandling.releaseConnection,
+  withConnection: ConnectionHandling.withConnection,
+  connectionPool: ConnectionHandling.connectionPool,
+  retrieveConnection: ConnectionHandling.retrieveConnection,
+  connectionDbConfig: ConnectionHandling.connectionDbConfig,
+  isConnectedQ: ConnectionHandling.isConnectedQ,
+  removeConnection: ConnectionHandling.removeConnection,
+  schemaCache: ConnectionHandling.schemaCache,
+  clearCacheBang: ConnectionHandling.clearCacheBang,
+  shardKeys: ConnectionHandling.shardKeys,
+  isSharded: ConnectionHandling.isSharded,
+});
 
 mixin(Base.prototype, {
   // Core

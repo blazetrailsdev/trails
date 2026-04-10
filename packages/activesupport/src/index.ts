@@ -352,8 +352,8 @@ export {
 } from "./callbacks.js";
 export type { ClassMethods } from "./callbacks.js";
 export { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
-export { include } from "./include.js";
-export type { Included } from "./include.js";
+export { include, extend } from "./include.js";
+export type { Included, Extended } from "./include.js";
 export { ClassAttribute } from "./class-attribute.js";
 
 export {

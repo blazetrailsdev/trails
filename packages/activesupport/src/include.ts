@@ -47,3 +47,42 @@ export function include(klass: AnyClass, mod: Module): void {
   }
   Object.defineProperties(klass.prototype, descriptors);
 }
+
+/**
+ * Derive static method types from an extended module object.
+ * Strips the `this` parameter from each function signature.
+ *
+ * Usage:
+ *   interface BaseStatic extends Extended<typeof ConnectionHandlingMethods> {
+ *     new (...args: any[]): Base;
+ *   }
+ *   extend(Base, ConnectionHandlingMethods);
+ *   const TypedBase = Base as unknown as BaseStatic;
+ */
+export type Extended<M extends Module> = {
+  [K in keyof M]: M[K] extends (this: any, ...args: infer A) => infer R ? (...args: A) => R : never;
+};
+
+/**
+ * Ruby-style `extend` for mixing module methods onto a class as static methods.
+ *
+ * In Ruby, `extend SomeModule` copies the module's methods onto the
+ * object itself (not its prototype). When used on a class, this makes
+ * the methods available as class-level (static) methods.
+ *
+ * Mirrors: Ruby's Object#extend (core language feature)
+ *
+ * Usage:
+ *   extend(Base, ConnectionHandlingMethods);
+ *   // Now Base.connectedTo(...) works
+ */
+export function extend(klass: AnyClass | object, mod: Module): void {
+  for (const key of Object.keys(mod)) {
+    Object.defineProperty(klass, key, {
+      value: mod[key],
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
+  }
+}
