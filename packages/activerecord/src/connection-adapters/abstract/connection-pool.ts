@@ -206,6 +206,23 @@ export class ConnectionPool implements ReapablePool {
     this.reaper.run();
   }
 
+  inspect(): string {
+    const q = (v: string) => JSON.stringify(String(v));
+    const parts = [`env_name=${q(this.dbConfig.envName)}`];
+    if (this.dbConfig.name !== "primary") parts.push(`name=${q(this.dbConfig.name)}`);
+    parts.push(`role=${q(this.role)}`);
+    if (this.shard !== "default") parts.push(`shard=${q(this.shard)}`);
+    return `#<ConnectionPool ${parts.join(" ")}>`;
+  }
+
+  toString(): string {
+    return this.inspect();
+  }
+
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return this.inspect();
+  }
+
   // --- Delegation to PoolConfig ---
 
   get schemaReflection(): SchemaReflection {
@@ -290,6 +307,12 @@ export class ConnectionPool implements ReapablePool {
       return conn;
     }
     if (this._connections && this._connections.length < this.size) {
+      if (!this.automaticReconnect) {
+        throw new ConnectionNotEstablished(
+          "No connection available from pool and automatic_reconnect is disabled",
+          { connectionPool: this },
+        );
+      }
       const conn = this.newConnection();
       this._connections.push(conn);
       this._checkedOut.add(conn);

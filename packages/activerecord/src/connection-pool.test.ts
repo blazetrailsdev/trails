@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
+import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
 
@@ -10,6 +11,7 @@ function makePool(size: number = 5): ConnectionPool {
     adapter: "sqlite3",
     database: "test.db",
     pool: size,
+    reapingFrequency: null,
   });
   const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
     adapterFactory: createTestAdapter,
@@ -23,8 +25,19 @@ describe("ConnectionPoolThreadTest", () => {
   });
 });
 
-it.skip("checkout after close", () => {
-  /* needs pool close/shutdown semantics */
+it("checkout after close", () => {
+  const pool = makePool();
+  const conn = pool.leaseConnection();
+  expect(conn).toBeTruthy();
+  pool.releaseConnection();
+
+  pool.disconnectBang();
+
+  // After disconnect, leaseConnection creates a fresh connection
+  const conn2 = pool.leaseConnection();
+  expect(conn2).toBeTruthy();
+  expect(conn2).not.toBe(conn);
+  pool.releaseConnection();
 });
 
 it.skip("released connection moves between threads", () => {
@@ -114,8 +127,16 @@ it.skip("removing releases latch", () => {
   /* needs async waiting */
 });
 
-it.skip("reap and active", () => {
-  /* needs reaper/idle timeout */
+it("reap and active", () => {
+  const pool = makePool();
+  pool.checkout();
+  pool.checkout();
+  pool.checkout();
+  const count = pool.connections.length;
+  pool.reap();
+  // In single-threaded JS, no connections have dead owners, so reap is a no-op
+  expect(pool.connections.length).toBe(count);
+  pool.disconnect();
 });
 
 it.skip("reap inactive", () => {
@@ -126,12 +147,76 @@ it.skip("inactive are returned from dead thread", () => {
   /* needs thread tracking */
 });
 
-it.skip("idle timeout configuration", () => {
-  /* needs reaper */
+it("idle timeout configuration", () => {
+  // High idleTimeout: flush() with no args keeps connections
+  const keepConfig = new HashConfig("test", "primary", {
+    adapter: "sqlite3",
+    database: "test.db",
+    idleTimeout: 9999,
+    reapingFrequency: null,
+  });
+  const keepPc = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    keepConfig,
+    "writing",
+    "default",
+    { adapterFactory: createTestAdapter },
+  );
+  const keepPool = new ConnectionPool(keepPc);
+  const keepConn = keepPool.checkout();
+  keepPool.checkin(keepConn);
+  expect(keepPool.stat().connections).toBe(1);
+  keepPool.flush();
+  expect(keepPool.stat().connections).toBe(1);
+
+  // Small idleTimeout: flush() with no args removes expired idle connections
+  const flushConfig = new HashConfig("test", "primary", {
+    adapter: "sqlite3",
+    database: "test.db",
+    idleTimeout: 1,
+    reapingFrequency: null,
+  });
+  const flushPc = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    flushConfig,
+    "writing",
+    "default",
+    { adapterFactory: createTestAdapter },
+  );
+  const flushPool = new ConnectionPool(flushPc);
+  vi.useFakeTimers();
+  try {
+    const flushConn = flushPool.checkout();
+    flushPool.checkin(flushConn);
+    expect(flushPool.stat().connections).toBe(1);
+    // Not yet expired
+    flushPool.flush();
+    expect(flushPool.stat().connections).toBe(1);
+    // Advance past the 1-second idleTimeout
+    vi.advanceTimersByTime(2000);
+    flushPool.flush();
+    expect(flushPool.stat().connections).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
-it.skip("disable flush", () => {
-  /* needs flush implementation */
+it("disable flush", () => {
+  const dbConfig = new HashConfig("test", "primary", {
+    adapter: "sqlite3",
+    database: "test.db",
+    idleTimeout: null,
+    reapingFrequency: null,
+  });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+    adapterFactory: createTestAdapter,
+  });
+  const pool = new ConnectionPool(pc);
+  const conn = pool.checkout();
+  pool.checkin(conn);
+  // flush is a no-op when idleTimeout is null
+  pool.flush();
+  expect(pool.stat().connections).toBe(1);
 });
 
 it("flush", () => {
@@ -207,12 +292,25 @@ it.skip("checkout fairness by group", () => {
   /* needs thread fairness */
 });
 
-it.skip("automatic reconnect restores after disconnect", () => {
-  /* needs reconnect logic */
+it("automatic reconnect restores after disconnect", () => {
+  const pool = makePool();
+  expect(pool.automaticReconnect).toBe(true);
+  expect(pool.leaseConnection()).toBeTruthy();
+  pool.releaseConnection();
+
+  pool.disconnectBang();
+  // With automaticReconnect=true (default), new connections are created
+  expect(pool.leaseConnection()).toBeTruthy();
+  pool.releaseConnection();
 });
 
-it.skip("automatic reconnect can be disabled", () => {
-  /* needs reconnect logic */
+it("automatic reconnect can be disabled", () => {
+  const pool = makePool();
+  pool.disconnectBang();
+  pool.automaticReconnect = false;
+
+  expect(() => pool.leaseConnection()).toThrow(/automatic_reconnect is disabled/);
+  expect(() => pool.withConnection(() => {})).toThrow(/automatic_reconnect is disabled/);
 });
 
 it.skip("pool sets connection visitor", () => {
@@ -231,8 +329,15 @@ it.skip("connection notification is called for shard", () => {
   /* needs instrumentation/notifications */
 });
 
-it.skip("sets pool schema reflection", () => {
-  /* needs schema reflection */
+it("sets pool schema reflection", () => {
+  const pool = makePool();
+  const original = pool.schemaReflection;
+  expect(original).toBeTruthy();
+
+  const newReflection = new SchemaReflection(null);
+  pool.schemaReflection = newReflection;
+  expect(pool.schemaReflection).toBe(newReflection);
+  expect(pool.schemaReflection).not.toBe(original);
 });
 
 it.skip("pool sets connection schema cache", () => {
@@ -282,6 +387,7 @@ it("role and shard is returned", () => {
   const dbConfig = new HashConfig("test", "primary", {
     adapter: "sqlite3",
     database: "test.db",
+    reapingFrequency: null,
   });
   const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "reading", "shard_one", {
     adapterFactory: createTestAdapter,
@@ -323,6 +429,25 @@ it.skip("pin connection nesting lock inverse", () => {
   /* needs pin connection + locking */
 });
 
-it.skip("inspect does not show secrets", () => {
-  /* needs custom inspect */
+it("inspect does not show secrets", () => {
+  const pool = makePool();
+  const str = pool.inspect();
+  expect(str).toMatch(/ConnectionPool/);
+  expect(str).toMatch(/env_name="test"/);
+  expect(str).toMatch(/role="writing"/);
+  expect(str).not.toMatch(/password/);
+  expect(str).not.toMatch(/sqlite3/);
+
+  // With non-default shard
+  const dbConfig = new HashConfig("test", "primary", {
+    adapter: "sqlite3",
+    reapingFrequency: null,
+    database: "test.db",
+  });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "reading", "shard_one", {
+    adapterFactory: createTestAdapter,
+  });
+  const pool2 = new ConnectionPool(pc);
+  expect(pool2.inspect()).toMatch(/shard="shard_one"/);
+  expect(pool2.inspect()).toMatch(/role="reading"/);
 });
