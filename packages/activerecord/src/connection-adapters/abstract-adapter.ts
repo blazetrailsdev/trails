@@ -375,6 +375,38 @@ export class AbstractAdapter {
     return this._transactionManager.currentTransaction;
   }
 
+  async rollbackTransaction(): Promise<void> {
+    return this._transactionManager.rollbackTransaction();
+  }
+
+  async commitTransaction(): Promise<void> {
+    return this._transactionManager.commitTransaction();
+  }
+
+  isTransactionOpen(): boolean {
+    return this._transactionManager.currentTransaction.open;
+  }
+
+  get openTransactions(): number {
+    return this._transactionManager.openTransactions;
+  }
+
+  async materializeTransactions(): Promise<void> {
+    return this._transactionManager.materializeTransactions();
+  }
+
+  async disableLazyTransactionsBang(): Promise<void> {
+    return this._transactionManager.disableLazyTransactionsBang();
+  }
+
+  enableLazyTransactionsBang(): void {
+    this._transactionManager.enableLazyTransactionsBang();
+  }
+
+  dirtyCurrentTransaction(): void {
+    this._transactionManager.dirtyCurrentTransaction();
+  }
+
   async withinNewTransaction<T>(
     opts: { isolation?: string | null; joinable?: boolean },
     fn: (tx?: unknown) => Promise<T> | T,

@@ -5,6 +5,8 @@ import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
 function makePool(size: number = 5): ConnectionPool {
   const dbConfig = new HashConfig("test", "primary", {
@@ -15,6 +17,72 @@ function makePool(size: number = 5): ConnectionPool {
   });
   const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
     adapterFactory: createTestAdapter,
+  });
+  return new ConnectionPool(pc);
+}
+
+class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
+  override get adapterName() {
+    return "TestTransactionAdapter";
+  }
+  readonly inTransaction = false;
+
+  async execute(_sql: string, _binds?: unknown[]): Promise<Record<string, unknown>[]> {
+    return [];
+  }
+  async executeMutation(_sql: string, _binds?: unknown[]): Promise<number> {
+    return 0;
+  }
+  async beginTransaction(): Promise<void> {}
+  async commit(): Promise<void> {}
+  async rollback(): Promise<void> {}
+  async createSavepoint(_name: string): Promise<void> {}
+  async releaseSavepoint(_name: string): Promise<void> {}
+  async rollbackToSavepoint(_name: string): Promise<void> {}
+  async selectAll(sql: string, _n?: string | null, b?: unknown[]) {
+    return this.execute(sql, b);
+  }
+  async selectOne(sql: string, _n?: string | null, b?: unknown[]) {
+    return (await this.execute(sql, b))[0];
+  }
+  async selectValue(_s: string) {
+    return undefined;
+  }
+  async selectValues(_s: string) {
+    return [];
+  }
+  async selectRows(_s: string) {
+    return [];
+  }
+  async execQuery(sql: string, _n?: string | null, b?: unknown[]) {
+    return this.execute(sql, b);
+  }
+  async execInsert(sql: string, _n?: string | null, b?: unknown[]) {
+    return this.executeMutation(sql, b);
+  }
+  async execDelete(sql: string, _n?: string | null, b?: unknown[]) {
+    return this.executeMutation(sql, b);
+  }
+  async execUpdate(sql: string, _n?: string | null, b?: unknown[]) {
+    return this.executeMutation(sql, b);
+  }
+  isWriteQuery(_sql: string) {
+    return false;
+  }
+  emptyInsertStatementValue() {
+    return "DEFAULT VALUES";
+  }
+}
+
+function makeTransactionAwarePool(size: number = 5): ConnectionPool {
+  const dbConfig = new HashConfig("test", "primary", {
+    adapter: "sqlite3",
+    database: "test.db",
+    pool: size,
+    reapingFrequency: null,
+  });
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default", {
+    adapterFactory: () => new TransactionAwareTestAdapter(),
   });
   return new ConnectionPool(pc);
 }
@@ -397,36 +465,101 @@ it("role and shard is returned", () => {
   expect(pool.shard).toBe("shard_one");
 });
 
-it.skip("pin connection always returns the same connection", () => {
-  /* needs pin connection */
+it("pin connection always returns the same connection", async () => {
+  const pool = makeTransactionAwarePool(5);
+  await pool.pinConnectionBang();
+  const conn1 = pool.checkout();
+  const conn2 = pool.checkout();
+  expect(conn1).toBe(conn2);
+  await pool.unpinConnectionBang();
 });
 
-it.skip("pin connection connected?", () => {
-  /* needs pin connection */
+it("pin connection connected?", async () => {
+  const pool = makeTransactionAwarePool(5);
+  await pool.pinConnectionBang();
+  expect(pool.isConnected()).toBe(true);
+  await pool.unpinConnectionBang();
 });
 
 it.skip("pin connection synchronize the connection", () => {
-  /* needs pin connection */
+  /* needs thread synchronization */
 });
 
-it.skip("pin connection opens a transaction", () => {
-  /* needs pin connection + transactions */
+it("pin connection opens a transaction", async () => {
+  const pool = makeTransactionAwarePool(5);
+  await pool.pinConnectionBang();
+  const conn = pool.checkout() as TransactionAwareTestAdapter;
+  expect(conn.transactionManager.openTransactions).toBe(1);
+  expect(conn.transactionManager.currentTransaction.open).toBe(true);
+  expect(conn.transactionManager.currentTransaction.joinable).toBe(false);
+  await pool.unpinConnectionBang();
 });
 
-it.skip("unpin connection returns whether transaction has been rolledback", () => {
-  /* needs pin connection + transactions */
+it("unpin connection returns whether transaction has been rolledback", async () => {
+  const pool = makeTransactionAwarePool(5);
+
+  // Clean unpin — transaction is still open, rollback happens → clean = true
+  await pool.pinConnectionBang();
+  const clean = await pool.unpinConnectionBang();
+  expect(clean).toBe(true);
+
+  // Dirty unpin — manually commit the transaction before unpin
+  await pool.pinConnectionBang();
+  const conn = pool.checkout() as TransactionAwareTestAdapter;
+  await conn.transactionManager.commitTransaction();
+  const dirty = await pool.unpinConnectionBang();
+  expect(dirty).toBe(false);
 });
 
-it.skip("pin connection nesting", () => {
-  /* needs pin connection */
+it("pin connection nesting", async () => {
+  const pool = makeTransactionAwarePool(5);
+  await pool.pinConnectionBang();
+  const conn1 = pool.checkout() as TransactionAwareTestAdapter;
+  expect(conn1.transactionManager.openTransactions).toBe(1);
+  expect(conn1.transactionManager.currentTransaction.joinable).toBe(false);
+
+  // Nested pin opens a second transaction (savepoint-level in Rails)
+  await pool.pinConnectionBang();
+  const conn2 = pool.checkout();
+  expect(conn1).toBe(conn2);
+  expect(conn1.transactionManager.openTransactions).toBe(2);
+
+  // First unpin rolls back the inner transaction but keeps connection pinned
+  await pool.unpinConnectionBang();
+  expect(conn1.transactionManager.openTransactions).toBe(1);
+  expect(conn1.transactionManager.currentTransaction.open).toBe(true);
+  const conn3 = pool.checkout();
+  expect(conn3).toBe(conn1);
+
+  // Second unpin rolls back the outer transaction and checks in
+  await pool.unpinConnectionBang();
+  expect(conn1.transactionManager.openTransactions).toBe(0);
+});
+
+it("pin connection reuses leased connection and checks in on unpin", async () => {
+  const pool = makeTransactionAwarePool(5);
+  const leased = pool.leaseConnection() as TransactionAwareTestAdapter;
+
+  await pool.pinConnectionBang();
+  const pinned = pool.checkout() as TransactionAwareTestAdapter;
+  expect(pinned).toBe(leased);
+  expect(leased.transactionManager.openTransactions).toBe(1);
+  expect(leased.transactionManager.currentTransaction.joinable).toBe(false);
+
+  const clean = await pool.unpinConnectionBang();
+  expect(clean).toBe(true);
+  expect(leased.transactionManager.openTransactions).toBe(0);
+
+  // Pinning takes ownership — connection is checked in on final unpin (matches Rails)
+  expect(pool.stat().idle).toBe(1);
 });
 
 it.skip("pin connection nesting lock", () => {
-  /* needs pin connection + locking */
+  /* needs thread locking */
 });
 
 it.skip("pin connection nesting lock inverse", () => {
-  /* needs pin connection + locking */
+  /* needs thread locking */
 });
 
 it("inspect does not show secrets", () => {
