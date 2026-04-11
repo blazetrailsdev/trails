@@ -10,6 +10,7 @@
  */
 
 import type { DatabaseAdapter } from "./adapter.js";
+import { Result } from "./result.js";
 
 const DEFAULT_MAX_SIZE = 100;
 
@@ -264,12 +265,9 @@ export class QueryCacheAdapter implements DatabaseAdapter {
   // Read methods go through this.execute() to leverage the query cache.
   // Write methods go through this.executeMutation() to clear the cache.
 
-  async selectAll(
-    sql: string,
-    _name?: string | null,
-    binds?: unknown[],
-  ): Promise<Record<string, unknown>[]> {
-    return this.execute(sql, binds);
+  async selectAll(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
+    const rows = await this.execute(sql, binds);
+    return Result.fromRowHashes(rows);
   }
 
   async selectOne(
@@ -303,12 +301,9 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return rows.map((row) => keys.map((key) => row[key]));
   }
 
-  async execQuery(
-    sql: string,
-    _name?: string | null,
-    binds?: unknown[],
-  ): Promise<Record<string, unknown>[]> {
-    return this.execute(sql, binds);
+  async execQuery(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
+    const rows = await this.execute(sql, binds);
+    return Result.fromRowHashes(rows);
   }
 
   async execInsert(sql: string, _name?: string | null, binds?: unknown[]): Promise<number> {

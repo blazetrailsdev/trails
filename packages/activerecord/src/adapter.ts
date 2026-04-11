@@ -1,3 +1,5 @@
+import type { Result } from "./result.js";
+
 /**
  * Database adapter interface — pluggable backends.
  *
@@ -67,11 +69,7 @@ export interface DatabaseAdapter {
   // Mirrors ActiveRecord::ConnectionAdapters::DatabaseStatements.
   // Default implementations delegate to execute()/executeMutation().
 
-  selectAll(
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-  ): Promise<Record<string, unknown>[]>;
+  selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   selectOne(
     sql: string,
     name?: string | null,
@@ -80,11 +78,7 @@ export interface DatabaseAdapter {
   selectValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
   selectValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
   selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
-  execQuery(
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-  ): Promise<Record<string, unknown>[]>;
+  execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   execInsert(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;

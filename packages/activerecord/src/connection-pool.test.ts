@@ -10,6 +10,7 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { Result } from "./result.js";
 
 function makePool(size: number = 5): ConnectionPool {
   const dbConfig = new HashConfig("test", "primary", {
@@ -43,7 +44,7 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   async releaseSavepoint(_name: string): Promise<void> {}
   async rollbackToSavepoint(_name: string): Promise<void> {}
   async selectAll(sql: string, _n?: string | null, b?: unknown[]) {
-    return this.execute(sql, b);
+    return Result.fromRowHashes(await this.execute(sql, b));
   }
   async selectOne(sql: string, _n?: string | null, b?: unknown[]) {
     return (await this.execute(sql, b))[0];
@@ -58,7 +59,7 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
     return [];
   }
   async execQuery(sql: string, _n?: string | null, b?: unknown[]) {
-    return this.execute(sql, b);
+    return Result.fromRowHashes(await this.execute(sql, b));
   }
   async execInsert(sql: string, _n?: string | null, b?: unknown[]) {
     return this.executeMutation(sql, b);

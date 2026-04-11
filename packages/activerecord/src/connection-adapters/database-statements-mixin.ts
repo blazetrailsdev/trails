@@ -8,6 +8,7 @@
  */
 
 import { isWriteQuerySql } from "./sql-classification.js";
+import { Result } from "../result.js";
 
 /**
  * Minimum interface required by the mixin — the base class must provide
@@ -31,12 +32,9 @@ type Constructor<T = {}> = new (...args: any[]) => T;
 
 export function DatabaseStatementsMixin<T extends Constructor<any>>(Base: T) {
   return class extends Base {
-    async selectAll(
-      sql: string,
-      _name?: string | null,
-      binds?: unknown[],
-    ): Promise<Record<string, unknown>[]> {
-      return (this as unknown as ExecutionMethods).execute(sql, binds);
+    async selectAll(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
+      const rows = await (this as unknown as ExecutionMethods).execute(sql, binds);
+      return Result.fromRowHashes(rows);
     }
 
     async selectOne(
@@ -70,12 +68,9 @@ export function DatabaseStatementsMixin<T extends Constructor<any>>(Base: T) {
       return rows.map((row) => keys.map((key) => row[key]));
     }
 
-    async execQuery(
-      sql: string,
-      _name?: string | null,
-      binds?: unknown[],
-    ): Promise<Record<string, unknown>[]> {
-      return (this as unknown as ExecutionMethods).execute(sql, binds);
+    async execQuery(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
+      const rows = await (this as unknown as ExecutionMethods).execute(sql, binds);
+      return Result.fromRowHashes(rows);
     }
 
     async execInsert(sql: string, _name?: string | null, binds?: unknown[]): Promise<number> {

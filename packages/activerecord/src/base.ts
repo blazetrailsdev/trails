@@ -2531,9 +2531,10 @@ export class Base extends Model {
   async reload(): Promise<this> {
     const ctor = this.constructor as typeof Base;
     const sm = ctor.arelTable.project(arelStar).where(ctor._buildPkWhereNode(this.id));
-    const rows = await ctor.adapter.selectAll(sm.toSql(), "Reload");
+    const result = await ctor.adapter.selectAll(sm.toSql(), "Reload");
+    const row = result.first();
 
-    if (rows.length === 0) {
+    if (row === undefined) {
       throw new RecordNotFound(
         `${ctor.name} with ${ctor.primaryKey}=${this.id} not found`,
         ctor.name,
@@ -2542,7 +2543,7 @@ export class Base extends Model {
       );
     }
 
-    for (const [key, value] of Object.entries(rows[0])) {
+    for (const [key, value] of Object.entries(row)) {
       this._attributes.set(key, value);
     }
 
