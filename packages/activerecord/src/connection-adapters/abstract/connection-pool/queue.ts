@@ -173,20 +173,21 @@ interface BiasableQueueHost {
  * `with_a_bias_for(thread)` to temporarily bias the queue's condition variable
  * toward a specific thread.
  */
+export function withABiasFor<T>(this: BiasableQueueHost, context: unknown, fn: () => T): T {
+  const previousCond = this._cond;
+  const newCond = new BiasedConditionVariable(undefined, this._cond, context);
+  this._cond = newCond;
+  try {
+    return fn();
+  } finally {
+    this._cond = previousCond;
+    newCond.transferWaitersTo(previousCond);
+  }
+}
+
 export const BiasableQueue = {
   BiasedConditionVariable,
-
-  withABiasFor<T>(this: BiasableQueueHost, context: unknown, fn: () => T): T {
-    const previousCond = this._cond;
-    const newCond = new BiasedConditionVariable(undefined, this._cond, context);
-    this._cond = newCond;
-    try {
-      return fn();
-    } finally {
-      this._cond = previousCond;
-      newCond.transferWaitersTo(previousCond);
-    }
-  },
+  withABiasFor,
 };
 
 /**

@@ -1,5 +1,11 @@
 export { Base } from "./base.js";
 export * as Type from "./type.js";
+
+// Wire ExecutorHooks to lazily resolve Base.connectionHandler at call time,
+// matching Rails' ActiveRecord::Base.connection_handler late binding.
+import { ExecutorHooks } from "./connection-adapters/abstract/connection-pool.js";
+import { Base as _Base } from "./base.js";
+ExecutorHooks.setConnectionHandlerResolver(() => _Base.connectionHandler);
 export { Relation, Range } from "./relation.js";
 export { QueryAttribute } from "./relation/query-attribute.js";
 export { InsertAll, Builder as InsertAllBuilder } from "./insert-all.js";

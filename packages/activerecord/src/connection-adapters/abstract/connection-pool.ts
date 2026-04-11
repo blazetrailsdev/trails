@@ -14,6 +14,9 @@ import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
 import { ConnectionLeasingQueue } from "./connection-pool/queue.js";
 import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
 import type { TransactionManager } from "./transaction.js";
+import { SchemaMigration } from "../../schema-migration.js";
+import { InternalMetadata } from "../../internal-metadata.js";
+import { MigrationContext } from "../../migration.js";
 
 /**
  * A connection that supports transaction management.
@@ -181,15 +184,37 @@ export class LeaseRegistry {
  * Base.connectionHandler which creates a circular dependency at module level.
  * Wired up when ConnectionHandler is complete (PR 6).
  */
-export const ExecutorHooks = {
-  run(): void {
-    // noop — matches Rails
-  },
-
-  complete(): void {
-    // Wired up in PR 6 when ConnectionHandler.eachConnectionPool exists
-  },
+type ConnectionHandlerLike = {
+  eachConnectionPool(role: string | null | undefined, cb: (pool: ConnectionPool) => void): void;
 };
+
+export class ExecutorHooks {
+  private static _getConnectionHandler: (() => ConnectionHandlerLike | null) | null = null;
+
+  static setConnectionHandlerResolver(resolver: () => ConnectionHandlerLike | null): void {
+    ExecutorHooks._getConnectionHandler = resolver;
+  }
+
+  static run(): void {
+    // noop — matches Rails
+  }
+
+  static complete(): void {
+    const handler = ExecutorHooks._getConnectionHandler?.();
+    if (!handler) return;
+    handler.eachConnectionPool(null, (pool) => {
+      const connection = pool.activeConnection;
+      if (connection) {
+        const txn =
+          (connection as any).currentTransaction?.() ??
+          (connection as any).transactionManager?.currentTransaction;
+        if (txn && (txn.closed || !txn.joinable)) {
+          pool.releaseConnection();
+        }
+      }
+    });
+  }
+}
 
 export class ConnectionPool implements ReapablePool {
   readonly poolConfig: PoolConfig;
@@ -259,6 +284,54 @@ export class ConnectionPool implements ReapablePool {
 
   get connectionDescriptor(): ConnectionDescriptor {
     return this.poolConfig.connectionDescriptor;
+  }
+
+  // --- Migration / Schema ---
+
+  private _schemaMigration?: SchemaMigration;
+  private _internalMetadata?: InternalMetadata;
+  private _adapterProxy?: DatabaseAdapter;
+
+  private _getAdapterProxy(): DatabaseAdapter {
+    if (!this._adapterProxy) {
+      const pool = this;
+      this._adapterProxy = new Proxy({} as DatabaseAdapter, {
+        get(_target, prop) {
+          if (prop === "adapterName") return (pool.poolConfig as any).adapterClass ?? "sqlite";
+          return (...args: unknown[]) => {
+            return pool.withConnection((conn) => (conn as any)[prop](...args));
+          };
+        },
+      });
+    }
+    return this._adapterProxy;
+  }
+
+  get migrationsPaths(): string[] {
+    return (this.dbConfig as any).migrationsPaths ?? ["db/migrate"];
+  }
+
+  get schemaMigration(): SchemaMigration {
+    if (!this._schemaMigration) {
+      this._schemaMigration = new SchemaMigration(this._getAdapterProxy());
+    }
+    return this._schemaMigration;
+  }
+
+  get internalMetadata(): InternalMetadata {
+    if (!this._internalMetadata) {
+      this._internalMetadata = new InternalMetadata(this._getAdapterProxy());
+    }
+    return this._internalMetadata;
+  }
+
+  private _migrationContext?: MigrationContext;
+
+  get migrationContext(): MigrationContext {
+    if (!this._migrationContext) {
+      this._migrationContext = new MigrationContext(this._getAdapterProxy());
+    }
+    return this._migrationContext;
   }
 
   // --- Pool state ---

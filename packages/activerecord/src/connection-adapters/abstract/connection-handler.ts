@@ -20,8 +20,13 @@ export { ConnectionDescriptor };
 export type { ConnectionOwner };
 
 export class ConnectionHandler {
-  private _connectionNameToPoolManager = new Map<string, PoolManager>();
-  private _preventWrites = false;
+  private _connectionNameToPoolManager: Map<string, PoolManager>;
+  private _preventWrites: boolean;
+
+  constructor() {
+    this._connectionNameToPoolManager = new Map();
+    this._preventWrites = false;
+  }
 
   get preventWrites(): boolean {
     return this._preventWrites;
