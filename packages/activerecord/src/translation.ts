@@ -11,7 +11,7 @@ import type { Base } from "./base.js";
  *
  * Mirrors: ActiveRecord::Translation#i18n_scope
  */
-export function i18nScope(_modelClass: typeof Base): string {
+export function i18nScope(this: typeof Base): string {
   return "activerecord";
 }
 
@@ -22,15 +22,15 @@ export function i18nScope(_modelClass: typeof Base): string {
  *
  * Mirrors: ActiveRecord::Translation#lookup_ancestors
  */
-export function lookupAncestors(modelClass: typeof Base): Array<typeof Base> {
+export function lookupAncestors(this: typeof Base): Array<typeof Base> {
   const ancestors: Array<typeof Base> = [];
-  let klass: any = modelClass;
+  let klass: any = this;
   while (klass) {
     const parent = Object.getPrototypeOf(klass);
     if (!parent || !("_attributeDefinitions" in parent)) {
       // klass is Base (its parent is Model which doesn't have _attributeDefinitions).
-      // Only include Base if it was the original modelClass.
-      if (klass === modelClass) ancestors.push(klass);
+      // Only include Base if it was the original receiver.
+      if (klass === this) ancestors.push(klass);
       break;
     }
     ancestors.push(klass);
@@ -38,3 +38,11 @@ export function lookupAncestors(modelClass: typeof Base): Array<typeof Base> {
   }
   return ancestors;
 }
+
+/**
+ * Module methods wired onto Base as static methods via `extend()` in base.ts.
+ * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention.
+ */
+export const ClassMethods = {
+  lookupAncestors,
+};

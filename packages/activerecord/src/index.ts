@@ -82,14 +82,13 @@ export {
   findStiClass,
 } from "./inheritance.js";
 // hasSecurePassword requires node:crypto — use subpath: @blazetrails/activerecord/secure-password
-export {
-  incrementCounter,
-  decrementCounter,
-  updateCounters,
-  resetCounters,
-} from "./counter-cache.js";
-export { attrReadonly, readonlyAttributes, readonlyAttribute } from "./readonly-attributes.js";
-export { touch, touchAll } from "./timestamp.js";
+// CounterCache, ReadonlyAttributes, Timestamp, Locking::Pessimistic, and
+// Translation are consumed via the Base mixins — class methods like
+// `User.incrementCounter(...)`, `User.touchAll(...)`, `User.attrReadonly(...)`,
+// and instance methods like `user.touch()`, `user.lockBang()`,
+// `user.withLock(cb)`. They are no longer exported as standalone free
+// functions — their `this:`-typed signatures are only callable on a Base
+// subclass (statics) or a Base instance (instance methods).
 // establishConnection requires node:fs — use subpath: @blazetrails/activerecord/connection-handling
 // signedId requires MessageVerifier (node:crypto) — use subpath: @blazetrails/activerecord/signed-id
 export {
@@ -98,8 +97,6 @@ export {
   lockingEnabled,
   LockingType,
 } from "./locking/optimistic.js";
-export { lockBang, withLock } from "./locking/pessimistic.js";
-export { i18nScope, lookupAncestors } from "./translation.js";
 export {
   columnNames as schemaColumnNames,
   columnsHash as schemaColumnsHash,

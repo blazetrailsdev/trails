@@ -6,8 +6,8 @@ import type { Base } from "./base.js";
  * Mirrors: ActiveRecord::ReadonlyAttributes
  *
  * Usage:
- *   attrReadonly(User, 'email', 'username')
- *   readonlyAttributes(User) // => ['email', 'username']
+ *   User.attrReadonly('email', 'username')
+ *   User.readonlyAttributes // => ['email', 'username']
  */
 
 /**
@@ -16,12 +16,12 @@ import type { Base } from "./base.js";
  *
  * Mirrors: ActiveRecord::ReadonlyAttributes::ClassMethods#attr_readonly
  */
-export function attrReadonly(modelClass: typeof Base, ...attributes: string[]): void {
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_readonlyAttributes")) {
-    (modelClass as any)._readonlyAttributes = new Set((modelClass as any)._readonlyAttributes);
+export function attrReadonly(this: typeof Base, ...attributes: string[]): void {
+  if (!Object.prototype.hasOwnProperty.call(this, "_readonlyAttributes")) {
+    (this as any)._readonlyAttributes = new Set((this as any)._readonlyAttributes);
   }
   for (const attr of attributes) {
-    (modelClass as any)._readonlyAttributes.add(attr);
+    (this as any)._readonlyAttributes.add(attr);
   }
 }
 
@@ -30,17 +30,30 @@ export function attrReadonly(modelClass: typeof Base, ...attributes: string[]): 
  *
  * Mirrors: ActiveRecord::ReadonlyAttributes::ClassMethods#readonly_attributes
  */
-export function readonlyAttributes(modelClass: typeof Base): string[] {
-  return Array.from((modelClass as any)._readonlyAttributes ?? []);
+export function readonlyAttributes(this: typeof Base): string[] {
+  return Array.from((this as any)._readonlyAttributes ?? []);
 }
 
 /**
  * Check if a specific attribute is readonly.
  *
  * Mirrors: ActiveRecord::ReadonlyAttributes::ClassMethods#readonly_attribute?
+ * (The `Q` suffix mirrors Ruby's `?` predicate convention.)
  */
-export function readonlyAttribute(modelClass: typeof Base, attribute: string): boolean {
-  return (
-    ((modelClass as any)._readonlyAttributes as Set<string> | undefined)?.has(attribute) ?? false
-  );
+export function readonlyAttributeQ(this: typeof Base, attribute: string): boolean {
+  return ((this as any)._readonlyAttributes as Set<string> | undefined)?.has(attribute) ?? false;
 }
+
+/**
+ * Module methods wired onto Base as static methods via `extend()` in base.ts.
+ * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention.
+ *
+ * Note: `readonlyAttributes` is exposed on Base as a getter for ergonomic
+ * property access (TS idiom for what Rails exposes as a bare method call),
+ * so it stays as a hand-rolled delegate in base.ts rather than being mixed
+ * in here.
+ */
+export const ClassMethods = {
+  attrReadonly,
+  readonlyAttributeQ,
+};

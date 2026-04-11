@@ -14,15 +14,15 @@ import { ReadOnlyRecord } from "./errors.js";
  *
  * Mirrors: ActiveRecord::Timestamp#touch
  */
-export async function touch(instance: Base, ...names: string[]): Promise<boolean> {
-  if (instance.isReadonly()) {
-    throw new ReadOnlyRecord(`${instance.constructor.name} is marked as readonly`);
+export async function touch(this: Base, ...names: string[]): Promise<boolean> {
+  if (this.isReadonly()) {
+    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
-  if (!instance.isPersisted()) return false;
+  if (!this.isPersisted()) return false;
   const now = new Date();
   const attrs: Record<string, unknown> = {};
 
-  const ctor = instance.constructor as typeof Base;
+  const ctor = this.constructor as typeof Base;
   if (ctor._attributeDefinitions.has("updated_at")) {
     attrs.updated_at = now;
   }
@@ -33,9 +33,9 @@ export async function touch(instance: Base, ...names: string[]): Promise<boolean
 
   if (Object.keys(attrs).length === 0) return false;
 
-  await instance.updateColumns(attrs);
+  await this.updateColumns(attrs);
 
-  await ctor._callbackChain.runAfter("touch", instance);
+  await ctor._callbackChain.runAfter("touch", this);
   return true;
 }
 
@@ -44,8 +44,8 @@ export async function touch(instance: Base, ...names: string[]): Promise<boolean
  *
  * Mirrors: ActiveRecord::Base.touch_all
  */
-export async function touchAll(modelClass: typeof Base, ...names: string[]): Promise<number> {
-  return modelClass.all().touchAll(...names);
+export async function touchAll(this: typeof Base, ...names: string[]): Promise<number> {
+  return this.all().touchAll(...names);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,3 +106,18 @@ export function allTimestampAttributesInModel(this: TimestampHost): string[] {
 export function currentTimeFromProperTimezone(): Date {
   return new Date();
 }
+
+/**
+ * Module methods wired onto Base as static methods via `extend()` in base.ts.
+ * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention.
+ */
+export const ClassMethods = {
+  touchAll,
+};
+
+/**
+ * Instance methods wired onto Base.prototype via `include()` in base.ts.
+ */
+export const InstanceMethods = {
+  touch,
+};
