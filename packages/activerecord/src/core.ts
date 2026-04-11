@@ -4,7 +4,8 @@
  * Mirrors: ActiveRecord::Core
  */
 
-import { Notifications, ParameterFilter } from "@blazetrails/activesupport";
+import { Notifications, ParameterFilter, getAsyncContext } from "@blazetrails/activesupport";
+import type { AsyncContext } from "@blazetrails/activesupport";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 
 /**
@@ -217,19 +218,41 @@ export function isApplicationRecordClass(this: CoreHost): boolean {
 }
 
 // Rails uses ActiveSupport::IsolatedExecutionState for per-fiber/thread
-// storage. This is currently process-global; AsyncLocalStorage isolation
-// is a future improvement.
-type ConnectedToEntry = {
+// storage. We use AsyncLocalStorage for per-context isolation when a
+// store has been established via withIsolatedConnectionState(). Callers
+// outside that wrapper fall back to a process-global stack, so
+// per-request isolation requires wrapping the request handler.
+export type ConnectedToEntry = {
   role?: string;
   shard?: string;
   klasses: Set<any>;
   preventWrites?: boolean;
 };
 
-const _connectedToStack: ConnectedToEntry[] = [];
+const _fallbackStack: ConnectedToEntry[] = [];
+let _stackContext: AsyncContext<ConnectedToEntry[]> | null = null;
+let _stackContextAdapter: ReturnType<typeof getAsyncContext> | null = null;
+
+function getStackContext(): AsyncContext<ConnectedToEntry[]> {
+  const adapter = getAsyncContext();
+  if (!_stackContext || _stackContextAdapter !== adapter) {
+    _stackContextAdapter = adapter;
+    _stackContext = adapter.create<ConnectedToEntry[]>();
+  }
+  return _stackContext;
+}
 
 export function connectedToStack(): ConnectedToEntry[] {
-  return _connectedToStack;
+  return getStackContext().getStore() ?? _fallbackStack;
+}
+
+/**
+ * Run a callback with an isolated connected-to stack.
+ * Nested connectedTo/connectedToMany calls inside will not affect
+ * the outer context's stack.
+ */
+export function withIsolatedConnectionState<T>(fn: () => T): T {
+  return getStackContext().run([], fn);
 }
 
 function klassesInclude(klasses: Set<any>, target: any): boolean {
@@ -246,8 +269,9 @@ function matchesStack(entry: ConnectedToEntry, connClass: CoreHost): boolean {
 
 export function currentRole(this: CoreHost): string {
   const connClass = connectionClassForSelf.call(this);
-  for (let i = _connectedToStack.length - 1; i >= 0; i--) {
-    const entry = _connectedToStack[i];
+  const stack = connectedToStack();
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
     if (entry.role && matchesStack(entry, connClass)) {
       return entry.role;
     }
@@ -257,8 +281,9 @@ export function currentRole(this: CoreHost): string {
 
 export function currentShard(this: CoreHost): string {
   const connClass = connectionClassForSelf.call(this);
-  for (let i = _connectedToStack.length - 1; i >= 0; i--) {
-    const entry = _connectedToStack[i];
+  const stack = connectedToStack();
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
     if (entry.shard && matchesStack(entry, connClass)) {
       return entry.shard;
     }
@@ -268,8 +293,9 @@ export function currentShard(this: CoreHost): string {
 
 export function currentPreventingWrites(this: CoreHost): boolean {
   const connClass = connectionClassForSelf.call(this);
-  for (let i = _connectedToStack.length - 1; i >= 0; i--) {
-    const entry = _connectedToStack[i];
+  const stack = connectedToStack();
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
     if (entry.preventWrites !== undefined && matchesStack(entry, connClass)) {
       return entry.preventWrites;
     }
@@ -278,8 +304,9 @@ export function currentPreventingWrites(this: CoreHost): boolean {
 }
 
 export function isPreventingWrites(this: CoreHost, className?: string): boolean {
-  for (let i = _connectedToStack.length - 1; i >= 0; i--) {
-    const entry = _connectedToStack[i];
+  const stack = connectedToStack();
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
     if (entry.preventWrites === undefined) continue;
     if (klassesInclude(entry.klasses, "Base")) return entry.preventWrites;
     if (className) {

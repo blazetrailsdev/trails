@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
-import { connectedToStack, currentRole, currentShard, currentPreventingWrites } from "./core.js";
+import {
+  connectedToStack,
+  currentRole,
+  currentShard,
+  currentPreventingWrites,
+  withIsolatedConnectionState,
+} from "./core.js";
 
 function setupConnection() {
   const config = new HashConfig("test", "primary", {
@@ -190,5 +196,94 @@ describe("ConnectionHandlingTest", () => {
     expect(() => Base.connectionPool()).toThrow(/No database connection/);
     // Re-establish for other tests
     setupConnection();
+  });
+
+  it("connected_to stack is isolated per async context", async () => {
+    let innerRoleBeforeAwait: string | undefined;
+    let innerRoleAfterAwait: string | undefined;
+
+    await withIsolatedConnectionState(async () => {
+      await Base.connectedTo({ role: "reading" }, async () => {
+        innerRoleBeforeAwait = currentRole.call(Base);
+        await Promise.resolve();
+        innerRoleAfterAwait = currentRole.call(Base);
+      });
+    });
+
+    const outerRole = currentRole.call(Base);
+
+    expect(innerRoleBeforeAwait).toBe("reading");
+    expect(innerRoleAfterAwait).toBe("reading");
+    expect(outerRole).toBe("writing");
+    expect(connectedToStack()).toHaveLength(0);
+  });
+
+  it("prohibit_shard_swapping is isolated per async context", async () => {
+    let resolveOverlap!: () => void;
+    const overlap = new Promise<void>((resolve) => {
+      resolveOverlap = resolve;
+    });
+    let prohibitedBeforeAwait: boolean | undefined;
+    let prohibitedAfterAwait: boolean | undefined;
+    let concurrentProhibited: boolean | undefined;
+
+    const prohibitedTask = withIsolatedConnectionState(async () => {
+      await Base.prohibitShardSwapping(async () => {
+        prohibitedBeforeAwait = Base.isShardSwappingProhibited();
+        await Promise.resolve();
+        prohibitedAfterAwait = Base.isShardSwappingProhibited();
+        await overlap;
+      });
+    });
+
+    const concurrentTask = withIsolatedConnectionState(async () => {
+      await Promise.resolve();
+      concurrentProhibited = Base.isShardSwappingProhibited();
+      resolveOverlap();
+    });
+
+    await Promise.all([prohibitedTask, concurrentTask]);
+
+    expect(prohibitedBeforeAwait).toBe(true);
+    expect(prohibitedAfterAwait).toBe(true);
+    expect(concurrentProhibited).toBe(false);
+    expect(Base.isShardSwappingProhibited()).toBe(false);
+  });
+
+  it("concurrent async contexts do not interfere", async () => {
+    let resolveTask1!: () => void;
+    const task1Gate = new Promise<void>((r) => {
+      resolveTask1 = r;
+    });
+    let resolveTask2!: () => void;
+    const task2Gate = new Promise<void>((r) => {
+      resolveTask2 = r;
+    });
+    const results: string[] = [];
+
+    const task1 = withIsolatedConnectionState(async () => {
+      await Base.connectedTo({ role: "reading" }, async () => {
+        await Promise.resolve();
+        results.push(`task1: ${currentRole.call(Base)}`);
+        resolveTask2();
+        await task1Gate;
+      });
+    });
+
+    const task2 = withIsolatedConnectionState(async () => {
+      await task2Gate;
+      await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
+        await Promise.resolve();
+        results.push(`task2: ${currentRole.call(Base)}`);
+        resolveTask1();
+      });
+    });
+
+    await Promise.all([task1, task2]);
+
+    expect(results).toContain("task1: reading");
+    expect(results).toContain("task2: writing");
+    expect(currentRole.call(Base)).toBe("writing");
+    expect(connectedToStack()).toHaveLength(0);
   });
 });

@@ -16,6 +16,8 @@ import {
   currentRole as coreCurrentRole,
   currentShard as coreCurrentShard,
 } from "./core.js";
+import { getAsyncContext } from "@blazetrails/activesupport";
+import type { AsyncContext } from "@blazetrails/activesupport";
 
 /**
  * Connection establishment and management for ActiveRecord models.
@@ -23,7 +25,17 @@ import {
  * Mirrors: ActiveRecord::ConnectionHandling
  */
 
-let _shardSwappingProhibited = false;
+let _prohibitContext: AsyncContext<boolean> | null = null;
+let _prohibitContextAdapter: ReturnType<typeof getAsyncContext> | null = null;
+
+function getProhibitContext(): AsyncContext<boolean> {
+  const adapter = getAsyncContext();
+  if (!_prohibitContext || _prohibitContextAdapter !== adapter) {
+    _prohibitContextAdapter = adapter;
+    _prohibitContext = adapter.create<boolean>();
+  }
+  return _prohibitContext;
+}
 
 // --- ConnectionHandling module methods (mixed into Base as static methods) ---
 
@@ -174,24 +186,11 @@ export function whilePreventingWrites<T>(this: typeof Base, fn: () => T, enabled
 }
 
 export function prohibitShardSwapping<T>(fn: () => T, enabled = true): T {
-  const prev = _shardSwappingProhibited;
-  _shardSwappingProhibited = enabled;
-
-  let result: T;
-  try {
-    result = fn();
-  } catch (error) {
-    _shardSwappingProhibited = prev;
-    throw error;
-  }
-
-  return withCleanup(result, () => {
-    _shardSwappingProhibited = prev;
-  });
+  return getProhibitContext().run(enabled, fn);
 }
 
 export function isShardSwappingProhibited(): boolean {
-  return _shardSwappingProhibited;
+  return getProhibitContext().getStore() ?? false;
 }
 
 export function clearQueryCachesForCurrentThread(this: typeof Base): void {
@@ -355,7 +354,7 @@ function appendToConnectedToStack(entry: {
   preventWrites?: boolean;
   klasses: Set<any>;
 }): void {
-  if (_shardSwappingProhibited && entry.shard) {
+  if (isShardSwappingProhibited() && entry.shard) {
     // Check if the shard would actually change
     for (const klass of entry.klasses) {
       const current = coreCurrentShard.call(klass);
