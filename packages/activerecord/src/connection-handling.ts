@@ -616,3 +616,38 @@ export function adapterNameFromUrl(url: string): string {
       `or pass { adapter: "postgresql", url: "..." }`,
   );
 }
+
+/**
+ * Module methods wired onto Base as static methods via `extend()` in base.ts.
+ *
+ * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention: a Concern
+ * module exposes a `ClassMethods` object whose members become class methods
+ * on any class that includes the Concern. Grouping them here keeps the
+ * mixin surface colocated with the implementations, so adding a new class
+ * method only requires touching this file — `base.ts` wires the whole
+ * object in one line.
+ */
+export const ClassMethods = {
+  connectsTo,
+  connectedTo,
+  connectedToMany,
+  connectedToAllShards,
+  connectingTo,
+  connectedToQ,
+  whilePreventingWrites,
+  prohibitShardSwapping,
+  isShardSwappingProhibited,
+  clearQueryCachesForCurrentThread,
+  leaseConnection,
+  releaseConnection,
+  withConnection,
+  connectionDbConfig,
+  connectionPool,
+  retrieveConnection,
+  isConnectedQ,
+  removeConnection,
+  schemaCache,
+  clearCacheBang,
+  shardKeys,
+  isSharded,
+};

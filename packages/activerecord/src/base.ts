@@ -61,6 +61,7 @@ import * as LockingPessimistic from "./locking/pessimistic.js";
 import * as Translation from "./translation.js";
 import { sanitizeSqlArray, sanitizeSqlLike } from "./sanitization.js";
 import * as Querying from "./querying.js";
+import { include, extend } from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
   attributePresent as _attributePresent,
@@ -1715,10 +1716,11 @@ export class Base extends Model {
     return record;
   }
 
-  static findBySql = Querying.findBySql;
-  static asyncFindBySql = Querying.asyncFindBySql;
-  static countBySql = Querying.countBySql;
-  static asyncCountBySql = Querying.asyncCountBySql;
+  // --- Querying mixin (static methods, wired via extend() after class) ---
+  declare static findBySql: typeof Querying.findBySql;
+  declare static asyncFindBySql: typeof Querying.asyncFindBySql;
+  declare static countBySql: typeof Querying.countBySql;
+  declare static asyncCountBySql: typeof Querying.asyncCountBySql;
 
   /**
    * Increment counter columns for a record by primary key.
@@ -3089,51 +3091,23 @@ export class Base extends Model {
 }
 
 // ---------------------------------------------------------------------------
-// Mixin: attach extracted module functions directly to Base.prototype.
-// This is the TS equivalent of Ruby's `include Module` — the real
-// implementation lives in the module file, Base just wires it up.
-// Uses defineProperty to match class method behavior (non-enumerable).
+// Ruby-style mixin wiring — one `extend` per module, mirroring Rails:
+//
+//   class Base
+//     extend ConnectionHandling  # via ClassMethods in connection-handling.ts
+//     extend Querying
+//     include Core, Integration, AttributeMethods, PrimaryKey
+//   end
+//
+// Per-method types chain from the source modules via `declare static` lines
+// in the class body, so `Base.findBySql` and `Base.connectsTo` carry the
+// exact generics, `this` parameter, and return type of their implementations.
 // ---------------------------------------------------------------------------
 
-function mixin(target: object, methods: Record<string, Function>): void {
-  for (const [name, fn] of Object.entries(methods)) {
-    Object.defineProperty(target, name, {
-      value: fn,
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    });
-  }
-}
+extend(Base, ConnectionHandling.ClassMethods);
+extend(Base, Querying);
 
-// ConnectionHandling: extend Base with static methods (non-enumerable, matching mixin pattern)
-import { extend } from "@blazetrails/activesupport";
-extend(Base, {
-  connectsTo: ConnectionHandling.connectsTo,
-  connectedTo: ConnectionHandling.connectedTo,
-  connectedToMany: ConnectionHandling.connectedToMany,
-  connectedToAllShards: ConnectionHandling.connectedToAllShards,
-  connectingTo: ConnectionHandling.connectingTo,
-  connectedToQ: ConnectionHandling.connectedToQ,
-  whilePreventingWrites: ConnectionHandling.whilePreventingWrites,
-  prohibitShardSwapping: ConnectionHandling.prohibitShardSwapping,
-  isShardSwappingProhibited: ConnectionHandling.isShardSwappingProhibited,
-  clearQueryCachesForCurrentThread: ConnectionHandling.clearQueryCachesForCurrentThread,
-  leaseConnection: ConnectionHandling.leaseConnection,
-  releaseConnection: ConnectionHandling.releaseConnection,
-  withConnection: ConnectionHandling.withConnection,
-  connectionPool: ConnectionHandling.connectionPool,
-  retrieveConnection: ConnectionHandling.retrieveConnection,
-  connectionDbConfig: ConnectionHandling.connectionDbConfig,
-  isConnectedQ: ConnectionHandling.isConnectedQ,
-  removeConnection: ConnectionHandling.removeConnection,
-  schemaCache: ConnectionHandling.schemaCache,
-  clearCacheBang: ConnectionHandling.clearCacheBang,
-  shardKeys: ConnectionHandling.shardKeys,
-  isSharded: ConnectionHandling.isSharded,
-});
-
-mixin(Base.prototype, {
+include(Base, {
   // Core
   inspect: _inspect,
   attributeForInspect: _attributeForInspect,
