@@ -34,7 +34,7 @@ export class TableMetadata {
 
   hasColumn(columnName: string): boolean {
     if (!this._klass) return false;
-    const hash = columnsHash(this._klass);
+    const hash = columnsHash.call(this._klass);
     return columnName in hash;
   }
 

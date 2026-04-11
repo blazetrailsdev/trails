@@ -24,14 +24,14 @@ import { detectAdapterName } from "./adapter-name.js";
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#table_name
  */
-export function resolveTableName(modelClass: typeof Base): string {
-  if ((modelClass as any)._tableName != null) return (modelClass as any)._tableName;
-  if (isStiSubclass(modelClass)) {
-    return resolveTableName(getStiBase(modelClass));
+export function resolveTableName(this: typeof Base): string {
+  if ((this as any)._tableName != null) return (this as any)._tableName;
+  if (isStiSubclass(this)) {
+    return resolveTableName.call(getStiBase(this));
   }
-  const prefix = (modelClass as any)._tableNamePrefix ?? "";
-  const suffix = (modelClass as any)._tableNameSuffix ?? "";
-  const inferred = pluralize(underscore(modelClass.name));
+  const prefix = (this as any)._tableNamePrefix ?? "";
+  const suffix = (this as any)._tableNameSuffix ?? "";
+  const inferred = pluralize(underscore(this.name));
   return `${prefix}${inferred}${suffix}`;
 }
 
@@ -44,9 +44,9 @@ export function resolveTableName(modelClass: typeof Base): string {
  *
  * Mirrors: used throughout ActiveRecord persistence internals
  */
-export function buildPkWhere(modelClass: typeof Base, idValue: unknown): string {
-  const pk = modelClass.primaryKey;
-  const adapter = detectAdapterName(modelClass.adapter);
+export function buildPkWhere(this: typeof Base, idValue: unknown): string {
+  const pk = this.primaryKey;
+  const adapter = detectAdapterName(this.adapter);
   if (Array.isArray(pk)) {
     if (!Array.isArray(idValue) || idValue.length !== pk.length) return "1=0";
     const conditions: string[] = [];
@@ -67,11 +67,11 @@ export function buildPkWhere(modelClass: typeof Base, idValue: unknown): string 
  * Mirrors: used with Arel managers for type-safe SQL generation
  */
 export function buildPkWhereNode(
-  modelClass: typeof Base,
+  this: typeof Base,
   idValue: unknown,
 ): InstanceType<typeof Nodes.Node> {
-  const table = modelClass.arelTable;
-  const pk = modelClass.primaryKey;
+  const table = this.arelTable;
+  const pk = this.primaryKey;
   if (Array.isArray(pk)) {
     if (!Array.isArray(idValue) || idValue.length !== pk.length) return arelSql("1=0");
     const values = idValue;
@@ -98,9 +98,9 @@ export function buildPkWhereNode(
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#column_names
  */
-export function columnNames(modelClass: typeof Base): string[] {
-  const ignored = new Set(modelClass.ignoredColumns ?? []);
-  return Array.from(modelClass._attributeDefinitions.keys()).filter((name) => !ignored.has(name));
+export function columnNames(this: typeof Base): string[] {
+  const ignored = new Set(this.ignoredColumns ?? []);
+  return Array.from(this._attributeDefinitions.keys()).filter((name) => !ignored.has(name));
 }
 
 /**
@@ -108,8 +108,8 @@ export function columnNames(modelClass: typeof Base): string[] {
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#has_attribute?
  */
-export function hasAttributeDefinition(modelClass: typeof Base, name: string): boolean {
-  return modelClass._attributeDefinitions.has(name);
+export function hasAttributeDefinition(this: typeof Base, name: string): boolean {
+  return this._attributeDefinitions.has(name);
 }
 
 /**
@@ -118,13 +118,13 @@ export function hasAttributeDefinition(modelClass: typeof Base, name: string): b
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#columns_hash
  */
 export function columnsHash(
-  modelClass: typeof Base,
+  this: typeof Base,
 ): Record<string, { name: string; type: string; default: unknown }> {
-  if (modelClass.abstractClass) {
-    throw new Error(`Cannot call columnsHash on abstract class ${modelClass.name}`);
+  if (this.abstractClass) {
+    throw new Error(`Cannot call columnsHash on abstract class ${this.name}`);
   }
   const result: Record<string, { name: string; type: string; default: unknown }> = {};
-  for (const [name, def] of modelClass._attributeDefinitions) {
+  for (const [name, def] of this._attributeDefinitions) {
     result[name] = { name, type: def.type.name, default: def.defaultValue ?? null };
   }
   return result;
@@ -135,9 +135,9 @@ export function columnsHash(
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#content_columns
  */
-export function contentColumns(modelClass: typeof Base): string[] {
-  const pk = modelClass.primaryKey;
-  return columnNames(modelClass).filter((col) => {
+export function contentColumns(this: typeof Base): string[] {
+  const pk = this.primaryKey;
+  return columnNames.call(this).filter((col) => {
     if (col === pk) return false;
     if (col.endsWith("_id")) return false;
     if (col === "created_at" || col === "updated_at") return false;
@@ -234,19 +234,15 @@ export function sqlTypeFor(typeName: string, adapterName?: string): string {
  *
  * Mirrors: used by test infrastructure, not a direct Rails API
  */
-export async function createTable(modelClass: typeof Base): Promise<void> {
-  const table = resolveTableName(modelClass);
-  const pks = Array.isArray(modelClass.primaryKey)
-    ? modelClass.primaryKey
-    : [modelClass.primaryKey];
-  const adapterName = detectAdapterName(modelClass.adapter);
+export async function createTable(this: typeof Base): Promise<void> {
+  const table = resolveTableName.call(this);
+  const pks = Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey];
+  const adapterName = detectAdapterName(this.adapter);
   const isMysql = adapterName === "mysql";
   const isPg = adapterName === "postgres";
   const pkSet = new Set(pks);
 
-  await modelClass.adapter.executeMutation(
-    `DROP TABLE IF EXISTS ${quoteTableName(table, adapterName)}`,
-  );
+  await this.adapter.executeMutation(`DROP TABLE IF EXISTS ${quoteTableName(table, adapterName)}`);
 
   const colDefs: string[] = [];
   if (pks.length === 1) {
@@ -259,13 +255,13 @@ export async function createTable(modelClass: typeof Base): Promise<void> {
     colDefs.push(pkDef);
   } else {
     for (const pk of pks) {
-      const pkDef = modelClass._attributeDefinitions.get(pk);
+      const pkDef = this._attributeDefinitions.get(pk);
       const pkType = sqlTypeFor(pkDef?.type?.name || "integer", adapterName);
       colDefs.push(`${quoteIdentifier(pk, adapterName)} ${pkType} NOT NULL`);
     }
   }
 
-  for (const [name, def] of modelClass._attributeDefinitions) {
+  for (const [name, def] of this._attributeDefinitions) {
     if (pkSet.has(name)) continue;
     const sqlType = sqlTypeFor(def.type?.name || "string", adapterName);
     colDefs.push(`${quoteIdentifier(name, adapterName)} ${sqlType}`);
@@ -275,7 +271,7 @@ export async function createTable(modelClass: typeof Base): Promise<void> {
     colDefs.push(`PRIMARY KEY (${pks.map((pk) => quoteIdentifier(pk, adapterName)).join(", ")})`);
   }
 
-  await modelClass.adapter.executeMutation(
+  await this.adapter.executeMutation(
     `CREATE TABLE IF NOT EXISTS ${quoteTableName(table, adapterName)} (${colDefs.join(", ")})`,
   );
 }
@@ -329,7 +325,7 @@ export function resetTableName(this: SchemaHost): string {
       return this._tableName!;
     }
   }
-  const name = resolveTableName(this as any);
+  const name = resolveTableName.call(this as any);
   this._tableName = name;
   return name;
 }
@@ -455,3 +451,44 @@ function getColumnsHash(host: SchemaHost): Record<string, any> {
   if (typeof ch === "function") return ch.call(host) ?? {};
   return {};
 }
+
+/**
+ * Module methods wired onto Base as static methods via `extend()` in base.ts.
+ *
+ * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention: a Concern
+ * module exposes a `ClassMethods` object whose members become class methods
+ * on any class that includes the Concern. Grouping them here keeps the
+ * mixin surface colocated with the implementations.
+ *
+ * Not included:
+ * - `resolveTableName`, `buildPkWhere`, `buildPkWhereNode` — internal helpers
+ *   that back the `tableName` getter and the underscore-prefixed
+ *   `_buildPkWhere*` accessors. They use the `this:` convention for internal
+ *   consistency but aren't Rails-style class methods.
+ * - `realInheritanceColumn` — internal setter alias; `Base` already exposes
+ *   `inheritanceColumn` as a getter/setter.
+ * - `loadSchema` — private lifecycle hook in Rails; called automatically
+ *   rather than by user code.
+ */
+export const ClassMethods = {
+  // Mirrors: ActiveRecord::ModelSchema::ClassMethods
+  columnNames,
+  hasAttributeDefinition,
+  columnsHash,
+  contentColumns,
+  createTable,
+  deriveJoinTableName,
+  quotedTableName,
+  resetTableName,
+  fullTableNamePrefix,
+  fullTableNameSuffix,
+  resetSequenceName,
+  isPrefetchPrimaryKey,
+  nextSequenceValue,
+  attributesBuilder,
+  columns,
+  yamlEncoder,
+  columnForAttribute,
+  symbolColumnToString,
+  resetColumnInformation,
+};

@@ -97,12 +97,11 @@ export {
   lockingEnabled,
   LockingType,
 } from "./locking/optimistic.js";
-export {
-  columnNames as schemaColumnNames,
-  columnsHash as schemaColumnsHash,
-  contentColumns as schemaContentColumns,
-  createTable as schemaCreateTable,
-} from "./model-schema.js";
+// ModelSchema is consumed via the Base mixins — `User.columnNames()`,
+// `User.columnsHash()`, `User.contentColumns()`, `User.createTable()`, etc.
+// (mixed in via activesupport `extend()`). The underlying functions are
+// no longer exported as standalone free functions — their `this:`-typed
+// signatures are only callable on a Base subclass.
 export {
   store,
   storeAccessor,

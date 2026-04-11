@@ -282,7 +282,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.table_name
    */
   static get tableName(): string {
-    return ModelSchema.resolveTableName(this);
+    return ModelSchema.resolveTableName.call(this);
   }
 
   static set tableName(name: string) {
@@ -332,11 +332,11 @@ export class Base extends Model {
    * Quote a single value for use in SQL.
    */
   static _buildPkWhere(idValue: unknown): string {
-    return ModelSchema.buildPkWhere(this, idValue);
+    return ModelSchema.buildPkWhere.call(this, idValue);
   }
 
   static _buildPkWhereNode(idValue: unknown): InstanceType<typeof Nodes.Node> {
-    return ModelSchema.buildPkWhereNode(this, idValue);
+    return ModelSchema.buildPkWhereNode.call(this, idValue);
   }
 
   /**
@@ -370,10 +370,9 @@ export class Base extends Model {
    * between tests.
    *
    * This is a test/development helper — in production, use migrations.
+   * Wired via extend() after class.
    */
-  static async createTable(): Promise<void> {
-    return ModelSchema.createTable(this);
-  }
+  declare static createTable: typeof ModelSchema.createTable;
 
   /**
    * Set the database adapter for this model class.
@@ -493,26 +492,26 @@ export class Base extends Model {
   declare static shardKeys: typeof ConnectionHandling.shardKeys;
   declare static isSharded: typeof ConnectionHandling.isSharded;
 
-  /**
-   * Return the list of column names (attribute names).
-   *
-   * Mirrors: ActiveRecord::Base.column_names
-   */
-  static columnNames(): string[] {
-    return ModelSchema.columnNames(this);
-  }
-
-  static hasAttributeDefinition(name: string): boolean {
-    return ModelSchema.hasAttributeDefinition(this, name);
-  }
-
-  static columnsHash(): Record<string, { name: string; type: string; default: unknown }> {
-    return ModelSchema.columnsHash(this);
-  }
-
-  static contentColumns(): string[] {
-    return ModelSchema.contentColumns(this);
-  }
+  // --- ModelSchema mixin (wired via extend() after class) ---
+  // Mirrors: ActiveRecord::ModelSchema::ClassMethods
+  declare static columnNames: typeof ModelSchema.columnNames;
+  declare static hasAttributeDefinition: typeof ModelSchema.hasAttributeDefinition;
+  declare static columnsHash: typeof ModelSchema.columnsHash;
+  declare static contentColumns: typeof ModelSchema.contentColumns;
+  declare static deriveJoinTableName: typeof ModelSchema.deriveJoinTableName;
+  declare static quotedTableName: typeof ModelSchema.quotedTableName;
+  declare static resetTableName: typeof ModelSchema.resetTableName;
+  declare static fullTableNamePrefix: typeof ModelSchema.fullTableNamePrefix;
+  declare static fullTableNameSuffix: typeof ModelSchema.fullTableNameSuffix;
+  declare static resetSequenceName: typeof ModelSchema.resetSequenceName;
+  declare static isPrefetchPrimaryKey: typeof ModelSchema.isPrefetchPrimaryKey;
+  declare static nextSequenceValue: typeof ModelSchema.nextSequenceValue;
+  declare static attributesBuilder: typeof ModelSchema.attributesBuilder;
+  declare static columns: typeof ModelSchema.columns;
+  declare static yamlEncoder: typeof ModelSchema.yamlEncoder;
+  declare static columnForAttribute: typeof ModelSchema.columnForAttribute;
+  declare static symbolColumnToString: typeof ModelSchema.symbolColumnToString;
+  declare static resetColumnInformation: typeof ModelSchema.resetColumnInformation;
 
   /**
    * Return the STI inheritance column name, if STI is enabled.
@@ -979,7 +978,7 @@ export class Base extends Model {
             [],
           );
         }
-        const whereNodes = tuples.map((tuple) => ModelSchema.buildPkWhereNode(this, tuple));
+        const whereNodes = tuples.map((tuple) => ModelSchema.buildPkWhereNode.call(this, tuple));
         const orCondition = whereNodes.reduce((left, right) => new Nodes.Or(left, right));
         const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();
         if (records.length !== tuples.length) {
@@ -3057,6 +3056,7 @@ extend(Base, ReadonlyAttributes.ClassMethods);
 extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
+extend(Base, ModelSchema.ClassMethods);
 
 include(Base, {
   // Core
