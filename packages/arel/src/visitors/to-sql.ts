@@ -157,6 +157,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.SqlLiteral) return this.visitSqlLiteral(node);
     if (node instanceof Nodes.Quoted) return this.visitQuoted(node);
     if (node instanceof Nodes.Casted) return this.visitCasted(node);
+    if (node instanceof Nodes.UnqualifiedColumn) return this.visitUnqualifiedColumn(node);
     if (node instanceof Nodes.Attribute) return this.visitAttribute(node);
     if (node instanceof Nodes.ValuesList) return this.visitValuesList(node);
     if (node instanceof Table) return this.visitTable(node);
@@ -1187,6 +1188,17 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   private visitAttribute(node: Nodes.Attribute): SQLString {
     this.collector.append(`"${node.relation.tableAlias || node.relation.name}"."${node.name}"`);
+    return this.collector;
+  }
+
+  private visitUnqualifiedColumn(node: Nodes.UnqualifiedColumn): SQLString {
+    // Mirrors Arel's visit_Arel_Nodes_UnqualifiedColumn — strips the table
+    // qualifier so `SET col = col + 1` works in UPDATE statements.
+    const attr = node.attribute as Partial<Nodes.Attribute> | undefined;
+    if (!attr || typeof attr.name !== "string") {
+      throw new UnsupportedVisitError("UnqualifiedColumn must wrap an Attribute node with a name");
+    }
+    this.collector.append(`"${attr.name}"`);
     return this.collector;
   }
 

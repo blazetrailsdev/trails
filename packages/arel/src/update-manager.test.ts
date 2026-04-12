@@ -37,6 +37,43 @@ describe("UpdateManagerTest", () => {
     });
   });
 
+  describe("UnqualifiedColumn", () => {
+    it("renders without a table qualifier on the RHS of an UPDATE SET", () => {
+      // Mirrors Rails' ActiveRecord::CounterCache pattern:
+      //   SET "counter" = COALESCE("counter", 0) + 1
+      // without a `"posts"."counter"` table prefix on the RHS, which some
+      // adapters reject inside UPDATE statements.
+      const posts = new Table("posts");
+      const counter = posts.get("counter");
+      const unqual = new Nodes.UnqualifiedColumn(counter);
+      const coalesced = new Nodes.NamedFunction("COALESCE", [unqual, new Nodes.Quoted(0)]);
+      const expr = new Nodes.Addition(coalesced, new Nodes.Quoted(1));
+
+      const um = new UpdateManager();
+      um.table(posts);
+      um.set([[counter, expr]]);
+      const sql = um.toSql();
+
+      expect(sql).toContain(`SET "counter" = COALESCE("counter", 0) + 1`);
+      expect(sql).not.toContain(`"posts"."counter", 0`);
+    });
+
+    it("supports Subtraction for negative counter deltas", () => {
+      const posts = new Table("posts");
+      const counter = posts.get("counter");
+      const unqual = new Nodes.UnqualifiedColumn(counter);
+      const coalesced = new Nodes.NamedFunction("COALESCE", [unqual, new Nodes.Quoted(0)]);
+      const expr = new Nodes.Subtraction(coalesced, new Nodes.Quoted(3));
+
+      const um = new UpdateManager();
+      um.table(posts);
+      um.set([[counter, expr]]);
+      const sql = um.toSql();
+
+      expect(sql).toContain(`SET "counter" = COALESCE("counter", 0) - 3`);
+    });
+  });
+
   describe("set", () => {
     it("updates with null", () => {
       const mgr = new UpdateManager();
