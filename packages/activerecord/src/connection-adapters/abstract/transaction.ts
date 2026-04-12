@@ -939,6 +939,7 @@ export class TransactionManager {
 
   async rollbackTransaction(transaction?: Transaction): Promise<void> {
     const txn = transaction || this._stack[this._stack.length - 1];
+
     if (!(txn instanceof Transaction)) return;
 
     try {

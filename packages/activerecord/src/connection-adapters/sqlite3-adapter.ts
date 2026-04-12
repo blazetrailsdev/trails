@@ -46,6 +46,9 @@ export class SQLite3Adapter
   }
 
   private db: Database.Database;
+  override get active(): boolean {
+    return this.db?.open ?? false;
+  }
   private _inTransaction = false;
   private _savepointCounter = 0;
   private _readonly: boolean;
@@ -84,6 +87,8 @@ export class SQLite3Adapter
    * Execute a SELECT query and return rows.
    */
   async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+    await this.materializeTransactions();
+
     try {
       const stmt = this.db.prepare(sql);
       return stmt.all(...binds) as Record<string, unknown>[];
@@ -126,12 +131,14 @@ export class SQLite3Adapter
    * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
    */
   async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
+    await this.materializeTransactions();
     if (this._preventWrites) {
       throw new ReadOnlyError("Write query attempted while preventing writes");
     }
     try {
       const stmt = this.db.prepare(sql);
       const result = stmt.run(...binds);
+      this.dirtyCurrentTransaction();
 
       // For INSERT, return the last inserted rowid
       if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
@@ -148,6 +155,17 @@ export class SQLite3Adapter
   /**
    * Begin a transaction.
    */
+  async beginDeferredTransaction(): Promise<void> {
+    return this.beginDbTransaction();
+  }
+
+  async beginDbTransaction(): Promise<void> {
+    if (!this._inTransaction) {
+      this.db.exec("BEGIN");
+      this._inTransaction = true;
+    }
+  }
+
   async beginTransaction(): Promise<void> {
     this.db.exec("BEGIN");
     this._inTransaction = true;
@@ -156,17 +174,22 @@ export class SQLite3Adapter
   /**
    * Commit the current transaction.
    */
-  async commit(): Promise<void> {
+  async commitDbTransaction(): Promise<void> {
     this.db.exec("COMMIT");
     this._inTransaction = false;
   }
 
-  /**
-   * Rollback the current transaction.
-   */
-  async rollback(): Promise<void> {
+  async commit(): Promise<void> {
+    return this.commitDbTransaction();
+  }
+
+  async rollbackDbTransaction(): Promise<void> {
     this.db.exec("ROLLBACK");
     this._inTransaction = false;
+  }
+
+  async rollback(): Promise<void> {
+    return this.rollbackDbTransaction();
   }
 
   /**

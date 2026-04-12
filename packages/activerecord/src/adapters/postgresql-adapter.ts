@@ -144,6 +144,14 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
     this._inTransaction = true;
   }
 
+  async beginDbTransaction(): Promise<void> {
+    return this.beginTransaction();
+  }
+
+  async beginDeferredTransaction(): Promise<void> {
+    return this.beginTransaction();
+  }
+
   /**
    * Commit the current transaction and release the client.
    */
@@ -155,6 +163,10 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
     this._inTransaction = false;
   }
 
+  async commitDbTransaction(): Promise<void> {
+    return this.commit();
+  }
+
   /**
    * Rollback the current transaction and release the client.
    */
@@ -164,6 +176,10 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
     this._client.release();
     this._client = null;
     this._inTransaction = false;
+  }
+
+  async rollbackDbTransaction(): Promise<void> {
+    return this.rollback();
   }
 
   /**

@@ -126,6 +126,14 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
     this._inTransaction = true;
   }
 
+  async beginDbTransaction(): Promise<void> {
+    return this.beginTransaction();
+  }
+
+  async beginDeferredTransaction(): Promise<void> {
+    return this.beginTransaction();
+  }
+
   /**
    * Commit the current transaction and release the connection.
    */
@@ -137,6 +145,10 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
     this._inTransaction = false;
   }
 
+  async commitDbTransaction(): Promise<void> {
+    return this.commit();
+  }
+
   /**
    * Rollback the current transaction and release the connection.
    */
@@ -146,6 +158,10 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
     this._conn.release();
     this._conn = null;
     this._inTransaction = false;
+  }
+
+  async rollbackDbTransaction(): Promise<void> {
+    return this.rollback();
   }
 
   /**

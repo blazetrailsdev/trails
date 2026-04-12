@@ -395,16 +395,16 @@ export class AbstractAdapter {
     return this._transactionManager.materializeTransactions();
   }
 
+  dirtyCurrentTransaction(): void {
+    this._transactionManager.dirtyCurrentTransaction();
+  }
+
   async disableLazyTransactionsBang(): Promise<void> {
     return this._transactionManager.disableLazyTransactionsBang();
   }
 
   enableLazyTransactionsBang(): void {
     this._transactionManager.enableLazyTransactionsBang();
-  }
-
-  dirtyCurrentTransaction(): void {
-    this._transactionManager.dirtyCurrentTransaction();
   }
 
   async withinNewTransaction<T>(

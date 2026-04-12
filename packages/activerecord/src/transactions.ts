@@ -5,6 +5,7 @@ import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
 import { Rollback, TransactionIsolationError } from "./errors.js";
 export { Rollback };
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
+import { transaction as dbTransaction } from "./connection-adapters/abstract/database-statements.js";
 
 type TransactionAction = "create" | "update" | "destroy";
 
@@ -22,8 +23,8 @@ function getTransactionStorage(): AsyncContext<Transaction | null> {
   return _transactionStorage;
 }
 
-// Per-adapter mutex: serializes beginTransaction so concurrent callers wait
-// for the first BEGIN to complete before checking nesting state.
+// Per-adapter mutex: serializes outermost transactions for the fallback path.
+// Matches Rails where each thread gets its own connection.
 const _adapterLocks = new WeakMap<object, Promise<void>>();
 
 async function acquireAdapterLock(adapter: object): Promise<() => void> {
@@ -41,6 +42,8 @@ async function acquireAdapterLock(adapter: object): Promise<() => void> {
   return release;
 }
 
+let _savepointCounter = 0;
+
 /**
  * Get the currently active transaction, if any.
  */
@@ -52,108 +55,138 @@ export function currentTransaction(): Transaction | null {
  * Execute a block within a database transaction.
  *
  * Mirrors: ActiveRecord::Base.transaction
+ *
+ * When the adapter has a TransactionManager (via withinNewTransaction),
+ * delegates through the database-statements transaction function which
+ * routes through TransactionManager for proper Rails-style transaction
+ * lifecycle. Falls back to direct adapter calls for simple adapters.
  */
-let _savepointCounter = 0;
-
 export async function transaction<T>(
   modelClass: typeof Base,
   fn: (tx: Transaction) => Promise<T>,
-  options?: { isolation?: string },
+  options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
 ): Promise<T | undefined> {
   const adapter = modelClass.adapter;
-  const previousTx = currentTransaction();
 
+  // If the adapter supports the full TransactionManager path, use it.
+  // Also check adapter.inTransaction to detect external transactions
+  // (e.g., fixtures) that TransactionManager doesn't know about — fall
+  // through to the fallback which handles nesting via savepoints.
+  if (
+    typeof (adapter as any).withinNewTransaction === "function" &&
+    !(currentTransaction() === null && adapter.inTransaction)
+  ) {
+    // No per-adapter lock needed: TransactionManager's join-or-savepoint
+    // logic handles concurrent callers. The second caller either joins the
+    // existing transaction (if joinable) or creates a SavepointTransaction.
+    // Locking here would deadlock because withinNewTransaction runs
+    // commit/rollback callbacks before returning.
+    const result = await dbTransaction.call(
+      adapter as any,
+      async (userTx?: unknown) => {
+        let internalTx: Transaction;
+        if (userTx instanceof Transaction) {
+          internalTx = userTx;
+        } else if (userTx && (userTx as any)._internalTransaction instanceof Transaction) {
+          internalTx = (userTx as any)._internalTransaction;
+        } else {
+          const tmCurrent = (adapter as any).currentTransaction?.();
+          internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(adapter);
+        }
+        return getTransactionStorage().run(internalTx, () => fn(internalTx));
+      },
+      {
+        requiresNew: options?.requiresNew,
+        isolation: options?.isolation,
+        joinable: options?.joinable,
+      },
+    );
+    return result as T | undefined;
+  }
+
+  // Fallback for simple adapters without TransactionManager:
+  // manage transaction lifecycle and callbacks directly.
+  return _transactionFallback(adapter, fn, options);
+}
+
+async function _transactionFallback<T>(
+  adapter: import("./adapter.js").DatabaseAdapter,
+  fn: (tx: Transaction) => Promise<T>,
+  options?: { isolation?: string },
+): Promise<T | undefined> {
   if (options?.isolation) {
-    if (previousTx !== null) {
-      throw new TransactionIsolationError(
-        "Setting transaction isolation level is not supported inside a nested transaction",
-      );
-    }
     throw new TransactionIsolationError(
       `Transaction isolation level '${options.isolation}' is not yet supported`,
     );
   }
 
   const tx = new Transaction(adapter);
-
-  // Check nesting: prefer AsyncLocalStorage (tracks our own transaction() calls).
-  // Fall back to adapter.inTransaction for DB transactions started outside our
-  // transaction() function (e.g. test fixtures). The per-adapter mutex serializes
-  // outermost transactions, so unrelated async flows cannot race here.
-  const nested = previousTx !== null || adapter.inTransaction;
-  const spName = nested ? `sp_${++_savepointCounter}` : null;
-
-  // For outermost transactions, serialize on the adapter. This matches Rails
-  // where each thread gets its own connection — concurrent callers queue.
-  // Nested transactions (savepoints) skip the lock since they run inside
-  // the outer transaction's locked scope.
+  const nested = currentTransaction() !== null || adapter.inTransaction;
   let releaseLock = nested ? null : await acquireAdapterLock(adapter);
 
   let result: T;
   try {
-    if (nested && spName) {
+    if (nested) {
+      const spName = `active_record_${++_savepointCounter}`;
       await adapter.createSavepoint(spName);
+      try {
+        result = await getTransactionStorage().run(tx, () => fn(tx));
+        await adapter.releaseSavepoint(spName);
+      } catch (error) {
+        try {
+          await adapter.rollbackToSavepoint(spName);
+        } catch {}
+        releaseLock?.();
+        releaseLock = null;
+        await tx.rollback();
+        await tx.runAfterRollbackCallbacks();
+        if (error instanceof Rollback) return undefined;
+        throw error;
+      }
     } else {
       await adapter.beginTransaction();
-    }
-
-    result = await getTransactionStorage().run(tx, () => fn(tx));
-    if (nested && spName) {
-      await adapter.releaseSavepoint(spName);
-    } else {
-      await adapter.commit();
+      try {
+        result = await getTransactionStorage().run(tx, () => fn(tx));
+        await adapter.commit();
+      } catch (error) {
+        try {
+          await adapter.rollback();
+        } catch {}
+        releaseLock?.();
+        releaseLock = null;
+        await tx.rollback();
+        await tx.runAfterRollbackCallbacks();
+        if (error instanceof Rollback) return undefined;
+        throw error;
+      }
     }
     await tx.commit();
-  } catch (error) {
-    try {
-      if (nested && spName) {
-        await adapter.rollbackToSavepoint(spName);
-      } else {
-        await adapter.rollback();
-      }
-      await tx.rollback();
-    } catch {
-      // Swallow rollback errors — the original error is more important
-    }
-    // Release lock before callbacks to prevent deadlocks if a callback
-    // starts a new outermost transaction on the same adapter.
     releaseLock?.();
     releaseLock = null;
-    await tx.runAfterRollbackCallbacks();
-    if (error instanceof Rollback) {
-      return undefined;
-    }
+    await tx.runAfterCommitCallbacks();
+    return result;
+  } catch (error) {
+    if (error instanceof Rollback) return undefined;
     throw error;
   } finally {
-    // Guarantee lock release even if commit/rollback/callbacks throw
     releaseLock?.();
   }
-  await tx.runAfterCommitCallbacks();
-  return result;
 }
 
 /**
  * Execute a block within a savepoint (nested transaction).
+ * The name parameter is accepted for backward compatibility but
+ * savepoint names are auto-generated by the TransactionManager
+ * (matching Rails' `active_record_N` naming).
  *
  * Mirrors: ActiveRecord::Base.transaction(requires_new: true)
  */
 export async function savepoint<T>(
   modelClass: typeof Base,
-  name: string,
+  _name: string,
   fn: () => Promise<T>,
-): Promise<T> {
-  const adapter = modelClass.adapter;
-
-  await adapter.createSavepoint(name);
-
-  try {
-    const result = await fn();
-    await adapter.releaseSavepoint(name);
-    return result;
-  } catch (error) {
-    await adapter.rollbackToSavepoint(name);
-    throw error;
-  }
+): Promise<T | undefined> {
+  return transaction(modelClass, async () => fn(), { requiresNew: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +405,7 @@ export async function withTransactionReturningStatus<T>(
   // operation succeeds).
   const r = record as any;
   r._transactionAction = undefined;
-  r._newRecordBeforeLastCommit = false;
+  r._newRecordBeforeLastCommit = r._newRecord ?? record.isNewRecord?.() ?? false;
   r._triggerUpdateCallback = false;
   r._triggerDestroyCallback = false;
 
