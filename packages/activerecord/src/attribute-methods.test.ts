@@ -1633,12 +1633,12 @@ describe("AttributeMethodsTest", () => {
         this.adapter = adapter;
       }
     }
-    const types = User.attributeTypes;
+    const types = User.attributeTypes();
     expect(types).toHaveProperty("id");
     expect(types).toHaveProperty("name");
     expect(types).toHaveProperty("age");
-    expect(types.name.cast("42")).toBe("42");
-    expect(types.age.cast("42")).toBe(42);
+    expect(types["name"].cast("42")).toBe("42");
+    expect(types["age"].cast("42")).toBe(42);
   });
 });
 

@@ -33,7 +33,12 @@ export interface Attributes {
  * of the class-level `attribute` declaration.
  */
 export function attribute(
-  this: { _attributeDefinitions: Map<string, AttributeDefinition>; prototype: object },
+  this: {
+    _attributeDefinitions: Map<string, AttributeDefinition>;
+    prototype: object;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _cachedDefaultAttributes?: any;
+  },
   name: string,
   typeName: string,
   options?: { default?: unknown; virtual?: boolean },
@@ -44,6 +49,9 @@ export function attribute(
     this._attributeDefinitions = new Map(this._attributeDefinitions);
   }
   this._attributeDefinitions.set(name, { name, type, defaultValue, virtual: options?.virtual });
+
+  // Mirrors: Rails reset_default_attributes — clear cached AttributeSet
+  this._cachedDefaultAttributes = null;
 
   if (!Object.prototype.hasOwnProperty.call(this.prototype, name)) {
     Object.defineProperty(this.prototype, name, {
@@ -70,22 +78,17 @@ export function attribute(
 export function buildDefaultAttributes(defs: Map<string, AttributeDefinition>): AttributeSet {
   const attrMap = new Map<string, Attribute>();
   for (const [name, def] of defs) {
-    let defVal = typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
-    if (defVal !== null && typeof defVal === "object") {
-      defVal = structuredClone(defVal);
+    const base = Attribute.withCastValue(name, null, def.type);
+    if (def.defaultValue != null) {
+      // withUserDefault creates a UserProvidedDefault that preserves function
+      // defaults and re-evaluates them on each deepDup — matching Rails'
+      // PendingDefault behavior where procs are called per-instance.
+      attrMap.set(name, base.withUserDefault(def.defaultValue));
+    } else {
+      attrMap.set(name, base);
     }
-    attrMap.set(name, Attribute.withCastValue(name, defVal ?? null, def.type));
   }
   return new AttributeSet(attrMap);
-}
-
-/**
- * Initialize instance attributes by building from class definitions.
- *
- * Mirrors: ActiveModel::Attributes#initialize
- */
-export function constructor(defs: Map<string, AttributeDefinition>): AttributeSet {
-  return buildDefaultAttributes(defs);
 }
 
 /**

@@ -9,7 +9,7 @@ describe("ConversionTest", () => {
       }
     }
     const p = new Post({ title: "hi" });
-    expect(p.toPartialPath()).toBe("posts/_post");
+    expect(p.toPartialPath()).toBe("posts/post");
   });
 
   it("#to_param_delimiter allows redefining the delimiter used in #to_param", () => {
@@ -106,7 +106,7 @@ describe("ConversionTest", () => {
         this.attribute("name", "string");
       }
     }
-    expect(new Person({ name: "Alice" }).toPartialPath()).toBe("people/_person");
+    expect(new Person({ name: "Alice" }).toPartialPath()).toBe("people/person");
   });
 
   it("to_key default implementation returns the id in an array for persisted records", () => {

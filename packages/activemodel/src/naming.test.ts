@@ -46,7 +46,7 @@ describe("NamingTest", () => {
 
   it("to_partial_path default implementation returns a string giving a relative path", () => {
     const p = new Post();
-    expect(p.toPartialPath()).toBe("posts/_post");
+    expect(p.toPartialPath()).toBe("posts/post");
   });
 
   it("i18n key", () => {

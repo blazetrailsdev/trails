@@ -162,7 +162,14 @@ export class AttributeSet {
     const existing = cache.get(attr);
     if (existing) return existing;
 
-    const cloned = Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
+    // UserProvidedDefault needs a fresh construction so function defaults
+    // re-evaluate per instance — matching Rails' Proc-per-deep_dup behavior.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const asAny = attr as Record<string, any>;
+    const cloned =
+      typeof asAny.dupForDeepClone === "function"
+        ? asAny.dupForDeepClone()
+        : Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
     cache.set(attr, cloned);
 
     const orig = attr.getOriginalAttribute();

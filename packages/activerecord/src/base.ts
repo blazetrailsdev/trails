@@ -2757,19 +2757,6 @@ export class Base extends Model {
     return result;
   }
 
-  /**
-   * Return a hash of attribute name to type object.
-   *
-   * Mirrors: ActiveRecord::Base.attribute_types
-   */
-  static get attributeTypes(): Record<string, any> {
-    const result: Record<string, any> = {};
-    for (const [name, def] of this._attributeDefinitions) {
-      result[name] = def.type;
-    }
-    return result;
-  }
-
   // -- Strict loading class-level default --
   static _strictLoadingByDefault = false;
 

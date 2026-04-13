@@ -6286,7 +6286,7 @@ describe("CalculationsTest", () => {
         this.adapter = adapter;
       }
     }
-    const types = User.attributeTypes;
+    const types = User.attributeTypes();
     expect(types).toHaveProperty("id");
     expect(types).toHaveProperty("name");
   });

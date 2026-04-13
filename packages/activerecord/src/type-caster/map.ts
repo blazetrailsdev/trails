@@ -38,7 +38,8 @@ export class Map {
     }
 
     // Fallback to attributeTypes (builds full object, O(n))
-    const attributeTypes = klass.attributeTypes;
+    const attributeTypes =
+      typeof klass.attributeTypes === "function" ? klass.attributeTypes() : klass.attributeTypes;
     if (attributeTypes) {
       const type =
         attributeTypes instanceof globalThis.Map ? attributeTypes.get(name) : attributeTypes[name];

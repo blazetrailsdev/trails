@@ -273,7 +273,8 @@ export class Association {
 
   private _attributeTypeName(model: typeof Base | null, key: string): string | null {
     if (!model) return null;
-    const types = (model as any).attributeTypes;
+    const at = (model as any).attributeTypes;
+    const types = typeof at === "function" ? at.call(model) : at;
     if (!types) return null;
     const type = types[key];
     if (!type) return null;

@@ -20,7 +20,7 @@ export function _registerUserProvidedDefault(ctor: new (...args: any[]) => Attri
  */
 export abstract class Attribute {
   readonly name: string;
-  readonly valueBeforeTypeCast: unknown;
+  protected _valueBeforeTypeCast: unknown;
   readonly type: Type;
   private originalAttribute: Attribute | null;
   private _value: unknown;
@@ -36,7 +36,7 @@ export abstract class Attribute {
     value?: unknown,
   ) {
     this.name = name;
-    this.valueBeforeTypeCast = valueBeforeTypeCast;
+    this._valueBeforeTypeCast = valueBeforeTypeCast;
     this.type = type;
     this.originalAttribute = originalAttribute;
 
@@ -49,6 +49,10 @@ export abstract class Attribute {
     }
     this._valueForDatabase = undefined;
     this._hasValueForDatabase = false;
+  }
+
+  get valueBeforeTypeCast(): unknown {
+    return this._valueBeforeTypeCast;
   }
 
   get value(): unknown {
