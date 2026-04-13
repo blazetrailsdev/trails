@@ -26,6 +26,7 @@ export class Column {
       primaryKey?: boolean;
       autoIncrement?: boolean;
       rowid?: boolean;
+      generatedType?: "stored" | "virtual" | null;
     } = {},
   ) {
     this.name = name;
@@ -37,9 +38,24 @@ export class Column {
     this.primaryKey = options.primaryKey ?? false;
     this.autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;
+    this._generatedType = options.generatedType ?? null;
   }
+
+  private _generatedType: "stored" | "virtual" | null;
 
   get hasDefault(): boolean {
     return this.default !== null || this.defaultFunction !== null;
+  }
+
+  isAutoIncrementedByDb(): boolean {
+    return this.autoIncrement || this.rowid;
+  }
+
+  isVirtual(): boolean {
+    return this._generatedType !== null;
+  }
+
+  isVirtualStored(): boolean {
+    return this.isVirtual() && this._generatedType === "stored";
   }
 }
