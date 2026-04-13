@@ -23,7 +23,13 @@ import {
 
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
 export { Range };
-import { WhereChain, QueryMethodBangs } from "./relation/query-methods.js";
+import {
+  WhereChain,
+  QueryMethodBangs,
+  areStructurallyCompatible,
+  VALID_UNSCOPING_VALUES,
+  type UnscopeType,
+} from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
 import { wrapWithScopeProxy } from "./relation/delegation.js";
 import { InsertAll } from "./insert-all.js";
@@ -57,8 +63,8 @@ export class Relation<T extends Base> {
   private _isDistinct = false;
   private _distinctOnColumns: string[] = [];
   private _groupColumns: string[] = [];
-  private _orRelations: Relation<T>[] = [];
-  private _havingClauses: string[] = [];
+  /** @internal */
+  _havingClause: WhereClause = WhereClause.empty();
   private _isNone = false;
   private _lockValue: string | null = null;
   private _setOperation: {
@@ -74,6 +80,7 @@ export class Relation<T extends Base> {
   private _isStrictLoading = false;
   private _annotations: string[] = [];
   private _optimizerHints: string[] = [];
+  private _referencesValues: string[] = [];
   private _fromClause: FromClause = FromClause.empty();
   private _createWithAttrs: Record<string, unknown> = {};
   private _extending: Array<Record<string, Function>> = [];
@@ -116,82 +123,7 @@ export class Relation<T extends Base> {
     ...binds: unknown[]
   ): Relation<T> | WhereChain<Relation<T>> {
     if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this._clone());
-    if (conditionsOrSql === null) return this._clone();
-
-    // Arel node: store directly, bypass string/hash processing
-    if (conditionsOrSql instanceof Nodes.Node) {
-      const rel = this._clone();
-      rel._whereClause.predicates.push(conditionsOrSql);
-      return rel;
-    }
-
-    if (
-      typeof conditionsOrSql !== "string" &&
-      (typeof conditionsOrSql !== "object" || Array.isArray(conditionsOrSql))
-    ) {
-      const err = new Error(
-        `Unsupported argument type: ${typeof conditionsOrSql} (${String(conditionsOrSql)})`,
-      );
-      err.name = "ArgumentError";
-      throw err;
-    }
-    const rel = this._clone();
-    if (typeof conditionsOrSql === "string") {
-      let sql = conditionsOrSql;
-
-      // Check for named binds: where("age > :min AND age < :max", { min: 18, max: 65 })
-      if (
-        binds.length === 1 &&
-        typeof binds[0] === "object" &&
-        binds[0] !== null &&
-        !Array.isArray(binds[0])
-      ) {
-        const namedBinds = binds[0] as Record<string, unknown>;
-        for (const [name, value] of Object.entries(namedBinds)) {
-          const replacement =
-            value === null
-              ? "NULL"
-              : typeof value === "number"
-                ? String(value)
-                : typeof value === "boolean"
-                  ? value
-                    ? "TRUE"
-                    : "FALSE"
-                  : `'${String(value).replace(/'/g, "''")}'`;
-          sql = sql.replace(new RegExp(`:${name}\\b`, "g"), replacement);
-        }
-      } else {
-        // Positional ? placeholders
-        for (const bind of binds) {
-          const replacement =
-            bind === null
-              ? "NULL"
-              : typeof bind === "number"
-                ? String(bind)
-                : typeof bind === "boolean"
-                  ? bind
-                    ? "TRUE"
-                    : "FALSE"
-                  : `'${String(bind).replace(/'/g, "''")}'`;
-          sql = sql.replace("?", replacement);
-        }
-      }
-      if (sql.trim()) rel._whereClause.predicates.push(new Nodes.SqlLiteral(sql));
-    } else {
-      const castConditions: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(conditionsOrSql)) {
-        // Relation subquery values pass through to PredicateBuilder's RelationHandler
-        if (value instanceof Relation) {
-          castConditions[key] = value;
-        } else {
-          castConditions[key] = Array.isArray(value)
-            ? value.map((v) => this._castWhereValue(key, v))
-            : this._castWhereValue(key, value);
-        }
-      }
-      rel._whereClause.predicates.push(...this.predicateBuilder.buildFromHash(castConditions));
-    }
-    return rel;
+    return this._clone().whereBang(conditionsOrSql, ...binds);
   }
 
   /**
@@ -419,9 +351,8 @@ export class Relation<T extends Base> {
   whereAny(...conditions: Record<string, unknown>[]): Relation<T> {
     if (conditions.length === 0) return this;
     if (conditions.length === 1) return this.where(conditions[0]);
-    // Build a chain: where(cond1).or(where(cond2)).or(where(cond3))...
-    const makeRel = (cond: Record<string, unknown>) => {
-      const r = this._clone();
+
+    const buildClause = (cond: Record<string, unknown>): WhereClause => {
       const cast: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(cond)) {
         cast[key] =
@@ -431,17 +362,15 @@ export class Relation<T extends Base> {
               ? value.map((v) => this._castWhereValue(key, v))
               : this._castWhereValue(key, value);
       }
-      r._whereClause = new WhereClause(this.predicateBuilder.buildFromHash(cast));
-      r._orRelations = [];
-      return r;
+      return new WhereClause(this.predicateBuilder.buildFromHash(cast));
     };
-    let combined = makeRel(conditions[0]);
+
+    let combined = buildClause(conditions[0]);
     for (let i = 1; i < conditions.length; i++) {
-      combined = combined.or(makeRel(conditions[i]));
+      combined = combined.or(buildClause(conditions[i]));
     }
     const rel = this._clone();
-    rel._whereClause = combined._whereClause;
-    rel._orRelations = [...rel._orRelations, ...combined._orRelations];
+    if (combined.predicates.length > 0) rel._whereClause.predicates.push(combined.ast);
     return rel;
   }
 
@@ -523,7 +452,7 @@ export class Relation<T extends Base> {
       return this.toArray().then((records) => records.filter(args[0]));
     }
     const columns = args.map((a: any) => (a instanceof Nodes.SqlLiteral ? a : String(a)));
-    return this._clone().reselectBang(...columns);
+    return this._clone()._selectBang(...columns);
   }
 
   /**
@@ -566,12 +495,19 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Add HAVING clause. Accepts raw SQL string or hash form.
+   * Add HAVING clause. Accepts raw SQL string (with optional bind values),
+   * a hash of column/value pairs, or an Arel node.
    *
    * Mirrors: ActiveRecord::Relation#having
    */
-  having(condition: string | Record<string, unknown>): Relation<T> {
-    return this._clone().havingBang(condition);
+  having(condition: string, ...binds: unknown[]): Relation<T>;
+  having(condition: Record<string, unknown>): Relation<T>;
+  having(condition: Nodes.Node): Relation<T>;
+  having(
+    condition: string | Record<string, unknown> | Nodes.Node,
+    ...binds: unknown[]
+  ): Relation<T> {
+    return this._clone().havingBang(condition, ...binds);
   }
 
   /**
@@ -774,21 +710,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#unscope
    */
-  unscope(
-    ...types: Array<
-      | "where"
-      | "order"
-      | "limit"
-      | "offset"
-      | "group"
-      | "having"
-      | "select"
-      | "distinct"
-      | "lock"
-      | "readonly"
-      | "from"
-    >
-  ): Relation<T> {
+  unscope(...types: Array<UnscopeType | { where: string | string[] }>): Relation<T> {
     return this._clone().unscopeBang(...types);
   }
 
@@ -797,47 +719,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::SpawnMethods#only
    */
-  only(
-    ...types: Array<
-      | "where"
-      | "order"
-      | "limit"
-      | "offset"
-      | "group"
-      | "having"
-      | "select"
-      | "distinct"
-      | "lock"
-      | "readonly"
-      | "from"
-    >
-  ): Relation<T> {
-    const allTypes: Array<
-      | "where"
-      | "order"
-      | "limit"
-      | "offset"
-      | "group"
-      | "having"
-      | "select"
-      | "distinct"
-      | "lock"
-      | "readonly"
-      | "from"
-    > = [
-      "where",
-      "order",
-      "limit",
-      "offset",
-      "group",
-      "having",
-      "select",
-      "distinct",
-      "lock",
-      "readonly",
-      "from",
-    ];
-    const toRemove = allTypes.filter((t) => !types.includes(t));
+  only(...types: Array<UnscopeType>): Relation<T> {
+    const toRemove = [...VALID_UNSCOPING_VALUES].filter((t) => !types.includes(t));
     return this.unscope(...toRemove);
   }
 
@@ -1384,7 +1267,8 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#structurally_compatible?
    */
   structurallyCompatible(other: Relation<T>): boolean {
-    return this._modelClass === other._modelClass;
+    if (this._modelClass !== other._modelClass) return false;
+    return areStructurallyCompatible(this, other);
   }
 
   /**
@@ -1442,9 +1326,16 @@ export class Relation<T extends Base> {
     if (this._isNone) return [];
     if (this._loaded) return [...this._records];
 
+    // Rails: `includes(:assoc).references(:assocs_table)` promotes the
+    // matching includes to eager_load so the JOIN is present — otherwise
+    // a raw where condition referring to that table would fail.
+    // See ActiveRecord::Relation#references_eager_loaded_tables?
+    const promotedIncludes = this._includesToPromoteFromReferences();
+
     // Eager load via single JOIN query when eager_load associations are specified
-    if (this._eagerLoadAssociations.length > 0) {
-      await this._executeEagerLoad();
+    if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
+      const allEager = [...new Set([...this._eagerLoadAssociations, ...promotedIncludes])];
+      await this._executeEagerLoad(allEager);
     } else {
       const sql = this._toSql();
       const result = await this._modelClass.adapter.selectAll(sql, "Load");
@@ -1464,8 +1355,12 @@ export class Relation<T extends Base> {
       }
     }
 
-    // Preload associations via separate queries (includes + preload)
-    const preloadAssocs = [...this._includesAssociations, ...this._preloadAssociations];
+    // Preload associations via separate queries (includes + preload minus
+    // any includes we already eager-loaded above)
+    const preloadAssocs = [
+      ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
+      ...this._preloadAssociations,
+    ];
     if (preloadAssocs.length > 0 && this._records.length > 0) {
       await this._preloadAssociationsForRecords(this._records, preloadAssocs);
     }
@@ -1473,7 +1368,35 @@ export class Relation<T extends Base> {
     return [...this._records];
   }
 
-  private async _executeEagerLoad(): Promise<void> {
+  /**
+   * Rails all-or-nothing promotion: if ANY references_values entry
+   * refers to a table that is NOT already joined, ALL includes get
+   * promoted to eager_load. See `references_eager_loaded_tables?`
+   * in Rails relation.rb — the check is boolean, not per-association.
+   */
+  private _includesToPromoteFromReferences(): string[] {
+    if (this._referencesValues.length === 0) return [];
+    if (this._includesAssociations.length === 0) return [];
+
+    const joinedTables = new Set(
+      this._joinClauses
+        .map((j) => j.table.toLowerCase())
+        .concat([
+          String(
+            (this._modelClass as unknown as { tableName?: string }).tableName ?? "",
+          ).toLowerCase(),
+        ]),
+    );
+    const refs = this._referencesValues.map((t) => t.toLowerCase());
+    const hasUnjoined = refs.some((ref) => !joinedTables.has(ref));
+    if (!hasUnjoined) return [];
+
+    const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
+    return this._includesAssociations.filter((name) => !alreadyEagerLoaded.has(name));
+  }
+
+  private async _executeEagerLoad(eagerAssocs?: string[]): Promise<void> {
+    const eagerAssociations = eagerAssocs ?? this._eagerLoadAssociations;
     const basePk = (this._modelClass as any).primaryKey ?? "id";
     if (
       Array.isArray(basePk) ||
@@ -1484,7 +1407,7 @@ export class Relation<T extends Base> {
       const sql = this._toSql();
       const result = await this._modelClass.adapter.selectAll(sql, "Eager Load");
       this._records = result.toArray().map((row) => this._modelClass._instantiate(row) as T);
-      await this._preloadAssociationsForRecords(this._records, this._eagerLoadAssociations);
+      await this._preloadAssociationsForRecords(this._records, eagerAssociations);
       return;
     }
 
@@ -1492,7 +1415,7 @@ export class Relation<T extends Base> {
     const jd = new JoinDependency(this._modelClass);
 
     const fallbackAssocs: string[] = [];
-    for (const assocName of this._eagerLoadAssociations) {
+    for (const assocName of eagerAssociations) {
       if (assocName.includes(".")) {
         // Nested paths fall back to preload until per-level grouping is implemented
         fallbackAssocs.push(assocName);
@@ -1530,7 +1453,7 @@ export class Relation<T extends Base> {
 
     if (this._isDistinct) manager.distinct();
     for (const col of this._groupColumns) manager.group(col);
-    for (const clause of this._havingClauses) manager.having(new Nodes.SqlLiteral(clause));
+    if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
     if (this._lockValue) manager.lock(this._lockValue);
 
     // When LIMIT/OFFSET is present, use a subquery for parent IDs to avoid
@@ -2389,9 +2312,7 @@ export class Relation<T extends Base> {
       manager.group(col);
     }
 
-    for (const clause of this._havingClauses) {
-      manager.having(new Nodes.SqlLiteral(clause));
-    }
+    if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
 
     if (this._lockValue) {
       manager.lock(this._lockValue);
@@ -2448,24 +2369,9 @@ export class Relation<T extends Base> {
   }
 
   private _applyWheresToManager(manager: SelectManager, table: Table): void {
-    if (this._orRelations.length > 0) {
-      // Collect all branches: this relation's wheres + each OR relation's wheres
-      const allBranches: (Nodes.Node | null)[] = [
-        this._combineNodes(this._collectAllWhereNodes(table, this)),
-      ];
-      for (const orRel of this._orRelations) {
-        allBranches.push(this._combineNodes(this._collectAllWhereNodes(table, orRel)));
-      }
-      const nonNull = allBranches.filter((n): n is Nodes.Node => n !== null);
-      if (nonNull.length > 0) {
-        const combined = nonNull.reduce((left, right) => new Nodes.Or(left, right));
-        manager.where(new Nodes.Grouping(combined));
-      }
-    } else {
-      const allNodes = this._collectAllWhereNodes(table, this);
-      for (const node of allNodes) {
-        manager.where(node);
-      }
+    const allNodes = this._collectAllWhereNodes(table, this);
+    for (const node of allNodes) {
+      manager.where(node);
     }
   }
 
@@ -2940,7 +2846,7 @@ export class Relation<T extends Base> {
       order: [...this._orderClauses],
       joins: [...this._joinClauses],
       where: this._whereClause.clone(),
-      having: [...this._havingClauses],
+      having: this._havingClause.clone(),
       limit: this._limitValue,
       offset: this._offsetValue,
       lock: this._lockValue,
@@ -2950,6 +2856,7 @@ export class Relation<T extends Base> {
       from: this._fromClause,
       annotations: [...this._annotations],
       optimizerHints: [...this._optimizerHints],
+      references: [...this._referencesValues],
       extending: [...this._extending],
       with: [...this._ctes],
       createWith: { ...this._createWithAttrs },
@@ -2969,7 +2876,7 @@ export class Relation<T extends Base> {
       this._selectColumns === null &&
       !this._isDistinct &&
       this._groupColumns.length === 0 &&
-      this._havingClauses.length === 0 &&
+      this._havingClause.isEmpty() &&
       this._joinClauses.length === 0 &&
       this._rawJoins.length === 0 &&
       this._includesAssociations.length === 0 &&
@@ -3132,8 +3039,7 @@ export class Relation<T extends Base> {
     rel._isDistinct = this._isDistinct;
     rel._distinctOnColumns = [...this._distinctOnColumns];
     rel._groupColumns = [...this._groupColumns];
-    rel._havingClauses = [...this._havingClauses];
-    rel._orRelations = [...this._orRelations];
+    rel._havingClause = this._havingClause.clone();
     rel._isNone = this._isNone;
     rel._lockValue = this._lockValue;
     rel._setOperation = this._setOperation;
@@ -3146,6 +3052,7 @@ export class Relation<T extends Base> {
     rel._isStrictLoading = this._isStrictLoading;
     rel._annotations = [...this._annotations];
     rel._optimizerHints = [...this._optimizerHints];
+    rel._referencesValues = [...this._referencesValues];
     rel._fromClause = this._fromClause;
     rel._createWithAttrs = { ...this._createWithAttrs };
     rel._extending = [...this._extending];

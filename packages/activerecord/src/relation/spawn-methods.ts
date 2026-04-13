@@ -46,13 +46,20 @@ export function mergeBang(this: any, other: any): any {
     if (other._selectColumns) this._selectColumns = [...other._selectColumns];
     if (other._isDistinct) this._isDistinct = true;
     if (other._groupColumns?.length > 0) this._groupColumns.push(...other._groupColumns);
-    if (other._havingClauses?.length > 0) this._havingClauses.push(...other._havingClauses);
+    if (other._havingClause && !other._havingClause.isEmpty()) {
+      this._havingClause = this._havingClause.merge(other._havingClause);
+    }
     if (other._lockValue) this._lockValue = other._lockValue;
     if (other._isReadonly) this._isReadonly = true;
     if (other._isStrictLoading) this._isStrictLoading = true;
     this._joinClauses.push(...(other._joinClauses ?? []));
     this._rawJoins.push(...(other._rawJoins ?? []));
     this._annotations.push(...(other._annotations ?? []));
+    if (other._referencesValues) {
+      for (const ref of other._referencesValues) {
+        if (!this._referencesValues.includes(ref)) this._referencesValues.push(ref);
+      }
+    }
   } else if (typeof other === "object" && other !== null) {
     const merged = new HashMerger(this, other).merge();
     if (merged && merged._whereClause) {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base, Relation, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -6,6 +6,12 @@ import type { DatabaseAdapter } from "./adapter.js";
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
+
+// Ensure spies and mocks created inside individual tests don't leak
+// across tests (e.g. vi.spyOn usages in the references/eager load tests).
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // ─── Shared model setup ───
 
@@ -296,7 +302,7 @@ describe("RelationTest", () => {
     it("having with hash form", () => {
       const sql = Post.all().group("category").having({ count: 5 }).toSql();
       expect(sql).toContain("HAVING");
-      expect(sql).toContain("count = 5");
+      expect(sql).toContain(`"count" = 5`);
     });
   });
 
@@ -5851,24 +5857,72 @@ describe("RelationTest", () => {
     expect(sql).toContain("GROUP BY");
   });
 
-  it("references triggers eager loading", () => {
-    class Post extends Base {
+  it("references triggers eager loading", async () => {
+    const { Associations, registerModel } = await import("./associations.js");
+    const a = freshAdapter();
+    class RefAuthor extends Base {
       static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
+        this._tableName = "ref_authors";
+        this.attribute("name", "string");
+        this.adapter = a;
       }
     }
-    expect(Post.all()).toBeInstanceOf(Relation);
+    class RefPost extends Base {
+      static {
+        this._tableName = "ref_posts";
+        this.attribute("title", "string");
+        this.attribute("ref_author_id", "integer");
+        this.adapter = a;
+      }
+    }
+    Associations.belongsTo.call(RefPost, "refAuthor", {
+      className: "RefAuthor",
+      foreignKey: "ref_author_id",
+    });
+    registerModel("RefAuthor", RefAuthor);
+    registerModel("RefPost", RefPost);
+
+    const author = await RefAuthor.create({ name: "Dean" });
+    await RefPost.create({ title: "First", ref_author_id: author.id });
+
+    const execSpy = vi.spyOn(a, "execute");
+    execSpy.mockClear();
+
+    const posts = await RefPost.all().includes("refAuthor").references("ref_authors").toArray();
+
+    expect(posts).toHaveLength(1);
+    // Eager load fires a single query (base JOIN author) rather than
+    // base + separate preload. The JOIN's SQL contains the associated
+    // table name, so we can assert both count and shape.
+    const readCalls = execSpy.mock.calls.filter(([sql]) => /ref_posts/.test(String(sql)));
+    expect(readCalls).toHaveLength(1);
+    expect(String(readCalls[0][0])).toMatch(/LEFT OUTER JOIN ["`]?ref_authors["`]?/i);
   });
 
-  it("references doesnt trigger eager loading if reference not included", () => {
-    class Post extends Base {
+  it("references doesnt trigger eager loading if reference not included", async () => {
+    const a = freshAdapter();
+    class RefPost3 extends Base {
       static {
+        this._tableName = "ref_posts3";
         this.attribute("title", "string");
-        this.adapter = adapter;
+        this.adapter = a;
       }
     }
-    expect(Post.all()).toBeInstanceOf(Relation);
+
+    await RefPost3.create({ title: "First" });
+
+    const execSpy = vi.spyOn(a, "execute");
+    execSpy.mockClear();
+
+    // references without includes — no promotion possible since there are
+    // no includes to promote. Rails: references only triggers eager load
+    // when there are includes_values present.
+    const posts = await RefPost3.all().references("some_table").toArray();
+
+    expect(posts).toHaveLength(1);
+    const baseCall = execSpy.mock.calls.find(([sql]) => /ref_posts3/.test(String(sql)));
+    expect(baseCall).toBeDefined();
+    expect(String(baseCall![0])).not.toMatch(/LEFT OUTER JOIN/i);
   });
 
   it("order triggers eager loading", () => {

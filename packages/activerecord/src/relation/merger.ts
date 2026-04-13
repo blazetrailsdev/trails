@@ -34,8 +34,8 @@ export class Merger {
     if (this.other._groupColumns.length > 0) {
       rel._groupColumns.push(...this.other._groupColumns);
     }
-    if (this.other._havingClauses.length > 0) {
-      rel._havingClauses.push(...this.other._havingClauses);
+    if (!this.other._havingClause.isEmpty()) {
+      rel._havingClause = rel._havingClause.merge(this.other._havingClause);
     }
     if (this.other._lockValue) rel._lockValue = this.other._lockValue;
     if (this.other._isReadonly) rel._isReadonly = true;
@@ -43,6 +43,9 @@ export class Merger {
     rel._joinClauses.push(...this.other._joinClauses);
     rel._rawJoins.push(...this.other._rawJoins);
     rel._annotations.push(...this.other._annotations);
+    for (const ref of this.other._referencesValues) {
+      if (!rel._referencesValues.includes(ref)) rel._referencesValues.push(ref);
+    }
     return rel;
   }
 }
