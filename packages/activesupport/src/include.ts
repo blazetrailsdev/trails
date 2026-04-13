@@ -23,6 +23,13 @@ type AnyClass = new (...args: any[]) => any;
 type Module = Record<string, Function>;
 
 /**
+ * Symbol keys for Ruby's Module#included and Module#extended callbacks.
+ * Using symbols avoids collisions with real method names.
+ */
+export const included = Symbol.for("@blazetrails/activesupport:included");
+export const extended = Symbol.for("@blazetrails/activesupport:extended");
+
+/**
  * Derive instance method types from an included module object.
  * Strips the `this` parameter from each function signature.
  *
@@ -30,7 +37,12 @@ type Module = Record<string, Function>;
  *   export interface Relation<T> extends Included<typeof QueryMethodBangs> {}
  */
 export type Included<M extends Module> = {
-  [K in keyof M]: M[K] extends (this: any, ...args: infer A) => infer R ? (...args: A) => R : never;
+  [K in keyof M as K extends string ? K : never]: M[K] extends (
+    this: any,
+    ...args: infer A
+  ) => infer R
+    ? (...args: A) => R
+    : never;
 };
 
 export function include(klass: AnyClass, mod: Module): void {
@@ -46,6 +58,11 @@ export function include(klass: AnyClass, mod: Module): void {
     };
   }
   Object.defineProperties(klass.prototype, descriptors);
+
+  // Ruby's Module#included(base) — fires after methods are copied
+  if (typeof (mod as any)[included] === "function") {
+    (mod as any)[included](klass);
+  }
 }
 
 /**
@@ -60,7 +77,12 @@ export function include(klass: AnyClass, mod: Module): void {
  *   const TypedBase = Base as unknown as BaseStatic;
  */
 export type Extended<M extends Module> = {
-  [K in keyof M]: M[K] extends (this: any, ...args: infer A) => infer R ? (...args: A) => R : never;
+  [K in keyof M as K extends string ? K : never]: M[K] extends (
+    this: any,
+    ...args: infer A
+  ) => infer R
+    ? (...args: A) => R
+    : never;
 };
 
 /**
@@ -84,5 +106,10 @@ export function extend(klass: AnyClass | object, mod: Module): void {
       configurable: true,
       enumerable: false,
     });
+  }
+
+  // Ruby's Module#extended(base) — fires after methods are copied
+  if (typeof (mod as any)[extended] === "function") {
+    (mod as any)[extended](klass);
   }
 }

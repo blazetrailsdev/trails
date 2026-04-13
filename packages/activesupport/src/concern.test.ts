@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { concern, includeConcern, hasConcern } from "./concern.js";
+import { extended } from "./include.js";
 
 describe("Concern", () => {
   it("mixes instance methods into class prototype", () => {
@@ -411,5 +412,41 @@ describe("ConcernTest", () => {
     includeConcern(Base, m);
     expect((Base as any).classMethod()).toBe("class");
     expect(new (Base as any)().instMethod()).toBe("inst");
+  });
+
+  it("fires Symbol extended hook on classMethods when concern is included", () => {
+    const calls: any[] = [];
+    class Base {}
+    const m = concern({
+      classMethods: {
+        classMethod() {
+          return "class";
+        },
+        [extended](base: any) {
+          calls.push(base);
+        },
+      },
+    });
+    includeConcern(Base, m);
+    expect((Base as any).classMethod()).toBe("class");
+    expect(calls).toEqual([Base]);
+  });
+
+  it("fires Symbol extended hook on instanceMethods when concern is included", () => {
+    const calls: any[] = [];
+    class Base {}
+    const m = concern({
+      instanceMethods: {
+        instMethod() {
+          return "inst";
+        },
+        [extended](base: any) {
+          calls.push(base);
+        },
+      },
+    });
+    includeConcern(Base, m);
+    expect(new (Base as any)().instMethod()).toBe("inst");
+    expect(calls).toEqual([Base.prototype]);
   });
 });

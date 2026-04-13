@@ -1,3 +1,5 @@
+import { extend as extendModule } from "./include.js";
+
 export class MultipleIncludedBlocks extends Error {
   constructor() {
     super("Cannot define multiple 'included' blocks for a Concern");
@@ -30,6 +32,30 @@ const INCLUDED_CONCERNS = Symbol("includedConcerns");
 const INCLUDED_BLOCK = Symbol("includedBlock");
 const PREPENDED_BLOCK = Symbol("prependedBlock");
 
+/**
+ * Prepend instance methods onto klass.prototype, saving originals as
+ * _super_<name> so the prepending method can call through.
+ * This is the one path Concern handles directly — Ruby's prepend
+ * semantics have no equivalent in the plain include() helper.
+ */
+function prependMethods(klass: any, methods: Record<string, Function>): void {
+  const descriptor = {
+    value: undefined as any,
+    writable: true,
+    configurable: true,
+    enumerable: false,
+  };
+  for (const [name, fn] of Object.entries(methods)) {
+    const existing = klass.prototype[name];
+    if (existing) {
+      descriptor.value = existing;
+      Object.defineProperty(klass.prototype, `_super_${name}`, descriptor);
+    }
+    descriptor.value = fn;
+    Object.defineProperty(klass.prototype, name, descriptor);
+  }
+}
+
 export namespace Concern {
   export function define(definition: ConcernDefinition): ConcernMixin {
     return { __concern: true, definition };
@@ -40,10 +66,10 @@ export namespace Concern {
       const inherited: Set<ConcernMixin> | undefined = klass[INCLUDED_CONCERNS];
       klass[INCLUDED_CONCERNS] = inherited ? new Set(inherited) : new Set<ConcernMixin>();
     }
-    const included: Set<ConcernMixin> = klass[INCLUDED_CONCERNS];
+    const includedSet: Set<ConcernMixin> = klass[INCLUDED_CONCERNS];
 
-    if (included.has(mixin)) return;
-    included.add(mixin);
+    if (includedSet.has(mixin)) return;
+    includedSet.add(mixin);
 
     const def = mixin.definition;
 
@@ -54,19 +80,19 @@ export namespace Concern {
     }
 
     if (def.instanceMethods) {
-      for (const [name, fn] of Object.entries(def.instanceMethods)) {
-        if (def.prepend && klass.prototype[name]) {
-          const original = klass.prototype[name];
-          klass.prototype[`_super_${name}`] = original;
-        }
-        klass.prototype[name] = fn;
+      if (def.prepend) {
+        prependMethods(klass, def.instanceMethods);
+      } else {
+        // Concerns overwrite existing methods (TS has no MRO, so this is the
+        // only way to simulate Ruby's ancestor chain insertion). Use
+        // extendModule on the prototype — extend() always overwrites and
+        // fires the extended hook, matching the "methods added" semantic.
+        extendModule(klass.prototype, def.instanceMethods);
       }
     }
 
     if (def.classMethods) {
-      for (const [name, fn] of Object.entries(def.classMethods)) {
-        klass[name] = fn;
-      }
+      extendModule(klass, def.classMethods);
     }
 
     const includedBlock = def.included ?? (mixin as any)[INCLUDED_BLOCK];
@@ -83,8 +109,8 @@ export namespace Concern {
   }
 
   export function hasConcern(klass: any, mixin: ConcernMixin): boolean {
-    const included: Set<ConcernMixin> | undefined = klass[INCLUDED_CONCERNS];
-    return included?.has(mixin) ?? false;
+    const includedSet: Set<ConcernMixin> | undefined = klass[INCLUDED_CONCERNS];
+    return includedSet?.has(mixin) ?? false;
   }
 
   export function setIncludedBlock(target: any, block: (base: any) => void): void {
