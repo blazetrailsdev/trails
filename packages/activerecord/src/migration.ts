@@ -539,7 +539,9 @@ export abstract class Migration {
 
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | { column?: string; name?: string },
+    toTableOrOptions?:
+      | string
+      | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
   ): Promise<void> {
     if (this._recording) {
       this._recorder.record("removeForeignKey", [fromTable, toTableOrOptions]);
@@ -562,7 +564,7 @@ export abstract class Migration {
 
   async removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?: string | { name?: string },
+    expressionOrOptions?: string | { name?: string; ifExists?: boolean },
   ): Promise<void> {
     if (this._recording) {
       this._recorder.record("removeCheckConstraint", [tableName, expressionOrOptions]);

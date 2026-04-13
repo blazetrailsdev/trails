@@ -266,10 +266,12 @@ export class SchemaCreation {
         return `ON ${action} RESTRICT`;
       case "no_action":
         return `ON ${action} NO ACTION`;
+      case "set_default":
+        return `ON ${action} SET DEFAULT`;
       default:
         throw new Error(
           `'${String(dependency)}' is not supported for on_update or on_delete. ` +
-            `Supported values are: cascade, nullify, restrict, no_action`,
+            `Supported values are: cascade, nullify, restrict, no_action, set_default`,
         );
     }
   }

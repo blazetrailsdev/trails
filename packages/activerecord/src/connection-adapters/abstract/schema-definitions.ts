@@ -24,7 +24,7 @@ export type ColumnType =
 
 export type PrimaryKeyType = "uuid";
 
-export type ReferentialAction = "cascade" | "nullify" | "restrict" | "no_action";
+export type ReferentialAction = "cascade" | "nullify" | "restrict" | "no_action" | "set_default";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::ColumnDefinition
