@@ -35,7 +35,7 @@ export async function touch(this: Base, ...names: string[]): Promise<boolean> {
 
   await this.updateColumns(attrs);
 
-  await ctor._callbackChain.runAfter("touch", this);
+  await ctor._callbackChain.runAfterAsync("touch", this);
   return true;
 }
 

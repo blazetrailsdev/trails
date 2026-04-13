@@ -1749,7 +1749,7 @@ export class Base extends Model {
       record._strictLoading = true;
     }
     // Fire after_find callbacks
-    this._callbackChain.runAfterSync("find", record);
+    this._callbackChain.runAfter("find", record);
     return record;
   }
 
@@ -2119,7 +2119,7 @@ export class Base extends Model {
     const { autosaveBelongsTo, autosaveChildren } = await import("./autosave-association.js");
 
     let saved = false;
-    if (!(await ctor._callbackChain.runBefore("save", this))) return false;
+    if (!(await ctor._callbackChain.runBeforeAsync("save", this))) return false;
 
     const belongsToOk = await autosaveBelongsTo(this);
     if (!belongsToOk) {
@@ -2129,7 +2129,7 @@ export class Base extends Model {
 
     const wasNewRecord = this._newRecord;
     if (this._newRecord) {
-      const createResult = await ctor._callbackChain.run("create", this, async () => {
+      const createResult = await ctor._callbackChain.runCallbacksAsync("create", this, async () => {
         this._performInsert();
         if (this._pendingOperation) {
           await this._pendingOperation;
@@ -2142,7 +2142,7 @@ export class Base extends Model {
       });
       if (!createResult) saved = false;
     } else {
-      const updateResult = await ctor._callbackChain.run("update", this, async () => {
+      const updateResult = await ctor._callbackChain.runCallbacksAsync("update", this, async () => {
         this._performUpdate();
         if (this._pendingOperation) {
           await this._pendingOperation;
@@ -2157,12 +2157,11 @@ export class Base extends Model {
     this._skipTouch = false;
 
     if (saved) {
-      // Set transaction action and tracking flags for callback filtering
       this._transactionAction = wasNewRecord ? "create" : "update";
       (this as any)._newRecordBeforeLastCommit = wasNewRecord;
       (this as any)._triggerUpdateCallback = !wasNewRecord;
 
-      await ctor._callbackChain.runAfter("save", this);
+      await ctor._callbackChain.runAfterAsync("save", this);
 
       if (wasNewRecord) {
         const { updateCounterCaches } = await import("./associations.js");
@@ -2388,7 +2387,7 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
 
     let didDelete = false;
-    const halted = !(await ctor._callbackChain.run("destroy", this, async () => {
+    const destroyResult = await ctor._callbackChain.runCallbacksAsync("destroy", this, async () => {
       const table = ctor.arelTable;
       const pk = this.id;
       if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {
@@ -2415,9 +2414,9 @@ export class Base extends Model {
       this._collectionProxies.clear();
       this._preloadedAssociations.clear();
       this._associationInstances.clear();
-    }));
+    });
 
-    if (halted) return false;
+    if (!destroyResult) return false;
 
     if (didDelete) {
       this._transactionAction = "destroy";
@@ -2428,7 +2427,7 @@ export class Base extends Model {
       await updateCounterCaches(this, "decrement");
     }
 
-    return didDelete || !halted;
+    return true;
   }
 
   /**

@@ -15,7 +15,7 @@ import {
   defineModelCallbacks,
 } from "./callbacks.js";
 import { serializableHash, SerializeOptions } from "./serialization.js";
-import { BlockValidator } from "./validator.js";
+import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
 import {
   AttributeMethodPattern,
   attributeMethodPrefix,
@@ -29,13 +29,8 @@ import {
   attributeWriterMissing as defaultAttributeWriterMissing,
   ArgumentError,
 } from "./attribute-assignment.js";
-import type {
-  ValidatorContract as Validator,
-  ConditionalOptions,
-  ConditionFn,
-  AnyRecord,
-} from "./validator.js";
-import { shouldValidate } from "./validator.js";
+import type { ConditionalOptions, ConditionFn, AnyRecord } from "./validator.js";
+import { evaluateCondition } from "./validator.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { AbsenceValidator } from "./validations/absence.js";
 import { LengthValidator } from "./validations/length.js";
@@ -55,20 +50,6 @@ import {
 } from "./attribute-registration.js";
 import { _toPartialPath } from "./conversion.js";
 
-interface ValidationEntry {
-  attribute: string;
-  validator: Validator;
-  on?: string;
-  strict?: boolean;
-  if?: ConditionFn | ConditionFn[];
-  unless?: ConditionFn | ConditionFn[];
-}
-
-interface CustomValidationEntry {
-  method: string | ((record: AnyRecord) => void);
-  options: ConditionalOptions;
-}
-
 /**
  * Model — the base class that bundles Attributes, Validations, Callbacks,
  * Dirty tracking, Serialization, and Naming.
@@ -87,8 +68,7 @@ export class Model {
   static _attributeAliases: Record<string, string> = {};
   static _aliasesByAttributeName: Map<string, string[]> = new Map();
   static _generatedMethods: Set<string> = new Set();
-  static _validations: ValidationEntry[] = [];
-  static _customValidations: CustomValidationEntry[] = [];
+  static _validators: Array<ValidatorBase | EachValidator> = [];
   static _callbackChain: CallbackChain = new CallbackChain();
   private static _modelName: ModelName | null = null;
 
@@ -265,10 +245,6 @@ export class Model {
   // -- Validations (Phase 1100) --
 
   static validates(attribute: string, rules: Record<string, unknown>): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_validations")) {
-      this._validations = [...this._validations];
-    }
-
     const onContext = rules.on as string | undefined;
     const ifCond = rules.if as ConditionFn | ConditionFn[] | undefined;
     const unlessCond = rules.unless as ConditionFn | ConditionFn[] | undefined;
@@ -276,28 +252,25 @@ export class Model {
     const sharedAllowNil = rules.allowNil as boolean | undefined;
     const sharedAllowBlank = rules.allowBlank as boolean | undefined;
 
-    const push = (validator: Validator) => {
-      if (typeof (validator as AnyRecord).checkValidityBang === "function") {
-        (validator as AnyRecord).checkValidityBang();
-      }
-      this._validations.push({
-        attribute,
-        validator,
-        on: onContext,
-        ...(isStrict && { strict: true }),
-        ...(ifCond !== undefined && { if: ifCond }),
-        ...(unlessCond !== undefined && { unless: unlessCond }),
-      });
-    };
+    const shared: Record<string, unknown> = {};
+    if (onContext !== undefined) shared.on = onContext;
+    if (ifCond !== undefined) shared.if = ifCond;
+    if (unlessCond !== undefined) shared.unless = unlessCond;
+    if (isStrict) shared.strict = true;
+
+    const validatorSpecs: Array<{
+      klass: new (options: Record<string, unknown>) => ValidatorBase;
+      opts: Record<string, unknown>;
+    }> = [];
 
     if (rules.presence) {
       const opts = rules.presence === true ? {} : (rules.presence as AnyRecord);
-      push(new PresenceValidator(opts));
+      validatorSpecs.push({ klass: PresenceValidator, opts });
     }
 
     if (rules.absence) {
       const opts = rules.absence === true ? {} : (rules.absence as AnyRecord);
-      push(new AbsenceValidator(opts));
+      validatorSpecs.push({ klass: AbsenceValidator, opts });
     }
 
     if (rules.length) {
@@ -306,7 +279,7 @@ export class Model {
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
         opts.allowBlank = sharedAllowBlank;
-      push(new LengthValidator(opts));
+      validatorSpecs.push({ klass: LengthValidator, opts });
     }
 
     if (rules.numericality) {
@@ -315,7 +288,7 @@ export class Model {
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
         opts.allowBlank = sharedAllowBlank;
-      push(new NumericalityValidator(opts));
+      validatorSpecs.push({ klass: NumericalityValidator, opts });
     }
 
     if (rules.inclusion) {
@@ -324,7 +297,7 @@ export class Model {
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
         opts.allowBlank = sharedAllowBlank;
-      push(new InclusionValidator(opts));
+      validatorSpecs.push({ klass: InclusionValidator, opts });
     }
 
     if (rules.exclusion) {
@@ -333,7 +306,7 @@ export class Model {
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
         opts.allowBlank = sharedAllowBlank;
-      push(new ExclusionValidator(opts));
+      validatorSpecs.push({ klass: ExclusionValidator, opts });
     }
 
     if (rules.format) {
@@ -342,7 +315,7 @@ export class Model {
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
         opts.allowBlank = sharedAllowBlank;
-      push(new FormatValidator(opts));
+      validatorSpecs.push({ klass: FormatValidator, opts });
     }
 
     if (rules.acceptance) {
@@ -350,7 +323,7 @@ export class Model {
       if (!this._attributeDefinitions.has(attribute)) {
         this.attribute(attribute, "string", { virtual: true });
       }
-      push(new AcceptanceValidator(opts));
+      validatorSpecs.push({ klass: AcceptanceValidator, opts });
     }
 
     if (rules.confirmation) {
@@ -359,11 +332,15 @@ export class Model {
       if (!this._attributeDefinitions.has(confirmationAttr)) {
         this.attribute(confirmationAttr, "string", { virtual: true });
       }
-      push(new ConfirmationValidator(opts));
+      validatorSpecs.push({ klass: ConfirmationValidator, opts });
     }
 
     if (rules.comparison) {
-      push(new ComparisonValidator(rules.comparison as AnyRecord));
+      validatorSpecs.push({ klass: ComparisonValidator, opts: rules.comparison as AnyRecord });
+    }
+
+    for (const { klass, opts } of validatorSpecs) {
+      this.validatesWith(klass, { ...opts, attributes: [attribute], ...shared });
     }
   }
 
@@ -372,8 +349,9 @@ export class Model {
   }
 
   static clearValidatorsBang(): void {
-    this._validations = [];
-    this._customValidations = [];
+    this._validators = [];
+    this._ensureOwnCallbacks();
+    this._callbackChain.clearEvent("validate");
   }
 
   static isAttributeMethod(attribute: string): boolean {
@@ -384,10 +362,15 @@ export class Model {
     methodOrFn: string | ((record: AnyRecord) => void),
     options: ConditionalOptions = {},
   ): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_customValidations")) {
-      this._customValidations = [...this._customValidations];
-    }
-    this._customValidations.push({ method: methodOrFn, options });
+    const fn: CallbackFn = (record: AnyRecord) => {
+      if (typeof methodOrFn === "function") {
+        methodOrFn(record);
+      } else if (typeof record[methodOrFn] === "function") {
+        record[methodOrFn]();
+      }
+    };
+    this._ensureOwnCallbacks();
+    this._callbackChain.register("before", "validate", fn, this._buildValidateConditions(options));
   }
 
   /**
@@ -401,9 +384,15 @@ export class Model {
     options: ConditionalOptions = {},
   ): void {
     const validator = new BlockValidator({ attributes, ...options }, fn);
-    this.validate((record: AnyRecord) => {
-      validator.validate(record);
-    }, options);
+    this._ensureOwnValidators();
+    this._validators.push(validator);
+    this._ensureOwnCallbacks();
+    this._callbackChain.register(
+      "before",
+      "validate",
+      (record: AnyRecord) => validator.validate(record),
+      this._buildValidateConditions(options),
+    );
   }
 
   /**
@@ -413,19 +402,60 @@ export class Model {
    * Mirrors: ActiveModel::Validations.validates_with
    */
   static validatesWith(
-    validatorClass: {
-      new (options?: Record<string, unknown>): { validate(record: AnyRecord): void };
-    },
-    options: ConditionalOptions & { [key: string]: unknown } = {},
+    ...args: Array<
+      | {
+          new (
+            options: Record<string, unknown>,
+          ): ValidatorBase | { validate(record: AnyRecord): void };
+        }
+      | (ConditionalOptions & { strict?: boolean; [key: string]: unknown })
+    >
   ): void {
-    const { if: ifOpt, unless: unlessOpt, on: onOpt, ...rest } = options;
-    const validator = new validatorClass(rest);
-    this.validate(
-      (record: AnyRecord) => {
-        validator.validate(record);
-      },
-      { if: ifOpt, unless: unlessOpt, on: onOpt },
-    );
+    const last = args[args.length - 1];
+    const options: ConditionalOptions & { strict?: boolean; [key: string]: unknown } =
+      typeof last === "function"
+        ? {}
+        : ((args.pop() as ConditionalOptions & { strict?: boolean; [key: string]: unknown }) ?? {});
+
+    const { if: ifOpt, unless: unlessOpt, on: onOpt, strict: isStrict, ...rest } = options;
+    const conditions = this._buildValidateConditions({ if: ifOpt, unless: unlessOpt, on: onOpt });
+
+    for (const klass of args as Array<{
+      new (options: Record<string, unknown>): ValidatorBase | { validate(record: AnyRecord): void };
+    }>) {
+      const validator = new klass(rest);
+      if (!(validator instanceof EachValidator)) {
+        if (typeof (validator as AnyRecord).checkValidity === "function") {
+          (validator as AnyRecord).checkValidity();
+        } else if (typeof (validator as AnyRecord).checkValidityBang === "function") {
+          (validator as AnyRecord).checkValidityBang();
+        }
+      }
+      this._ensureOwnValidators();
+      this._validators.push(validator as ValidatorBase);
+
+      let callbackFn: CallbackFn;
+      if (isStrict) {
+        callbackFn = (record: AnyRecord) => {
+          const origErrors = record.errors;
+          const tempErrors = new Errors(record);
+          record.errors = tempErrors;
+          try {
+            validator.validate(record);
+          } finally {
+            record.errors = origErrors;
+          }
+          if (tempErrors.any) {
+            throw new StrictValidationFailed(tempErrors.fullMessages.join(", "));
+          }
+        };
+      } else {
+        callbackFn = (record: AnyRecord) => validator.validate(record);
+      }
+
+      this._ensureOwnCallbacks();
+      this._callbackChain.register("before", "validate", callbackFn, conditions);
+    }
   }
 
   /**
@@ -433,8 +463,8 @@ export class Model {
    *
    * Mirrors: ActiveModel::Validations.validators
    */
-  static validators(): Array<{ attribute: string; validator: Validator; on?: string }> {
-    return [...this._validations];
+  static validators(): Array<ValidatorBase | EachValidator> {
+    return [...this._validators];
   }
 
   /**
@@ -442,10 +472,11 @@ export class Model {
    *
    * Mirrors: ActiveModel::Validations.validators_on
    */
-  static validatorsOn(attribute: string): Validator[] {
-    return this._validations
-      .filter((entry) => entry.attribute === attribute)
-      .map((entry) => entry.validator);
+  static validatorsOn(attribute: string): Array<ValidatorBase | EachValidator> {
+    return this._validators.filter((v) => {
+      const attributes = (v as AnyRecord).attributes;
+      return Array.isArray(attributes) && attributes.includes(attribute);
+    });
   }
 
   // -- Individual validator helper methods --
@@ -680,9 +711,45 @@ export class Model {
 
   private static _ensureOwnCallbacks(): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-      // Clone parent's chain so subclass inherits existing callbacks
       this._callbackChain = this._callbackChain.clone();
     }
+  }
+
+  private static _ensureOwnValidators(): void {
+    if (!Object.prototype.hasOwnProperty.call(this, "_validators")) {
+      this._validators = [...this._validators];
+    }
+  }
+
+  private static _buildValidateConditions(
+    options: ConditionalOptions,
+  ): CallbackConditions | undefined {
+    const parts: Array<(record: AnyRecord) => boolean> = [];
+
+    if (options.on !== undefined) {
+      const onContext = options.on;
+      parts.push((record: AnyRecord) => {
+        const ctx = record._validationContext;
+        if (!ctx) return false;
+        return ctx === onContext;
+      });
+    }
+
+    if (options.if !== undefined) {
+      const conds = Array.isArray(options.if) ? options.if : [options.if];
+      parts.push((record: AnyRecord) => conds.every((c) => evaluateCondition(record, c)));
+    }
+
+    if (options.unless !== undefined) {
+      const conds = Array.isArray(options.unless) ? options.unless : [options.unless];
+      parts.push((record: AnyRecord) => !conds.some((c) => evaluateCondition(record, c)));
+    }
+
+    if (parts.length === 0) return undefined;
+
+    return {
+      if: (record: AnyRecord) => parts.every((fn) => fn(record)),
+    };
   }
 
   /**
@@ -777,7 +844,7 @@ export class Model {
     this._dirty.snapshot(this._attributes);
 
     // Fire after_initialize callbacks
-    ctor._callbackChain.runAfterSync("initialize", this);
+    ctor._callbackChain.runAfter("initialize", this);
   }
 
   // -- Attribute access --
@@ -894,44 +961,23 @@ export class Model {
     this.errors.clear();
     const ctor = this.constructor as typeof Model;
     const contextStr = context instanceof ValidationContext ? context.name : context;
-    const effectiveContext = contextStr ?? this._validationContext;
+    const prevContext = this._validationContext;
+    this._validationContext = contextStr ?? this._validationContext;
 
-    // Run before_validation callbacks
-    if (!ctor._callbackChain.runBeforeSync("validation", this)) return false;
-
-    // Run attribute validations
-    for (const entry of ctor._validations) {
-      // If validation has an `on` context, only run when context matches
-      if (entry.on && entry.on !== effectiveContext) continue;
-      // Check if/unless conditions
-      if (!shouldValidate(this, { if: entry.if, unless: entry.unless })) continue;
-      const value = this.readAttribute(entry.attribute);
-      if (entry.strict) {
-        const tempErrors = new Errors(this);
-        entry.validator.validate(this, entry.attribute, value, tempErrors);
-        if (tempErrors.any) {
-          const msg = tempErrors.fullMessages.join(", ");
-          throw new StrictValidationFailed(`${entry.attribute} ${msg}`);
-        }
-      } else {
-        entry.validator.validate(this, entry.attribute, value, this.errors);
-      }
+    try {
+      const completed = ctor._callbackChain.runCallbacks("validation", this, () => {
+        this._runValidateCallbacks();
+      });
+      if (!completed) return false;
+      return this.errors.empty;
+    } finally {
+      this._validationContext = prevContext;
     }
+  }
 
-    // Run custom validations
-    for (const entry of ctor._customValidations) {
-      if (!shouldValidate(this, entry.options)) continue;
-      if (typeof entry.method === "function") {
-        entry.method(this);
-      } else if (typeof (this as AnyRecord)[entry.method] === "function") {
-        (this as AnyRecord)[entry.method]();
-      }
-    }
-
-    // Run after_validation callbacks
-    ctor._callbackChain.runAfterSync("validation", this);
-
-    return this.errors.empty;
+  private _runValidateCallbacks(): void {
+    const ctor = this.constructor as typeof Model;
+    ctor._callbackChain.runBefore("validate", this);
   }
 
   /**
@@ -1378,7 +1424,7 @@ export class Model {
   // -- Callbacks helper for subclasses --
 
   runCallbacks(event: string, block: () => void): boolean {
-    return (this.constructor as typeof Model)._callbackChain.runSync(event, this, block);
+    return (this.constructor as typeof Model)._callbackChain.runCallbacks(event, this, block);
   }
 }
 

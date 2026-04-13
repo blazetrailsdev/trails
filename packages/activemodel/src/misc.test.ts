@@ -2068,8 +2068,8 @@ describe("ActiveModel", () => {
 
       const p = new Payment({ amount: 100 });
       // Run callbacks manually
-      (Payment as any)._callbackChain.runBeforeSync("process", p);
-      (Payment as any)._callbackChain.runAfterSync("process", p);
+      (Payment as any)._callbackChain.runBefore("process", p);
+      (Payment as any)._callbackChain.runAfter("process", p);
       expect(log).toEqual(["before_process", "after_process"]);
     });
 
@@ -2144,7 +2144,7 @@ describe("ActiveModel", () => {
       );
 
       const u = new User({ name: "Alice" });
-      await (User as any)._callbackChain.runBefore("save", u);
+      (User as any)._callbackChain.runBefore("save", u);
       expect(order).toEqual(["prepended", "first"]);
     });
   });
@@ -2164,12 +2164,12 @@ describe("ActiveModel", () => {
         m.validates("email", { presence: true });
       });
 
-      // The validations should have on: "create" context
-      const validations = (User as any)._validations;
-      const nameV = validations.find((v: any) => v.attribute === "name");
-      const emailV = validations.find((v: any) => v.attribute === "email");
-      expect(nameV.on).toBe("create");
-      expect(emailV.on).toBe("create");
+      // Validations only run with "create" context, not without
+      const user = new User();
+      expect(user.isValid()).toBe(true);
+      expect(user.isValid("create")).toBe(false);
+      expect(user.errors.on("name")).toContain("can't be blank");
+      expect(user.errors.on("email")).toContain("can't be blank");
     });
   });
 

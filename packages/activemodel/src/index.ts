@@ -31,7 +31,6 @@ export { PresenceValidator } from "./validations/presence.js";
 export { LengthValidator } from "./validations/length.js";
 export { NumericalityValidator } from "./validations/numericality.js";
 export { AcceptsMultiparameterTime } from "./type/helpers/accepts-multiparameter-time.js";
-export type { ValidatorContract } from "./validator.js";
 export { ModelName } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";
 export { CallbackChain } from "./callbacks.js";

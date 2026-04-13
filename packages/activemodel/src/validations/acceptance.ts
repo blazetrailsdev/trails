@@ -1,16 +1,5 @@
-import type { Errors } from "../errors.js";
-import type {
-  AnyRecord,
-  ConditionalOptions,
-  ValidatorContract as Validator,
-} from "../validator.js";
-import { shouldValidate } from "../validator.js";
-
-export interface AcceptanceOptions extends ConditionalOptions {
-  accept?: unknown[];
-  allowNil?: boolean;
-  message?: string;
-}
+import { EachValidator } from "../validator.js";
+import type { AnyRecord } from "../validator.js";
 
 /**
  * Manages lazily-defined virtual attributes for acceptance validation.
@@ -39,23 +28,15 @@ export class LazilyDefineAttributes {
   }
 }
 
-export class AcceptanceValidator implements Validator {
+export class AcceptanceValidator extends EachValidator {
   static readonly lazilyDefineAttributes = new LazilyDefineAttributes([]);
 
-  constructor(private options: AcceptanceOptions = {}) {}
-
-  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
-    if (!shouldValidate(record, this.options)) return;
-    this.validateEach(record, attribute, value, errors);
-  }
-
-  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
-    const errs = errors ?? record.errors;
+  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
     const allowNil = this.options.allowNil ?? true;
     if (allowNil && (value === null || value === undefined)) return;
-    const accepted = this.options.accept ?? ["1", "true", true];
+    const accepted = (this.options.accept as unknown[]) ?? ["1", "true", true];
     if (!accepted.includes(value)) {
-      errs.add(attribute, "accepted", { message: this.options.message });
+      record.errors.add(attribute, "accepted", { message: this.options.message });
     }
   }
 

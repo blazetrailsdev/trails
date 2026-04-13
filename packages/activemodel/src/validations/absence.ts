@@ -1,15 +1,6 @@
-import type { Errors } from "../errors.js";
-import type {
-  AnyRecord,
-  ConditionalOptions,
-  ValidatorContract as Validator,
-} from "../validator.js";
-import { shouldValidate } from "../validator.js";
+import { EachValidator } from "../validator.js";
+import type { AnyRecord } from "../validator.js";
 import { isBlank } from "@blazetrails/activesupport";
-
-export interface AbsenceOptions extends ConditionalOptions {
-  message?: string;
-}
 
 /**
  * HelperMethods — shorthand validators (validates_presence_of, etc.)
@@ -31,18 +22,10 @@ export interface HelperMethods {
   validatesPresenceOf(...attributes: string[]): void;
 }
 
-export class AbsenceValidator implements Validator {
-  constructor(private options: AbsenceOptions = {}) {}
-
-  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
-    if (!shouldValidate(record, this.options)) return;
-    this.validateEach(record, attribute, value, errors);
-  }
-
-  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
-    const errs = errors ?? record.errors;
+export class AbsenceValidator extends EachValidator {
+  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
     if (!isBlank(value)) {
-      errs.add(attribute, "present", { message: this.options.message });
+      record.errors.add(attribute, "present", { message: this.options.message });
     }
   }
 }

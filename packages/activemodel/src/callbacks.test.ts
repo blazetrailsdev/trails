@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
+import { CallbackChain } from "./callbacks.js";
 
 describe("CallbacksTest", () => {
   it("after callbacks are not executed if the block returns false", () => {
@@ -65,7 +66,7 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    await (p.constructor as typeof Model)._callbackChain.runAfter("create", p);
+    (p.constructor as typeof Model)._callbackChain.runAfter("create", p);
     expect(log).toEqual(["first", "second"]);
   });
 
@@ -310,24 +311,21 @@ describe("CallbacksTest", () => {
   });
 });
 
-describe("CallbackChain.runAsync", () => {
-  it("runs after callbacks only after the async block completes", async () => {
-    const { CallbackChain } = await import("./callbacks.js");
+describe("CallbackChain.run", () => {
+  it("runs after callbacks only after the block completes", () => {
     const chain = new CallbackChain();
     const log: string[] = [];
     chain.register("after", "save", () => {
       log.push("after");
     });
-    await chain.run("save", {}, async () => {
+    chain.runCallbacks("save", {}, () => {
       log.push("block:start");
-      await Promise.resolve();
       log.push("block:end");
     });
     expect(log).toEqual(["block:start", "block:end", "after"]);
   });
 
-  it("returns false and skips block when before callback halts", async () => {
-    const { CallbackChain } = await import("./callbacks.js");
+  it("returns false and skips block when before callback halts", () => {
     const chain = new CallbackChain();
     const log: string[] = [];
     chain.register("before", "save", () => {
@@ -337,35 +335,14 @@ describe("CallbackChain.runAsync", () => {
     chain.register("after", "save", () => {
       log.push("after");
     });
-    const result = await chain.run("save", {}, async () => {
+    const result = chain.runCallbacks("save", {}, () => {
       log.push("block");
     });
     expect(result).toBe(false);
     expect(log).toEqual(["before"]);
   });
 
-  it("around callbacks wrap the async block", async () => {
-    const { CallbackChain } = await import("./callbacks.js");
-    const chain = new CallbackChain();
-    const log: string[] = [];
-    chain.register("around", "save", async (_record: any, proceed: () => void | Promise<void>) => {
-      log.push("around:before");
-      await proceed();
-      log.push("around:after");
-    });
-    chain.register("after", "save", () => {
-      log.push("after");
-    });
-    await chain.run("save", {}, async () => {
-      log.push("block:start");
-      await Promise.resolve();
-      log.push("block:end");
-    });
-    expect(log).toEqual(["around:before", "block:start", "block:end", "around:after", "after"]);
-  });
-
-  it("sync around callback still waits for async block", async () => {
-    const { CallbackChain } = await import("./callbacks.js");
+  it("around callbacks wrap the block", () => {
     const chain = new CallbackChain();
     const log: string[] = [];
     chain.register("around", "save", (_record: any, proceed: () => void) => {
@@ -376,71 +353,41 @@ describe("CallbackChain.runAsync", () => {
     chain.register("after", "save", () => {
       log.push("after");
     });
-    await chain.run("save", {}, async () => {
-      log.push("block:start");
-      await Promise.resolve();
-      log.push("block:end");
+    chain.runCallbacks("save", {}, () => {
+      log.push("block");
     });
-    expect(log).toEqual(["around:before", "block:start", "around:after", "block:end", "after"]);
+    expect(log).toEqual(["around:before", "block", "around:after", "after"]);
   });
 
-  it("async before callback that resolves to false halts the chain", async () => {
-    const { CallbackChain } = await import("./callbacks.js");
+  it("before callback that returns false halts the chain", () => {
     const chain = new CallbackChain();
     const log: string[] = [];
-    chain.register("before", "save", async () => {
-      await Promise.resolve();
+    chain.register("before", "save", () => {
       log.push("before");
       return false;
     });
     chain.register("after", "save", () => {
       log.push("after");
     });
-    const result = await chain.run("save", {}, async () => {
+    const result = chain.runCallbacks("save", {}, () => {
       log.push("block");
     });
     expect(result).toBe(false);
     expect(log).toEqual(["before"]);
   });
 
-  it("async after callbacks are awaited in order", async () => {
-    const { CallbackChain } = await import("./callbacks.js");
+  it("after callbacks run in registration order", () => {
     const chain = new CallbackChain();
     const log: string[] = [];
-
-    // Use controlled deferreds so we can prove sequential awaiting.
-    // The second callback's promise resolves before the first's, but
-    // because runAfter awaits sequentially, "after1" must appear
-    // before "after2".
-    let resolveFirst!: () => void;
-    const firstDeferred = new Promise<void>((r) => {
-      resolveFirst = r;
-    });
-    let resolveSecond!: () => void;
-    const secondDeferred = new Promise<void>((r) => {
-      resolveSecond = r;
-    });
-
-    chain.register("after", "save", async () => {
-      await firstDeferred;
+    chain.register("after", "save", () => {
       log.push("after1");
     });
-    chain.register("after", "save", async () => {
-      await secondDeferred;
+    chain.register("after", "save", () => {
       log.push("after2");
     });
-
-    const runPromise = chain.run("save", {}, async () => {
+    chain.runCallbacks("save", {}, () => {
       log.push("block");
     });
-
-    // Resolve second before first — if callbacks ran concurrently,
-    // "after2" would appear before "after1"
-    resolveSecond();
-    await Promise.resolve();
-    resolveFirst();
-
-    await runPromise;
     expect(log).toEqual(["block", "after1", "after2"]);
   });
 });

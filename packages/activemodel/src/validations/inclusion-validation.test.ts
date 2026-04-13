@@ -187,12 +187,12 @@ describe("InclusionValidationTest", () => {
         this.attribute("tags", "string");
       }
     }
-    const validator = new InclusionValidator({ in: ["a", "b", "c"] });
+    const validator = new InclusionValidator({ in: ["a", "b", "c"], attributes: ["tags"] });
     const r1 = new Item();
-    validator.validateEach(r1, "tags", ["a", "b"], r1.errors);
+    validator.validateEach(r1, "tags", ["a", "b"]);
     expect(r1.errors.size).toBe(0);
     const r2 = new Item();
-    validator.validateEach(r2, "tags", ["a", "z"], r2.errors);
+    validator.validateEach(r2, "tags", ["a", "z"]);
     expect(r2.errors.size).toBeGreaterThan(0);
   });
 

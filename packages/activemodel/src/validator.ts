@@ -1,4 +1,3 @@
-import type { Errors } from "./errors.js";
 import { isBlank, underscore } from "@blazetrails/activesupport";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -12,15 +11,7 @@ export interface ConditionalOptions {
   on?: string;
 }
 
-/**
- * Base validator interface — kept for backward compatibility with
- * existing validators that implement this shape.
- */
-export interface ValidatorContract {
-  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void;
-}
-
-function evaluateCondition(record: AnyRecord, cond: ConditionFn): boolean {
+export function evaluateCondition(record: AnyRecord, cond: ConditionFn): boolean {
   if (typeof cond === "function") return cond(record);
   const method = record[cond];
   if (typeof method === "function") return method.call(record);

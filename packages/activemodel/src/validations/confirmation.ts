@@ -1,27 +1,9 @@
-import type { Errors } from "../errors.js";
-import type {
-  AnyRecord,
-  ConditionalOptions,
-  ValidatorContract as Validator,
-} from "../validator.js";
-import { shouldValidate } from "../validator.js";
+import { EachValidator } from "../validator.js";
+import type { AnyRecord } from "../validator.js";
 import { humanize } from "@blazetrails/activesupport";
 
-export interface ConfirmationOptions extends ConditionalOptions {
-  message?: string;
-  caseSensitive?: boolean;
-}
-
-export class ConfirmationValidator implements Validator {
-  constructor(private options: ConfirmationOptions = {}) {}
-
-  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
-    if (!shouldValidate(record, this.options)) return;
-    this.validateEach(record, attribute, value, errors);
-  }
-
-  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
-    const errs = errors ?? record.errors;
+export class ConfirmationValidator extends EachValidator {
+  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
     const confirmationAttr = `${attribute}Confirmation`;
     const confirmation = record.readAttribute?.(confirmationAttr) ?? record[confirmationAttr];
     if (confirmation == null) return;
@@ -37,7 +19,7 @@ export class ConfirmationValidator implements Validator {
       const humanAttr = modelClass?.humanAttributeName
         ? modelClass.humanAttributeName(attribute)
         : humanize(attribute);
-      errs.add(confirmationAttr, "confirmation", {
+      record.errors.add(confirmationAttr, "confirmation", {
         message: this.options.message,
         attribute: humanAttr,
       });

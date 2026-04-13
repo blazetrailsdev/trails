@@ -1,34 +1,8 @@
-import type { Errors } from "../errors.js";
-import type {
-  AnyRecord,
-  ConditionalOptions,
-  ValidatorContract as Validator,
-} from "../validator.js";
-import { shouldValidate } from "../validator.js";
-import { isBlank } from "@blazetrails/activesupport";
+import { EachValidator } from "../validator.js";
+import type { AnyRecord } from "../validator.js";
 
-export interface LengthOptions extends ConditionalOptions {
-  minimum?: number | (() => number);
-  maximum?: number | (() => number);
-  is?: number | (() => number);
-  in?: [number, number];
-  allowNil?: boolean;
-  allowBlank?: boolean;
-  message?: string;
-  tooShort?: string;
-  tooLong?: string;
-  wrongLength?: string;
-}
-
-export class LengthValidator implements Validator {
-  constructor(private options: LengthOptions = {}) {}
-
-  validate(record: AnyRecord, attribute: string, value: unknown, errors: Errors): void {
-    if (!shouldValidate(record, this.options)) return;
-    this.validateEach(record, attribute, value, errors);
-  }
-
-  checkValidityBang(): void {
+export class LengthValidator extends EachValidator {
+  override checkValidity(): void {
     if (
       this.options.minimum === undefined &&
       this.options.maximum === undefined &&
@@ -41,22 +15,16 @@ export class LengthValidator implements Validator {
     }
   }
 
-  validateEach(record: AnyRecord, attribute: string, value: unknown, errors?: Errors): void {
-    const errs = errors ?? record.errors;
-    if (!shouldValidate(record, this.options)) return;
+  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
     if (value === null || value === undefined) {
-      // Rails: nil is always skipped for maximum-only validations
       const maximumOnly =
         this.options.maximum !== undefined &&
         this.options.minimum === undefined &&
         this.options.is === undefined &&
         this.options.in === undefined;
       if (this.options.allowNil !== false || maximumOnly) return;
-      // allowNil is explicitly false and not maximum-only — fall through to validate
     }
-    if (this.options.allowBlank && isBlank(value)) return;
 
-    // Rails: handle any object with a length property
     let length: number;
     if (typeof value === "string" || Array.isArray(value)) {
       length = value.length;
@@ -75,37 +43,41 @@ export class LengthValidator implements Validator {
       if (v === undefined) return undefined;
       return typeof v === "function" ? v() : v;
     };
-    let min = this.options.in ? this.options.in[0] : resolveNum(this.options.minimum);
-    const max = this.options.in ? this.options.in[1] : resolveNum(this.options.maximum);
+    const inOpt = this.options.in as [number, number] | undefined;
+    let min = inOpt
+      ? inOpt[0]
+      : resolveNum(this.options.minimum as number | (() => number) | undefined);
+    const max = inOpt
+      ? inOpt[1]
+      : resolveNum(this.options.maximum as number | (() => number) | undefined);
 
-    // Rails: implicit minimum: 1 when allow_blank is false and no explicit constraints
     if (
       min === undefined &&
       max === undefined &&
       this.options.allowBlank === false &&
       this.options.is === undefined &&
-      this.options.in === undefined
+      inOpt === undefined
     ) {
       min = 1;
     }
 
     if (min !== undefined && length < min) {
-      errs.add(attribute, "too_short", {
-        message: this.options.tooShort ?? this.options.message,
+      record.errors.add(attribute, "too_short", {
+        message: (this.options.tooShort ?? this.options.message) as string | undefined,
         count: min,
         value,
       });
     }
     if (max !== undefined && length > max) {
-      errs.add(attribute, "too_long", {
-        message: this.options.tooLong ?? this.options.message,
+      record.errors.add(attribute, "too_long", {
+        message: (this.options.tooLong ?? this.options.message) as string | undefined,
         count: max,
         value,
       });
     }
     if (this.options.is !== undefined && length !== this.options.is) {
-      errs.add(attribute, "wrong_length", {
-        message: this.options.wrongLength ?? this.options.message,
+      record.errors.add(attribute, "wrong_length", {
+        message: (this.options.wrongLength ?? this.options.message) as string | undefined,
         count: this.options.is,
         value,
       });

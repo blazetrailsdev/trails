@@ -9,13 +9,13 @@ import { PresenceValidator as BasePresenceValidator } from "@blazetrails/activem
 import { isAssociation, resolveAssociation, filterDestroyed } from "./association-helpers.js";
 
 export class PresenceValidator extends BasePresenceValidator {
-  validate(record: any, attribute: string, value: unknown, errors: any): void {
+  validateEach(record: any, attribute: string, value: unknown): void {
     if (isAssociation(record, attribute)) {
       const resolved = resolveAssociation(record, attribute, value);
       const filtered = filterDestroyed(resolved);
-      super.validate(record, attribute, filtered, errors);
+      super.validateEach(record, attribute, filtered);
       return;
     }
-    super.validate(record, attribute, value, errors);
+    super.validateEach(record, attribute, value);
   }
 }
