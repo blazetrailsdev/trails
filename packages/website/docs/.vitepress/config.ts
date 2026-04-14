@@ -22,7 +22,10 @@ export default defineConfig({
       "/guides/": [
         {
           text: "Overview",
-          items: [{ text: "Guides", link: "/guides/" }],
+          items: [
+            { text: "Guides", link: "/guides/" },
+            { text: "Trails Idioms", link: "/guides/idioms" },
+          ],
         },
         {
           text: "Rails Deviations",

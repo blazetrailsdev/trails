@@ -8,6 +8,10 @@ description: Conceptual guides for Trails — how the TypeScript port relates to
 Conceptual guides for Trails. The API reference tells you _what_ exists;
 these guides tell you _why_ it looks the way it does.
 
+If you're coming from Rails and want the quick translation reference,
+start with [**Trails Idioms**](./idioms.md) — the one-page summary of
+the naming, async, and options-object conventions every guide uses.
+
 ## Rails deviations
 
 Trails mirrors the Rails API as closely as TypeScript allows, but some
