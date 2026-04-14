@@ -25,9 +25,9 @@ const aliases = {
   "@blazetrails/rack": path.resolve(__dirname, "../rack/src/index.ts"),
   "@blazetrails/actionview": path.resolve(__dirname, "../actionview/src/index.ts"),
   "@blazetrails/actionpack": path.resolve(__dirname, "../actionpack/src/index.ts"),
-  "@blazetrails/railties/generators": path.resolve(
+  "@blazetrails/trailties/generators": path.resolve(
     __dirname,
-    "../railties/src/generators/index.ts",
+    "../trailties/src/generators/index.ts",
   ),
   $frontiers: path.resolve(__dirname, "src/lib/frontiers"),
 };

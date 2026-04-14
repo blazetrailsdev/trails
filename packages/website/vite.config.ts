@@ -26,7 +26,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/rack", "../rack/src/index.ts"),
       pkgAlias("@blazetrails/actionview", "../actionview/src/index.ts"),
       pkgAlias("@blazetrails/actionpack", "../actionpack/src/index.ts"),
-      pkgAlias("@blazetrails/railties/generators", "../railties/src/generators/index.ts"),
+      pkgAlias("@blazetrails/trailties/generators", "../trailties/src/generators/index.ts"),
     ],
   },
   build: {

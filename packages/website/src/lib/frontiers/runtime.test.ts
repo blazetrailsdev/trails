@@ -26,7 +26,7 @@ describe("createRuntime", () => {
 });
 
 describe("exec: new", () => {
-  it("creates app scaffold files via railties AppGenerator", async () => {
+  it("creates app scaffold files via trailties AppGenerator", async () => {
     const result = await runtime.exec("new myapp");
     expect(result.success).toBe(true);
     expect(result.output.join("\n")).toContain("create  src/config/routes.ts");
@@ -47,11 +47,11 @@ describe("exec: new", () => {
 });
 
 describe("exec: generate model", () => {
-  it("creates model and migration files via railties generators", async () => {
+  it("creates model and migration files via trailties generators", async () => {
     const result = await runtime.exec("generate model User name:string email:string");
     expect(result.success).toBe(true);
 
-    // Model uses railties format (src/app/models/ path, import from @blazetrails)
+    // Model uses trailties format (src/app/models/ path, import from @blazetrails)
     const modelFile = runtime.vfs.read("src/app/models/user.ts");
     expect(modelFile).not.toBeNull();
     expect(modelFile!.content).toContain("class User extends Base");
@@ -59,7 +59,7 @@ describe("exec: generate model", () => {
     expect(modelFile!.content).toContain('this.attribute("email", "string")');
     expect(modelFile!.content).toContain('import { Base } from "@blazetrails/activerecord"');
 
-    // Migration uses railties format
+    // Migration uses trailties format
     const migFiles = runtime.vfs
       .list()
       .filter((f) => f.path.startsWith("db/migrations/") && f.path.includes("create-users"));

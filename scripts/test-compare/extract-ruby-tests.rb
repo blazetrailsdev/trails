@@ -29,7 +29,7 @@ PACKAGE_TEST_DIRS = {
   "actiondispatch" => File.join(RAILS_DIR, "actionpack", "test"),
   "actioncontroller" => File.join(RAILS_DIR, "actionpack", "test"),
   "actionview" => File.join(RAILS_DIR, "actionview", "test"),
-  "railties" => File.join(RAILS_DIR, "railties", "test"),
+  "trailties" => File.join(RAILS_DIR, "railties", "test"),
 }
 
 # Files/directories to skip (infrastructure, not actual tests)

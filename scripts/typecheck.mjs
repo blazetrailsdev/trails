@@ -16,7 +16,7 @@ const projects = [
   "packages/activerecord/tsconfig.json",
   "packages/rack/tsconfig.json",
   "packages/actionpack/tsconfig.json",
-  "packages/railties/tsconfig.json",
+  "packages/trailties/tsconfig.json",
 ];
 
 for (const project of projects) {

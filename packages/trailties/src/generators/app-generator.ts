@@ -61,7 +61,7 @@ export class AppGenerator extends GeneratorBase {
             "@blazetrails/activesupport": "*",
             "@blazetrails/rack": "*",
             "@blazetrails/actionpack": "*",
-            "@blazetrails/railties": "*",
+            "@blazetrails/trailties": "*",
             ...this.dbDependency(options.database),
           },
           devDependencies: {
@@ -189,7 +189,7 @@ export default app;
     this.createFile(
       "vite.config.ts",
       `import { defineConfig } from "vite";
-import { trailsPlugin } from "@blazetrails/railties/vite";
+import { trailsPlugin } from "@blazetrails/trailties/vite";
 
 export default defineConfig({
   plugins: [trailsPlugin()],
@@ -215,7 +215,7 @@ export default defineConfig({
     this.createFile(
       "bin/trails",
       `#!/usr/bin/env node
-import { createProgram } from "@blazetrails/railties";
+import { createProgram } from "@blazetrails/trailties";
 
 const program = createProgram();
 program.parse(process.argv);

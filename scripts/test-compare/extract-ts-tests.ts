@@ -16,7 +16,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "activesupport",
     "rack",
     "actionview",
-    "railties",
+    "trailties",
   ];
   const packageAliases: Record<string, string> = {};
   const result: Record<string, string[]> = {};
@@ -39,7 +39,7 @@ function getPackageTestFiles(): Record<string, string[]> {
   // Shared test files also relevant to controller/ Ruby tests
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
 
-  // Aliased packages (railties → cli)
+  // Aliased packages (trailties → cli)
   for (const [alias, dir] of Object.entries(packageAliases)) {
     const files = globSync(`packages/${dir}/src/**/*.test.ts`, { cwd: ROOT_DIR }).sort();
     result[alias] = files;
@@ -192,7 +192,7 @@ function pkgFromPath(relPath: string): string {
     if (parts[1] === "actionpack" && parts[3]) {
       return parts[3]; // actiondispatch, actioncontroller, actionview
     }
-    if (parts[1] === "railties") return "railties";
+    if (parts[1] === "trailties") return "trailties";
     return parts[1];
   }
   return "unknown";

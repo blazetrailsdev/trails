@@ -73,7 +73,7 @@ export { Railtie } from "./railtie.js";
 export { assertTemplate } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { renderForApi } from "./api/api-rendering.js";
-export { resolveHelperPath, inheritedWithHelpers } from "./railties/helpers.js";
+export { resolveHelperPath, inheritedWithHelpers } from "./trailties/helpers.js";
 export { RescueRegistry } from "./metal/rescue.js";
 export { FlashTypeRegistry } from "./metal/flash.js";
 export { HelperRegistry } from "./metal/helpers.js";

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { AppGenerator, ModelGenerator } from "@blazetrails/railties/generators";
+import { AppGenerator, ModelGenerator } from "@blazetrails/trailties/generators";
 import { fixtures } from "./generator-fixtures.js";
 
 let tmpDir: string;

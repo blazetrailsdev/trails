@@ -123,7 +123,7 @@ importers:
         specifier: workspace:*
         version: link:../activesupport
 
-  packages/railties:
+  packages/trailties:
     dependencies:
       '@blazetrails/actionpack':
         specifier: workspace:*

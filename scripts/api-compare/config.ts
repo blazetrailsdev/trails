@@ -12,7 +12,7 @@ export const PACKAGES = [
   "actiondispatch",
   "actioncontroller",
   "actionview",
-  "railties",
+  "trailties",
 ];
 
 /** Override package → directory mapping when they differ */

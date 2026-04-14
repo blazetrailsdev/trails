@@ -1,5 +1,9 @@
-import { AppGenerator, ModelGenerator, MigrationGenerator } from "@blazetrails/railties/generators";
-import type { AppOptions } from "@blazetrails/railties/generators";
+import {
+  AppGenerator,
+  ModelGenerator,
+  MigrationGenerator,
+} from "@blazetrails/trailties/generators";
+import type { AppOptions } from "@blazetrails/trailties/generators";
 import {
   registerFsAdapter,
   ActiveSupport,
