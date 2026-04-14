@@ -8,7 +8,8 @@
  * Mirrors: ActiveRecord::FinderMethods
  */
 
-import { RecordNotFound, RecordInvalid, SoleRecordExceeded } from "../errors.js";
+import { RecordNotFound, SoleRecordExceeded } from "../errors.js";
+import { RecordInvalid } from "../validations.js";
 
 interface FinderRelation {
   _modelClass: {

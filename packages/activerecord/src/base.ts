@@ -22,7 +22,6 @@ import {
 } from "./inheritance.js";
 import {
   RecordNotFound,
-  RecordInvalid,
   RecordNotSaved,
   RecordNotDestroyed,
   StaleObjectError,
@@ -30,6 +29,15 @@ import {
   ConnectionNotDefined,
   AttributeAssignmentError,
 } from "./errors.js";
+import { AssociatedValidator } from "./validations/associated.js";
+import {
+  RecordInvalid,
+  isValid as validationsIsValid,
+  customValidationContext,
+  defaultValidationContext,
+  performValidations,
+  _setSuperIsValid,
+} from "./validations.js";
 import { encrypts as _encrypts, applyPendingEncryptions } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
@@ -676,22 +684,24 @@ export class Base extends Model {
    * Validate that all named associations are themselves valid.
    *
    * Mirrors: ActiveRecord::Validations::ClassMethods#validates_associated
+   *
+   * Registers AssociatedValidator through validatesWith (matching Rails'
+   * validates_with pattern) so on:/if:/unless:/message: options all work.
    */
-  static validatesAssociated(...associationNames: string[]): void {
-    this.beforeValidation(async function (this: Base) {
-      for (const name of associationNames) {
-        const cached =
-          (this as any)._preloadedAssociations?.get(name) ??
-          (this as any)._cachedAssociations?.get(name);
-        if (!cached) continue;
-        const records = Array.isArray(cached) ? cached : [cached];
-        for (const record of records) {
-          if (record && typeof record.isValid === "function" && !record.isValid()) {
-            this.errors.add(name, "invalid");
-          }
-        }
-      }
-    });
+  /**
+   * Mirrors: ActiveRecord::Reflection::ClassMethods#_reflect_on_association
+   */
+  static _reflectOnAssociation(name: string): any {
+    return (this as any)._reflections?.[name] ?? null;
+  }
+
+  static validatesAssociated(...args: (string | Record<string, unknown>)[]): void {
+    const last = args[args.length - 1];
+    const opts =
+      typeof last === "object" && last !== null ? (args.pop() as Record<string, unknown>) : {};
+    for (const name of args as string[]) {
+      this.validatesWith(AssociatedValidator, { ...opts, attributes: [name] });
+    }
   }
 
   // -- Enums --
@@ -2073,17 +2083,8 @@ export class Base extends Model {
     if (this._readonly) {
       throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
     }
-    const shouldValidate = options?.validate !== false;
-    if (shouldValidate) {
-      // Set validation context for on: :create / on: :update
-      this._validationContext = this._newRecord ? "create" : "update";
-      if (!this.isValid()) {
-        this._validationContext = null;
-        return false;
-      }
-      this._validationContext = null;
-
-      // Run async validations (uniqueness)
+    if (!performValidations.call(this, options)) return false;
+    if (options?.validate !== false) {
       if (!(await this._runAsyncValidations())) return false;
     }
 
@@ -2894,22 +2895,65 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Validations#validate
    */
   /**
-   * Check if this record passes all validations.
+   * Mirrors: ActiveModel::Validations#read_attribute_for_validation
    *
+   * Rails aliases this to `send`, so calling it with an association name
+   * returns the association target (loaded records). We resolve from
+   * association caches first,
+   * falling back to readAttribute for regular columns.
+   */
+  readAttributeForValidation(attribute: string): unknown {
+    const cached = (this as any)._cachedAssociations?.get?.(attribute);
+    if (cached !== undefined) return cached;
+    const preloaded = (this as any)._preloadedAssociations?.get?.(attribute);
+    if (preloaded !== undefined) return preloaded;
+    const proxy = (this as any)._collectionProxies?.get?.(attribute);
+    if (
+      proxy &&
+      (proxy.loaded === true || (Array.isArray(proxy.target) && proxy.target.length > 0))
+    ) {
+      return proxy.target;
+    }
+    if (typeof this.association === "function") {
+      try {
+        const assoc = this.association(attribute);
+        if (assoc?.loaded === true && assoc.target !== undefined) return assoc.target;
+      } catch {
+        // Not an association — fall through
+      }
+    }
+    return this.readAttribute(attribute);
+  }
+
+  /**
    * Mirrors: ActiveRecord::Validations#valid?
+   *
+   * Delegates to validations module for context resolution, then runs
+   * autosave association validations.
    */
   override isValid(context?: string): boolean {
-    const effectiveContext = context ?? this._validationContext ?? undefined;
-    const result = super.isValid(effectiveContext);
+    const effectiveContext =
+      context ?? this._validationContext ?? defaultValidationContext.call(this);
+    const result = validationsIsValid.call(this, effectiveContext);
     if (_validateAssociationsFn) {
       _validateAssociationsFn(this, effectiveContext);
     }
     return result && !this.errors.any;
   }
 
+  /**
+   * Mirrors: ActiveRecord::Validations#validate (alias of valid?)
+   */
   validate(context?: string): this {
     this.isValid(context);
     return this;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Validations#custom_validation_context?
+   */
+  customValidationContext(): boolean {
+    return customValidationContext.call(this);
   }
 
   declare isPresent: () => boolean;
@@ -2917,6 +2961,20 @@ export class Base extends Model {
 
   equals(other: unknown): boolean {
     return this.isEqual(other);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AutosaveAssociation#mark_for_destruction
+   */
+  markForDestruction(): void {
+    (this as any)[Symbol.for("blazetrails.markedForDestruction")] = true;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::AutosaveAssociation#marked_for_destruction?
+   */
+  markedForDestruction(): boolean {
+    return !!(this as any)[Symbol.for("blazetrails.markedForDestruction")];
   }
 
   /**
@@ -3065,3 +3123,7 @@ include(Base, {
 });
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
+
+// Register Model.isValid as the super for the Validations module's isValid.
+// Breaks the recursion: Base.isValid → validations.isValid → Model.isValid.
+_setSuperIsValid(Model.prototype.isValid);

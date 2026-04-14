@@ -131,8 +131,31 @@ describe("AssociationValidationTest", () => {
     expect(valid).toBe(true);
   });
 
-  it.skip("validates associated marked for destruction", () => {
-    /* needs has_many collection proxy with markForDestruction integration */
+  it("validates associated marked for destruction", () => {
+    class FakeReply {
+      _destroyed = false;
+      isValid() {
+        return false;
+      }
+      markedForDestruction() {
+        return this._destroyed;
+      }
+    }
+    class TopicMD extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validatesAssociated("replies");
+      }
+    }
+    registerModel("TopicMD_destruction", TopicMD);
+    const reply = new FakeReply();
+    const t = new TopicMD({ title: "test" });
+    (t as any)._cachedAssociations = new Map([["replies", [reply]]]);
+    expect(t.isValid()).toBe(false);
+    reply._destroyed = true;
+    t.errors.clear();
+    expect(t.isValid()).toBe(true);
   });
   it("validates associated without marked for destruction", () => {
     class FakeReply {
@@ -152,13 +175,51 @@ describe("AssociationValidationTest", () => {
     (t as any).replies = [new FakeReply()];
     expect(t.isValid()).toBe(true);
   });
-  it.skip("validates associated with custom message using quotes", () => {
-    /* custom message not implemented */
+  it("validates associated with custom message using quotes", () => {
+    class FakeTopic {
+      isValid() {
+        return false;
+      }
+    }
+    class ReplyMsg extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validatesAssociated("topic", {
+          message: "This string contains 'single' and \"double\" quotes",
+        });
+      }
+    }
+    registerModel("ReplyMsg", ReplyMsg);
+    const r = new ReplyMsg({ title: "A reply" });
+    (r as any)._cachedAssociations = new Map([["topic", new FakeTopic()]]);
+    expect(r.isValid()).toBe(false);
+    expect(r.errors.fullMessagesFor("topic")).toContain(
+      "Topic This string contains 'single' and \"double\" quotes",
+    );
   });
-  it.skip("validates associated with custom context", () => {
-    /* validation contexts not implemented */
+  it("validates associated with custom context", () => {
+    class FakeTopic {
+      isValid(context?: string) {
+        if (context === "custom") return false;
+        return true;
+      }
+    }
+    class ReplyCtx extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.validatesAssociated("topic", { on: "custom" });
+      }
+    }
+    registerModel("ReplyCtx", ReplyCtx);
+    const r = new ReplyCtx({ title: "A reply" });
+    (r as any)._cachedAssociations = new Map([["topic", new FakeTopic()]]);
+    expect(r.isValid()).toBe(true);
+    expect(r.isValid("custom")).toBe(false);
+    expect(r.errors.fullMessagesFor("topic")).toEqual(["Topic is invalid"]);
   });
   it.skip("validates associated with create context", () => {
-    /* validation contexts not implemented */
+    /* needs update! and replies.create — complex persistence operations */
   });
 });

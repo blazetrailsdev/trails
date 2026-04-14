@@ -82,10 +82,14 @@ export class EachValidator extends Validator {
 
   validate(record: AnyRecord): void {
     for (const attribute of this.attributes) {
+      // Rails: record.read_attribute_for_validation(attribute)
+      // Defaults to send(attr) — AR overrides to resolve associations.
       const value =
-        typeof record.readAttribute === "function"
-          ? record.readAttribute(attribute)
-          : record[attribute];
+        typeof record.readAttributeForValidation === "function"
+          ? record.readAttributeForValidation(attribute)
+          : typeof record.readAttribute === "function"
+            ? record.readAttribute(attribute)
+            : record[attribute];
       if (value == null && this.options.allowNil === true) continue;
       if (isBlank(value) && this.options.allowBlank === true) continue;
       this.validateEach(record, attribute, value);

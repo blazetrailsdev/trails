@@ -41,7 +41,14 @@ export class NumericalityValidator extends EachValidator {
     }
   }
 
-  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
+  // Rails: validate_each(record, attr_name, value, precision: Float::DIG, scale: nil)
+  validateEach(
+    record: AnyRecord,
+    attribute: string,
+    value: unknown,
+    precision = 15,
+    scale?: number,
+  ): void {
     if (value === null || value === undefined) {
       if (this.options.allowNil !== false) return;
       record.errors.add(attribute, "not_a_number", { value, message: this.options.message });
@@ -54,11 +61,14 @@ export class NumericalityValidator extends EachValidator {
       return;
     }
 
-    const num = Number(value);
-    if (isNaN(num)) {
+    const raw = Number(value);
+    if (isNaN(raw)) {
       record.errors.add(attribute, "not_a_number", { value, message: this.options.message });
       return;
     }
+
+    // Rails: parse_as_number → round(value, scale).to_d(precision)
+    const num = parseAsNumber(raw, precision, scale);
 
     if (this.options.onlyInteger && !Number.isInteger(num)) {
       record.errors.add(attribute, "not_an_integer", { value, message: this.options.message });
@@ -113,4 +123,19 @@ export class NumericalityValidator extends EachValidator {
       record.errors.add(attribute, "even", { value, message: msg });
     }
   }
+}
+
+/**
+ * Rails: parse_as_number → round(value, scale).to_d(precision)
+ *
+ * Rounds to scale decimal places, then truncates to precision significant
+ * digits. This matches Ruby's BigDecimal(float.round(scale), precision).
+ */
+function parseAsNumber(num: number, precision: number, scale?: number): number {
+  let result = num;
+  if (scale != null) {
+    const factor = Math.pow(10, scale);
+    result = Math.round(result * factor) / factor;
+  }
+  return +result.toPrecision(precision);
 }

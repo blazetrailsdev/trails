@@ -129,7 +129,6 @@ export {
   ConnectionTimeoutError,
   ReadOnlyError,
   RecordNotFound,
-  RecordInvalid,
   RecordNotSaved,
   RecordNotDestroyed,
   SoleRecordExceeded,
@@ -158,6 +157,7 @@ export {
   TransactionIsolationError,
   IrreversibleOrderError,
 } from "./errors.js";
+export { RecordInvalid } from "./validations.js";
 export {
   AssociationNotFoundError,
   InverseOfAssociationNotFoundError,

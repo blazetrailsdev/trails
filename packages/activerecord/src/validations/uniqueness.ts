@@ -4,24 +4,43 @@
  * Validates that the specified attribute value is unique in the database.
  * Builds a query against the model's table to check for existing records
  * with the same value, optionally scoped to other columns.
- *
- * Note: this class exists for API parity. The primary uniqueness
- * validation path is Base.validatesUniqueness() which registers async
- * validators at the class level. Using this validator directly via
- * validatesWith may not integrate with the async validation lifecycle.
- *
- * Options:
- *   scope      - Additional columns to scope the uniqueness check
- *   conditions - A callable that adds additional conditions to the query
- *   message    - Custom error message
  */
 import { EachValidator } from "@blazetrails/activemodel";
 
 export class UniquenessValidator extends EachValidator {
+  private _klass: any;
+
+  /**
+   * Mirrors: ActiveRecord::Validations::UniquenessValidator#initialize
+   *
+   * Validates options: :conditions must be callable, :scope must be
+   * strings. Extracts :class option for finder resolution.
+   */
+  constructor(options: Record<string, unknown> = {}) {
+    if (options.conditions != null && typeof options.conditions !== "function") {
+      throw new Error(
+        `${options.conditions} was passed as :conditions but is not callable. ` +
+          "Pass a callable instead: `conditions: () => where({ approved: true })`",
+      );
+    }
+    const scope = options.scope;
+    if (scope != null) {
+      const scopes = Array.isArray(scope) ? scope : [scope];
+      if (!scopes.every((s) => typeof s === "string")) {
+        throw new Error(
+          `${scope} is not a supported format for :scope option. ` +
+            "Pass a string or an array of strings instead: `scope: 'userId'`",
+        );
+      }
+    }
+    super(options);
+    this._klass = options.class ?? null;
+  }
+
   validateEach(record: any, attribute: string, value: unknown): void {
     if (value == null) return;
 
-    const modelClass = record.constructor as any;
+    const modelClass = (this._klass ?? record.constructor) as any;
     if (!modelClass.where) return;
 
     let relation = modelClass.where({ [attribute]: value });
@@ -34,6 +53,7 @@ export class UniquenessValidator extends EachValidator {
     }
 
     const opts = this.options as any;
+
     if (opts?.scope) {
       const scopes = Array.isArray(opts.scope) ? opts.scope : [opts.scope];
       for (const scopeAttr of scopes) {
@@ -42,8 +62,11 @@ export class UniquenessValidator extends EachValidator {
     }
 
     if (opts?.conditions && typeof opts.conditions === "function") {
-      const conditioned = opts.conditions.call(relation, relation);
-      if (conditioned) relation = conditioned;
+      const conditioned =
+        opts.conditions.length === 0
+          ? opts.conditions.call(relation)
+          : opts.conditions.call(relation, record);
+      if (conditioned != null) relation = conditioned;
     }
 
     let asyncValidations = (record as any)._asyncValidationPromises as

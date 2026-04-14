@@ -3,7 +3,7 @@ import { _setValidateAssociationsFn } from "./base.js";
 import type { AssociationDefinition } from "./associations.js";
 import { underscore } from "@blazetrails/activesupport";
 
-const MARKED_FOR_DESTRUCTION = Symbol("markedForDestruction");
+const MARKED_FOR_DESTRUCTION = Symbol.for("blazetrails.markedForDestruction");
 
 /**
  * Mark a record to be destroyed when the parent saves.

@@ -9,24 +9,30 @@
  *   }
  */
 import { EachValidator } from "@blazetrails/activemodel";
-import { isMarkedForDestruction } from "../autosave-association.js";
-import { resolveAssociation } from "./association-helpers.js";
 
 export class AssociatedValidator extends EachValidator {
   validateEach(record: any, attribute: string, value: unknown): void {
-    const associationValue = resolveAssociation(record, attribute, value);
+    const context = this._recordValidationContextForAssociation(record);
+    const values = Array.isArray(value) ? value : value != null ? [value] : [];
 
-    const values = Array.isArray(associationValue)
-      ? associationValue
-      : associationValue
-        ? [associationValue]
-        : [];
-    for (const assoc of values) {
-      if (isMarkedForDestruction(assoc)) continue;
-      if (typeof assoc?.isValid === "function" && !assoc.isValid()) {
-        record.errors.add(attribute, "invalid", { value: associationValue });
-        return;
-      }
+    if (values.some((assoc: any) => !this._validObject(assoc, context))) {
+      const { attributes: _, ...errorOpts } = this.options as Record<string, unknown>;
+      record.errors.add(attribute, "invalid", { ...errorOpts, value });
     }
+  }
+
+  private _validObject(record: any, context: string | undefined): boolean {
+    if (typeof record?.markedForDestruction === "function" && record.markedForDestruction()) {
+      return true;
+    }
+    if (typeof record?.isValid !== "function") return true;
+    return context != null ? record.isValid(context) : record.isValid();
+  }
+
+  private _recordValidationContextForAssociation(record: any): string | undefined {
+    if (typeof record.customValidationContext === "function" && record.customValidationContext()) {
+      return record._validationContext;
+    }
+    return undefined;
   }
 }

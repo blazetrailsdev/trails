@@ -158,20 +158,11 @@ export class RecordNotDestroyed extends ActiveRecordError {
   }
 }
 
-export class RecordInvalid extends ActiveRecordError {
-  readonly record: any;
-
-  constructor(record: any) {
-    const fullMessages = record.errors?.fullMessages;
-    const message =
-      Array.isArray(fullMessages) && fullMessages.length > 0
-        ? `Validation failed: ${fullMessages.join(", ")}`
-        : "Validation failed";
-    super(message);
-    this.name = "RecordInvalid";
-    this.record = record;
-  }
-}
+// RecordInvalid is defined in validations.ts (matching Rails' validations.rb).
+// Type-only re-export: a runtime re-export would create a circular dependency
+// (errors.ts → validations.ts → errors.ts). The public API exports
+// RecordInvalid from index.ts which imports from validations.ts.
+export type { RecordInvalid } from "./validations.js";
 
 export class SoleRecordExceeded extends ActiveRecordError {
   readonly model?: any;

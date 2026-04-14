@@ -6,16 +6,16 @@
  * are excluded from the presence check.
  */
 import { PresenceValidator as BasePresenceValidator } from "@blazetrails/activemodel";
-import { isAssociation, resolveAssociation, filterDestroyed } from "./association-helpers.js";
 
 export class PresenceValidator extends BasePresenceValidator {
   validateEach(record: any, attribute: string, value: unknown): void {
-    if (isAssociation(record, attribute)) {
-      const resolved = resolveAssociation(record, attribute, value);
-      const filtered = filterDestroyed(resolved);
-      super.validateEach(record, attribute, filtered);
-      return;
+    let associationOrValue = value;
+    if (record.constructor._reflectOnAssociation?.(attribute)) {
+      const arr = Array.isArray(value) ? value : value != null ? [value] : [];
+      associationOrValue = arr.filter(
+        (v: any) => !(typeof v?.markedForDestruction === "function" && v.markedForDestruction()),
+      );
     }
-    super.validateEach(record, attribute, value);
+    super.validateEach(record, attribute, associationOrValue);
   }
 }

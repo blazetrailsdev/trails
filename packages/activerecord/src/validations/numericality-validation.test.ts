@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
+import { NumericalityValidator } from "./numericality.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -104,5 +105,54 @@ describe("NumericalityValidationTest", () => {
     }
     const w = new Widget2({});
     expect(w.isValid()).toBe(true);
+  });
+  it("column with precision rounds value before comparison", () => {
+    // AR NumericalityValidator extracts precision/scale from typeForAttribute
+    // and passes to AM's validateEach which rounds the value before checks.
+    class Decimal extends Base {
+      static {
+        this.attribute("amount", "decimal");
+        this.adapter = adapter;
+        this.validatesWith(NumericalityValidator, {
+          attributes: ["amount"],
+          lessThan: 1000,
+        });
+      }
+      static typeForAttribute(name: string): any {
+        if (name === "amount") return { precision: 5, scale: 2 };
+        return null;
+      }
+    }
+    // 999.99 < 1000 — valid
+    const d = new Decimal({ amount: 999.99 });
+    expect(d.isValid()).toBe(true);
+
+    // 1000 is not < 1000 — invalid
+    const d2 = new Decimal({ amount: 1000 });
+    expect(d2.isValid()).toBe(false);
+  });
+  it("column with scale rounds fractional digits before comparison", () => {
+    class Decimal extends Base {
+      static {
+        this.attribute("amount", "decimal");
+        this.adapter = adapter;
+        // greaterThan: 1.23 — value is rounded to scale=2 before compare
+        this.validatesWith(NumericalityValidator, {
+          attributes: ["amount"],
+          greaterThan: 1.23,
+        });
+      }
+      static typeForAttribute(name: string): any {
+        if (name === "amount") return { precision: 5, scale: 2 };
+        return null;
+      }
+    }
+    // 1.234 rounds to 1.23 at scale=2 → not > 1.23 → invalid
+    const d = new Decimal({ amount: 1.234 });
+    expect(d.isValid()).toBe(false);
+
+    // 1.235 rounds to 1.24 at scale=2 → > 1.23 → valid
+    const d2 = new Decimal({ amount: 1.235 });
+    expect(d2.isValid()).toBe(true);
   });
 });

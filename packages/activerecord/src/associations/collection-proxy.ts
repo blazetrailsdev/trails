@@ -4,7 +4,8 @@ import { applyThenable, stripThenable } from "../relation/thenable.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
-import { StrictLoadingViolationError, RecordInvalid, RecordNotSaved } from "../errors.js";
+import { StrictLoadingViolationError, RecordNotSaved } from "../errors.js";
+import { RecordInvalid } from "../validations.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
   HasManyThroughNestedAssociationsAreReadonly,
