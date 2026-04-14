@@ -13,11 +13,26 @@ export default defineConfig({
     siteTitle: "BlazeTrails",
     nav: [
       { text: "Docs", link: "/" },
+      { text: "Guides", link: "/guides/" },
       { text: "Website", link: siteRoot },
       { text: "API Reference", link: "/api/@blazetrails/arel/README" },
     ],
 
     sidebar: {
+      "/guides/": [
+        {
+          text: "Overview",
+          items: [{ text: "Guides", link: "/guides/" }],
+        },
+        {
+          text: "Rails Deviations",
+          items: [
+            { text: "Arel", link: "/guides/arel-rails-deviations" },
+            { text: "ActiveModel", link: "/guides/activemodel-rails-deviations" },
+            { text: "ActiveRecord", link: "/guides/activerecord-rails-deviations" },
+          ],
+        },
+      ],
       "/api/": [
         {
           text: "Packages",

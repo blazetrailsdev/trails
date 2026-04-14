@@ -6,6 +6,9 @@ hero:
   tagline: TypeScript packages that mirror the Rails API. trails is the CLI.
   actions:
     - theme: brand
+      text: Guides
+      link: /guides/
+    - theme: alt
       text: API Reference
       link: /api/@blazetrails/arel/README
     - theme: alt
@@ -24,4 +27,8 @@ features:
     details: Web server interface, middleware, request/response handling.
   - title: ActionPack
     details: Routing, controllers, cookies, and sessions (ActionDispatch + ActionController).
+  - title: Rails Deviations
+    details: Where Trails diverges from Rails and why — async propagation, mixin helpers, browser adapters.
+    link: /guides/
+    linkText: Read the guides
 ---
