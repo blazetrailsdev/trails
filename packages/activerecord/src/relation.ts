@@ -3061,6 +3061,10 @@ export class Relation<T extends Base> {
     rel._skipQueryCache = this._skipQueryCache;
     return wrapWithScopeProxy(rel);
   }
+
+  _execScope(fn: (...args: unknown[]) => unknown, ...args: unknown[]): Relation<T> {
+    return (fn.call(this, ...args) || this) as Relation<T>;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -455,6 +455,13 @@ export async function withTransactionReturningStatus<T>(
 }
 
 /**
+ * Mirrors: ActiveRecord::Transactions#_new_record_before_last_commit (attr_accessor)
+ */
+export function _newRecordBeforeLastCommit(record: Base): boolean {
+  return (record as any)._newRecordBeforeLastCommit ?? false;
+}
+
+/**
  * Returns whether the record should trigger transactional callbacks.
  *
  * Mirrors: ActiveRecord::Transactions#trigger_transactional_callbacks?

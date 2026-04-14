@@ -15,6 +15,7 @@ export interface InsertAllOptions {
   onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
   updateOnly?: string | string[];
   uniqueBy?: string | string[];
+  returning?: string | string[] | Nodes.SqlLiteral | false;
   recordTimestamps?: boolean;
 }
 
@@ -24,6 +25,7 @@ export class InsertAll {
   readonly inserts: Record<string, unknown>[];
   readonly keys: Set<string>;
   readonly uniqueBy: string | string[] | undefined;
+  readonly returning: string | string[] | Nodes.SqlLiteral | false;
 
   onDuplicate: "skip" | "update" | undefined;
   updateOnly: string | string[] | undefined;
@@ -59,6 +61,20 @@ export class InsertAll {
     this.updateSql = undefined;
     this.onDuplicate = undefined;
 
+    if (options.returning !== undefined) {
+      this.returning =
+        options.returning === false ||
+        (Array.isArray(options.returning) && options.returning.length === 0)
+          ? false
+          : options.returning;
+    } else {
+      const supportsReturning =
+        typeof (connection as any).supportsInsertReturning === "function"
+          ? (connection as any).supportsInsertReturning()
+          : false;
+      this.returning = supportsReturning ? this.primaryKeys() : false;
+    }
+
     if (this.inserts.length === 0) {
       this.keys = new Set();
     } else {
@@ -75,6 +91,7 @@ export class InsertAll {
 
     this._verifyAttributes();
     this._configureDuplicateLogic(options.onDuplicate);
+    this._ensureValidOptionsForConnection();
   }
 
   async execute(): Promise<number> {
@@ -187,6 +204,18 @@ export class InsertAll {
     if (!this.uniqueBy) return [];
     return Array.isArray(this.uniqueBy) ? this.uniqueBy : [this.uniqueBy];
   }
+
+  private _ensureValidOptionsForConnection(): void {
+    if (
+      this.returning &&
+      typeof (this.connection as any).supportsInsertReturning === "function" &&
+      !(this.connection as any).supportsInsertReturning()
+    ) {
+      throw new Error(
+        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support INSERT...RETURNING`,
+      );
+    }
+  }
 }
 
 /**
@@ -207,6 +236,25 @@ export class Builder {
     this._insertAll = insertAll;
     this.model = insertAll.model;
     this._dialect = dialect;
+  }
+
+  returning(): string | undefined {
+    const ret = this._insertAll.returning;
+    if (!ret) return undefined;
+    if (ret instanceof Nodes.SqlLiteral) return ret.value;
+    const cols = Array.isArray(ret) ? ret : [ret];
+    return cols
+      .map((attr: string) => {
+        const model = this._insertAll.model;
+        if (
+          typeof (model as any).attributeAlias === "function" &&
+          (model as any).attributeAlias(attr)
+        ) {
+          return `"${(model as any).attributeAlias(attr).replace(/"/g, '""')}" AS "${attr.replace(/"/g, '""')}"`;
+        }
+        return `"${attr.replace(/"/g, '""')}"`;
+      })
+      .join(", ");
   }
 
   toSql(): string {
@@ -310,6 +358,11 @@ export class Builder {
         );
         sql += assignments.join(",");
       }
+    }
+
+    const ret = this.returning();
+    if (ret) {
+      sql += ` RETURNING ${ret}`;
     }
 
     return sql;

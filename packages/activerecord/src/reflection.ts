@@ -337,8 +337,16 @@ export class MacroReflection extends AbstractReflection {
       this._klassCache = this.options.anonymousClass as typeof Base;
       return this._klassCache;
     }
-    this._klassCache = this.computeClass(this.className);
+    this._klassCache = this._klass(this.className);
     return this._klassCache;
+  }
+
+  _klass(className: string): typeof Base {
+    // Rails uses this for namespace-aware resolution (tries ::ClassName
+    // before Module::ClassName). Our model registry is flat, so this
+    // delegates directly to computeClass. When namespace support is
+    // added, this should try top-level resolution first.
+    return this.computeClass(className);
   }
 
   computeClass(name: string): typeof Base {

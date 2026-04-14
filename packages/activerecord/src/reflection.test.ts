@@ -674,8 +674,47 @@ describe("ReflectionTest", () => {
   it.skip("non existent types are identity types", () => {
     /* needs unknown type fallback to identity type */
   });
-  it.skip("reflection klass for nested class name", () => {});
-  it.skip("irregular reflection class name", () => {});
+  it("reflection klass for nested class name", () => {
+    const adp = freshAdapter();
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    class Book extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    registerModel("Library::Book", Book);
+    registerModel("Author", Author);
+    Associations.hasMany.call(Author, "books", { className: "Library::Book" });
+    const ref = reflectOnAssociation(Author, "books");
+    expect(ref).not.toBeNull();
+    expect(ref!.klass).toBe(Book);
+  });
+  it("irregular reflection class name", () => {
+    const adp = freshAdapter();
+    class Person extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    class Address extends Base {
+      static {
+        this.attribute("street", "string");
+        this.adapter = adp;
+      }
+    }
+    registerModel("Person", Person);
+    registerModel("Address", Address);
+    Associations.hasMany.call(Person, "addresses", { className: "Address" });
+    const ref = reflectOnAssociation(Person, "addresses");
+    expect(ref!.klass).toBe(Address);
+  });
   it.skip("reflection klass with same demodularized different modularized name", () => {});
   it.skip("reflection klass with same modularized name", () => {});
   it("reflect on all autosave associations", () => {
@@ -1507,8 +1546,25 @@ describe("ReflectionTest", () => {
     expect(ref!.klass).toBe(Child);
   });
 
-  it.skip("reflection klass with same demodularized name", () => {
-    // Requires module/namespace support
+  it("reflection klass with same demodularized name", () => {
+    const adp = freshAdapter();
+    class Project extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    class Task extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    registerModel("Project", Project);
+    registerModel("Task", Task);
+    Associations.hasMany.call(Project, "tasks", {});
+    const ref = reflectOnAssociation(Project, "tasks");
+    expect(ref!.klass).toBe(Task);
   });
 
   it("aggregation reflection", () => {

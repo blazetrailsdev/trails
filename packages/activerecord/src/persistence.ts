@@ -5,6 +5,8 @@
  * Mirrors: ActiveRecord::Persistence::ClassMethods
  */
 
+import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
+
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
   _instantiate(row: Record<string, unknown>, columnTypes?: Record<string, any>): any;
@@ -104,4 +106,96 @@ export function compositeQueryConstraintsList(this: PersistenceHost): string[] {
   if (list) return list;
   const pk = this.primaryKey;
   return Array.isArray(pk) ? pk : [pk];
+}
+
+/**
+ * Builds and executes an INSERT for the given values.
+ *
+ * Mirrors: ActiveRecord::Persistence::ClassMethods#_insert_record
+ */
+export async function _insertRecord(
+  this: PersistenceHost,
+  connection: {
+    insert?(arel: unknown, ...args: unknown[]): Promise<unknown>;
+    executeMutation?(sql: string, binds?: unknown[]): Promise<number>;
+    toSql?(arel: unknown): string;
+    emptyInsertStatementValue?(): string;
+  },
+  values: Record<string, unknown>,
+): Promise<number> {
+  const table: ArelTable = (this as any).arelTable;
+  const im = new InsertManager(table);
+
+  const entries = Object.entries(values);
+  if (entries.length > 0) {
+    im.insert(entries.map(([col, val]) => [table.get(col), val]));
+  }
+
+  if (typeof connection.insert === "function") {
+    const result = await connection.insert(im);
+    return typeof result === "number" ? result : 0;
+  }
+
+  // Fallback for simple adapters without insert()
+  const sql = connection.toSql ? connection.toSql(im) : im.toSql();
+  const finalSql =
+    entries.length > 0
+      ? sql
+      : `${sql} ${connection.emptyInsertStatementValue?.() ?? "DEFAULT VALUES"}`;
+  return connection.executeMutation!(finalSql);
+}
+
+/**
+ * Builds and executes an UPDATE with the given values and constraints.
+ *
+ * Mirrors: ActiveRecord::Persistence::ClassMethods#_update_record
+ */
+export async function _updateRecord(
+  this: PersistenceHost,
+  values: Record<string, unknown>,
+  constraints: Record<string, unknown>,
+): Promise<number> {
+  const setEntries = Object.entries(values);
+  if (setEntries.length === 0) return 0;
+
+  const table: ArelTable = (this as any).arelTable;
+  const um = new UpdateManager();
+  um.table(table);
+  um.set(setEntries.map(([col, val]) => [table.get(col), val]));
+
+  for (const [col, val] of Object.entries(constraints)) {
+    um.where(table.get(col).eq(val));
+  }
+
+  const adapter = (this as any).adapter;
+  if (typeof adapter.update === "function") {
+    return adapter.update(um);
+  }
+  const sql = adapter.toSql ? adapter.toSql(um) : um.toSql();
+  return adapter.executeMutation(sql);
+}
+
+/**
+ * Builds and executes a DELETE with the given constraints.
+ *
+ * Mirrors: ActiveRecord::Persistence::ClassMethods#_delete_record
+ */
+export async function _deleteRecord(
+  this: PersistenceHost,
+  constraints: Record<string, unknown>,
+): Promise<number> {
+  const table: ArelTable = (this as any).arelTable;
+  const dm = new DeleteManager();
+  dm.from(table);
+
+  for (const [col, val] of Object.entries(constraints)) {
+    dm.where(table.get(col).eq(val));
+  }
+
+  const adapter = (this as any).adapter;
+  if (typeof adapter.delete === "function") {
+    return adapter.delete(dm);
+  }
+  const sql = adapter.toSql ? adapter.toSql(dm) : dm.toSql();
+  return adapter.executeMutation(sql);
 }

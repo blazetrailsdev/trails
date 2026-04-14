@@ -361,6 +361,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return `${sql} /* ${comment.replace(/\*\//g, "* /")} */`;
   }
 
+  addSqlCommentBang(sql: string, comment: string): string {
+    if (comment) return `${sql} COMMENT ${mysqlQuoteString(comment)}`;
+    return sql;
+  }
+
   async foreignKeys(tableName: string): Promise<unknown[]> {
     void tableName;
     return [];

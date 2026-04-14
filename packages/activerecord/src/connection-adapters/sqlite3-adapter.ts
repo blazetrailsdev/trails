@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { Visitors } from "@blazetrails/arel";
 import type { DatabaseAdapter } from "../adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
@@ -47,6 +48,10 @@ export class SQLite3Adapter
 {
   override get adapterName(): string {
     return "SQLite";
+  }
+
+  override get arelVisitor(): Visitors.ToSql {
+    return new Visitors.SQLite();
   }
 
   private db: Database.Database;

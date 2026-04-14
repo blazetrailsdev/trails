@@ -5,7 +5,7 @@
  */
 
 import type { DatabaseAdapter } from "../adapter.js";
-import type { Nodes } from "@blazetrails/arel";
+import { type Nodes, Visitors } from "@blazetrails/arel";
 import { ReadOnlyError } from "../errors.js";
 import { SchemaCache } from "./schema-cache.js";
 import { isWriteQuerySql, stripSqlComments } from "./sql-classification.js";
@@ -458,6 +458,16 @@ export class AbstractAdapter {
 
   get visitor(): unknown {
     return (this.pool as any)?.visitor ?? null;
+  }
+
+  /**
+   * Returns the Arel visitor for this adapter's SQL dialect.
+   * Subclasses override to return MySQL/PostgreSQL visitors.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#arel_visitor
+   */
+  get arelVisitor(): Visitors.ToSql {
+    return new Visitors.ToSql();
   }
 
   private _preparedStatementsDisabledCache = new Set<unknown>();

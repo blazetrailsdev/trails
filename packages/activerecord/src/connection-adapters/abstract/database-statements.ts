@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements
  */
 
-import { sql as arelSql, Nodes } from "@blazetrails/arel";
+import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { TransactionIsolationError } from "../../errors.js";
 import { quote, quoteTableName, quoteColumnName } from "./quoting.js";
 import { TransactionManager } from "./transaction.js";
@@ -51,17 +51,26 @@ export interface DatabaseStatementsHost {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#to_sql
  */
-export function toSql(arel: unknown, binds: unknown[] = []): string {
-  const [sql] = toSqlAndBinds(arel, binds);
+export function toSql(
+  this: DatabaseStatementsHost | void,
+  arel: unknown,
+  binds: unknown[] = [],
+): string {
+  const [sql] = toSqlAndBinds.call(this, arel, binds);
   return sql;
 }
 
 /**
  * Converts an arel AST to SQL and binds.
  *
+ * When called on an adapter with an `arelVisitor`, uses that visitor to
+ * compile Arel nodes (matching Rails' `visitor.compile(arel, collector)`).
+ * Falls back to the node's own `toSql()` for standalone usage.
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#to_sql_and_binds
  */
 export function toSqlAndBinds(
+  this: DatabaseStatementsHost | void,
   arel: unknown,
   binds: unknown[] = [],
   preparable: boolean | null = null,
@@ -72,19 +81,22 @@ export function toSqlAndBinds(
   }
 
   // Arel::TreeManager -> Arel::Node (unwrap .ast)
-  if (arel && (arel as any).ast != null && typeof (arel as any).ast === "object") {
-    arel = (arel as any).ast;
+  let node = arel;
+  if (node && (node as any).ast != null && typeof (node as any).ast === "object") {
+    node = (node as any).ast;
   }
 
-  // Arel node — compile to SQL via toSql()
-  if (arel instanceof Nodes.Node || (arel && typeof (arel as any).toSql === "function")) {
+  // Arel node — compile via adapter visitor when available, else generic toSql()
+  if (node instanceof Nodes.Node || (node && typeof (node as any).toSql === "function")) {
     if (binds.length > 0) {
       throw new Error(
         "Passing bind parameters with an arel AST is forbidden. " +
           "The values must be stored on the AST directly",
       );
     }
-    const sql = (arel as any).toSql();
+    const visitor = (this as any)?.arelVisitor as Visitors.ToSql | undefined;
+    const sql =
+      visitor && node instanceof Nodes.Node ? visitor.compile(node) : (node as any).toSql();
     return [sql, [], preparable, allowRetry];
   }
 

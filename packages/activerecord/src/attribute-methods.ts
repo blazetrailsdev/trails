@@ -265,3 +265,7 @@ export function isDangerousClassMethod(this: AttributeMethodsHost, methodName: s
 export function isAttributeMethod(this: AttributeMethodsHost, name: string): boolean {
   return this._attributeDefinitions.has(name);
 }
+
+export function _hasAttribute(this: AttributeMethodsHost, attrName: string): boolean {
+  return this._attributeDefinitions.has(attrName);
+}

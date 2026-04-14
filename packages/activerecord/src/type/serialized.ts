@@ -36,6 +36,10 @@ export class Serialized extends Type {
     }
   }
 
+  accessor(): unknown {
+    return null;
+  }
+
   deserialize(value: unknown): unknown {
     if (this.isDefaultValue(value)) return value;
     const deserialized = this.subtype.deserialize?.(value) ?? value;
