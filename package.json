@@ -1,6 +1,7 @@
 {
   "name": "trails",
   "private": true,
+  "license": "SEE LICENSE IN LICENSES.md",
   "packageManager": "pnpm@10.27.0",
   "scripts": {
     "build": "tsc --build",

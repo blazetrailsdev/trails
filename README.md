@@ -144,4 +144,9 @@ Trails is not affiliated with, endorsed by, or connected to Ruby on Rails or the
 
 ## License
 
-MIT
+- Source code is licensed under the [MIT License](LICENSE).
+- Hand-written documentation prose under `packages/website/docs/guides/` is
+  licensed under [Creative Commons Attribution 4.0 International](LICENSE-docs)
+  (CC BY 4.0). Code examples embedded in documentation remain MIT.
+
+See [LICENSES.md](LICENSES.md) for the full split and rationale.
