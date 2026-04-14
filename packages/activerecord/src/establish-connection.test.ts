@@ -64,7 +64,7 @@ describe("Base.establishConnection", () => {
   it("throws for an unknown adapter name", async () => {
     await expect(
       Base.establishConnection({ adapter: "oracle", url: "oracle://localhost" }),
-    ).rejects.toThrow(/Unknown database adapter "oracle"/);
+    ).rejects.toThrow(/nonexistent 'oracle' adapter/);
   });
 
   it("registers the pool with the ConnectionHandler", async () => {

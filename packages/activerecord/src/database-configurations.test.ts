@@ -94,7 +94,11 @@ describe("DatabaseConfigurationsTest", () => {
         super(envName, name, config);
       }
     }
-    DatabaseConfigurations.registerDbConfig("custom_key", CustomConfig);
+    const handler = (envName: string, name: string, _url: string | undefined, config: any) => {
+      if ("custom_key" in config) return new CustomConfig(envName, name, config);
+      return null;
+    };
+    DatabaseConfigurations.registerDbConfigHandler(handler);
     try {
       const configs = new DatabaseConfigurations({
         development: { adapter: "sqlite3", database: "dev.db", custom_key: true },
@@ -102,7 +106,8 @@ describe("DatabaseConfigurationsTest", () => {
       const result = configs.configsFor({ envName: "development" });
       expect(result[0]).toBeInstanceOf(CustomConfig);
     } finally {
-      DatabaseConfigurations.unregisterDbConfig("custom_key");
+      const idx = DatabaseConfigurations.dbConfigHandlers.lastIndexOf(handler);
+      if (idx >= 0) DatabaseConfigurations.dbConfigHandlers.splice(idx, 1);
     }
   });
 

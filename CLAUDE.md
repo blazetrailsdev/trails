@@ -120,6 +120,8 @@ See `activesupport/src/include.ts` for the API and
 - Do use worktrees for any changes. Leave the default worktree for the user.
 - Copilot automatically reviews every PR and every push, so no need to request review.
 - Do open new PRs in draft status.
+- After opening a PR, run the `/link` skill with the PR number so webhook
+  notifications (Copilot reviews, CI failures) are delivered to this pane.
 - Do NOT add code comments that just describe what the line does. Only add
   comments when they provide additional value — a potential bug hidden, or
   explanation about the larger context.

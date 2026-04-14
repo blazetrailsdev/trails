@@ -4,6 +4,9 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
+import { UrlConfig } from "./database-configurations/url-config.js";
+import { _setAdapterClassResolver } from "./database-configurations/database-config.js";
+import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
 import {
   AdapterNotFound,
   AdapterNotSpecified,
@@ -366,24 +369,10 @@ function appendToConnectedToStack(entry: {
   connectedToStack().push(entry);
 }
 
-const _adapterCache: Record<string, new (...args: any[]) => DatabaseAdapter> = {};
-
-async function _loadAdapter(normalized: string): Promise<new (...args: any[]) => DatabaseAdapter> {
-  if (_adapterCache[normalized]) return _adapterCache[normalized];
-  let Cls: new (...args: any[]) => DatabaseAdapter;
-  if (normalized === "sqlite") {
-    Cls = (await import("./connection-adapters/sqlite3-adapter.js")).SQLite3Adapter;
-  } else if (normalized === "postgresql") {
-    Cls = (await import("./adapters/postgresql-adapter.js")).PostgreSQLAdapter;
-  } else if (normalized === "mysql") {
-    Cls = (await import("./adapters/mysql2-adapter.js")).Mysql2Adapter;
-  } else {
-    throw new AdapterNotFound(
-      `Unknown database adapter "${normalized}". Supported adapters: postgresql, mysql, sqlite`,
-    );
-  }
-  _adapterCache[normalized] = Cls;
-  return Cls;
+// Delegates to ConnectionAdapters.resolve, which holds the registry of
+// pre-registered and user-registered adapters.
+async function _loadAdapter(name: string): Promise<new (arg: unknown) => DatabaseAdapter> {
+  return resolveConnectionAdapter(name);
 }
 
 export async function establishConnection(
@@ -430,7 +419,10 @@ async function establishWithConfig(
   config?: Record<string, unknown>,
 ): Promise<void> {
   const normalized = normalizeAdapterName(adapterName);
-  const AdapterClass = await _loadAdapter(normalized);
+  // Pass the original adapter name to the registry so caller overrides
+  // like register("mysql2", ...) aren't shadowed by normalization.
+  // `normalized` is only used below for adapter-arg construction.
+  const AdapterClass = await _loadAdapter(adapterName);
 
   let adapterArg: unknown;
   if (normalized === "sqlite") {
@@ -477,7 +469,14 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
     );
   }
 
-  const url = dbConfig.configuration.url || "";
+  // UrlConfig exposes the original URL via the `url` attr (Rails' attr_reader).
+  // For parseable URLs the URL is decomposed into the configuration hash and
+  // `configuration.url` is unset (matches Rails' build_url_hash), so prefer
+  // the attr when available.
+  const url =
+    (dbConfig instanceof UrlConfig ? dbConfig.url : undefined) ||
+    (dbConfig.configuration.url as string | undefined) ||
+    "";
   const adapterName = dbConfig.adapter || (url ? adapterNameFromUrl(url) : undefined);
   if (!adapterName) {
     throw new AdapterNotSpecified(
@@ -651,3 +650,10 @@ export const ClassMethods = {
   shardKeys,
   isSharded,
 };
+
+// Register adapter class resolver so DatabaseConfig#adapterClass and
+// #newConnection can resolve adapters (matching Rails'
+// ActiveRecord::ConnectionAdapters.resolve). Pass the adapter name through
+// unchanged — the registry handles canonical names and aliases, so caller
+// overrides like register("mysql2", ...) aren't shadowed by normalization.
+_setAdapterClassResolver(async (adapterName) => _loadAdapter(adapterName));
