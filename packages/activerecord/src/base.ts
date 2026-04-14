@@ -30,6 +30,10 @@ import {
   AttributeAssignmentError,
 } from "./errors.js";
 import { AssociatedValidator } from "./validations/associated.js";
+import { AbsenceValidator as ARAbsenceValidator } from "./validations/absence.js";
+import { PresenceValidator as ARPresenceValidator } from "./validations/presence.js";
+import { LengthValidator as ARLengthValidator } from "./validations/length.js";
+import { NumericalityValidator as ARNumericalityValidator } from "./validations/numericality.js";
 import { AutosaveAssociation, clearAutosaveState } from "./autosave-association.js";
 import {
   RecordInvalid,
@@ -675,20 +679,73 @@ export class Base extends Model {
   }
 
   /**
-   * Validate that all named associations are themselves valid.
-   *
-   * Mirrors: ActiveRecord::Validations::ClassMethods#validates_associated
-   *
-   * Registers AssociatedValidator through validatesWith (matching Rails'
-   * validates_with pattern) so on:/if:/unless:/message: options all work.
-   */
-  /**
    * Mirrors: ActiveRecord::Reflection::ClassMethods#_reflect_on_association
    */
   static _reflectOnAssociation(name: string): any {
     return (this as any)._reflections?.[name] ?? null;
   }
 
+  /**
+   * Mirrors: ActiveRecord::Validations.validates
+   *
+   * Overrides Model.validates to use AR-specific validator classes for
+   * presence/absence/length/numericality. These AR validators add
+   * association awareness (filtering destroyed records, column precision).
+   */
+  static override validates(attribute: string, rules: Record<string, unknown>): void {
+    const arRules = { ...rules };
+    const shared = extractShared(arRules);
+    const { allowNil: sharedAllowNil, allowBlank: sharedAllowBlank, ...sharedRest } = shared;
+
+    // Build options for an AR validator, respecting per-validator allowNil/allowBlank
+    // precedence (only apply shared value when per-validator option is undefined).
+    const buildOpts = (opts: Record<string, unknown>) => ({
+      ...opts,
+      attributes: [attribute],
+      ...sharedRest,
+      ...(opts.allowNil === undefined && sharedAllowNil !== undefined
+        ? { allowNil: sharedAllowNil }
+        : {}),
+      ...(opts.allowBlank === undefined && sharedAllowBlank !== undefined
+        ? { allowBlank: sharedAllowBlank }
+        : {}),
+    });
+
+    if (arRules.presence) {
+      const opts = arRules.presence === true ? {} : (arRules.presence as Record<string, unknown>);
+      delete arRules.presence;
+      this.validatesWith(ARPresenceValidator, buildOpts(opts));
+    }
+    if (arRules.absence) {
+      const opts = arRules.absence === true ? {} : (arRules.absence as Record<string, unknown>);
+      delete arRules.absence;
+      this.validatesWith(ARAbsenceValidator, buildOpts(opts));
+    }
+    if (arRules.length) {
+      const opts = arRules.length as Record<string, unknown>;
+      delete arRules.length;
+      this.validatesWith(ARLengthValidator, buildOpts(opts));
+    }
+    if (arRules.numericality) {
+      const opts =
+        arRules.numericality === true ? {} : (arRules.numericality as Record<string, unknown>);
+      delete arRules.numericality;
+      this.validatesWith(ARNumericalityValidator, buildOpts(opts));
+    }
+    // Delegate remaining rules (inclusion, exclusion, format, etc.) to Model
+    const hasRemaining = Object.keys(arRules).some(
+      (k) => !["on", "if", "unless", "strict", "allowNil", "allowBlank"].includes(k),
+    );
+    if (hasRemaining) {
+      super.validates(attribute, arRules);
+    }
+  }
+
+  /**
+   * Validates that all named associations are themselves valid.
+   *
+   * Mirrors: ActiveRecord::Validations::ClassMethods#validates_associated
+   */
   static validatesAssociated(...args: (string | Record<string, unknown>)[]): void {
     const last = args[args.length - 1];
     const opts =
@@ -3069,6 +3126,17 @@ export interface Base extends Included<typeof AutosaveAssociation> {}
 // in the class body, so `Base.findBySql` and `Base.connectsTo` carry the
 // exact generics, `this` parameter, and return type of their implementations.
 // ---------------------------------------------------------------------------
+
+function extractShared(rules: Record<string, unknown>): Record<string, unknown> {
+  const shared: Record<string, unknown> = {};
+  if (rules.on !== undefined) shared.on = rules.on;
+  if (rules.if !== undefined) shared.if = rules.if;
+  if (rules.unless !== undefined) shared.unless = rules.unless;
+  if (rules.strict) shared.strict = rules.strict;
+  if (rules.allowNil !== undefined) shared.allowNil = rules.allowNil;
+  if (rules.allowBlank !== undefined) shared.allowBlank = rules.allowBlank;
+  return shared;
+}
 
 extend(Base, ConnectionHandling.ClassMethods);
 extend(Base, Querying);

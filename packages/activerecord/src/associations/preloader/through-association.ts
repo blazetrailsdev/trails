@@ -1,6 +1,5 @@
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
-import { _reflectOnAssociation } from "../../reflection.js";
 import { Association } from "./association.js";
 import { Preloader } from "../preloader.js";
 import { pluralize, singularize } from "@blazetrails/activesupport";
@@ -278,8 +277,7 @@ export class ThroughAssociation extends Association {
     const model = (this.reflection as any).activeRecord;
     const assocDef = model?._associations?.find((a: any) => a.name === this.reflection.name);
     if (assocDef?.options?.through) {
-      return _reflectOnAssociation(
-        model,
+      return model._reflectOnAssociation(
         assocDef.options.through,
       ) as AssociationLikeReflection | null;
     }
@@ -305,7 +303,7 @@ export class ThroughAssociation extends Association {
       if (throughKlass) {
         const candidates = [sourceName, pluralize(sourceName), singularize(sourceName)];
         for (const name of candidates) {
-          const r = _reflectOnAssociation(throughKlass, name) as AssociationLikeReflection | null;
+          const r = throughKlass._reflectOnAssociation(name) as AssociationLikeReflection | null;
           if (r) return r;
         }
       }

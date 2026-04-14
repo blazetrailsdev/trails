@@ -1,6 +1,5 @@
 import type { Base } from "../../base.js";
 import type { AbstractReflection } from "../../reflection.js";
-import { _reflectOnAssociation } from "../../reflection.js";
 import { Association } from "./association.js";
 import { ThroughAssociation } from "./through-association.js";
 
@@ -127,7 +126,7 @@ export class Branch {
     const parentClasses = this.parent!.targetClasses();
     const result: AbstractReflection[] = [];
     for (const parentKlass of parentClasses) {
-      const refl = _reflectOnAssociation(parentKlass, this.association!);
+      const refl = parentKlass._reflectOnAssociation(this.association!);
       if (refl) result.push(refl);
     }
     return result;
@@ -155,8 +154,7 @@ export class Branch {
     const h = new Map<AbstractReflection, Base[]>();
 
     for (const record of this.sourceRecords) {
-      const reflection = _reflectOnAssociation(
-        record.constructor as typeof Base,
+      const reflection = (record.constructor as typeof Base)._reflectOnAssociation(
         this.association!,
       );
 
@@ -233,8 +231,7 @@ export class Branch {
     if (this._polymorphic !== undefined) return this._polymorphic;
 
     this._polymorphic = this.sourceRecords.some((record) => {
-      const reflection = _reflectOnAssociation(
-        record.constructor as typeof Base,
+      const reflection = (record.constructor as typeof Base)._reflectOnAssociation(
         this.association!,
       );
       return reflection != null && reflection.isPolymorphic();
