@@ -1729,7 +1729,7 @@ describe("CalculationsTest", () => {
     const names = await Account.distinct().pluck("name");
     expect(names).toContain("Alice");
     expect(names).toContain("Bob");
-    expect(names.filter((n: string) => n === "Alice").length).toBe(1);
+    expect((names as string[]).filter((n) => n === "Alice").length).toBe(1);
   });
 
   it("pluck replaces select clause", async () => {

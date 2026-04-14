@@ -36,9 +36,17 @@ describe("basic CRUD DX — defining and using a model", () => {
     assertType<Promise<Base>>(User.create({ name: "dean", email: "d@example.com" }));
   });
 
-  it("User.find resolves — currently typed as `any`, a key DX gap", () => {
-    // In Rails: User.find(1) → User. Here it's declared as returning `any`.
-    expectTypeOf(User.find).returns.resolves.toBeAny();
+  it("User.find(id) resolves to a single User", async () => {
+    const u = await User.find(1);
+    expectTypeOf(u).toEqualTypeOf<User>();
+  });
+
+  it("User.find([ids]) returns User | User[] — caller narrows (CPK ambiguity)", async () => {
+    // For simple primary keys `find([1,2,3])` returns User[] at runtime.
+    // For composite keys `find([shop_id, id])` returns a single User.
+    // TS can't statically inspect `primaryKey`, so the return is a union.
+    const users = await User.find([1, 2, 3]);
+    expectTypeOf(users).toEqualTypeOf<User | User[]>();
   });
 
   it("User.findBy / findByBang have concrete Base returns", () => {

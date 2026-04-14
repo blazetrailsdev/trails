@@ -1752,11 +1752,11 @@ describe("BasicsTest", () => {
     }
     const t1 = await Topic.create({ title: "first" });
     const t2 = await Topic.create({ title: "second" });
-    const results = await Topic.find([`${t1.id}-meowmeow`, `${t2.id}-hello`]);
+    const results = (await Topic.find([`${t1.id}-meowmeow`, `${t2.id}-hello`])) as Topic[];
     expect(results).toHaveLength(2);
     expect(results[0].title).toBe("first");
     expect(results[1].title).toBe("second");
-    const reversed = await Topic.find([`${t2.id}-hello`, `${t1.id}-meowmeow`]);
+    const reversed = (await Topic.find([`${t2.id}-hello`, `${t1.id}-meowmeow`])) as Topic[];
     expect(reversed[0].title).toBe("second");
   });
   it.skip("find by slug with range", () => {});

@@ -3139,7 +3139,7 @@ describe("FinderTest", () => {
   });
 
   it("find with multiple IDs", async () => {
-    const found = await User.find([1, 3]);
+    const found = (await User.find([1, 3])) as User[];
     expect(found).toHaveLength(2);
     expect(found[0].name).toBe("Alice");
     expect(found[1].name).toBe("Charlie");
@@ -3309,7 +3309,7 @@ describe("FinderTest", () => {
   });
 
   it("find with multiple IDs returns array", async () => {
-    const users = await User.find([1, 2]);
+    const users = (await User.find([1, 2])) as User[];
     expect(users).toHaveLength(2);
     expect(users[0].name).toBeDefined();
     expect(users[1].name).toBeDefined();
@@ -3576,7 +3576,7 @@ describe("FinderTest", () => {
     await User.create({ name: "Bob" });
     await User.create({ name: "Charlie" });
 
-    const found = await User.find([1, 3]);
+    const found = (await User.find([1, 3])) as User[];
     expect(found).toHaveLength(2);
     expect(found[0].name).toBe("Alice");
     expect(found[1].name).toBe("Charlie");
@@ -3717,7 +3717,9 @@ describe("FinderTest", () => {
       await Item.create({ active: false });
       await Item.create({ active: true });
 
-      const items = await Item.all().active().toArray();
+      // Dynamic attribute-value scope: `.active()` is runtime-attached by the
+      // boolean attribute; not yet statically typed on Relation.
+      const items = await (Item.all() as any).active().toArray();
       expect(items).toHaveLength(2);
     });
   });

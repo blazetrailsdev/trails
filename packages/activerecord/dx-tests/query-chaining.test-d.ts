@@ -60,15 +60,55 @@ describe("query chaining DX", () => {
     expectTypeOf(await rel.createOrFindByBang({ title: "x" })).toEqualTypeOf<Post>();
   });
 
-  it("KNOWN GAP: Post.where returns `any` — ideally Relation<Post>", () => {
-    const chain = Post.where({ published: true });
-    expectTypeOf(chain).toBeAny();
-  });
-
-  it("hand-typed chain via `as Relation<Post>` preserves T through await", async () => {
-    const rel = Post.where({ published: true }) as Relation<Post>;
+  it("Post.where returns Relation<Post> — chain keeps the generic", async () => {
+    const rel = Post.where({ published: true });
+    expectTypeOf(rel).toMatchTypeOf<Relation<Post>>();
     const rows = await rel;
     expectTypeOf(rows).toEqualTypeOf<Post[]>();
+  });
+
+  it("Post.all() / Post.from(...) / Post.whereNot(...) preserve the generic", () => {
+    expectTypeOf(Post.all()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.from("posts")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.whereNot({ published: false })).toMatchTypeOf<Relation<Post>>();
+  });
+
+  it("Post.joins / distinct / none / unscoped all return Relation<Post>", () => {
+    expectTypeOf(Post.joins("comments")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.leftJoins("comments")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.leftOuterJoins("comments")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.distinct()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.none()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.unscoped()).toMatchTypeOf<Relation<Post>>();
+  });
+
+  it("full chain keeps Post through multiple Relation methods", async () => {
+    const rel = Post.where({ published: true }).order("id").limit(10).offset(5).distinct();
+    expectTypeOf(rel).toMatchTypeOf<Relation<Post>>();
+    const rows = await rel;
+    expectTypeOf(rows).toEqualTypeOf<Post[]>();
+    expectTypeOf(await rel.first()).toEqualTypeOf<Post | null>();
+    expectTypeOf(await rel.find(1)).toEqualTypeOf<Post>();
+  });
+
+  it("awaiting .load() / .reload() resolves to the relation, not T[]", async () => {
+    const rel = Post.where({ published: true });
+    const loaded = await rel.load();
+    expectTypeOf(loaded.isLoaded).toBeBoolean();
+    const reloaded = await rel.reload();
+    expectTypeOf(reloaded.isLoaded).toBeBoolean();
+  });
+
+  it("extending(mod) returns Relation<Post> & M — module methods are visible", async () => {
+    const scopeMod = {
+      onlyPublished(this: Relation<Post>): Relation<Post> {
+        return this.where({ published: true });
+      },
+    };
+    const rel = Post.all().extending(scopeMod);
+    expectTypeOf(rel.onlyPublished).toBeFunction();
+    const narrowed = rel.onlyPublished();
+    expectTypeOf(narrowed).toMatchTypeOf<Relation<Post>>();
   });
 
   it("Post.where accepts a Record or a SQL-string + binds", () => {

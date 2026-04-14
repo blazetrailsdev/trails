@@ -419,7 +419,7 @@ describe("InsertAllTest", () => {
     }
     await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "original" }]);
     await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "updated" }]);
-    const record = await CpkOrder.find([1, 1]);
+    const record = (await CpkOrder.find([1, 1])) as CpkOrder;
     expect(record.name).toBe("updated");
   });
   it.skip("insert_all can insert rows with all defaults", () => {
@@ -491,7 +491,7 @@ describe("InsertAllTest", () => {
     });
     const count = await CpkOrder.count();
     expect(count).toBe(1);
-    const record = await CpkOrder.find([1, 1]);
+    const record = (await CpkOrder.find([1, 1])) as CpkOrder;
     expect(record.name).toBe("second");
   });
   it("insert all and upsert all works with composite primary keys when unique by is not provided", async () => {

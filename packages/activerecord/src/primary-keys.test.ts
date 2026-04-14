@@ -141,7 +141,7 @@ describe("PrimaryKeysTest", () => {
     await Topic.create({ title: "b" });
     const all = await Topic.all().toArray();
     const ids = all.map((t: any) => t.id);
-    const found = await Topic.find(...ids);
+    const found = await Topic.find(ids);
     expect(Array.isArray(found) ? found.length : 1).toBeGreaterThan(0);
   });
 
@@ -659,7 +659,7 @@ describe("CompositePrimaryKeyTest", () => {
     expect(o.id).toEqual([1, 42]);
     expect(o.isPersisted()).toBe(true);
 
-    const found = await Order.find([1, 42]);
+    const found = (await Order.find([1, 42])) as Order;
     expect(found.name).toBe("Widget");
   });
 

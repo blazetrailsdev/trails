@@ -902,7 +902,7 @@ export class CollectionProxy {
     return this.scope().pick(...columns);
   }
 
-  async reload(): Promise<this> {
+  async reload(): Promise<Omit<this, "then">> {
     this._loaded = false;
     this._target = [];
     await this.load();

@@ -1119,7 +1119,9 @@ describe("RelationTest", () => {
 
     it("scope accessible from relation proxy", async () => {
       Article.scope("published", (rel: any) => rel.where({ status: "published" }));
-      const articles = await Article.all().published().toArray();
+      // Named scope `published` is registered at runtime and not yet
+      // statically typed on Relation — see DX gap tracked in dx-tests.
+      const articles = await (Article.all() as any).published().toArray();
       expect(articles).toHaveLength(2);
     });
 

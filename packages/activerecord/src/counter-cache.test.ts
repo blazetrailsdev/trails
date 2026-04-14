@@ -1157,7 +1157,7 @@ describe("CounterCacheTest", () => {
     }
     const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 0 });
     await CpkOrder.incrementCounter("items_count", [1, 1]);
-    const reloaded = await CpkOrder.find([1, 1]);
+    const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
     expect(reloaded.items_count).toBe(1);
   });
   it("increment counter for multiple cpk model records", async () => {
@@ -1179,8 +1179,8 @@ describe("CounterCacheTest", () => {
       ],
       { items_count: 5 },
     );
-    const r1 = await CpkOrder.find([1, 1]);
-    const r2 = await CpkOrder.find([1, 2]);
+    const r1 = (await CpkOrder.find([1, 1])) as CpkOrder;
+    const r2 = (await CpkOrder.find([1, 2])) as CpkOrder;
     expect(r1.items_count).toBe(5);
     expect(r2.items_count).toBe(5);
   });
@@ -1196,7 +1196,7 @@ describe("CounterCacheTest", () => {
     }
     const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
     await CpkOrder.decrementCounter("items_count", [1, 1]);
-    const reloaded = await CpkOrder.find([1, 1]);
+    const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
     expect(reloaded.items_count).toBe(9);
   });
   it("reset counters by counter name", async () => {
@@ -1356,7 +1356,7 @@ describe("CounterCacheTest", () => {
     }
     const o = await CpkOrder.create({ shop_id: 1, id: 1, items_count: 10 });
     await CpkOrder.updateCounters([1, 1], { items_count: -3 });
-    const reloaded = await CpkOrder.find([1, 1]);
+    const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
     expect(reloaded.items_count).toBe(7);
   });
   it.skip("reset the right counter if two have the same foreign key", () => {});

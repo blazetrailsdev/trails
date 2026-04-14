@@ -1702,10 +1702,12 @@ describe("EnumTest", () => {
       await Task.create({ priority: 0 });
       await Task.create({ priority: 2 });
 
-      const lowTasks = await Task.all().low().toArray();
+      // Enum-value scope methods (`.low()`, `.high()`) are added at runtime
+      // by `enum(...)` and are not yet statically typed on Relation.
+      const lowTasks = await (Task.all() as any).low().toArray();
       expect(lowTasks).toHaveLength(2);
 
-      const highTasks = await Task.all().high().toArray();
+      const highTasks = await (Task.all() as any).high().toArray();
       expect(highTasks).toHaveLength(1);
     });
   });

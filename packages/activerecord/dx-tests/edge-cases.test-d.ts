@@ -66,10 +66,17 @@ describe("edge cases — rough edges in current DX", () => {
     expectTypeOf<ReturnType<typeof Base.validatesUniqueness>>().toEqualTypeOf<void>();
   });
 
-  it("KNOWN GAP: Base.find / Base.all / Base.where are typed as `any`", () => {
-    expectTypeOf(Base.find).returns.resolves.toBeAny();
-    expectTypeOf(Base.all()).toBeAny();
-    expectTypeOf(Base.where({})).toBeAny();
+  it("Base.find / Base.all / Base.where preserve the subclass via polymorphic `this`", async () => {
+    const w = await Widget.find(1);
+    expectTypeOf(w).toEqualTypeOf<Widget>();
+    const ws = await Widget.find([1, 2]);
+    expectTypeOf(ws).toEqualTypeOf<Widget | Widget[]>();
+    expectTypeOf(Widget.all()).toMatchTypeOf<
+      import("@blazetrails/activerecord").Relation<Widget>
+    >();
+    expectTypeOf(Widget.where({ name: "x" })).toMatchTypeOf<
+      import("@blazetrails/activerecord").Relation<Widget>
+    >();
   });
 
   it("KNOWN GAP: instance `id` is typed as `unknown`", () => {

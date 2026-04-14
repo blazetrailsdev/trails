@@ -25,10 +25,9 @@ describe("WithTest", () => {
         this.adapter = adapter;
       }
     }
-    const rel = Post.all().with(
-      "recent_posts",
-      "SELECT * FROM posts WHERE created_at > '2024-01-01'",
-    );
+    const rel = Post.all().with({
+      recent_posts: "SELECT * FROM posts WHERE created_at > '2024-01-01'",
+    });
     const sql = rel.toSql();
     expect(sql).toContain("WITH");
   });

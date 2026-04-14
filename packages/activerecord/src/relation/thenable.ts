@@ -17,7 +17,7 @@
  * with `undefined` on the instance to prevent that for objects returned
  * as `this` (load, reload, presence) or yielded (inBatches).
  */
-export function stripThenable<T extends object>(obj: T): T {
+export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
   Object.defineProperty(obj, "then", {
     value: undefined,
     writable: true,
