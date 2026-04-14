@@ -3144,3 +3144,105 @@ describe("should update children when autosave is true and parent is new but chi
     /* TODO: needs RecordInvalid import */
   });
 });
+
+describe("ChangedForAutosaveTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  it("parent is changed_for_autosave when nested autosave child is changed", () => {
+    class Child extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Parent extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+        (this as any)._associations = [
+          { name: "children", type: "hasMany", options: { autosave: true } },
+        ];
+      }
+    }
+    registerModel("ChangedParent", Parent);
+    registerModel("ChangedChild", Child);
+
+    const parent = new Parent({ id: 1 });
+    (parent as any)._newRecord = false;
+    const child = new Child({ id: 10, name: "original" });
+    (child as any)._newRecord = false;
+    (child as any)._dirty.snapshot(child._attributes);
+    child.writeAttribute("name", "modified");
+
+    (parent as any)._cachedAssociations = new Map([["children", [child]]]);
+
+    expect(parent.changedForAutosave()).toBe(true);
+  });
+
+  it("parent is changed_for_autosave when nested child is marked for destruction", () => {
+    class Child2 extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Parent2 extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+        (this as any)._associations = [
+          { name: "child", type: "hasOne", options: { autosave: true } },
+        ];
+      }
+    }
+    registerModel("ChangedParent2", Parent2);
+    registerModel("ChangedChild2", Child2);
+
+    const parent = new Parent2({ id: 1 });
+    (parent as any)._newRecord = false;
+    const child = new Child2({ id: 10 });
+    (child as any)._newRecord = false;
+    child.markForDestruction();
+
+    (parent as any)._cachedAssociations = new Map([["child", child]]);
+
+    expect(parent.changedForAutosave()).toBe(true);
+  });
+
+  it("does not infinite loop on cyclic inverse associations", () => {
+    class A extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+        (this as any)._associations = [{ name: "b", type: "hasOne", options: { autosave: true } }];
+      }
+    }
+    class B extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+        (this as any)._associations = [
+          { name: "a", type: "belongsTo", options: { autosave: true } },
+        ];
+      }
+    }
+    registerModel("CycleA", A);
+    registerModel("CycleB", B);
+
+    const a = new A({ id: 1 });
+    (a as any)._newRecord = false;
+    const b = new B({ id: 2 });
+    (b as any)._newRecord = false;
+
+    (a as any)._cachedAssociations = new Map([["b", b]]);
+    (b as any)._cachedAssociations = new Map([["a", a]]);
+
+    // Should not stack overflow
+    expect(a.changedForAutosave()).toBe(false);
+    expect(b.changedForAutosave()).toBe(false);
+  });
+});

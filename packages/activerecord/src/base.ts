@@ -30,6 +30,7 @@ import {
   AttributeAssignmentError,
 } from "./errors.js";
 import { AssociatedValidator } from "./validations/associated.js";
+import { AutosaveAssociation, clearAutosaveState } from "./autosave-association.js";
 import {
   RecordInvalid,
   isValid as validationsIsValid,
@@ -69,7 +70,7 @@ import * as LockingPessimistic from "./locking/pessimistic.js";
 import * as Translation from "./translation.js";
 import { sanitizeSqlArray, sanitizeSqlLike } from "./sanitization.js";
 import * as Querying from "./querying.js";
-import { include, extend } from "@blazetrails/activesupport";
+import { include, extend, type Included } from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
   attributePresent as _attributePresent,
@@ -136,14 +137,6 @@ export function _setScopeProxyWrapper(wrapper: (rel: any) => any): void {
   _wrapWithScopeProxy = wrapper;
 }
 
-// Late-bound validateAssociations to break circular dependency with autosave.ts
-let _validateAssociationsFn: ((record: any, context?: string) => void) | null = null;
-
-/** @internal Called by autosave.ts to register validateAssociations. */
-export function _setValidateAssociationsFn(fn: (record: any, context?: string) => void): void {
-  _validateAssociationsFn = fn;
-}
-
 /** @internal Hook called when a model's adapter is set. Used by test-adapter.ts. */
 let _onAdapterSet: ((modelClass: any) => void) | null = null;
 export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): void {
@@ -155,6 +148,7 @@ export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): 
  *
  * Mirrors: ActiveRecord::Base
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   // --- Translation mixin (wired via extend() after class) ---
   declare static lookupAncestors: typeof Translation.lookupAncestors;
@@ -2506,6 +2500,8 @@ export class Base extends Model {
     this._collectionProxies.clear();
     this._preloadedAssociations.clear();
     this._associationInstances.clear();
+    (this as any)._cachedAssociations?.clear();
+    clearAutosaveState(this);
     return this;
   }
 
@@ -2526,15 +2522,6 @@ export class Base extends Model {
 
   declare inspect: () => string;
   declare attributeForInspect: (attr: string) => string;
-
-  /**
-   * Returns true if the record has changes, is new, or is marked for destruction.
-   *
-   * Mirrors: ActiveRecord::AutosaveAssociation#changed_for_autosave?
-   */
-  isChangedForAutosave(): boolean {
-    return this.isNewRecord() || this.changed || this._destroyed;
-  }
 
   /**
    * Return a subset of the record's attributes as a plain object.
@@ -2935,8 +2922,9 @@ export class Base extends Model {
     const effectiveContext =
       context ?? this._validationContext ?? defaultValidationContext.call(this);
     const result = validationsIsValid.call(this, effectiveContext);
-    if (_validateAssociationsFn) {
-      _validateAssociationsFn(this, effectiveContext);
+    const ctor = this.constructor as any;
+    if (typeof ctor._validateAssociationsFn === "function") {
+      ctor._validateAssociationsFn(this, effectiveContext);
     }
     return result && !this.errors.any;
   }
@@ -2961,20 +2949,6 @@ export class Base extends Model {
 
   equals(other: unknown): boolean {
     return this.isEqual(other);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::AutosaveAssociation#mark_for_destruction
-   */
-  markForDestruction(): void {
-    (this as any)[Symbol.for("blazetrails.markedForDestruction")] = true;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::AutosaveAssociation#marked_for_destruction?
-   */
-  markedForDestruction(): boolean {
-    return !!(this as any)[Symbol.for("blazetrails.markedForDestruction")];
   }
 
   /**
@@ -3079,6 +3053,9 @@ export class Base extends Model {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface Base extends Included<typeof AutosaveAssociation> {}
+
 // ---------------------------------------------------------------------------
 // Ruby-style mixin wiring — one `extend` per module, mirroring Rails:
 //
@@ -3123,6 +3100,7 @@ include(Base, {
 });
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
+include(Base, AutosaveAssociation);
 
 // Register Model.isValid as the super for the Validations module's isValid.
 // Breaks the recursion: Base.isValid → validations.isValid → Model.isValid.
