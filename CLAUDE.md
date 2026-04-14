@@ -151,3 +151,13 @@ Run it to see current stats per package. Use `--package <name>` for a single pac
 Rails conventions. These need to be moved, not rewritten.
 
 CI runs `api:compare` on every push to track regressions.
+
+## Measuring DX
+
+A secondary signal is `pnpm test:types` — a Vitest typecheck-mode suite in
+`packages/*/dx-tests/` that exercises the public API the way a Rails
+developer would. It pins the current type contract and encodes DX gaps
+(e.g. `Model.where` returning `any`) as assertions. When a gap is closed,
+the assertion flips and signals the test should be tightened.
+
+A dedicated `DX Type Tests` CI job runs on every push.

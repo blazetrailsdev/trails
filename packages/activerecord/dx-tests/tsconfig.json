@@ -1,0 +1,18 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "paths": {
+      "@blazetrails/activerecord": ["../src/index.ts"],
+      "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
+      "@blazetrails/arel": ["../../arel/src/index.ts"],
+      "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],
+      "@blazetrails/activesupport/message-verifier": ["../../activesupport/src/message-verifier.ts"]
+    }
+  },
+  "include": ["."]
+}
