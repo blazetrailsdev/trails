@@ -69,6 +69,8 @@ each handler, calling it is itself async.
 `validates` / `validate` look the same:
 
 ```ts
+import { Model } from "@blazetrails/activemodel";
+
 class Post extends Model {
   static {
     Post.validates("title", { presence: true, length: { minimum: 3 } });

@@ -9,6 +9,7 @@
     "format:check": "prettier --check .",
     "prepare": "husky",
     "typecheck": "node scripts/typecheck.mjs",
+    "guides:typecheck": "tsx scripts/guides-typecheck/check.ts",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",

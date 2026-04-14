@@ -3,6 +3,7 @@ dist/
 *.tsbuildinfo
 scripts/test-compare/output/
 scripts/api-compare/output/
+scripts/guides-typecheck/.tmp/
 scripts/api-compare/.rack-source
 scripts/api-compare/.rails-source
 .claude/settings.local.json

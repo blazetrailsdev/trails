@@ -201,6 +201,33 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3)
 
+  scripts/guides-typecheck:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../../packages/actionpack
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../../packages/actionview
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../../packages/activemodel
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../../packages/activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../../packages/activesupport
+      '@blazetrails/arel':
+        specifier: workspace:*
+        version: link:../../packages/arel
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../../packages/rack
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../../packages/trailties
+
 packages:
 
   '@adobe/css-tools@4.4.4':

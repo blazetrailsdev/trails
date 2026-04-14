@@ -1,0 +1,17 @@
+{
+  "name": "@blazetrails/guides-typecheck",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Type-checks TypeScript code blocks in the website guides.",
+  "dependencies": {
+    "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/arel": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/trailties": "workspace:*"
+  }
+}
