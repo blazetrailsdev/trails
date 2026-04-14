@@ -319,7 +319,9 @@ describe("schema dump and load", () => {
 
       // Dump schema
       const source = new AdapterSchemaSource(sourceAdapter);
-      const schema = await SchemaDumper.dump(source);
+      // Dump as JS so the JSDoc-annotated output is valid input to
+      // `new Function` below (no TS `import type` / annotation syntax).
+      const schema = await SchemaDumper.dump(source, { language: "js" });
       expect(schema).toContain("users");
       expect(schema).toContain("createTable");
 
@@ -328,8 +330,13 @@ describe("schema dump and load", () => {
       const defineSchema = new Function(
         "ctx",
         schema
+          // Strip only the header JSDoc (first /** ... */ before the
+          // export statement). Anchored to start-of-string with optional
+          // leading // line comments / blank lines so later block comments
+          // in the body aren't clobbered.
+          .replace(/^(?:\s*\/\/[^\n]*\n)*\s*\/\*\*[\s\S]*?\*\/\s*/, "")
           .replace(
-            "export default async function defineSchema(ctx: any) {",
+            /export default async function defineSchema\(ctx(?:: any)?\) \{/,
             "return (async () => {",
           )
           .replace(/}$/, "})();"),

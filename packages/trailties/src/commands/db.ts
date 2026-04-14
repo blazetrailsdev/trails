@@ -2,55 +2,27 @@ import { Command } from "commander";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
-import { loadDatabaseConfig, connectAdapter, type DatabaseConfig } from "../database.js";
+import {
+  loadDatabaseConfig,
+  connectAdapter,
+  resolveEnv,
+  type DatabaseConfig as RawConfig,
+} from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
-import { Migrator, SchemaDumper } from "@blazetrails/activerecord";
+import {
+  DatabaseTasks,
+  HashConfig,
+  Migrator,
+  SchemaDumper,
+  DatabaseAlreadyExists,
+  NoDatabaseError,
+} from "@blazetrails/activerecord";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 import { AdapterSchemaSource } from "../schema-source.js";
 
-// --- Helpers ---
-
-function buildSystemConfig(
-  config: DatabaseConfig,
-  adapterName: string,
-): { systemConfig: DatabaseConfig; dbNameResolved: string } {
-  const isMysql = adapterName === "mysql2" || adapterName === "mysql";
-  const systemDb = isMysql ? undefined : "postgres";
-
-  if (config.url) {
-    const parsed = new URL(config.url);
-    const dbNameResolved = parsed.pathname.replace(/^\//, "");
-    if (!dbNameResolved) {
-      throw new Error(
-        `Could not extract database name from URL. Ensure the URL includes a database path.`,
-      );
-    }
-    parsed.pathname = isMysql ? "/" : "/postgres";
-    return {
-      systemConfig: { ...config, url: parsed.toString(), database: systemDb },
-      dbNameResolved,
-    };
-  }
-
-  const dbNameResolved = config.database!;
-  return {
-    systemConfig: { ...config, url: undefined, database: systemDb },
-    dbNameResolved,
-  };
-}
-
-const VALID_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_-]*$/;
-
-function validateDbName(name: string): void {
-  if (!VALID_IDENTIFIER.test(name)) {
-    throw new Error(`Invalid database name "${name}". Names must match ${VALID_IDENTIFIER}.`);
-  }
-}
-
 async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
-  if (typeof (adapter as any).close === "function") {
-    await (adapter as any).close();
-  }
+  const maybeClose = (adapter as { close?: () => Promise<void> }).close;
+  if (typeof maybeClose === "function") await maybeClose.call(adapter);
 }
 
 async function withAdapter(fn: (adapter: DatabaseAdapter) => Promise<void>): Promise<void> {
@@ -67,6 +39,90 @@ function migrationsDir(): string {
   return path.join(process.cwd(), "db", "migrations");
 }
 
+function databaseFromUrl(url: string, adapter?: string): string | undefined {
+  try {
+    const parsed = new URL(url);
+    const protocol = parsed.protocol;
+    const isSqlite =
+      adapter === "sqlite3" ||
+      adapter === "sqlite" ||
+      protocol === "sqlite:" ||
+      protocol === "sqlite3:" ||
+      protocol === "file:";
+    if (isSqlite) {
+      // SQLite URLs carry a filesystem path (often absolute). Preserve the
+      // leading slash and host prefix if any: `sqlite3:///tmp/app.sqlite3`
+      // -> `/tmp/app.sqlite3`; `sqlite3://./rel.sqlite3` -> `./rel.sqlite3`.
+      const host = parsed.host;
+      const pathname = decodeURIComponent(parsed.pathname);
+      return host ? `${host}${pathname}` : pathname;
+    }
+    const name = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+    return name || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function inferAdapterFromUrl(url: string): string | undefined {
+  try {
+    switch (new URL(url).protocol) {
+      case "postgres:":
+      case "postgresql:":
+        return "postgresql";
+      case "mysql:":
+      case "mysql2:":
+      case "trilogy:":
+        return "mysql2";
+      case "sqlite:":
+      case "sqlite3:":
+      case "file:":
+        return "sqlite3";
+      default:
+        return undefined;
+    }
+  } catch {
+    return undefined;
+  }
+}
+
+function toDbConfig(raw: RawConfig, envName: string = resolveEnv()): HashConfig {
+  const normalized: Record<string, unknown> = { ...raw };
+  if (!normalized.adapter) {
+    if (typeof normalized.url === "string") {
+      const inferred = inferAdapterFromUrl(normalized.url);
+      if (inferred) normalized.adapter = inferred;
+    }
+    if (!normalized.adapter) normalized.adapter = "sqlite3";
+  }
+  if (!normalized.database && typeof normalized.url === "string") {
+    const db = databaseFromUrl(normalized.url, normalized.adapter as string | undefined);
+    if (db) normalized.database = db;
+    try {
+      const parsed = new URL(normalized.url);
+      const protocol = parsed.protocol;
+      const isSqlite =
+        normalized.adapter === "sqlite3" ||
+        normalized.adapter === "sqlite" ||
+        protocol === "sqlite:" ||
+        protocol === "sqlite3:" ||
+        protocol === "file:";
+      if (!isSqlite) {
+        if (!normalized.host && parsed.hostname) normalized.host = parsed.hostname;
+        if (!normalized.username && parsed.username) {
+          normalized.username = decodeURIComponent(parsed.username);
+        }
+        if (!normalized.password && parsed.password) {
+          normalized.password = decodeURIComponent(parsed.password);
+        }
+      }
+    } catch {
+      // leave unparsed url as-is; adapters will surface the error
+    }
+  }
+  return new HashConfig(envName, "primary", normalized);
+}
+
 async function runMigrate(adapter: DatabaseAdapter, targetVersion?: string): Promise<void> {
   const migrations = await discoverMigrations(migrationsDir());
   if (migrations.length === 0) {
@@ -77,14 +133,10 @@ async function runMigrate(adapter: DatabaseAdapter, targetVersion?: string): Pro
   const migrator = new Migrator(adapter, migrations);
   await migrator.migrate(targetVersion ?? null);
 
-  for (const line of migrator.output) {
-    console.log(line);
-  }
+  for (const line of migrator.output) console.log(line);
 
   const pending = await migrator.pendingMigrations();
-  if (pending.length === 0) {
-    console.log("All migrations are up to date.");
-  }
+  if (pending.length === 0) console.log("All migrations are up to date.");
 }
 
 async function runRollback(adapter: DatabaseAdapter, steps: number): Promise<void> {
@@ -97,9 +149,7 @@ async function runRollback(adapter: DatabaseAdapter, steps: number): Promise<voi
   const migrator = new Migrator(adapter, migrations);
   await migrator.rollback(steps);
 
-  for (const line of migrator.output) {
-    console.log(line);
-  }
+  for (const line of migrator.output) console.log(line);
 }
 
 async function runSeed(): Promise<void> {
@@ -118,66 +168,60 @@ async function runSeed(): Promise<void> {
   console.log("Seeds completed.");
 }
 
-async function runCreate(): Promise<void> {
-  const config = await loadDatabaseConfig();
-  const adapterName = config.adapter ?? "sqlite3";
+/** Strip credentials from a DB URL before we log it. */
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.password) parsed.password = "***";
+    if (parsed.username && parsed.password === "***") {
+      // Keep username visible so operators can still identify the connection.
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
 
-  if (adapterName === "sqlite3" || adapterName === "sqlite") {
-    const dbPath = config.database;
-    if (dbPath && dbPath !== ":memory:") {
-      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-      if (!fs.existsSync(dbPath)) {
-        fs.writeFileSync(dbPath, "");
-      }
-      console.log(`Created database '${dbPath}'`);
+function displayNameFor(config: HashConfig, raw: RawConfig): string {
+  return (
+    config.database ??
+    (raw.database as string | undefined) ??
+    (typeof raw.url === "string" ? sanitizeUrl(raw.url) : undefined) ??
+    `${config.adapter ?? "unknown"} database`
+  );
+}
+
+async function runCreate(): Promise<void> {
+  const raw = await loadDatabaseConfig();
+  const config = toDbConfig(raw);
+  const displayName = displayNameFor(config, raw);
+  try {
+    await DatabaseTasks.create(config);
+    console.log(`Created database '${displayName}'`);
+  } catch (error) {
+    if (error instanceof DatabaseAlreadyExists) {
+      console.error(`Database '${displayName}' already exists`);
+      return;
     }
-  } else {
-    if (!config.database && !config.url) {
-      throw new Error(
-        `No database name specified in config for adapter "${adapterName}". Set the "database" property.`,
-      );
-    }
-    const { systemConfig, dbNameResolved } = buildSystemConfig(config, adapterName);
-    validateDbName(dbNameResolved);
-    const systemAdapter = await connectAdapter(systemConfig);
-    try {
-      await systemAdapter.executeMutation(`CREATE DATABASE "${dbNameResolved}"`);
-      console.log(`Created database '${dbNameResolved}'`);
-    } finally {
-      await closeAdapter(systemAdapter);
-    }
+    throw error;
   }
 }
 
 async function runDrop(): Promise<void> {
-  const config = await loadDatabaseConfig();
-  const adapterName = config.adapter ?? "sqlite3";
-
-  if (adapterName === "sqlite3" || adapterName === "sqlite") {
-    const dbPath = config.database;
-    if (dbPath && dbPath !== ":memory:" && fs.existsSync(dbPath)) {
-      fs.unlinkSync(dbPath);
-      console.log(`Dropped database '${dbPath}'`);
+  const raw = await loadDatabaseConfig();
+  const config = toDbConfig(raw);
+  const displayName = displayNameFor(config, raw);
+  try {
+    await DatabaseTasks.drop(config);
+    console.log(`Dropped database '${displayName}'`);
+  } catch (error) {
+    if (error instanceof NoDatabaseError) {
+      console.error(`Database '${displayName}' does not exist`);
+      return;
     }
-  } else {
-    if (!config.database && !config.url) {
-      throw new Error(
-        `No database name specified in config for adapter "${adapterName}". Set the "database" property.`,
-      );
-    }
-    const { systemConfig, dbNameResolved } = buildSystemConfig(config, adapterName);
-    validateDbName(dbNameResolved);
-    const systemAdapter = await connectAdapter(systemConfig);
-    try {
-      await systemAdapter.executeMutation(`DROP DATABASE IF EXISTS "${dbNameResolved}"`);
-      console.log(`Dropped database '${dbNameResolved}'`);
-    } finally {
-      await closeAdapter(systemAdapter);
-    }
+    throw error;
   }
 }
-
-// --- Command definitions ---
 
 export function dbCommand(): Command {
   const cmd = new Command("db");

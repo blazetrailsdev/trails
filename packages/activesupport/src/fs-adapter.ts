@@ -42,6 +42,12 @@ export interface FsAdapter {
   ): number;
   closeSync(fd: number): void;
   copyFileSync(src: string, dest: string): void;
+  /**
+   * Create a unique temp directory (optional — not all filesystems support
+   * atomic uniqueness). Only used by server-side database tasks; custom
+   * adapters may omit it.
+   */
+  mkdtempSync?(prefix: string): string;
 }
 
 export interface PathAdapter {
@@ -50,6 +56,18 @@ export interface PathAdapter {
   basename(p: string): string;
   resolve(...parts: string[]): string;
   extname(p: string): string;
+  /**
+   * Optional — adapters that don't model absolute paths (e.g. in-memory
+   * VFS) can omit this. When undefined, callers should treat any path as
+   * absolute.
+   */
+  isAbsolute?(p: string): boolean;
+  /**
+   * Optional — convert an absolute filesystem path to a `file://` URL
+   * (RFC 8089). Only used by server-side paths that call dynamic `import()`
+   * on disk files.
+   */
+  pathToFileURL?(p: string): URL;
   sep: string;
 }
 
@@ -88,7 +106,18 @@ function tryAutoRegisterNode(): boolean {
       typeof __filename !== "undefined" ? __filename : "file:///activesupport",
     );
     const fs = req("node:fs") as FsAdapter;
-    const path = req("node:path") as PathAdapter;
+    const nodePath = req("node:path") as Required<Omit<PathAdapter, "pathToFileURL">>;
+    const nodeUrl = req("node:url") as { pathToFileURL(p: string): URL };
+    const path: PathAdapter = {
+      join: (...parts) => nodePath.join(...parts),
+      dirname: (p) => nodePath.dirname(p),
+      basename: (p) => nodePath.basename(p),
+      resolve: (...parts) => nodePath.resolve(...parts),
+      extname: (p) => nodePath.extname(p),
+      isAbsolute: (p) => nodePath.isAbsolute(p),
+      pathToFileURL: (p) => nodeUrl.pathToFileURL(p),
+      sep: nodePath.sep,
+    };
     registry.set("node", { fs, path });
     return true;
   } catch {
@@ -105,7 +134,20 @@ function tryAutoRegisterNodeAsync(): Promise<boolean> {
           return false;
         }
         const fs = (await import("node:fs")) as unknown as FsAdapter;
-        const path = (await import("node:path")) as unknown as PathAdapter;
+        const nodePath = (await import("node:path")) as unknown as Required<
+          Omit<PathAdapter, "pathToFileURL">
+        >;
+        const nodeUrl = (await import("node:url")) as { pathToFileURL(p: string): URL };
+        const path: PathAdapter = {
+          join: (...parts) => nodePath.join(...parts),
+          dirname: (p) => nodePath.dirname(p),
+          basename: (p) => nodePath.basename(p),
+          resolve: (...parts) => nodePath.resolve(...parts),
+          extname: (p) => nodePath.extname(p),
+          isAbsolute: (p) => nodePath.isAbsolute(p),
+          pathToFileURL: (p) => nodeUrl.pathToFileURL(p),
+          sep: nodePath.sep,
+        };
         registry.set("node", { fs, path });
         return true;
       } catch {

@@ -52,21 +52,28 @@ class AdapterSchemaSource implements SchemaSource {
   }
 }
 
+export interface SchemaDumperOptions {
+  /** Output language for the generated schema DSL: "ts" (default) or "js". */
+  language?: "ts" | "js";
+}
+
 export class SchemaDumper {
   private _adapter: DatabaseAdapter;
+  private _options: SchemaDumperOptions;
 
-  constructor(adapter: DatabaseAdapter) {
+  constructor(adapter: DatabaseAdapter, options: SchemaDumperOptions = {}) {
     this._adapter = adapter;
+    this._options = options;
   }
 
-  static async dump(adapter: DatabaseAdapter): Promise<string> {
-    const dumper = new SchemaDumper(adapter);
+  static async dump(adapter: DatabaseAdapter, options: SchemaDumperOptions = {}): Promise<string> {
+    const dumper = new SchemaDumper(adapter, options);
     return dumper.dump();
   }
 
   async dump(): Promise<string> {
     const source = new AdapterSchemaSource(this._adapter);
-    return await AbstractSchemaDumper.dump(source);
+    return await AbstractSchemaDumper.dump(source, { language: this._options.language ?? "ts" });
   }
 
   async dumpWithVersion(): Promise<string> {

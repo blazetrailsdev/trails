@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { randomUUID } from "node:crypto";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -6,7 +10,7 @@ import { createTestAdapter } from "../test-adapter.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   it("raises an error when called with protected environment", async () => {
-    await expect(DatabaseTasks.checkProtectedEnvironments("production")).rejects.toThrow(
+    await expect(DatabaseTasks.checkProtectedEnvironmentsBang("production")).rejects.toThrow(
       /production/,
     );
   });
@@ -72,11 +76,11 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     /* needs schema cache implementation */
   });
   it("cache dump default filename", () => {
-    expect(DatabaseTasks.dumpSchemaFilename()).toBe("db/schema.rb");
+    expect(DatabaseTasks.dumpSchemaFilename()).toBe("db/schema.ts");
   });
   it("cache dump default filename with custom db dir", () => {
     DatabaseTasks.dbDir = "custom_db";
-    expect(DatabaseTasks.dumpSchemaFilename()).toBe("custom_db/schema.rb");
+    expect(DatabaseTasks.dumpSchemaFilename()).toBe("custom_db/schema.ts");
   });
   it("cache dump alternate filename", () => {
     process.env.SCHEMA = "alt_schema.rb";
@@ -87,7 +91,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
       adapter: "sqlite3",
       database: "animals.db",
     });
-    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/animals_schema.rb");
+    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/animals_schema.ts");
   });
   it("cache dump filename with path from the argument has precedence", () => {
     process.env.SCHEMA = "override.rb";
@@ -683,7 +687,7 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
 describe("DatabaseTasksCheckSchemaFileTest", () => {
   it("check schema file", () => {
     expect(() => DatabaseTasks.checkSchemaFile("")).toThrow();
-    expect(() => DatabaseTasks.checkSchemaFile("db/schema.rb")).not.toThrow();
+    expect(() => DatabaseTasks.checkSchemaFile("db/schema.ts")).not.toThrow();
   });
 });
 
@@ -702,7 +706,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
   });
 
   it("check dump filename defaults", () => {
-    expect(DatabaseTasks.dumpSchemaFilename()).toBe("db/schema.rb");
+    expect(DatabaseTasks.dumpSchemaFilename()).toBe("db/schema.ts");
   });
 
   it("check dump filename with schema env", () => {
@@ -712,7 +716,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
 
   it("check dump filename defaults for non primary databases", () => {
     const config = new HashConfig("test", "animals", { adapter: "sqlite3" });
-    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/animals_schema.rb");
+    expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("db/animals_schema.ts");
   });
 
   it.skip("setting schema dump to nil", () => {
@@ -723,5 +727,190 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     process.env.SCHEMA = "override.rb";
     const config = new HashConfig("test", "animals", { adapter: "sqlite3" });
     expect(DatabaseTasks.dumpSchemaFilename(config)).toBe("override.rb");
+  });
+});
+
+describe("DatabaseTasksStructureDumpDispatchTest", () => {
+  beforeEach(() => {
+    DatabaseTasks.clearRegisteredTasks();
+    DatabaseTasks.structureDumpFlags = null;
+    DatabaseTasks.structureLoadFlags = null;
+  });
+
+  afterEach(() => {
+    DatabaseTasks.clearRegisteredTasks();
+    DatabaseTasks.structureDumpFlags = null;
+    DatabaseTasks.structureLoadFlags = null;
+  });
+
+  it("structure_dump dispatches to registered handler", async () => {
+    const calls: Array<{ filename: string; flags: unknown }> = [];
+    DatabaseTasks.registerTask("sqlite", {
+      structureDump: async (_c, filename, flags) => {
+        calls.push({ filename, flags: flags ?? null });
+      },
+    });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    await DatabaseTasks.structureDump(config, "out.sql");
+    expect(calls).toEqual([{ filename: "out.sql", flags: null }]);
+  });
+
+  it("structure_load dispatches to registered handler", async () => {
+    const calls: string[] = [];
+    DatabaseTasks.registerTask("sqlite", {
+      structureLoad: async (_c, filename) => {
+        calls.push(filename);
+      },
+    });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    await DatabaseTasks.structureLoad(config, "in.sql");
+    expect(calls).toEqual(["in.sql"]);
+  });
+
+  it("structure_dump raises when adapter does not support it", async () => {
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    await expect(DatabaseTasks.structureDump(config, "out.sql")).rejects.toThrow(
+      /does not support structureDump/,
+    );
+  });
+
+  it("structure_load raises when adapter does not support it", async () => {
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    await expect(DatabaseTasks.structureLoad(config, "in.sql")).rejects.toThrow(
+      /does not support structureLoad/,
+    );
+  });
+
+  it("structure_dump passes flag string when structureDumpFlags is a string", async () => {
+    let received: unknown = "unset";
+    DatabaseTasks.structureDumpFlags = "--no-tablespaces";
+    DatabaseTasks.registerTask("sqlite", {
+      structureDump: async (_c, _f, flags) => {
+        received = flags;
+      },
+    });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    await DatabaseTasks.structureDump(config, "out.sql");
+    expect(received).toBe("--no-tablespaces");
+  });
+
+  it("structure_dump selects adapter-specific flags from a hash", async () => {
+    let received: unknown = "unset";
+    DatabaseTasks.structureDumpFlags = {
+      sqlite3: ["--sqlite-only"],
+      postgresql: ["--pg-only"],
+    };
+    DatabaseTasks.registerTask("sqlite", {
+      structureDump: async (_c, _f, flags) => {
+        received = flags;
+      },
+    });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    await DatabaseTasks.structureDump(config, "out.sql");
+    expect(received).toEqual(["--sqlite-only"]);
+  });
+
+  it("structure_load selects adapter-specific flags from a hash", async () => {
+    let received: unknown = "unset";
+    DatabaseTasks.structureLoadFlags = {
+      sqlite3: ["--quiet"],
+      postgresql: ["--verbose"],
+    };
+    DatabaseTasks.registerTask("sqlite", {
+      structureLoad: async (_c, _f, flags) => {
+        received = flags;
+      },
+    });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    await DatabaseTasks.structureLoad(config, "in.sql");
+    expect(received).toEqual(["--quiet"]);
+  });
+
+  it("explicit extraFlags argument overrides configured structureDumpFlags", async () => {
+    let received: unknown = "unset";
+    DatabaseTasks.structureDumpFlags = "--default-flag";
+    DatabaseTasks.registerTask("sqlite", {
+      structureDump: async (_c, _f, flags) => {
+        received = flags;
+      },
+    });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+    await DatabaseTasks.structureDump(config, "out.sql", "--explicit");
+    expect(received).toBe("--explicit");
+  });
+});
+
+describe("DatabaseTasksDumpSchemaFormatBranchingTest", () => {
+  const originalFormat = DatabaseTasks.schemaFormat;
+  const originalRoot = DatabaseTasks.root;
+
+  beforeEach(() => {
+    DatabaseTasks.clearRegisteredTasks();
+  });
+
+  afterEach(() => {
+    DatabaseTasks.clearRegisteredTasks();
+    DatabaseTasks.schemaFormat = originalFormat;
+    DatabaseTasks.root = originalRoot;
+  });
+
+  it("dump schema delegates to structureDump when schema format is sql", async () => {
+    const calls: Array<{ filename: string }> = [];
+    DatabaseTasks.registerTask("sqlite", {
+      structureDump: async (_c, filename) => {
+        calls.push({ filename });
+      },
+    });
+    DatabaseTasks.schemaFormat = "sql";
+    DatabaseTasks.dbDir = path.join(os.tmpdir(), `trails-dump-${randomUUID()}`);
+    try {
+      const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+      await DatabaseTasks.dumpSchema(config);
+      expect(calls.length).toBe(1);
+      expect(calls[0].filename.endsWith("structure.sql")).toBe(true);
+      expect(fs.existsSync(path.dirname(calls[0].filename))).toBe(true);
+    } finally {
+      fs.rmSync(DatabaseTasks.dbDir, { recursive: true, force: true });
+      DatabaseTasks.dbDir = "db";
+    }
+  });
+});
+
+describe("DatabaseTasksLoadSchemaTsFormatTest", () => {
+  const originalFormat = DatabaseTasks.schemaFormat;
+  const originalRoot = DatabaseTasks.root;
+
+  afterEach(() => {
+    DatabaseTasks.schemaFormat = originalFormat;
+    DatabaseTasks.root = originalRoot;
+    DatabaseTasks.setAdapter(null);
+  });
+
+  it("load schema imports the schema module for ts format", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-schema-"));
+    const schemaFile = path.join(dir, "schema.mjs");
+    const markerFile = path.join(dir, "marker.txt");
+    fs.writeFileSync(
+      schemaFile,
+      `export default async function defineSchema() {\n` +
+        `  const fs = await import("node:fs");\n` +
+        `  fs.writeFileSync(${JSON.stringify(markerFile)}, "loaded");\n` +
+        `}\n`,
+    );
+
+    const adapter = createTestAdapter();
+    DatabaseTasks.setAdapter(adapter);
+    DatabaseTasks.schemaFormat = "ts";
+
+    try {
+      const config = new HashConfig("test", "primary", { adapter: "sqlite3" });
+      await DatabaseTasks.loadSchema(config, "ts", schemaFile);
+      expect(fs.existsSync(markerFile)).toBe(true);
+      expect(fs.readFileSync(markerFile, "utf8")).toBe("loaded");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

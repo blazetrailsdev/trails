@@ -24,9 +24,26 @@ export {
 } from "./async-context-adapter.js";
 export type { AsyncContext, AsyncContextAdapter } from "./async-context-adapter.js";
 
+export {
+  registerChildProcessAdapter,
+  getChildProcess,
+  getChildProcessAsync,
+  childProcessAdapterConfig,
+} from "./child-process-adapter.js";
+export type {
+  ChildProcessAdapter,
+  SpawnSyncOptions,
+  SpawnSyncResult,
+} from "./child-process-adapter.js";
+
+export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
+export type { OsAdapter } from "./os-adapter.js";
+
 import { fsAdapterConfig } from "./fs-adapter.js";
 import { cryptoAdapterConfig } from "./crypto-adapter.js";
 import { asyncContextAdapterConfig } from "./async-context-adapter.js";
+import { childProcessAdapterConfig } from "./child-process-adapter.js";
+import { osAdapterConfig } from "./os-adapter.js";
 
 /**
  * ActiveSupport configuration — mirrors Rails' ActiveSupport module.
@@ -62,6 +79,20 @@ export const ActiveSupport = {
   },
   set asyncContextAdapter(name: string | null) {
     asyncContextAdapterConfig.adapter = name;
+  },
+
+  get childProcessAdapter(): string | null {
+    return childProcessAdapterConfig.adapter;
+  },
+  set childProcessAdapter(name: string | null) {
+    childProcessAdapterConfig.adapter = name;
+  },
+
+  get osAdapter(): string | null {
+    return osAdapterConfig.adapter;
+  },
+  set osAdapter(name: string | null) {
+    osAdapterConfig.adapter = name;
   },
 };
 

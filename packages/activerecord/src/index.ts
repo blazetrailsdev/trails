@@ -153,6 +153,7 @@ export {
   ValueTooLong,
   PreparedStatementInvalid,
   NoDatabaseError,
+  DatabaseAlreadyExists,
   AttributeAssignmentError,
   TransactionIsolationError,
   IrreversibleOrderError,
@@ -220,7 +221,16 @@ export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks } from "./tasks/database-tasks.js";
-export type { DatabaseTaskHandler } from "./tasks/database-tasks.js";
+export type { DatabaseTaskHandler, SchemaFormat } from "./tasks/database-tasks.js";
+export { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
+export { PostgreSQLDatabaseTasks } from "./tasks/postgresql-database-tasks.js";
+export { MySQLDatabaseTasks } from "./tasks/mysql-database-tasks.js";
+import { SQLiteDatabaseTasks as _SQLiteTasks } from "./tasks/sqlite-database-tasks.js";
+import { PostgreSQLDatabaseTasks as _PGTasks } from "./tasks/postgresql-database-tasks.js";
+import { MySQLDatabaseTasks as _MySQLTasks } from "./tasks/mysql-database-tasks.js";
+_SQLiteTasks.register();
+_PGTasks.register();
+_MySQLTasks.register();
 export { Migrator } from "./migration.js";
 export type { MigrationProxy, MigrationLike } from "./migration.js";
 export type { DelegatedTypeOptions } from "./delegated-type.js";

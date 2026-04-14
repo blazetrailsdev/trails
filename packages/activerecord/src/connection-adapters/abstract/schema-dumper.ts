@@ -200,16 +200,21 @@ function cleanDefault(raw: unknown): unknown {
   return raw;
 }
 
+export type SchemaDumpLanguage = "ts" | "js";
+
 export class SchemaDumper {
   static readonly DEFAULT_DATETIME_PRECISION = 6;
   static ignoreTables: (string | RegExp)[] = [];
 
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
+  private _language: SchemaDumpLanguage;
 
   constructor(source: SchemaSource, options: Record<string, unknown> = {}) {
     this._source = source;
     this._options = options;
+    const lang = (options.language as SchemaDumpLanguage | undefined) ?? "ts";
+    this._language = lang;
   }
 
   /**
@@ -221,8 +226,11 @@ export class SchemaDumper {
     return new this(source, options);
   }
 
-  static dump(source: SchemaSource): string | Promise<string> {
-    const dumper = this.create(source);
+  static dump(
+    source: SchemaSource,
+    options: Record<string, unknown> = {},
+  ): string | Promise<string> {
+    const dumper = this.create(source, options);
     return dumper.dump();
   }
 
@@ -251,7 +259,14 @@ export class SchemaDumper {
     lines.push("// This file is auto-generated from the current state of the database.");
     lines.push("// Instead of editing this file, please use the migrations feature.");
     lines.push("");
-    lines.push("export default async function defineSchema(ctx: any) {");
+    if (this._language === "ts") {
+      lines.push(`import type { MigrationContext } from "@blazetrails/activerecord";`);
+      lines.push("");
+      lines.push("export default async function defineSchema(ctx: MigrationContext) {");
+    } else {
+      lines.push("/** @param {import('@blazetrails/activerecord').MigrationContext} ctx */");
+      lines.push("export default async function defineSchema(ctx) {");
+    }
   }
 
   private trailer(lines: string[]): void {
