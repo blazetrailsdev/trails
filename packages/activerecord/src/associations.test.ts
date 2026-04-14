@@ -7828,4 +7828,39 @@ describe("CollectionProxyDelegation", () => {
     const rel = proxy.select("body");
     expect(typeof rel.toSql).toBe("function");
   });
+
+  it("associations mixed onto Base: this.belongsTo / hasOne / hasMany / hasAndBelongsToMany work", () => {
+    const adapter = createTestAdapter();
+    class BtBlog extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.hasMany("posts");
+      }
+    }
+    class BtPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("bt_blog_id", "integer");
+        this.adapter = adapter;
+        this.belongsTo("bt_blog");
+      }
+    }
+    class BtAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.hasOne("bt_post");
+        this.hasAndBelongsToMany("bt_tags");
+      }
+    }
+    registerModel(BtBlog);
+    registerModel(BtPost);
+    registerModel(BtAuthor);
+
+    expect(reflectOnAllAssociations(BtBlog).map((r) => r.name)).toContain("posts");
+    expect(reflectOnAllAssociations(BtPost).map((r) => r.name)).toContain("bt_blog");
+    expect(reflectOnAllAssociations(BtAuthor).map((r) => r.name)).toContain("bt_post");
+    expect(reflectOnAllAssociations(BtAuthor).map((r) => r.name)).toContain("bt_tags");
+  });
 });

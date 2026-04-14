@@ -79,8 +79,18 @@ describe("edge cases — rough edges in current DX", () => {
     >();
   });
 
-  it("KNOWN GAP: instance `id` is typed as `unknown`", () => {
-    const w = new Widget({ name: "w" });
-    expectTypeOf(w.id).toBeUnknown();
+  it("instance `id` is typed as PrimaryKeyValue (string | number | array | null | undefined)", () => {
+    expectTypeOf<Widget["id"]>().toEqualTypeOf<
+      import("@blazetrails/activerecord").PrimaryKeyValue
+    >();
+    // PrimaryKeyValue includes scalar IDs and CPK tuples — narrow at the use
+    // site (e.g. `w.id as number`) when you know the PK type.
+  });
+
+  it("belongsTo / hasMany / hasOne are statically typed on typeof Base", () => {
+    expectTypeOf<ReturnType<typeof Base.belongsTo>>().toEqualTypeOf<void>();
+    expectTypeOf<ReturnType<typeof Base.hasMany>>().toEqualTypeOf<void>();
+    expectTypeOf<ReturnType<typeof Base.hasOne>>().toEqualTypeOf<void>();
+    expectTypeOf<ReturnType<typeof Base.hasAndBelongsToMany>>().toEqualTypeOf<void>();
   });
 });
