@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createProgram } from "../cli.js";
 import {
   loadDatabaseConfig,
+  loadAllDatabaseConfigs,
   connectAdapter,
   resolveEnv,
   resolveSchemaFormat,
@@ -219,6 +220,156 @@ describe("loadDatabaseConfig", () => {
 
     await expect(loadDatabaseConfig("production", tmpDir)).rejects.toThrow(
       /No database configuration for environment "production"/,
+    );
+  });
+
+  it("returns the primary sub-config for a multi-DB environment", async () => {
+    // Rails-style multi-DB shape: env key -> named sub-configs.
+    // loadDatabaseConfig picks 'primary' so single-adapter CLI commands
+    // still have something to connect to.
+    const configDir = path.join(tmpDir, "config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: "db/primary.sqlite3" },
+    animals: { adapter: "sqlite3", database: "db/animals.sqlite3" },
+  },
+};`,
+    );
+    const config = await loadDatabaseConfig("development", tmpDir);
+    expect(config.database).toBe("db/primary.sqlite3");
+  });
+
+  it("rejects an array env value instead of silently falling through", async () => {
+    // Arrays are objects in JS; without an explicit guard the check
+    // would slip into multi-DB handling and confuse users with a
+    // 'no primary' error. Reject up front.
+    const configDir = path.join(tmpDir, "config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, "database.ts"), `export default { development: [] };`);
+    await expect(loadDatabaseConfig("development", tmpDir)).rejects.toThrow(
+      /Invalid database configuration for environment "development".*expected an object/,
+    );
+  });
+
+  it("errors when a multi-DB env has no primary sub-config", async () => {
+    const configDir = path.join(tmpDir, "config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "database.ts"),
+      `export default {
+  development: {
+    animals: { adapter: "sqlite3", database: "db/animals.sqlite3" },
+  },
+};`,
+    );
+    await expect(loadDatabaseConfig("development", tmpDir)).rejects.toThrow(
+      /no "primary" sub-config.*Found: animals/,
+    );
+  });
+});
+
+describe("loadAllDatabaseConfigs", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-multi-"));
+    fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns [{name:'primary', config}] for a flat single-DB config", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: "db/dev.sqlite3" },
+};`,
+    );
+    const all = await loadAllDatabaseConfigs("development", tmpDir);
+    expect(all).toHaveLength(1);
+    expect(all[0].name).toBe("primary");
+    expect(all[0].config.database).toBe("db/dev.sqlite3");
+  });
+
+  it("returns one entry per named sub-config for multi-DB", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: "db/primary.sqlite3" },
+    animals: { adapter: "sqlite3", database: "db/animals.sqlite3" },
+  },
+};`,
+    );
+    const all = await loadAllDatabaseConfigs("development", tmpDir);
+    expect(all.map((c) => c.name)).toEqual(["primary", "animals"]);
+    expect(all[0].config.database).toBe("db/primary.sqlite3");
+    expect(all[1].config.database).toBe("db/animals.sqlite3");
+  });
+
+  it("treats an env with any non-object sub-value as single-DB (Rails all-values-are-hashes rule)", async () => {
+    // Matches Rails' `DatabaseConfigurations#build_configs`: unless every
+    // sub-value is a Hash, the whole env-level object is the primary
+    // config. Here `url` is a string, so the env-object is NOT walked
+    // as sub-configs — the whole thing becomes the single primary
+    // config. Trails mirrors this behavior exactly.
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    url: "postgres://host/db",
+    primary: { adapter: "sqlite3", database: "ignored.sqlite3" },
+  },
+};`,
+    );
+    const all = await loadAllDatabaseConfigs("development", tmpDir);
+    expect(all).toHaveLength(1);
+    expect(all[0].name).toBe("primary");
+    expect((all[0].config as { url?: string }).url).toBe("postgres://host/db");
+  });
+
+  it("rejects an empty multi-DB env", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default { development: {} };`,
+    );
+    await expect(loadAllDatabaseConfigs("development", tmpDir)).rejects.toThrow(
+      /has no database configurations defined/,
+    );
+  });
+
+  it("treats a url-only env value as single-DB (the string value fails Rails' all-hashes check)", async () => {
+    // Detection rule is `config.values.all?(Hash)`. Here the only
+    // value is a string, so the predicate is false and the whole env
+    // object becomes the single primary config.
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { url: "sqlite3:///tmp/dev.sqlite3" },
+};`,
+    );
+    const all = await loadAllDatabaseConfigs("development", tmpDir);
+    expect(all).toHaveLength(1);
+    expect(all[0].name).toBe("primary");
+    expect(all[0].config.url).toBe("sqlite3:///tmp/dev.sqlite3");
+  });
+
+  it("rejects an array env value with a clear error", async () => {
+    // Arrays pass `typeof === 'object'` but a `development: []` config
+    // is never valid — catch it up front instead of letting it slip
+    // into the multi-DB path and producing a misleading
+    // 'no database configurations defined' error.
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default { development: [] };`,
+    );
+    await expect(loadAllDatabaseConfigs("development", tmpDir)).rejects.toThrow(
+      /Invalid database configuration for environment "development".*expected an object/,
     );
   });
 });
@@ -1483,6 +1634,53 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     expect(parsed.indexes["users"]).toEqual([
       { name: "users_on_email", columns: ["email"], unique: true },
     ]);
+  });
+
+  it("db schema:cache:dump fans out across every multi-DB config", async () => {
+    // Rails multi-DB: each named sub-config gets its own
+    // `db/<name>_schema_cache.json`. HashConfig.defaultSchemaCachePath
+    // emits `schema_cache.json` for primary and `<name>_schema_cache.json`
+    // for others, so we assert both files show up.
+    const primaryDb = path.join(tmpDir, "primary.sqlite3");
+    const animalsDb = path.join(tmpDir, "animals.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+};`,
+    );
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const seedPrimary = new SQLite3Adapter(primaryDb);
+    try {
+      await seedPrimary.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY)");
+    } finally {
+      await seedPrimary.close();
+    }
+    const seedAnimals = new SQLite3Adapter(animalsDb);
+    try {
+      await seedAnimals.executeMutation("CREATE TABLE dogs (id INTEGER PRIMARY KEY)");
+    } finally {
+      await seedAnimals.close();
+    }
+
+    await runDb(["schema:cache:dump"]);
+
+    const primaryCache = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, "db", "schema_cache.json"), "utf8"),
+    ) as { columns: Record<string, unknown[]> };
+    const animalsCache = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, "db", "animals_schema_cache.json"), "utf8"),
+    ) as { columns: Record<string, unknown[]> };
+    expect(Object.keys(primaryCache.columns)).toContain("widgets");
+    expect(Object.keys(animalsCache.columns)).toContain("dogs");
   });
 
   it("db schema:dump --format=sql writes db/structure.sql", async () => {

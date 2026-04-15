@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   loadDatabaseConfig,
+  loadAllDatabaseConfigs,
   connectAdapter,
   resolveEnv,
   resolveSchemaFormat,
@@ -153,12 +154,28 @@ async function withRegisteredConfiguration<T>(
   config: HashConfig,
   fn: () => Promise<T>,
 ): Promise<T> {
+  return withRegisteredConfigurations([config], config.envName, fn);
+}
+
+/**
+ * Multi-config variant: register every HashConfig for the env so
+ * `DatabaseTasks.configsFor(envName)` fans out across them. Used by
+ * commands that mirror Rails' `with_temporary_pool_for_each` /
+ * `configs_for(env_name:).each` — schema:cache:dump, schema:cache:clear
+ * — which need to hit every named DB (primary + animals + ...) in a
+ * multi-DB app.
+ */
+async function withRegisteredConfigurations<T>(
+  configs: HashConfig[],
+  envName: string,
+  fn: () => Promise<T>,
+): Promise<T> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
   const previousTasksConfig = DatabaseTasks.databaseConfiguration;
   const previousCurrent = DatabaseConfigurations.current;
   const previousEnv = DatabaseTasks.env;
-  DatabaseTasks.databaseConfiguration = new DatabaseConfigurations([config]);
-  DatabaseTasks.env = config.envName;
+  DatabaseTasks.databaseConfiguration = new DatabaseConfigurations(configs);
+  DatabaseTasks.env = envName;
   try {
     return await fn();
   } finally {
@@ -855,18 +872,21 @@ export function dbCommand(): Command {
 
   cmd
     .command("schema:cache:dump")
-    .description("Dump db/schema_cache.json for the primary database configuration")
+    .description(
+      "Dump db/schema_cache.json for every database configuration in the current environment",
+    )
     .action(async () => {
-      // Rails iterates `with_temporary_pool_for_each { |pool| ... }` across
-      // every config in the env. trailties' loadDatabaseConfig only returns
-      // the primary config today, so `configsFor(envName)` — and therefore
-      // `withTemporaryPoolForEach` — sees exactly that one. The iterator
-      // shape is still Rails-faithful; it'll fan out automatically once the
-      // multi-DB config loader lands.
+      // Rails: `with_temporary_pool_for_each { |pool| dump_schema_cache(pool, filename) }`.
+      // Fans out across every named DB in the env for multi-DB apps
+      // (primary + animals + ...) — each gets its own
+      // `db/<name>_schema_cache.json` per HashConfig.defaultSchemaCachePath.
       const envName = resolveEnv();
-      const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
-      const primary = toDbConfig(raw, envName);
-      await withRegisteredConfiguration(primary, async () => {
+      const named = await loadAllDatabaseConfigs(envName);
+      const configs = named.map(
+        ({ name, config }) =>
+          new HashConfig(envName, name, normalizeRawConfig(config) as Record<string, unknown>),
+      );
+      await withRegisteredConfigurations(configs, envName, async () => {
         await DatabaseTasks.withTemporaryPoolForEach(envName, async (config) => {
           const adapter = DatabaseTasks.migrationConnection();
           if (!adapter) return;
@@ -879,15 +899,18 @@ export function dbCommand(): Command {
 
   cmd
     .command("schema:cache:clear")
-    .description("Delete db/schema_cache.json for the primary database configuration")
+    .description(
+      "Delete db/schema_cache.json for every database configuration in the current environment",
+    )
     .action(async () => {
       // Rails: `configurations.configs_for(env_name: env).each { |c| clear_schema_cache(cache_dump_filename(c)) }`.
-      // trailties currently loads only the primary config; the loop is
-      // Rails-shaped and ready for multi-DB expansion.
       const envName = resolveEnv();
-      const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
-      const primary = toDbConfig(raw, envName);
-      await withRegisteredConfiguration(primary, async () => {
+      const named = await loadAllDatabaseConfigs(envName);
+      const configs = named.map(
+        ({ name, config }) =>
+          new HashConfig(envName, name, normalizeRawConfig(config) as Record<string, unknown>),
+      );
+      await withRegisteredConfigurations(configs, envName, async () => {
         for (const config of DatabaseTasks.configsFor(envName)) {
           const filename = DatabaseTasks.cacheDumpFilename(config);
           // clearSchemaCache is a no-op on ENOENT; don't log "Cleared"
