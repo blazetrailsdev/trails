@@ -1,4 +1,5 @@
 import type { Base } from "../base.js";
+import type { Relation } from "../relation.js";
 
 /**
  * Named scope handling — defines named scopes on model classes
@@ -12,10 +13,10 @@ import type { Base } from "../base.js";
  *
  * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#scope
  */
-export function scope(
-  this: typeof Base,
+export function scope<T extends typeof Base>(
+  this: T,
   name: string,
-  fn: (rel: any, ...args: any[]) => any,
+  fn: (rel: Relation<InstanceType<T>>, ...args: any[]) => Relation<any>,
   extension?: Record<string, Function>,
 ): void {
   const modelClass = this as any;

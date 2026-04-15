@@ -948,8 +948,11 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.default_scope
    */
-  static defaultScope(fn: (rel: any) => any): void {
-    this._defaultScope = fn;
+  static defaultScope<T extends typeof Base>(
+    this: T,
+    fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  ): void {
+    this._defaultScope = fn as (rel: any) => any;
   }
 
   /**

@@ -67,6 +67,33 @@ describe("query chaining DX", () => {
     expectTypeOf(rows).toEqualTypeOf<Post[]>();
   });
 
+  it("this.scope(fn) infers `rel` as Relation<Self>; defaultScope same", () => {
+    class Article extends Base {
+      declare published: boolean;
+      declare static published: () => Relation<Article>;
+      declare static recent: (days: number) => Relation<Article>;
+
+      static {
+        this.attribute("published", "boolean");
+        // No manual `rel: Relation<Article>` annotation needed.
+        this.scope("published", (rel) => {
+          expectTypeOf(rel).toMatchTypeOf<Relation<Article>>();
+          return rel.where({ published: true });
+        });
+        this.scope("recent", (rel, days: number) => {
+          expectTypeOf(rel).toMatchTypeOf<Relation<Article>>();
+          expectTypeOf(days).toBeNumber();
+          return rel;
+        });
+        this.defaultScope((rel) => {
+          expectTypeOf(rel).toMatchTypeOf<Relation<Article>>();
+          return rel.where({ published: true });
+        });
+      }
+    }
+    assertType(Article);
+  });
+
   it("Post.all() / Post.from(...) / Post.whereNot(...) preserve the generic", () => {
     expectTypeOf(Post.all()).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.from("posts")).toMatchTypeOf<Relation<Post>>();

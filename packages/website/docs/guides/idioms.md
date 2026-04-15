@@ -49,11 +49,11 @@ class Post extends Base {
 
     Post.validates("title", { presence: true, length: { minimum: 3 } });
 
-    Post.beforeSave((record: Post) => {
+    Post.beforeSave((record) => {
       record.title = record.title.trim();
     });
 
-    Post.scope("published", (rel: Relation<Post>) => rel.where({ published: true }));
+    Post.scope("published", (rel) => rel.where({ published: true }));
   }
 }
 

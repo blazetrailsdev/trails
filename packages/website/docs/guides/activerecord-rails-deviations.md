@@ -296,7 +296,7 @@ class Post extends Base {
     // `this`, no not* scopes).
     defineEnum(this, "status", { draft: 0, published: 1 });
     // Named scope — use a name that doesn't collide with an enum value above.
-    this.scope("featured", (rel: Relation<Post>) => rel.where({ featured: true }));
+    this.scope("featured", (rel) => rel.where({ featured: true }));
   }
 }
 ```
