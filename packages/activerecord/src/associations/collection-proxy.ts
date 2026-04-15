@@ -22,7 +22,11 @@ import {
 } from "../associations.js";
 
 export interface CollectionProxy<T extends Base = Base> {
-  // Thenable — makes CollectionProxy awaitable (delegates to toArray)
+  // Thenable — makes CollectionProxy awaitable. Delegates to `load()`,
+  // which both returns the loaded records AND hydrates `_target`, so
+  // subsequent sync ops (`proxy.length`, `proxy[0]`, iteration) work
+  // after a single `await proxy`. Wired at the bottom of the file via
+  // `applyThenable(CollectionProxy.prototype, "load")`.
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
@@ -55,7 +59,18 @@ type DelegatedRelationMethods<T extends Base> = {
 export type AssociationProxy<
   T extends Base = Base,
   TExtensions extends Record<string, any> = Record<string, any>,
-> = CollectionProxy<T> & DelegatedRelationMethods<T> & TExtensions;
+> = CollectionProxy<T> &
+  DelegatedRelationMethods<T> &
+  TExtensions & {
+    // Numeric indexing — `proxy[0]` reads the loaded target via the
+    // `wrapCollectionProxy` `get` trap. Lives on AssociationProxy (not
+    // raw CollectionProxy) because the runtime support comes from the
+    // JS Proxy wrapper. A bare `new CollectionProxy(...)` does NOT
+    // support indexing — you'd get `undefined` at runtime.
+    // Out-of-range / unloaded indices return `undefined`, matching
+    // `Array<T>[i]` semantics under TS's standard lib.
+    readonly [index: number]: T | undefined;
+  };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CollectionProxy<T extends Base = Base> {
@@ -71,6 +86,119 @@ export class CollectionProxy<T extends Base = Base> {
 
   get target(): T[] {
     return this._target;
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Array-likeness — sync ops over the loaded target.
+  //
+  // Rails' CollectionProxy IS a Relation that's iterable / countable
+  // / array-shaped against the loaded records. JS has no blocking IO,
+  // so these methods do NOT trigger a fresh DB load — they read
+  // whatever's in `_target` (populated by `await proxy`,
+  // `await proxy.load()`, `Post.includes(...)`, or push / build /
+  // create through the proxy). For a fresh load, await the proxy
+  // first.
+  // ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Sync count of the loaded target. Mirrors `Array.prototype.length`
+   * and Rails' `posts.length` (which blocks to load in Ruby). In trails,
+   * this reads `_target` — zero if nobody loaded. Await the proxy first
+   * (or `Post.includes(...)`) if you need a fresh load.
+   *
+   * Shadows `Relation#length()` (async, `Promise<number>`). For a Relation-
+   * style async count through the proxy, use `.count()` — which still
+   * routes through to Relation via the `AssociationProxy` delegation.
+   */
+  get length(): number {
+    return this._target.length;
+  }
+
+  [Symbol.iterator](): IterableIterator<T> {
+    return this._target[Symbol.iterator]();
+  }
+
+  at(index: number): T | undefined {
+    return this._target.at(index);
+  }
+
+  map<U>(fn: (record: T, index: number, all: T[]) => U, thisArg?: unknown): U[] {
+    return this._target.map(fn, thisArg);
+  }
+
+  // filter has the standard type-predicate overload from Array<T>.
+  filter<S extends T>(
+    predicate: (record: T, index: number, all: T[]) => record is S,
+    thisArg?: unknown,
+  ): S[];
+  filter(predicate: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): T[];
+  filter(predicate: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): T[] {
+    return this._target.filter(predicate, thisArg);
+  }
+
+  forEach(fn: (record: T, index: number, all: T[]) => void, thisArg?: unknown): void {
+    this._target.forEach(fn, thisArg);
+  }
+
+  some(fn: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): boolean {
+    return this._target.some(fn, thisArg);
+  }
+
+  // every has the standard type-predicate overload from Array<T>.
+  every<S extends T>(
+    predicate: (record: T, index: number, all: T[]) => record is S,
+    thisArg?: unknown,
+  ): boolean;
+  every(predicate: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): boolean;
+  every(predicate: (record: T, index: number, all: T[]) => unknown, thisArg?: unknown): boolean {
+    return this._target.every(predicate, thisArg);
+  }
+
+  // The Array-style `includes(record)` and `find(predicate)` overloads
+  // are intentionally NOT added:
+  //   - Array-style `includes(record)` would shadow
+  //     `Relation#includes(...associations)` (eager loading).
+  //   - Array-style `find(predicate)` would shadow this class's own
+  //     `async find(id)` and `Relation#find(id)` — the Rails-style
+  //     PK-lookup forms.
+  // Reach for Array semantics via `Array.from(proxy).includes(...)` /
+  // `Array.from(proxy).find(...)` (or `proxy.target.includes(...)` /
+  // `proxy.target.find(...)`). Matches Rails' priority — CollectionProxy
+  // preserves the Relation + PK-find surface and lets Array semantics
+  // route through `to_a`.
+
+  slice(start?: number, end?: number): T[] {
+    return this._target.slice(start, end);
+  }
+
+  reduce(fn: (acc: T, record: T, index: number, all: T[]) => T): T;
+  reduce<U>(fn: (acc: U, record: T, index: number, all: T[]) => U, initial: U): U;
+  reduce(...args: [unknown, ...unknown[]]): unknown {
+    // Forward verbatim with the array as receiver — reduce needs `this`
+    // to be the array. (with-vs-without initial value picks different
+    // semantics, hence the variadic forwarding.)
+    return (this._target.reduce as (...a: unknown[]) => unknown).apply(this._target, args);
+  }
+
+  indexOf(record: T, fromIndex?: number): number {
+    return this._target.indexOf(record, fromIndex);
+  }
+
+  flatMap<U>(fn: (record: T, index: number, all: T[]) => U | readonly U[], thisArg?: unknown): U[] {
+    return this._target.flatMap(fn, thisArg);
+  }
+
+  keys(): IterableIterator<number> {
+    return this._target.keys();
+  }
+
+  // `values()` is intentionally NOT added — it would shadow
+  // `Relation#values(): Record<string, unknown>` (query-state
+  // introspection used by the Relation merger). Use the proxy's
+  // built-in iteration (`for...of`, `[...proxy]`, `Array.from(proxy)`).
+
+  entries(): IterableIterator<[number, T]> {
+    return this._target.entries();
   }
 
   /** @internal Initialize from preloaded association data. */
@@ -1296,4 +1424,11 @@ export class CollectionProxy<T extends Base = Base> {
   }
 }
 
-applyThenable(CollectionProxy.prototype);
+// Route `await proxy` through `load()` (not `toArray`) so the thenable
+// also hydrates `_target` — matches the documented contract that
+// `await proxy; proxy[0]` / `proxy.length` work after a single await.
+// `toArray()` stays available for callers who want a fresh array
+// without hydrating this proxy's `_target` / `_loaded` (it still goes
+// through `loadHasMany`, which syncs into the record's association
+// instance cache — only this proxy's local cache is left untouched).
+applyThenable(CollectionProxy.prototype, "load");

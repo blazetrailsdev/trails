@@ -1329,6 +1329,8 @@ export function association<T extends Base = Base>(
  * 1. Own/prototype properties (CollectionProxy methods, extend methods)
  * 2. Relation query methods + named scopes (via scope()'s own proxy)
  */
+const NUMERIC_INDEX_PATTERN = /^(0|[1-9]\d*)$/;
+
 function wrapCollectionProxy<T extends Base = Base>(
   proxy: CollectionProxy<T>,
 ): AssociationProxy<T> {
@@ -1338,6 +1340,15 @@ function wrapCollectionProxy<T extends Base = Base>(
       if (value !== undefined) return value;
       if (prop in target) return value;
       if (typeof prop === "symbol") return value;
+
+      // Numeric indexing — `proxy[0]`, `proxy[1]` read the loaded target
+      // via the public `target` accessor. Matches array semantics; same
+      // constraint as the other array-likeness on CollectionProxy: reads
+      // whatever's loaded. `await proxy` (or `await proxy.load()`) hydrates
+      // `_target` first if you need a fresh load.
+      if (typeof prop === "string" && NUMERIC_INDEX_PATTERN.test(prop)) {
+        return target.target[Number(prop)];
+      }
 
       if (target._record._strictLoading && !target._record._strictLoadingBypassCount) {
         throw StrictLoadingViolationError.forAssociation(target._record, target._assocName);
