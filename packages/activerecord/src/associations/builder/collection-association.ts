@@ -1,5 +1,6 @@
 import { singularize } from "@blazetrails/activesupport";
 import { Association } from "./association.js";
+import { association } from "../../associations.js";
 
 const CALLBACKS = ["beforeAdd", "afterAdd", "beforeRemove", "afterRemove"] as const;
 
@@ -80,9 +81,36 @@ export class CollectionAssociation extends Association {
     }
   }
 
+  // Phase R.2: collection association readers return the AssociationProxy
+  // — the same chainable, awaitable, array-shaped surface Rails'
+  // `blog.posts` returns. Matches Rails'
+  // `activerecord/lib/active_record/associations/collection_association.rb#reader`
+  // (`@proxy ||= CollectionProxy.create(klass, self).reset_scope`).
+  //
+  // Sync access (`for...of`, `.length`, `.map`, `proxy[0]`) reads the
+  // loaded `_target` via the array-likeness landed in Phase R.1; chainable
+  // calls (`blog.posts.where(...).order(...)`) flow through the
+  // `wrapCollectionProxy` Proxy delegation; `await blog.posts` hydrates
+  // and yields a plain array.
   static override defineReaders(mixin: any, name: string): void {
-    super.defineReaders(mixin, name);
     if (!mixin || typeof mixin !== "object") return;
+
+    // Override the main `<name>` getter to return the AssociationProxy
+    // (Rails-faithful). Skip `super.defineReaders(...)` for the main
+    // name — it would install the array reader, which we're replacing.
+    const existing = Object.getOwnPropertyDescriptor(mixin, name);
+    if (!existing || existing.configurable) {
+      Object.defineProperty(mixin, name, {
+        get(this: any) {
+          return association(this, name);
+        },
+        set: existing?.set,
+        configurable: true,
+      });
+    }
+
+    // `<singularized>Ids` reader stays as before (not a collection of
+    // records — just the FK list).
     const idsName = `${singularize(name)}Ids`;
     if (!(idsName in mixin)) {
       Object.defineProperty(mixin, idsName, {

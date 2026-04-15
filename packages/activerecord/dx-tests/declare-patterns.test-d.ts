@@ -12,6 +12,7 @@ import { describe, it, expectTypeOf } from "vitest";
 import {
   Base,
   CollectionProxy,
+  AssociationProxy,
   Relation,
   association,
   defineEnum,
@@ -55,14 +56,16 @@ class Tag extends Base {
 class Author extends Base {
   declare name: string;
 
-  // hasMany → synchronous reader returning the loaded target array
-  // (the same shape as Rails' `author.comments` once loaded). Use
-  // `association(author, "comments")` to get the full CollectionProxy
-  // API (async load/first/create/push/etc).
-  declare comments: Comment[];
+  // hasMany → AssociationProxy reader. Chainable
+  // (`author.comments.where(...).order(...)`), awaitable
+  // (`await author.comments` returns `Comment[]`), and array-shaped
+  // against the loaded target (`for (const c of author.comments)`,
+  // `.length`, `.map`, `[0]`). Matches Rails' `author.comments` which
+  // is also a `CollectionProxy`.
+  declare comments: AssociationProxy<Comment>;
 
-  // hasAndBelongsToMany → same shape as hasMany (array reader)
-  declare tags: Tag[];
+  // hasAndBelongsToMany → same shape as hasMany (AssociationProxy)
+  declare tags: AssociationProxy<Tag>;
 
   // hasOne → Profile | null (synchronous reader; returns the record directly)
   declare profile: Profile | null;
@@ -172,9 +175,14 @@ describe("declare patterns — typing runtime-attached members", () => {
     expectTypeOf(u.admin).toBeBoolean();
   });
 
-  it("hasMany accessor: `declare comments: Comment[]` (synchronous reader)", async () => {
+  it("hasMany accessor: `declare comments: AssociationProxy<Comment>` (chainable + awaitable + array-shaped)", async () => {
     const author = new Author({ name: "dean" });
-    expectTypeOf(author.comments).toEqualTypeOf<Comment[]>();
+    expectTypeOf(author.comments).toEqualTypeOf<AssociationProxy<Comment>>();
+    // Awaitable → Comment[]
+    expectTypeOf(await author.comments).toEqualTypeOf<Comment[]>();
+    // Array-shaped — sync against loaded target.
+    expectTypeOf(author.comments.length).toBeNumber();
+    expectTypeOf(author.comments[0]).toEqualTypeOf<Comment | undefined>();
   });
 
   it("full CollectionProxy API via `association(record, name)` helper", async () => {
@@ -185,9 +193,9 @@ describe("declare patterns — typing runtime-attached members", () => {
     expectTypeOf(await proxy.toArray()).toEqualTypeOf<Comment[]>();
   });
 
-  it("hasAndBelongsToMany accessor: `declare tags: Tag[]` (same shape as hasMany)", async () => {
+  it("hasAndBelongsToMany accessor: `declare tags: AssociationProxy<Tag>` (same shape as hasMany)", async () => {
     const author = new Author({ name: "dean" });
-    expectTypeOf(author.tags).toEqualTypeOf<Tag[]>();
+    expectTypeOf(author.tags).toEqualTypeOf<AssociationProxy<Tag>>();
   });
 
   it("belongsTo accessor: `declare author: Author | null` (synchronous reader)", () => {

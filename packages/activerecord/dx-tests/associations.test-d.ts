@@ -1,5 +1,5 @@
 import { describe, it, expectTypeOf, assertType } from "vitest";
-import { Base, CollectionProxy } from "@blazetrails/activerecord";
+import { Base, CollectionProxy, AssociationProxy } from "@blazetrails/activerecord";
 
 // Scenario: blog-style domain — Authors write Posts, Posts have Comments,
 // Authors have a Profile. This is the Rails guides' canonical example.
@@ -92,20 +92,20 @@ describe("associations DX", () => {
     expectTypeOf(proxy.target).toEqualTypeOf<Post[]>();
   });
 
-  it("declare posts: Post[] gives typed synchronous access on the instance", () => {
+  it("declare posts: AssociationProxy<Post> gives the chainable / array-shaped reader on the instance", () => {
     class Blog extends Base {
       declare name: string;
-      // The synchronous accessor returns the loaded target array.
-      // For the full async CollectionProxy API, use `association(blog, "posts")`
-      // — see `dx-tests/declare-patterns.test-d.ts` for the canonical reference.
-      declare posts: Post[];
+      // Post-Phase-R: collection readers return the AssociationProxy
+      // (Rails-faithful — `blog.posts` is chainable, awaitable, and
+      // array-shaped against the loaded target via R.1's array-likeness).
+      declare posts: AssociationProxy<Post>;
       static {
         this.attribute("name", "string");
         this.hasMany("posts");
       }
     }
     const blog = new Blog({ name: "dean's blog" });
-    expectTypeOf(blog.posts).toEqualTypeOf<Post[]>();
+    expectTypeOf(blog.posts).toEqualTypeOf<AssociationProxy<Post>>();
   });
 
   it("KNOWN GAP: without a `declare`, association accessors still return `unknown`", () => {

@@ -255,6 +255,7 @@ but the type system only sees them if you opt in with a `declare`:
 import {
   Base,
   CollectionProxy,
+  AssociationProxy,
   Relation,
   association,
   defineEnum,
@@ -269,9 +270,11 @@ class Post extends Base {
   declare status: number; // enum is stored as an integer; defineEnum
   //                        does not override the accessor (unlike Base.enum)
   declare author: Author | null; // belongsTo reader (synchronous)
-  declare comments: Comment[]; // hasMany reader (synchronous array;
-  //                            use `association(post, "comments")` for
-  //                            the full CollectionProxy<Comment> API)
+  declare comments: AssociationProxy<Comment>;
+  // hasMany reader — chainable (`.where(...)`), awaitable
+  // (`await post.comments` → `Comment[]`), and array-shaped over the
+  // loaded target (`for...of`, `.length`, `.map`, `[0]`). Same object
+  // as what `association(post, "comments")` returns.
   declare isDraft: () => boolean; // enum predicate
   declare draft: () => void; // enum in-memory setter (defineEnum only)
   declare draftBang: () => Promise<void>; // async (defineEnum only): sets

@@ -305,18 +305,15 @@ Status legend: ✅ merged, 🚧 in flight, 📋 planned.
 Removed `experimentalDecorators` / `emitDecoratorMetadata` from the
 four tsconfigs that carried them.
 
-### Phase 1a — virtualize() pure text transform 🚧 (#529)
+### Phase 1a — virtualize() pure text transform ✅ (#529)
 
-Lands `packages/activerecord/src/type-virtualization/` (virtualize,
+Landed `packages/activerecord/src/type-virtualization/` (virtualize,
 walker, synthesize, type-registry). 27 passing tests, 18 fixture pairs.
+Emits `Target[]` for hasMany / HABTM as of landing — the
+Phase 1a-fixup below flips this to `AssociationProxy<Target>` once R.2
+is merged.
 
-**Open until Phase R lands**: emits `Target[]` for hasMany / HABTM
-today. After Phase R, a one-liner switch in `synthesize.ts` and the
-matching fixtures will flip these to `AssociationProxy<Target>`. Phase
-1a can land first under the current types and update post-R, or wait
-for R — see the ordering note below.
-
-### Phase R — Rails-fidelity runtime fix 📋 (new, top priority)
+### Phase R — Rails-fidelity runtime fix 🚧 (top priority)
 
 Make `blog.posts` (and every collection association reader) return the
 existing `AssociationProxy<T>` instead of `Base[]`, and adopt
@@ -325,24 +322,28 @@ changes in the plan; both are pre-1.0 breaking changes — by design.
 
 Three sub-PRs, each independently testable:
 
-- **R.1 — make CollectionProxy a drop-in for arrays.** Add
-  `Symbol.iterator`, `length`, numeric indexing (via the existing JS
+- **R.1 — make CollectionProxy a drop-in for arrays ✅ (#532).**
+  Added `Symbol.iterator`, `length`, numeric indexing (via the JS
   Proxy `get` trap on string-coerced numeric keys), and the array
-  prototype methods consumers actually use (`map`, `filter`, `forEach`,
-  `find`, `some`, `every`, `includes`, `slice`, `reduce`, `at`). Each
-  delegates to the loaded `_target`. **Iteration semantics:** sync
-  iteration / array-method calls operate on the already-loaded target
-  — they do not trigger a fresh DB load (JS has no blocking IO). For a
-  fresh load, `await blog.posts` first (the proxy's existing thenable
-  unchanged). No reader change yet — just additive surface on
-  CollectionProxy. All existing tests stay green.
+  prototype methods consumers actually use (`map`, `filter`,
+  `forEach`, `some`, `every`, `slice`, `reduce`, `at`, `flatMap`,
+  `indexOf`, `keys`, `entries`). Each delegates to the loaded
+  `_target`. `Array#find` / `Array#includes(record)` / `Array#values()`
+  were deliberately **not** added — they would shadow Relation methods
+  (`find(id)` PK lookup, `includes(...associations)` eager loading,
+  `values(): Record<string, unknown>` query state). Also added an
+  `[index: number]: T | undefined` index signature on
+  `AssociationProxy` for typed bracket access, and routed the
+  thenable through `load()` (was `toArray()`) so `await proxy`
+  hydrates `_target`. Zero regressions.
 
-- **R.2 — swap the reader.** Override `defineReaders` in
+- **R.2 — swap the reader 🚧 (#536).** Overrode `defineReaders` in
   `packages/activerecord/src/associations/builder/collection-association.ts`
   so the `<name>` getter returns `association(this, name)` (the
-  AssociationProxy) instead of `this.association(name).reader`. Writers
-  (`blog.posts = [...]`) stay routed through `defineWriters` as today —
-  the array on the right is normalized into the proxy's `_target`.
+  AssociationProxy) instead of `this.association(name).reader`.
+  Writers (`blog.posts = [...]`) stay routed through `defineWriters`
+  as today — the setter is preserved by the base `defineWriters`
+  reading the existing getter descriptor and overlaying only `set`.
   Concrete update list:
   - `packages/activerecord/src/associations/builder/collection-association.ts` (the reader override)
   - `packages/activerecord/dx-tests/declare-patterns.test-d.ts` (lines ~62, ~175 — the `declare comments: Comment[]` pattern + matching test name)
@@ -536,14 +537,14 @@ The dependency graph is shallow:
 ```
 Phase 0 ✅
    │
-   ├── Phase 1a 🚧 (current)
+   ├── Phase 1a ✅
    │       │
    │       └── Phase 1a-fixup ── needs Phase R
    │
-   ├── Phase R (R.1 → R.2 → R.3)  ── pre-req for 1a-fixup, Phase 1b dx-tests, Phase 3
-   │      R.1 additive array-likeness on CollectionProxy
-   │      R.2 swap collection reader → AssociationProxy
-   │      R.3 strict-loading-by-default for singular associations
+   ├── Phase R (R.1 ✅ → R.2 🚧 → R.3 📋)  ── pre-req for 1a-fixup, Phase 1b dx-tests, Phase 3
+   │      R.1 ✅ additive array-likeness on CollectionProxy (#532)
+   │      R.2 🚧 swap collection reader → AssociationProxy (#536)
+   │      R.3 📋 strict-loading-by-default for singular associations
    │
    └── Phase 1b ── needs Phase 1a; benefits from R for honest dx-tests
             │

@@ -183,6 +183,7 @@ Every snippet below assumes:
 import {
   Base,
   CollectionProxy,
+  AssociationProxy,
   Relation,
   association,
   defineEnum,
@@ -203,22 +204,37 @@ class User extends Base {
 }
 ```
 
-**has_many / HABTM** (`this.hasMany(name)` — synchronous reader returns the
-loaded target array; use `association(record, name)` for the full async
-`CollectionProxy` API):
+**has_many / HABTM** (`this.hasMany(name)` — reader returns an
+`AssociationProxy<Target>`, mirroring Rails' `CollectionProxy`. The proxy
+is **chainable** like Relation, **awaitable** to the loaded array, and
+**array-shaped** for sync ops over the loaded target):
 
 ```ts
 class Blog extends Base {
-  declare posts: Post[]; // synchronous reader
+  declare posts: AssociationProxy<Post>;
   static {
     this.hasMany("posts");
   }
 }
 
-// Full async API — load, push, create, first, etc.
-const blog = new Blog();
-const proxy = association<Post>(blog, "posts"); // CollectionProxy<Post>
-await proxy.first();
+const blog = await Blog.find(1);
+
+// Chainable like Relation — `blog.posts.where(...).order(...)` —
+// matches Rails' `blog.posts.where(published: true).order(:created_at)`.
+const recent = await blog.posts.where({ published: true }).order("created_at").limit(10);
+
+// Awaitable — single `await` hydrates and yields the array.
+const all = await blog.posts;
+
+// Array-shaped sync ops — read the loaded target. (Iteration / .length /
+// .map / [0] don't trigger a fresh load; await first if you need one.)
+for (const post of blog.posts) console.log(post.title);
+const titles = blog.posts.map((p) => p.title);
+const first = blog.posts[0];
+
+// `association(record, name)` still returns the same proxy if you want
+// to bind it to a local for clarity.
+const proxy = association<Post>(blog, "posts"); // AssociationProxy<Post>
 ```
 
 **belongs_to / has_one** (synchronous reader — returns the record, not a Promise):

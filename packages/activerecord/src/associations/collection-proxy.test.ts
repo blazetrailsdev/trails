@@ -261,4 +261,49 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const found = await proxy.find(blog.apPosts[0]?.id);
     expect(found?.title).toBe("a");
   });
+
+  // ── Phase R.2 — collection reader returns the AssociationProxy ─────
+
+  it("blog.apPosts is the AssociationProxy itself (Phase R.2 reader swap)", async () => {
+    const blog = await blogWithPosts();
+    // After Phase R.2, the collection reader returns the AssociationProxy
+    // directly — no `association(blog, "apPosts")` indirection needed.
+    // Same identity as what `association()` returns.
+    const direct = (blog as any).apPosts;
+    const helper = association<ApPost>(blog, "apPosts");
+    expect(direct).toBe(helper);
+  });
+
+  it("blog.apPosts.where(...) chains through Relation delegation", async () => {
+    const blog = await blogWithPosts();
+    const reader = (blog as any).apPosts;
+    // Chainable through the JS Proxy `get` trap → Relation delegation.
+    const filtered = await reader.where({ title: "b" });
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].title).toBe("b");
+  });
+
+  it("blog.apPosts is array-like via R.1 surface", async () => {
+    const blog = await blogWithPosts();
+    const reader = (blog as any).apPosts;
+    expect(reader.length).toBe(3);
+    expect(reader[0]?.title).toBe("a");
+    expect(reader.map((p: ApPost) => p.title)).toEqual(["a", "b", "c"]);
+    const titles: string[] = [];
+    for (const p of reader as Iterable<ApPost>) titles.push(p.title);
+    expect(titles).toEqual(["a", "b", "c"]);
+  });
+
+  it("writer `blog.apPosts = [...]` still flows through Association#writer", async () => {
+    // R.2 only swapped the reader; the writer (defineWriters) is
+    // untouched and still routes through `this.association(name).writer(value)`.
+    const blog = await blogWithPosts();
+    const replacement = new ApPost({ title: "z", ap_blog_id: blog.id as number });
+    await replacement.save();
+    (blog as any).apPosts = [replacement];
+    // The proxy returned by the reader reflects the new target.
+    const reader = (blog as any).apPosts;
+    expect(reader.length).toBe(1);
+    expect(reader[0]?.title).toBe("z");
+  });
 });
