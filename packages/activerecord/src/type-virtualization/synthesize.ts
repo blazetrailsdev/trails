@@ -18,6 +18,14 @@ import { tsTypeFor } from "./type-registry.js";
 
 const INDENT = "  ";
 
+// Built-in generic types emitted by the virtualizer — qualified with
+// inline `import("...")` so users don't need to add imports to their
+// model files. Erased at runtime. User-defined target classes
+// (Author, Comment, etc.) are still emitted bare and resolve against
+// the user's existing imports or the CLI/plugin's auto-import pass
+// (see the plan § "Auto-import resolution under Phase 1b").
+const AR_IMPORT = `import("@blazetrails/activerecord")`;
+
 export function synthesizeDeclares(info: ClassInfo): string[] {
   const out: string[] = [];
   for (const call of info.calls) {
@@ -60,8 +68,13 @@ function renderAttribute(call: AttributeCall): RenderedLine[] {
 }
 
 function renderCollectionAssoc(call: AssociationCall): RenderedLine[] {
+  // Post-Phase-R.2: collection readers return an AssociationProxy,
+  // not a plain `Target[]`. Matches what `blog.posts` returns at
+  // runtime and what `dx-tests/declare-patterns.test-d.ts` asserts.
   const target = resolveTarget(call);
-  return [line(`declare ${call.name}: ${target}[];`, call.name, false)];
+  return [
+    line(`declare ${call.name}: ${AR_IMPORT}.AssociationProxy<${target}>;`, call.name, false),
+  ];
 }
 
 function renderSingularAssoc(call: AssociationCall): RenderedLine[] {
@@ -74,7 +87,11 @@ function renderSingularAssoc(call: AssociationCall): RenderedLine[] {
 function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
   const argList = call.paramsAfterRel.length === 0 ? "" : call.paramsAfterRel.join(", ");
   return [
-    line(`declare static ${call.name}: (${argList}) => Relation<${info.name}>;`, call.name, true),
+    line(
+      `declare static ${call.name}: (${argList}) => ${AR_IMPORT}.Relation<${info.name}>;`,
+      call.name,
+      true,
+    ),
   ];
 }
 
@@ -88,7 +105,13 @@ function renderEnum(info: ClassInfo, call: EnumCall): RenderedLine[] {
     const scopeName = camelize(methodBase, false);
     out.push(line(`declare ${predicate}: () => boolean;`, predicate, false));
     out.push(line(`declare ${bang}: () => this;`, bang, false));
-    out.push(line(`declare static ${scopeName}: () => Relation<${info.name}>;`, scopeName, true));
+    out.push(
+      line(
+        `declare static ${scopeName}: () => ${AR_IMPORT}.Relation<${info.name}>;`,
+        scopeName,
+        true,
+      ),
+    );
   }
   return out;
 }
@@ -105,8 +128,16 @@ function renderDefineEnum(info: ClassInfo, call: DefineEnumCall): RenderedLine[]
     out.push(line(`declare ${predicate}: () => boolean;`, predicate, false));
     out.push(line(`declare ${setter}: () => void;`, setter, false));
     out.push(line(`declare ${bang}: () => Promise<void>;`, bang, false));
-    out.push(line(`declare static ${setter}: () => Relation<${info.name}>;`, setter, true));
-    out.push(line(`declare static ${notScope}: () => Relation<${info.name}>;`, notScope, true));
+    out.push(
+      line(`declare static ${setter}: () => ${AR_IMPORT}.Relation<${info.name}>;`, setter, true),
+    );
+    out.push(
+      line(
+        `declare static ${notScope}: () => ${AR_IMPORT}.Relation<${info.name}>;`,
+        notScope,
+        true,
+      ),
+    );
   }
   return out;
 }

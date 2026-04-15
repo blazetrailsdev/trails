@@ -1,6 +1,6 @@
 export class Post extends Base {
-  declare static published: () => Relation<Post>;
-  declare static recent: (limit: number) => Relation<Post>;
+  declare static published: () => import("@blazetrails/activerecord").Relation<Post>;
+  declare static recent: (limit: number) => import("@blazetrails/activerecord").Relation<Post>;
 
   static {
     this.scope("published", (rel) => rel.where({ published: true }));

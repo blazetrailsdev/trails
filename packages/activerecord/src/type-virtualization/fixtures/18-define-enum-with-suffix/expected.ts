@@ -5,13 +5,13 @@ export class Article extends Base {
   declare isDraftStatus: () => boolean;
   declare draftStatus: () => void;
   declare draftStatusBang: () => Promise<void>;
-  declare static draftStatus: () => Relation<Article>;
-  declare static notDraftStatus: () => Relation<Article>;
+  declare static draftStatus: () => import("@blazetrails/activerecord").Relation<Article>;
+  declare static notDraftStatus: () => import("@blazetrails/activerecord").Relation<Article>;
   declare isPublishedStatus: () => boolean;
   declare publishedStatus: () => void;
   declare publishedStatusBang: () => Promise<void>;
-  declare static publishedStatus: () => Relation<Article>;
-  declare static notPublishedStatus: () => Relation<Article>;
+  declare static publishedStatus: () => import("@blazetrails/activerecord").Relation<Article>;
+  declare static notPublishedStatus: () => import("@blazetrails/activerecord").Relation<Article>;
 
   static {
     this.attribute("status", "integer");
