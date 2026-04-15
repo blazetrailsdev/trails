@@ -269,12 +269,25 @@ class Post extends Base {
   declare featured: boolean; // attribute (backs the named scope below)
   declare status: number; // enum is stored as an integer; defineEnum
   //                        does not override the accessor (unlike Base.enum)
-  declare author: Author | null; // belongsTo reader (synchronous)
+  declare author: Author | null; // belongsTo reader (synchronous —
+  //                                returns the currently loaded record
+  //                                or null; use `post.loadBelongsTo("author")`
+  //                                for an explicit async load — returns
+  //                                the cached/preloaded value if present,
+  //                                otherwise runs a query)
   declare comments: AssociationProxy<Comment>;
   // hasMany reader — chainable (`.where(...)`), awaitable
   // (`await post.comments` → `Comment[]`), and array-shaped over the
   // loaded target (`for...of`, `.length`, `.map`, `[0]`). Same object
-  // as what `association(post, "comments")` returns.
+  // as what `association(post, "comments")` returns. Collections have
+  // no explicit loader — `await post.comments` IS the load.
+  declare loadBelongsTo: (name: "author") => Promise<Author | null>;
+  // Per-macro singular-association loaders. The virtualizer aggregates
+  // all belongsTo calls into a single `declare loadBelongsTo: ...`
+  // intersection and all hasOne calls into `declare loadHasOne: ...`.
+  // Method-name-matches-macro means calling the wrong one for a given
+  // association is a TS error (the other method doesn't include that
+  // name in its overload set).
   declare isDraft: () => boolean; // enum predicate
   declare draft: () => void; // enum in-memory setter (defineEnum only)
   declare draftBang: () => Promise<void>; // async (defineEnum only): sets

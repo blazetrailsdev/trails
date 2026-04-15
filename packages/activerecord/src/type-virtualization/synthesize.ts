@@ -33,7 +33,54 @@ export function synthesizeDeclares(info: ClassInfo): string[] {
       if (!line.skipIfPresent || !memberPresent(info, line)) out.push(line.text);
     }
   }
+  for (const l of renderLoaderOverloads(info)) {
+    if (!info.existingMembers.has(l.declaredName)) out.push(l.text);
+  }
   return out;
+}
+
+/**
+ * Aggregates singular associations into `declare loadBelongsTo` and
+ * `declare loadHasOne` lines, each with intersection-typed overloads
+ * for every belongsTo / hasOne on the class. Users get typed narrowing
+ * on the association name (`post.loadBelongsTo("author")` →
+ * `Promise<Author | null>`), and calling the wrong macro (e.g.
+ * `post.loadHasOne("author")` on a belongsTo) is a TS error because
+ * the `loadHasOne` overloads don't include that name.
+ *
+ * Collections (hasMany / HABTM) use `await record.<name>` for explicit
+ * loads — no method emitted.
+ */
+function renderLoaderOverloads(info: ClassInfo): RenderedLine[] {
+  const belongsToOverloads: string[] = [];
+  const hasOneOverloads: string[] = [];
+  for (const call of info.calls) {
+    if (call.kind !== "belongsTo" && call.kind !== "hasOne") continue;
+    const target =
+      (call as AssociationCall).options["polymorphic"] === "true"
+        ? "Base"
+        : resolveTarget(call as AssociationCall);
+    const overload = `((name: "${call.name}") => Promise<${target} | null>)`;
+    if (call.kind === "belongsTo") belongsToOverloads.push(overload);
+    else hasOneOverloads.push(overload);
+  }
+  const out: RenderedLine[] = [];
+  if (belongsToOverloads.length > 0) {
+    out.push(
+      line(`declare loadBelongsTo: ${joinOverloads(belongsToOverloads)};`, "loadBelongsTo", false),
+    );
+  }
+  if (hasOneOverloads.length > 0) {
+    out.push(line(`declare loadHasOne: ${joinOverloads(hasOneOverloads)};`, "loadHasOne", false));
+  }
+  return out;
+}
+
+function joinOverloads(overloads: string[]): string {
+  // Single-overload case: drop the outer parens for readability.
+  // Multiple: TS treats A & B where A and B are callable as an
+  // overloaded function type.
+  return overloads.length === 1 ? overloads[0]!.slice(1, -1) : overloads.join(" & ");
 }
 
 interface RenderedLine {
@@ -69,8 +116,11 @@ function renderAttribute(call: AttributeCall): RenderedLine[] {
 
 function renderCollectionAssoc(call: AssociationCall): RenderedLine[] {
   // Post-Phase-R.2: collection readers return an AssociationProxy,
-  // not a plain `Target[]`. Matches what `blog.posts` returns at
-  // runtime and what `dx-tests/declare-patterns.test-d.ts` asserts.
+  // not a plain `Target[]`. The proxy is awaitable — `await blog.posts`
+  // hydrates and returns `Post[]` — so we don't emit a loader for
+  // collections. Singular associations (belongsTo / hasOne) are
+  // covered by `loadBelongsTo` / `loadHasOne` overloads rendered by
+  // `renderLoaderOverloads` at the end of `synthesizeDeclares`.
   const target = resolveTarget(call);
   return [
     line(`declare ${call.name}: ${AR_IMPORT}.AssociationProxy<${target}>;`, call.name, false),
@@ -80,6 +130,9 @@ function renderCollectionAssoc(call: AssociationCall): RenderedLine[] {
 function renderSingularAssoc(call: AssociationCall): RenderedLine[] {
   // `polymorphic: true` on belongsTo can't be narrowed statically — any
   // Base-rooted class could be on the other end. Fall back to `Base | null`.
+  // Per-association loader declarations are aggregated into
+  // `declare loadBelongsTo: ...` / `declare loadHasOne: ...` lines
+  // by `renderLoaderOverloads` below.
   const target = call.options["polymorphic"] === "true" ? "Base" : resolveTarget(call);
   return [line(`declare ${call.name}: ${target} | null;`, call.name, false)];
 }

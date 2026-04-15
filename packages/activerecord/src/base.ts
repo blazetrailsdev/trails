@@ -106,7 +106,7 @@ import { ScopeRegistry } from "./scoping.js";
 import { Default as DefaultScoping } from "./scoping/default.js";
 import * as NamedScoping from "./scoping/named.js";
 import { AssociationNotFoundError } from "./associations/errors.js";
-import { Associations as _Associations } from "./associations.js";
+import { Associations as _Associations, loadBelongsTo, loadHasOne } from "./associations.js";
 import { BelongsToAssociation } from "./associations/belongs-to-association.js";
 import { BelongsToPolymorphicAssociation } from "./associations/belongs-to-polymorphic-association.js";
 import { HasOneAssociation } from "./associations/has-one-association.js";
@@ -3206,6 +3206,69 @@ export class Base extends Model {
     this._syncAssociationInstance(name, instance);
     this._associationInstances.set(name, instance);
     return instance;
+  }
+
+  /**
+   * Explicit async load for a belongsTo association. Same shape as
+   * the standalone `loadBelongsTo(record, name, opts)` helper, but
+   * takes just the association name.
+   *
+   * Returns the cached/preloaded value if present; otherwise runs a
+   * query. Not a forced reload — use `record.reload()` for that.
+   *
+   * The virtualizer emits typed overloads so `post.loadBelongsTo("author")`
+   * narrows to `Promise<Author | null>` without a hand-written declare.
+   *
+   * Mirrors Rails' `ActiveRecord::Associations::Preloader::Branch` /
+   * `BelongsToAssociation` which are the belongs_to-specific preload
+   * paths.
+   */
+  async loadBelongsTo(name: string): Promise<Base | null> {
+    const assocDef = this._assertSingularAssociation(name, "belongsTo");
+    return loadBelongsTo(this, name, assocDef.options ?? {});
+  }
+
+  /**
+   * Explicit async load for a hasOne association. Same shape as the
+   * standalone `loadHasOne(record, name, opts)` helper, but takes just
+   * the association name.
+   *
+   * Returns the cached/preloaded value if present; otherwise runs a
+   * query. Not a forced reload — use `record.reload()` for that.
+   *
+   * The virtualizer emits typed overloads so `user.loadHasOne("profile")`
+   * narrows to `Promise<Profile | null>` without a hand-written declare.
+   *
+   * Mirrors Rails' `HasOneAssociation` preload path.
+   */
+  async loadHasOne(name: string): Promise<Base | null> {
+    const assocDef = this._assertSingularAssociation(name, "hasOne");
+    return loadHasOne(this, name, assocDef.options ?? {});
+  }
+
+  private _assertSingularAssociation(
+    name: string,
+    expected: "belongsTo" | "hasOne",
+  ): { type: string; options: any } {
+    const ctor = this.constructor as any;
+    const associations: any[] = ctor._associations ?? [];
+    const assocDef = associations.find((a: any) => a.name === name);
+    if (!assocDef) {
+      throw new AssociationNotFoundError(this, name);
+    }
+    if (assocDef.type !== expected) {
+      if (assocDef.type === "hasMany" || assocDef.type === "hasAndBelongsToMany") {
+        throw new Error(
+          `load${expected === "belongsTo" ? "BelongsTo" : "HasOne"} is for singular associations. ` +
+            `\`${ctor.name}.${name}\` is a ${assocDef.type} — await the reader: \`await record.${name}\`.`,
+        );
+      }
+      const right = assocDef.type === "belongsTo" ? "loadBelongsTo" : "loadHasOne";
+      throw new Error(
+        `\`${ctor.name}.${name}\` is a ${assocDef.type}, not ${expected}. Use \`record.${right}("${name}")\` instead.`,
+      );
+    }
+    return assocDef;
   }
 
   private _buildAssociationInstance(assocDef: any): AssociationInstance {

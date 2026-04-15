@@ -64,11 +64,21 @@ class Author extends Base {
   // is also a `CollectionProxy`.
   declare comments: AssociationProxy<Comment>;
 
-  // hasAndBelongsToMany → same shape as hasMany (AssociationProxy)
+  // hasAndBelongsToMany → same shape as hasMany (AssociationProxy).
+  // Collections don't need a loader method — `await author.tags`
+  // triggers the load directly via the proxy's thenable.
   declare tags: AssociationProxy<Tag>;
 
-  // hasOne → Profile | null (synchronous reader; returns the record directly)
+  // hasOne → Profile | null (sync reader; returns the currently loaded
+  // record or null). Use `author.loadHasOne("profile")` for an
+  // explicit async load — the typed overload below narrows the return.
   declare profile: Profile | null;
+
+  // Per-macro singular-association loaders. Virtualizer aggregates
+  // all belongsTo calls into `declare loadBelongsTo: ...` and all
+  // hasOne calls into `declare loadHasOne: ...`. Hand-written version
+  // shown here for the dx-test reference.
+  declare loadHasOne: (name: "profile") => Promise<Profile | null>;
 
   static {
     this.attribute("name", "string");

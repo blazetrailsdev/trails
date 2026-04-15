@@ -223,7 +223,9 @@ const blog = await Blog.find(1);
 // matches Rails' `blog.posts.where(published: true).order(:created_at)`.
 const recent = await blog.posts.where({ published: true }).order("created_at").limit(10);
 
-// Awaitable — single `await` hydrates and yields the array.
+// Awaitable — single `await` hydrates and yields the array. This IS
+// the explicit-load path for collections; no separate `loadPosts()`
+// method exists (the proxy's thenable is the loader).
 const all = await blog.posts;
 
 // Array-shaped sync ops — read the loaded target. (Iteration / .length /
@@ -237,7 +239,10 @@ const first = blog.posts[0];
 const proxy = association<Post>(blog, "posts"); // AssociationProxy<Post>
 ```
 
-**belongs_to / has_one** (synchronous reader — returns the record, not a Promise):
+**belongs_to / has_one** (sync reader returns the currently loaded
+record or `null`; `loadBelongsTo(name)` / `loadHasOne(name)` perform
+an explicit async load, returning the cached/preloaded value if
+present or running a query otherwise):
 
 ```ts
 class Post extends Base {
@@ -252,6 +257,28 @@ class Author extends Base {
     this.hasOne("profile");
   }
 }
+
+// Sync reads return whatever's currently cached (may be null if
+// nothing loaded). Use `loadBelongsTo(name)` / `loadHasOne(name)` to
+// explicitly load — method name matches the macro, so calling the
+// wrong one is a TS error. Returns the cached/preloaded value if
+// present, otherwise runs a query.
+const post = await Post.find(1);
+const author = await post.loadBelongsTo("author"); // Promise<Author | null>
+const author2 = await Author.find(1);
+const profile = await author2.loadHasOne("profile"); // Promise<Profile | null>
+
+// Virtualizer emits typed overloads so the return type narrows
+// automatically. Without the virtualizer, declare by hand:
+//   declare loadBelongsTo: (name: "author") => Promise<Author | null>;
+//   declare loadHasOne: (name: "profile") => Promise<Profile | null>;
+//
+// Collections (hasMany / hasAndBelongsToMany) have no explicit
+// loader — the AssociationProxy is awaitable (`await blog.posts`).
+// Calling `loadBelongsTo("posts")` throws with a pointer to the
+// proxy-await form. Calling the wrong macro for a singular
+// (`loadHasOne("author")` on a belongsTo) also throws with a
+// pointer to the right method.
 ```
 
 **Named scopes** (`this.scope(name, fn)` — class-level):
