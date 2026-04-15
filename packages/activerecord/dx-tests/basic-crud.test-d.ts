@@ -28,12 +28,12 @@ describe("basic CRUD DX — defining and using a model", () => {
     expectTypeOf(u.email).toBeString();
   });
 
-  it("User.create returns a Promise<Base> (should narrow to User — known gap)", () => {
-    expectTypeOf(User.create).returns.resolves.toEqualTypeOf<Base>();
-  });
-
-  it("User.create(attrs) accepts a Record<string, unknown>", () => {
-    assertType<Promise<Base>>(User.create({ name: "dean", email: "d@example.com" }));
+  it("User.create / createBang / new resolve to a User (polymorphic `this`)", async () => {
+    const u = await User.create({ name: "dean", email: "d@example.com" });
+    expectTypeOf(u).toEqualTypeOf<User>();
+    const u2 = await User.createBang({ name: "x" });
+    expectTypeOf(u2).toEqualTypeOf<User>();
+    expectTypeOf(User.new({ name: "y" })).toEqualTypeOf<User>();
   });
 
   it("User.find(id) resolves to a single User", async () => {
@@ -49,9 +49,48 @@ describe("basic CRUD DX — defining and using a model", () => {
     expectTypeOf(users).toEqualTypeOf<User | User[]>();
   });
 
-  it("User.findBy / findByBang have concrete Base returns", () => {
-    expectTypeOf(User.findBy).returns.resolves.toEqualTypeOf<Base | null>();
-    expectTypeOf(User.findByBang).returns.resolves.toEqualTypeOf<Base>();
+  it("User.findBy / findByBang / findSoleBy resolve to User (nullable variant for findBy)", async () => {
+    expectTypeOf(await User.findBy({ email: "d@example.com" })).toEqualTypeOf<User | null>();
+    expectTypeOf(await User.findByBang({ email: "d@example.com" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.findSoleBy({ email: "d@example.com" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.findByAttribute("name", "dean")).toEqualTypeOf<User | null>();
+  });
+
+  it("ordinal + cardinality finders all carry User through", async () => {
+    expectTypeOf(await User.first()).toEqualTypeOf<User | null>();
+    expectTypeOf(await User.first(5)).toEqualTypeOf<User[]>();
+    expectTypeOf(await User.firstBang()).toEqualTypeOf<User>();
+    expectTypeOf(await User.last()).toEqualTypeOf<User | null>();
+    expectTypeOf(await User.last(5)).toEqualTypeOf<User[]>();
+    expectTypeOf(await User.lastBang()).toEqualTypeOf<User>();
+    expectTypeOf(await User.take()).toEqualTypeOf<User | null>();
+    expectTypeOf(await User.take(3)).toEqualTypeOf<User[]>();
+    expectTypeOf(await User.sole()).toEqualTypeOf<User>();
+    expectTypeOf(await User.second()).toEqualTypeOf<User | null>();
+    expectTypeOf(await User.third()).toEqualTypeOf<User | null>();
+    expectTypeOf(await User.fortyTwo()).toEqualTypeOf<User | null>();
+    expectTypeOf(await User.secondToLast()).toEqualTypeOf<User | null>();
+  });
+
+  it("findSigned / findSignedBang and underscore aliases carry User through", async () => {
+    expectTypeOf(await User.findSigned("tok")).toEqualTypeOf<User | null>();
+    expectTypeOf(await User.findSignedBang("tok")).toEqualTypeOf<User>();
+    expectTypeOf(await User.first_()).toEqualTypeOf<User>();
+    expectTypeOf(await User.last_()).toEqualTypeOf<User>();
+    expectTypeOf(await User.take_()).toEqualTypeOf<User>();
+    expectTypeOf(await User.findBy_({ name: "dean" })).toEqualTypeOf<User>();
+  });
+
+  it("find_or / destroyBy / destroyAll / update / destroy all preserve User", async () => {
+    expectTypeOf(await User.findOrCreateBy({ name: "a" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.findOrInitializeBy({ name: "a" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.createOrFindBy({ name: "a" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.createOrFindByBang({ name: "a" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.destroyBy({ name: "a" })).toEqualTypeOf<User[]>();
+    expectTypeOf(await User.destroyAll()).toEqualTypeOf<User[]>();
+    expectTypeOf(await User.update(1, { name: "b" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.updateBang(1, { name: "b" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.destroy(1)).toEqualTypeOf<User | User[]>();
   });
 
   it("User.count / exists / pluck have concrete return types", () => {

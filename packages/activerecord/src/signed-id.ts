@@ -98,11 +98,11 @@ export function signedId(
  *
  * Mirrors: ActiveRecord::SignedId::ClassMethods#find_signed
  */
-export async function findSigned(
-  modelClass: typeof Base,
+export async function findSigned<T extends typeof Base>(
+  modelClass: T,
   token: string,
   options?: { purpose?: string },
-): Promise<Base | null> {
+): Promise<InstanceType<T> | null> {
   const verifier = signedIdVerifier(modelClass);
   const id = verifier.verified(token, {
     purpose: combinePurposes(modelClass, options?.purpose),
@@ -125,11 +125,11 @@ export async function findSigned(
  *
  * Mirrors: ActiveRecord::SignedId::ClassMethods#find_signed!
  */
-export async function findSignedBang(
-  modelClass: typeof Base,
+export async function findSignedBang<T extends typeof Base>(
+  modelClass: T,
   token: string,
   options?: { purpose?: string },
-): Promise<Base> {
+): Promise<InstanceType<T>> {
   const verifier = signedIdVerifier(modelClass);
   const id = verifier.verify(token, {
     purpose: combinePurposes(modelClass, options?.purpose),
