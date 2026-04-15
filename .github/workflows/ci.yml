@@ -82,6 +82,30 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:types
 
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: >
+          pnpm vitest run
+          packages/arel
+          packages/activemodel
+          packages/activesupport
+          packages/rack
+          packages/actionpack
+          packages/actionview
+          packages/trailties
+          scripts/guides-typecheck
+
   sqlite-tests:
     name: SQLite Tests
     runs-on: ubuntu-latest
@@ -95,7 +119,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest run --no-file-parallelism
+      - run: pnpm vitest run --no-file-parallelism packages/activerecord
 
   postgres-tests:
     name: PostgreSQL Tests
@@ -124,7 +148,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest run --no-file-parallelism
+      - run: pnpm vitest run --no-file-parallelism packages/activerecord
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
 
@@ -157,7 +181,7 @@ jobs:
       - name: Set MariaDB to case-sensitive collation
         run: |
           mysql -h 127.0.0.1 -u root -e "ALTER DATABASE rails_js_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
-      - run: pnpm vitest run --no-file-parallelism
+      - run: pnpm vitest run --no-file-parallelism packages/activerecord
         env:
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
 
