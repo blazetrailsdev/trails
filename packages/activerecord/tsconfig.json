@@ -6,5 +6,6 @@
     "rootDir": "src"
   },
   "include": ["src"],
+  "exclude": ["src/type-virtualization/fixtures"],
   "references": [{ "path": "../arel" }, { "path": "../activemodel" }]
 }

@@ -15,6 +15,7 @@ export default defineConfig(
       "**/dist/**",
       "packages/website/static/**",
       "packages/website/build/**",
+      "packages/activerecord/src/type-virtualization/fixtures/**",
     ],
   },
   eslint.configs.recommended,
