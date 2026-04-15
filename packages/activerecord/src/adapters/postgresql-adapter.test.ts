@@ -548,5 +548,87 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
+  describe("schema introspection", () => {
+    beforeEach(async () => {
+      await adapter.exec('DROP TABLE IF EXISTS "widgets" CASCADE');
+      await adapter.exec('DROP VIEW IF EXISTS "recent_widgets" CASCADE');
+      await adapter.exec(`CREATE TABLE "widgets" ("id" SERIAL PRIMARY KEY, "name" text NOT NULL)`);
+      await adapter.exec(`CREATE VIEW "recent_widgets" AS SELECT id, name FROM widgets`);
+    });
+
+    afterEach(async () => {
+      await adapter.exec('DROP VIEW IF EXISTS "recent_widgets" CASCADE');
+      await adapter.exec('DROP TABLE IF EXISTS "widgets" CASCADE');
+    });
+
+    it("views() returns view names", async () => {
+      expect(await adapter.views()).toContain("recent_widgets");
+    });
+
+    it("dataSources() returns tables + views, deduped", async () => {
+      const sources = await adapter.dataSources();
+      expect(sources).toContain("widgets");
+      expect(sources).toContain("recent_widgets");
+      expect(new Set(sources).size).toBe(sources.length);
+    });
+
+    it("tableExists() is true for tables, false for views", async () => {
+      expect(await adapter.tableExists("widgets")).toBe(true);
+      expect(await adapter.tableExists("recent_widgets")).toBe(false);
+      expect(await adapter.tableExists("nonexistent")).toBe(false);
+    });
+
+    it("tableExists()/viewExists() accept quoted identifiers", async () => {
+      // parseSchemaQualifiedName strips the surrounding quotes; without
+      // that step the pg_class lookup compares relname against the
+      // literal '"widgets"' and never matches. Regression guard so a
+      // future refactor doesn't silently break quoted callers.
+      expect(await adapter.tableExists('"widgets"')).toBe(true);
+      expect(await adapter.viewExists('"recent_widgets"')).toBe(true);
+    });
+
+    it("viewExists() is true for views, false for tables", async () => {
+      expect(await adapter.viewExists("recent_widgets")).toBe(true);
+      expect(await adapter.viewExists("widgets")).toBe(false);
+    });
+
+    it("dataSourceExists() covers both tables and views", async () => {
+      expect(await adapter.dataSourceExists("widgets")).toBe(true);
+      expect(await adapter.dataSourceExists("recent_widgets")).toBe(true);
+      expect(await adapter.dataSourceExists("nonexistent")).toBe(false);
+    });
+
+    it("views() and viewExists() include materialized views (Rails relkind 'm')", async () => {
+      // Rails' PG data_source_sql maps VIEW -> relkind IN ('v','m'), so
+      // materialized views show up in views() and register with
+      // viewExists. Plain pg_views would miss them — the pg_class-based
+      // query we use catches both.
+      await adapter.exec('DROP MATERIALIZED VIEW IF EXISTS "widget_totals" CASCADE');
+      await adapter.exec(
+        `CREATE MATERIALIZED VIEW "widget_totals" AS SELECT COUNT(*) AS c FROM widgets`,
+      );
+      try {
+        const views = await adapter.views();
+        expect(views).toContain("widget_totals");
+        expect(await adapter.viewExists("widget_totals")).toBe(true);
+        expect(await adapter.tableExists("widget_totals")).toBe(false);
+      } finally {
+        await adapter.exec('DROP MATERIALIZED VIEW IF EXISTS "widget_totals" CASCADE');
+      }
+    });
+
+    it("SchemaCache.addAll populates from PostgreSQL", async () => {
+      // Integration with Phase 5's dumpSchemaCache path — PG now
+      // exposes the full surface (dataSources/columns/primaryKey/
+      // indexes) that SchemaCache.addAll drives through.
+      const { SchemaCache } = await import("../connection-adapters/schema-cache.js");
+      const cache = new SchemaCache();
+      await cache.addAll(adapter);
+      const cols = await cache.columns(adapter, "widgets");
+      expect(cols?.map((c) => c.name)).toEqual(["id", "name"]);
+      expect(await cache.primaryKeys(adapter, "widgets")).toBe("id");
+    });
+  });
+
   // ── Rails-matching test stubs ──
 });

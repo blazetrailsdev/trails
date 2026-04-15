@@ -765,6 +765,97 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
     return rows.map((r) => r.tablename as string);
   }
 
+  /**
+   * List views visible on the current search_path, including
+   * materialized views. Mirrors Rails'
+   * `ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#views`
+   * which uses `data_source_sql(type: "VIEW")` — relkind IN ('v','m').
+   * Plain `pg_views` would miss materialized views; querying `pg_class`
+   * directly catches both.
+   */
+  async views(): Promise<string[]> {
+    const rows = await this.execute(
+      `SELECT c.relname FROM pg_class c
+         LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = ANY(current_schemas(false))
+         AND c.relkind IN ('v', 'm')
+         ORDER BY c.relname`,
+    );
+    return rows.map((r) => r.relname as string);
+  }
+
+  /**
+   * Tables + views, deduped. Mirrors AbstractAdapter#data_sources. The
+   * name is what SchemaCache.addAll queries to build the initial
+   * dump — without this method the PG adapter is rejected by
+   * DatabaseTasks.dumpSchemaCache's capability check.
+   */
+  async dataSources(): Promise<string[]> {
+    const [tables, views] = await Promise.all([this.tables(), this.views()]);
+    return Array.from(new Set([...tables, ...views]));
+  }
+
+  /**
+   * Table-only existence check (no views). Mirrors Rails'
+   * `table_exists?` vs `data_source_exists?` distinction: a table is a
+   * data source but a data source isn't always a table. SchemaCache
+   * uses dataSourceExists; tableExists is here for callers that
+   * specifically need to exclude views (e.g. `drop_table`).
+   */
+  async tableExists(name: string): Promise<boolean> {
+    // Rails' relkind 'r' + 'p' (plain + partitioned tables) — matches
+    // `data_source_sql(name, type: "BASE TABLE")` in
+    // `PostgreSQL::SchemaStatements#quoted_scope`.
+    return this.relkindExists(name, ["r", "p"]);
+  }
+
+  /**
+   * View-only existence check. Mirrors Rails'
+   * `SchemaStatements#view_exists?` which treats both views and
+   * materialized views as "view".
+   */
+  async viewExists(name: string): Promise<boolean> {
+    return this.relkindExists(name, ["v", "m"]);
+  }
+
+  /**
+   * Shared helper for table/view existence checks — lets both
+   * methods share Rails' pg_class-based predicate. Uses
+   * `SELECT 1 ... LIMIT 1` so the planner short-circuits instead of
+   * counting every match.
+   */
+  private async relkindExists(name: string, relkinds: string[]): Promise<boolean> {
+    const { schema, table } = this.parseSchemaQualifiedName(name);
+    if (schema) {
+      // $1=schema, $2=table, $3..=relkinds
+      const relPlaceholders = relkinds.map((_, i) => `$${i + 3}`).join(", ");
+      const rows = await this.execute(
+        `SELECT 1 AS one FROM pg_class c
+           LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname = $1 AND c.relname = $2
+           AND c.relkind IN (${relPlaceholders})
+           LIMIT 1`,
+        [schema, table, ...relkinds],
+      );
+      return rows.length > 0;
+    }
+    // $1=table, $2..=relkinds. Bind `table` (the unquoted identifier
+    // returned by parseSchemaQualifiedName), not the raw `name`
+    // argument — otherwise a quoted input like `"widgets"` gets
+    // compared against `relname = '"widgets"'` in pg_class, which
+    // never matches (the catalog stores names unquoted).
+    const relPlaceholders = relkinds.map((_, i) => `$${i + 2}`).join(", ");
+    const rows = await this.execute(
+      `SELECT 1 AS one FROM pg_class c
+         LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = ANY(current_schemas(false))
+         AND c.relname = $1 AND c.relkind IN (${relPlaceholders})
+         LIMIT 1`,
+      [table, ...relkinds],
+    );
+    return rows.length > 0;
+  }
+
   async addIndex(
     tableName: string,
     columns: string | string[],
