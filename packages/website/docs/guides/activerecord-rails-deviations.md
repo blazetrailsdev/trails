@@ -243,6 +243,81 @@ All cross-package — see the index for
 and [symbols/kwargs](./index.md#symbols-kwargs). Every ActiveRecord API
 follows them.
 
+## 13. Typing runtime-attached members with `declare`
+
+Rails defines attributes/associations/scopes/enums dynamically, so a
+Ruby author just writes `post.title`, `post.author`, `Post.published`
+and everything works. In TypeScript, the same calls are attached at
+runtime (via `this.attribute`, `this.hasMany`, `this.scope`, `this.enum`)
+but the type system only sees them if you opt in with a `declare`:
+
+```ts
+import {
+  Base,
+  CollectionProxy,
+  Relation,
+  association,
+  defineEnum,
+} from "@blazetrails/activerecord";
+
+class Author extends Base {}
+class Comment extends Base {}
+
+class Post extends Base {
+  declare title: string; // attribute
+  declare featured: boolean; // attribute (backs the named scope below)
+  declare status: number; // enum is stored as an integer; defineEnum
+  //                        does not override the accessor (unlike Base.enum)
+  declare author: Author | null; // belongsTo reader (synchronous)
+  declare comments: Comment[]; // hasMany reader (synchronous array;
+  //                            use `association(post, "comments")` for
+  //                            the full CollectionProxy<Comment> API)
+  declare isDraft: () => boolean; // enum predicate
+  declare draft: () => void; // enum in-memory setter (defineEnum only)
+  declare draftBang: () => Promise<void>; // async (defineEnum only): sets
+  //                                         in-memory; if persisted, calls
+  //                                         updateColumn — bypasses
+  //                                         validations/callbacks
+  declare static draft: () => Relation<Post>; // enum class scope
+  declare static published: () => Relation<Post>; // enum class scope
+  declare static notDraft: () => Relation<Post>; // enum `not*` scope (defineEnum only)
+  declare static featured: () => Relation<Post>; // named scope (distinct from the enum above)
+
+  static {
+    this.attribute("title", "string");
+    this.attribute("featured", "boolean", { default: false });
+    this.attribute("status", "integer"); // defineEnum only attaches methods;
+    //                                       the underlying column still needs an attribute
+    this.belongsTo("author");
+    this.hasMany("comments");
+    // defineEnum (above, section 7) gives the full surface: plain setter,
+    // async bang, and not* scope. Use `this.enum(...)` instead for the
+    // simpler Base.enum surface (no plain setter, sync bang returning
+    // `this`, no not* scopes).
+    defineEnum(this, "status", { draft: 0, published: 1 });
+    // Named scope — use a name that doesn't collide with an enum value above.
+    this.scope("featured", (rel: Relation<Post>) => rel.where({ featured: true }));
+  }
+}
+```
+
+Without a matching `declare`:
+
+- **Instance access** (`record.title`, `post.comments`) type-checks via
+  `Model`'s `[key: string]: unknown` index signature and resolves to
+  `unknown`.
+- **Static access** (`Post.published`, enum class scopes like
+  `Post.draft`) is a `Property 'published' does not exist on type 'typeof Post'`
+  error — the class has no index signature. Always pair `this.scope(...)`,
+  `this.enum(...)`, or `defineEnum(...)` with a matching `declare static`.
+
+The compiled reference for every supported pattern lives in
+`packages/activerecord/dx-tests/declare-patterns.test-d.ts`.
+
+Don't redeclare `id` — `Base#id` is an accessor typed as
+`PrimaryKeyValue`, and TS forbids overriding an accessor with a
+differently-typed property. Narrow at the use site: `record.id as number`.
+
 ## Summary
 
 | Area                     | Rails                                   | Trails                                            |

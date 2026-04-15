@@ -92,27 +92,25 @@ describe("associations DX", () => {
     expectTypeOf(proxy.target).toEqualTypeOf<Post[]>();
   });
 
-  it("declare posts: CollectionProxy<Post> gives typed access on the instance", async () => {
+  it("declare posts: Post[] gives typed synchronous access on the instance", () => {
     class Blog extends Base {
       declare name: string;
-      declare posts: CollectionProxy<Post>;
+      // The synchronous accessor returns the loaded target array.
+      // For the full async CollectionProxy API, use `association(blog, "posts")`
+      // — see `dx-tests/declare-patterns.test-d.ts` for the canonical reference.
+      declare posts: Post[];
       static {
         this.attribute("name", "string");
         this.hasMany("posts");
       }
     }
     const blog = new Blog({ name: "dean's blog" });
-    // Even though runtime attaches `posts` dynamically, the explicit
-    // `declare` wins for static typing — no more `unknown` fallthrough
-    // via Model's `[key: string]: unknown` index signature.
-    expectTypeOf(blog.posts).toMatchTypeOf<CollectionProxy<Post>>();
-    const titles = (await blog.posts.toArray()).map((p) => p.title);
-    expectTypeOf(titles).toEqualTypeOf<string[]>();
+    expectTypeOf(blog.posts).toEqualTypeOf<Post[]>();
   });
 
   it("KNOWN GAP: without a `declare`, association accessors still return `unknown`", () => {
-    // `Model` has `[key: string]: unknown`, so without `declare posts:
-    // CollectionProxy<Post>` on the class body, the accessor still falls
+    // `Model` has `[key: string]: unknown`, so without a `declare posts:
+    // Post[]` (or similar) on the class body, the accessor still falls
     // through to `unknown`. Users opt in per-association.
     const post = new Post({ title: "hi", author_id: 1, published: true });
     expectTypeOf(post.author).toBeUnknown();

@@ -36,11 +36,12 @@ published = Post.published.order(:title).to_a
 
 ```ts
 // TypeScript / Trails
-import { Base } from "@blazetrails/activerecord";
+import { Base, Relation } from "@blazetrails/activerecord";
 
 class Post extends Base {
-  title!: string;
-  published!: boolean;
+  declare title: string;
+  declare published: boolean;
+  declare static published: () => Relation<Post>;
 
   static {
     Post.attribute("title", "string");
@@ -48,17 +49,17 @@ class Post extends Base {
 
     Post.validates("title", { presence: true, length: { minimum: 3 } });
 
-    Post.beforeSave((record) => {
-      (record as Post).title = (record as Post).title.trim();
+    Post.beforeSave((record: Post) => {
+      record.title = record.title.trim();
     });
 
-    Post.scope("published", (rel: any) => rel.where({ published: true }));
+    Post.scope("published", (rel: Relation<Post>) => rel.where({ published: true }));
   }
 }
 
-const post = (await Post.createBang({ title: "Hello" })) as Post;
+const post = await Post.createBang({ title: "Hello" });
 await post.updateBang({ published: true });
-const published = await Post.where({ published: true }).order("title").toArray();
+const published = await Post.published().order("title").toArray();
 ```
 
 Everything below this point is that example broken into its
@@ -213,13 +214,13 @@ Trails puts the equivalent in a `static {}` initializer block.
 import { Model } from "@blazetrails/activemodel";
 
 class Post extends Model {
-  title!: string;
+  declare title: string;
 
   static {
     Post.attribute("title", "string");
     Post.validates("title", { presence: true });
-    Post.beforeSave((record) => {
-      (record as Post).title = (record as Post).title.trim();
+    Post.beforeSave((record: Post) => {
+      record.title = record.title.trim();
     });
   }
 }

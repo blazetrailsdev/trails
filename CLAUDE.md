@@ -162,25 +162,145 @@ the assertion flips and signals the test should be tightened.
 
 A dedicated `DX Type Tests` CI job runs on every push.
 
-### Typed association accessors
+### The `declare` pattern for typed runtime-attached members
 
-`hasMany`/`hasAndBelongsToMany` runtime-attach a `CollectionProxy` onto the
-instance. Because `Model` has an `[key: string]: unknown` index signature,
-access like `blog.posts` type-checks but falls through to `unknown`. Opt
-into static typing per-association by declaring the field:
+Several things in ActiveRecord are attached to a class/instance at
+runtime (via `this.attribute`, `this.hasMany`, `this.scope`, `this.enum`,
+...) and aren't visible to the TypeScript type system by default.
+
+- **Instance members** (`record.name`, `post.comments`): `Model`'s
+  `[key: string]: unknown` index signature means the access type-checks
+  but resolves to `unknown`. Opt in with `declare name: string` etc.
+- **Static members** (`Post.published`, enum class scopes): there's no
+  static index signature, so without `declare static`, the access is a
+  `Property 'published' does not exist on type 'typeof Post'` error.
+  Always pair `this.scope(...)`, `this.enum(...)`, and
+  `defineEnum(...)` with a matching `declare static`.
+
+Every snippet below assumes:
+
+```ts
+import {
+  Base,
+  CollectionProxy,
+  Relation,
+  association,
+  defineEnum,
+  readEnumValue,
+} from "@blazetrails/activerecord";
+```
+
+**Attributes** (`this.attribute(name, type)`):
+
+```ts
+class User extends Base {
+  declare name: string;
+  declare admin: boolean;
+  static {
+    this.attribute("name", "string");
+    this.attribute("admin", "boolean", { default: false });
+  }
+}
+```
+
+**has_many / HABTM** (`this.hasMany(name)` — synchronous reader returns the
+loaded target array; use `association(record, name)` for the full async
+`CollectionProxy` API):
 
 ```ts
 class Blog extends Base {
-  declare posts: CollectionProxy<Post>;
+  declare posts: Post[]; // synchronous reader
   static {
     this.hasMany("posts");
   }
 }
 
-const blog = new Blog({ name: "dean" });
-await blog.posts.first(); // Promise<Post | null>
+// Full async API — load, push, create, first, etc.
+const blog = new Blog();
+const proxy = association<Post>(blog, "posts"); // CollectionProxy<Post>
+await proxy.first();
 ```
 
+**belongs_to / has_one** (synchronous reader — returns the record, not a Promise):
+
+```ts
+class Post extends Base {
+  declare author: Author | null;
+  static {
+    this.belongsTo("author");
+  }
+}
+class Author extends Base {
+  declare profile: Profile | null;
+  static {
+    this.hasOne("profile");
+  }
+}
+```
+
+**Named scopes** (`this.scope(name, fn)` — class-level):
+
+```ts
+class Post extends Base {
+  declare static published: () => Relation<Post>;
+  static {
+    this.scope("published", (rel) => rel.where({ published: true }));
+  }
+}
+```
+
+**Enums** — two forms with different surfaces:
+
+- `this.enum(name, mapping)` (`Base.enum`) generates a predicate +
+  in-memory bang setter (returns `this`, no persistence) + class scope
+  per value.
+- `defineEnum(modelClass, name, mapping)` (`@blazetrails/activerecord`'s
+  `defineEnum`) generates the same + a plain in-memory setter + an async
+  persisting `*Bang` + `not*` class scopes per value. Use this when
+  you want bang methods to persist, matching Rails' `enum` semantics
+  (see section 7 of the ActiveRecord deviations guide).
+
+```ts
+// Base.enum — simpler
+class Task extends Base {
+  declare status: string;
+  declare isLow: () => boolean;
+  declare lowBang: () => this; // in-memory; does not persist
+  declare static low: () => Relation<Task>;
+  static {
+    this.attribute("status", "integer");
+    this.enum("status", { low: 0, high: 1 });
+  }
+}
+
+// defineEnum — full surface
+class Article extends Base {
+  // defineEnum does NOT override the attribute accessor: `status` stays
+  // the integer column. Use `readEnumValue(record, "status")` when you
+  // want the string label.
+  declare status: number;
+  declare isDraft: () => boolean;
+  declare draft: () => void; // plain in-memory setter
+  declare draftBang: () => Promise<void>; // async; in-memory on new records,
+  //                                         otherwise persists via updateColumn
+  //                                         (bypasses validations/callbacks)
+  declare static draft: () => Relation<Article>;
+  declare static notDraft: () => Relation<Article>;
+  static {
+    this.attribute("status", "integer");
+    defineEnum(this, "status", { draft: 0, published: 1 });
+  }
+}
+```
+
+**Do not** redeclare `id` on subclasses — `Base#id` is an accessor
+(`PrimaryKeyValue`) and TS forbids overriding accessors with differently
+typed instance properties. Narrow at the use site instead:
+`record.id as number`.
+
+See `packages/activerecord/dx-tests/declare-patterns.test-d.ts` for the
+canonical, compiled reference for every pattern.
+
 `CollectionProxy<T>` and `AssociationProxy<T>` are both generic in the
-element type. Without the `declare`, the accessor still resolves to
-`unknown` (same as before).
+element type. Without the `declare`, any of these runtime-attached
+members still resolves to `unknown`.
