@@ -624,6 +624,13 @@ export class DatabaseTasks {
       const path = getPath();
       fs.mkdirSync(path.dirname(filename), { recursive: true });
       await this.structureDump(config, filename);
+      // Rails' dump_schema appends `dump_schema_information` after a
+      // structure_dump so schema_migrations' version rows round-trip
+      // through load. Without this, loading structure.sql into a
+      // fresh DB would leave schema_migrations empty and every past
+      // migration would replay. Gated on the schema_migrations table
+      // existing — on a never-migrated DB there's nothing to stamp.
+      await this._appendSchemaInformation(filename);
       return;
     }
     const { SchemaDumper } = await import("../schema-dumper.js");
@@ -826,6 +833,78 @@ export class DatabaseTasks {
     const hash = getCrypto().createHash("sha1");
     hash.update(contents);
     return hash.digest("hex");
+  }
+
+  /**
+   * Append `INSERT INTO schema_migrations (version) VALUES ...` rows to
+   * an already-dumped structure.sql, mirroring Rails'
+   * `ConnectionAdapters::SchemaStatements#dump_schema_information` that
+   * `DatabaseTasks.dump_schema` calls for the `:sql` format. Gated on
+   * the schema_migrations table existing — a fresh DB has nothing to
+   * stamp. Required for every adapter (including PG/MySQL): pg_dump
+   * runs with `--schema-only` and mysqldump with `--no-data`, so the
+   * version rows are NOT in those tools' output.
+   *
+   * Identifier quoting routes through the per-adapter scheme — backticks
+   * for MySQL, double-quotes for SQLite/PostgreSQL — so the appended
+   * SQL is valid for whichever `structureLoad` consumes it. Matches
+   * Rails' `quote_table_name`. The column name `(version)` is
+   * hardcoded verbatim, matching Rails' `insert_versions_sql`.
+   */
+  private static async _appendSchemaInformation(filename: string): Promise<void> {
+    const adapter = this._adapterInstance;
+    if (!adapter) return;
+
+    const { SchemaMigration } = await import("../schema-migration.js");
+    const migration = new SchemaMigration(adapter);
+    if (!(await migration.tableExists())) return;
+
+    const versions = await migration.allVersions();
+    if (versions.length === 0) return;
+
+    const { quoteTableName } = await import("../connection-adapters/abstract/quoting.js");
+    const adapterKind = this._adapterQuotingKind(adapter);
+    const quotedTable = quoteTableName(migration.tableName, adapterKind);
+    const quoted = versions
+      // Rails inserts versions in reverse order so the final row has
+      // the highest version — matches `versions.reverse.map`.
+      .slice()
+      .reverse()
+      // Versions are timestamp strings (`20260101000000`), so escape
+      // single quotes defensively via SQL's double-up convention even
+      // though no real version should contain one.
+      .map((v) => `('${String(v).replace(/'/g, "''")}')`)
+      .join(",\n");
+    // Rails hardcodes `(version)` in insert_versions_sql — never
+    // routes through quote_column_name. Match verbatim.
+    const insertSql = `\nINSERT INTO ${quotedTable} (version) VALUES\n${quoted};\n`;
+    // Append in place rather than read+rewrite so dump time scales with
+    // the appended content, not the dump size. Drop a leading newline
+    // into insertSql itself so we don't have to read the file's last
+    // byte just to decide whether to add a separator — if structureDump
+    // already ended on a newline (it does for sqlite/pg/mysql), the
+    // result is one blank line between sections, which matches Rails'
+    // `f.puts` + `f.print "\n"` shape.
+    getFs().appendFileSync(filename, insertSql);
+  }
+
+  /**
+   * Map a DatabaseAdapter instance to the quoting kind expected by the
+   * abstract quoting helpers. Adapter classes report adapterName as
+   * "SQLite" / "PostgreSQL" / "Mysql2"; the helper expects lowercased
+   * "sqlite" / "postgres" / "mysql". Defaults to undefined (which the
+   * helper treats as standard double-quoted identifiers).
+   */
+  private static _adapterQuotingKind(
+    adapter: import("../adapter.js").DatabaseAdapter,
+  ): "sqlite" | "postgres" | "mysql" | undefined {
+    const name = (adapter as { adapterName?: string }).adapterName?.toLowerCase() ?? "";
+    if (name.includes("sqlite")) return "sqlite";
+    if (name.includes("postgres")) return "postgres";
+    if (name.includes("mysql") || name.includes("trilogy") || name.includes("mariadb")) {
+      return "mysql";
+    }
+    return undefined;
   }
 
   static setupInitialDatabaseYaml(): Record<string, unknown> {

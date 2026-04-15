@@ -202,16 +202,24 @@ async function runProtectedEnvCheck(config: HashConfig, envName: string): Promis
  * delegates to `DatabaseTasks.dumpSchema(config)` so ts / js / sql formats
  * route through the same code path the standalone `trails db schema:dump`
  * subcommand uses.
+ *
+ * Respects the same schema-format precedence as the standalone command —
+ * SCHEMA_FORMAT env / config.schemaFormat / existence inference — so an
+ * app that commits a structure.sql stays on sql through the whole
+ * migrate → dump cycle.
  */
 async function dumpSchemaAfterMigrate(adapter: DatabaseAdapter, raw: RawConfig): Promise<void> {
   if (!DatabaseTasks.dumpSchemaAfterMigration) return;
   const config = toDbConfig(raw);
   const previous = DatabaseTasks.migrationConnection();
-  DatabaseTasks.setAdapter(adapter);
+  const previousFormat = DatabaseTasks.schemaFormat;
   try {
+    DatabaseTasks.schemaFormat = await resolveSchemaFormat();
+    DatabaseTasks.setAdapter(adapter);
     await DatabaseTasks.dumpSchema(config);
   } finally {
     DatabaseTasks.setAdapter(previous);
+    DatabaseTasks.schemaFormat = previousFormat;
   }
 }
 

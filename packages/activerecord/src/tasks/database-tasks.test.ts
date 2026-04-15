@@ -1032,3 +1032,90 @@ describe("DatabaseTasks schema cache", () => {
     }
   });
 });
+
+describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
+  /**
+   * Build the smallest stub that _appendSchemaInformation needs:
+   * an adapterName (for the quoting kind dispatch) and SchemaMigration's
+   * read path (versions + tableExists return values come back through
+   * adapter.execute).
+   */
+  function stubAdapter(adapterName: string, versions: string[]) {
+    return {
+      adapterName,
+      execute: async (sql: string) => {
+        // Both tableExists() and versions() funnel through execute().
+        // Return one row to claim the table exists; for the versions
+        // SELECT, return the version list.
+        if (/SELECT.*FROM.*schema_migrations/i.test(sql)) {
+          return versions.map((v) => ({ version: v }));
+        }
+        // tableExists() runs `SELECT 1 FROM ... LIMIT 1` — surface a row
+        // so it returns true.
+        return [{ "1": 1 }];
+      },
+      executeMutation: async () => {
+        return;
+      },
+    };
+  }
+
+  it("emits backtick-quoted identifiers for MySQL adapters", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-append-mysql-"));
+    const filename = path.join(tmp, "structure.sql");
+    fs.writeFileSync(filename, "-- mysqldump output\n");
+    DatabaseTasks.setAdapter(stubAdapter("Mysql2", ["20260101000000"]) as never);
+    try {
+      // private; reach in through indexer for the test (matches how
+      // dumpSchema would call it through the public path).
+      await (
+        DatabaseTasks as unknown as { _appendSchemaInformation(f: string): Promise<void> }
+      )._appendSchemaInformation(filename);
+      const written = fs.readFileSync(filename, "utf8");
+      expect(written).toContain("INSERT INTO `schema_migrations` (version)");
+      expect(written).toContain("('20260101000000')");
+    } finally {
+      DatabaseTasks.setAdapter(null);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("emits double-quoted identifiers for SQLite/PostgreSQL adapters", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-append-sqlite-"));
+    const filename = path.join(tmp, "structure.sql");
+    fs.writeFileSync(filename, "-- sqlite dump\n");
+    DatabaseTasks.setAdapter(stubAdapter("SQLite", ["20260101000000"]) as never);
+    try {
+      await (
+        DatabaseTasks as unknown as { _appendSchemaInformation(f: string): Promise<void> }
+      )._appendSchemaInformation(filename);
+      const written = fs.readFileSync(filename, "utf8");
+      expect(written).toContain('INSERT INTO "schema_migrations" (version)');
+    } finally {
+      DatabaseTasks.setAdapter(null);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("appends in place without rewriting the existing dump", async () => {
+    // For very large dumps the original implementation read+rewrote the
+    // entire file. Verify we now stream the appended content and leave
+    // the original bytes untouched.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-append-stream-"));
+    const filename = path.join(tmp, "structure.sql");
+    const head = "-- existing dump\nCREATE TABLE foo (id INTEGER);\n";
+    fs.writeFileSync(filename, head);
+    DatabaseTasks.setAdapter(stubAdapter("SQLite", ["20260101000000"]) as never);
+    try {
+      await (
+        DatabaseTasks as unknown as { _appendSchemaInformation(f: string): Promise<void> }
+      )._appendSchemaInformation(filename);
+      const written = fs.readFileSync(filename, "utf8");
+      expect(written.startsWith(head)).toBe(true);
+      expect(written.length).toBeGreaterThan(head.length);
+    } finally {
+      DatabaseTasks.setAdapter(null);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});

@@ -1537,4 +1537,198 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     // No --format flag — config.schemaFormat drives it.
     expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
   });
+
+  it("db schema:load --format=sql replays structure.sql end-to-end", async () => {
+    // Round-trip: populate → dump → drop → load → verify. Covers the
+    // sqlite3 structureLoad path (db.exec of the full dump) so a real
+    // regression in either direction surfaces.
+    const dbFile = path.join(tmpDir, "roundtrip.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const seed = new SQLite3Adapter(dbFile);
+    try {
+      await seed.executeMutation(
+        "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT NOT NULL)",
+      );
+      await seed.executeMutation("CREATE INDEX gadgets_on_label ON gadgets (label)");
+    } finally {
+      await seed.close();
+    }
+
+    await runDb(["schema:dump", "--format=sql"]);
+    expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
+
+    // Drop the table behind the CLI's back, then load from the dump to
+    // prove structureLoad actually replays the DDL.
+    const dropper = new SQLite3Adapter(dbFile);
+    try {
+      await dropper.executeMutation("DROP TABLE gadgets");
+    } finally {
+      await dropper.close();
+    }
+
+    await runDb(["schema:load", "--format=sql"]);
+
+    const verify = new SQLite3Adapter(dbFile);
+    try {
+      const tables = (await verify.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='gadgets'",
+      )) as Array<{ name: string }>;
+      expect(tables).toHaveLength(1);
+      const indexes = (await verify.execute(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name='gadgets_on_label'",
+      )) as Array<{ name: string }>;
+      expect(indexes).toHaveLength(1);
+    } finally {
+      await verify.close();
+    }
+  });
+
+  it("post-migrate schema dump honors config.schemaFormat=sql", async () => {
+    // Rails runs db:_dump after db:migrate; trails' dumpSchemaAfterMigrate
+    // must respect the same format precedence as the standalone
+    // schema:dump command. Otherwise `trails db migrate` would clobber
+    // an app's structure.sql with a schema.ts.
+    const dbFile = path.join(tmpDir, "migrate-fmt.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  schemaFormat: "sql",
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-things.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateThings extends Migration {
+  async up() { await this.createTable("things", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("things"); }
+}`,
+    );
+
+    await runDb(["migrate:up", "--version=20260101000000"]);
+
+    expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "db", "schema.ts"))).toBe(false);
+    const dumped = fs.readFileSync(path.join(tmpDir, "db", "structure.sql"), "utf8");
+    expect(dumped).toContain("things");
+  });
+
+  it("db schema:dump --format=sql appends schema_migrations versions", async () => {
+    // Rails' dump_schema calls dump_schema_information after
+    // structure_dump so schema_migrations' version rows round-trip
+    // through load. Without this, loading structure.sql into a fresh DB
+    // leaves schema_migrations empty and every prior migration replays.
+    const dbFile = path.join(tmpDir, "migrations-dump.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-posts.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreatePosts extends Migration {
+  async up() { await this.createTable("posts", (t) => { t.string("title"); }); }
+  async down() { await this.dropTable("posts"); }
+}`,
+    );
+
+    await runDb(["migrate"]);
+    await runDb(["schema:dump", "--format=sql"]);
+
+    const dumped = fs.readFileSync(path.join(tmpDir, "db", "structure.sql"), "utf8");
+    expect(dumped).toMatch(/INSERT INTO "schema_migrations"/);
+    expect(dumped).toContain("20260101000000");
+
+    // Drop schema_migrations + the user table to prove load replays
+    // both the DDL and the version INSERTs.
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const dropper = new SQLite3Adapter(dbFile);
+    try {
+      await dropper.executeMutation("DROP TABLE schema_migrations");
+      await dropper.executeMutation("DROP TABLE ar_internal_metadata");
+      await dropper.executeMutation("DROP TABLE posts");
+    } finally {
+      await dropper.close();
+    }
+
+    await runDb(["schema:load", "--format=sql"]);
+
+    const verify = new SQLite3Adapter(dbFile);
+    try {
+      const rows = (await verify.execute(
+        "SELECT version FROM schema_migrations ORDER BY version",
+      )) as Array<{ version: string }>;
+      expect(rows.map((r) => r.version)).toEqual(["20260101000000"]);
+    } finally {
+      await verify.close();
+    }
+  });
+
+  it("db schema:dump --format=sql works against ':memory:' sqlite by reusing the migration adapter", async () => {
+    // Regression for Copilot's #2 on PR 534. ":memory:" sqlite DBs
+    // aren't shared across connections — a fresh per-call adapter
+    // would see an empty DB, dump nothing, and any later
+    // _appendSchemaInformation call would write INSERTs into a
+    // structureless dump that fails to load. Fix routes structureDump
+    // through the migration adapter when one is set.
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  schemaFormat: "sql",
+  development: { adapter: "sqlite3", database: ":memory:" },
+  test: { adapter: "sqlite3", database: ":memory:" },
+};`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-things.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateThings extends Migration {
+  async up() { await this.createTable("things", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("things"); }
+}`,
+    );
+
+    await runDb(["migrate"]);
+
+    const dumped = fs.readFileSync(path.join(tmpDir, "db", "structure.sql"), "utf8");
+    // The user table DDL proves structureDump saw real data; the
+    // schema_migrations CREATE proves the in-memory connection was
+    // actually queried (a fresh in-memory adapter would have neither).
+    expect(dumped).toContain("things");
+    expect(dumped).toMatch(/CREATE TABLE.*schema_migrations/);
+  });
+
+  it("db schema:load --format=sql errors when structure.sql is missing", async () => {
+    const dbFile = path.join(tmpDir, "missing.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    // Create the DB file so the adapter can connect, but don't create
+    // a structure.sql — the CLI should bail out cleanly.
+    new (
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js")
+    ).SQLite3Adapter(dbFile).close();
+
+    await runDb(["schema:load", "--format=sql"]);
+
+    expect(process.exitCode).toBe(1);
+    expect(errs.some((e) => e.includes("No schema file found"))).toBe(true);
+  });
 });

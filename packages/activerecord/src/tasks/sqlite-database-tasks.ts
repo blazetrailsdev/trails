@@ -98,7 +98,17 @@ export class SQLiteDatabaseTasks {
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     void extraFlags;
-    const adapter = await this.connectAdapter();
+    // Reuse the migration adapter when one is registered. Two reasons:
+    //   1. ":memory:" sqlite DBs are not shared across connections — a
+    //      fresh adapter sees an empty DB, dumps nothing, and any later
+    //      _appendSchemaInformation call (which runs against the
+    //      migration adapter) writes INSERTs into a structureless dump
+    //      that fails to load.
+    //   2. Even for file-backed sqlite, reusing the active connection
+    //      keeps WAL + transaction state consistent with what the
+    //      caller has already written, matching Rails where structure
+    //      dumping uses the established pool's connection.
+    const { adapter, owned } = await this.adapterForRead();
     try {
       const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
       const ignoreTables = SchemaDumper.ignoreTables;
@@ -113,7 +123,11 @@ export class SQLiteDatabaseTasks {
       const typeOrder =
         "CASE type WHEN 'table' THEN 0 WHEN 'view' THEN 1 " +
         "WHEN 'index' THEN 2 WHEN 'trigger' THEN 3 ELSE 4 END";
-      let where = "WHERE sql IS NOT NULL";
+      // Skip SQLite internals (sqlite_sequence, sqlite_stat*, etc.)
+      // — their names are reserved, so re-emitting their CREATE
+      // statements during structureLoad would fail. Rails' .schema CLI
+      // path filters these implicitly; we replicate that here.
+      let where = "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'";
       let binds: unknown[] = [];
 
       if (ignoreTables.length > 0) {
@@ -146,8 +160,27 @@ export class SQLiteDatabaseTasks {
       const output = rows.map((r) => String(r.sql ?? "")).join("\n");
       getFs().writeFileSync(filename, output);
     } finally {
-      await this.closeAdapter(adapter);
+      if (owned) await this.closeAdapter(adapter);
     }
+  }
+
+  /**
+   * Use DatabaseTasks.migrationConnection() if it points to a SQLite
+   * adapter, falling back to a fresh per-call adapter otherwise.
+   * `owned` tells the caller whether to close the returned adapter:
+   * borrowed connections must be left alone, freshly-opened ones must
+   * be closed.
+   */
+  private async adapterForRead(): Promise<{ adapter: DatabaseAdapter; owned: boolean }> {
+    const { DatabaseTasks } = await import("./database-tasks.js");
+    const migration = DatabaseTasks.migrationConnection();
+    if (
+      migration &&
+      (migration as { adapterName?: string }).adapterName?.toLowerCase().includes("sqlite")
+    ) {
+      return { adapter: migration, owned: false };
+    }
+    return { adapter: await this.connectAdapter(), owned: true };
   }
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
