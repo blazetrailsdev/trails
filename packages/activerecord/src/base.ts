@@ -2891,7 +2891,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#dup
    */
-  dup(): Base {
+  dup(): this {
     const ctor = this.constructor as typeof Base;
     const attrs = { ...this.attributes };
     const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
@@ -2899,7 +2899,7 @@ export class Base extends Model {
       delete attrs[col]; // Remove PK so it's a new record
     }
     const copy = new ctor(attrs);
-    return copy;
+    return copy as this;
   }
 
   /**
@@ -2907,8 +2907,8 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Core#clone
    */
-  clone(): Base {
-    const copy = Object.create(Object.getPrototypeOf(this)) as Base;
+  clone(): this {
+    const copy = Object.create(Object.getPrototypeOf(this)) as this;
     Object.assign(copy, this);
     copy._attributes = this._attributes;
     copy._previouslyNewRecord = false;
@@ -2921,8 +2921,8 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#becomes
    */
-  becomes(klass: typeof Base): Base {
-    const instance = new klass({});
+  becomes<K extends typeof Base>(klass: K): InstanceType<K> {
+    const instance = new klass({}) as InstanceType<K>;
     // Share the same attributes map (Rails behavior)
     instance._attributes = this._attributes;
     instance._newRecord = this._newRecord;
@@ -3072,7 +3072,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#becomes!
    */
-  becomesBang(klass: typeof Base): Base {
+  becomesBang<K extends typeof Base>(klass: K): InstanceType<K> {
     const instance = this.becomes(klass);
     // Set the STI type column — find it from the base class
     const base = getStiBase(klass);

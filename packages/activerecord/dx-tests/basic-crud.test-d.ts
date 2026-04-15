@@ -122,6 +122,26 @@ describe("basic CRUD DX — defining and using a model", () => {
     expectTypeOf(u.isPersisted()).toBeBoolean();
   });
 
+  it("dup / clone return `this` and becomes<K> / becomesBang<K> return InstanceType<K>", async () => {
+    const u = new User({ name: "dean" });
+    expectTypeOf(u.dup()).toEqualTypeOf<User>();
+    expectTypeOf(u.clone()).toEqualTypeOf<User>();
+    // becomes / becomesBang let you switch model classes (e.g., STI).
+    class Admin extends User {}
+    expectTypeOf(u.becomes(Admin)).toEqualTypeOf<Admin>();
+    expectTypeOf(u.becomesBang(Admin)).toEqualTypeOf<Admin>();
+  });
+
+  it("reload() resolves to the same model type", async () => {
+    const u = new User({ name: "dean" });
+    expectTypeOf(await u.reload()).toEqualTypeOf<User>();
+  });
+
+  it("findBySql / asyncFindBySql return User[]", async () => {
+    expectTypeOf(await User.findBySql("SELECT * FROM users")).toEqualTypeOf<User[]>();
+    expectTypeOf(await User.asyncFindBySql("SELECT * FROM users")).toEqualTypeOf<User[]>();
+  });
+
   it("serialization methods expose a JSON-ish shape", () => {
     const u = new User({ name: "dean", email: "d@example.com" });
     expectTypeOf(u.toJson()).toBeString();

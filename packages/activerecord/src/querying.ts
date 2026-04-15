@@ -5,26 +5,19 @@
  * Mirrors: ActiveRecord::Querying
  */
 
+import type { Base } from "./base.js";
 import { sanitizeSql } from "./sanitization.js";
-
-interface QueryingHost {
-  name: string;
-  adapter: {
-    execute(sql: string): Promise<Record<string, unknown>[]>;
-  };
-  _instantiate(row: Record<string, unknown>, columnTypes?: Record<string, any>): any;
-}
 
 /**
  * Rails: find_by_sql(sql, binds = [], preparable: nil, allow_retry: false, &block)
  * Executes raw SQL and instantiates model objects from the result rows.
  */
-export async function findBySql(
-  this: QueryingHost,
+export async function findBySql<T extends typeof Base>(
+  this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  block?: (record: any) => void,
-): Promise<any[]> {
+  block?: (record: InstanceType<T>) => void,
+): Promise<InstanceType<T>[]> {
   // Rails passes binds to the connection for prepared statements.
   // Our adapter uses string substitution, so merge binds into the SQL.
   let sanitized: string;
@@ -45,13 +38,18 @@ export async function findBySql(
  * Rails: async_find_by_sql — same as find_by_sql but returns a Promise.
  * In our async-first codebase, this is identical to findBySql.
  */
-export function asyncFindBySql(
-  this: QueryingHost,
+export async function asyncFindBySql<T extends typeof Base>(
+  this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  block?: (record: any) => void,
-): Promise<any[]> {
-  return findBySql.call(this, sql, binds, block);
+  block?: (record: InstanceType<T>) => void,
+): Promise<InstanceType<T>[]> {
+  return findBySql.call<T, [typeof sql, typeof binds, typeof block], Promise<InstanceType<T>[]>>(
+    this,
+    sql,
+    binds,
+    block,
+  );
 }
 
 /**
@@ -59,7 +57,7 @@ export function asyncFindBySql(
  * Uses select_value to get a single scalar, not full row instantiation.
  */
 export async function countBySql(
-  this: QueryingHost,
+  this: typeof Base,
   sql: string | [string, ...unknown[]],
 ): Promise<number> {
   const sanitized = typeof sql === "string" ? sql : sanitizeSql(sql);
@@ -75,7 +73,7 @@ export async function countBySql(
  * Rails: async_count_by_sql — same as count_by_sql but returns a Promise.
  */
 export function asyncCountBySql(
-  this: QueryingHost,
+  this: typeof Base,
   sql: string | [string, ...unknown[]],
 ): Promise<number> {
   return countBySql.call(this, sql);
