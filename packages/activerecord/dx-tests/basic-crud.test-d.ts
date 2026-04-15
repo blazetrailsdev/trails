@@ -142,6 +142,47 @@ describe("basic CRUD DX — defining and using a model", () => {
     expectTypeOf(await User.asyncFindBySql("SELECT * FROM users")).toEqualTypeOf<User[]>();
   });
 
+  it("lifecycle callbacks: `record` is typed as the concrete subclass", () => {
+    class WithHooks extends Base {
+      declare name: string;
+      static {
+        this.attribute("name", "string");
+        this.beforeSave((record) => {
+          expectTypeOf(record).toEqualTypeOf<WithHooks>();
+          expectTypeOf(record.name).toBeString();
+        });
+        this.afterCreate((record) => {
+          expectTypeOf(record).toEqualTypeOf<WithHooks>();
+        });
+        this.beforeValidation((record) => {
+          expectTypeOf(record).toEqualTypeOf<WithHooks>();
+        });
+        this.aroundSave((record, proceed) => {
+          expectTypeOf(record).toEqualTypeOf<WithHooks>();
+          expectTypeOf(proceed).toBeFunction();
+          return proceed();
+        });
+        this.afterCommit((record) => {
+          expectTypeOf(record).toEqualTypeOf<WithHooks>();
+        });
+        // Conditions' `if` / `unless` predicates are typed too.
+        this.beforeSave(
+          (record) => {
+            expectTypeOf(record).toEqualTypeOf<WithHooks>();
+          },
+          {
+            if: (record) => {
+              expectTypeOf(record).toEqualTypeOf<WithHooks>();
+              return record.name.length > 0;
+            },
+            unless: (record) => record.name === "skip",
+          },
+        );
+      }
+    }
+    assertType(WithHooks);
+  });
+
   it("serialization methods expose a JSON-ish shape", () => {
     const u = new User({ name: "dean", email: "d@example.com" });
     expectTypeOf(u.toJson()).toBeString();

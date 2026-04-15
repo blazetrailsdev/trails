@@ -8,13 +8,17 @@
  * Mirrors: ActiveRecord::Callbacks
  */
 
-export type CallbackOptions = {
-  if?: (record: any) => boolean;
-  unless?: (record: any) => boolean;
+import type { Base } from "./base.js";
+
+type ModelCtor = typeof Base;
+
+export type CallbackOptions<TRecord = Base> = {
+  if?: (record: TRecord) => boolean;
+  unless?: (record: TRecord) => boolean;
   prepend?: boolean;
 };
 
-export type ValidationCallbackOptions = CallbackOptions & {
+export type ValidationCallbackOptions<TRecord = Base> = CallbackOptions<TRecord> & {
   on?: "create" | "update" | Array<"create" | "update">;
 };
 
@@ -23,10 +27,10 @@ export type ValidationCallbackOptions = CallbackOptions & {
  *
  * Mirrors: ActiveRecord::Callbacks.before_validation
  */
-export function beforeValidation(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void>,
-  options?: ValidationCallbackOptions,
+export function beforeValidation<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void>,
+  options?: ValidationCallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "validation", fn, options);
 }
@@ -36,10 +40,10 @@ export function beforeValidation(
  *
  * Mirrors: ActiveRecord::Callbacks.after_validation
  */
-export function afterValidation(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void>,
-  options?: ValidationCallbackOptions,
+export function afterValidation<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void>,
+  options?: ValidationCallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "validation", fn, options);
 }
@@ -49,10 +53,10 @@ export function afterValidation(
  *
  * Mirrors: ActiveRecord::Callbacks.before_save
  */
-export function beforeSave(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void> | false,
-  options?: CallbackOptions,
+export function beforeSave<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void> | false,
+  options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "save", fn, options);
 }
@@ -62,10 +66,10 @@ export function beforeSave(
  *
  * Mirrors: ActiveRecord::Callbacks.after_save
  */
-export function afterSave(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void>,
-  options?: CallbackOptions,
+export function afterSave<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void>,
+  options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "save", fn, options);
 }
@@ -75,10 +79,10 @@ export function afterSave(
  *
  * Mirrors: ActiveRecord::Callbacks.before_create
  */
-export function beforeCreate(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void> | false,
-  options?: CallbackOptions,
+export function beforeCreate<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void> | false,
+  options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "create", fn, options);
 }
@@ -88,10 +92,10 @@ export function beforeCreate(
  *
  * Mirrors: ActiveRecord::Callbacks.after_create
  */
-export function afterCreate(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void>,
-  options?: CallbackOptions,
+export function afterCreate<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void>,
+  options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "create", fn, options);
 }
@@ -101,10 +105,10 @@ export function afterCreate(
  *
  * Mirrors: ActiveRecord::Callbacks.before_update
  */
-export function beforeUpdate(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void> | false,
-  options?: CallbackOptions,
+export function beforeUpdate<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void> | false,
+  options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "update", fn, options);
 }
@@ -114,10 +118,10 @@ export function beforeUpdate(
  *
  * Mirrors: ActiveRecord::Callbacks.after_update
  */
-export function afterUpdate(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void>,
-  options?: CallbackOptions,
+export function afterUpdate<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void>,
+  options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "update", fn, options);
 }
@@ -127,10 +131,10 @@ export function afterUpdate(
  *
  * Mirrors: ActiveRecord::Callbacks.before_destroy
  */
-export function beforeDestroy(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void> | false,
-  options?: CallbackOptions,
+export function beforeDestroy<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void> | false,
+  options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "destroy", fn, options);
 }
@@ -140,33 +144,46 @@ export function beforeDestroy(
  *
  * Mirrors: ActiveRecord::Callbacks.after_destroy
  */
-export function afterDestroy(
-  modelClass: any,
-  fn: (record: any) => void | Promise<void>,
-  options?: CallbackOptions,
+export function afterDestroy<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void>,
+  options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "destroy", fn, options);
 }
 
+type AnyCallbackOptions = CallbackOptions<never> | ValidationCallbackOptions<never>;
+
 function registerCallback(
-  modelClass: any,
+  modelClass: ModelCtor,
   timing: "before" | "after",
   event: string,
   fn: Function,
-  options?: CallbackOptions | ValidationCallbackOptions,
+  options?: AnyCallbackOptions,
 ): void {
-  if (!modelClass._callbackChain) return;
+  const klass = modelClass as unknown as {
+    _callbackChain?: {
+      clone(): unknown;
+      register(
+        timing: "before" | "after",
+        event: string,
+        fn: Function,
+        conditions: Record<string, unknown>,
+      ): void;
+    };
+  };
+  if (!klass._callbackChain) return;
   // Clone the chain if it's inherited from a parent, so we don't
   // register callbacks on sibling subclasses
   if (!Object.prototype.hasOwnProperty.call(modelClass, "_callbackChain")) {
-    modelClass._callbackChain = modelClass._callbackChain.clone();
+    klass._callbackChain = klass._callbackChain.clone() as typeof klass._callbackChain;
   }
   const conditions: Record<string, unknown> = {};
   if (options?.if) conditions.if = options.if;
   if (options?.unless) conditions.unless = options.unless;
   if (options?.prepend) conditions.prepend = options.prepend;
   if (event === "validation" && "on" in (options ?? {})) {
-    conditions.on = (options as ValidationCallbackOptions).on;
+    conditions.on = (options as ValidationCallbackOptions<never>).on;
   }
-  modelClass._callbackChain.register(timing, event, fn, conditions);
+  klass._callbackChain!.register(timing, event, fn, conditions);
 }

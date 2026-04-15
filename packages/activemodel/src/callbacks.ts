@@ -184,9 +184,9 @@ export type AroundCallbackFn = (
 export type CallbackTiming = "before" | "after" | "around";
 export type CallbackEvent = string;
 
-export interface CallbackConditions {
-  if?: (record: AnyRecord) => boolean;
-  unless?: (record: AnyRecord) => boolean;
+export interface CallbackConditions<TRecord = AnyRecord> {
+  if?: (record: TRecord) => boolean;
+  unless?: (record: TRecord) => boolean;
   prepend?: boolean;
   on?: string | string[];
 }

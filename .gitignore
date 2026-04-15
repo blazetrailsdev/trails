@@ -10,3 +10,6 @@ scripts/api-compare/.rails-source
 .claude/worktrees/
 .claude/hooks/
 .claude/skills/
+
+# Local SQLite test databases
+*.db
