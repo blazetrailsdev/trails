@@ -1542,6 +1542,43 @@ export class Migrator {
   }
 
   /**
+   * Read-only variant of {@link currentVersion}: returns 0 when the
+   * schema_migrations table doesn't yet exist, without creating it.
+   *
+   * Matches Rails' `current_version` exactly (it calls `get_all_versions`
+   * which checks `schema_migration.table_exists?` and returns [] on miss).
+   * The regular {@link currentVersion} keeps the legacy auto-create path
+   * to stay compatible with internal callers that rely on it.
+   */
+  async currentVersionReadOnly(): Promise<number> {
+    if (!(await this._schemaMigration.tableExists())) return 0;
+    const applied = await this._appliedVersions();
+    let max = BigInt(0);
+    for (const v of applied) {
+      const bv = BigInt(v);
+      if (bv > max) max = bv;
+    }
+    return Number(max);
+  }
+
+  /**
+   * Read-only variant of {@link pendingMigrations}: does not create the
+   * schema_migrations / ar_internal_metadata tables. Treats a missing
+   * schema_migrations as "no applied versions", so every known migration
+   * is considered pending.
+   *
+   * Matches Rails' `pending_migration_versions` (built from
+   * `get_all_versions`, which checks `table_exists?` and returns [] on
+   * miss).
+   */
+  async pendingMigrationsReadOnly(): Promise<MigrationProxy[]> {
+    const applied = (await this._schemaMigration.tableExists())
+      ? await this._appliedVersions()
+      : new Set<string>();
+    return this._migrations.filter((m) => !applied.has(m.version));
+  }
+
+  /**
    * Get pending (unapplied) migrations.
    *
    * Mirrors: ActiveRecord::Migrator#pending_migrations
@@ -1651,6 +1688,35 @@ export class Migrator {
         throw new MigrationError(`Invalid target version: ${v}. Must be a non-negative integer.`);
       }
     }
+  }
+
+  /**
+   * Run exactly one migration (identified by `targetVersion`) in the given
+   * direction. Used by the `db:migrate:up` / `db:migrate:down` CLI paths
+   * where the user supplies a specific VERSION.
+   *
+   * Mirrors: ActiveRecord::MigrationContext#run (which builds a Migrator
+   * scoped to `target_version` and calls `#run`).
+   */
+  async run(direction: "up" | "down", targetVersion: number | string): Promise<void> {
+    this._validateTargetVersion(targetVersion);
+    await this._ensureSchemaTable();
+    // Normalize via BigInt like the constructor does so callers can pass
+    // equivalent forms (leading zeros, `20260101000000` vs the string "20260101000000",
+    // etc.) without hitting a spurious UnknownMigrationVersionError.
+    // The constructor already normalizes every migration's version via
+    // BigInt, so we only need to normalize the incoming targetVersion and
+    // compare directly against the proxy list.
+    const key = String(BigInt(targetVersion));
+    const proxy = this._migrations.find((m) => m.version === key);
+    if (!proxy) {
+      throw new UnknownMigrationVersionError(key);
+    }
+    const applied = await this._appliedVersions();
+    const isApplied = applied.has(key);
+    if (direction === "up" && isApplied) return;
+    if (direction === "down" && !isApplied) return;
+    await this._runMigration(proxy, direction);
   }
 
   private async _migrateUp(targetVersion: number | string | null): Promise<void> {

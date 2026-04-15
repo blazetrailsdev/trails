@@ -233,7 +233,7 @@ import { MySQLDatabaseTasks as _MySQLTasks } from "./tasks/mysql-database-tasks.
 _SQLiteTasks.register();
 _PGTasks.register();
 _MySQLTasks.register();
-export { Migrator } from "./migration.js";
+export { Migrator, UnknownMigrationVersionError } from "./migration.js";
 export type { MigrationProxy, MigrationLike } from "./migration.js";
 export type { DelegatedTypeOptions } from "./delegated-type.js";
 

@@ -13,26 +13,70 @@ import {
   DatabaseTasks,
   HashConfig,
   Migrator,
-  SchemaDumper,
   DatabaseAlreadyExists,
   NoDatabaseError,
 } from "@blazetrails/activerecord";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
-import { AdapterSchemaSource } from "../schema-source.js";
 
 async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
   const maybeClose = (adapter as { close?: () => Promise<void> }).close;
   if (typeof maybeClose === "function") await maybeClose.call(adapter);
 }
 
-async function withAdapter(fn: (adapter: DatabaseAdapter) => Promise<void>): Promise<void> {
-  const config = await loadDatabaseConfig();
-  const adapter = await connectAdapter(config);
+async function withAdapter(
+  fn: (adapter: DatabaseAdapter, raw: RawConfig) => Promise<void>,
+): Promise<void> {
+  // Normalize the raw config once, before connecting. `connectAdapter`
+  // uses the adapter/database/url fields to choose a driver; later paths
+  // (`toDbConfig` → `DatabaseTasks.dumpSchema`) need the same resolved
+  // adapter so the connection and the schema handler agree. If we passed
+  // the unnormalized config to connectAdapter and the adapter-less
+  // variant to toDbConfig, a url-only `postgres://host/db` config would
+  // migrate against postgres but try to dump schema via sqlite3.
+  const raw = normalizeRawConfig(await loadDatabaseConfig());
+  const adapter = await connectAdapter(raw);
   try {
-    await fn(adapter);
+    await fn(adapter, raw);
   } finally {
     await closeAdapter(adapter);
   }
+}
+
+function normalizeRawConfig(raw: RawConfig): RawConfig {
+  const normalized: Record<string, unknown> = { ...raw };
+  if (!normalized.adapter) {
+    if (typeof normalized.url === "string") {
+      const inferred = inferAdapterFromUrl(normalized.url);
+      if (inferred) normalized.adapter = inferred;
+    }
+    if (!normalized.adapter) normalized.adapter = "sqlite3";
+  }
+  if (!normalized.database && typeof normalized.url === "string") {
+    const db = databaseFromUrl(normalized.url, normalized.adapter as string | undefined);
+    if (db) normalized.database = db;
+    try {
+      const parsed = new URL(normalized.url);
+      const protocol = parsed.protocol;
+      const isSqlite =
+        normalized.adapter === "sqlite3" ||
+        normalized.adapter === "sqlite" ||
+        protocol === "sqlite:" ||
+        protocol === "sqlite3:" ||
+        protocol === "file:";
+      if (!isSqlite) {
+        if (!normalized.host && parsed.hostname) normalized.host = parsed.hostname;
+        if (!normalized.username && parsed.username) {
+          normalized.username = decodeURIComponent(parsed.username);
+        }
+        if (!normalized.password && parsed.password) {
+          normalized.password = decodeURIComponent(parsed.password);
+        }
+      }
+    } catch {
+      // leave unparsed url as-is; adapters will surface the error
+    }
+  }
+  return normalized as RawConfig;
 }
 
 function migrationsDir(): string {
@@ -87,43 +131,49 @@ function inferAdapterFromUrl(url: string): string | undefined {
 }
 
 function toDbConfig(raw: RawConfig, envName: string = resolveEnv()): HashConfig {
-  const normalized: Record<string, unknown> = { ...raw };
-  if (!normalized.adapter) {
-    if (typeof normalized.url === "string") {
-      const inferred = inferAdapterFromUrl(normalized.url);
-      if (inferred) normalized.adapter = inferred;
-    }
-    if (!normalized.adapter) normalized.adapter = "sqlite3";
-  }
-  if (!normalized.database && typeof normalized.url === "string") {
-    const db = databaseFromUrl(normalized.url, normalized.adapter as string | undefined);
-    if (db) normalized.database = db;
-    try {
-      const parsed = new URL(normalized.url);
-      const protocol = parsed.protocol;
-      const isSqlite =
-        normalized.adapter === "sqlite3" ||
-        normalized.adapter === "sqlite" ||
-        protocol === "sqlite:" ||
-        protocol === "sqlite3:" ||
-        protocol === "file:";
-      if (!isSqlite) {
-        if (!normalized.host && parsed.hostname) normalized.host = parsed.hostname;
-        if (!normalized.username && parsed.username) {
-          normalized.username = decodeURIComponent(parsed.username);
-        }
-        if (!normalized.password && parsed.password) {
-          normalized.password = decodeURIComponent(parsed.password);
-        }
-      }
-    } catch {
-      // leave unparsed url as-is; adapters will surface the error
-    }
-  }
-  return new HashConfig(envName, "primary", normalized);
+  // `withAdapter` normalizes the config before handing it to callers, so
+  // this wrapper is a thin adapter from RawConfig to HashConfig. Re-run
+  // normalization defensively so external callers that build a
+  // HashConfig out-of-band still get adapter/database inference from a
+  // url-only config.
+  const normalized = normalizeRawConfig(raw);
+  return new HashConfig(envName, "primary", normalized as Record<string, unknown>);
 }
 
-async function runMigrate(adapter: DatabaseAdapter, targetVersion?: string): Promise<void> {
+/**
+ * Dump the schema to disk after a migration-writing task. Mirrors Rails'
+ * `db:_dump`: gated on `DatabaseTasks.dumpSchemaAfterMigration`, and
+ * delegates to `DatabaseTasks.dumpSchema(config)` so ts / js / sql formats
+ * route through the same code path the standalone `trails db schema:dump`
+ * subcommand uses.
+ */
+async function dumpSchemaAfterMigrate(adapter: DatabaseAdapter, raw: RawConfig): Promise<void> {
+  if (!DatabaseTasks.dumpSchemaAfterMigration) return;
+  const config = toDbConfig(raw);
+  const previous = DatabaseTasks.migrationConnection();
+  DatabaseTasks.setAdapter(adapter);
+  try {
+    await DatabaseTasks.dumpSchema(config);
+  } finally {
+    DatabaseTasks.setAdapter(previous);
+  }
+}
+
+interface RunOptions {
+  /**
+   * When true, skip the post-task schema dump. Used by composite
+   * commands (e.g. `migrate:redo`) that want to dump once at the end
+   * instead of twice.
+   */
+  skipDump?: boolean;
+}
+
+async function runMigrate(
+  adapter: DatabaseAdapter,
+  raw: RawConfig,
+  targetVersion?: string,
+  options: RunOptions = {},
+): Promise<void> {
   const migrations = await discoverMigrations(migrationsDir());
   if (migrations.length === 0) {
     console.log("No migrations found.");
@@ -137,9 +187,16 @@ async function runMigrate(adapter: DatabaseAdapter, targetVersion?: string): Pro
 
   const pending = await migrator.pendingMigrations();
   if (pending.length === 0) console.log("All migrations are up to date.");
+
+  if (!options.skipDump) await dumpSchemaAfterMigrate(adapter, raw);
 }
 
-async function runRollback(adapter: DatabaseAdapter, steps: number): Promise<void> {
+async function runRollback(
+  adapter: DatabaseAdapter,
+  raw: RawConfig,
+  steps: number,
+  options: RunOptions = {},
+): Promise<void> {
   const migrations = await discoverMigrations(migrationsDir());
   if (migrations.length === 0) {
     console.log("No migrations found.");
@@ -150,6 +207,8 @@ async function runRollback(adapter: DatabaseAdapter, steps: number): Promise<voi
   await migrator.rollback(steps);
 
   for (const line of migrator.output) console.log(line);
+
+  if (!options.skipDump) await dumpSchemaAfterMigrate(adapter, raw);
 }
 
 async function runSeed(): Promise<void> {
@@ -232,7 +291,7 @@ export function dbCommand(): Command {
     .description("Run pending migrations")
     .option("--version <version>", "Migrate to a specific version")
     .action(async (opts) => {
-      await withAdapter((adapter) => runMigrate(adapter, opts.version));
+      await withAdapter((adapter, raw) => runMigrate(adapter, raw, opts.version));
     });
 
   cmd
@@ -246,7 +305,114 @@ export function dbCommand(): Command {
         process.exitCode = 1;
         return;
       }
-      await withAdapter((adapter) => runRollback(adapter, step));
+      await withAdapter((adapter, raw) => runRollback(adapter, raw, step));
+    });
+
+  cmd
+    .command("forward")
+    .description("Move the schema forward N migrations (inverse of rollback)")
+    .option("--step <n>", "Number of migrations to apply", "1")
+    .action(async (opts) => {
+      const step = Number(opts.step);
+      if (!Number.isInteger(step) || step < 1) {
+        console.error(`Invalid value for --step: "${opts.step}". Expected a positive integer.`);
+        process.exitCode = 1;
+        return;
+      }
+      await withAdapter(async (adapter, raw) => {
+        const migrations = await discoverMigrations(migrationsDir());
+        if (migrations.length === 0) {
+          console.log("No migrations found.");
+          return;
+        }
+        const migrator = new Migrator(adapter, migrations);
+        await migrator.forward(step);
+        for (const line of migrator.output) console.log(line);
+        await dumpSchemaAfterMigrate(adapter, raw);
+      });
+    });
+
+  cmd
+    .command("version")
+    .description("Print the current schema version")
+    .action(async () => {
+      // Don't discover or validate migration files — users should be able
+      // to ask for the current version even when the migrations/ directory
+      // has a stale file. Use the read-only currentVersion path so running
+      // `trails db version` on a fresh/production DB doesn't silently
+      // create schema_migrations / ar_internal_metadata as a side effect
+      // (matches Rails' current_version contract).
+      await withAdapter(async (adapter) => {
+        const migrator = new Migrator(adapter, []);
+        const version = await migrator.currentVersionReadOnly();
+        console.log(`Current version: ${version}`);
+      });
+    });
+
+  cmd
+    .command("abort_if_pending_migrations")
+    .description("Exit with non-zero status if any migrations are pending")
+    .action(async () => {
+      await withAdapter(async (adapter) => {
+        const migrations = await discoverMigrations(migrationsDir());
+        if (migrations.length === 0) return;
+        const migrator = new Migrator(adapter, migrations);
+        // Use the read-only pending check so running this in a
+        // production-health-check context (e.g. before deploying) doesn't
+        // silently create schema_migrations / ar_internal_metadata.
+        const pending = await migrator.pendingMigrationsReadOnly();
+        if (pending.length > 0) {
+          // Match Rails' output format (from activerecord/lib/active_record/
+          // railties/databases.rake), with the command name swapped for
+          // trails:
+          //   "You have N pending migration[s]:"
+          //   "  %4d %s" per pending
+          //   "Run `trails db migrate` to resolve this issue."
+          // Rails prints `bin/rails db:migrate`; the trails CLI is
+          // commander-style (`trails db migrate`, space-separated), not
+          // rake-style colon namespaces.
+          console.error(
+            `You have ${pending.length} pending migration${pending.length === 1 ? "" : "s"}:`,
+          );
+          for (const m of pending) {
+            // Rails prints `"  %4d %s" % [version, name]`, which emits the
+            // version as an integer (no leading zeros). Normalize via BigInt
+            // to match and to stay consistent with the rest of Migrator.
+            const version = String(BigInt(m.version));
+            console.error(`  ${version.padStart(4, " ")} ${m.name}`);
+          }
+          console.error("Run `trails db migrate` to resolve this issue.");
+          process.exitCode = 1;
+        }
+      });
+    });
+
+  cmd
+    .command("migrate:up")
+    .description("Run a specific migration up (by version)")
+    .requiredOption("--version <version>", "Migration version to run up")
+    .action(async (opts) => {
+      await withAdapter(async (adapter, raw) => {
+        const migrations = await discoverMigrations(migrationsDir());
+        const migrator = new Migrator(adapter, migrations);
+        await migrator.run("up", opts.version);
+        for (const line of migrator.output) console.log(line);
+        await dumpSchemaAfterMigrate(adapter, raw);
+      });
+    });
+
+  cmd
+    .command("migrate:down")
+    .description("Run a specific migration down (by version)")
+    .requiredOption("--version <version>", "Migration version to run down")
+    .action(async (opts) => {
+      await withAdapter(async (adapter, raw) => {
+        const migrations = await discoverMigrations(migrationsDir());
+        const migrator = new Migrator(adapter, migrations);
+        await migrator.run("down", opts.version);
+        for (const line of migrator.output) console.log(line);
+        await dumpSchemaAfterMigrate(adapter, raw);
+      });
     });
 
   cmd
@@ -300,9 +466,11 @@ export function dbCommand(): Command {
         process.exitCode = 1;
         return;
       }
-      await withAdapter(async (adapter) => {
-        await runRollback(adapter, step);
-        await runMigrate(adapter);
+      await withAdapter(async (adapter, raw) => {
+        // Suppress the intermediate dump on rollback; runMigrate handles
+        // the single end-of-task dump.
+        await runRollback(adapter, raw, step, { skipDump: true });
+        await runMigrate(adapter, raw);
       });
     });
 
@@ -312,8 +480,8 @@ export function dbCommand(): Command {
     .action(async () => {
       await runDrop();
       await runCreate();
-      await withAdapter(async (adapter) => {
-        await runMigrate(adapter);
+      await withAdapter(async (adapter, raw) => {
+        await runMigrate(adapter, raw);
         const { Base } = await import("@blazetrails/activerecord");
         Base.adapter = adapter;
         await runSeed();
@@ -325,8 +493,8 @@ export function dbCommand(): Command {
     .description("Create, migrate, and seed the database")
     .action(async () => {
       await runCreate();
-      await withAdapter(async (adapter) => {
-        await runMigrate(adapter);
+      await withAdapter(async (adapter, raw) => {
+        await runMigrate(adapter, raw);
         const { Base } = await import("@blazetrails/activerecord");
         Base.adapter = adapter;
         await runSeed();
@@ -335,58 +503,58 @@ export function dbCommand(): Command {
 
   cmd
     .command("schema:dump")
-    .description("Dump the current database schema to db/schema.ts")
+    .description(
+      "Dump the current database schema (format: DatabaseTasks.schemaFormat — ts/js/sql)",
+    )
     .action(async () => {
-      await withAdapter(async (adapter) => {
-        const source = new AdapterSchemaSource(adapter);
-        const output = await SchemaDumper.dump(source);
-        const schemaPath = path.join(process.cwd(), "db", "schema.ts");
-        fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
-        fs.writeFileSync(schemaPath, output);
-        console.log(`Schema dumped to ${schemaPath}`);
+      await withAdapter(async (adapter, raw) => {
+        const config = toDbConfig(raw);
+        const filename = DatabaseTasks.schemaDumpPath(config);
+        const previous = DatabaseTasks.migrationConnection();
+        DatabaseTasks.setAdapter(adapter);
+        try {
+          await DatabaseTasks.dumpSchema(config);
+        } finally {
+          DatabaseTasks.setAdapter(previous);
+        }
+        console.log(`Schema dumped to ${filename}`);
       });
     });
 
   cmd
     .command("schema:load")
-    .description("Load the schema from db/schema.ts into the database")
+    .description(
+      "Load the schema (format: DatabaseTasks.schemaFormat — ts/js/sql) into the database",
+    )
     .action(async () => {
-      const schemaCandidates = [
-        path.join(process.cwd(), "db", "schema.ts"),
-        path.join(process.cwd(), "db", "schema.js"),
-      ];
-      const schemaFile = schemaCandidates.find((f) => fs.existsSync(f));
-      if (!schemaFile) {
-        console.error("No schema file found at db/schema.ts or db/schema.js");
-        process.exitCode = 1;
-        return;
-      }
-
-      await withAdapter(async (adapter) => {
-        const { MigrationContext } = await import("@blazetrails/activerecord");
-        const ctx = new MigrationContext(adapter);
-        let mod: any;
+      await withAdapter(async (adapter, raw) => {
+        const config = toDbConfig(raw);
+        const filename = DatabaseTasks.schemaDumpPath(config);
+        if (!fs.existsSync(filename)) {
+          console.error(`No schema file found at ${filename}`);
+          process.exitCode = 1;
+          return;
+        }
+        const previous = DatabaseTasks.migrationConnection();
+        DatabaseTasks.setAdapter(adapter);
         try {
-          mod = await import(pathToFileURL(schemaFile).href);
-        } catch (error: any) {
-          if (schemaFile.endsWith(".ts")) {
+          console.log(`Loading schema from ${filename}...`);
+          await DatabaseTasks.loadSchema(config);
+          console.log("Schema loaded.");
+        } catch (error: unknown) {
+          if (filename.endsWith(".ts")) {
             const enhanced = new Error(
-              `Failed to load schema file "${schemaFile}". ` +
+              `Failed to load schema file "${filename}". ` +
                 `Ensure a TypeScript loader (tsx, ts-node) is configured, ` +
-                `or use a compiled db/schema.js instead.`,
+                `or set DatabaseTasks.schemaFormat = "js" / "sql".`,
             );
-            (enhanced as any).cause = error;
+            (enhanced as { cause?: unknown }).cause = error;
             throw enhanced;
           }
           throw error;
+        } finally {
+          DatabaseTasks.setAdapter(previous);
         }
-        const defineSchema = mod.default ?? mod;
-        if (typeof defineSchema !== "function") {
-          throw new Error(`Schema file must export a default function, got ${typeof defineSchema}`);
-        }
-        console.log("Loading schema...");
-        await defineSchema(ctx);
-        console.log("Schema loaded.");
       });
     });
 
