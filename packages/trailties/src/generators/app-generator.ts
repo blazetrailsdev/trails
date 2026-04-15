@@ -90,8 +90,6 @@ export class AppGenerator extends GeneratorBase {
             skipLibCheck: true,
             outDir: "dist",
             rootDir: "src",
-            experimentalDecorators: true,
-            emitDecoratorMetadata: true,
           },
           include: ["src"],
         },
