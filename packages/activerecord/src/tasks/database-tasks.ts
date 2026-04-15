@@ -479,11 +479,74 @@ export class DatabaseTasks {
     return `${this.dbDir}/schema_cache.json`;
   }
 
+  /**
+   * Dump the schema cache to `filename`. Mirrors Rails'
+   * `DatabaseTasks.dump_schema_cache`, which delegates to
+   * `conn_or_pool.schema_cache.dump_to(filename)`. In Rails the pool-side
+   * `schema_cache` is a `BoundSchemaReflection` whose `dump_to` allocates a
+   * fresh `SchemaCache`, `add_all`s every data source through the pool, then
+   * writes it. Our adapter's `schemaCache` getter returns a plain
+   * `SchemaCache`, so replicate the BoundSchemaReflection semantics here:
+   * always dump from a freshly-populated cache instead of serializing
+   * whatever incidental entries the in-memory cache accumulated.
+   */
   static async dumpSchemaCache(connOrPool: unknown, filename: string): Promise<void> {
-    const schemaCache = (connOrPool as any).schemaCache;
-    if (schemaCache && typeof schemaCache.dumpTo === "function") {
-      await schemaCache.dumpTo(filename);
+    // Rails: `conn_or_pool.schema_cache.dump_to(filename)`. On a real pool
+    // `schema_cache` is a BoundSchemaReflection whose `dump_to` runs
+    // `add_all(pool)` + write. Honor that when the caller wires up such a
+    // reflection — delegate straight to it. Adapter.schemaCache exposes a
+    // plain SchemaCache with no bound pool (SchemaCache DOES define
+    // `addAll`, but it takes a pool arg that the adapter-level getter
+    // can't supply), so don't treat that as the self-populating
+    // reflection path; let the fresh-cache fallback below drive the
+    // populate+dump, which is what BoundSchemaReflection.dump_to does
+    // internally.
+    const reflection = (connOrPool as { schemaCache?: { dumpTo?: unknown; addAll?: unknown } })
+      ?.schemaCache;
+    if (
+      reflection &&
+      typeof (reflection as { dumpTo?: unknown }).dumpTo === "function" &&
+      typeof (reflection as { addAll?: unknown }).addAll !== "function"
+    ) {
+      // Reflection-shaped (dump_to pulls its own pool): let it self-dump.
+      // We distinguish by the absence of `addAll`, which is the
+      // SchemaCache-specific populate entry point.
+      await (reflection as { dumpTo: (f: string) => Promise<void> | void }).dumpTo(filename);
+      return;
     }
+
+    // Adapter/connection path: SchemaCache.addAll routes through
+    // `pool.withConnection(...)` when present, so the introspection check
+    // has to go through the same lens — otherwise false negatives for
+    // real pools whose methods live on the yielded connection.
+    const required = ["dataSources", "columns", "primaryKey", "indexes"] as const;
+    const assertSupported = (connection: unknown): void => {
+      const missing = required.filter(
+        (m) => typeof (connection as Record<string, unknown>)[m] !== "function",
+      );
+      if (missing.length > 0) {
+        throw new Error(
+          `dumpSchemaCache requires the connection to implement [${missing.join(", ")}]. ` +
+            `The adapter isn't exposing the schema introspection API that ` +
+            `SchemaCache.addAll needs to populate a cache dump.`,
+        );
+      }
+    };
+    const maybePool = connOrPool as {
+      withConnection?: <T>(cb: (connection: unknown) => T | Promise<T>) => Promise<T> | T;
+    };
+    if (typeof maybePool.withConnection === "function") {
+      await maybePool.withConnection((connection: unknown) => {
+        assertSupported(connection);
+      });
+    } else {
+      assertSupported(connOrPool);
+    }
+
+    const { SchemaCache } = await import("../connection-adapters/schema-cache.js");
+    const fresh = new SchemaCache();
+    await fresh.addAll(connOrPool);
+    fresh.dumpTo(filename);
   }
 
   static clearSchemaCache(filename: string): void {

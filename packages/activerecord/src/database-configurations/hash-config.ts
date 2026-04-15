@@ -68,7 +68,10 @@ export class HashConfig extends DatabaseConfig {
    * Mirrors: HashConfig#default_schema_cache_path
    */
   defaultSchemaCachePath(dbDir: string = "db"): string {
-    const file = this.isPrimary() ? "schema_cache.yml" : `${this.name}_schema_cache.yml`;
+    // Rails writes YAML; trails writes JSON (no Ruby Marshal/YAML in TS), so
+    // the on-disk extension is .json to match what DatabaseTasks.dumpSchemaCache
+    // actually produces.
+    const file = this.isPrimary() ? "schema_cache.json" : `${this.name}_schema_cache.json`;
     return `${dbDir}/${file}`;
   }
 

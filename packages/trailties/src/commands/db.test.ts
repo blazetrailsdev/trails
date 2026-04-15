@@ -103,6 +103,18 @@ describe("DbCommand", () => {
     const db = program.commands.find((c) => c.name() === "db");
     expect(db?.commands.some((c) => c.name() === "migrate:down")).toBe(true);
   });
+
+  it("has schema:cache:dump subcommand", () => {
+    const program = createProgram();
+    const db = program.commands.find((c) => c.name() === "db");
+    expect(db?.commands.some((c) => c.name() === "schema:cache:dump")).toBe(true);
+  });
+
+  it("has schema:cache:clear subcommand", () => {
+    const program = createProgram();
+    const db = program.commands.find((c) => c.name() === "db");
+    expect(db?.commands.some((c) => c.name() === "schema:cache:clear")).toBe(true);
+  });
 });
 
 describe("resolveEnv", () => {
@@ -1161,5 +1173,89 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     } finally {
       await verify.close();
     }
+  });
+
+  it("db schema:cache:dump writes a populated schema_cache.json", async () => {
+    const dbFile = path.join(tmpDir, "cache.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const seed = new SQLite3Adapter(dbFile);
+    try {
+      await seed.executeMutation(
+        "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
+      );
+    } finally {
+      await seed.close();
+    }
+
+    await runDb(["schema:cache:dump"]);
+
+    const cachePath = path.join(tmpDir, "db", "schema_cache.json");
+    expect(fs.existsSync(cachePath)).toBe(true);
+    const parsed = JSON.parse(fs.readFileSync(cachePath, "utf8")) as {
+      columns: Record<string, unknown[]>;
+      data_sources: Record<string, boolean>;
+    };
+    expect(Object.keys(parsed.columns)).toContain("widgets");
+    expect(parsed.data_sources["widgets"]).toBe(true);
+  });
+
+  it("db schema:cache:clear deletes the schema_cache.json file", async () => {
+    const cachePath = path.join(tmpDir, "db", "schema_cache.json");
+    fs.writeFileSync(cachePath, "{}");
+    expect(fs.existsSync(cachePath)).toBe(true);
+
+    await runDb(["schema:cache:clear"]);
+
+    expect(fs.existsSync(cachePath)).toBe(false);
+  });
+
+  it("db schema:cache:clear is a no-op when no cache file exists", async () => {
+    const cachePath = path.join(tmpDir, "db", "schema_cache.json");
+    expect(fs.existsSync(cachePath)).toBe(false);
+    await runDb(["schema:cache:clear"]);
+    expect(errs).toHaveLength(0);
+    // No "Cleared ..." log when nothing was deleted — the command
+    // previously logged unconditionally which falsely implied a deletion.
+    expect(logs.find((l) => l.includes("Cleared schema cache"))).toBeUndefined();
+  });
+
+  it("db schema:cache:dump captures user-created indexes", async () => {
+    const dbFile = path.join(tmpDir, "idx.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const seed = new SQLite3Adapter(dbFile);
+    try {
+      await seed.executeMutation(
+        "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)",
+      );
+      await seed.executeMutation("CREATE UNIQUE INDEX users_on_email ON users (email)");
+    } finally {
+      await seed.close();
+    }
+
+    await runDb(["schema:cache:dump"]);
+
+    const cachePath = path.join(tmpDir, "db", "schema_cache.json");
+    const parsed = JSON.parse(fs.readFileSync(cachePath, "utf8")) as {
+      indexes: Record<string, Array<{ name: string; columns: string[]; unique: boolean }>>;
+    };
+    expect(parsed.indexes["users"]).toEqual([
+      { name: "users_on_email", columns: ["email"], unique: true },
+    ]);
   });
 });
