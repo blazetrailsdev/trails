@@ -141,12 +141,38 @@ function toDbConfig(raw: RawConfig, envName: string = resolveEnv()): HashConfig 
 }
 
 /**
+ * Run `fn` with `DatabaseTasks.databaseConfiguration`, the module-level
+ * `DatabaseConfigurations.current` singleton, AND `DatabaseTasks.env`
+ * temporarily aligned with `config`. Captures/restores all three so
+ * callers can safely invoke methods like `DatabaseTasks.truncateAll(env)`
+ * that resolve the env via `_normalizeEnv()` (reads DatabaseTasks.env by
+ * default) and then call `configsFor` against it.
+ */
+async function withRegisteredConfiguration<T>(
+  config: HashConfig,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
+  const previousTasksConfig = DatabaseTasks.databaseConfiguration;
+  const previousCurrent = DatabaseConfigurations.current;
+  const previousEnv = DatabaseTasks.env;
+  DatabaseTasks.databaseConfiguration = new DatabaseConfigurations([config]);
+  DatabaseTasks.env = config.envName;
+  try {
+    return await fn();
+  } finally {
+    DatabaseTasks.databaseConfiguration = previousTasksConfig;
+    DatabaseConfigurations.current = previousCurrent;
+    DatabaseTasks.env = previousEnv;
+  }
+}
+
+/**
  * Run Rails' `check_protected_environments!` guard with a temporarily-
  * registered `DatabaseTasks.databaseConfiguration` so it actually consults
  * the stored env in `ar_internal_metadata`. Without the registration the
  * guard falls back to checking only the current env name, which misses
- * `EnvironmentMismatchError` and the protected-stamp case this PR cares
- * about.
+ * `EnvironmentMismatchError` and the protected-stamp case.
  */
 async function runProtectedEnvCheck(config: HashConfig, envName: string): Promise<void> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
@@ -238,6 +264,73 @@ async function runRollback(
   for (const line of migrator.output) console.log(line);
 
   if (!options.skipDump) await dumpSchemaAfterMigrate(adapter, raw);
+}
+
+/**
+ * Run a seed-running callback with `Base.adapter` temporarily set so
+ * seed files that touch ActiveRecord models work. Restores the previous
+ * `Base.adapter` on exit (including when the outer caller is about to
+ * close the provided adapter) so we don't leave `Base` pointing at a
+ * closed connection.
+ */
+async function withSeedAdapter(adapter: DatabaseAdapter, fn: () => Promise<void>): Promise<void> {
+  const { Base } = await import("@blazetrails/activerecord");
+  const previous = Base._adapter;
+  Base.adapter = adapter;
+  try {
+    await fn();
+  } finally {
+    // Preserve setter side effects (Base.adapter's setter fires the
+    // internal _onAdapterSet hook) when restoring a non-null adapter.
+    // Fall back to the backing field for a previous null because the
+    // public setter is typed as DatabaseAdapter, not DatabaseAdapter |
+    // null.
+    if (previous === null) {
+      Base._adapter = previous;
+    } else {
+      Base.adapter = previous;
+    }
+  }
+}
+
+/**
+ * Purge the test DB and load the schema file. Shared implementation
+ * behind `trails db test:load_schema` and `trails db test:prepare` —
+ * Rails' `db:test:prepare` task just invokes `db:test:load_schema`, so
+ * keeping the flow in one helper prevents the two commands from
+ * drifting.
+ *
+ * Rails' chain: `test:load_schema → test:purge → DatabaseTasks.purge`
+ * (disconnect → drop → create → reconnect). We delegate to
+ * DatabaseTasks.purge to preserve the disconnect/reconnect semantics
+ * instead of hand-rolling drop+create.
+ */
+async function runTestLoadSchema(options: {
+  successMessage: (displayName: string, filename: string) => string;
+}): Promise<void> {
+  const raw = normalizeRawConfig(await loadDatabaseConfig("test"));
+  const config = toDbConfig(raw, "test");
+  await runProtectedEnvCheck(config, "test");
+  const filename = DatabaseTasks.schemaDumpPath(config);
+  if (!fs.existsSync(filename)) {
+    console.error(`No schema file found at ${filename}. Run \`trails db schema:dump\` first.`);
+    process.exitCode = 1;
+    return;
+  }
+  await DatabaseTasks.purge(config);
+  const adapter = await connectAdapter(raw);
+  try {
+    const previous = DatabaseTasks.migrationConnection();
+    DatabaseTasks.setAdapter(adapter);
+    try {
+      await DatabaseTasks.loadSchema(config);
+    } finally {
+      DatabaseTasks.setAdapter(previous);
+    }
+  } finally {
+    await closeAdapter(adapter);
+  }
+  console.log(options.successMessage(displayNameFor(config, raw), filename));
 }
 
 async function runSeed(): Promise<void> {
@@ -503,10 +596,105 @@ export function dbCommand(): Command {
     .description("Run database seeds")
     .action(async () => {
       await withAdapter(async (adapter) => {
-        const { Base } = await import("@blazetrails/activerecord");
-        Base.adapter = adapter;
-        await runSeed();
+        await withSeedAdapter(adapter, runSeed);
       });
+    });
+
+  cmd
+    .command("seed:replant")
+    .description("Truncate all tables in the current environment and re-run seeds")
+    .action(async () => {
+      // Run the truncate path first (no connection in the CLI — the
+      // DatabaseTasks.truncateAll handler opens/closes its own per-
+      // config connection). Open the seed adapter only after the
+      // protected-env guard has passed and the truncate has completed,
+      // so we don't double-connect.
+      const raw = normalizeRawConfig(await loadDatabaseConfig());
+      const config = toDbConfig(raw);
+      await withRegisteredConfiguration(config, async () => {
+        await DatabaseTasks.truncateAll(config.envName);
+      });
+
+      const adapter = await connectAdapter(raw);
+      try {
+        await withSeedAdapter(adapter, runSeed);
+      } finally {
+        await closeAdapter(adapter);
+      }
+    });
+
+  cmd
+    .command("truncate_all")
+    .description("Truncate all tables in the current environment")
+    .action(async () => {
+      // No need for withAdapter — DatabaseTasks.truncateAll opens its
+      // own per-config connection. Connecting here first would create
+      // sqlite files as a side effect before the protected-env guard
+      // can abort.
+      const raw = normalizeRawConfig(await loadDatabaseConfig());
+      const config = toDbConfig(raw);
+      await withRegisteredConfiguration(config, async () => {
+        await DatabaseTasks.truncateAll(config.envName);
+      });
+    });
+
+  cmd
+    .command("prepare")
+    .description(
+      "Create the database if it doesn't exist, run pending migrations, and seed when fresh",
+    )
+    .action(async () => {
+      // Do NOT go through withAdapter — connectAdapter would try to
+      // connect to the target DB before we've had a chance to create
+      // it, which fails for pg/mysql when the DB doesn't exist yet.
+      // Create first, then connect.
+      const raw = normalizeRawConfig(await loadDatabaseConfig());
+      const config = toDbConfig(raw);
+      const { DatabaseAlreadyExists, Migrator } = await import("@blazetrails/activerecord");
+
+      try {
+        await DatabaseTasks.create(config);
+        console.log(`Created database '${displayNameFor(config, raw)}'`);
+      } catch (error) {
+        if (!(error instanceof DatabaseAlreadyExists)) throw error;
+      }
+
+      const adapter = await connectAdapter(raw);
+      try {
+        // Rails measures "fresh" via `!schema_migration.table_exists?`,
+        // matching its `initialize_database` contract. A sqlite DB file
+        // may have been created by either our DatabaseTasks.create call
+        // above or by better-sqlite3 on connect; the meaningful signal
+        // is whether migrations have been applied.
+        const migrator = new Migrator(adapter, []);
+        const wasFresh = !(await migrator.schemaMigrationTableExists());
+
+        await runMigrate(adapter, raw);
+        if (wasFresh) {
+          await withSeedAdapter(adapter, runSeed);
+        }
+      } finally {
+        const close = (adapter as { close?: () => Promise<void> }).close;
+        if (typeof close === "function") await close.call(adapter);
+      }
+    });
+
+  cmd
+    .command("test:load_schema")
+    .description("Purge the test DB and load the schema")
+    .action(async () => {
+      await runTestLoadSchema({ successMessage: (d) => `Loaded test schema into '${d}'` });
+    });
+
+  cmd
+    .command("test:prepare")
+    .description("Prepare the test database (Rails parallel to db:test:prepare)")
+    .action(async () => {
+      // Rails db:test:prepare → db:test:load_schema. The two commands
+      // run the same flow — test:prepare exists as a semantically-named
+      // entry point for dev/CI scripts; the implementation delegates to
+      // the shared runTestLoadSchema helper.
+      await runTestLoadSchema({ successMessage: (_d, f) => `Test database prepared (${f})` });
     });
 
   cmd.command("create").description("Create the database").action(runCreate);
@@ -565,9 +753,7 @@ export function dbCommand(): Command {
       await runCreate();
       await withAdapter(async (adapter, raw) => {
         await runMigrate(adapter, raw);
-        const { Base } = await import("@blazetrails/activerecord");
-        Base.adapter = adapter;
-        await runSeed();
+        await withSeedAdapter(adapter, runSeed);
       });
     });
 
@@ -578,9 +764,7 @@ export function dbCommand(): Command {
       await runCreate();
       await withAdapter(async (adapter, raw) => {
         await runMigrate(adapter, raw);
-        const { Base } = await import("@blazetrails/activerecord");
-        Base.adapter = adapter;
-        await runSeed();
+        await withSeedAdapter(adapter, runSeed);
       });
     });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { MySQLDatabaseTasks } from "./mysql-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
@@ -39,5 +39,62 @@ describe("MySQLDatabaseTasks", () => {
     MySQLDatabaseTasks.register();
     expect(DatabaseTasks.resolveTask("mysql2")).toBeDefined();
     expect(DatabaseTasks.resolveTask("trilogy")).toBeDefined();
+  });
+
+  it("test_truncate_all_queries_information_schema_and_truncates_each_user_table", async () => {
+    const executeCalls: Array<{ sql: string; binds?: unknown[] }> = [];
+    const mutationCalls: string[] = [];
+    const closeMock = vi.fn(async () => {});
+
+    class FakeMysql2Adapter {
+      constructor(_opts: unknown) {
+        void _opts;
+      }
+      async execute(sql: string, binds?: unknown[]) {
+        executeCalls.push({ sql, binds });
+        // information_schema.tables result — returns three user tables
+        // plus the two bookkeeping tables that truncateAll must skip.
+        return [{ table_name: "widgets" }, { table_name: "posts" }, { table_name: "comments" }];
+      }
+      async executeMutation(sql: string) {
+        mutationCalls.push(sql);
+      }
+      close = closeMock;
+    }
+
+    vi.resetModules();
+    vi.doMock("../adapters/mysql2-adapter.js", () => ({ Mysql2Adapter: FakeMysql2Adapter }));
+
+    try {
+      const mod =
+        (await import("./mysql-database-tasks.js")) as typeof import("./mysql-database-tasks.js");
+      await new mod.MySQLDatabaseTasks(
+        new HashConfig("development", "primary", {
+          adapter: "mysql2",
+          database: "trails_test",
+        }),
+      ).truncateAll();
+    } finally {
+      vi.doUnmock("../adapters/mysql2-adapter.js");
+      vi.resetModules();
+    }
+
+    // Exactly one information_schema query with the db name bound.
+    expect(executeCalls).toHaveLength(1);
+    expect(executeCalls[0].sql).toMatch(/FROM information_schema\.tables/i);
+    expect(executeCalls[0].sql).toMatch(
+      /table_name NOT IN \('schema_migrations', 'ar_internal_metadata'\)/,
+    );
+    expect(executeCalls[0].binds).toEqual(["trails_test"]);
+
+    // FK checks toggled around per-table truncates.
+    expect(mutationCalls[0]).toBe("SET FOREIGN_KEY_CHECKS = 0");
+    expect(mutationCalls[mutationCalls.length - 1]).toBe("SET FOREIGN_KEY_CHECKS = 1");
+    expect(mutationCalls).toContain("TRUNCATE TABLE `widgets`");
+    expect(mutationCalls).toContain("TRUNCATE TABLE `posts`");
+    expect(mutationCalls).toContain("TRUNCATE TABLE `comments`");
+
+    // Adapter was closed.
+    expect(closeMock).toHaveBeenCalledTimes(1);
   });
 });

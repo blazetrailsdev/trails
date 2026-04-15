@@ -171,6 +171,58 @@ export class SQLiteDatabaseTasks {
     }
   }
 
+  /**
+   * Truncate every user table in the database — used by
+   * `DatabaseTasks.truncate_all` / `trails db seed:replant`. SQLite
+   * doesn't support TRUNCATE TABLE, so we DELETE FROM each user table
+   * instead (the Rails parallel is Arel::Truncate which falls back to
+   * DELETE for sqlite adapters).
+   *
+   * Skips schema_migrations and ar_internal_metadata so migration
+   * state and environment stamping survive.
+   *
+   * Wraps the per-table deletes in disableReferentialIntegrity so
+   * foreign-key constraints don't block deletion of a parent table
+   * while its children are still populated — matches the FK-safety
+   * the PG/MySQL truncateAll implementations provide.
+   */
+  async truncateAll(): Promise<void> {
+    const adapter = await this.connectAdapter();
+    try {
+      const rows = (await adapter.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' " +
+          "AND name <> 'schema_migrations' AND name <> 'ar_internal_metadata'",
+      )) as Array<{ name: string }>;
+      const withFks = adapter as DatabaseAdapter & {
+        disableReferentialIntegrity?: (fn: () => Promise<void>) => Promise<void>;
+      };
+      const run = async () => {
+        for (const row of rows) {
+          await adapter.executeMutation(`DELETE FROM "${row.name.replace(/"/g, '""')}"`);
+        }
+        // Match TRUNCATE/RESTART IDENTITY semantics by clearing the
+        // AUTOINCREMENT counters for the truncated tables. Rails'
+        // SQLite3Adapter#truncate_tables does the same thing.
+        // sqlite_sequence only exists once any AUTOINCREMENT column has
+        // been created — silently skip when it's absent.
+        const hasSequence = (await adapter.execute(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'",
+        )) as Array<{ name: string }>;
+        if (hasSequence.length > 0 && rows.length > 0) {
+          const list = rows.map((r) => `'${r.name.replace(/'/g, "''")}'`).join(", ");
+          await adapter.executeMutation(`DELETE FROM sqlite_sequence WHERE name IN (${list})`);
+        }
+      };
+      if (typeof withFks.disableReferentialIntegrity === "function") {
+        await withFks.disableReferentialIntegrity(run);
+      } else {
+        await run();
+      }
+    } finally {
+      await this.closeAdapter(adapter);
+    }
+  }
+
   private resolveDbPath(): string {
     const path = getPath();
     // Align with DatabaseTasks._connectFor which defaults missing sqlite
@@ -201,6 +253,7 @@ export class SQLiteDatabaseTasks {
       drop: async (config) => new SQLiteDatabaseTasks(config).drop(),
       purge: async (config) => new SQLiteDatabaseTasks(config).purge(),
       charset: async (config) => new SQLiteDatabaseTasks(config).charset(),
+      truncateAll: async (config) => new SQLiteDatabaseTasks(config).truncateAll(),
       structureDump: async (config, filename, flags) =>
         new SQLiteDatabaseTasks(config).structureDump(filename, flags),
       structureLoad: async (config, filename, flags) =>

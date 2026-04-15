@@ -990,4 +990,176 @@ export class CreatePosts extends Migration {
       await adapter.close();
     }
   });
+
+  it("SQLiteDatabaseTasks.truncateAll deletes user tables but keeps schema_migrations + ar_internal_metadata", async () => {
+    const {
+      SQLiteDatabaseTasks,
+      Migrator,
+      HashConfig: HC,
+    } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dbFile = path.join(tmpDir, "truncate.sqlite3");
+    const seedAdapter = new SQLite3Adapter(dbFile);
+    try {
+      await seedAdapter.executeMutation("CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT)");
+      await seedAdapter.executeMutation("INSERT INTO posts (title) VALUES ('a'), ('b')");
+      const migrator = new Migrator(seedAdapter, []);
+      await migrator.internalMetadata.createTableAndSetFlags("development");
+      await seedAdapter.executeMutation(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR NOT NULL PRIMARY KEY)",
+      );
+      await seedAdapter.executeMutation(
+        "INSERT INTO schema_migrations (version) VALUES ('20260101000000')",
+      );
+    } finally {
+      await seedAdapter.close();
+    }
+
+    const config = new HC("development", "primary", {
+      adapter: "sqlite3",
+      database: dbFile,
+    });
+    await new SQLiteDatabaseTasks(config).truncateAll();
+
+    const verify = new SQLite3Adapter(dbFile);
+    try {
+      const postsCount = (await verify.execute(`SELECT COUNT(*) AS c FROM posts`)) as Array<{
+        c: number;
+      }>;
+      expect(Number(postsCount[0].c)).toBe(0);
+
+      const schemaCount = (await verify.execute(
+        `SELECT COUNT(*) AS c FROM schema_migrations`,
+      )) as Array<{ c: number }>;
+      expect(Number(schemaCount[0].c)).toBe(1);
+
+      const metaCount = (await verify.execute(
+        `SELECT COUNT(*) AS c FROM ar_internal_metadata WHERE key = 'environment'`,
+      )) as Array<{ c: number }>;
+      expect(Number(metaCount[0].c)).toBe(1);
+    } finally {
+      await verify.close();
+    }
+  });
+
+  it("db truncate_all empties user tables", async () => {
+    const dbFile = path.join(tmpDir, "cli-truncate.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const seed = new SQLite3Adapter(dbFile);
+    try {
+      await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
+      await seed.executeMutation("INSERT INTO widgets (name) VALUES ('x'), ('y')");
+    } finally {
+      await seed.close();
+    }
+
+    await runDb(["truncate_all"]);
+    expect(process.exitCode).toBeUndefined();
+
+    const verify = new SQLite3Adapter(dbFile);
+    try {
+      const rows = (await verify.execute(`SELECT COUNT(*) AS c FROM widgets`)) as Array<{
+        c: number;
+      }>;
+      expect(Number(rows[0].c)).toBe(0);
+    } finally {
+      await verify.close();
+    }
+  });
+
+  it("db prepare creates, migrates, and seeds a fresh database", async () => {
+    const dbFile = path.join(tmpDir, "prepare.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-widgets.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateWidgets extends Migration {
+  async up() { await this.createTable("widgets", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("widgets"); }
+}`,
+    );
+    const seedMarker = path.join(tmpDir, "db", "seeds-ran");
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "seeds.ts"),
+      `import * as fs from "node:fs";
+fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
+    );
+
+    expect(fs.existsSync(dbFile)).toBe(false);
+    await runDb(["prepare"]);
+    expect(fs.existsSync(dbFile)).toBe(true);
+    expect(fs.existsSync(seedMarker)).toBe(true);
+
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const a = new SQLite3Adapter(dbFile);
+    try {
+      const tables = await a.execute(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name='widgets'`,
+      );
+      expect(tables).toHaveLength(1);
+    } finally {
+      await a.close();
+    }
+  });
+
+  it("db seed:replant truncates tables then runs seeds", async () => {
+    const dbFile = path.join(tmpDir, "replant.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+    const seedMarker = path.join(tmpDir, "db", "seed-count");
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "seeds.ts"),
+      `import * as fs from "node:fs";
+const prev = fs.existsSync(${JSON.stringify(seedMarker)})
+  ? Number(fs.readFileSync(${JSON.stringify(seedMarker)}, "utf8"))
+  : 0;
+fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
+    );
+
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const seed = new SQLite3Adapter(dbFile);
+    try {
+      await seed.executeMutation("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)");
+      await seed.executeMutation("INSERT INTO widgets (name) VALUES ('keep-me')");
+    } finally {
+      await seed.close();
+    }
+
+    await runDb(["seed:replant"]);
+    expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
+
+    const verify = new SQLite3Adapter(dbFile);
+    try {
+      const rows = (await verify.execute(`SELECT COUNT(*) AS c FROM widgets`)) as Array<{
+        c: number;
+      }>;
+      expect(Number(rows[0].c)).toBe(0);
+    } finally {
+      await verify.close();
+    }
+  });
 });

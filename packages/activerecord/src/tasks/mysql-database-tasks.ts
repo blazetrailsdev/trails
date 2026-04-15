@@ -130,6 +130,63 @@ export class MySQLDatabaseTasks {
     await this.runCmd("mysql", args, "loading", stdin);
   }
 
+  /**
+   * Truncate every user table in the current database, skipping
+   * schema_migrations and ar_internal_metadata. Disables FK checks for
+   * the duration so TRUNCATE order doesn't matter (matching Rails'
+   * Mysql2Adapter#truncate_tables behavior).
+   */
+  async truncateAll(): Promise<void> {
+    const { Mysql2Adapter } = await import("../adapters/mysql2-adapter.js");
+    const dbName = this.requireDatabaseName();
+    // Build the adapter config the same way withAdmin does: prefer a
+    // unix socket when the config provides one, coerce port safely so
+    // invalid/NaN values don't leak into mysql2.
+    const socket = this.resolvedField("socket");
+    const adapterConfig: {
+      host?: string;
+      port?: number;
+      database: string;
+      user?: string;
+      password?: string;
+      socketPath?: string;
+    } = {
+      database: dbName,
+      user: this.resolvedField("username"),
+      password: this.resolvedField("password"),
+    };
+    if (socket) {
+      adapterConfig.socketPath = socket;
+    } else {
+      adapterConfig.host = this.resolvedField("host") ?? "localhost";
+      adapterConfig.port = coercePort(this.resolvedField("port"), 3306);
+    }
+    const adapter = new Mysql2Adapter(adapterConfig);
+    try {
+      const rows = (await adapter.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = ? " +
+          "AND table_type = 'BASE TABLE' " +
+          "AND table_name NOT IN ('schema_migrations', 'ar_internal_metadata')",
+        [dbName],
+      )) as Array<{ table_name?: string; TABLE_NAME?: string }>;
+      const names = rows
+        .map((r) => r.table_name ?? r.TABLE_NAME)
+        .filter((n): n is string => typeof n === "string");
+      if (names.length === 0) return;
+      await adapter.executeMutation("SET FOREIGN_KEY_CHECKS = 0");
+      try {
+        for (const name of names) {
+          await adapter.executeMutation(`TRUNCATE TABLE \`${name.replace(/`/g, "``")}\``);
+        }
+      } finally {
+        await adapter.executeMutation("SET FOREIGN_KEY_CHECKS = 1");
+      }
+    } finally {
+      const close = (adapter as unknown as { close?: () => Promise<void> }).close;
+      if (typeof close === "function") await close.call(adapter);
+    }
+  }
+
   static register(): void {
     const handler = {
       create: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).create(),
@@ -137,6 +194,7 @@ export class MySQLDatabaseTasks {
       purge: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).purge(),
       charset: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).charset(),
       collation: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).collation(),
+      truncateAll: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).truncateAll(),
       structureDump: async (
         config: DatabaseConfig,
         filename: string,

@@ -1497,6 +1497,18 @@ export class Migrator {
   }
 
   /**
+   * Read-only check for whether `schema_migrations` already exists.
+   * Used by `db prepare` to decide whether the DB is fresh (should run
+   * seeds) vs. already-initialized (just run pending migrations).
+   *
+   * Mirrors Rails' `initialize_database` which checks
+   * `schema_migration.table_exists?` for the same purpose.
+   */
+  async schemaMigrationTableExists(): Promise<boolean> {
+    return this._schemaMigration.tableExists();
+  }
+
+  /**
    * Read-only variant of {@link currentVersion}: returns 0 when the
    * schema_migrations table doesn't yet exist, without creating it.
    *

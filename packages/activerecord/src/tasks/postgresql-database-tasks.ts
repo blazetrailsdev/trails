@@ -168,6 +168,37 @@ export class PostgreSQLDatabaseTasks {
     await this.runCmd("psql", args, "loading");
   }
 
+  /**
+   * Truncate every user table in `public`, skipping schema_migrations
+   * and ar_internal_metadata. TRUNCATE ... RESTART IDENTITY CASCADE
+   * matches Rails' default for PG (identity sequences reset; FK
+   * dependencies cascaded).
+   */
+  async truncateAll(): Promise<void> {
+    const { PostgreSQLAdapter } = await import("../adapters/postgresql-adapter.js");
+    const c = this.configurationHash;
+    const adapter: DatabaseAdapter = c.url
+      ? new PostgreSQLAdapter(String(c.url))
+      : new PostgreSQLAdapter({
+          host: (c.host as string) ?? "localhost",
+          port: coercePort(c.port, 5432),
+          database: this.requireDatabaseName(),
+          user: c.username as string | undefined,
+          password: c.password as string | undefined,
+        });
+    try {
+      const rows = (await adapter.execute(
+        "SELECT tablename FROM pg_tables WHERE schemaname = 'public' " +
+          "AND tablename NOT IN ('schema_migrations', 'ar_internal_metadata')",
+      )) as Array<{ tablename: string }>;
+      if (rows.length === 0) return;
+      const quoted = rows.map((r) => `"${r.tablename.replace(/"/g, '""')}"`).join(", ");
+      await adapter.executeMutation(`TRUNCATE TABLE ${quoted} RESTART IDENTITY CASCADE`);
+    } finally {
+      await this.closeAdapter(adapter);
+    }
+  }
+
   static register(): void {
     DatabaseTasks.registerTask(/postgres/, {
       create: async (config) => new PostgreSQLDatabaseTasks(config).create(),
@@ -175,6 +206,7 @@ export class PostgreSQLDatabaseTasks {
       purge: async (config) => new PostgreSQLDatabaseTasks(config).purge(),
       charset: async (config) => new PostgreSQLDatabaseTasks(config).charset(),
       collation: async (config) => new PostgreSQLDatabaseTasks(config).collation(),
+      truncateAll: async (config) => new PostgreSQLDatabaseTasks(config).truncateAll(),
       structureDump: async (config, filename, flags) =>
         new PostgreSQLDatabaseTasks(config).structureDump(filename, flags),
       structureLoad: async (config, filename, flags) =>
