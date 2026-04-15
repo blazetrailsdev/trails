@@ -23,15 +23,72 @@ export function resolveEnv(): string {
 }
 
 /**
- * Load the database configuration for the given environment.
- * Looks for config/database.ts or src/config/database.ts in the cwd.
+ * Shape of the exported object in config/database.ts: each env key maps
+ * to a DatabaseConfig, plus the optional `schemaFormat` top-level key
+ * (the only non-env key we currently recognize — keep in sync with
+ * TOP_LEVEL_CONFIG_KEYS below). Kept loose (`unknown`) so callers
+ * inspect the keys they need without the type fighting them.
  */
-export async function loadDatabaseConfig(
-  env?: string,
-  cwd: string = process.cwd(),
-): Promise<DatabaseConfig> {
-  const resolvedEnv = env ?? resolveEnv();
+export interface DatabaseConfigModule {
+  [key: string]: unknown;
+  schemaFormat?: string;
+}
 
+/**
+ * Non-environment top-level keys recognized in config/database.ts.
+ * Currently: `schemaFormat`. The env-name lookup / "Available" error
+ * message excludes these so users don't see `schemaFormat` listed
+ * alongside `development`/`test`/`production`. When adding a new
+ * top-level key, update both this set and the DatabaseConfigModule
+ * shape above.
+ */
+const TOP_LEVEL_CONFIG_KEYS = new Set<string>(["schemaFormat"]);
+
+/**
+ * Safely render an unknown value for inclusion in an error message.
+ * Total over every JS value: bigint -> `42n`, symbol -> `Symbol(foo)`,
+ * undefined/null -> `undefined`/`null`, objects fall back to a type tag
+ * when they can't be JSON-serialized (circular refs, thrown toJSON).
+ * No Node deps — this file sits at the boundary between trailties CLI
+ * code and the rest of the system, which should stay browser-safe.
+ */
+function formatUnknown(value: unknown): string {
+  if (value === null) return "null";
+  const type = typeof value;
+  if (type === "string") return JSON.stringify(value);
+  if (type === "bigint") return `${value as bigint}n`;
+  if (type === "symbol" || type === "function" || type === "undefined") return String(value);
+  if (type === "number" || type === "boolean") return String(value);
+  // Objects: prefer a JSON repr, fall back to a type tag if that
+  // blows up (circular ref, toJSON that throws, etc).
+  try {
+    return JSON.stringify(value);
+  } catch {
+    const proto = Object.getPrototypeOf(value as object);
+    const ctor = proto?.constructor?.name ?? "Object";
+    return `[object ${ctor}]`;
+  }
+}
+
+/**
+ * Locate + import the app's `config/database.*`. Centralizing this keeps
+ * the lookup/import logic in one place — both loadDatabaseConfig and
+ * resolveSchemaFormat route through here. Node's ESM loader caches by
+ * URL, so repeat calls for the same path return the same module without
+ * re-running module side effects (the import() call itself still runs,
+ * it just resolves against the cache).
+ *
+ * Returns `null` when no config file is present — callers decide whether
+ * that's an error (loadDatabaseConfig) or just absence (resolver
+ * falling through to existence inference).
+ *
+ * Throws a source-labeled error when the config file loads but its
+ * default export isn't an object (e.g. `export default "oops"`), so
+ * downstream code doesn't need to defensively guard every key lookup.
+ */
+export async function loadDatabaseConfigModule(
+  cwd: string = process.cwd(),
+): Promise<{ path: string; module: DatabaseConfigModule } | null> {
   // Prefer .ts (source of truth) over .js (compiled)
   const candidates = [
     path.join(cwd, "config", "database.ts"),
@@ -47,36 +104,169 @@ export async function loadDatabaseConfig(
       break;
     }
   }
+  if (!configPath) return null;
 
-  if (!configPath) {
+  let mod: { default?: unknown } & Record<string, unknown>;
+  try {
+    mod = (await import(pathToFileURL(configPath).href)) as typeof mod;
+  } catch (error: unknown) {
+    const rel = path.relative(cwd, configPath) || configPath;
+    // Extract a useful message even when user code throws a non-Error
+    // (e.g. `throw "boom"` or `throw null`) — `(error as Error).message`
+    // would produce `undefined` or crash. Route non-Errors through
+    // formatUnknown so a thrown object with a poisoned toString()
+    // can't bring down the fallback path too.
+    // Strip trailing punctuation from the inner message so the final
+    // string doesn't end up with a double period like "...message..".
+    const rawMessage = error instanceof Error ? error.message : formatUnknown(error);
+    const message = rawMessage.replace(/[.!?]+$/, "");
+    const enhanced = new Error(
+      `Failed to load database config from "${rel}": ${message}. ` +
+        `Run with tsx (e.g., "npx tsx node_modules/.bin/trails").`,
+    );
+    (enhanced as { cause?: unknown }).cause = error;
+    throw enhanced;
+  }
+  // `export default "oops"` loads fine but leaves us with a non-object
+  // default that will crash downstream `in` / Object.keys lookups with
+  // a confusing TypeError. Check up front and throw a clear message
+  // with the offending value's repr.
+  const candidate = mod.default ?? mod;
+  if (candidate === null || (typeof candidate !== "object" && typeof candidate !== "function")) {
+    const rel = path.relative(cwd, configPath) || configPath;
+    throw new Error(
+      `Invalid database config in "${rel}": expected an object, got ${formatUnknown(candidate)}.`,
+    );
+  }
+  return { path: configPath, module: candidate as DatabaseConfigModule };
+}
+
+/**
+ * Load the database configuration for the given environment.
+ * Looks for config/database.ts or src/config/database.ts in the cwd.
+ */
+export async function loadDatabaseConfig(
+  env?: string,
+  cwd: string = process.cwd(),
+): Promise<DatabaseConfig> {
+  const resolvedEnv = env ?? resolveEnv();
+  const loaded = await loadDatabaseConfigModule(cwd);
+  if (!loaded) {
     throw new Error(
       "No database config found. Expected config/database.ts (.js) or src/config/database.ts (.js)",
     );
   }
 
-  let mod: any;
-  try {
-    mod = await import(pathToFileURL(configPath).href);
-  } catch (error: any) {
-    const rel = path.relative(cwd, configPath);
-    const enhanced = new Error(
-      `Failed to load database config from "${rel}": ${error.message}. ` +
-        `Run with tsx (e.g., "npx tsx node_modules/.bin/trails").`,
-    );
-    (enhanced as any).cause = error;
-    throw enhanced;
-  }
-  const configs = mod.default ?? mod;
+  const envs = Object.keys(loaded.module).filter((k) => !TOP_LEVEL_CONFIG_KEYS.has(k));
+  // Distinguish "asked for 'production' but only have 'development'"
+  // from "config file defines no environments at all" — the latter
+  // would otherwise produce the confusing "Available: " with nothing
+  // after the colon.
+  const available = envs.length > 0 ? `Available: ${envs.join(", ")}` : "No environments defined";
 
-  const envConfig = configs[resolvedEnv];
+  // Explicitly reject env names that collide with top-level keys (e.g.
+  // `TRAILS_ENV=schemaFormat`). Without this, the lookup below would
+  // happily return the string "ts" as a DatabaseConfig and adapter
+  // resolution would crash with a confusing error downstream.
+  if (TOP_LEVEL_CONFIG_KEYS.has(resolvedEnv)) {
+    throw new Error(`No database configuration for environment "${resolvedEnv}". ${available}`);
+  }
+
+  const envConfig = (loaded.module as Record<string, unknown>)[resolvedEnv] as
+    | DatabaseConfig
+    | undefined;
   if (!envConfig) {
-    throw new Error(
-      `No database configuration for environment "${resolvedEnv}". ` +
-        `Available: ${Object.keys(configs).join(", ")}`,
-    );
+    throw new Error(`No database configuration for environment "${resolvedEnv}". ${available}`);
   }
 
-  return envConfig as DatabaseConfig;
+  return envConfig;
+}
+
+export type SchemaFormat = "ts" | "js" | "sql";
+
+/**
+ * Resolve the effective `schemaFormat` for CLI dump/load commands.
+ *
+ * Precedence (highest wins):
+ *   1. Explicit CLI flag (`opts.format`) — Rails' rake task arg equivalent
+ *   2. `SCHEMA_FORMAT` env var — matches Rails
+ *      `ENV.fetch("SCHEMA_FORMAT", ActiveRecord.schema_format).to_sym`
+ *      pattern used throughout `activerecord/lib/active_record/railties/
+ *      databases.rake`
+ *   3. Top-level `schemaFormat` key in config/database.ts — equivalent
+ *      of `ActiveRecord.schema_format` (set via
+ *      `config.active_record.schema_format` in Rails' application.rb)
+ *   4. Existence inference — pick ts/js/sql based on which schema file
+ *      is already present in `db/`. Trails-specific convenience so
+ *      deleting the old file + dumping migrates format without touching
+ *      config.
+ *   5. Default "ts"
+ *
+ * Returns the resolved format. Callers should assign it to
+ * `DatabaseTasks.schemaFormat` before invoking dump/load.
+ */
+export async function resolveSchemaFormat(
+  opts: { format?: string } = {},
+  cwd: string = process.cwd(),
+): Promise<SchemaFormat> {
+  const normalize = (raw: unknown, source: string): SchemaFormat => {
+    // `schemaFormat` in config/database.ts is user-authored with only
+    // structural typing, so we can be handed a number, boolean, etc.
+    // Refuse with the same source-labeled error instead of blowing up
+    // when the unchecked input lacks `.toLowerCase`.
+    if (typeof raw !== "string") {
+      // Format the offending value for the error message. JSON.stringify
+      // throws on bigint / circular objects, and util.inspect would pull
+      // in a Node-only dep — neither is acceptable for code that sits
+      // in a package whose runtime surface should route through
+      // activesupport adapters. Roll our own minimal, total formatter:
+      // typeof-dispatched and always returns a string.
+      throw new Error(
+        `Invalid ${source} value ${formatUnknown(raw)}. Expected one of: ts, js, sql.`,
+      );
+    }
+    const normalized = raw.toLowerCase();
+    if (normalized !== "ts" && normalized !== "js" && normalized !== "sql") {
+      throw new Error(`Invalid ${source} value "${raw}". Expected one of: ts, js, sql.`);
+    }
+    return normalized;
+  };
+
+  // Presence-based, not truthy — `--format ""` and `SCHEMA_FORMAT=""`
+  // should error (caller clearly set the knob to something) rather than
+  // silently falling through to the next rung.
+  if (opts.format !== undefined) return normalize(opts.format, "--format");
+
+  if ("SCHEMA_FORMAT" in process.env) {
+    return normalize(process.env.SCHEMA_FORMAT ?? "", "SCHEMA_FORMAT env var");
+  }
+
+  // Inspect the config file for a top-level `schemaFormat` key (sibling
+  // of the per-env configs). Rails sets this via
+  // `config.active_record.schema_format` in config/application.rb; trails
+  // folds it into config/database.ts so the one file holds everything a
+  // db command needs to know.
+  //
+  // Routes through the shared loader so we don't double-import the
+  // config file — Node's ESM cache already dedups by URL, but funneling
+  // both call sites through one function keeps error handling (the
+  // "failed to load config" rethrow) in one place and surfaces real
+  // import failures instead of silently falling through to inference.
+  const loaded = await loadDatabaseConfigModule(cwd);
+  if (loaded && "schemaFormat" in loaded.module) {
+    // Presence-based: an explicitly-set-but-garbage value (including an
+    // empty string) is a misconfig that should throw, not silently fall
+    // through to inference. Use a relative path in the error source so
+    // it stays short and consistent with other config-loading errors.
+    const loadedRel = path.relative(cwd, loaded.path) || loaded.path;
+    return normalize(loaded.module.schemaFormat ?? "", `schemaFormat in ${loadedRel}`);
+  }
+
+  const dbDir = path.join(cwd, "db");
+  if (fs.existsSync(path.join(dbDir, "structure.sql"))) return "sql";
+  if (fs.existsSync(path.join(dbDir, "schema.js"))) return "js";
+  if (fs.existsSync(path.join(dbDir, "schema.ts"))) return "ts";
+  return "ts";
 }
 
 /**

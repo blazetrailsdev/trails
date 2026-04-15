@@ -6,6 +6,7 @@ import {
   loadDatabaseConfig,
   connectAdapter,
   resolveEnv,
+  resolveSchemaFormat,
   type DatabaseConfig as RawConfig,
 } from "../database.js";
 import { discoverMigrations } from "../migration-loader.js";
@@ -771,59 +772,75 @@ export function dbCommand(): Command {
   cmd
     .command("schema:dump")
     .description(
-      "Dump the current database schema (format: DatabaseTasks.schemaFormat — ts/js/sql)",
+      "Dump the current database schema (format precedence: --format > SCHEMA_FORMAT env > config.schemaFormat > existing structure.sql/schema.js/schema.ts > ts)",
     )
-    .action(async () => {
+    .option("--format <format>", "Override schema format: ts, js, or sql")
+    .action(async (opts) => {
       await withAdapter(async (adapter, raw) => {
         const config = toDbConfig(raw);
-        const filename = DatabaseTasks.schemaDumpPath(config);
+        // Capture the prior format BEFORE calling resolveSchemaFormat —
+        // the resolver can throw (bad --format / SCHEMA_FORMAT / config
+        // value) and we want the restore-in-finally path to run even
+        // then. Assigning inside the try keeps global state clean on
+        // any throw from resolve, schemaDumpPath, or setAdapter.
+        const previousFormat = DatabaseTasks.schemaFormat;
         const previous = DatabaseTasks.migrationConnection();
-        DatabaseTasks.setAdapter(adapter);
         try {
+          DatabaseTasks.schemaFormat = await resolveSchemaFormat(opts);
+          const filename = DatabaseTasks.schemaDumpPath(config);
+          DatabaseTasks.setAdapter(adapter);
           await DatabaseTasks.dumpSchema(config);
+          console.log(`Schema dumped to ${filename}`);
         } finally {
           DatabaseTasks.setAdapter(previous);
+          DatabaseTasks.schemaFormat = previousFormat;
         }
-        console.log(`Schema dumped to ${filename}`);
       });
     });
 
   cmd
     .command("schema:load")
     .description(
-      "Load the schema (format: DatabaseTasks.schemaFormat — ts/js/sql) into the database",
+      "Load the schema (format precedence: --format > SCHEMA_FORMAT env > config.schemaFormat > existing structure.sql/schema.js/schema.ts > ts)",
     )
-    .action(async () => {
+    .option("--format <format>", "Override schema format: ts, js, or sql")
+    .action(async (opts) => {
       await withAdapter(async (adapter, raw) => {
         const config = toDbConfig(raw);
         // schema:load is destructive (replaces the schema) — Rails gates
         // it on check_protected_environments.
         await runProtectedEnvCheck(config, config.envName);
-        const filename = DatabaseTasks.schemaDumpPath(config);
-        if (!fs.existsSync(filename)) {
-          console.error(`No schema file found at ${filename}`);
-          process.exitCode = 1;
-          return;
-        }
+        const previousFormat = DatabaseTasks.schemaFormat;
         const previous = DatabaseTasks.migrationConnection();
-        DatabaseTasks.setAdapter(adapter);
         try {
-          console.log(`Loading schema from ${filename}...`);
-          await DatabaseTasks.loadSchema(config);
-          console.log("Schema loaded.");
-        } catch (error: unknown) {
-          if (filename.endsWith(".ts")) {
-            const enhanced = new Error(
-              `Failed to load schema file "${filename}". ` +
-                `Ensure a TypeScript loader (tsx, ts-node) is configured, ` +
-                `or set DatabaseTasks.schemaFormat = "js" / "sql".`,
-            );
-            (enhanced as { cause?: unknown }).cause = error;
-            throw enhanced;
+          DatabaseTasks.schemaFormat = await resolveSchemaFormat(opts);
+          const filename = DatabaseTasks.schemaDumpPath(config);
+          if (!fs.existsSync(filename)) {
+            console.error(`No schema file found at ${filename}`);
+            process.exitCode = 1;
+            return;
           }
-          throw error;
+          DatabaseTasks.setAdapter(adapter);
+          try {
+            console.log(`Loading schema from ${filename}...`);
+            await DatabaseTasks.loadSchema(config);
+            console.log("Schema loaded.");
+          } catch (error: unknown) {
+            if (filename.endsWith(".ts")) {
+              const enhanced = new Error(
+                `Failed to load schema file "${filename}". ` +
+                  `Ensure a TypeScript loader (tsx, ts-node) is configured, ` +
+                  `or choose a different schema format with --format js/sql, ` +
+                  `SCHEMA_FORMAT=js/sql, or config.schemaFormat.`,
+              );
+              (enhanced as { cause?: unknown }).cause = error;
+              throw enhanced;
+            }
+            throw error;
+          }
         } finally {
           DatabaseTasks.setAdapter(previous);
+          DatabaseTasks.schemaFormat = previousFormat;
         }
       });
     });
