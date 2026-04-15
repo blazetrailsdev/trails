@@ -82,14 +82,38 @@ describe("associations DX", () => {
     assertType(Tagged);
   });
 
-  it("CollectionProxy is exported (currently non-generic — known gap)", () => {
-    assertType<typeof CollectionProxy>(CollectionProxy);
+  it("CollectionProxy is generic in its element type", () => {
+    const proxy = {} as CollectionProxy<Post>;
+    expectTypeOf(proxy.toArray).returns.resolves.toEqualTypeOf<Post[]>();
+    expectTypeOf(proxy.first).returns.resolves.toEqualTypeOf<Post | null>();
+    expectTypeOf(proxy.last).returns.resolves.toEqualTypeOf<Post | null>();
+    expectTypeOf(proxy.build).returns.toEqualTypeOf<Post>();
+    expectTypeOf(proxy.create).returns.resolves.toEqualTypeOf<Post>();
+    expectTypeOf(proxy.target).toEqualTypeOf<Post[]>();
   });
 
-  it("KNOWN GAP: association accessors return `unknown` via Model's index signature", () => {
-    // `Model` declares `[key: string]: unknown`, so `post.author` type-checks
-    // but resolves to `unknown` — no autocomplete, no narrowing. The ideal DX
-    // is `post.author: Promise<Author | null>` and `author.posts: CollectionProxy<Post>`.
+  it("declare posts: CollectionProxy<Post> gives typed access on the instance", async () => {
+    class Blog extends Base {
+      declare name: string;
+      declare posts: CollectionProxy<Post>;
+      static {
+        this.attribute("name", "string");
+        this.hasMany("posts");
+      }
+    }
+    const blog = new Blog({ name: "dean's blog" });
+    // Even though runtime attaches `posts` dynamically, the explicit
+    // `declare` wins for static typing — no more `unknown` fallthrough
+    // via Model's `[key: string]: unknown` index signature.
+    expectTypeOf(blog.posts).toMatchTypeOf<CollectionProxy<Post>>();
+    const titles = (await blog.posts.toArray()).map((p) => p.title);
+    expectTypeOf(titles).toEqualTypeOf<string[]>();
+  });
+
+  it("KNOWN GAP: without a `declare`, association accessors still return `unknown`", () => {
+    // `Model` has `[key: string]: unknown`, so without `declare posts:
+    // CollectionProxy<Post>` on the class body, the accessor still falls
+    // through to `unknown`. Users opt in per-association.
     const post = new Post({ title: "hi", author_id: 1, published: true });
     expectTypeOf(post.author).toBeUnknown();
     const author = new Author({ name: "dean" });

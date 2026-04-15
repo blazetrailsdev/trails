@@ -21,17 +21,16 @@ import {
   loadHasMany,
 } from "../associations.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface CollectionProxy {
+export interface CollectionProxy<T extends Base = Base> {
   // Thenable — makes CollectionProxy awaitable (delegates to toArray)
-  then<TResult1 = Base[], TResult2 = never>(
-    onfulfilled?: ((value: Base[]) => TResult1 | PromiseLike<TResult1>) | null,
+  then<TResult1 = T[], TResult2 = never>(
+    onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2>;
   catch<TResult = never>(
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
-  ): Promise<Base[] | TResult>;
-  finally(onfinally?: (() => void) | null): Promise<Base[]>;
+  ): Promise<T[] | TResult>;
+  finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 
 /**
@@ -40,39 +39,42 @@ export interface CollectionProxy {
  * Using Omit instead of Pick means new Relation methods are automatically
  * available on AssociationProxy without manual maintenance.
  */
-type DelegatedRelationMethods = {
-  [K in keyof Omit<Relation<Base>, keyof CollectionProxy> as K extends `_${string}`
+type DelegatedRelationMethods<T extends Base> = {
+  [K in keyof Omit<Relation<T>, keyof CollectionProxy<T>> as K extends `_${string}`
     ? never
-    : K]: Omit<Relation<Base>, keyof CollectionProxy>[K];
+    : K]: Omit<Relation<T>, keyof CollectionProxy<T>>[K];
 };
 
 /**
  * A CollectionProxy wrapped with a JS Proxy that delegates methods
  * and named scopes to the underlying Relation. Returned by association().
- * The generic parameter allows typing extend-option methods; defaults to
- * an open index signature so named scopes and extensions work without casts.
+ * The generic parameters allow typing the associated model and any
+ * extend-option methods; default to open index signatures so named scopes
+ * and extensions work without casts.
  */
-export type AssociationProxy<TExtensions extends Record<string, any> = Record<string, any>> =
-  CollectionProxy & DelegatedRelationMethods & TExtensions;
+export type AssociationProxy<
+  T extends Base = Base,
+  TExtensions extends Record<string, any> = Record<string, any>,
+> = CollectionProxy<T> & DelegatedRelationMethods<T> & TExtensions;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class CollectionProxy {
+export class CollectionProxy<T extends Base = Base> {
   private _record: Base;
   private _assocName: string;
   private _assocDef: AssociationDefinition;
-  private _target: Base[] = [];
+  private _target: T[] = [];
   private _loaded = false;
 
   get loaded(): boolean {
     return this._loaded;
   }
 
-  get target(): Base[] {
+  get target(): T[] {
     return this._target;
   }
 
   /** @internal Initialize from preloaded association data. */
-  _hydrateFromPreload(records: Base[]): void {
+  _hydrateFromPreload(records: T[]): void {
     // Preserve any unsaved in-memory records (from build/push before preload ran)
     const unsaved = this._target.filter((r) => r.isNewRecord());
     this._target = unsaved.length > 0 ? [...records, ...unsaved] : records;
@@ -101,8 +103,12 @@ export class CollectionProxy {
   /**
    * Load and return all associated records.
    */
-  async toArray(): Promise<Base[]> {
-    const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
+  async toArray(): Promise<T[]> {
+    const results = (await loadHasMany(
+      this._record,
+      this._assocName,
+      this._assocDef.options,
+    )) as T[];
     const unsaved = this._target.filter((r) => r.isNewRecord());
     if (unsaved.length > 0) {
       return [...results, ...unsaved];
@@ -110,16 +116,20 @@ export class CollectionProxy {
     return results;
   }
 
-  async load(): Promise<Base[]> {
+  async load(): Promise<T[]> {
     if (this._loaded) return this._target;
-    const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
+    const results = (await loadHasMany(
+      this._record,
+      this._assocName,
+      this._assocDef.options,
+    )) as T[];
     // Merge: prefer existing in-memory instances (from push/build) over fresh DB records
-    const existingByPk = new Map<string, Base>();
+    const existingByPk = new Map<string, T>();
     for (const r of this._target) {
       const id = this._identityFor(r);
       if (id != null) existingByPk.set(id, r);
     }
-    const merged: Base[] = results.map((r) => {
+    const merged: T[] = results.map((r) => {
       const id = this._identityFor(r);
       return id != null && existingByPk.has(id) ? existingByPk.get(id)! : r;
     });
@@ -198,10 +208,10 @@ export class CollectionProxy {
    * For through associations, builds the target without FK — the join
    * record is created later via create() or push().
    */
-  build(attrs: Record<string, unknown> = {}): Base {
+  build(attrs: Record<string, unknown> = {}): T {
     // Through association: build the target record (no FK on target)
     if (this._isThrough) {
-      const record = this._buildThrough(attrs);
+      const record = this._buildThrough(attrs) as T;
       const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
       if (allowed) {
         this._target.push(record);
@@ -210,7 +220,7 @@ export class CollectionProxy {
       return record;
     }
 
-    const record = this._buildRaw(attrs);
+    const record = this._buildRaw(attrs) as T;
     const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
     if (allowed) {
       this._target.push(record);
@@ -266,12 +276,12 @@ export class CollectionProxy {
   /**
    * Build and save a new associated record.
    */
-  async create(attrs: Record<string, unknown> = {}): Promise<Base> {
+  async create(attrs: Record<string, unknown> = {}): Promise<T> {
     this._ensureThroughWritable();
     if (this._isThrough) {
-      return this._createThrough(attrs);
+      return (await this._createThrough(attrs)) as T;
     }
-    const record = this._buildRaw(attrs);
+    const record = this._buildRaw(attrs) as T;
     if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
       return record;
     }
@@ -291,7 +301,7 @@ export class CollectionProxy {
     if (this._record.isNewRecord()) {
       throw new Error(`Cannot create through association on an unpersisted ${ctor.name}`);
     }
-    const record = this._buildThrough(attrs);
+    const record = this._buildThrough(attrs) as T;
     const saved = await record.save();
     if (!saved) return record;
     await this._pushThrough([record]);
@@ -330,7 +340,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#push / #<<
    */
-  async push(...records: Base[]): Promise<void> {
+  async push(...records: T[]): Promise<void> {
     this._ensureThroughWritable();
     // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
@@ -378,7 +388,7 @@ export class CollectionProxy {
     }
   }
 
-  private async _pushThrough(records: Base[], skipCallbacks = false): Promise<void> {
+  private async _pushThrough(records: T[], skipCallbacks = false): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
@@ -451,7 +461,7 @@ export class CollectionProxy {
   /**
    * Alias for push.
    */
-  async concat(...records: Base[]): Promise<void> {
+  async concat(...records: T[]): Promise<void> {
     return this.push(...records);
   }
 
@@ -460,7 +470,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#delete
    */
-  async delete(...records: Base[]): Promise<void> {
+  async delete(...records: T[]): Promise<void> {
     this._ensureThroughWritable();
     // Through association (including HABTM): delete the join records
     if (this._assocDef.options.through) {
@@ -619,7 +629,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy
    */
-  async destroy(...records: Base[]): Promise<void> {
+  async destroy(...records: T[]): Promise<void> {
     const destroyed: Base[] = [];
     for (const record of records) {
       await record.destroy();
@@ -659,7 +669,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#include?
    */
-  async isInclude(record: Base): Promise<boolean> {
+  async isInclude(record: T): Promise<boolean> {
     if (this._loaded) {
       const targetId = this._identityFor(record);
       if (targetId != null) {
@@ -702,7 +712,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#first
    */
-  async first(): Promise<Base | null> {
+  async first(): Promise<T | null> {
     const records = await this.toArray();
     return records[0] ?? null;
   }
@@ -712,7 +722,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#last
    */
-  async last(): Promise<Base | null> {
+  async last(): Promise<T | null> {
     const records = await this.toArray();
     return records[records.length - 1] ?? null;
   }
@@ -722,7 +732,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#take
    */
-  async take(n?: number): Promise<Base | Base[] | null> {
+  async take(n?: number): Promise<T | T[] | null> {
     const records = await this.toArray();
     if (n === undefined) return records[0] ?? null;
     return records.slice(0, n);
@@ -791,7 +801,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#first_or_initialize
    */
-  async firstOrInitialize(conditions: Record<string, unknown> = {}): Promise<Base> {
+  async firstOrInitialize(conditions: Record<string, unknown> = {}): Promise<T> {
     this._checkStrictLoading();
     const matches = await this.scope().where(conditions).toArray();
     if (matches.length > 0) return matches[0];
@@ -803,7 +813,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#first_or_create
    */
-  async firstOrCreate(conditions: Record<string, unknown> = {}): Promise<Base> {
+  async firstOrCreate(conditions: Record<string, unknown> = {}): Promise<T> {
     this._checkStrictLoading();
     const matches = await this.scope().where(conditions).toArray();
     if (matches.length > 0) return matches[0];
@@ -815,7 +825,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#first_or_create!
    */
-  async firstOrCreateBang(conditions: Record<string, unknown> = {}): Promise<Base> {
+  async firstOrCreateBang(conditions: Record<string, unknown> = {}): Promise<T> {
     this._checkStrictLoading();
     const matches = await this.scope().where(conditions).toArray();
     if (matches.length > 0) return matches[0];
@@ -827,7 +837,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#replace
    */
-  async replace(records: Base[]): Promise<void> {
+  async replace(records: T[]): Promise<void> {
     this._ensureThroughWritable();
     await this.clear();
     await this.push(...records);
@@ -848,7 +858,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#find
    */
-  async find(id: number | number[]): Promise<Base | Base[]> {
+  async find(id: number | number[]): Promise<T | T[]> {
     const records = await this.toArray();
     const targetModel = (records[0]?.constructor ?? Object) as typeof Base;
     const pk = targetModel.primaryKey ?? "id";
@@ -871,7 +881,7 @@ export class CollectionProxy {
     const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
     const targetModel = resolveModel(className);
     const cleanIds = ids.filter((id) => id !== null && id !== undefined && id !== "");
-    const records = await Promise.all(cleanIds.map((id) => targetModel.find(Number(id))));
+    const records = (await Promise.all(cleanIds.map((id) => targetModel.find(Number(id))))) as T[];
     await this.replace(records);
   }
 
@@ -1050,7 +1060,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#load_target
    */
-  async loadTarget(): Promise<Base[]> {
+  async loadTarget(): Promise<T[]> {
     await this.load();
     return this._target;
   }
@@ -1060,7 +1070,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#create!
    */
-  async createBang(attrs: Record<string, unknown> = {}): Promise<Base> {
+  async createBang(attrs: Record<string, unknown> = {}): Promise<T> {
     this._ensureThroughWritable();
     if (this._isThrough) {
       const ctor = this._record.constructor as typeof Base;
@@ -1069,7 +1079,7 @@ export class CollectionProxy {
           `Cannot create through association on an unpersisted ${ctor.name}`,
         );
       }
-      const record = this._buildThrough(attrs);
+      const record = this._buildThrough(attrs) as T;
       if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
         throw new RecordNotSaved("Callback prevented record creation", record);
       }
@@ -1083,7 +1093,7 @@ export class CollectionProxy {
       fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
       return record;
     }
-    const record = this._buildRaw(attrs);
+    const record = this._buildRaw(attrs) as T;
     if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
       throw new RecordNotSaved("Callback prevented record creation", record);
     }
@@ -1224,7 +1234,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#records
    */
-  async records(): Promise<Base[]> {
+  async records(): Promise<T[]> {
     return this.loadTarget();
   }
 
@@ -1233,7 +1243,7 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#append
    */
-  async append(...records: Base[]): Promise<void> {
+  async append(...records: T[]): Promise<void> {
     return this.push(...records);
   }
 
@@ -1263,11 +1273,12 @@ export class CollectionProxy {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#select
    */
-  select(fn: (record: Base) => boolean): Promise<Base[]>;
-  select(...columns: (string | Nodes.SqlLiteral)[]): Relation<Base>;
-  select(...args: any[]): Promise<Base[]> | Relation<Base> {
+  select(fn: (record: T) => boolean): Promise<T[]>;
+  select(...columns: (string | Nodes.SqlLiteral)[]): Relation<T>;
+  select(...args: any[]): Promise<T[]> | Relation<T> {
     if (args.length === 1 && typeof args[0] === "function") {
-      return this.loadTarget().then((records: Base[]) => records.filter(args[0]));
+      const predicate = args[0] as (record: T) => boolean;
+      return this.loadTarget().then((records) => records.filter(predicate));
     }
     return this.scope().select(...args);
   }
@@ -1277,7 +1288,7 @@ export class CollectionProxy {
    *
    * Mirrors: Ruby's Enumerable#each on CollectionProxy
    */
-  async *[Symbol.asyncIterator](): AsyncIterableIterator<Base> {
+  async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     const records = await this.loadTarget();
     for (const record of records) {
       yield record;

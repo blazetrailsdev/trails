@@ -161,3 +161,26 @@ developer would. It pins the current type contract and encodes DX gaps
 the assertion flips and signals the test should be tightened.
 
 A dedicated `DX Type Tests` CI job runs on every push.
+
+### Typed association accessors
+
+`hasMany`/`hasAndBelongsToMany` runtime-attach a `CollectionProxy` onto the
+instance. Because `Model` has an `[key: string]: unknown` index signature,
+access like `blog.posts` type-checks but falls through to `unknown`. Opt
+into static typing per-association by declaring the field:
+
+```ts
+class Blog extends Base {
+  declare posts: CollectionProxy<Post>;
+  static {
+    this.hasMany("posts");
+  }
+}
+
+const blog = new Blog({ name: "dean" });
+await blog.posts.first(); // Promise<Post | null>
+```
+
+`CollectionProxy<T>` and `AssociationProxy<T>` are both generic in the
+element type. Without the `declare`, the accessor still resolves to
+`unknown` (same as before).

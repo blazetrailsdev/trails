@@ -1283,15 +1283,18 @@ export async function createThroughAssociation(
  * Factory to get a CollectionProxy for a has_many association.
  * Returns a cached proxy if one exists on the record.
  */
-export function association(record: Base, assocName: string): AssociationProxy {
-  const existing = record._collectionProxies.get(assocName) as AssociationProxy | undefined;
+export function association<T extends Base = Base>(
+  record: Base,
+  assocName: string,
+): AssociationProxy<T> {
+  const existing = record._collectionProxies.get(assocName) as AssociationProxy<T> | undefined;
   if (existing) {
     // Hydrate from preloaded data if proxy was cached before preloading ran
     if (!existing.loaded) {
       const preloaded = record._preloadedAssociations?.get(assocName);
       if (preloaded != null) {
         const records = Array.isArray(preloaded) ? preloaded : [preloaded];
-        existing._hydrateFromPreload(records as Base[]);
+        existing._hydrateFromPreload(records as T[]);
       }
     }
     return existing;
@@ -1303,16 +1306,16 @@ export function association(record: Base, assocName: string): AssociationProxy {
   if (!assocDef) {
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
   }
-  const proxy = new CollectionProxy(record, assocName, assocDef);
+  const proxy = new CollectionProxy<T>(record, assocName, assocDef);
 
   // Hydrate from preloaded data if available
   const preloaded = record._preloadedAssociations?.get(assocName);
   if (preloaded != null) {
     const records = Array.isArray(preloaded) ? preloaded : [preloaded];
-    proxy._hydrateFromPreload(records as Base[]);
+    proxy._hydrateFromPreload(records as T[]);
   }
 
-  const wrapped = wrapCollectionProxy(proxy);
+  const wrapped = wrapCollectionProxy<T>(proxy);
   record._collectionProxies.set(assocName, wrapped);
   return wrapped;
 }
@@ -1326,7 +1329,9 @@ export function association(record: Base, assocName: string): AssociationProxy {
  * 1. Own/prototype properties (CollectionProxy methods, extend methods)
  * 2. Relation query methods + named scopes (via scope()'s own proxy)
  */
-function wrapCollectionProxy(proxy: CollectionProxy): AssociationProxy {
+function wrapCollectionProxy<T extends Base = Base>(
+  proxy: CollectionProxy<T>,
+): AssociationProxy<T> {
   return new Proxy(proxy, {
     get(target: any, prop: string | symbol, receiver: any) {
       const value = Reflect.get(target, prop, receiver);
