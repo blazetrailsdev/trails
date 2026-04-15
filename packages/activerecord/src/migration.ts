@@ -34,96 +34,40 @@ export {
   type Compatibility,
 } from "./migration/compatibility.js";
 
-export class MigrationError extends Error {
-  constructor(message?: string) {
-    super(message);
-    this.name = "MigrationError";
-  }
-}
-
-export class IrreversibleMigration extends MigrationError {
-  constructor(message = "This migration uses a feature that is not reversible.") {
-    super(message);
-    this.name = "IrreversibleMigration";
-  }
-}
-
-export class DuplicateMigrationVersionError extends MigrationError {
-  constructor(version: string | number) {
-    super(`Duplicate migration version: ${version}`);
-    this.name = "DuplicateMigrationVersionError";
-  }
-}
-
-export class DuplicateMigrationNameError extends MigrationError {
-  constructor(name: string) {
-    super(`Duplicate migration name: ${name}`);
-    this.name = "DuplicateMigrationNameError";
-  }
-}
-
-export class UnknownMigrationVersionError extends MigrationError {
-  constructor(version: string | number) {
-    super(`No migration with version number ${version}.`);
-    this.name = "UnknownMigrationVersionError";
-  }
-}
-
-export class IllegalMigrationNameError extends MigrationError {
-  constructor(name: string) {
-    super(`Illegal name for migration file: ${name}.`);
-    this.name = "IllegalMigrationNameError";
-  }
-}
-
-export class InvalidMigrationTimestampError extends MigrationError {
-  constructor(version: string | number) {
-    super(`Invalid timestamp ${version} in migration file name.`);
-    this.name = "InvalidMigrationTimestampError";
-  }
-}
-
-export class PendingMigrationError extends MigrationError {
-  constructor(message = "Migrations are pending. Run `migrate` to resolve.") {
-    super(message);
-    this.name = "PendingMigrationError";
-  }
-}
-
-export class ConcurrentMigrationError extends MigrationError {
-  constructor(message = "Cannot run migrations because another migration is currently running.") {
-    super(message);
-    this.name = "ConcurrentMigrationError";
-  }
-}
-
-export class NoEnvironmentInSchemaError extends MigrationError {
-  constructor(message = "Environment data not found in the schema.") {
-    super(message);
-    this.name = "NoEnvironmentInSchemaError";
-  }
-}
-
-export class ProtectedEnvironmentError extends MigrationError {
-  constructor(env: string) {
-    super(`You are attempting to run a destructive action against your '${env}' database.`);
-    this.name = "ProtectedEnvironmentError";
-  }
-}
-
-export class EnvironmentMismatchError extends MigrationError {
-  constructor(message = "The environment does not match the stored environment.") {
-    super(message);
-    this.name = "EnvironmentMismatchError";
-  }
-}
-
-export class EnvironmentStorageError extends MigrationError {
-  constructor(message = "Cannot store environment data.") {
-    super(message);
-    this.name = "EnvironmentStorageError";
-  }
-}
+// Migration error classes live in a standalone module so leaf modules
+// like InternalMetadata can import EnvironmentStorageError without
+// creating a cycle through migration.ts. Imported here for local use
+// AND re-exported for existing consumers.
+import {
+  MigrationError,
+  IrreversibleMigration,
+  DuplicateMigrationVersionError,
+  DuplicateMigrationNameError,
+  UnknownMigrationVersionError,
+  IllegalMigrationNameError,
+  InvalidMigrationTimestampError,
+  PendingMigrationError,
+  ConcurrentMigrationError,
+  NoEnvironmentInSchemaError,
+  ProtectedEnvironmentError,
+  EnvironmentMismatchError,
+  EnvironmentStorageError,
+} from "./migration-errors.js";
+export {
+  MigrationError,
+  IrreversibleMigration,
+  DuplicateMigrationVersionError,
+  DuplicateMigrationNameError,
+  UnknownMigrationVersionError,
+  IllegalMigrationNameError,
+  InvalidMigrationTimestampError,
+  PendingMigrationError,
+  ConcurrentMigrationError,
+  NoEnvironmentInSchemaError,
+  ProtectedEnvironmentError,
+  EnvironmentMismatchError,
+  EnvironmentStorageError,
+};
 
 /**
  * Migration — base class for database migrations.
@@ -1404,11 +1348,22 @@ export class Migrator {
   constructor(
     adapter: DatabaseAdapter,
     migrations: MigrationProxy[],
-    options: { environment?: string; strategy?: ExecutionStrategy } = {},
+    options: {
+      environment?: string;
+      strategy?: ExecutionStrategy;
+      /**
+       * Set to false when the db_config opts out of metadata storage
+       * (Rails' `use_metadata_table: false`). environment stamping is a
+       * no-op / raises in `environment:set` when this is false.
+       */
+      internalMetadataEnabled?: boolean;
+    } = {},
   ) {
     this._adapter = adapter;
     this._schemaMigration = new SchemaMigration(adapter);
-    this._internalMetadata = new InternalMetadata(adapter);
+    this._internalMetadata = new InternalMetadata(adapter, {
+      enabled: options.internalMetadataEnabled ?? true,
+    });
     this._environment =
       options.environment ?? (process.env.NODE_ENV || DatabaseConfigurations.defaultEnv);
     this._strategy = options.strategy ?? new DefaultStrategy();
@@ -1754,7 +1709,15 @@ export class Migrator {
     await this._strategy.exec(direction, migration, this._adapter);
     if (direction === "up") {
       await this._schemaMigration.recordVersion(proxy.version);
-      await this._internalMetadata.set("environment", this._environment);
+      // Skip stamping when internal metadata is disabled
+      // (`use_metadata_table: false`). Writing through a disabled
+      // InternalMetadata raises EnvironmentStorageError, which would
+      // otherwise break the migrate path for consumers that intentionally
+      // opt out. Rails' equivalent call site is similarly guarded via
+      // `internal_metadata.enabled?`.
+      if (this._internalMetadata.enabled) {
+        await this._internalMetadata.set("environment", this._environment);
+      }
     } else {
       await this._schemaMigration.deleteVersion(proxy.version);
     }
@@ -1772,7 +1735,11 @@ export class Migrator {
    * Mirrors: ActiveRecord::Tasks::DatabaseTasks.check_current_environment
    */
   async checkEnvironment(): Promise<void> {
-    if (process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK === "1") return;
+    // Match Rails' `return if ENV["DISABLE_DATABASE_ENVIRONMENT_CHECK"]`.
+    // In Ruby, "" is truthy, so any *present* value (including empty
+    // string) bypasses the check. JS treats "" as falsy, so we use a
+    // presence check instead to preserve Rails semantics.
+    if (process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK !== undefined) return;
     await this._ensureSchemaTable();
     const stored = await this._internalMetadata.get("environment");
     if (stored === null) {
@@ -1781,11 +1748,10 @@ export class Migrator {
       );
     }
     if (stored !== this._environment) {
-      throw new EnvironmentMismatchError(
-        `You are attempting to modify a database that was last used in the '${stored}' environment. ` +
-          `You are running in the '${this._environment}' environment. ` +
-          `If you are sure you want to continue, run with DISABLE_DATABASE_ENVIRONMENT_CHECK=1.`,
-      );
+      // Use the Rails-style (current, stored) constructor so the error
+      // message stays consistent with DatabaseTasks'
+      // checkProtectedEnvironmentsBang path.
+      throw new EnvironmentMismatchError(this._environment, stored);
     }
   }
 
@@ -1797,9 +1763,12 @@ export class Migrator {
    * Mirrors: ActiveRecord::Tasks::DatabaseTasks.check_protected_environments!
    */
   async checkProtectedEnvironments(protectedEnvironments?: string[]): Promise<void> {
-    await this._ensureSchemaTable();
-    const stored = await this._internalMetadata.get("environment");
-    const env = stored ?? this._environment;
+    // Matches Rails: protected_environment? returns nil when nothing has
+    // been stamped yet, so a fresh DB under NODE_ENV=production doesn't
+    // trip the guard until it's actually been migrated and stamped.
+    // Read-only — no _ensureSchemaTable side effect.
+    const stored = await this.lastStoredEnvironment();
+    if (!stored) return;
 
     let envList = protectedEnvironments;
     if (!envList) {
@@ -1807,9 +1776,22 @@ export class Migrator {
       envList = Base.protectedEnvironments ?? ["production"];
     }
 
-    if (envList.includes(env)) {
-      throw new ProtectedEnvironmentError(env);
+    if (envList.includes(stored)) {
+      throw new ProtectedEnvironmentError(stored);
     }
+  }
+
+  /**
+   * Boolean mirror of {@link checkProtectedEnvironments}.
+   *
+   * Mirrors: ActiveRecord::MigrationContext#protected_environment?
+   */
+  async protectedEnvironment(): Promise<boolean> {
+    const stored = await this.lastStoredEnvironment();
+    if (!stored) return false;
+    const { Base } = await import("./base.js");
+    const list = Base.protectedEnvironments ?? ["production"];
+    return list.includes(stored);
   }
 
   get internalMetadata(): InternalMetadata {
@@ -1857,7 +1839,16 @@ export class Migrator {
   }
 
   async lastStoredEnvironment(): Promise<string | null> {
-    await this._ensureSchemaTable();
+    // When metadata storage is explicitly opted out (`use_metadata_table:
+    // false`), treat the DB as unstamped even if a stale
+    // ar_internal_metadata table exists from a previous run — Rails'
+    // MigrationContext#last_stored_environment short-circuits on
+    // `internal_metadata.enabled?` before the table_exists? read.
+    if (!this._internalMetadata.enabled) return null;
+    // Read-only: if ar_internal_metadata doesn't exist yet, the database
+    // has never been stamped with an environment — return null without
+    // creating the table.
+    if (!(await this._internalMetadata.tableExists())) return null;
     return this._internalMetadata.get("environment");
   }
 

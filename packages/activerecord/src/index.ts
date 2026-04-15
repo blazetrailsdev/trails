@@ -233,7 +233,15 @@ import { MySQLDatabaseTasks as _MySQLTasks } from "./tasks/mysql-database-tasks.
 _SQLiteTasks.register();
 _PGTasks.register();
 _MySQLTasks.register();
-export { Migrator, UnknownMigrationVersionError } from "./migration.js";
+export {
+  Migrator,
+  UnknownMigrationVersionError,
+  ProtectedEnvironmentError,
+  EnvironmentMismatchError,
+  EnvironmentStorageError,
+  NoEnvironmentInSchemaError,
+} from "./migration.js";
+export { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 export type { MigrationProxy, MigrationLike } from "./migration.js";
 export type { DelegatedTypeOptions } from "./delegated-type.js";
 

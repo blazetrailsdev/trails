@@ -695,4 +695,299 @@ export class CreatePosts extends Migration {
     // 'no silent success' since we'd otherwise have printed something).
     expect(logs.filter((l) => l.startsWith("=="))).toHaveLength(0);
   });
+
+  it("db environment:set stamps the schema with the current env", async () => {
+    const dbFile = path.join(tmpDir, "test.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+
+    await runDb(["environment:set"]);
+
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const a = new SQLite3Adapter(dbFile);
+    try {
+      const rows = await a.execute(
+        `SELECT value FROM ar_internal_metadata WHERE key = 'environment'`,
+      );
+      // Matches whatever NODE_ENV / TRAILS_ENV resolves to at test time
+      // (vitest sets NODE_ENV=test).
+      expect((rows[0] as { value: string }).value).toBe(resolveEnv());
+    } finally {
+      await a.close();
+    }
+    expect(logs.some((l) => l.includes("Stamped schema with environment"))).toBe(true);
+  });
+
+  it("db environment:check is a no-op for non-protected environments", async () => {
+    await runDb(["environment:check"]);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("checkProtectedEnvironmentsBang raises when stored env is protected", async () => {
+    const {
+      DatabaseTasks,
+      Migrator,
+      ProtectedEnvironmentError,
+      DatabaseConfigurations,
+      HashConfig,
+    } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dbFile = path.join(tmpDir, "prod.sqlite3");
+    const adapter = new SQLite3Adapter(dbFile);
+    try {
+      const migrator = new Migrator(adapter, []);
+      await migrator.internalMetadata.createTable();
+      await migrator.internalMetadata.set("environment", "production");
+    } finally {
+      await adapter.close();
+    }
+
+    const configurations = new DatabaseConfigurations([
+      new HashConfig("production", "primary", { adapter: "sqlite3", database: dbFile }),
+    ]);
+    const previous = DatabaseTasks.databaseConfiguration;
+    const previousCurrent = DatabaseConfigurations.current;
+    DatabaseTasks.databaseConfiguration = configurations;
+    try {
+      await expect(
+        DatabaseTasks.checkProtectedEnvironmentsBang("production"),
+      ).rejects.toBeInstanceOf(ProtectedEnvironmentError);
+    } finally {
+      // DatabaseConfigurations constructor registers itself as the
+      // module-level current-configurations singleton — restore that too,
+      // not just DatabaseTasks.databaseConfiguration.
+      DatabaseTasks.databaseConfiguration = previous;
+      DatabaseConfigurations.current = previousCurrent;
+    }
+  });
+
+  it("checkProtectedEnvironmentsBang raises EnvironmentMismatchError when stored != current", async () => {
+    const {
+      DatabaseTasks,
+      Migrator,
+      EnvironmentMismatchError,
+      DatabaseConfigurations,
+      HashConfig,
+    } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dbFile = path.join(tmpDir, "staging.sqlite3");
+    const adapter = new SQLite3Adapter(dbFile);
+    try {
+      const migrator = new Migrator(adapter, []);
+      await migrator.internalMetadata.createTable();
+      await migrator.internalMetadata.set("environment", "staging");
+    } finally {
+      await adapter.close();
+    }
+
+    const configurations = new DatabaseConfigurations([
+      new HashConfig("development", "primary", { adapter: "sqlite3", database: dbFile }),
+    ]);
+    const previous = DatabaseTasks.databaseConfiguration;
+    const previousCurrent = DatabaseConfigurations.current;
+    DatabaseTasks.databaseConfiguration = configurations;
+    try {
+      await expect(
+        DatabaseTasks.checkProtectedEnvironmentsBang("development"),
+      ).rejects.toBeInstanceOf(EnvironmentMismatchError);
+    } finally {
+      DatabaseTasks.databaseConfiguration = previous;
+      DatabaseConfigurations.current = previousCurrent;
+    }
+  });
+
+  it("DISABLE_DATABASE_ENVIRONMENT_CHECK bypasses the check", async () => {
+    const { DatabaseTasks, Migrator, DatabaseConfigurations, HashConfig } =
+      await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dbFile = path.join(tmpDir, "prod2.sqlite3");
+    const adapter = new SQLite3Adapter(dbFile);
+    try {
+      const migrator = new Migrator(adapter, []);
+      await migrator.internalMetadata.createTable();
+      await migrator.internalMetadata.set("environment", "production");
+    } finally {
+      await adapter.close();
+    }
+
+    const configurations = new DatabaseConfigurations([
+      new HashConfig("production", "primary", { adapter: "sqlite3", database: dbFile }),
+    ]);
+    const previous = DatabaseTasks.databaseConfiguration;
+    const previousCurrent = DatabaseConfigurations.current;
+    const origEnv = process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
+    DatabaseTasks.databaseConfiguration = configurations;
+    process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = "1";
+    try {
+      await expect(
+        DatabaseTasks.checkProtectedEnvironmentsBang("production"),
+      ).resolves.toBeUndefined();
+    } finally {
+      DatabaseTasks.databaseConfiguration = previous;
+      DatabaseConfigurations.current = previousCurrent;
+      if (origEnv === undefined) delete process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
+      else process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = origEnv;
+    }
+  });
+
+  it("Migrator.checkProtectedEnvironments is read-only and a no-op on fresh DB", async () => {
+    const { Migrator, ProtectedEnvironmentError, Base } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dbFile = path.join(tmpDir, "fresh.sqlite3");
+    const adapter = new SQLite3Adapter(dbFile);
+    const previousProtected = Base.protectedEnvironments;
+    Base.protectedEnvironments = ["production"];
+    try {
+      const migrator = new Migrator(adapter, [], { environment: "production" });
+      // No environment stamped yet → no raise even though current env is
+      // in the protected list. Matches Rails' protected_environment? ==
+      // nil semantics.
+      await expect(migrator.checkProtectedEnvironments()).resolves.toBeUndefined();
+      expect(await migrator.protectedEnvironment()).toBe(false);
+
+      // Verify no ar_internal_metadata was created by the check.
+      expect(await migrator.internalMetadata.tableExists()).toBe(false);
+
+      // After stamping as production, both calls reflect the protected state.
+      await migrator.internalMetadata.createTable();
+      await migrator.internalMetadata.set("environment", "production");
+      expect(await migrator.protectedEnvironment()).toBe(true);
+      await expect(migrator.checkProtectedEnvironments()).rejects.toBeInstanceOf(
+        ProtectedEnvironmentError,
+      );
+    } finally {
+      Base.protectedEnvironments = previousProtected;
+      await adapter.close();
+    }
+  });
+
+  it("InternalMetadata with enabled=false refuses set writes with EnvironmentStorageError", async () => {
+    const { EnvironmentStorageError, InternalMetadata } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dbFile = path.join(tmpDir, "disabled.sqlite3");
+    const adapter = new SQLite3Adapter(dbFile);
+    try {
+      const disabledMeta = new InternalMetadata(adapter, { enabled: false });
+      expect(disabledMeta.enabled).toBe(false);
+
+      // createTable + createTableAndSetFlags silently no-op (Rails'
+      // create_table_and_set_flags returns early when enabled? is false).
+      await expect(disabledMeta.createTable()).resolves.toBeUndefined();
+      await expect(disabledMeta.createTableAndSetFlags("production")).resolves.toBeUndefined();
+      expect(await disabledMeta.tableExists()).toBe(false);
+
+      // Direct `set` raises so callers that attempt a write through a
+      // disabled instance fail loudly.
+      await expect(disabledMeta.set("environment", "test")).rejects.toBeInstanceOf(
+        EnvironmentStorageError,
+      );
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it("Migrator plumbs internalMetadataEnabled=false through to InternalMetadata", async () => {
+    const { Migrator, EnvironmentStorageError } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dbFile = path.join(tmpDir, "disabled-migrator.sqlite3");
+    const adapter = new SQLite3Adapter(dbFile);
+    try {
+      const migrator = new Migrator(adapter, [], { internalMetadataEnabled: false });
+      expect(migrator.internalMetadata.enabled).toBe(false);
+      await expect(
+        migrator.internalMetadata.set("environment", "production"),
+      ).rejects.toBeInstanceOf(EnvironmentStorageError);
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it("Migrator with internalMetadataEnabled=false migrates without stamping", async () => {
+    const { Migrator } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dbFile = path.join(tmpDir, "no-metadata-migrate.sqlite3");
+    const adapter = new SQLite3Adapter(dbFile);
+    try {
+      // Low-level MigrationLike shape (same pattern migrator.test.ts uses)
+      // — bypasses the Migration base class so the test doesn't depend on
+      // its schema-helper wiring.
+      const migrations = [
+        {
+          version: "20260101000000",
+          name: "CreateWidgets",
+          migration: () => ({
+            up: async (a: typeof adapter) => {
+              await a.executeMutation(`CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`);
+            },
+            down: async (a: typeof adapter) => {
+              await a.executeMutation(`DROP TABLE widgets`);
+            },
+          }),
+        },
+      ];
+      const migrator = new Migrator(adapter, migrations, {
+        internalMetadataEnabled: false,
+      });
+
+      // Migrate should succeed and NOT throw EnvironmentStorageError
+      // despite the stamping call site being hit.
+      await expect(migrator.migrate()).resolves.toBeUndefined();
+
+      // Table exists; metadata table does not.
+      const tables = (await adapter.execute(
+        `SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`,
+      )) as Array<{ name: string }>;
+      const names = tables.map((t) => t.name);
+      expect(names).toContain("widgets");
+      expect(names).not.toContain("ar_internal_metadata");
+
+      // lastStoredEnvironment short-circuits to null when disabled.
+      expect(await migrator.lastStoredEnvironment()).toBeNull();
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it("lastStoredEnvironment returns null when metadata is disabled even if table exists", async () => {
+    const { Migrator, InternalMetadata } = await import("@blazetrails/activerecord");
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dbFile = path.join(tmpDir, "stale-metadata.sqlite3");
+    const adapter = new SQLite3Adapter(dbFile);
+    try {
+      // Seed a real metadata table + environment value with a separate
+      // enabled=true instance.
+      const enabledMeta = new InternalMetadata(adapter, { enabled: true });
+      await enabledMeta.createTable();
+      await enabledMeta.set("environment", "production");
+
+      // Disabled Migrator should still report null (no stale read).
+      const migrator = new Migrator(adapter, [], { internalMetadataEnabled: false });
+      expect(await migrator.lastStoredEnvironment()).toBeNull();
+      expect(await migrator.protectedEnvironment()).toBe(false);
+    } finally {
+      await adapter.close();
+    }
+  });
 });

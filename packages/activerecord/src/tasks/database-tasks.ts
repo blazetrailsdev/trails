@@ -352,12 +352,89 @@ export class DatabaseTasks {
     }
   }
 
+  /**
+   * Guard destructive tasks against being run against a database that was
+   * last stamped with a protected environment (e.g. production).
+   *
+   * Mirrors ActiveRecord::Tasks::DatabaseTasks.check_protected_environments!
+   * exactly:
+   *   - If DISABLE_DATABASE_ENVIRONMENT_CHECK is set in the environment,
+   *     this is a no-op (escape hatch for intentional production ops).
+   *   - For each config in the target environment, read the stored
+   *     `environment` key from InternalMetadata.
+   *   - Raise ProtectedEnvironmentError if that stored env is in
+   *     Base.protectedEnvironments.
+   *   - Raise EnvironmentMismatchError if a stored env exists but differs
+   *     from the current env.
+   *   - Swallow NoDatabaseError (can't check a database that isn't there).
+   */
   static async checkProtectedEnvironmentsBang(environment?: string): Promise<void> {
-    const env = this._normalizeEnv(environment);
+    // Rails: `return if ENV["DISABLE_DATABASE_ENVIRONMENT_CHECK"]`.
+    // In Ruby "" is truthy, so any *present* value bypasses. JS "" is
+    // falsy, so we use a presence check to preserve Rails semantics.
+    const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+    if (proc?.env?.DISABLE_DATABASE_ENVIRONMENT_CHECK !== undefined) return;
+
+    const envName = this._normalizeEnv(environment);
     const { Base } = await import("../base.js");
-    const protectedEnvs = Base.protectedEnvironments;
-    if (protectedEnvs.includes(env)) {
-      throw new ProtectedEnvironmentError(env);
+    const protectedEnvs = Base.protectedEnvironments ?? ["production"];
+
+    // Include hidden / `databaseTasks: false` / replica configs so the
+    // guard is a superset of everything destructive callers like dropAll
+    // might touch — a hidden config stamped as production should still
+    // block the operation even though the regular configsFor filter
+    // would have hidden it.
+    const configs = this.databaseConfiguration
+      ? this.databaseConfiguration.configsFor({ envName, includeHidden: true })
+      : [];
+    if (configs.length === 0) {
+      // Two reasons configsFor can come back empty:
+      //   (a) DatabaseTasks.databaseConfiguration was never set (e.g.
+      //       in-memory tests or a stand-alone CLI invocation with
+      //       just DatabaseTasks.env). Fall back to an env-name-only
+      //       check so a flat "production" still raises.
+      //   (b) DatabaseConfigurations is registered but has no entries
+      //       for this env. Rails' check_protected_environments! loops
+      //       over 0 configs and performs no checks — don't raise just
+      //       because the requested env is in the protected list.
+      if (!this.databaseConfiguration && protectedEnvs.includes(envName)) {
+        throw new ProtectedEnvironmentError(envName);
+      }
+      return;
+    }
+
+    const { NoDatabaseError } = await import("../errors.js");
+    const { Migrator, EnvironmentMismatchError } = await import("../migration.js");
+
+    for (const config of configs) {
+      try {
+        const adapter = await this._connectFor(config);
+        try {
+          // Honor the config's use_metadata_table opt-out. When set to
+          // false, Rails treats the DB as unstamped and
+          // last_stored_environment returns nil — don't probe the
+          // ar_internal_metadata table even if it's there from a prior
+          // run with the flag enabled. Read via the DatabaseConfig
+          // getter so defaulting/coercion stays consistent across
+          // HashConfig / UrlConfig.
+          const migrator = new Migrator(adapter, [], {
+            internalMetadataEnabled: config.useMetadataTable,
+          });
+          const stored = await migrator.lastStoredEnvironment();
+          if (stored && protectedEnvs.includes(stored)) {
+            throw new ProtectedEnvironmentError(stored);
+          }
+          if (stored && stored !== envName) {
+            throw new EnvironmentMismatchError(envName, stored);
+          }
+        } finally {
+          const close = (adapter as { close?: () => Promise<void> }).close;
+          if (typeof close === "function") await close.call(adapter);
+        }
+      } catch (error) {
+        if (error instanceof NoDatabaseError) continue;
+        throw error;
+      }
     }
   }
 

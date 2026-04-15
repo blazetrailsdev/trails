@@ -141,6 +141,35 @@ function toDbConfig(raw: RawConfig, envName: string = resolveEnv()): HashConfig 
 }
 
 /**
+ * Run Rails' `check_protected_environments!` guard with a temporarily-
+ * registered `DatabaseTasks.databaseConfiguration` so it actually consults
+ * the stored env in `ar_internal_metadata`. Without the registration the
+ * guard falls back to checking only the current env name, which misses
+ * `EnvironmentMismatchError` and the protected-stamp case this PR cares
+ * about.
+ */
+async function runProtectedEnvCheck(config: HashConfig, envName: string): Promise<void> {
+  const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
+  // DatabaseConfigurations' constructor registers itself as the
+  // module-level "current" singleton (HashConfig.isPrimary consults it),
+  // so swapping DatabaseTasks.databaseConfiguration isn't enough on its
+  // own. Capture BOTH slots — they may differ when other code (e.g.
+  // connection-handling) created a DatabaseConfigurations without
+  // assigning it to DatabaseTasks.databaseConfiguration — and restore
+  // both in finally instead of clobbering the singleton with an empty
+  // fallback.
+  const previousTasksConfig = DatabaseTasks.databaseConfiguration;
+  const previousCurrent = DatabaseConfigurations.current;
+  DatabaseTasks.databaseConfiguration = new DatabaseConfigurations([config]);
+  try {
+    await DatabaseTasks.checkProtectedEnvironmentsBang(envName);
+  } finally {
+    DatabaseTasks.databaseConfiguration = previousTasksConfig;
+    DatabaseConfigurations.current = previousCurrent;
+  }
+}
+
+/**
  * Dump the schema to disk after a migration-writing task. Mirrors Rails'
  * `db:_dump`: gated on `DatabaseTasks.dumpSchemaAfterMigration`, and
  * delegates to `DatabaseTasks.dumpSchema(config)` so ts / js / sql formats
@@ -267,9 +296,12 @@ async function runCreate(): Promise<void> {
 }
 
 async function runDrop(): Promise<void> {
-  const raw = await loadDatabaseConfig();
+  const raw = normalizeRawConfig(await loadDatabaseConfig());
   const config = toDbConfig(raw);
   const displayName = displayNameFor(config, raw);
+  // Rails db:drop is gated on check_protected_environments; we match.
+  // DISABLE_DATABASE_ENVIRONMENT_CHECK=1 is the Rails escape hatch.
+  await runProtectedEnvCheck(config, config.envName);
   try {
     await DatabaseTasks.drop(config);
     console.log(`Dropped database '${displayName}'`);
@@ -347,6 +379,57 @@ export function dbCommand(): Command {
         const version = await migrator.currentVersionReadOnly();
         console.log(`Current version: ${version}`);
       });
+    });
+
+  cmd
+    .command("environment:set")
+    .description("Stamp the schema with the current environment name")
+    .action(async () => {
+      await withAdapter(async (adapter, raw) => {
+        // Use resolveEnv() so the stamped env matches what the trails
+        // CLI considers 'current' (TRAILS_ENV takes precedence over
+        // NODE_ENV). Without this, `TRAILS_ENV=production trails db
+        // environment:set` with NODE_ENV=development would stamp the DB
+        // as development and defeat the protected-env guard.
+        const envName = resolveEnv();
+        const internalMetadataEnabled =
+          (raw as { useMetadataTable?: boolean }).useMetadataTable !== false;
+        const migrator = new Migrator(adapter, [], {
+          environment: envName,
+          internalMetadataEnabled,
+        });
+        // Rails: raise EnvironmentStorageError when
+        // internal_metadata.enabled? is false (use_metadata_table opt-out).
+        if (!migrator.internalMetadata.enabled) {
+          const { EnvironmentStorageError } = await import("@blazetrails/activerecord");
+          throw new EnvironmentStorageError();
+        }
+        await migrator.internalMetadata.createTableAndSetFlags(envName);
+        console.log(`Stamped schema with environment: ${envName}`);
+      });
+    });
+
+  cmd
+    .command("environment:check")
+    .description(
+      "Abort if the stored schema environment is protected or does not match the current environment",
+    )
+    .action(async () => {
+      // Don't go through withAdapter — we don't want to open a connection
+      // here. The guard itself connects per-config (and swallows
+      // NoDatabaseError) so a missing DB shouldn't crash this command.
+      // Pass resolveEnv() explicitly so the check runs against the
+      // environment the CLI is currently operating as (RawConfig doesn't
+      // carry envName).
+      const envName = resolveEnv();
+      const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
+      const config = toDbConfig(raw, envName);
+      try {
+        await runProtectedEnvCheck(config, envName);
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exitCode = 1;
+      }
     });
 
   cmd
@@ -529,6 +612,9 @@ export function dbCommand(): Command {
     .action(async () => {
       await withAdapter(async (adapter, raw) => {
         const config = toDbConfig(raw);
+        // schema:load is destructive (replaces the schema) — Rails gates
+        // it on check_protected_environments.
+        await runProtectedEnvCheck(config, config.envName);
         const filename = DatabaseTasks.schemaDumpPath(config);
         if (!fs.existsSync(filename)) {
           console.error(`No schema file found at ${filename}`);

@@ -64,6 +64,23 @@ export class DatabaseConfigurations {
     this._defaultEnv = value;
   }
 
+  /**
+   * The DatabaseConfigurations instance most recently registered (via
+   * constructor or explicit set). `HashConfig.isPrimary` consults it,
+   * matching Rails' `Base.configurations.primary?(name)`.
+   *
+   * Exposed so callers that temporarily swap configurations (e.g. the
+   * trailties CLI's `runProtectedEnvCheck`) can capture and restore the
+   * singleton without having to re-instantiate it.
+   */
+  static get current(): DatabaseConfigurations | null {
+    return _currentConfigurations;
+  }
+
+  static set current(value: DatabaseConfigurations | null) {
+    _currentConfigurations = value;
+  }
+
   private _configurations: DatabaseConfig[];
 
   constructor(configurations: RawConfigurations | DatabaseConfig[] = {}) {
