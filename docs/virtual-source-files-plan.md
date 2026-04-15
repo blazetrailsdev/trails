@@ -48,7 +48,7 @@ constraint — pre-1.0 trails has no external consumers depending on the
 divergence, and getting the runtime right is what makes the virtualizer
 output honest.
 
-The single divergence this plan addresses head-on:
+The first divergence this plan addresses:
 
 - **`blog.posts` returns `Base[]` today; Rails returns a `CollectionProxy`.**
   Rails (`activerecord/lib/active_record/associations/collection_association.rb#reader`):
@@ -65,7 +65,7 @@ Other surfaces (`belongsTo` / `hasOne` returning the record or null,
 `scope` returning a Relation, attribute getters returning the typed
 value) already match Rails; no runtime change needed.
 
-A second divergence this plan addresses:
+The second divergence this plan addresses:
 
 - **Sync access to unloaded `post.author` silently returns `null`.**
   Rails would have lazy-loaded; trails today returns `this.target` —
@@ -75,7 +75,7 @@ A second divergence this plan addresses:
   posture: sync access to an unloaded association throws
   `StrictLoadingViolationError` (the error type already exists in
   trails, currently optional). The fix is preloading via
-  `Post.includes("author")` or an explicit `await loadAssociation(post, "author")`
+  `Post.includes("author")` or an explicit `await loadBelongsTo(post, "author")` / `loadHasOne(post, "author")`
   — the same pattern Rails users already write to avoid N+1.
 
 **Pragmatic divergences left in place (out of scope for this plan):**
@@ -147,8 +147,9 @@ shells around it:
    `LanguageServiceHost.getScriptSnapshot` and returns the virtualized
    snapshot per file.
 
-Both shells call the same `virtualize(source, fileName)` function. Same
-AST walker, same declaration synthesizer, same type registry.
+Both shells call the same `virtualize(source, fileName, options?)`
+function. Same AST walker, same declaration synthesizer, same type
+registry.
 
 ### The virtualize function
 
@@ -204,9 +205,9 @@ Steps:
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `this.attribute(name, "string", opts?)`                         | `declare name: string;`                                                                                                                                       | literal `"string" \| "integer" \| ...` → `string \| number \| ...`                                   |
 | `this.attribute(name, "string", { default: ..., null: false })` | `declare name: string;`                                                                                                                                       | `null: false` drops nullability                                                                      |
-| `this.hasMany(name, opts?)`                                     | `declare name: AssociationProxy<TargetClass>;`                                                                                                                | classify(singularize(name)) or `opts.className`                                                      |
+| `this.hasMany(name, opts?)`                                     | `declare name: AssociationProxy<TargetClass>;`                                                                                                                | `classify(name)` (which composes `camelize(singularize(...))`) or `opts.className`                   |
 | `this.hasAndBelongsToMany(name)`                                | `declare name: AssociationProxy<TargetClass>;`                                                                                                                | same                                                                                                 |
-| `this.belongsTo(name)`                                          | `declare name: TargetClass \| null;`                                                                                                                          | classify(name) or `opts.className`                                                                   |
+| `this.belongsTo(name)`                                          | `declare name: TargetClass \| null;`                                                                                                                          | `classify(name)` or `opts.className`                                                                 |
 | `this.hasOne(name)`                                             | `declare name: TargetClass \| null;`                                                                                                                          | same                                                                                                 |
 | `this.scope(name, fn)`                                          | `declare static name: (...args: ScopeArgs) => Relation<ThisClass>;` where `ScopeArgs` is `fn`'s parameter list with the leading `Relation<ThisClass>` dropped | extract the inline `fn` expression's parameters, drop the first (`rel`), preserve the rest literally |
 | `this.enum(attr, map, opts?)`                                   | per-value: `declare is<Value>: () => boolean; declare <value>Bang: () => this; declare static <value>: () => Relation<ThisClass>;`                            | `Base.enum` shape; honors `prefix` / `suffix` options                                                |
@@ -322,7 +323,7 @@ existing `AssociationProxy<T>` instead of `Base[]`, and adopt
 strict-loading semantics for singular readers. These are the runtime
 changes in the plan; both are pre-1.0 breaking changes — by design.
 
-Two sub-PRs, each independently testable:
+Three sub-PRs, each independently testable:
 
 - **R.1 — make CollectionProxy a drop-in for arrays.** Add
   `Symbol.iterator`, `length`, numeric indexing (via the existing JS
@@ -362,11 +363,14 @@ Two sub-PRs, each independently testable:
   silently `null` when nobody preloaded. Rails-faithful posture: sync
   access on an unloaded association throws
   `StrictLoadingViolationError` with a message naming the association
-  and pointing at the fix (`Post.includes("author")` or
-  `await loadAssociation(post, "author")`). The error type is already
-  defined in trails (`packages/activerecord/src/errors.ts`); today
-  it's only thrown by `CollectionProxy` when `strictLoading` is opted
-  in. R.3 generalizes the rule:
+  and pointing at the fix (`Post.includes("author")`, or the
+  per-association helpers `await loadBelongsTo(post, "author")` /
+  `loadHasOne(post, "author")`). The error type is already defined in
+  trails (`packages/activerecord/src/errors.ts`); today, direct
+  property access still returns the cached target, but strict loading
+  can already raise via the explicit lazy-load helpers / proxy-delegated
+  loads when `strictLoading` is opted in. R.3 generalizes the rule to
+  singular reader access itself:
   - **Singular reader (`belongsTo` / `hasOne`):** sync access throws
     if the association has never been loaded AND the FK is non-null.
     Loaded-and-`null` (FK is null) returns `null` cleanly — that's a
@@ -389,7 +393,8 @@ Two sub-PRs, each independently testable:
     cache, so preloaded records pass the sync-access check
     transparently. The error message in the throw should reference
     both the eager-load chain (`Post.includes("author")`) and the
-    one-off helper (`await loadAssociation(post, "author")`).
+    per-association helper (`await loadBelongsTo(post, "author")` for
+    `belongsTo`, or `await loadHasOne(post, "author")` for `hasOne`).
 
   Virtualizer-side: no change. `declare author: Author | null;` stays
   honest — at sync access time the value really is the loaded record
