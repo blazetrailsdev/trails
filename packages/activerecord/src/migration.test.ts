@@ -3,8 +3,9 @@
  * Mirrors: activerecord/test/cases/migration_test.rb
  *          activerecord/test/cases/invertible_migration_test.rb
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { Base, MigrationContext, MigrationRunner, Migrator } from "./index.js";
+import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -2137,5 +2138,248 @@ describe("addForeignKey with referential actions", () => {
     await migration.addForeignKey("players", "teams", { column: "team_id" });
     expect(sql[0]).not.toContain("ON DELETE");
     expect(sql[0]).not.toContain("ON UPDATE");
+  });
+});
+
+describe("Migrator DDL transaction wrapping", () => {
+  // Use a dedicated in-memory SQLite adapter instead of createTestAdapter
+  // (which auto-detects PG/MySQL in CI). These tests exercise the
+  // Migrator's wrapping logic, not adapter-specific behavior, and must
+  // not depend on an external DB connection.
+  const openAdapters: Array<{ close?: () => void | Promise<void> }> = [];
+  async function makeSqliteBase() {
+    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const adapter = new SQLite3Adapter(":memory:");
+    openAdapters.push(adapter);
+    return adapter;
+  }
+  afterAll(async () => {
+    for (const a of openAdapters) {
+      if (typeof a.close === "function") await a.close();
+    }
+    openAdapters.length = 0;
+  });
+
+  function makeDdlAdapter(calls: string[], opts: { supportsDdl?: boolean } = {}, base: any = null) {
+    const target = base ?? createTestAdapter();
+    // Proxy intercepts specific methods to track calls while
+    // preserving all of the adapter's execute/executeMutation.
+    return new Proxy(target, {
+      get(target, prop) {
+        if (prop === "supportsDdlTransactions") {
+          return opts.supportsDdl ? () => true : undefined;
+        }
+        if (prop === "beginTransaction")
+          return async () => {
+            calls.push("begin");
+          };
+        if (prop === "commit")
+          return async () => {
+            calls.push("commit");
+          };
+        if (prop === "rollback")
+          return async () => {
+            calls.push("rollback");
+          };
+        return (target as any)[prop];
+      },
+    });
+  }
+
+  it("wraps migration in a transaction when adapter supports DDL transactions", async () => {
+    const calls: string[] = [];
+    const adapter = makeDdlAdapter(calls, { supportsDdl: true }, await makeSqliteBase());
+    const migrations = [
+      {
+        version: "20260101000000",
+        name: "test",
+        migration: () => ({
+          up: async () => {
+            calls.push("up");
+          },
+          down: async () => {},
+        }),
+      },
+    ];
+    const migrator = new Migrator(adapter as any, migrations as any);
+    await migrator.migrate(null);
+    expect(calls).toContain("begin");
+    expect(calls).toContain("up");
+    expect(calls).toContain("commit");
+    expect(calls.indexOf("begin")).toBeLessThan(calls.indexOf("up"));
+    expect(calls.indexOf("up")).toBeLessThan(calls.indexOf("commit"));
+  });
+
+  it("skips transaction when migration opts out via disableDdlTransaction", async () => {
+    const calls: string[] = [];
+    const adapter = makeDdlAdapter(calls, { supportsDdl: true }, await makeSqliteBase());
+    const migrations = [
+      {
+        version: "20260101000000",
+        name: "test",
+        migration: () => ({
+          disableDdlTransaction: true,
+          up: async () => {
+            calls.push("up");
+          },
+          down: async () => {},
+        }),
+      },
+    ];
+    const migrator = new Migrator(adapter as any, migrations as any);
+    await migrator.migrate(null);
+    expect(calls).toContain("up");
+    expect(calls).not.toContain("begin");
+    expect(calls).not.toContain("commit");
+  });
+
+  it("skips transaction when adapter doesn't support DDL transactions", async () => {
+    const calls: string[] = [];
+    const adapter = makeDdlAdapter(calls, { supportsDdl: false }, await makeSqliteBase());
+    const migrations = [
+      {
+        version: "20260101000000",
+        name: "test",
+        migration: () => ({
+          up: async () => {
+            calls.push("up");
+          },
+          down: async () => {},
+        }),
+      },
+    ];
+    const migrator = new Migrator(adapter as any, migrations as any);
+    await migrator.migrate(null);
+    expect(calls).toContain("up");
+    expect(calls).not.toContain("begin");
+  });
+
+  it("calls rollback (not commit) when the migration throws", async () => {
+    const calls: string[] = [];
+    const adapter = makeDdlAdapter(calls, { supportsDdl: true }, await makeSqliteBase());
+    const migrations = [
+      {
+        version: "20260101000000",
+        name: "test",
+        migration: () => ({
+          up: async () => {
+            throw new Error("boom");
+          },
+          down: async () => {},
+        }),
+      },
+    ];
+    const migrator = new Migrator(adapter as any, migrations as any);
+    await expect(migrator.migrate(null)).rejects.toThrow("boom");
+    expect(calls).toContain("begin");
+    expect(calls).toContain("rollback");
+    expect(calls).not.toContain("commit");
+  });
+
+  it("skips wrapping when adapter is already in a transaction", async () => {
+    const calls: string[] = [];
+    const base = await makeSqliteBase();
+    const adapter = new Proxy(base, {
+      get(target, prop) {
+        if (prop === "supportsDdlTransactions") return () => true;
+        if (prop === "inTransaction") return true; // already in txn
+        if (prop === "beginTransaction")
+          return async () => {
+            calls.push("begin");
+          };
+        if (prop === "commit")
+          return async () => {
+            calls.push("commit");
+          };
+        if (prop === "rollback")
+          return async () => {
+            calls.push("rollback");
+          };
+        return (target as any)[prop];
+      },
+    });
+    const migrations = [
+      {
+        version: "20260101000000",
+        name: "test",
+        migration: () => ({
+          up: async () => {
+            calls.push("up");
+          },
+          down: async () => {},
+        }),
+      },
+    ];
+    const migrator = new Migrator(adapter as any, migrations as any);
+    await migrator.migrate(null);
+    expect(calls).toContain("up");
+    expect(calls).not.toContain("begin"); // skipped — already in txn
+  });
+});
+
+describe("SchemaMigration.assumeMigratedUptoVersion", () => {
+  it("inserts the target version and all known versions below it", async () => {
+    const adapter = createTestAdapter();
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+
+    await sm.assumeMigratedUptoVersion("20260103000000", [
+      "20260101000000",
+      "20260102000000",
+      "20260103000000",
+      "20260104000000", // above target — should NOT be inserted
+    ]);
+
+    const versions = await sm.allVersions();
+    expect(versions).toContain("20260101000000");
+    expect(versions).toContain("20260102000000");
+    expect(versions).toContain("20260103000000");
+    expect(versions).not.toContain("20260104000000");
+  });
+
+  it("does not duplicate already-migrated versions", async () => {
+    const adapter = createTestAdapter();
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await sm.createVersion("20260101000000");
+
+    await sm.assumeMigratedUptoVersion("20260102000000", ["20260101000000", "20260102000000"]);
+
+    const versions = await sm.allVersions();
+    // 20260101000000 appears once, not twice
+    expect(versions.filter((v) => v === "20260101000000")).toHaveLength(1);
+    expect(versions).toContain("20260102000000");
+  });
+
+  it("throws on non-numeric version", async () => {
+    const adapter = createTestAdapter();
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await expect(sm.assumeMigratedUptoVersion("abc")).rejects.toThrow();
+  });
+
+  it("throws on non-numeric entry in migrationVersions", async () => {
+    const adapter = createTestAdapter();
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await expect(sm.assumeMigratedUptoVersion("20260102000000", ["abc"])).rejects.toThrow();
+    // No partial state — the target version should NOT have been inserted
+    // because validation runs before any writes.
+    const versions = await sm.allVersions();
+    expect(versions).not.toContain("20260102000000");
+  });
+
+  it("throws on duplicate versions without leaving partial state", async () => {
+    const adapter = createTestAdapter();
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await expect(
+      sm.assumeMigratedUptoVersion("20260103000000", [
+        "20260101000000",
+        "20260101000000", // duplicate
+      ]),
+    ).rejects.toThrow(/Duplicate migration/);
+    const versions = await sm.allVersions();
+    expect(versions).toHaveLength(0); // no partial writes
   });
 });

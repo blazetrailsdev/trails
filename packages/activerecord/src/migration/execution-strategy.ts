@@ -12,6 +12,8 @@ import type { DatabaseAdapter } from "../adapter.js";
 export interface MigrationLike {
   up(adapter: DatabaseAdapter): Promise<void>;
   down(adapter: DatabaseAdapter): Promise<void>;
+  /** When true, Migrator skips DDL transaction wrapping for this migration. */
+  disableDdlTransaction?: boolean;
 }
 
 export abstract class ExecutionStrategy {

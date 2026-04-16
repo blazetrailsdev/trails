@@ -1718,26 +1718,79 @@ export class Migrator {
     }
 
     const migration = proxy.migration();
-    await this._strategy.exec(direction, migration, this._adapter);
-    if (direction === "up") {
-      await this._schemaMigration.recordVersion(proxy.version);
-      // Skip stamping when internal metadata is disabled
-      // (`use_metadata_table: false`). Writing through a disabled
-      // InternalMetadata raises EnvironmentStorageError, which would
-      // otherwise break the migrate path for consumers that intentionally
-      // opt out. Rails' equivalent call site is similarly guarded via
-      // `internal_metadata.enabled?`.
-      if (this._internalMetadata.enabled) {
-        await this._internalMetadata.set("environment", this._environment);
+    // Rails wraps both the migration execution AND the version
+    // stamping inside the same ddl_transaction so they commit/rollback
+    // atomically. Without this, a committed migration + failed stamp
+    // would leave schema_migrations out of sync.
+    await this._ddlTransaction(migration, async () => {
+      await this._strategy.exec(direction, migration, this._adapter);
+      if (direction === "up") {
+        await this._schemaMigration.recordVersion(proxy.version);
+        if (this._internalMetadata.enabled) {
+          await this._internalMetadata.set("environment", this._environment);
+        }
+      } else {
+        await this._schemaMigration.deleteVersion(proxy.version);
       }
-    } else {
-      await this._schemaMigration.deleteVersion(proxy.version);
-    }
+    });
 
     if (this.verbose) {
       const action = direction === "up" ? "migrated" : "reverted";
       this._output.push(`== ${proxy.version} ${proxy.name}: ${action} ==`);
     }
+  }
+
+  /**
+   * Wrap the migration in a DDL transaction if the adapter supports
+   * it and the migration hasn't opted out. Mirrors Rails'
+   * `Migrator#ddl_transaction`:
+   *
+   *     def ddl_transaction(migration)
+   *       if use_transaction?(migration)
+   *         connection.transaction { yield }
+   *       else
+   *         yield
+   *       end
+   *     end
+   */
+  private async _ddlTransaction(migration: MigrationLike, fn: () => Promise<void>): Promise<void> {
+    if (this._useTransaction(migration)) {
+      // Skip wrapping if the adapter is already in a transaction
+      // (e.g. a caller wrapped the entire migrate in a transaction).
+      // Starting a nested BEGIN would error on adapters that issue
+      // raw BEGIN (vs savepoints).
+      if (this._adapter.inTransaction) {
+        await fn();
+      } else {
+        await this._adapter.beginTransaction();
+        try {
+          await fn();
+          await this._adapter.commit();
+        } catch (e) {
+          try {
+            await this._adapter.rollback();
+          } catch {
+            // Swallow rollback errors so the original migration
+            // error isn't masked.
+          }
+          throw e;
+        }
+      }
+    } else {
+      await fn();
+    }
+  }
+
+  /**
+   * Mirrors Rails' `Migrator#use_transaction?`:
+   * `!migration.disable_ddl_transaction && connection.supports_ddl_transactions?`
+   */
+  private _useTransaction(migration: MigrationLike): boolean {
+    if (migration.disableDdlTransaction) return false;
+    // Check adapter support via the DatabaseAdapter interface.
+    // SQLite returns true, PG returns true, MySQL returns false.
+    // Absent (undefined) defaults to false.
+    return this._adapter.supportsDdlTransactions?.() ?? false;
   }
 
   /**

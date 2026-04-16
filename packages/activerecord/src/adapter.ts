@@ -85,4 +85,10 @@ export interface DatabaseAdapter {
   isWriteQuery(sql: string): boolean;
   emptyInsertStatementValue(pk?: string | null): string;
   getDatabaseVersion?(): unknown;
+  /**
+   * Whether the adapter supports wrapping DDL statements in a
+   * transaction. When true, Migrator wraps each migration in
+   * begin/commit. Optional — defaults to false when absent.
+   */
+  supportsDdlTransactions?(): boolean;
 }

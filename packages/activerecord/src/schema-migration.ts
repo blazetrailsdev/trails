@@ -124,4 +124,74 @@ export class SchemaMigration {
       return isNaN(n) ? 0 : n;
     });
   }
+
+  /**
+   * Mark all migration versions up to `version` as run without
+   * executing them. Used for legacy DB imports and test fixtures.
+   *
+   * A related implementation exists on `SchemaStatements` (which has
+   * pool/migrationContext access and uses parseInt-based normalization).
+   * This wrapper provides a standalone version for callers holding a
+   * SchemaMigration instance directly. It uses stricter validation
+   * (BigInt + /^\d+$/) and validates all inputs before any writes,
+   * whereas SchemaStatements may write before detecting duplicates.
+   * Versions are normalized via BigInt so "001" and "1" are treated
+   * as the same version.
+   */
+  async assumeMigratedUptoVersion(
+    version: number | string,
+    migrationVersions: (number | string)[] = [],
+  ): Promise<void> {
+    // Validate + normalize ALL inputs before any writes so a bad
+    // version or duplicate doesn't leave partial state.
+    const versionStr = String(version);
+    const versionsStr = migrationVersions.map(String);
+    if (!/^\d+$/.test(versionStr)) {
+      throw new Error(`Invalid migration version: ${versionStr}`);
+    }
+    const normalized = String(BigInt(versionStr));
+    const versionNum = BigInt(normalized);
+
+    const candidates = versionsStr.map((v) => {
+      if (!/^\d+$/.test(v)) {
+        throw new Error(`Invalid migration version: ${v}`);
+      }
+      const n = String(BigInt(v));
+      return { original: v, normalized: n, num: BigInt(n) };
+    });
+
+    const seen = new Set<string>();
+    for (const { normalized: n, original } of candidates) {
+      if (seen.has(n)) {
+        throw new Error(
+          `Duplicate migration ${original}. Please renumber your migrations to resolve the conflict.`,
+        );
+      }
+      seen.add(n);
+    }
+
+    // All validation passed — now write.
+    // Normalize existing versions the same way so "001" in the DB
+    // matches "1" from the input.
+    const rawMigrated = await this.allVersions();
+    const migrated = new Set(
+      rawMigrated.map((v) => {
+        try {
+          return String(BigInt(v));
+        } catch {
+          return v;
+        }
+      }),
+    );
+
+    if (!migrated.has(normalized)) {
+      await this.createVersion(normalized);
+    }
+
+    for (const { normalized: n, num } of candidates) {
+      if (num < versionNum && !migrated.has(n)) {
+        await this.createVersion(n);
+      }
+    }
+  }
 }
