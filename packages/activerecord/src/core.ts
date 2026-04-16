@@ -22,7 +22,7 @@ export interface Core {
   isReadonly(): boolean;
   readonlyBang(): this;
   isStrictLoading(): boolean;
-  strictLoadingBang(): this;
+  strictLoadingBang(value?: boolean): this;
   isFrozen(): boolean;
   freeze(): this;
 }

@@ -2051,12 +2051,15 @@ export class Base extends Model {
   }
 
   /**
-   * Enable strict loading — lazily-loaded associations will raise.
+   * Enable (or disable, with `value: false`) strict loading —
+   * lazily-loaded associations will raise. Matches Rails'
+   * `strict_loading!(value = true)` which accepts an explicit argument
+   * for symmetrical on/off.
    *
    * Mirrors: ActiveRecord::Base#strict_loading!
    */
-  strictLoadingBang(): this {
-    this._strictLoading = true;
+  strictLoadingBang(value: boolean = true): this {
+    this._strictLoading = value;
     return this;
   }
 
@@ -2969,6 +2972,19 @@ export class Base extends Model {
   }
 
   // -- Strict loading class-level default --
+  //
+  // Off by default, matching Rails
+  // (`config.active_record.strict_loading_by_default` is false unless
+  // explicitly enabled). Opt in per-class with
+  // `Post.strictLoadingByDefault = true`, per-instance with
+  // `record.strictLoadingBang()`, or globally with
+  // `Base.strictLoadingByDefault = true`.
+  //
+  // Phase R.3 makes strict loading LOUD on sync singular-association
+  // reader access: when enabled, `post.author` on an unloaded
+  // association throws `StrictLoadingViolationError` — pointing users
+  // at `post.loadBelongsTo("author")` or `Post.includes("author")`
+  // instead of silently returning null.
   static _strictLoadingByDefault = false;
 
   /**
@@ -3225,7 +3241,11 @@ export class Base extends Model {
    */
   async loadBelongsTo(name: string): Promise<Base | null> {
     const assocDef = this._assertSingularAssociation(name, "belongsTo");
-    return loadBelongsTo(this, name, assocDef.options ?? {});
+    const result = await this._bypassStrictLoading(() =>
+      loadBelongsTo(this, name, assocDef.options ?? {}),
+    );
+    this._hydrateSingularAssoc(name, result);
+    return result;
   }
 
   /**
@@ -3243,7 +3263,36 @@ export class Base extends Model {
    */
   async loadHasOne(name: string): Promise<Base | null> {
     const assocDef = this._assertSingularAssociation(name, "hasOne");
-    return loadHasOne(this, name, assocDef.options ?? {});
+    const result = await this._bypassStrictLoading(() =>
+      loadHasOne(this, name, assocDef.options ?? {}),
+    );
+    this._hydrateSingularAssoc(name, result);
+    return result;
+  }
+
+  /**
+   * Populate the association instance's target and mark it loaded so
+   * subsequent sync reader access (`post.author`) returns the record
+   * without tripping strict loading. `setTarget()` internally calls
+   * `loadedBang()`, so no separate call is needed here.
+   */
+  private _hydrateSingularAssoc(name: string, result: Base | null): void {
+    this.association(name).setTarget(result);
+  }
+
+  /**
+   * Temporarily bumps the strict-loading bypass count across the
+   * execution of `fn`. Explicit `loadBelongsTo` / `loadHasOne` calls
+   * are legitimate lazy loads — the caller asked for them — so they
+   * skip the strict-loading throw.
+   */
+  private async _bypassStrictLoading<T>(fn: () => Promise<T>): Promise<T> {
+    this._strictLoadingBypassCount += 1;
+    try {
+      return await fn();
+    } finally {
+      this._strictLoadingBypassCount = Math.max(0, this._strictLoadingBypassCount - 1);
+    }
   }
 
   private _assertSingularAssociation(

@@ -263,6 +263,17 @@ class Author extends Base {
 // explicitly load — method name matches the macro, so calling the
 // wrong one is a TS error. Returns the cached/preloaded value if
 // present, otherwise runs a query.
+//
+// Under strict loading (`record.strictLoadingBang()` or
+// `Class.strictLoadingByDefault = true`, both off by default matching
+// Rails), sync access on a singular association that WOULD require a
+// DB load throws `StrictLoadingViolationError` instead of silently
+// returning null. The check honors preloaded / cached associations
+// (including keys mapped to null), null FKs on belongsTo, and new
+// owners on hasOne — none of those would run a query, so none throw.
+// The explicit async loaders (`loadBelongsTo` / `loadHasOne`) bypass
+// the check — the caller asked for the load. Per-instance opt-out:
+// `record.strictLoadingBang(false)`.
 const post = await Post.find(1);
 const author = await post.loadBelongsTo("author"); // Promise<Author | null>
 const author2 = await Author.find(1);
