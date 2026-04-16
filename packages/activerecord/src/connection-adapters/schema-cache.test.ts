@@ -252,6 +252,47 @@ describe("SchemaCacheTest", () => {
     const pkKeys = Object.keys(coder["primary_keys"] as Record<string, unknown>);
     expect(pkKeys).toEqual(["alpacas", "zebras"]);
   });
+
+  it("stores and round-trips composite primary keys as arrays", () => {
+    // Rails' SchemaCache stores composite PKs as an array of column
+    // names. Phase 13 widened the type from string|null to
+    // string|string[]|null. Verify encode → initWith round-trips.
+    const cache = new SchemaCache();
+    cache.setPrimaryKeys("memberships", ["user_id", "group_id"]);
+
+    const coder: Record<string, unknown> = {};
+    cache.encodeWith(coder);
+    const serialized = coder["primary_keys"] as Record<string, unknown>;
+    expect(serialized["memberships"]).toEqual(["user_id", "group_id"]);
+
+    const restored = new SchemaCache();
+    restored.initWith(coder);
+    // Reading back via the internal map — the value survives the
+    // Object.entries → Map → Object.fromEntries round-trip.
+    const pool = null;
+    return restored.primaryKeys(pool, "memberships").then((pk) => {
+      expect(pk).toEqual(["user_id", "group_id"]);
+    });
+  });
+
+  it("marshalDump / marshalLoad round-trips composite primary keys", () => {
+    const cache = new SchemaCache();
+    cache.setPrimaryKeys("memberships", ["user_id", "group_id"]);
+    cache.setPrimaryKeys("users", "id");
+
+    const data = cache.marshalDump();
+    const restored = new SchemaCache();
+    restored.marshalLoad(data);
+
+    return Promise.all([
+      restored.primaryKeys(null, "memberships").then((pk) => {
+        expect(pk).toEqual(["user_id", "group_id"]);
+      }),
+      restored.primaryKeys(null, "users").then((pk) => {
+        expect(pk).toBe("id");
+      }),
+    ]);
+  });
 });
 
 describe("SchemaReflectionTest", () => {

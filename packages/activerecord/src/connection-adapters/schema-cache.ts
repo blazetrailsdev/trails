@@ -65,7 +65,7 @@ function rehydrateColumn(data: unknown): Column {
 export class SchemaCache {
   private _columns = new Map<string, Column[]>();
   private _columnsHash = new Map<string, Record<string, Column>>();
-  private _primaryKeys = new Map<string, string | null>();
+  private _primaryKeys = new Map<string, string | string[] | null>();
   private _dataSourceExists = new Map<string, boolean>();
   private _indexes = new Map<string, unknown[]>();
   private _version: string | number | null = null;
@@ -126,10 +126,10 @@ export class SchemaCache {
     }
 
     if (coder["primary_keys"] instanceof Map) {
-      this._primaryKeys = coder["primary_keys"] as Map<string, string | null>;
+      this._primaryKeys = coder["primary_keys"] as Map<string, string | string[] | null>;
     } else if (coder["primary_keys"] && typeof coder["primary_keys"] === "object") {
       this._primaryKeys = new Map(
-        Object.entries(coder["primary_keys"] as Record<string, string | null>),
+        Object.entries(coder["primary_keys"] as Record<string, string | string[] | null>),
       );
     }
 
@@ -164,7 +164,10 @@ export class SchemaCache {
     return this._columns.has(tableName);
   }
 
-  async primaryKeys(pool: unknown, tableName: string): Promise<string | null | undefined> {
+  async primaryKeys(
+    pool: unknown,
+    tableName: string,
+  ): Promise<string | string[] | null | undefined> {
     if (this._primaryKeys.has(tableName)) {
       return this._primaryKeys.get(tableName);
     }
@@ -318,7 +321,7 @@ export class SchemaCache {
     this._dataSourceExists.set(tableName, true);
   }
 
-  setPrimaryKeys(tableName: string, pk: string | null): void {
+  setPrimaryKeys(tableName: string, pk: string | string[] | null): void {
     this._primaryKeys.set(tableName, pk);
   }
 
@@ -368,7 +371,7 @@ export class SchemaCache {
       Object.entries(rawCols).map(([table, cols]) => [table, cols.map((c) => rehydrateColumn(c))]),
     );
     this._primaryKeys = new Map(
-      Object.entries((primaryKeys as Record<string, string | null>) ?? {}),
+      Object.entries((primaryKeys as Record<string, string | string[] | null>) ?? {}),
     );
     this._dataSourceExists = new Map(
       Object.entries((dataSources as Record<string, boolean>) ?? {}),
@@ -460,7 +463,10 @@ export class SchemaReflection {
     return this._cache;
   }
 
-  async primaryKeys(pool: unknown, tableName: string): Promise<string | null | undefined> {
+  async primaryKeys(
+    pool: unknown,
+    tableName: string,
+  ): Promise<string | string[] | null | undefined> {
     return (await this.cache(pool)).primaryKeys(pool, tableName);
   }
 
@@ -638,7 +644,7 @@ export class BoundSchemaReflection {
     return this._schemaReflection.isCached(tableName);
   }
 
-  async primaryKeys(tableName: string): Promise<string | null | undefined> {
+  async primaryKeys(tableName: string): Promise<string | string[] | null | undefined> {
     return this._schemaReflection.primaryKeys(this._pool, tableName);
   }
 

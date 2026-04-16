@@ -490,7 +490,7 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
     return idxs.some((idx) => idx.name === indexName);
   }
 
-  async primaryKey(tableName: string): Promise<string | null> {
+  async primaryKey(tableName: string): Promise<string | string[] | null> {
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
     let tableCondition: string;
@@ -504,6 +504,11 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
+    // Order by the column's position within the index key array so
+    // composite PKs come back in declaration order, not the
+    // non-deterministic order pg_attribute happens to yield rows.
+    // `array_position(i.indkey, a.attnum)` gives each column's
+    // 1-based position inside the index definition.
     const rows = await this.execute(
       `SELECT a.attname
        FROM pg_index i
@@ -511,12 +516,14 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
        JOIN pg_class t ON t.oid = i.indrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
        WHERE ${tableCondition}
-         AND i.indisprimary = true`,
+         AND i.indisprimary = true
+       ORDER BY array_position(i.indkey, a.attnum)`,
       binds,
     );
 
     if (rows.length === 0) return null;
-    return rows[0].attname as string;
+    if (rows.length === 1) return rows[0].attname as string;
+    return rows.map((r) => r.attname as string);
   }
 
   async pkAndSequenceFor(

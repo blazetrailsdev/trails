@@ -314,13 +314,12 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
   }
 
   /**
-   * Return the single-column primary key name, or null for composite /
-   * no-PK tables. Uses the same `information_schema.statistics` +
-   * `seq_in_index` shape Rails emits in
-   * `abstract_mysql_adapter#primary_keys` — works across all MySQL
-   * versions + MariaDB.
+   * Return the primary key: scalar string for single-column PKs,
+   * array for composite PKs, null for no-PK tables. Uses the same
+   * `information_schema.statistics` + `seq_in_index` shape Rails
+   * emits in `abstract_mysql_adapter#primary_keys`.
    */
-  async primaryKey(tableName: string): Promise<string | null> {
+  async primaryKey(tableName: string): Promise<string | string[] | null> {
     const { schema, table } = this.parseMysqlName(tableName);
     const rows = (await this.execute(
       `SELECT column_name AS name FROM information_schema.statistics
@@ -331,8 +330,9 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
       [schema ?? null, table],
     )) as Array<{ name?: string; NAME?: string; COLUMN_NAME?: string }>;
     const names = rows.map((r) => (r.name ?? r.NAME ?? r.COLUMN_NAME) as string);
+    if (names.length === 0) return null;
     if (names.length === 1) return names[0];
-    return null;
+    return names;
   }
 
   /**

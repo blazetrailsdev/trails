@@ -916,24 +916,26 @@ export class SQLite3Adapter
   }
 
   /**
-   * Return the single-column primary key name, or null for composite /
-   * rowid-only tables. Rails' SchemaCache stores the composite case as
-   * an array, but the common path for cache-dump is a scalar name.
+   * Return the primary key for the named table: a single string for
+   * scalar PKs, an array for composite PKs, or null for rowid-only
+   * tables (no explicit PK column). Matches Rails' SchemaCache which
+   * stores `string | string[] | null` for primary_keys entries.
    *
    * Uses the `PRAGMA schema.table_info(table)` form for schema-qualified
    * names (e.g. `temp.widgets`). The `PRAGMA table_info("schema"."table")`
    * form does NOT work — SQLite treats the whole quoted string as a
    * single table name and returns no rows.
    */
-  async primaryKey(tableName: string): Promise<string | null> {
+  async primaryKey(tableName: string): Promise<string | string[] | null> {
     const { schema, bare } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const rows = (await this.execute(
       `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bare)})`,
     )) as Array<{ name: string; pk: number }>;
     const pks = rows.filter((r) => r.pk > 0).sort((a, b) => a.pk - b.pk);
+    if (pks.length === 0) return null;
     if (pks.length === 1) return pks[0].name;
-    return null;
+    return pks.map((r) => r.name);
   }
 
   /**

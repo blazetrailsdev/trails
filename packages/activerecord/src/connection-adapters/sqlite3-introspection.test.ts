@@ -32,7 +32,7 @@ describe("SQLite3Adapter schema introspection", () => {
     await adapter.executeMutation(
       "CREATE TABLE memberships (user_id INTEGER, group_id INTEGER, PRIMARY KEY (user_id, group_id))",
     );
-    expect(await adapter.primaryKey("memberships")).toBeNull();
+    expect(await adapter.primaryKey("memberships")).toEqual(["user_id", "group_id"]);
   });
 
   it("columns returns Column metadata keyed by name", async () => {
