@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto, Notifications } from "@blazetrails/activesupport";
 import {
   Table,
   SelectManager,
@@ -1354,7 +1354,8 @@ export class Relation<T extends Base> {
     } else {
       const sql = this._toSql();
       const result = await this._modelClass.adapter.selectAll(sql, "Load");
-      this._records = result.toArray().map((row) => this._modelClass._instantiate(row) as T);
+      const rows = result.toArray();
+      this._records = this._instrumentInstantiation(rows);
     }
     this._loaded = true;
 
@@ -1421,7 +1422,7 @@ export class Relation<T extends Base> {
     ) {
       const sql = this._toSql();
       const result = await this._modelClass.adapter.selectAll(sql, "Eager Load");
-      this._records = result.toArray().map((row) => this._modelClass._instantiate(row) as T);
+      this._records = this._instrumentInstantiation(result.toArray());
       await this._preloadAssociationsForRecords(this._records, eagerAssociations);
       return;
     }
@@ -1444,7 +1445,7 @@ export class Relation<T extends Base> {
     if (jd.nodes.length === 0) {
       const sql = this._toSql();
       const rows = await this._modelClass.adapter.execute(sql);
-      this._records = rows.map((row) => this._modelClass._instantiate(row) as T);
+      this._records = this._instrumentInstantiation(rows);
       if (fallbackAssocs.length > 0) {
         await this._preloadAssociationsForRecords(this._records, fallbackAssocs);
       }
@@ -2300,6 +2301,14 @@ export class Relation<T extends Base> {
    */
   toSql(): string {
     return this._toSql();
+  }
+
+  private _instrumentInstantiation(rows: Record<string, unknown>[]): T[] {
+    if (rows.length === 0) return [];
+    const payload = { record_count: rows.length, class_name: this._modelClass.name };
+    return Notifications.instrument("instantiation.active_record", payload, () =>
+      rows.map((row) => this._modelClass._instantiate(row) as T),
+    );
   }
 
   private _toSql(): string {

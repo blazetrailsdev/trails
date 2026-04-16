@@ -9,6 +9,7 @@
  * rollbacks automatically clear the cache.
  */
 
+import { Notifications } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Result } from "./result.js";
 
@@ -75,6 +76,18 @@ export class QueryCacheStore {
   clear(): void {
     this._map.clear();
   }
+}
+
+/**
+ * Extract primitive values from bind objects, matching Rails' type_casted_binds.
+ */
+function castBinds(binds: unknown[]): unknown[] {
+  return binds.map((b: any) => {
+    if (b && typeof b === "object" && typeof b.valueForDatabase === "function") {
+      return b.valueForDatabase();
+    }
+    return b && typeof b === "object" && "value" in b ? b.value : b;
+  });
 }
 
 /**
@@ -207,15 +220,26 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     }
 
     const key = cacheKey(sql, binds);
-    const wasHit = this.cache.get(key) !== undefined;
-    return this.cache
-      .computeIfAbsent(key, async () => {
-        return this.inner.execute(sql, binds);
-      })
-      .then((result) => {
-        if (wasHit) this._cacheHits++;
-        return result;
+    const cached = this.cache.get(key);
+    if (cached !== undefined) {
+      this._cacheHits++;
+      // Emit sql.active_record with cached: true, matching Rails'
+      // lookup_sql_cache / cache_sql cache-hit notifications.
+      const bindArray = binds ?? [];
+      Notifications.instrument("sql.active_record", {
+        sql,
+        name: "SQL",
+        binds: bindArray,
+        type_casted_binds: castBinds(bindArray),
+        connection: this,
+        cached: true,
+        row_count: cached.length,
       });
+      return cached.map((row) => ({ ...row }));
+    }
+    return this.cache.computeIfAbsent(key, async () => {
+      return this.inner.execute(sql, binds);
+    });
   }
 
   async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
@@ -265,7 +289,29 @@ export class QueryCacheAdapter implements DatabaseAdapter {
   // Read methods go through this.execute() to leverage the query cache.
   // Write methods go through this.executeMutation() to clear the cache.
 
-  async selectAll(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
+  async selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result> {
+    // Check cache directly here (rather than via execute()) so the
+    // notification payload carries the caller-supplied name (e.g.
+    // "Developer Load") instead of the generic "SQL".
+    if (this.cache.enabled) {
+      const key = cacheKey(sql, binds);
+      const cached = this.cache.get(key);
+      if (cached !== undefined) {
+        this._cacheHits++;
+        this._queryCount++;
+        const bindArray = binds ?? [];
+        Notifications.instrument("sql.active_record", {
+          sql,
+          name: name ?? "SQL",
+          binds: bindArray,
+          type_casted_binds: castBinds(bindArray),
+          connection: this,
+          cached: true,
+          row_count: cached.length,
+        });
+        return Result.fromRowHashes(cached.map((row) => ({ ...row })));
+      }
+    }
     const rows = await this.execute(sql, binds);
     return Result.fromRowHashes(rows);
   }

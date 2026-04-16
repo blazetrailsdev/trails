@@ -5,6 +5,7 @@
  * Mirrors: ActiveRecord::Querying
  */
 
+import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { sanitizeSql } from "./sanitization.js";
 
@@ -29,7 +30,12 @@ export async function findBySql<T extends typeof Base>(
     sanitized = sql;
   }
   const rows = await this.adapter.execute(sanitized);
-  const records = rows.map((row) => this._instantiate(row));
+  if (rows.length === 0) return [];
+
+  const payload = { record_count: rows.length, class_name: this.name };
+  const records = Notifications.instrument("instantiation.active_record", payload, () =>
+    rows.map((row) => this._instantiate(row)),
+  );
   if (block) records.forEach(block);
   return records;
 }
