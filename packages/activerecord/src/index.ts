@@ -57,6 +57,33 @@ export type { AssociationOptions } from "./associations.js";
 export { Transaction } from "./connection-adapters/abstract/transaction.js";
 export { ActiveRecordTransaction } from "./transaction.js";
 export {
+  LogSubscriber,
+  getVerboseQueryLogs,
+  setVerboseQueryLogs,
+  setBaseResolver as setLogSubscriberBaseResolver,
+} from "./log-subscriber.js";
+export { ExplainSubscriber } from "./explain-subscriber.js";
+export { ExplainRegistry } from "./explain-registry.js";
+
+// Wire LogSubscriber's Base resolver so it can delegate logger/filter
+// to ActiveRecord::Base without circular imports.
+import { setBaseResolver as _setBaseResolver } from "./log-subscriber.js";
+_setBaseResolver(() => _Base);
+
+// Auto-attach LogSubscriber to :active_record, matching Rails'
+// `ActiveRecord::LogSubscriber.attach_to :active_record`.
+import { LogSubscriber as _LogSubscriber } from "./log-subscriber.js";
+_LogSubscriber.attachTo("active_record");
+
+// Auto-subscribe ExplainSubscriber to sql.active_record, matching Rails'
+// `ActiveSupport::Notifications.subscribe("sql.active_record", new)`.
+import { Notifications as _Notifications } from "@blazetrails/activesupport";
+import { ExplainSubscriber as _ExplainSubscriber } from "./explain-subscriber.js";
+const _explainSub = new _ExplainSubscriber();
+_Notifications.subscribe("sql.active_record", (event) => {
+  _explainSub.finish(event.name, event.transactionId, event.payload);
+});
+export {
   transaction,
   savepoint,
   currentTransaction,

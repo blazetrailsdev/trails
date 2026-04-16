@@ -250,6 +250,8 @@ export type { ClassAttributeOptions } from "./class-attribute.js";
 export { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
 export { BroadcastLogger } from "./broadcast-logger.js";
 export type { LogLevel, LoggerOutput, TaggedLogger } from "./logger.js";
+export { Subscriber } from "./subscriber.js";
+export { LogSubscriber } from "./log-subscriber.js";
 
 export { MemoryStore } from "./cache/memory-store.js";
 export { DupCoder } from "./cache/memory-store.js";
