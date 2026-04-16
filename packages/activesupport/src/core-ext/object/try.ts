@@ -8,7 +8,7 @@ export interface Tryable {
   tryBang(method: string, ...args: unknown[]): unknown;
 }
 
-export const TryableMixin = {
+export const Tryable = {
   try(obj: unknown, method: string, ...args: unknown[]): unknown {
     if (obj == null) return undefined;
     const target = obj as Record<string, unknown>;
@@ -32,8 +32,6 @@ export const TryableMixin = {
   },
 };
 
-export { TryableMixin as Tryable };
-
 export class Delegator implements Tryable {
   private _delegate: unknown;
 
@@ -42,10 +40,10 @@ export class Delegator implements Tryable {
   }
 
   try(method: string, ...args: unknown[]): unknown {
-    return TryableMixin.try(this._delegate, method, ...args);
+    return Tryable.try(this._delegate, method, ...args);
   }
 
   tryBang(method: string, ...args: unknown[]): unknown {
-    return TryableMixin.tryBang(this._delegate, method, ...args);
+    return Tryable.tryBang(this._delegate, method, ...args);
   }
 }

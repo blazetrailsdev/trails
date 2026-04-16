@@ -5,38 +5,16 @@
  */
 
 export class Vector {
-  get type(): string {
-    return "vector";
+  readonly delim: string;
+  readonly subtype: unknown;
+
+  constructor(delim: string, subtype: unknown) {
+    this.delim = delim;
+    this.subtype = subtype;
   }
 
-  cast(value: unknown): number[] | null {
-    if (value == null) return null;
-    if (globalThis.Array.isArray(value)) return value.map(Number);
-    if (typeof value === "string") {
-      if (value === "") return null;
-      return this.parseVector(value);
-    }
-    return null;
-  }
-
-  serialize(value: unknown): string | null {
-    if (value == null) return null;
-    if (globalThis.Array.isArray(value)) {
-      return `[${value.join(",")}]`;
-    }
-    if (typeof value === "string") return value;
-    return null;
-  }
-
-  deserialize(value: unknown): number[] | null {
-    return this.cast(value);
-  }
-
-  private parseVector(str: string): number[] | null {
-    const cleaned = str.replace(/[[\]]/g, "").trim();
-    if (cleaned === "") return [];
-    const values = cleaned.split(",").map((s) => parseFloat(s.trim()));
-    if (values.some((v) => !Number.isFinite(v))) return null;
-    return values;
+  cast(value: unknown): unknown {
+    // Rails currently leaves composite/vector values untouched.
+    return value;
   }
 }

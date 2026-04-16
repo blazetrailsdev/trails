@@ -4,6 +4,18 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting
  */
 
+import { BinaryData } from "@blazetrails/activemodel";
+import {
+  quote as abstractQuote,
+  quotedFalse as abstractQuotedFalse,
+  quotedTrue as abstractQuotedTrue,
+  typeCast as abstractTypeCast,
+} from "../abstract/quoting.js";
+import { Data as ArrayData } from "./oid/array.js";
+import { Data as BitData } from "./oid/bit.js";
+import { Range } from "./oid/range.js";
+import { Data as XmlData } from "./oid/xml.js";
+
 export class IntegerOutOf64BitRange extends RangeError {
   constructor(value: bigint | number) {
     super(
@@ -30,8 +42,23 @@ export interface Quoting {
   quoteBinaryColumn(value: Buffer): string;
 }
 
+export interface BinaryBind {
+  value: string;
+  format: 1;
+}
+
+export interface DefaultExpressionColumn {
+  sqlType?: string | null;
+  type?: string | null;
+  array?: boolean;
+}
+
+export interface TypeMapLike {
+  lookup(sqlType: string): { serialize?(value: unknown): unknown } | null;
+}
+
 export function quotedTrue(): string {
-  return "'t'";
+  return abstractQuotedTrue();
 }
 
 export function unquotedTrue(): boolean {
@@ -39,7 +66,7 @@ export function unquotedTrue(): boolean {
 }
 
 export function quotedFalse(): string {
-  return "'f'";
+  return abstractQuotedFalse();
 }
 
 export function unquotedFalse(): boolean {
@@ -108,6 +135,90 @@ export function quoteBinaryColumn(value: Buffer): string {
   return `'\\x${value.toString("hex")}'`;
 }
 
+export function quote(value: unknown): string {
+  if (value instanceof XmlData) {
+    return `xml ${quoteString(value.toString())}`;
+  }
+  if (value instanceof BitData) {
+    return `B'${value.toString()}'`;
+  }
+  if (typeof value === "number" && !Number.isFinite(value)) {
+    return quoteString(String(value));
+  }
+  if (value instanceof ArrayData) {
+    return quoteString(value.toString());
+  }
+  if (value instanceof Range) {
+    return quoteString(encodeRange(value));
+  }
+  return abstractQuote(value);
+}
+
+export function quoteDefaultExpression(
+  value: unknown,
+  column?: DefaultExpressionColumn | null,
+  typeMap?: TypeMapLike | null,
+): string {
+  if (value === undefined) return "";
+  if (typeof value === "function") {
+    const result = (value as () => unknown)();
+    if (typeof result === "string") return ` DEFAULT ${result}`;
+    if (isSqlLiteral(result)) return ` DEFAULT ${result.value}`;
+    throw new TypeError(
+      "quoteDefaultExpression expected function default to return a string or SqlLiteral",
+    );
+  }
+  if (isSqlLiteral(value)) return ` DEFAULT ${value.value}`;
+
+  let serialized: unknown = value;
+  if (column != null && "array" in column) {
+    const sqlType = column.sqlType ?? column.type ?? null;
+    const castType = sqlType ? typeMap?.lookup(sqlType) : null;
+    serialized = castType?.serialize ? castType.serialize(value) : value;
+  }
+  return ` DEFAULT ${quote(serialized)}`;
+}
+
+export function typeCast(value: unknown): unknown {
+  if (value instanceof BinaryData) {
+    return { value: value.toString(), format: 1 } satisfies BinaryBind;
+  }
+  if (value instanceof XmlData || value instanceof BitData) {
+    return value.toString();
+  }
+  if (value instanceof ArrayData) {
+    return value.toString();
+  }
+  if (value instanceof Range) {
+    return encodeRange(value);
+  }
+  if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
+    checkIntegerRange(value);
+  }
+  return abstractTypeCast(value);
+}
+
+export function escapeBytea(value: Buffer | Uint8Array | string): string {
+  // Treat string inputs as raw byte sequences ("binary") so callers passing
+  // pre-encoded binary strings don't get UTF-8 re-encoded.
+  const buffer = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
+  return `\\x${buffer.toString("hex")}`;
+}
+
+export function unescapeBytea(value: string): Buffer {
+  // Matches Rails' PG-driver-backed contract: this is intentionally not the
+  // inverse of escapeBytea for every possible input representation.
+  if (value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
+  return Buffer.from(value, "binary");
+}
+
+export function columnNameMatcher(): RegExp {
+  // Rails uses recursive regexp syntax for nested function calls. JavaScript
+  // RegExp cannot express that directly, so this mirrors the current abstract
+  // limitation and only allows a bare identifier inside function calls.
+  return /^((?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:(?:\s+AS)?\s+\w+)?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:(?:\s+AS)?\s+\w+)?)*$/i;
+}
+
 export function checkIntegerRange(value: bigint | number): void {
   if (typeof value === "number") {
     if (!Number.isSafeInteger(value)) {
@@ -118,4 +229,19 @@ export function checkIntegerRange(value: bigint | number): void {
   if (bigVal < PG_INT64_MIN || bigVal > PG_INT64_MAX) {
     throw new IntegerOutOf64BitRange(value);
   }
+}
+
+function encodeRange(value: Range): string {
+  const lower = value.begin == null || value.begin === -Infinity ? "" : String(value.begin);
+  const upper = value.end == null || value.end === Infinity ? "" : String(value.end);
+  return `[${lower},${upper}${value.excludeEnd ? ")" : "]"}`;
+}
+
+function isSqlLiteral(value: unknown): value is { value: string } {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    value.constructor?.name === "SqlLiteral" &&
+    typeof (value as any).value === "string"
+  );
 }

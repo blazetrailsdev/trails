@@ -4,61 +4,65 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Array
  */
 
+function stableStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? `${v}n` : v)) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+export interface ArraySubtype {
+  readonly type?: string | (() => string);
+  cast(value: unknown): unknown;
+  serialize(value: unknown): unknown;
+  deserialize?(value: unknown): unknown;
+  typeCastForSchema?(value: unknown): string;
+  map?(value: unknown, block?: (value: unknown) => unknown): unknown;
+}
+
 export class Array {
-  readonly subtype: { cast(value: unknown): unknown; serialize(value: unknown): unknown };
+  readonly subtype: ArraySubtype;
   readonly delimiter: string;
 
-  constructor(
-    subtype: { cast(value: unknown): unknown; serialize(value: unknown): unknown },
-    delimiter: string = ",",
-  ) {
+  constructor(subtype: ArraySubtype, delimiter: string = ",") {
     this.subtype = subtype;
     this.delimiter = delimiter;
   }
 
   get type(): string {
+    const subtypeType = this.subtype.type;
+    if (typeof subtypeType === "function") return subtypeType.call(this.subtype);
+    if (typeof subtypeType === "string") return subtypeType;
     return "array";
   }
 
-  cast(value: unknown): unknown[] | null {
+  cast(value: unknown): unknown {
     if (value == null) return null;
-    if (globalThis.Array.isArray(value)) return value.map((v) => this.subtype.cast(v));
+    if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "cast");
     if (typeof value === "string") return this.parseArray(value);
-    return null;
+    return this.typeCastArray(value, "cast");
   }
 
-  serialize(value: unknown): string | null {
+  serialize(value: unknown): unknown {
     if (value == null) return null;
-    if (!globalThis.Array.isArray(value)) return null;
-    const items = value.map((v) => {
-      const s = this.subtype.serialize(v);
-      if (s == null) return "NULL";
-      const str = String(s);
-      if (
-        str === "" ||
-        str.toUpperCase() === "NULL" ||
-        str.includes(this.delimiter) ||
-        str.includes('"') ||
-        str.includes("\\") ||
-        str.includes("{") ||
-        str.includes("}") ||
-        /\s/.test(str)
-      ) {
-        return `"${str.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-      }
-      return str;
-    });
-    return `{${items.join(this.delimiter)}}`;
+    if (!globalThis.Array.isArray(value)) return value;
+    return new Data(this, this.typeCastArray(value, "serialize") as unknown[]);
   }
 
-  deserialize(value: unknown): unknown[] | null {
+  deserialize(value: unknown): unknown {
     if (value == null) return null;
-    if (globalThis.Array.isArray(value)) return value.map((v) => this.subtype.cast(v));
-    if (typeof value === "string") return this.parseArray(value);
-    return null;
+    if (value instanceof Data) return this.typeCastArray(value.values, "deserialize") as unknown[];
+    if (typeof value === "string") return this.parseArray(value, "deserialize");
+    // Divergence: Rails' deserialize only sees strings (PG::TextDecoder is run
+    // upstream). node-pg can return already-decoded JS arrays, so route them
+    // through the subtype here the same way cast() does.
+    if (globalThis.Array.isArray(value))
+      return this.typeCastArray(value, "deserialize") as unknown[];
+    return value;
   }
 
-  private parseArray(str: string): unknown[] {
+  private parseArray(str: string, method: "cast" | "deserialize" = "cast"): unknown[] {
     const trimmed = str.trim();
     if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return [];
     const inner = trimmed.slice(1, -1);
@@ -81,7 +85,7 @@ export class Array {
           i++;
         }
         i++; // closing quote
-        elements.push(this.subtype.cast(val));
+        elements.push(this.castElement(val, method));
       } else if (
         inner.substring(i, i + 4).toUpperCase() === "NULL" &&
         (i + 4 >= inner.length || inner[i + 4] === this.delimiter || inner[i + 4] === "}")
@@ -97,18 +101,102 @@ export class Array {
           if (inner[i] === "}") depth--;
           i++;
         }
-        elements.push(this.parseArray(inner.substring(start, i)));
+        elements.push(this.parseArray(inner.substring(start, i), method));
       } else {
         let val = "";
         while (i < inner.length && inner[i] !== this.delimiter) {
           val += inner[i];
           i++;
         }
-        elements.push(this.subtype.cast(val));
+        elements.push(this.castElement(val, method));
       }
       if (i < inner.length && inner[i] === this.delimiter) i++;
     }
 
     return elements;
+  }
+
+  private castElement(value: unknown, method: "cast" | "deserialize"): unknown {
+    if (method === "deserialize")
+      return this.subtype.deserialize?.(value) ?? this.subtype.cast(value);
+    return this.subtype.cast(value);
+  }
+
+  encode(values: readonly unknown[]): string {
+    const items = values.map((value) => {
+      if (value == null) return "NULL";
+      if (globalThis.Array.isArray(value)) return this.encode(value);
+
+      const str = String(value);
+      if (
+        str === "" ||
+        str.toUpperCase() === "NULL" ||
+        str.includes(this.delimiter) ||
+        str.includes('"') ||
+        str.includes("\\") ||
+        str.includes("{") ||
+        str.includes("}") ||
+        /\s/.test(str)
+      ) {
+        return `"${str.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+      }
+      return str;
+    });
+    return `{${items.join(this.delimiter)}}`;
+  }
+
+  private formatValueForSchema(value: unknown): string {
+    const typeCastForSchema = this.subtype.typeCastForSchema;
+    if (typeCastForSchema) return typeCastForSchema(value);
+    if (typeof value === "bigint") return String(value);
+    try {
+      return JSON.stringify(value) ?? String(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  typeCastForSchema(value: unknown): string {
+    if (!globalThis.Array.isArray(value)) return this.formatValueForSchema(value);
+    return `[${value.map((item) => this.formatValueForSchema(item)).join(", ")}]`;
+  }
+
+  map(value: unknown, block?: (value: unknown) => unknown): unknown {
+    if (globalThis.Array.isArray(value)) return block ? value.map(block) : value;
+    return this.subtype.map ? this.subtype.map(value, block) : block ? block(value) : value;
+  }
+
+  isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
+    const oldValue = this.deserialize(rawOldValue);
+    return stableStringify(oldValue) !== stableStringify(newValue);
+  }
+
+  isForceEquality(value: unknown): boolean {
+    return globalThis.Array.isArray(value);
+  }
+
+  private typeCastArray(value: unknown, method: "cast" | "serialize" | "deserialize"): unknown {
+    if (globalThis.Array.isArray(value)) {
+      return value.map((item) => this.typeCastArray(item, method));
+    }
+
+    if (method === "deserialize")
+      return this.subtype.deserialize?.(value) ?? this.subtype.cast(value);
+    if (method === "cast") return this.subtype.cast(value);
+    return this.subtype.serialize(value);
+  }
+}
+
+export class Data {
+  readonly encoder: Array;
+  readonly values: unknown[];
+
+  constructor(encoder: Array, values: unknown[]) {
+    this.encoder = encoder;
+    this.values = values;
+  }
+
+  toString(): string {
+    return this.encoder.encode(this.values);
   }
 }
