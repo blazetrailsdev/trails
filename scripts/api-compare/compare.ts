@@ -11,7 +11,7 @@
  * This prevents agents from gaming the metric with empty interfaces.
  *
  * Usage:
- *   npx tsx scripts/api-compare/compare.ts [--package activerecord] [--missing] [--files]
+ *   npx tsx scripts/api-compare/compare.ts [--package activerecord] [--missing] [--files] [--incomplete]
  */
 
 import * as fs from "fs";
@@ -92,6 +92,7 @@ function main() {
   }
   const showMissing = args.includes("--missing");
   const showFiles = args.includes("--files");
+  const showIncomplete = args.includes("--incomplete");
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
   const tsPath = path.join(OUTPUT_DIR, "ts-api.json");
@@ -492,7 +493,7 @@ function main() {
     JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
   );
 
-  printReport(results, showMissing, showFiles, filterPkg);
+  printReport(results, showMissing, showFiles, filterPkg, showIncomplete);
 }
 
 // ---------------------------------------------------------------------------
@@ -504,6 +505,7 @@ function printReport(
   showMissing: boolean,
   showFiles: boolean,
   filterPkg: string | null,
+  showIncomplete = false,
 ) {
   let grandTotal = 0;
   let grandMatched = 0;
@@ -533,6 +535,7 @@ function printReport(
 
       for (const f of pkg.files) {
         const pct = f.total > 0 ? Math.round((f.matched / f.total) * 100) : 0;
+        if (showIncomplete && f.total > 0 && f.matched === f.total) continue;
         const marker = !f.tsFileExists ? " \u2717" : f.matched === f.total ? " \u2713" : "";
         console.log(
           `  ${f.rubyFile.padEnd(55)} ${f.expectedTsFile.padEnd(40)} ${String(f.matched).padStart(6)} ${String(f.missing).padStart(6)} ${String(f.total).padStart(6)} ${String(pct).padStart(3)}%${marker}`,
