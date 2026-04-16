@@ -75,7 +75,7 @@ The second divergence this plan addresses:
   posture: sync access to an unloaded association throws
   `StrictLoadingViolationError` (the error type already exists in
   trails, currently optional). The fix is preloading via
-  `Post.includes("author")` or an explicit `await loadBelongsTo(post, "author")` / `loadHasOne(post, "author")`
+  `Post.includes("author")` or `await post.loadBelongsTo("author")`
   — the same pattern Rails users already write to avoid N+1.
 
 **Pragmatic divergences left in place (out of scope for this plan):**
@@ -309,18 +309,17 @@ four tsconfigs that carried them.
 
 Landed `packages/activerecord/src/type-virtualization/` (virtualize,
 walker, synthesize, type-registry). 27 passing tests, 18 fixture pairs.
-Emits `Target[]` for hasMany / HABTM as of landing — the
-Phase 1a-fixup below flips this to `AssociationProxy<Target>` once R.2
-is merged.
+Emitted `Target[]` for hasMany / HABTM as of landing; Phase 1a-fixup
+(#539) flipped this to `AssociationProxy<Target>` after R.2 merged.
 
-### Phase R — Rails-fidelity runtime fix 🚧 (top priority)
+### Phase R — Rails-fidelity runtime fix ✅ (R.1 ✅ → R.2 ✅ → R.3 ✅)
 
-Make `blog.posts` (and every collection association reader) return the
-existing `AssociationProxy<T>` instead of `Base[]`, and adopt
-strict-loading semantics for singular readers. These are the runtime
-changes in the plan; both are pre-1.0 breaking changes — by design.
+Made `blog.posts` (and every collection association reader) return the
+existing `AssociationProxy<T>` instead of `Base[]`, and adopted
+strict-loading semantics for singular readers. Pre-1.0 breaking
+changes — by design.
 
-Three sub-PRs, each independently testable:
+Three sub-PRs, all merged:
 
 - **R.1 — make CollectionProxy a drop-in for arrays ✅ (#532).**
   Added `Symbol.iterator`, `length`, numeric indexing (via the JS
@@ -337,7 +336,7 @@ Three sub-PRs, each independently testable:
   thenable through `load()` (was `toArray()`) so `await proxy`
   hydrates `_target`. Zero regressions.
 
-- **R.2 — swap the reader 🚧 (#536).** Overrode `defineReaders` in
+- **R.2 — swap the reader ✅ (#536).** Overrode `defineReaders` in
   `packages/activerecord/src/associations/builder/collection-association.ts`
   so the `<name>` getter returns `association(this, name)` (the
   AssociationProxy) instead of `this.association(name).reader`.
@@ -359,14 +358,14 @@ Three sub-PRs, each independently testable:
   type-checking through the existing `AssociationProxy<T>` Proxy
   delegation, matching Rails' `blog.posts.published`.
 
-- **R.3 — strict-loading by default for singular associations.** Today
-  `post.author` returns `this.target` (the cached record or `null`) —
-  silently `null` when nobody preloaded. Rails-faithful posture: sync
-  access on an unloaded association throws
+- **R.3 — strict-loading catches sync singular-reader access ✅ (#543).**
+  Previously `post.author` returned `this.target` (the cached record
+  or `null`) — silently `null` when nobody preloaded. Under strict
+  loading, sync access on an unloaded singular association now throws
   `StrictLoadingViolationError` with a message naming the association
-  and pointing at the fix (`Post.includes("author")`, or the
-  per-association helpers `await loadBelongsTo(post, "author")` /
-  `loadHasOne(post, "author")`). The error type is already defined in
+  and pointing at the fix (`Post.includes("author")` or
+  `await post.loadBelongsTo("author")`). The error type is already
+  defined in
   trails (`packages/activerecord/src/errors.ts`); today, direct
   property access still returns the cached target, but strict loading
   can already raise via the explicit lazy-load helpers / proxy-delegated
@@ -392,10 +391,10 @@ Three sub-PRs, each independently testable:
     finds real latent bugs (the whole point).
   - Synergy with `includes` / `preload`: those already populate the
     cache, so preloaded records pass the sync-access check
-    transparently. The error message in the throw should reference
-    both the eager-load chain (`Post.includes("author")`) and the
-    per-association helper (`await loadBelongsTo(post, "author")` for
-    `belongsTo`, or `await loadHasOne(post, "author")` for `hasOne`).
+    transparently. The error message thrown by
+    `StrictLoadingViolationError.forAssociation` names the model and
+    association; users reach for `Post.includes("author")` or
+    `await post.loadBelongsTo("author")` as the fix.
 
   Virtualizer-side: no change. `declare author: Author | null;` stays
   honest — at sync access time the value really is the loaded record
@@ -418,80 +417,261 @@ Three sub-PRs, each independently testable:
   and match Rails' surface (`record.strictLoading`,
   `Class.strictLoadingByDefault`, project-wide config switch).
 
-### Phase 1a-fixup — flip virtualizer to `AssociationProxy<T>` 📋
+### Phase 1a-fixup — flip virtualizer to `AssociationProxy<T>` ✅ (#539)
 
-After R.2 lands: change `synthesize.ts` from
+Once R.2 landed, `synthesize.ts` flipped from
 `declare ${name}: ${target}[];` to
 `declare ${name}: AssociationProxy<${target}>;` for hasMany /
-hasAndBelongsToMany. Update the matching fixtures
+hasAndBelongsToMany. Updated matching fixtures
 (`02-has-many/expected.ts`, `13-has-and-belongs-to-many/expected.ts`,
-`08-combined/expected.ts`). One file in source, three files in
-fixtures, no behavior change beyond the emitted declaration.
+`08-combined/expected.ts`, `11-class-name-override/expected.ts`). Also
+qualified the emitted `AssociationProxy` / `Relation` built-ins with
+inline `import("@blazetrails/activerecord").<Type>` so zero-declare
+user files don't need to import those types either. One file in
+source + multiple fixture updates; no behavior change beyond emit.
 
 ### Phase 1b — `trails-tsc` CLI shell 📋
 
-- Land `packages/activerecord/src/tsc-wrapper/` shipping as
-  `@blazetrails/activerecord/tsc` with `bin: trails-tsc`.
-- Compose the syntactic walker with the symbol-aware transitive-extends
-  pass.
-- Wire **auto-import resolution** (see below) so target classes
-  referenced by `hasMany` / `belongsTo` / `hasOne` /
-  `hasAndBelongsToMany` resolve without the user adding sibling
-  imports.
-- Add `dx-tests/virtualized-patterns.test-d.ts` run under `trails-tsc`.
-- Two-package composite fixture to verify `trails-tsc --build` respects
-  virtualization across project references and build-info caching.
+The CLI that users opt into by swapping `tsc` for `trails-tsc` in
+their typecheck script. Biggest phase by surface area, so broken into
+**six sub-PRs**, each independently testable and shippable:
 
-#### Auto-import resolution
+| PR   | Name                                            | Depends on | Blocks                    |
+| ---- | ----------------------------------------------- | ---------- | ------------------------- |
+| 1b.1 | CLI skeleton + single-file virtualization       | —          | 1b.2, 1b.3                |
+| 1b.2 | Diagnostic range remap                          | 1b.1       | —                         |
+| 1b.3 | Transitive-extends walker                       | 1b.1       | 1b.4                      |
+| 1b.4 | Auto-import resolution                          | 1b.3       | 1b.5, 1b.6                |
+| 1b.5 | `--build` / composite project support           | 1b.4       | —                         |
+| 1b.6 | In-repo migration + CI + `virtualized-patterns` | 1b.4       | Phase 2 (tsserver plugin) |
 
-The walker's symbol-aware pass enumerates every Base-rooted class in
-the program and produces a model registry:
+Each sub-section below is scoped so a contributor can pick it up,
+ship it, and merge without the rest of Phase 1b landing first. After
+all six merge, Phase 1b's exit criteria (bottom of this section) are
+satisfied and Phase 2 (tsserver plugin) is unblocked.
 
-```ts
-type ModelRegistry = Map<string, string>; // class name → absolute source path
-// e.g. { "Comment" → "/abs/comment.ts", "Author" → "/abs/author.ts" }
-```
+---
 
-For each file being virtualized:
+#### 1b.1 — CLI skeleton + single-file virtualization 📋
 
-1. Collect the set of target class names referenced by the file's
-   association calls (post-`className:` override / inflection).
-2. Subtract names already in scope in the user's file (existing
-   imports, local declarations, same-file classes).
-3. For each remaining name, look it up in the registry, compute the
-   relative path from the source file's directory to the target's
-   file (with the `.js` suffix ESM TypeScript wants), and build an
-   `import type { Name } from "<relative>";` line.
-4. Pass the resulting list as `VirtualizeOptions.prependImports`. The
-   virtualizer splices them at the top of the file before the rest
-   of the transform; `LineDelta` accounting absorbs the prepended
-   lines so diagnostic remap stays accurate.
+**Goal:** `trails-tsc` runs, produces tsc-compatible output, and
+virtualizes any source file whose top-level class declaration
+literally extends `Base`. Enough to demo zero-declare on a flat
+single-file model.
 
-Why `import type`: the auto-injected imports are erased at runtime, so
-they cannot create new module-load cycles. They only exist for the
-checker's benefit.
+**Deliverables:**
 
-Failure modes:
+- `packages/activerecord/src/tsc-wrapper/`:
+  - `cli.ts` — entry for the bin; argv parsing (minimally: `-p`
+    tsconfig path, `--noEmit`, passthrough of everything else).
+  - `program.ts` — `createTrailsProgram(options)` wrapping
+    `ts.createProgram` with the custom host.
+  - `host.ts` — `buildCompilerHost(options)` overriding
+    `getSourceFile` / `readFile` to run `virtualize()` on matching
+    files.
+- `@blazetrails/activerecord/tsc` subpath export in
+  `packages/activerecord/package.json`.
+- `bin: trails-tsc` pointing at the compiled CLI entry.
+- Integration test: fixture `post.ts` with
+  `this.attribute("title", "string")` and no manual declares; invoke
+  the CLI programmatically; assert `(new Post()).title` types as
+  `string` end-to-end with zero diagnostics.
 
-- Class name collisions (two `Comment` classes in different paths) —
-  the walker logs a diagnostic; the wrapper picks the one closest to
-  the source file by path distance, then by lexicographic order.
-  Document that the fix is `className:` on the association.
-- Class not in the program — no auto-import; TS surfaces
-  `Cannot find name 'X'` against the injected declare. User imports
-  it manually or fixes the typo.
-- User explicitly imports a different class with the same name (e.g.
-  a wrapper type) — their existing import wins; the wrapper does not
-  shadow it.
+**Non-goals (deferred to later sub-PRs):** transitive extends,
+auto-import, `--build`, diagnostic remap.
 
-**Phase 1b exit criteria:**
+**Exit:** `pnpm build` / `pnpm typecheck` clean; one fixture
+integration test passing; `trails-tsc --noEmit -p fixture/tsconfig.json`
+runs from the command line and returns 0.
+
+---
+
+#### 1b.2 — Diagnostic range remap 📋
+
+**Goal:** user-facing error messages reference the user's original
+line numbers, not virtualized ones. Lands right after the CLI skeleton
+because wrong line numbers make the zero-declare DX regress vs. plain
+`tsc` from day one.
+
+**Deliverables:**
+
+- CLI wraps `ts.formatDiagnostics` /
+  `ts.formatDiagnosticsWithColorAndContext`.
+- Per-file `LineDelta[]` table stored on the `CompilerHost` (keyed by
+  absolute path) alongside the virtualized text.
+- `remapLine` (already exported from `virtualize()`) applied to each
+  diagnostic's start/end ranges before printing.
+- Edge case: error INSIDE an injected declare block (shouldn't happen
+  when the virtualizer is correct, but if it does, report at the
+  original class body's opening `{` with a note pointing at
+  `--print-virtualized` for debugging).
+- `trails-tsc --print-virtualized <file>` subcommand — dumps the
+  synthesized source for any model file. Ships here for
+  debuggability.
+- Integration test: fixture with a genuine type error in user code
+  AFTER a class body that gets declares injected. Assert the
+  reported line matches the original line, not the shifted
+  virtualized line.
+
+**Exit:** every diagnostic reported by `trails-tsc` matches the line
+number a user would have seen with plain `tsc` against the "before"
+(declare-heavy) form of the same file.
+
+---
+
+#### 1b.3 — Transitive-extends walker 📋
+
+**Goal:** `class Admin extends User` (where `User extends Base`) is
+virtualized. Most real codebases have an abstract intermediate class
+like `ApplicationRecord`.
+
+**Deliverables:**
+
+- `packages/activerecord/src/type-virtualization/transitive-extends-walker.ts`:
+  - Takes a `ts.Program` + `ts.TypeChecker`.
+  - Walks every top-level class declaration, resolves each `extends`
+    clause to its symbol, follows transitively to root.
+  - Returns the set of class names whose `extends` chain ends at
+    `Base` (or any configured root).
+  - Caches per-program — walker runs once, not per file.
+- CLI wiring: compute the allow-list once per program, pass via
+  `VirtualizeOptions.baseNames` so `virtualize()` treats every
+  transitive descendant as a Base-rooted class.
+- Fixture: three files — `base.ts` exports `Base`, `user.ts` defines
+  `class User extends Base`, `admin.ts` defines
+  `class Admin extends User`. `admin.ts`'s
+  `this.attribute("role", "string")` results in
+  `declare role: string;` being injected on Admin's class body (the
+  transitive walker recognizes Admin as a Base descendant).
+
+**Exit:** transitive-extends fixture passes; flat `extends Base` case
+from 1b.1 still works.
+
+---
+
+#### 1b.4 — Auto-import resolution 📋
+
+**Goal:** zero-declare AND zero-import model files. User writes
+`this.hasMany("comments")`; `Comment` is auto-imported from wherever
+it lives in the program.
+
+**Deliverables:**
+
+- Walker step extends the transitive-extends pass to also produce a
+  model registry:
+
+  ```ts
+  type ModelRegistry = Map<string, string>; // class name → absolute source path
+  // e.g. { "Comment" → "/abs/comment.ts", "Author" → "/abs/author.ts" }
+  ```
+
+- CLI per-file pipeline:
+  1. Collect target class names referenced by the file's association
+     calls (post-`className:` override / Rails inflection).
+  2. Subtract names already in scope (existing imports, local
+     declarations, same-file classes).
+  3. Look remaining names up in the registry; compute relative paths
+     from the source file's directory to each target's file (with
+     the `.js` suffix ESM TypeScript wants); build
+     `import type { Name } from "<relative>";` lines.
+  4. Pass the resulting list as `VirtualizeOptions.prependImports`.
+- `virtualize()` gains `prependImports?: readonly string[]` (already
+  spec'd in the § "The virtualize function" signature — implement
+  now). Splice lines at the top of the file before the rest of the
+  transform; `LineDelta` accounting absorbs the prepended lines so
+  1b.2's diagnostic remap stays accurate.
+- `import type` keeps injected imports erased at runtime — no
+  module-load cycles.
+- Failure modes handled:
+  - Name collisions (two `Comment` classes in different paths): log
+    a `trails-tsc` diagnostic; pick closest-by-path, then
+    lexicographic. Document `className:` as the disambiguation.
+  - Class not in the program: no auto-import; TS surfaces
+    `Cannot find name 'X'` against the injected declare.
+  - User explicitly imports a different class with the same name:
+    their existing import wins; wrapper does not shadow.
+- Fixture: two files. `post.ts` has
+  `class Post extends Base { static { this.belongsTo("author"); } }`
+  with NO `import` for Author. `author.ts` exports `Author`. Verify
+  `post.author` types as `Author | null` under `trails-tsc` with no
+  user-written imports for Author.
+
+**Exit:** auto-import fixture passes; single-file (1b.1) and
+transitive (1b.3) cases still work.
+
+---
+
+#### 1b.5 — `--build` / composite project support 📋
+
+**Goal:** users with `tsc --build` / `references:` in their tsconfigs
+get the same behavior as the `--noEmit` path. Matters for monorepos.
+
+**Deliverables:**
+
+- CLI supports `--build` / `-b`: delegates to
+  `ts.createSolutionBuilder` with the custom host applied to each
+  project in the solution.
+- Build-info caching audit: a `.tsbuildinfo` file written by a
+  pre-virtualization run must not leak incorrect diagnostics.
+  Either invalidate when `trails-tsc` first sees the project, or
+  scope the tsbuildinfo path per-tool.
+- Two-package composite fixture: `@fixture/models` owns the
+  Base-rooted classes; `@fixture/app` imports from it and declares
+  local models that use `@fixture/models`' classes as association
+  targets. Both compile under `trails-tsc --build`.
+- Integration test: modify an attribute on a model; re-run
+  `trails-tsc --build`; assert the new declares are reflected and
+  dependents type-check.
+
+**Exit:** composite fixture passes; docs call out `--build` in the
+consumer install path.
+
+---
+
+#### 1b.6 — In-repo migration + CI + `virtualized-patterns.test-d.ts` 📋
+
+**Goal:** dogfood, close the loop. Delete manual declares from in-repo
+models, wire CI to catch regressions, add the parallel dx-tests
+reference that exercises the zero-declare form end-to-end.
+
+**Deliverables:**
+
+- Pick ≥3 models from the repo's packages or dx-tests fixtures that
+  currently carry `declare` lines. Delete those declares; verify
+  `trails-tsc --noEmit` still typechecks the repo.
+- New CI job in `.github/workflows/ci.yml`:
+  `pnpm trails-tsc --noEmit` runs alongside the existing
+  `pnpm typecheck` job. Both must pass for PRs to merge.
+- `packages/activerecord/dx-tests/virtualized-patterns.test-d.ts` —
+  parallel structure to `declare-patterns.test-d.ts`, but the model
+  classes carry zero declares and are verified via `expectTypeOf`
+  assertions under `trails-tsc` (invoked via Vitest's
+  `typecheck.checker` config — confirmed feasible in the original
+  Spike 5).
+- CLAUDE.md update: `declare-patterns.test-d.ts` becomes "manual
+  escape hatches reference"; `virtualized-patterns.test-d.ts`
+  becomes the default "here's what `trails-tsc` injects" reference.
+- Vitest typecheck config: point `typecheck.checker` at `trails-tsc`
+  for the activerecord dx-tests so typecheck-mode runs use the
+  virtualizer end-to-end.
+
+**Exit:** repo green with declares removed from ≥3 models; CI runs
+the new job; dx-tests cover both forms; CLAUDE.md updated.
+
+---
+
+**Phase 1b exit criteria (satisfied after 1b.1–1b.6 merge):**
 
 - `trails-tsc` is byte-compatible with `tsc` for non-Base files
   (identical diagnostics).
-- At least 3 in-repo models migrated by deleting their declares; repo
-  typechecks under `trails-tsc`.
+- Transitive extends, auto-import, `--build` all work.
+- Diagnostic ranges map back to user source lines.
+- At least 3 in-repo models migrated by deleting their declares;
+  repo typechecks under `trails-tsc`.
 - CI runs `pnpm trails-tsc --noEmit` as a second typecheck job
   alongside plain `tsc`.
+- `virtualized-patterns.test-d.ts` ships as the canonical
+  zero-declare reference.
 
 ### Phase 2 — tsserver plugin 📋
 
@@ -532,31 +712,41 @@ Failure modes:
 
 ### Ordering
 
-The dependency graph is shallow:
+The dependency graph:
 
 ```
-Phase 0 ✅
+Phase 0 ✅ (#528)
    │
-   ├── Phase 1a ✅
+   ├── Phase 1a ✅ (#529)
    │       │
-   │       └── Phase 1a-fixup ── needs Phase R
+   │       └── Phase 1a-fixup ✅ (#539)  — AssociationProxy<T> emit
    │
-   ├── Phase R (R.1 ✅ → R.2 🚧 → R.3 📋)  ── pre-req for 1a-fixup, Phase 1b dx-tests, Phase 3
-   │      R.1 ✅ additive array-likeness on CollectionProxy (#532)
-   │      R.2 🚧 swap collection reader → AssociationProxy (#536)
-   │      R.3 📋 strict-loading-by-default for singular associations
+   ├── Phase R ✅
+   │      R.1 ✅ additive array-likeness on CollectionProxy   (#532)
+   │      R.2 ✅ swap collection reader → AssociationProxy    (#536)
+   │      R.3 ✅ strict-loading catches sync singular reader  (#543)
    │
-   └── Phase 1b ── needs Phase 1a; benefits from R for honest dx-tests
-            │
-            └── Phase 2 ── needs Phase 1b's shell logic
+   ├── Singular loaders ✅ (#541)  — post.loadBelongsTo(...) / post.loadHasOne(...)
+   │
+   └── Phase 1b 📋 — needs Phase 1a + Phase R (all done, unblocked)
+         │
+         ├── 1b.1 CLI skeleton + single-file virtualization
+         ├── 1b.2 Diagnostic remap          (after 1b.1)
+         ├── 1b.3 Transitive-extends walker (after 1b.1)
+         ├── 1b.4 Auto-import resolution    (after 1b.3)
+         ├── 1b.5 --build support           (after 1b.4)
+         └── 1b.6 In-repo migration + CI    (after 1b.4)
                   │
-                  └── Phase 3
+                  └── Phase 2 📋 — tsserver plugin (needs 1b.6's dx-tests)
+                        │
+                        └── Phase 3 📋 — docs + consumer cutover
 ```
 
-Recommendation: **land Phase R now, in parallel with 1a's review.** R
-is a contained runtime change and its merge unblocks the 1a-fixup
-one-liner. Phase 1b should wait for R so its dx-tests can assert
-against the post-R (Rails-faithful) shapes from day one.
+All prerequisite work is merged. Phase 1b is the next stretch — six
+sub-PRs totaling the CLI shell and associated dogfooding. 1b.1 and
+1b.2 are independent of each other after the skeleton lands, so two
+contributors can work in parallel. 1b.3 and 1b.4 serialize; 1b.5 and
+1b.6 can run in parallel after 1b.4.
 
 ## Key design decisions
 
