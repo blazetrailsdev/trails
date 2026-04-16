@@ -2,7 +2,6 @@ import ts from "typescript";
 import * as path from "node:path";
 import { virtualize, type VirtualizeResult } from "../type-virtualization/virtualize.js";
 
-const BASE_PATTERN = /\bextends\s+Base\b/;
 const STATIC_BLOCK_PATTERN = /\bstatic\s*\{/;
 
 export interface TrailsCompilerHost extends ts.CompilerHost {
@@ -10,14 +9,27 @@ export interface TrailsCompilerHost extends ts.CompilerHost {
   getOriginalText(fileName: string): string | undefined;
 }
 
-export function buildCompilerHost(options: ts.CompilerOptions): TrailsCompilerHost {
+export function buildCompilerHost(
+  options: ts.CompilerOptions,
+  baseNames?: readonly string[],
+): TrailsCompilerHost {
   const baseHost = ts.createCompilerHost(options, true);
   const deltaMap = new Map<string, VirtualizeResult["deltas"]>();
   const virtualizedTextCache = new Map<string, string>();
   const originalTextCache = new Map<string, string>();
 
+  const baseNameSet = new Set(baseNames ?? ["Base"]);
+  // Match valid JS/TS identifiers (including $) after `extends`.
+  const EXTENDS_IDENT = /\bextends\s+([\w$]+)/g;
+
   function shouldVirtualize(text: string): boolean {
-    return BASE_PATTERN.test(text) && STATIC_BLOCK_PATTERN.test(text);
+    if (!STATIC_BLOCK_PATTERN.test(text)) return false;
+    EXTENDS_IDENT.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = EXTENDS_IDENT.exec(text))) {
+      if (baseNameSet.has(match[1]!)) return true;
+    }
+    return false;
   }
 
   function getVirtualizedText(resolved: string): string | undefined {
@@ -28,7 +40,7 @@ export function buildCompilerHost(options: ts.CompilerOptions): TrailsCompilerHo
       virtualizedTextCache.set(resolved, originalText);
       return originalText;
     }
-    const result = virtualize(originalText, resolved);
+    const result = virtualize(originalText, resolved, { baseNames });
     virtualizedTextCache.set(resolved, result.text);
     originalTextCache.set(resolved, originalText);
     deltaMap.set(resolved, result.deltas);

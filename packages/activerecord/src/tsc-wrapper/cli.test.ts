@@ -133,3 +133,53 @@ describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
     }
   });
 });
+
+describe("trails-tsc transitive extends — Phase 1b.3", () => {
+  const TRANSITIVE_DIR = path.resolve(FIXTURES_DIR, "transitive");
+
+  it("virtualizes `class Admin extends User` where User extends Base", () => {
+    const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
+    const { program } = createTrailsProgram(configPath);
+    const diagnostics = [...ts.getPreEmitDiagnostics(program)];
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("admin.role types as string, admin.name inherited from User types as string", () => {
+    const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
+    const { program } = createTrailsProgram(configPath);
+    const checker = program.getTypeChecker();
+
+    const consumerFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "consumer.ts"));
+    expect(consumerFile).toBeDefined();
+
+    const probed: Record<string, string> = {};
+    function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        const type = checker.getTypeAtLocation(node.initializer);
+        probed[node.name.text] = checker.typeToString(type);
+      }
+      node.forEachChild(visit);
+    }
+    consumerFile!.forEachChild(visit);
+
+    expect(probed["userName"]).toBe("string");
+    expect(probed["adminRole"]).toBe("string");
+    expect(probed["adminName"]).toBe("string");
+  });
+
+  it("User (direct extends Base) still virtualizes correctly", () => {
+    const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
+    const { program } = createTrailsProgram(configPath);
+    const userFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "user.ts"));
+    expect(userFile).toBeDefined();
+    expect(userFile!.text).toContain("declare name: string");
+  });
+
+  it("Admin (transitive via User) gets declares injected", () => {
+    const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
+    const { program } = createTrailsProgram(configPath);
+    const adminFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "admin.ts"));
+    expect(adminFile).toBeDefined();
+    expect(adminFile!.text).toContain("declare role: string");
+  });
+});

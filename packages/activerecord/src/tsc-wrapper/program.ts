@@ -1,6 +1,7 @@
 import ts from "typescript";
 import * as path from "node:path";
 import { buildCompilerHost, type TrailsCompilerHost } from "./host.js";
+import { collectBaseDescendants } from "../type-virtualization/transitive-extends-walker.js";
 
 export interface TrailsProgram {
   program: ts.Program;
@@ -45,7 +46,29 @@ export function createTrailsProgram(configPath: string): TrailsProgram {
     };
   }
 
-  const host = buildCompilerHost(parsed.options);
+  // Pass 1: create program with default virtualization (literal
+  // `extends Base` only). This gives us a checker to resolve the
+  // full extends chain.
+  const host1 = buildCompilerHost(parsed.options);
+  const program1 = ts.createProgram({
+    rootNames: parsed.fileNames,
+    options: parsed.options,
+    host: host1,
+  });
+
+  // Pass 2: walk the checker to find transitive Base descendants
+  // (e.g. `class Admin extends User extends Base`). If any new names
+  // are found, rebuild with the expanded allow-list so those classes
+  // get virtualized too.
+  const baseNames = collectBaseDescendants(program1);
+  const defaultNames = new Set(["Base"]);
+  const hasNewNames = [...baseNames].some((n) => !defaultNames.has(n));
+
+  if (!hasNewNames) {
+    return { program: program1, host: host1, configDiagnostics: [] };
+  }
+
+  const host = buildCompilerHost(parsed.options, [...baseNames]);
   const program = ts.createProgram({
     rootNames: parsed.fileNames,
     options: parsed.options,
