@@ -142,8 +142,55 @@ export class PostgreSQLDatabaseTasks {
     if (extraFlags) {
       args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
     }
+
+    // Rails: reads ActiveRecord.dump_schemas to decide which PG schemas
+    // pg_dump includes. Trails equivalent: DatabaseTasks.dumpSchemas.
+    //
+    // The configured search_path (from config.schemaSearchPath) is
+    // used for TWO purposes:
+    // 1. --schema= filter args for pg_dump (when dumpSchemas isn't "all")
+    // 2. SET search_path footer appended to the dump file
+    // These are separated so dumpSchemas="all" still appends the footer.
+    // Trails uses camelCase config keys throughout; no snake_case fallback.
+    const rawSearchPath = this.configurationHash.schemaSearchPath;
+    const configuredSearchPath = typeof rawSearchPath === "string" ? rawSearchPath : undefined;
+
+    const dumpSchemas = DatabaseTasks.dumpSchemas;
+    let schemaFilter: string | undefined;
+    if (dumpSchemas === "schema_search_path") {
+      schemaFilter = configuredSearchPath;
+    } else if (dumpSchemas === "all") {
+      schemaFilter = undefined;
+    } else if (typeof dumpSchemas === "string") {
+      schemaFilter = dumpSchemas;
+    }
+
+    if (schemaFilter && schemaFilter.trim().length > 0) {
+      for (const schema of normalizeSchemaSearchPath(schemaFilter)) {
+        args.push(`--schema=${schema}`);
+      }
+    }
+
+    // Rails: applies SchemaDumper.ignore_tables as -T exclusions.
+    const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
+    for (const pattern of SchemaDumper.ignoreTables) {
+      if (typeof pattern === "string") args.push("-T", pattern);
+      // Regex patterns can't be expressed as pg_dump -T flags.
+    }
+
     await this.runCmd("pg_dump", args, "dumping");
     await this.removeSqlHeaderComments(filename);
+
+    // Rails: appends `SET search_path TO <path>;` at the end of the
+    // dump so loading it restores the session search_path. Uses the
+    // configured search_path (not the filtered schema list) so
+    // dumpSchemas="all" still appends when a search_path is set.
+    if (configuredSearchPath && configuredSearchPath.trim().length > 0) {
+      const sanitized = configuredSearchPath.trim().replace(/[;\n\r]/g, "");
+      if (sanitized.length > 0) {
+        getFs().appendFileSync(filename, `SET search_path TO ${sanitized};\n\n`);
+      }
+    }
   }
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
@@ -338,4 +385,31 @@ function formatCmdError(
     `Make sure \`${cmd}\` is installed in your PATH and has proper permissions.\n` +
     `(action: ${action})`
   );
+}
+
+/**
+ * Normalize a PG schema_search_path string into an array of schema
+ * names suitable for pg_dump `--schema=` args. Strips surrounding
+ * quotes, drops `$user` (PG runtime variable, not a real schema),
+ * and filters empties. Exported so the test can exercise the same
+ * code path instead of reimplementing the logic.
+ */
+export function normalizeSchemaSearchPath(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .map((s) => {
+      if (
+        s.length >= 2 &&
+        ((s.startsWith("'") && s.endsWith("'")) || (s.startsWith('"') && s.endsWith('"')))
+      ) {
+        const quote = s[0];
+        const inner = s.slice(1, -1).trim();
+        // Unescape doubled quotes inside quoted identifiers:
+        // "we""ird" → we"ird, 'it''s' → it's
+        return quote === '"' ? inner.replace(/""/g, '"') : inner.replace(/''/g, "'");
+      }
+      return s;
+    })
+    .filter((s) => s.length > 0 && s !== "$user");
 }

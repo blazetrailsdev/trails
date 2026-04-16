@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { PostgreSQLDatabaseTasks } from "./postgresql-database-tasks.js";
+import { PostgreSQLDatabaseTasks, normalizeSchemaSearchPath } from "./postgresql-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 
@@ -96,5 +96,20 @@ describe("PostgreSQLDatabaseTasks", () => {
     );
 
     expect(closeMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe("structureDump schema filtering", () => {
+    it("normalizes $user and quoted entries out of --schema= args", () => {
+      // Uses the exported normalizeSchemaSearchPath helper — same code
+      // path structureDump calls, so the test can't drift.
+      expect(normalizeSchemaSearchPath("'$user', public, \"custom\"")).toEqual([
+        "public",
+        "custom",
+      ]);
+    });
+
+    it("handles empty and whitespace-only entries", () => {
+      expect(normalizeSchemaSearchPath("  , public, ,")).toEqual(["public"]);
+    });
   });
 });
