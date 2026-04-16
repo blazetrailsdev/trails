@@ -618,6 +618,21 @@ export class DatabaseTasks {
   }
 
   static async dumpSchema(config: DatabaseConfig): Promise<void> {
+    // Rails: `return unless db_config.schema_dump` — lets per-config
+    // `schemaDump: false` (or null) suppress dumping. HashConfig.schemaDump()
+    // returns `string | false | null`; false AND null both mean "don't dump".
+    // Pass the current format so the check matches what's being dumped.
+    const cfgWithDump = config as unknown as {
+      schemaDump?: (format?: string) => string | false | null;
+    };
+    if (typeof cfgWithDump.schemaDump === "function") {
+      // JS dumps use the same schema file path/config as TS; normalize
+      // so HashConfig.schemaDump (which recognizes ruby/sql/ts but not
+      // js) doesn't return null and accidentally suppress the dump.
+      const format = this.schemaFormat === "js" ? "ts" : this.schemaFormat;
+      const result = cfgWithDump.schemaDump(format);
+      if (result === false || result === null) return;
+    }
     const filename = this.schemaDumpPath(config);
     if (this.schemaFormat === "sql") {
       const fs = getFs();
@@ -657,6 +672,7 @@ export class DatabaseTasks {
 
     if (format === "sql") {
       await this.structureLoad(config, filename);
+      await this._stampSchemaSha1(config, filename);
       return;
     }
 
@@ -690,6 +706,41 @@ export class DatabaseTasks {
     const { MigrationContext } = await import("../migration.js");
     const ctx = new MigrationContext(adapter);
     await defineSchema(ctx);
+    // Stamp using the resolved absolute path — `filename` may be
+    // relative and `_schemaSha1` reads the file via getFs(), so the
+    // path must match what was actually imported.
+    await this._stampSchemaSha1(config, absolute);
+  }
+
+  /**
+   * After loading a schema file, stamp ar_internal_metadata with the
+   * file's SHA1 so `schemaUpToDate` can skip purge+reload on
+   * subsequent `reconstructFromSchema` calls (the test:prepare fast
+   * path). Mirrors Rails' `load_schema` which calls
+   * `internal_metadata.create_table_and_set_flags(env, schema_sha1(file))`.
+   */
+  private static async _stampSchemaSha1(config: DatabaseConfig, filename: string): Promise<void> {
+    const adapter = this._adapterInstance;
+    if (!adapter) return;
+    // Respect useMetadataTable opt-out — if the config says don't use
+    // the metadata table, don't create one just to stamp the SHA1.
+    if (!config.useMetadataTable) return;
+    try {
+      const { InternalMetadata } = await import("../internal-metadata.js");
+      const metadata = new InternalMetadata(adapter);
+      const sha1 = this._schemaSha1(filename);
+      await metadata.createTableAndSetFlags(config.envName, sha1);
+    } catch (error) {
+      // Best effort — a failed stamp just means schemaUpToDate
+      // returns false next time, triggering a full reload instead
+      // of a truncate. No worse than before Phase 15. Log at debug
+      // level so failures are diagnosable without crashing the load.
+
+      console.debug?.(
+        `[trails] _stampSchemaSha1 failed for ${config.envName} (${filename})`,
+        error,
+      );
+    }
   }
 
   static async loadSchemaCurrent(
