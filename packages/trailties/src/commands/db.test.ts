@@ -1636,6 +1636,206 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     ]);
   });
 
+  it("db create + migrate fans out across every multi-DB config", async () => {
+    // Multi-DB: `trails db create` and `trails db migrate` iterate
+    // every named config. Each gets its own DB file + migration dir.
+    const primaryDb = path.join(tmpDir, "primary.sqlite3");
+    const animalsDb = path.join(tmpDir, "animals.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+};`,
+    );
+    // Primary migrations in db/migrations; animals in db/migrations_animals.
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateDogs extends Migration {
+  async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
+  async down() { await this.dropTable("dogs"); }
+}`,
+    );
+
+    await runDb(["create"]);
+    expect(fs.existsSync(primaryDb)).toBe(true);
+    expect(fs.existsSync(animalsDb)).toBe(true);
+
+    await runDb(["migrate"]);
+
+    // Verify each DB got its own migration applied.
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const pAdapter = new SQLite3Adapter(primaryDb);
+    try {
+      const users = await pAdapter.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
+      );
+      expect(users).toHaveLength(1);
+      // users migration should NOT have landed in animals DB.
+      const noDogs = await pAdapter.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'",
+      );
+      expect(noDogs).toHaveLength(0);
+    } finally {
+      await pAdapter.close();
+    }
+    const aAdapter = new SQLite3Adapter(animalsDb);
+    try {
+      const dogs = await aAdapter.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'",
+      );
+      expect(dogs).toHaveLength(1);
+      const noUsers = await aAdapter.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
+      );
+      expect(noUsers).toHaveLength(0);
+    } finally {
+      await aAdapter.close();
+    }
+
+    // Schema dump fan-out: each named DB should get its own schema
+    // file — primary → db/schema.ts, animals → db/animals_schema.ts.
+    // Without the per-config HashConfig threading in
+    // dumpSchemaAfterMigrate, both would dump to db/schema.ts.
+    const primarySchema = path.join(tmpDir, "db", "schema.ts");
+    const animalsSchema = path.join(tmpDir, "db", "animals_schema.ts");
+    expect(fs.existsSync(primarySchema)).toBe(true);
+    expect(fs.existsSync(animalsSchema)).toBe(true);
+    expect(fs.readFileSync(primarySchema, "utf8")).toContain("users");
+    expect(fs.readFileSync(animalsSchema, "utf8")).toContain("dogs");
+  });
+
+  it("db migrate --database=animals targets only the named DB", async () => {
+    const primaryDb = path.join(tmpDir, "primary2.sqlite3");
+    const animalsDb = path.join(tmpDir, "animals2.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)} },
+  },
+};`,
+    );
+    fs.mkdirSync(path.join(tmpDir, "db", "migrations_animals"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations_animals", "20260101000001-create-dogs.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateDogs extends Migration {
+  async up() { await this.createTable("dogs", (t) => { t.string("breed"); }); }
+  async down() { await this.dropTable("dogs"); }
+}`,
+    );
+
+    await runDb(["create"]);
+    // Only migrate animals — primary should stay unmigrated.
+    await runDb(["migrate", "--database=animals"]);
+
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const pAdapter = new SQLite3Adapter(primaryDb);
+    try {
+      const users = await pAdapter.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
+      );
+      expect(users).toHaveLength(0); // primary NOT migrated
+    } finally {
+      await pAdapter.close();
+    }
+    const aAdapter = new SQLite3Adapter(animalsDb);
+    try {
+      const dogs = await aAdapter.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'",
+      );
+      expect(dogs).toHaveLength(1); // animals IS migrated
+    } finally {
+      await aAdapter.close();
+    }
+  });
+
+  it("db migrate respects migrationsPaths config override", async () => {
+    // A named DB can set migrationsPaths to override the default
+    // db/migrations_<name> convention. Verify the CLI discovers
+    // migrations from the configured path instead.
+    const primaryDb = path.join(tmpDir, "mp-primary.sqlite3");
+    const animalsDb = path.join(tmpDir, "mp-animals.sqlite3");
+    const customDir = "custom/animal_migrations";
+    fs.mkdirSync(path.join(tmpDir, customDir), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: ${JSON.stringify(customDir)} },
+  },
+  test: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb)} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb)}, migrationsPaths: ${JSON.stringify(customDir)} },
+  },
+};`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrations", "20260101000000-create-users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, customDir, "20260101000001-create-cats.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateCats extends Migration {
+  async up() { await this.createTable("cats", (t) => { t.string("breed"); }); }
+  async down() { await this.dropTable("cats"); }
+}`,
+    );
+
+    await runDb(["create"]);
+    await runDb(["migrate", "--database=animals"]);
+
+    const { SQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+    const a = new SQLite3Adapter(animalsDb);
+    try {
+      const cats = await a.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='cats'",
+      );
+      expect(cats).toHaveLength(1);
+    } finally {
+      await a.close();
+    }
+  });
+
   it("db schema:cache:dump fans out across every multi-DB config", async () => {
     // Rails multi-DB: each named sub-config gets its own
     // `db/<name>_schema_cache.json`. HashConfig.defaultSchemaCachePath
