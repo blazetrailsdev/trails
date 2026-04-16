@@ -15,7 +15,10 @@ export function buildCompilerHost(
   baseNames?: readonly string[],
   modelRegistry?: ReadonlyMap<string, string>,
 ): TrailsCompilerHost {
-  const baseHost = ts.createCompilerHost(options, true);
+  // Incremental host seeds `createHash` and attaches file versions —
+  // required by `ts.createEmitAndSemanticDiagnosticsBuilderProgram`
+  // (used by `--build`) and harmless for plain `createProgram`.
+  const baseHost = ts.createIncrementalCompilerHost(options);
   const deltaMap = new Map<string, VirtualizeResult["deltas"]>();
   const virtualizedTextCache = new Map<string, string>();
   const originalTextCache = new Map<string, string>();
@@ -83,6 +86,14 @@ export function buildCompilerHost(
         return sourceFileCache.get(resolved)!;
       }
       const sf = ts.createSourceFile(resolved, text, languageVersionOrOptions, true);
+      // `ts.EmitAndSemanticDiagnosticsBuilderProgram` (used by
+      // `--build`) asserts every source file has a `version`. When
+      // we produce our own virtualized SourceFile we must set it
+      // ourselves — hash the virtualized text so re-parsing
+      // identical text stays cache-stable.
+      (sf as ts.SourceFile & { version: string }).version = baseHost.createHash
+        ? baseHost.createHash(text)
+        : djb2Hash(text);
       sourceFileCache.set(resolved, sf);
       return sf;
     },
@@ -101,4 +112,20 @@ export function buildCompilerHost(
   };
 
   return host;
+}
+
+/**
+ * djb2 string hash — content-sensitive fallback used for
+ * `SourceFile.version` when the base host doesn't expose a hash
+ * function. Not cryptographic, but distinguishes texts of the same
+ * length (unlike `String(text.length)`), so the incremental
+ * builder doesn't reuse stale SourceFiles for edits that don't
+ * change length.
+ */
+function djb2Hash(text: string): string {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) + hash + text.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36) + ":" + text.length;
 }

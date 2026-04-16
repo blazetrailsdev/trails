@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "composite": true,
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "types": []
+  },
+  "references": [{ "path": "../models" }],
+  "include": ["post.ts", "consumer.ts"]
+}

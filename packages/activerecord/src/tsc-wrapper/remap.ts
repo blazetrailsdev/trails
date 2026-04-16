@@ -13,8 +13,8 @@ import type { TrailsCompilerHost } from "./host.js";
 export function remapDiagnostics(
   diagnostics: readonly ts.Diagnostic[],
   host: TrailsCompilerHost,
+  originalSfCache: Map<string, ts.SourceFile> = new Map(),
 ): ts.Diagnostic[] {
-  const originalSfCache = new Map<string, ts.SourceFile>();
   return diagnostics.map((d) => remapOneDiagnostic(d, host, originalSfCache));
 }
 

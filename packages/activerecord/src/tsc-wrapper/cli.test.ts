@@ -4,6 +4,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createTrailsProgram } from "./program.js";
+import { createTrailsSolutionBuilder } from "./build.js";
 import { remapDiagnostics } from "./remap.js";
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -240,5 +241,103 @@ describe("trails-tsc auto-import — Phase 1b.4", () => {
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("trails-tsc --build composite projects — Phase 1b.5", () => {
+  const COMPOSITE_DIR = path.resolve(FIXTURES_DIR, "composite");
+
+  // Each test copies the fixture into a temp dir so .tsbuildinfo /
+  // dist/ outputs don't leak across runs or into the repo.
+  function withTempComposite(fn: (dir: string) => void): void {
+    const tempDir = fs.mkdtempSync(path.join(FIXTURES_DIR, ".composite-"));
+    try {
+      fs.cpSync(COMPOSITE_DIR, tempDir, { recursive: true });
+      fn(tempDir);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  it("builds a composite solution with a virtualizing host on every project", () => {
+    withTempComposite((dir) => {
+      const diagnostics: ts.Diagnostic[] = [];
+      const builder = createTrailsSolutionBuilder([path.join(dir, "tsconfig.json")], {
+        onDiagnostic: (d) => {
+          diagnostics.push(d);
+          const msg =
+            typeof d.messageText === "string"
+              ? d.messageText
+              : ts.flattenDiagnosticMessageText(d.messageText, "\n");
+          const loc = d.file
+            ? `${path.basename(d.file.fileName)}:${d.file.getLineAndCharacterOfPosition(d.start ?? 0).line + 1}`
+            : "?";
+          console.error(`DIAG [${d.code}] ${loc}: ${msg}`);
+        },
+      });
+      const status = builder.build();
+      expect(diagnostics).toHaveLength(0);
+      expect(status).toBe(ts.ExitStatus.Success);
+
+      // Emitted .d.ts artifacts land under the per-project outDir.
+      expect(fs.existsSync(path.join(dir, "models", "dist", "author.d.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
+
+      // Per-project tsbuildinfo is written (proves incremental build
+      // cache was engaged through the custom host).
+      expect(fs.existsSync(path.join(dir, "models", "dist", "tsconfig.tsbuildinfo"))).toBe(true);
+      expect(fs.existsSync(path.join(dir, "app", "dist", "tsconfig.tsbuildinfo"))).toBe(true);
+    });
+  });
+
+  it("CLI binary --build exits 0 on the composite fixture", async () => {
+    const binPath = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
+    // Same pattern as the Phase 1b.1 binary test: skip when dist
+    // isn't built (e.g., CI jobs that don't run `pnpm build`).
+    if (!fs.existsSync(binPath)) return;
+    const { execFileSync } = await import("node:child_process");
+    withTempComposite((dir) => {
+      const result = execFileSync("node", [binPath, "--build", path.join(dir, "tsconfig.json")], {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      // Solution builder prints no output on a clean build.
+      expect(result).toBe("");
+      expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
+    });
+  });
+
+  it("re-build after editing a model reflects the new declares in dependents", () => {
+    withTempComposite((dir) => {
+      const firstDiags: ts.Diagnostic[] = [];
+      const first = createTrailsSolutionBuilder([path.join(dir, "tsconfig.json")], {
+        onDiagnostic: (d) => firstDiags.push(d),
+      });
+      expect(first.build()).toBe(ts.ExitStatus.Success);
+      expect(firstDiags).toHaveLength(0);
+
+      // Add a new attribute on Author; consumer.ts should still
+      // typecheck and the new field should appear on the emitted
+      // .d.ts after rebuild.
+      const authorPath = path.join(dir, "models", "author.ts");
+      const authorSrc = fs.readFileSync(authorPath, "utf8");
+      fs.writeFileSync(
+        authorPath,
+        authorSrc.replace(
+          'this.attribute("name", "string");',
+          'this.attribute("name", "string");\n    this.attribute("bio", "string");',
+        ),
+      );
+
+      const secondDiags: ts.Diagnostic[] = [];
+      const second = createTrailsSolutionBuilder([path.join(dir, "tsconfig.json")], {
+        onDiagnostic: (d) => secondDiags.push(d),
+      });
+      expect(second.build()).toBe(ts.ExitStatus.Success);
+      expect(secondDiags).toHaveLength(0);
+
+      const authorDts = fs.readFileSync(path.join(dir, "models", "dist", "author.d.ts"), "utf8");
+      expect(authorDts).toContain("bio");
+    });
   });
 });

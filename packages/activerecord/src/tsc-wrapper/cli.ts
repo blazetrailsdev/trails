@@ -4,6 +4,7 @@ import ts from "typescript";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { createTrailsProgram } from "./program.js";
+import { createTrailsSolutionBuilder } from "./build.js";
 import { remapDiagnostics } from "./remap.js";
 import { virtualize } from "../type-virtualization/virtualize.js";
 
@@ -26,10 +27,102 @@ function handlePrintVirtualized(args: string[]): void {
   process.exit(0);
 }
 
+function parsePretty(args: string[], options: ts.CompilerOptions): boolean {
+  // Accept both `--pretty true|false` and `--pretty=true|false`; a
+  // bare `--pretty` with no following value means `true` (matches tsc).
+  const parseValue = (value: string | undefined): boolean | undefined => {
+    if (value === undefined) return true;
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return undefined;
+  };
+  let prettyFromArgs: boolean | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === "--pretty") {
+      prettyFromArgs = parseValue(args[i + 1]) ?? true;
+      break;
+    }
+    if (arg.startsWith("--pretty=")) {
+      const parsed = parseValue(arg.slice("--pretty=".length));
+      if (parsed !== undefined) {
+        prettyFromArgs = parsed;
+        break;
+      }
+    }
+  }
+  const prettyFromOpts = typeof options.pretty === "boolean" ? options.pretty : undefined;
+  return prettyFromArgs ?? prettyFromOpts ?? ts.sys.writeOutputIsTTY?.() ?? false;
+}
+
+function formatHost(): ts.FormatDiagnosticsHost {
+  return {
+    getCurrentDirectory: () => process.cwd(),
+    getCanonicalFileName: (f) => (ts.sys.useCaseSensitiveFileNames ? f : f.toLowerCase()),
+    getNewLine: () => ts.sys.newLine,
+  };
+}
+
+function handleBuildMode(args: string[]): void {
+  // --build / -b must be the first arg for tsc compatibility, but be
+  // lenient: accept it anywhere so users can pass flags in either
+  // order.
+  const buildIdx = args.findIndex((a) => a === "--build" || a === "-b");
+  if (buildIdx === -1) return;
+
+  // Project paths are positional args AFTER --build. Flags that
+  // consume a value must skip that value so we don't treat `false`
+  // (from `--pretty false`) or similar as a project path.
+  const buildArgs = args.slice(buildIdx + 1);
+  const verbose = args.includes("--verbose");
+  const clean = args.includes("--clean");
+  const flagsWithValues = new Set(["--pretty"]);
+  const rest: string[] = [];
+  for (let i = 0; i < buildArgs.length; i++) {
+    const arg = buildArgs[i]!;
+    if (arg === "--verbose" || arg === "--clean") continue;
+    if (arg.startsWith("--pretty=")) continue;
+    if (flagsWithValues.has(arg)) {
+      if (i + 1 < buildArgs.length && !buildArgs[i + 1]!.startsWith("-")) i++;
+      continue;
+    }
+    if (arg.startsWith("-")) continue;
+    rest.push(arg);
+  }
+  const rootConfigs =
+    rest.length > 0
+      ? rest.map((p) => path.resolve(p))
+      : [ts.findConfigFile(process.cwd(), ts.sys.fileExists) ?? path.resolve("tsconfig.json")];
+
+  const fh = formatHost();
+  const pretty = parsePretty(args, {});
+  const builder = createTrailsSolutionBuilder(rootConfigs, {
+    verbose,
+    onDiagnostic: (d) => {
+      const out = pretty
+        ? ts.formatDiagnosticsWithColorAndContext([d], fh)
+        : ts.formatDiagnostics([d], fh);
+      process.stderr.write(out);
+    },
+    onStatus: (d) => {
+      // Solution-builder status (informational, not diagnostics).
+      const msg = ts.flattenDiagnosticMessageText(d.messageText, ts.sys.newLine);
+      process.stdout.write(`${msg}${ts.sys.newLine}`);
+    },
+  });
+
+  const status = clean ? builder.clean() : builder.build();
+  // Preserve TS ExitStatus semantics (Success / DiagnosticsPresent_OutputsSkipped
+  // / InvalidProject_OutputsSkipped / ProjectReferenceCycle_OutputsSkipped) so
+  // callers scripting `trails-tsc --build` can distinguish them exactly like `tsc -b`.
+  process.exit(status);
+}
+
 function main(): void {
   const args = process.argv.slice(2);
 
   handlePrintVirtualized(args);
+  handleBuildMode(args);
 
   // Find -p / --project flag; default to ./tsconfig.json.
   // Error if the flag is present but no value follows (matches tsc).
@@ -54,16 +147,12 @@ function main(): void {
 
   const { program, host, configDiagnostics } = createTrailsProgram(configPath);
 
-  const formatHost: ts.FormatDiagnosticsHost = {
-    getCurrentDirectory: () => process.cwd(),
-    getCanonicalFileName: (f) => (ts.sys.useCaseSensitiveFileNames ? f : f.toLowerCase()),
-    getNewLine: () => ts.sys.newLine,
-  };
+  const fh = formatHost();
 
   // Config-level errors (bad tsconfig read / parse) — format and
   // exit before attempting to use the program.
   if (configDiagnostics.length > 0) {
-    process.stderr.write(ts.formatDiagnostics(configDiagnostics, formatHost));
+    process.stderr.write(ts.formatDiagnostics(configDiagnostics, fh));
     process.exit(1);
   }
 
@@ -85,17 +174,10 @@ function main(): void {
   const sorted = ts.sortAndDeduplicateDiagnostics(remapped);
 
   if (sorted.length > 0) {
-    // Mirror tsc's --pretty default: on when stdout is a TTY,
-    // off otherwise. Explicit --pretty true/false overrides.
-    const prettyIndex = args.indexOf("--pretty");
-    const prettyFromArgs =
-      prettyIndex === -1 ? undefined : args[prettyIndex + 1] === "false" ? false : true;
-    const pretty =
-      prettyFromArgs ?? program.getCompilerOptions().pretty ?? ts.sys.writeOutputIsTTY?.() ?? false;
+    const pretty = parsePretty(args, program.getCompilerOptions());
     const output = pretty
-      ? ts.formatDiagnosticsWithColorAndContext(sorted, formatHost)
-      : ts.formatDiagnostics(sorted, formatHost);
-
+      ? ts.formatDiagnosticsWithColorAndContext(sorted, fh)
+      : ts.formatDiagnostics(sorted, fh);
     process.stderr.write(output);
     process.exit(1);
   }
