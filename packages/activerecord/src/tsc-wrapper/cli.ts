@@ -2,10 +2,34 @@
 
 import ts from "typescript";
 import * as path from "node:path";
+import * as fs from "node:fs";
 import { createTrailsProgram } from "./program.js";
+import { remapDiagnostics } from "./remap.js";
+import { virtualize } from "../type-virtualization/virtualize.js";
+
+function handlePrintVirtualized(args: string[]): void {
+  const idx = args.indexOf("--print-virtualized");
+  if (idx === -1) return;
+  const filePath = args[idx + 1];
+  if (!filePath) {
+    process.stderr.write("trails-tsc: --print-virtualized expects a file path.\n");
+    process.exit(1);
+  }
+  const resolved = path.resolve(filePath);
+  if (!fs.existsSync(resolved)) {
+    process.stderr.write(`trails-tsc: File not found: ${resolved}\n`);
+    process.exit(1);
+  }
+  const text = fs.readFileSync(resolved, "utf8");
+  const { text: virtualized } = virtualize(text, resolved);
+  process.stdout.write(virtualized);
+  process.exit(0);
+}
 
 function main(): void {
   const args = process.argv.slice(2);
+
+  handlePrintVirtualized(args);
 
   // Find -p / --project flag; default to ./tsconfig.json.
   // Error if the flag is present but no value follows (matches tsc).
@@ -28,7 +52,7 @@ function main(): void {
     configPath = path.resolve(configPath);
   }
 
-  const { program, configDiagnostics } = createTrailsProgram(configPath);
+  const { program, host, configDiagnostics } = createTrailsProgram(configPath);
 
   const formatHost: ts.FormatDiagnosticsHost = {
     getCurrentDirectory: () => process.cwd(),
@@ -55,8 +79,10 @@ function main(): void {
     diagnostics.push(...emitResult.diagnostics);
   }
 
-  // Sort + deduplicate to match tsc output ordering and avoid dupes.
-  const sorted = ts.sortAndDeduplicateDiagnostics(diagnostics);
+  // Remap diagnostic positions from virtualized-source coordinates back
+  // to the user's original lines, then sort + deduplicate.
+  const remapped = remapDiagnostics(diagnostics, host);
+  const sorted = ts.sortAndDeduplicateDiagnostics(remapped);
 
   if (sorted.length > 0) {
     // Mirror tsc's --pretty default: on when stdout is a TTY,

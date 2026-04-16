@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import ts from "typescript";
 import * as path from "node:path";
+import * as fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createTrailsProgram } from "./program.js";
+import { remapDiagnostics } from "./remap.js";
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.resolve(CURRENT_DIR, "__fixtures__");
@@ -58,7 +60,6 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
   });
 
   it("CLI binary exits 0 on clean fixture", async () => {
-    const fs = await import("node:fs");
     const binPath = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
     // Skip if dist hasn't been built (CI test jobs that skip `pnpm build`).
     // The programmatic API tests above cover the same behavior; this test
@@ -75,5 +76,60 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
     );
     // Clean exit — no output expected on success.
     expect(result).toBe("");
+  });
+});
+
+describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
+  it("remaps error line from virtualized coordinates to original source line", () => {
+    const configPath = path.join(FIXTURES_DIR, "tsconfig-with-error.json");
+    const { program, host } = createTrailsProgram(configPath);
+    const diagnostics = [...ts.getPreEmitDiagnostics(program)];
+
+    // The error is TS2322 (Type 'string' is not assignable to type 'number')
+    // on the line `const x: number = "not a number";`.
+    // In the ORIGINAL file, that's line 9 (0-indexed: 8).
+    // The virtualizer injects declares after the class `{`, shifting lines.
+    expect(diagnostics.length).toBeGreaterThan(0);
+
+    const errorDiag = diagnostics.find((d) => d.code === 2322);
+    expect(errorDiag).toBeDefined();
+    expect(errorDiag!.file).toBeDefined();
+
+    // Virtualized line (shifted by injected declares)
+    const virtualLine = errorDiag!.file!.getLineAndCharacterOfPosition(errorDiag!.start!).line;
+
+    // Read the original source to find the real line
+    const originalText = fs.readFileSync(path.join(FIXTURES_DIR, "post-with-error.ts"), "utf8");
+    const originalLines = originalText.split("\n");
+    const errorLineIdx = originalLines.findIndex((l) => l.includes('"not a number"'));
+    expect(errorLineIdx).toBeGreaterThan(-1);
+
+    // The virtualized line should be HIGHER than the original (shifted down)
+    expect(virtualLine).toBeGreaterThan(errorLineIdx);
+
+    // After remap, the reported line should match the original
+    const remapped = remapDiagnostics(diagnostics, host);
+    const remappedDiag = remapped.find((d) => d.code === 2322);
+    expect(remappedDiag).toBeDefined();
+    const remappedLine = remappedDiag!.file!.getLineAndCharacterOfPosition(
+      remappedDiag!.start!,
+    ).line;
+    expect(remappedLine).toBe(errorLineIdx);
+  });
+
+  it("non-virtualized file diagnostics pass through unchanged", () => {
+    const configPath = path.join(FIXTURES_DIR, "tsconfig-with-error.json");
+    const { program, host } = createTrailsProgram(configPath);
+    const diagnostics = [...ts.getPreEmitDiagnostics(program)];
+    const remapped = remapDiagnostics(diagnostics, host);
+    // Every diagnostic without deltas should have the same start position
+    for (let i = 0; i < diagnostics.length; i++) {
+      const d = diagnostics[i]!;
+      if (!d.file) continue;
+      const deltas = host.getDeltasForFile(path.resolve(d.file.fileName));
+      if (!deltas || deltas.length === 0) {
+        expect(remapped[i]!.start).toBe(d.start);
+      }
+    }
   });
 });

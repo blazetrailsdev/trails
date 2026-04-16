@@ -7,12 +7,14 @@ const STATIC_BLOCK_PATTERN = /\bstatic\s*\{/;
 
 export interface TrailsCompilerHost extends ts.CompilerHost {
   getDeltasForFile(fileName: string): VirtualizeResult["deltas"] | undefined;
+  getOriginalText(fileName: string): string | undefined;
 }
 
 export function buildCompilerHost(options: ts.CompilerOptions): TrailsCompilerHost {
   const baseHost = ts.createCompilerHost(options, true);
   const deltaMap = new Map<string, VirtualizeResult["deltas"]>();
   const virtualizedTextCache = new Map<string, string>();
+  const originalTextCache = new Map<string, string>();
 
   function shouldVirtualize(text: string): boolean {
     return BASE_PATTERN.test(text) && STATIC_BLOCK_PATTERN.test(text);
@@ -28,6 +30,7 @@ export function buildCompilerHost(options: ts.CompilerOptions): TrailsCompilerHo
     }
     const result = virtualize(originalText, resolved);
     virtualizedTextCache.set(resolved, result.text);
+    originalTextCache.set(resolved, originalText);
     deltaMap.set(resolved, result.deltas);
     return result.text;
   }
@@ -45,6 +48,7 @@ export function buildCompilerHost(options: ts.CompilerOptions): TrailsCompilerHo
       // so we re-read, re-virtualize, and re-parse.
       if (shouldCreateNewSourceFile) {
         virtualizedTextCache.delete(resolved);
+        originalTextCache.delete(resolved);
         deltaMap.delete(resolved);
         sourceFileCache.delete(resolved);
       }
@@ -72,6 +76,10 @@ export function buildCompilerHost(options: ts.CompilerOptions): TrailsCompilerHo
 
     getDeltasForFile(fileName) {
       return deltaMap.get(path.resolve(fileName));
+    },
+
+    getOriginalText(fileName) {
+      return originalTextCache.get(path.resolve(fileName));
     },
   };
 

@@ -79,7 +79,7 @@ export function virtualize(
  * line in the ORIGINAL source — or `null` if the position is inside an
  * injected block.
  */
-export function remapLine(virtualLine: number, deltas: LineDelta[]): number | null {
+export function remapLine(virtualLine: number, deltas: readonly LineDelta[]): number | null {
   let line = virtualLine;
   for (let i = deltas.length - 1; i >= 0; i--) {
     const d = deltas[i];
