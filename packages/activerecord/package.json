@@ -22,10 +22,17 @@
       "types": "./dist/adapters/mysql2-adapter.d.ts",
       "default": "./dist/adapters/mysql2-adapter.js"
     },
+    "./tsc": {
+      "types": "./dist/tsc-wrapper/index.d.ts",
+      "default": "./dist/tsc-wrapper/index.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"
     }
+  },
+  "bin": {
+    "trails-tsc": "./dist/tsc-wrapper/cli.js"
   },
   "scripts": {
     "build": "tsc"
