@@ -9,7 +9,8 @@ import type { DatabaseConfig } from "../../database-configurations/database-conf
 import type { PoolConfig } from "../pool-config.js";
 import type { ConnectionDescriptor } from "./connection-descriptor.js";
 import { ConnectionNotEstablished, ConnectionTimeoutError } from "../../errors.js";
-import { SchemaReflection } from "../schema-cache.js";
+import { SchemaReflection, BoundSchemaReflection } from "../schema-cache.js";
+import { AbstractAdapter } from "../abstract-adapter.js";
 import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
 import { ConnectionLeasingQueue } from "./connection-pool/queue.js";
 import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
@@ -276,6 +277,31 @@ export class ConnectionPool implements ReapablePool {
 
   set schemaReflection(value: SchemaReflection) {
     this.poolConfig.schemaReflection = value;
+    // Matches Rails' `schema_reflection=`: swap the underlying
+    // reflection AND bust the cached BoundSchemaReflection so the
+    // next schemaCache access wraps the new reflection, not the
+    // stale one.
+    this._boundSchemaCache = undefined;
+  }
+
+  /**
+   * Bound schema-cache handle for this pool. Mirrors Rails'
+   * `ConnectionPool#schema_cache`, which returns a
+   * `BoundSchemaReflection` wrapping the pool's SchemaReflection plus
+   * the pool itself. DatabaseTasks.dumpSchemaCache detects the
+   * reflection shape (dumpTo without addAll) and delegates straight
+   * to it — same code path Rails' `conn_or_pool.schema_cache.dump_to`
+   * drives.
+   *
+   * Memoized per-pool so callers consistently see the same reflection
+   * across invocations, matching Rails.
+   */
+  private _boundSchemaCache?: BoundSchemaReflection;
+  get schemaCache(): BoundSchemaReflection {
+    if (!this._boundSchemaCache) {
+      this._boundSchemaCache = new BoundSchemaReflection(this.schemaReflection, this);
+    }
+    return this._boundSchemaCache;
   }
 
   serverVersion(connection: DatabaseAdapter): unknown {
@@ -696,10 +722,30 @@ export class ConnectionPool implements ReapablePool {
   // --- Connection creation ---
 
   newConnection(): DatabaseAdapter {
-    if (this.poolConfig.adapterFactory) {
-      return this.poolConfig.adapterFactory();
+    if (!this.poolConfig.adapterFactory) {
+      throw new ConnectionNotEstablished("No adapter factory configured for connection pool");
     }
-    throw new ConnectionNotEstablished("No adapter factory configured for connection pool");
+    const conn = this.poolConfig.adapterFactory();
+    // Set the back-reference so AbstractAdapter#schemaCache can reach
+    // pool.poolConfig.schemaCache to share the raw SchemaCache across
+    // every connection in this pool. Rails' AbstractAdapter has the
+    // same owner/pool reference threaded in via its connection
+    // constructor; trails' factory signature doesn't expose it, so
+    // we assign it post-hoc here.
+    //
+    // CRITICAL: gate on `instanceof AbstractAdapter`, not a
+    // generic `"pool" in conn` duck-type. Several driver-backed
+    // adapters (PostgreSQLAdapter, Mysql2Adapter) declare their own
+    // `pool` field holding the underlying pg.Pool / mysql.Pool —
+    // writing `this` over that would clobber the driver pool and
+    // break every subsequent query. Only AbstractAdapter's
+    // `pool: unknown = null` slot is safe to commandeer for this
+    // back-reference, and it's the only class that actually reads
+    // it (via `this.pool.poolConfig.schemaCache` etc.).
+    if (conn instanceof AbstractAdapter) {
+      (conn as unknown as { pool: unknown }).pool = this;
+    }
+    return conn;
   }
 
   remove(conn: DatabaseAdapter): void {
@@ -707,6 +753,13 @@ export class ConnectionPool implements ReapablePool {
     this._checkedOut.delete(conn);
     this._lastCheckinAt.delete(conn);
     this._available?.delete(conn);
+    // Clear the back-reference we set in newConnection so a removed
+    // adapter can't observe stale pool/poolConfig state post-eviction.
+    // Mirror the same narrow gate — only touch AbstractAdapter's slot,
+    // never a driver-adapter's own `pool` field.
+    if (conn instanceof AbstractAdapter && (conn as unknown as { pool: unknown }).pool === this) {
+      (conn as unknown as { pool: unknown }).pool = null;
+    }
 
     for (const [ctxId, pin] of this._pinnedConnections) {
       if (pin.connection === conn) {

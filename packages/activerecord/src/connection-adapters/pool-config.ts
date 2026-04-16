@@ -10,6 +10,7 @@ import type { SchemaCache } from "./schema-cache.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-descriptor.js";
 import { SchemaReflection } from "./schema-cache.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 const INSTANCES = new Set<WeakRef<PoolConfig>>();
 const registry =
@@ -54,9 +55,79 @@ export class PoolConfig {
 
   get schemaReflection(): SchemaReflection {
     if (!this._schemaReflection) {
-      this._schemaReflection = new SchemaReflection(null);
+      // Rails: `SchemaReflection.new(db_config.lazy_schema_cache_path)` —
+      // the reflection remembers where to load its cache from on first
+      // access. HashConfig exposes lazySchemaCachePath when
+      // schemaCachePath is set, or falls back to
+      // `<DatabaseTasks.dbDir>/schema_cache.json`. A NullConfig or
+      // missing config leaves the cache path null, which is what
+      // SchemaReflection treats as "no persistent cache on disk"
+      // (possibleCacheAvailable → false).
+      const cachePath = this._lazySchemaCachePath();
+      this._schemaReflection = new SchemaReflection(cachePath);
     }
     return this._schemaReflection;
+  }
+
+  /**
+   * Resolve the on-disk cache path for this pool's SchemaReflection.
+   *
+   * Pulls `DatabaseTasks.dbDir` as the `db_dir` argument to
+   * `HashConfig.defaultSchemaCachePath` so callers that customize
+   * `DatabaseTasks.dbDir` get a reflection that reads from the same
+   * directory `DatabaseTasks.cacheDumpFilename` writes to. Without
+   * this alignment, `trails db schema:cache:dump` would write to
+   * `<dbDir>/schema_cache.json` while the reflection looked for
+   * `db/schema_cache.json` on boot.
+   *
+   * Normalizes blank/empty results to `null` so downstream fs.existsSync
+   * doesn't chase a pathological "".
+   */
+  private _lazySchemaCachePath(): string | null {
+    const cfg = this.dbConfig as unknown as {
+      defaultSchemaCachePath?: (dbDir?: string) => string | null | undefined;
+      schemaCachePath?: string | null;
+    };
+    const dbDir = this._resolveDbDir();
+    // Presence-based (not truthy): if the user explicitly set
+    // schemaCachePath — even to "" — that's a deliberate "no cache"
+    // signal. Fall through to defaultSchemaCachePath(dbDir) only when
+    // the user didn't supply a value at all. Matches Phase 6's
+    // resolveSchemaFormat treating empty strings as "explicitly
+    // unset" rather than "use a default".
+    //
+    // Calling defaultSchemaCachePath(dbDir) directly (not
+    // lazySchemaCachePath()) because that HashConfig method takes no
+    // dbDir arg and would hardcode "db", defeating the alignment
+    // with DatabaseTasks.dbDir.
+    let raw: string | null | undefined;
+    if (cfg && "schemaCachePath" in cfg && cfg.schemaCachePath != null) {
+      raw = cfg.schemaCachePath;
+    } else if (typeof cfg?.defaultSchemaCachePath === "function") {
+      raw = cfg.defaultSchemaCachePath(dbDir);
+    }
+    const trimmed = typeof raw === "string" ? raw.trim() : "";
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  /**
+   * Read DatabaseTasks.dbDir so HashConfig.defaultSchemaCachePath uses
+   * the same directory DatabaseTasks.cacheDumpFilename writes to.
+   * Without this, customizing DatabaseTasks.dbDir would make
+   * `trails db schema:cache:dump` write to one place while the
+   * SchemaReflection loaded from another.
+   *
+   * DatabaseTasks doesn't import from pool-config, so the static
+   * import here introduces no cycle. Wrapped in try/catch as a
+   * belt-and-suspenders fallback for hypothetical bundler ordering
+   * weirdness.
+   */
+  private _resolveDbDir(): string {
+    try {
+      return DatabaseTasks.dbDir ?? "db";
+    } catch {
+      return "db";
+    }
   }
 
   set schemaReflection(value: SchemaReflection) {

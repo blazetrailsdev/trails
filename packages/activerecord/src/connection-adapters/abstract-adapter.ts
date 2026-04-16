@@ -229,12 +229,21 @@ export class AbstractAdapter {
   }
 
   get schemaCache(): SchemaCache {
-    const pool = this.pool as any;
-    if (pool?.schemaCache) return pool.schemaCache;
+    // Phase 11 made `pool.schemaCache` return a BoundSchemaReflection
+    // (the Rails-shaped handle DatabaseTasks.dumpSchemaCache expects).
+    // The raw SchemaCache that AbstractAdapter caches incidental
+    // introspection into now lives on `pool.poolConfig.schemaCache`,
+    // matching Rails' PoolConfig @schema_cache slot. Share it so
+    // every connection in the pool hits the same cache, and fall
+    // back to a per-adapter slot when no pool is attached (tests,
+    // bare adapters).
+    const pool = this.pool as { poolConfig?: { schemaCache: SchemaCache | null } } | null;
+    const poolConfig = pool?.poolConfig;
+    if (poolConfig?.schemaCache) return poolConfig.schemaCache;
 
     if (!this._schemaCache) {
       this._schemaCache = new SchemaCache();
-      if (pool) pool.schemaCache = this._schemaCache;
+      if (poolConfig) poolConfig.schemaCache = this._schemaCache;
     }
     return this._schemaCache;
   }
