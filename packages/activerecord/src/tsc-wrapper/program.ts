@@ -46,29 +46,26 @@ export function createTrailsProgram(configPath: string): TrailsProgram {
     };
   }
 
-  // Pass 1: create program with default virtualization (literal
-  // `extends Base` only). This gives us a checker to resolve the
-  // full extends chain.
-  const host1 = buildCompilerHost(parsed.options);
+  // Pass 1: create program with a plain compiler host (no
+  // virtualization / auto-import). We only need the checker here to
+  // resolve the full extends chain — doing the text transform twice
+  // would be wasted work.
+  const host1 = ts.createCompilerHost(parsed.options, true);
   const program1 = ts.createProgram({
     rootNames: parsed.fileNames,
     options: parsed.options,
     host: host1,
   });
 
-  // Pass 2: walk the checker to find transitive Base descendants
-  // (e.g. `class Admin extends User extends Base`). If any new names
-  // are found, rebuild with the expanded allow-list so those classes
-  // get virtualized too.
-  const baseNames = collectBaseDescendants(program1);
-  const defaultNames = new Set(["Base"]);
-  const hasNewNames = [...baseNames].some((n) => !defaultNames.has(n));
+  // Pass 2: walk the checker to find transitive Base descendants and
+  // build the model registry (className → absolutePath) for
+  // auto-import resolution.
+  const { baseNames, modelRegistry } = collectBaseDescendants(program1);
 
-  if (!hasNewNames) {
-    return { program: program1, host: host1, configDiagnostics: [] };
-  }
-
-  const host = buildCompilerHost(parsed.options, [...baseNames]);
+  // Rebuild with the full allow-list + model registry so transitive
+  // classes are virtualized AND missing `import type` lines are
+  // auto-injected.
+  const host = buildCompilerHost(parsed.options, [...baseNames], modelRegistry);
   const program = ts.createProgram({
     rootNames: parsed.fileNames,
     options: parsed.options,

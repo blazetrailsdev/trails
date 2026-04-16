@@ -4,7 +4,8 @@
 // user has already declared by hand. Output is plain text — the splicer
 // in virtualize.ts inserts it verbatim after the class body's opening `{`.
 
-import { classify, camelize } from "@blazetrails/activesupport";
+import { camelize } from "@blazetrails/activesupport";
+import { resolveAssociationTarget, stripQuotes } from "./resolve-target.js";
 import type {
   ClassInfo,
   RuntimeCall,
@@ -212,17 +213,7 @@ function readAffix(raw: string | undefined, attr: string, side: "prefix" | "suff
 }
 
 function resolveTarget(call: AssociationCall): string {
-  const explicit = call.options["className"];
-  if (explicit) return stripQuotes(explicit);
-  return classify(call.name);
-}
-
-function stripQuotes(source: string): string {
-  const first = source.charAt(0);
-  if ((first === '"' || first === "'" || first === "`") && source.endsWith(first)) {
-    return source.slice(1, -1);
-  }
-  return source;
+  return resolveAssociationTarget(call);
 }
 
 function pascal(s: string): string {

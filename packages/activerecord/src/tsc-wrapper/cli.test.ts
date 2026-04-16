@@ -183,3 +183,62 @@ describe("trails-tsc transitive extends — Phase 1b.3", () => {
     expect(adminFile!.text).toContain("declare role: string");
   });
 });
+
+describe("trails-tsc auto-import — Phase 1b.4", () => {
+  const AUTO_IMPORT_DIR = path.resolve(FIXTURES_DIR, "auto-import");
+
+  it("auto-injects `import type { Author }` into post.ts (no user-written import)", () => {
+    const configPath = path.join(AUTO_IMPORT_DIR, "tsconfig.json");
+    const { program } = createTrailsProgram(configPath);
+
+    const postFile = program.getSourceFile(path.join(AUTO_IMPORT_DIR, "post.ts"));
+    expect(postFile).toBeDefined();
+    expect(postFile!.text).toContain("import type { Author }");
+  });
+
+  it("zero diagnostics — auto-imported Author resolves for the belongsTo declare", () => {
+    const configPath = path.join(AUTO_IMPORT_DIR, "tsconfig.json");
+    const { program } = createTrailsProgram(configPath);
+    const diagnostics = [...ts.getPreEmitDiagnostics(program)];
+
+    for (const d of diagnostics) {
+      const msg = typeof d.messageText === "string" ? d.messageText : JSON.stringify(d.messageText);
+      const loc = d.file
+        ? `${path.basename(d.file.fileName)}:${d.file.getLineAndCharacterOfPosition(d.start ?? 0).line + 1}`
+        : "?";
+      console.error(`DIAG [${d.code}] ${loc}: ${msg}`);
+    }
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("user-written import for Author prevents duplicate auto-import", () => {
+    // Create a temp copy of the fixture with an explicit Author import
+    // already in post.ts, then verify the virtualizer doesn't inject
+    // a second one.
+    const tempDir = fs.mkdtempSync(path.join(AUTO_IMPORT_DIR, ".dup-test-"));
+    try {
+      for (const f of fs.readdirSync(AUTO_IMPORT_DIR)) {
+        const src = path.join(AUTO_IMPORT_DIR, f);
+        if (fs.statSync(src).isFile()) {
+          fs.copyFileSync(src, path.join(tempDir, f));
+        }
+      }
+      const postPath = path.join(tempDir, "post.ts");
+      const postSource = fs.readFileSync(postPath, "utf8");
+      const explicitImport = 'import type { Author } from "./author.js";\n';
+      if (!postSource.includes(explicitImport)) {
+        fs.writeFileSync(postPath, explicitImport + postSource);
+      }
+
+      const configPath = path.join(tempDir, "tsconfig.json");
+      const { program } = createTrailsProgram(configPath);
+      const postFile = program.getSourceFile(path.resolve(postPath));
+      expect(postFile).toBeDefined();
+
+      const matches = postFile!.text.match(/import type\s*\{\s*Author\s*\}/g) ?? [];
+      expect(matches).toHaveLength(1);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});

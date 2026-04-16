@@ -1,6 +1,7 @@
 import ts from "typescript";
 import * as path from "node:path";
 import { virtualize, type VirtualizeResult } from "../type-virtualization/virtualize.js";
+import { resolveAutoImports } from "./auto-import.js";
 
 const STATIC_BLOCK_PATTERN = /\bstatic\s*\{/;
 
@@ -12,6 +13,7 @@ export interface TrailsCompilerHost extends ts.CompilerHost {
 export function buildCompilerHost(
   options: ts.CompilerOptions,
   baseNames?: readonly string[],
+  modelRegistry?: ReadonlyMap<string, string>,
 ): TrailsCompilerHost {
   const baseHost = ts.createCompilerHost(options, true);
   const deltaMap = new Map<string, VirtualizeResult["deltas"]>();
@@ -40,7 +42,10 @@ export function buildCompilerHost(
       virtualizedTextCache.set(resolved, originalText);
       return originalText;
     }
-    const result = virtualize(originalText, resolved, { baseNames });
+    const prependImports = modelRegistry
+      ? resolveAutoImports(originalText, resolved, modelRegistry, baseNames)
+      : undefined;
+    const result = virtualize(originalText, resolved, { baseNames, prependImports });
     virtualizedTextCache.set(resolved, result.text);
     originalTextCache.set(resolved, originalText);
     deltaMap.set(resolved, result.deltas);
