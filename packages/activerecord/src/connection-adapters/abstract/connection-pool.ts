@@ -282,6 +282,17 @@ export class ConnectionPool implements ReapablePool {
     // next schemaCache access wraps the new reflection, not the
     // stale one.
     this._boundSchemaCache = undefined;
+    // Also reset the lazy-load guard AND the raw cache so the new
+    // reflection's on-disk cache path gets loaded on the next first-
+    // connection event. Without resetting _lazyLoadTriggered the
+    // guard would still be true from the old reflection; without
+    // resetting poolConfig.schemaCache the `!this.poolConfig.schemaCache`
+    // guard in newConnection would prevent the new lazy-load from
+    // triggering, and adapter-side consumers would keep seeing stale
+    // cache data from the old reflection.
+    this._lazyLoadTriggered = false;
+    this._lazyLoadPromise = null;
+    this.poolConfig.schemaCache = null;
   }
 
   /**
@@ -745,8 +756,85 @@ export class ConnectionPool implements ReapablePool {
     if (conn instanceof AbstractAdapter) {
       (conn as unknown as { pool: unknown }).pool = this;
     }
+    // Lazily load the on-disk schema cache when the first connection
+    // for this pool is adopted. Mirrors Rails'
+    // `ConnectionPool#adopt_connection`:
+    //
+    //     if @schema_cache.nil? && ActiveRecord.lazily_load_schema_cache
+    //       schema_cache.load!
+    //     end
+    //
+    // Trails' equivalent is `SchemaReflection.lazilyLoadSchemaCache`
+    // (static flag, off by default — apps opt in). The load is
+    // fire-and-forget because newConnection is sync and the load
+    // involves async work (schemaVersion introspection for version-
+    // check). SchemaReflection.loadCache already swallows errors
+    // internally (console.warn on version mismatch, returns null on
+    // file-not-found / parse failure), so the .catch here is purely
+    // defensive — it should never fire in practice. Callers can
+    // observe the pending/resolved load via _lazyLoadPromise (used
+    // by tests to await the actual completion instead of timing hacks).
+    if (
+      SchemaReflection.lazilyLoadSchemaCache &&
+      !this._lazyLoadTriggered &&
+      !this.poolConfig.schemaCache
+    ) {
+      this._lazyLoadTriggered = true;
+      // Use BoundSchemaReflection.forLoneConnection so the version-
+      // check in loadCache routes through a FakePool that yields the
+      // just-created connection — never re-enters the real pool's
+      // checkout. Without this, pool size=1 would deadlock: loadCache
+      // calls pool.withConnection to query schemaVersion(), which tries
+      // to checkout a second connection that doesn't exist.
+      //
+      // The loneRef shares the same SchemaReflection as `this.schemaCache`,
+      // so a successful load populates both.
+      const loneRef = BoundSchemaReflection.forLoneConnection(this.schemaReflection, conn);
+      this._lazyLoadPromise = loneRef
+        .loadBang()
+        .then(() => {
+          // Propagate the loaded SchemaCache into poolConfig.schemaCache
+          // so adapter-side consumers (AbstractAdapter.schemaCache,
+          // TypeCaster::Connection) see the preloaded data.
+          const loaded = this.schemaReflection.loadedCache;
+          if (loaded) {
+            // Always assign: poolConfig.schemaCache may have been
+            // populated with an empty SchemaCache during the in-flight
+            // load (e.g., AbstractAdapter.schemaCache accessed
+            // synchronously by TypeCaster::Connection before the
+            // promise resolved). Overwriting that empty cache with the
+            // fully-populated one is the correct outcome — the preloaded
+            // data should win.
+            this.poolConfig.schemaCache = loaded;
+          }
+        })
+        .catch((err) => {
+          // loadCache swallows read/parse/version errors internally;
+          // this is a belt-and-suspenders guard. Log enough context to
+          // diagnose if a future change adds an unexpected rejection.
+
+          console.warn(
+            `[trails] Failed to lazily load schema cache for pool ` +
+              `${this.poolConfig.connectionSpecName}: ` +
+              `${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+    }
     return conn;
   }
+
+  /**
+   * Set once per pool when the lazy-load trigger fires, so subsequent
+   * connections don't re-run the load. Mirrors Rails'
+   * `@schema_cache.nil?` guard on `adopt_connection`.
+   */
+  private _lazyLoadTriggered = false;
+
+  /**
+   * @internal Exposed so tests (and eager-boot callers) can await the
+   * lazy load's completion. Null when no lazy load was triggered.
+   */
+  _lazyLoadPromise: Promise<void> | null = null;
 
   remove(conn: DatabaseAdapter): void {
     this._connectionLease().clear(conn);
