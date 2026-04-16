@@ -65,7 +65,7 @@ const sqlite3Loader: AdapterLoader = async () =>
 const mysql2Loader: AdapterLoader = async () =>
   (await import("./adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
-  (await import("./adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
+  (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
 const trilogyLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/trilogy-adapter.js")).TrilogyAdapter as any;
 

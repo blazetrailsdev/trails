@@ -632,3 +632,94 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   // ── Rails-matching test stubs ──
 });
+
+describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
+  function makeAdapter(): PostgreSQLAdapter {
+    // Create adapter with a dummy config — we'll stub execute before any query runs
+    const adapter = new PostgreSQLAdapter({ host: "stub", port: 0 });
+    return adapter;
+  }
+
+  function stubVersion(adapter: PostgreSQLAdapter, version: number): void {
+    // Bypass _ensureInitialized by directly setting internal state
+    (adapter as any)._initialized = true;
+    (adapter as any)._databaseVersion = version;
+    (adapter as any)._hasOptimizerHints = false;
+  }
+
+  it("always-true predicates return true regardless of version", () => {
+    const adapter = makeAdapter();
+    stubVersion(adapter, 90300);
+    expect(adapter.supportsBulkAlter()).toBe(true);
+    expect(adapter.supportsIndexSortOrder()).toBe(true);
+    expect(adapter.supportsPartialIndex()).toBe(true);
+    expect(adapter.supportsExpressionIndex()).toBe(true);
+    expect(adapter.supportsTransactionIsolation()).toBe(true);
+    expect(adapter.supportsForeignKeys()).toBe(true);
+    expect(adapter.supportsCheckConstraints()).toBe(true);
+    expect(adapter.supportsViews()).toBe(true);
+    expect(adapter.supportsJson()).toBe(true);
+    expect(adapter.supportsComments()).toBe(true);
+    expect(adapter.supportsSavepoints()).toBe(true);
+    expect(adapter.supportsInsertReturning()).toBe(true);
+    expect(adapter.supportsDdlTransactions()).toBe(true);
+    expect(adapter.supportsAdvisoryLocks()).toBe(true);
+    expect(adapter.supportsExplain()).toBe(true);
+    expect(adapter.supportsExtensions()).toBe(true);
+    expect(adapter.supportsMaterializedViews()).toBe(true);
+    expect(adapter.supportsForeignTables()).toBe(true);
+    expect(adapter.supportsCommonTableExpressions()).toBe(true);
+    expect(adapter.supportsLazyTransactions()).toBe(true);
+  });
+
+  it("version-gated predicates respect version thresholds", () => {
+    const adapter = makeAdapter();
+
+    // PG 9.3 — below most version gates
+    stubVersion(adapter, 90300);
+    expect(adapter.supportsInsertOnConflict()).toBe(false);
+    expect(adapter.supportsPgcryptoUuid()).toBe(false);
+    expect(adapter.supportsIdentityColumns()).toBe(false);
+    expect(adapter.supportsPartitionedIndexes()).toBe(false);
+    expect(adapter.supportsVirtualColumns()).toBe(false);
+    expect(adapter.supportsRestartDbTransaction()).toBe(false);
+    expect(adapter.supportsNullsNotDistinct()).toBe(false);
+
+    // PG 9.5 — insert on conflict
+    stubVersion(adapter, 90500);
+    expect(adapter.supportsInsertOnConflict()).toBe(true);
+    expect(adapter.supportsInsertOnDuplicateSkip()).toBe(true);
+    expect(adapter.supportsInsertOnDuplicateUpdate()).toBe(true);
+    expect(adapter.supportsInsertConflictTarget()).toBe(true);
+    expect(adapter.supportsPgcryptoUuid()).toBe(true);
+
+    // PG 10 — identity columns, native partitioning
+    stubVersion(adapter, 100000);
+    expect(adapter.supportsIdentityColumns()).toBe(true);
+    expect(adapter.supportsNativePartitioning()).toBe(true);
+
+    // PG 11 — partitioned indexes, index include
+    stubVersion(adapter, 110000);
+    expect(adapter.supportsPartitionedIndexes()).toBe(true);
+    expect(adapter.supportsIndexInclude()).toBe(true);
+
+    // PG 12 — virtual columns, restart db transaction
+    stubVersion(adapter, 120000);
+    expect(adapter.supportsVirtualColumns()).toBe(true);
+    expect(adapter.supportsRestartDbTransaction()).toBe(true);
+
+    // PG 15 — nulls not distinct
+    stubVersion(adapter, 150000);
+    expect(adapter.supportsNullsNotDistinct()).toBe(true);
+  });
+
+  it("databaseVersion throws before initialization", () => {
+    const adapter = makeAdapter();
+    expect(() => adapter.databaseVersion).toThrow(/not available yet/);
+  });
+
+  it("indexAlgorithms returns concurrently", () => {
+    const adapter = makeAdapter();
+    expect(adapter.indexAlgorithms()).toEqual({ concurrently: "CONCURRENTLY" });
+  });
+});

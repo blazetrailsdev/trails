@@ -61,7 +61,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     }
 
     vi.resetModules();
-    vi.doMock("../adapters/postgresql-adapter.js", () => ({
+    vi.doMock("../connection-adapters/postgresql-adapter.js", () => ({
       PostgreSQLAdapter: FakePostgreSQLAdapter,
     }));
 
@@ -75,7 +75,7 @@ describe("PostgreSQLDatabaseTasks", () => {
         }),
       ).truncateAll();
     } finally {
-      vi.doUnmock("../adapters/postgresql-adapter.js");
+      vi.doUnmock("../connection-adapters/postgresql-adapter.js");
       vi.resetModules();
     }
 

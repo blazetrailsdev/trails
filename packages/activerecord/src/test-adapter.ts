@@ -293,7 +293,7 @@ async function dropAllTables(inner: any): Promise<void> {
 let _factory: () => DatabaseAdapter;
 
 if (PG_TEST_URL) {
-  const { PostgreSQLAdapter } = await import("./adapters/postgresql-adapter.js");
+  const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
   _sharedAdapter = new PostgreSQLAdapter(PG_TEST_URL);
   const rows = await _sharedAdapter.execute(
     `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,

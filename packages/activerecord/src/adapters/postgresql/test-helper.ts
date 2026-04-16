@@ -1,6 +1,6 @@
 import { describe } from "vitest";
 import pg from "pg";
-import { PostgreSQLAdapter } from "../postgresql-adapter.js";
+import { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.js";
 
 export const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
 

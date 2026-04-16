@@ -974,7 +974,7 @@ export class DatabaseTasks {
       return new SQLite3Adapter(resolved);
     }
     if (/postgres/.test(adapter)) {
-      const { PostgreSQLAdapter } = await import("../adapters/postgresql-adapter.js");
+      const { PostgreSQLAdapter } = await import("../connection-adapters/postgresql-adapter.js");
       const c = config.configuration;
       if (c.url) return new PostgreSQLAdapter(String(c.url));
       return new PostgreSQLAdapter({

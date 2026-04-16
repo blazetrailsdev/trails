@@ -14,9 +14,9 @@
       "types": "./dist/connection-adapters/sqlite3-adapter.d.ts",
       "default": "./dist/connection-adapters/sqlite3-adapter.js"
     },
-    "./adapters/postgresql-adapter.js": {
-      "types": "./dist/adapters/postgresql-adapter.d.ts",
-      "default": "./dist/adapters/postgresql-adapter.js"
+    "./connection-adapters/postgresql-adapter.js": {
+      "types": "./dist/connection-adapters/postgresql-adapter.d.ts",
+      "default": "./dist/connection-adapters/postgresql-adapter.js"
     },
     "./adapters/mysql2-adapter.js": {
       "types": "./dist/adapters/mysql2-adapter.d.ts",

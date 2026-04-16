@@ -430,7 +430,7 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
     case "postgresql":
     case "postgres": {
       const { PostgreSQLAdapter } =
-        await import("@blazetrails/activerecord/adapters/postgresql-adapter.js");
+        await import("@blazetrails/activerecord/connection-adapters/postgresql-adapter.js");
       if (config.url) {
         return new PostgreSQLAdapter(config.url);
       }

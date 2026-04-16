@@ -175,7 +175,7 @@ export class PostgreSQLDatabaseTasks {
    * dependencies cascaded).
    */
   async truncateAll(): Promise<void> {
-    const { PostgreSQLAdapter } = await import("../adapters/postgresql-adapter.js");
+    const { PostgreSQLAdapter } = await import("../connection-adapters/postgresql-adapter.js");
     const c = this.configurationHash;
     const adapter: DatabaseAdapter = c.url
       ? new PostgreSQLAdapter(String(c.url))
@@ -219,7 +219,7 @@ export class PostgreSQLDatabaseTasks {
   }
 
   private async connectAdmin(): Promise<DatabaseAdapter> {
-    const { PostgreSQLAdapter } = await import("../adapters/postgresql-adapter.js");
+    const { PostgreSQLAdapter } = await import("../connection-adapters/postgresql-adapter.js");
     const c = this.configurationHash;
     if (c.url) {
       const parsed = new URL(String(c.url));
