@@ -5,11 +5,18 @@ import { Data as BitData } from "./oid/bit.js";
 import { Range } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 import {
+  checkIntInRange,
   columnNameMatcher,
+  columnNameWithOrderMatcher,
+  IntegerOutOf64BitRange,
+  lookupCastTypeFromColumn,
   quote,
   quoteDefaultExpression,
+  quotedBinary,
   quotedFalse,
   quotedTrue,
+  quoteSchemaName,
+  quoteTableNameForAssignment,
   typeCast,
   unescapeBytea,
 } from "./quoting.js";
@@ -63,6 +70,64 @@ describe("PostgreSQL quoting", () => {
 
   it("unescapes hex bytea values we now own locally", () => {
     expect(unescapeBytea("\\x6869")).toEqual(Buffer.from("hi"));
+  });
+
+  it("quoteTableNameForAssignment drops the table prefix", () => {
+    expect(quoteTableNameForAssignment("users", "name")).toBe('"name"');
+  });
+
+  it("quoteSchemaName delegates to quoteColumnName", () => {
+    expect(quoteSchemaName("public")).toBe('"public"');
+  });
+
+  it("quotedBinary wraps escape_bytea output in SQL quotes", () => {
+    expect(quotedBinary(Buffer.from("ab"))).toBe("'\\x6162'");
+    expect(quotedBinary("ab")).toBe("'\\x6162'");
+  });
+
+  it("checkIntInRange is the Rails name for checkIntegerRange", () => {
+    expect(() => checkIntInRange(BigInt("9223372036854775808"))).toThrow(IntegerOutOf64BitRange);
+    expect(() => checkIntInRange(BigInt("9223372036854775807"))).not.toThrow();
+  });
+
+  it("lookupCastTypeFromColumn forwards oid/fmod/sqlType to the type map", () => {
+    const calls: Array<[number, number, string]> = [];
+    const typeMap = {
+      lookup(oid: number, fmod: number, sqlType: string) {
+        calls.push([oid, fmod, sqlType]);
+        return { sentinel: true };
+      },
+    };
+    const column = { oid: 23, fmod: -1, sqlType: "integer" };
+
+    expect(lookupCastTypeFromColumn(column, typeMap)).toEqual({ sentinel: true });
+    expect(calls).toEqual([[23, -1, "integer"]]);
+  });
+
+  describe("columnNameWithOrderMatcher", () => {
+    const matcher = columnNameWithOrderMatcher();
+
+    it("matches a bare column", () => {
+      expect(matcher.test("name")).toBe(true);
+    });
+
+    it("matches ASC / DESC / NULLS FIRST | LAST", () => {
+      expect(matcher.test("name ASC")).toBe(true);
+      expect(matcher.test("name DESC NULLS LAST")).toBe(true);
+    });
+
+    it("matches quoted collations (Rails-faithful: quoted only)", () => {
+      expect(matcher.test('name COLLATE "C"')).toBe(true);
+    });
+
+    it("rejects unquoted collations, matching Rails", () => {
+      // Rails: (?:\s+COLLATE\s+"\w+")? — quoted identifier only.
+      expect(matcher.test("name COLLATE C")).toBe(false);
+    });
+
+    it("rejects SQL injection attempts", () => {
+      expect(matcher.test("name; DROP TABLE users")).toBe(false);
+    });
   });
 });
 
