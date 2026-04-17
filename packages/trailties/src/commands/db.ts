@@ -25,25 +25,6 @@ async function closeAdapter(adapter: DatabaseAdapter): Promise<void> {
   if (typeof maybeClose === "function") await maybeClose.call(adapter);
 }
 
-async function withAdapter(
-  fn: (adapter: DatabaseAdapter, raw: RawConfig) => Promise<void>,
-): Promise<void> {
-  // Normalize the raw config once, before connecting. `connectAdapter`
-  // uses the adapter/database/url fields to choose a driver; later paths
-  // (`toDbConfig` → `DatabaseTasks.dumpSchema`) need the same resolved
-  // adapter so the connection and the schema handler agree. If we passed
-  // the unnormalized config to connectAdapter and the adapter-less
-  // variant to toDbConfig, a url-only `postgres://host/db` config would
-  // migrate against postgres but try to dump schema via sqlite3.
-  const raw = normalizeRawConfig(await loadDatabaseConfig());
-  const adapter = await connectAdapter(raw);
-  try {
-    await fn(adapter, raw);
-  } finally {
-    await closeAdapter(adapter);
-  }
-}
-
 function normalizeRawConfig(raw: RawConfig): RawConfig {
   const normalized: Record<string, unknown> = { ...raw };
   if (!normalized.adapter) {
@@ -432,26 +413,6 @@ async function runMigrate(
   if (!options.skipDump) await dumpSchemaAfterMigrate(adapter, raw);
 }
 
-async function runRollback(
-  adapter: DatabaseAdapter,
-  raw: RawConfig,
-  steps: number,
-  options: RunOptions = {},
-): Promise<void> {
-  const migrations = await discoverMigrations(migrationsDir());
-  if (migrations.length === 0) {
-    console.log("No migrations found.");
-    return;
-  }
-
-  const migrator = createMigrator(adapter, migrations, raw);
-  await migrator.rollback(steps);
-
-  for (const line of migrator.output) console.log(line);
-
-  if (!options.skipDump) await dumpSchemaAfterMigrate(adapter, raw);
-}
-
 /**
  * Run a seed-running callback with `Base.adapter` temporarily set so
  * seed files that touch ActiveRecord models work. Restores the previous
@@ -519,20 +480,28 @@ async function runTestLoadSchema(options: {
   console.log(options.successMessage(displayNameFor(config, raw), filename));
 }
 
-async function runSeed(): Promise<void> {
+let _seedImportCounter = 0;
+async function runSeed(prefix = ""): Promise<void> {
   const seedCandidates = [
     path.join(process.cwd(), "db", "seeds.ts"),
     path.join(process.cwd(), "db", "seeds.js"),
   ];
   const seedFile = seedCandidates.find((f) => fs.existsSync(f));
   if (!seedFile) {
-    console.log("No seeds file found at db/seeds.ts or db/seeds.js");
+    console.log(`${prefix}No seeds file found at db/seeds.ts or db/seeds.js`);
     return;
   }
 
-  console.log("Running seeds...");
-  await import(pathToFileURL(seedFile).href);
-  console.log("Seeds completed.");
+  console.log(`${prefix}Running seeds...`);
+  // Cache-bust the import so the seed file is re-evaluated for each
+  // database in a multi-DB fan-out. Node caches dynamic imports by URL;
+  // without the query string, the second iteration sees a cached module
+  // and skips execution entirely. Mirrors Rails' `load` semantics
+  // (which always re-evaluates the file).
+  const url = pathToFileURL(seedFile);
+  url.searchParams.set("_t", `${++_seedImportCounter}`);
+  await import(url.href);
+  console.log(`${prefix}Seeds completed.`);
 }
 
 /** Strip credentials from a DB URL before we log it. */
@@ -717,23 +686,17 @@ export function dbCommand(): Command {
   cmd
     .command("environment:set")
     .description("Stamp the schema with the current environment name")
-    .action(async () => {
-      await withAdapter(async (adapter, raw) => {
-        // Use resolveEnv() so the stamped env matches what the trails
-        // CLI considers 'current' (TRAILS_ENV takes precedence over
-        // NODE_ENV). Without this, `TRAILS_ENV=production trails db
-        // environment:set` with NODE_ENV=development would stamp the DB
-        // as development and defeat the protected-env guard.
+    .option("--database <name>", "Target a specific named database")
+    .action(async (opts: DatabaseOpts) => {
+      await forEachDatabase(opts, async ({ adapter, raw, prefix }) => {
         const envName = resolveEnv();
         const migrator = createMigrator(adapter, [], raw);
-        // Rails: raise EnvironmentStorageError when
-        // internal_metadata.enabled? is false (use_metadata_table opt-out).
         if (!migrator.internalMetadata.enabled) {
           const { EnvironmentStorageError } = await import("@blazetrails/activerecord");
           throw new EnvironmentStorageError();
         }
         await migrator.internalMetadata.createTableAndSetFlags(envName);
-        console.log(`Stamped schema with environment: ${envName}`);
+        console.log(`${prefix}Stamped schema with environment: ${envName}`);
       });
     });
 
@@ -763,9 +726,11 @@ export function dbCommand(): Command {
   cmd
     .command("abort_if_pending_migrations")
     .description("Exit with non-zero status if any migrations are pending")
-    .action(async () => {
-      await withAdapter(async (adapter, raw) => {
-        const migrations = await discoverMigrations(migrationsDir());
+    .option("--database <name>", "Target a specific named database")
+    .action(async (opts: DatabaseOpts) => {
+      await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
+        const mDirs = migrationsDirsForConfig(name, raw);
+        const migrations = await discoverMigrationsFromDirs(mDirs);
         if (migrations.length === 0) return;
         const migrator = createMigrator(adapter, migrations, raw);
         // Use the read-only pending check so running this in a
@@ -783,16 +748,13 @@ export function dbCommand(): Command {
           // commander-style (`trails db migrate`, space-separated), not
           // rake-style colon namespaces.
           console.error(
-            `You have ${pending.length} pending migration${pending.length === 1 ? "" : "s"}:`,
+            `${prefix}You have ${pending.length} pending migration${pending.length === 1 ? "" : "s"}:`,
           );
           for (const m of pending) {
-            // Rails prints `"  %4d %s" % [version, name]`, which emits the
-            // version as an integer (no leading zeros). Normalize via BigInt
-            // to match and to stay consistent with the rest of Migrator.
             const version = String(BigInt(m.version));
-            console.error(`  ${version.padStart(4, " ")} ${m.name}`);
+            console.error(`${prefix}  ${version.padStart(4, " ")} ${m.name}`);
           }
-          console.error("Run `trails db migrate` to resolve this issue.");
+          console.error(`${prefix}Run \`trails db migrate\` to resolve this issue.`);
           process.exitCode = 1;
         }
       });
@@ -802,13 +764,15 @@ export function dbCommand(): Command {
     .command("migrate:up")
     .description("Run a specific migration up (by version)")
     .requiredOption("--version <version>", "Migration version to run up")
+    .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      await withAdapter(async (adapter, raw) => {
-        const migrations = await discoverMigrations(migrationsDir());
+      await forEachDatabase(opts, async ({ adapter, raw, name, prefix, config }) => {
+        const mDirs = migrationsDirsForConfig(name, raw);
+        const migrations = await discoverMigrationsFromDirs(mDirs);
         const migrator = createMigrator(adapter, migrations, raw);
         await migrator.run("up", opts.version);
-        for (const line of migrator.output) console.log(line);
-        await dumpSchemaAfterMigrate(adapter, raw);
+        for (const line of migrator.output) console.log(`${prefix}${line}`);
+        await dumpSchemaAfterMigrate(adapter, raw, config);
       });
     });
 
@@ -816,22 +780,25 @@ export function dbCommand(): Command {
     .command("migrate:down")
     .description("Run a specific migration down (by version)")
     .requiredOption("--version <version>", "Migration version to run down")
+    .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      await withAdapter(async (adapter, raw) => {
-        const migrations = await discoverMigrations(migrationsDir());
+      await forEachDatabase(opts, async ({ adapter, raw, name, prefix, config }) => {
+        const mDirs = migrationsDirsForConfig(name, raw);
+        const migrations = await discoverMigrationsFromDirs(mDirs);
         const migrator = createMigrator(adapter, migrations, raw);
         await migrator.run("down", opts.version);
-        for (const line of migrator.output) console.log(line);
-        await dumpSchemaAfterMigrate(adapter, raw);
+        for (const line of migrator.output) console.log(`${prefix}${line}`);
+        await dumpSchemaAfterMigrate(adapter, raw, config);
       });
     });
 
   cmd
     .command("seed")
     .description("Run database seeds")
-    .action(async () => {
-      await withAdapter(async (adapter) => {
-        await withSeedAdapter(adapter, runSeed);
+    .option("--database <name>", "Target a specific named database")
+    .action(async (opts: DatabaseOpts) => {
+      await forEachDatabase(opts, async ({ adapter, prefix }) => {
+        await withSeedAdapter(adapter, () => runSeed(prefix));
       });
     });
 
@@ -947,11 +914,13 @@ export function dbCommand(): Command {
   cmd
     .command("migrate:status")
     .description("Show migration status")
-    .action(async () => {
-      await withAdapter(async (adapter, raw) => {
-        const migrations = await discoverMigrations(migrationsDir());
+    .option("--database <name>", "Target a specific named database")
+    .action(async (opts: DatabaseOpts) => {
+      await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
+        const mDirs = migrationsDirsForConfig(name, raw);
+        const migrations = await discoverMigrationsFromDirs(mDirs);
         if (migrations.length === 0) {
-          console.log("No migrations found.");
+          console.log(`${prefix}No migrations found.`);
           return;
         }
 
@@ -959,11 +928,11 @@ export function dbCommand(): Command {
         const statuses = await migrator.migrationsStatus();
 
         console.log("");
-        console.log(" Status   Migration ID    Migration Name");
-        console.log("--------------------------------------------------");
+        console.log(`${prefix}Status   Migration ID    Migration Name`);
+        console.log(`${prefix}--------------------------------------------------`);
         for (const s of statuses) {
           const statusStr = s.status === "up" ? "  up  " : " down ";
-          console.log(`${statusStr}   ${s.version.padEnd(16)}${s.name}`);
+          console.log(`${prefix}${statusStr}   ${s.version.padEnd(16)}${s.name}`);
         }
         console.log("");
       });
@@ -973,6 +942,7 @@ export function dbCommand(): Command {
     .command("migrate:redo")
     .description("Rollback and re-run the last migration")
     .option("--step <n>", "Number of migrations to redo", "1")
+    .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       const step = Number(opts.step);
       if (!Number.isInteger(step) || step < 1) {
@@ -980,11 +950,25 @@ export function dbCommand(): Command {
         process.exitCode = 1;
         return;
       }
-      await withAdapter(async (adapter, raw) => {
-        // Suppress the intermediate dump on rollback; runMigrate handles
-        // the single end-of-task dump.
-        await runRollback(adapter, raw, step, { skipDump: true });
-        await runMigrate(adapter, raw);
+      await forEachDatabase(opts, async (ctx) => {
+        // Discover once, run rollback then migrate on the same
+        // migrator — avoids double "No migrations found." and
+        // produces the same post-migrate output as `db migrate`.
+        await withMigratorForDb(
+          ctx,
+          async (migrator) => {
+            await migrator.rollback(step);
+            await migrator.migrate(null);
+          },
+          {
+            afterOutput: async (migrator) => {
+              const pending = await migrator.pendingMigrations();
+              if (pending.length === 0) {
+                console.log(`${ctx.prefix}All migrations are up to date.`);
+              }
+            },
+          },
+        );
       });
     });
 
@@ -992,16 +976,14 @@ export function dbCommand(): Command {
     .command("reset")
     .description("Drop, create, migrate, and seed the primary database")
     .action(async () => {
-      // reset/setup operate on the primary DB only — they call
-      // runMigrate/runSeed via withAdapter (primary-only), so
-      // create/drop must also target primary for consistency.
-      // Multi-DB apps use `trails db create --database=<name>`
-      // + `trails db migrate --database=<name>` individually.
-      await runDrop({ database: "primary" });
-      await runCreate({ database: "primary" });
-      await withAdapter(async (adapter, raw) => {
-        await runMigrate(adapter, raw);
-        await withSeedAdapter(adapter, runSeed);
+      const primary: DatabaseOpts = { database: "primary" };
+      await runDrop(primary);
+      await runCreate(primary);
+      await forEachDatabase(primary, async (ctx) => {
+        await withMigratorForDb(ctx, async (migrator) => {
+          await migrator.migrate(null);
+        });
+        await withSeedAdapter(ctx.adapter, () => runSeed(ctx.prefix));
       });
     });
 
@@ -1009,10 +991,13 @@ export function dbCommand(): Command {
     .command("setup")
     .description("Create, migrate, and seed the primary database")
     .action(async () => {
-      await runCreate({ database: "primary" });
-      await withAdapter(async (adapter, raw) => {
-        await runMigrate(adapter, raw);
-        await withSeedAdapter(adapter, runSeed);
+      const primary: DatabaseOpts = { database: "primary" };
+      await runCreate(primary);
+      await forEachDatabase(primary, async (ctx) => {
+        await withMigratorForDb(ctx, async (migrator) => {
+          await migrator.migrate(null);
+        });
+        await withSeedAdapter(ctx.adapter, () => runSeed(ctx.prefix));
       });
     });
 
@@ -1022,14 +1007,9 @@ export function dbCommand(): Command {
       "Dump the current database schema (format precedence: --format > SCHEMA_FORMAT env > config.schemaFormat > existing structure.sql/schema.js/schema.ts > ts)",
     )
     .option("--format <format>", "Override schema format: ts, js, or sql")
+    .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      await withAdapter(async (adapter, raw) => {
-        const config = toDbConfig(raw);
-        // Capture the prior format BEFORE calling resolveSchemaFormat —
-        // the resolver can throw (bad --format / SCHEMA_FORMAT / config
-        // value) and we want the restore-in-finally path to run even
-        // then. Assigning inside the try keeps global state clean on
-        // any throw from resolve, schemaDumpPath, or setAdapter.
+      await forEachDatabase(opts, async ({ adapter, config, prefix }) => {
         const previousFormat = DatabaseTasks.schemaFormat;
         const previous = DatabaseTasks.migrationConnection();
         try {
@@ -1037,7 +1017,7 @@ export function dbCommand(): Command {
           const filename = DatabaseTasks.schemaDumpPath(config);
           DatabaseTasks.setAdapter(adapter);
           await DatabaseTasks.dumpSchema(config);
-          console.log(`Schema dumped to ${filename}`);
+          console.log(`${prefix}Schema dumped to ${filename}`);
         } finally {
           DatabaseTasks.setAdapter(previous);
           DatabaseTasks.schemaFormat = previousFormat;
@@ -1051,11 +1031,11 @@ export function dbCommand(): Command {
       "Load the schema (format precedence: --format > SCHEMA_FORMAT env > config.schemaFormat > existing structure.sql/schema.js/schema.ts > ts)",
     )
     .option("--format <format>", "Override schema format: ts, js, or sql")
+    .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      await withAdapter(async (adapter, raw) => {
-        const config = toDbConfig(raw);
-        // schema:load is destructive (replaces the schema) — Rails gates
-        // it on check_protected_environments.
+      await forEachDatabase(opts, async ({ adapter, config, prefix }) => {
+        // schema:load is destructive — Rails gates on
+        // check_protected_environments.
         await runProtectedEnvCheck(config, config.envName);
         const previousFormat = DatabaseTasks.schemaFormat;
         const previous = DatabaseTasks.migrationConnection();
@@ -1063,15 +1043,15 @@ export function dbCommand(): Command {
           DatabaseTasks.schemaFormat = await resolveSchemaFormat(opts);
           const filename = DatabaseTasks.schemaDumpPath(config);
           if (!fs.existsSync(filename)) {
-            console.error(`No schema file found at ${filename}`);
+            console.error(`${prefix}No schema file found at ${filename}`);
             process.exitCode = 1;
             return;
           }
           DatabaseTasks.setAdapter(adapter);
           try {
-            console.log(`Loading schema from ${filename}...`);
+            console.log(`${prefix}Loading schema from ${filename}...`);
             await DatabaseTasks.loadSchema(config);
-            console.log("Schema loaded.");
+            console.log(`${prefix}Schema loaded.`);
           } catch (error: unknown) {
             if (filename.endsWith(".ts")) {
               const enhanced = new Error(
