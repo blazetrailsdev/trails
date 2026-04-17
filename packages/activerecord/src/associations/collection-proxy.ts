@@ -1,5 +1,19 @@
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
+import type { AssociationRelation as AssociationRelationType } from "./association-relation.js";
+import { wrapWithScopeProxy } from "../relation/delegation.js";
+
+// Late-bound AssociationRelation constructor to break circular imports
+// (association-relation.ts extends Relation, which would otherwise
+// transitively load before Base finishes initializing the Relation ctor
+// slot). Set by association-relation.ts when it loads.
+let _AssociationRelationCtor: (new (modelClass: any, assoc: any) => any) | null = null;
+/** @internal */
+export function _setAssociationRelationCtor(
+  ctor: new (modelClass: any, assoc: any) => AssociationRelationType<any>,
+): void {
+  _AssociationRelationCtor = ctor;
+}
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
@@ -86,6 +100,26 @@ export class CollectionProxy<T extends Base = Base> {
 
   get target(): T[] {
     return this._target;
+  }
+
+  /** @internal Owner record — used by AssociationRelation. */
+  get owner(): Base {
+    return this._record;
+  }
+
+  /** @internal Association definition — used by AssociationRelation. */
+  get reflection(): AssociationDefinition {
+    return this._assocDef;
+  }
+
+  /** @internal Association name — used by AssociationRelation. */
+  get associationName(): string {
+    return this._assocName;
+  }
+
+  /** @internal Whether this is a through association — used by AssociationRelation. */
+  get isThrough(): boolean {
+    return !!this._assocDef.options.through;
   }
 
   // ──────────────────────────────────────────────────────────────────
@@ -1054,7 +1088,7 @@ export class CollectionProxy<T extends Base = Base> {
 
   scope(): any {
     if (this._isThrough) {
-      return this._buildThroughScope();
+      return this._wrapAsAssociationRelation(this._buildThroughScope());
     }
 
     const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
@@ -1065,9 +1099,35 @@ export class CollectionProxy<T extends Base = Base> {
       if (this._assocDef.options.scope) {
         emptyRel = this._assocDef.options.scope(emptyRel);
       }
-      return emptyRel.none();
+      return this._wrapAsAssociationRelation(emptyRel.none());
     }
-    return rel;
+    return this._wrapAsAssociationRelation(rel);
+  }
+
+  /**
+   * Promote a plain Relation produced by `buildHasManyRelation` /
+   * `_buildThroughScope` into an AssociationRelation bound to this proxy.
+   * Matching Rails' CollectionAssociation#scope — writes on the returned
+   * relation (build / create / create!) route back through the owning
+   * association so FK, inverse, and loaded target stay in sync.
+   */
+  private _wrapAsAssociationRelation(rel: any): any {
+    if (!_AssociationRelationCtor) {
+      // Defensive: only reachable if a consumer deep-imports this file
+      // without loading the @blazetrails/activerecord package entry,
+      // which re-exports association-relation.ts (where the ctor
+      // self-registers). A direct side-effect import here would
+      // reintroduce the Base↔Relation↔AssociationRelation evaluation
+      // cycle we used late-binding to break in the first place.
+      throw new Error(
+        "AssociationRelation constructor has not been registered. Import " +
+          "from '@blazetrails/activerecord' (the package entry) rather than " +
+          "deep-importing './associations/collection-proxy.js'.",
+      );
+    }
+    const ar = new _AssociationRelationCtor(rel.model, this);
+    ar._copyStateFrom(rel);
+    return wrapWithScopeProxy(ar);
   }
 
   private _buildThroughScope(): any {

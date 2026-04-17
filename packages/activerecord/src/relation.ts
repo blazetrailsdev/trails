@@ -2120,7 +2120,8 @@ export class Relation<T extends Base> {
     return result;
   }
 
-  private _scopeAttributes(): Record<string, unknown> {
+  /** @internal */
+  protected _scopeAttributes(): Record<string, unknown> {
     const h = this._whereClause.toH(this._modelClass.tableName);
     const attrs: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(h)) {
@@ -3060,39 +3061,57 @@ export class Relation<T extends Base> {
     return version ? `${key}-${version}` : key;
   }
 
+  /**
+   * @internal Subclasses (e.g. AssociationRelation) override this to return
+   * an instance of themselves so `_clone()` preserves the subclass through
+   * chains like `blog.posts.where(...).order(...)`.
+   */
+  protected _newRelation(): Relation<T> {
+    return new Relation<T>(this._modelClass);
+  }
+
+  /**
+   * @internal Copy query state from `source` onto `this`. Extracted from
+   * `_clone()` so subclasses (and helpers like AssociationRelation) can
+   * reuse it without duplicating the field list.
+   */
+  _copyStateFrom(source: Relation<T>): void {
+    this._table = source._table;
+    this._whereClause = source._whereClause.clone();
+    this._orderClauses = [...source._orderClauses];
+    this._rawOrderClauses = [...source._rawOrderClauses];
+    this._limitValue = source._limitValue;
+    this._offsetValue = source._offsetValue;
+    this._selectColumns = source._selectColumns ? [...source._selectColumns] : null;
+    this._isDistinct = source._isDistinct;
+    this._distinctOnColumns = [...source._distinctOnColumns];
+    this._groupColumns = [...source._groupColumns];
+    this._havingClause = source._havingClause.clone();
+    this._isNone = source._isNone;
+    this._lockValue = source._lockValue;
+    this._setOperation = source._setOperation;
+    this._joinClauses = [...source._joinClauses];
+    this._rawJoins = [...source._rawJoins];
+    this._includesAssociations = [...source._includesAssociations];
+    this._preloadAssociations = [...source._preloadAssociations];
+    this._eagerLoadAssociations = [...source._eagerLoadAssociations];
+    this._isReadonly = source._isReadonly;
+    this._isStrictLoading = source._isStrictLoading;
+    this._annotations = [...source._annotations];
+    this._optimizerHints = [...source._optimizerHints];
+    this._referencesValues = [...source._referencesValues];
+    this._fromClause = source._fromClause;
+    this._createWithAttrs = { ...source._createWithAttrs };
+    this._extending = [...source._extending];
+    this._ctes = [...source._ctes];
+    this._skipPreloading = source._skipPreloading;
+    this._skipQueryCache = source._skipQueryCache;
+  }
+
   /** @internal */
   _clone(): Relation<T> {
-    const rel = new Relation<T>(this._modelClass);
-    rel._table = this._table;
-    rel._whereClause = this._whereClause.clone();
-    rel._orderClauses = [...this._orderClauses];
-    rel._rawOrderClauses = [...this._rawOrderClauses];
-    rel._limitValue = this._limitValue;
-    rel._offsetValue = this._offsetValue;
-    rel._selectColumns = this._selectColumns ? [...this._selectColumns] : null;
-    rel._isDistinct = this._isDistinct;
-    rel._distinctOnColumns = [...this._distinctOnColumns];
-    rel._groupColumns = [...this._groupColumns];
-    rel._havingClause = this._havingClause.clone();
-    rel._isNone = this._isNone;
-    rel._lockValue = this._lockValue;
-    rel._setOperation = this._setOperation;
-    rel._joinClauses = [...this._joinClauses];
-    rel._rawJoins = [...this._rawJoins];
-    rel._includesAssociations = [...this._includesAssociations];
-    rel._preloadAssociations = [...this._preloadAssociations];
-    rel._eagerLoadAssociations = [...this._eagerLoadAssociations];
-    rel._isReadonly = this._isReadonly;
-    rel._isStrictLoading = this._isStrictLoading;
-    rel._annotations = [...this._annotations];
-    rel._optimizerHints = [...this._optimizerHints];
-    rel._referencesValues = [...this._referencesValues];
-    rel._fromClause = this._fromClause;
-    rel._createWithAttrs = { ...this._createWithAttrs };
-    rel._extending = [...this._extending];
-    rel._ctes = [...this._ctes];
-    rel._skipPreloading = this._skipPreloading;
-    rel._skipQueryCache = this._skipQueryCache;
+    const rel = this._newRelation();
+    rel._copyStateFrom(this);
     return wrapWithScopeProxy(rel);
   }
 

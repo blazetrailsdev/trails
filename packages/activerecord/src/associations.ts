@@ -53,6 +53,12 @@ export interface AssociationOptions {
    * Exists for Rails API parity — Rails uses this to switch between JOIN and
    * multi-query strategies. */
   disableJoins?: boolean;
+  /** When true, records loaded through this association are marked
+   * strict-loading, causing further lazy loads on them to raise.
+   *
+   * Mirrors Rails' `has_many :foo, strict_loading: true` — checked via
+   * `reflection.strict_loading?` during query execution. */
+  strictLoading?: boolean;
 }
 
 export interface AssociationDefinition {
