@@ -19,6 +19,7 @@ import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR, packageSrcDir } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { isExcluded } from "./excluded-files.js";
 
 const DETAIL_PACKAGES = new Set([
   "arel",
@@ -30,9 +31,7 @@ const DETAIL_PACKAGES = new Set([
   "actionview",
 ]);
 
-// Ruby files to exclude from comparison — these are features that don't apply
-// pre-1.0 (migration compatibility layers, legacy adapters, etc.)
-const SKIP_FILES = ["migration/compatibility"];
+// Files intentionally excluded from comparison live in excluded-files.ts.
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,6 +70,7 @@ interface PackageResult {
   percent: number;
   totalFiles: number;
   filesExist: number;
+  excludedFiles: string[];
   files: FileResult[];
 }
 
@@ -356,9 +356,13 @@ function main() {
 
     // Group by Ruby file
     const byFile = new Map<string, typeof allRuby>();
+    const excludedFiles = new Set<string>();
     for (const item of allRuby) {
       const file = item.info.file || "unknown.rb";
-      if (SKIP_FILES.some((pattern) => file.includes(pattern))) continue;
+      if (isExcluded(file)) {
+        excludedFiles.add(file);
+        continue;
+      }
       const list = byFile.get(file) || [];
       list.push(item);
       byFile.set(file, list);
@@ -482,6 +486,7 @@ function main() {
       percent: pct,
       totalFiles,
       filesExist,
+      excludedFiles: [...excludedFiles].sort(),
       files: fileResults,
     });
   }
@@ -519,8 +524,10 @@ function printReport(
     grandFilesExist += pkg.filesExist;
 
     console.log(`\n${"=".repeat(100)}`);
+    const excludedNote =
+      pkg.excludedFiles.length > 0 ? "  (some intentionally excluded, see excluded-files.ts)" : "";
     console.log(
-      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}`,
+      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${excludedNote}`,
     );
     console.log(`${"=".repeat(100)}`);
 
@@ -547,11 +554,15 @@ function printReport(
           }
         }
       }
+
+      for (const excluded of pkg.excludedFiles) {
+        console.log(`  ${excluded.padEnd(55)} ${"(excluded)".padEnd(40)}`);
+      }
     }
   }
 
-  // Data layer summary (arel + activemodel + activerecord + activesupport)
-  const DATA_LAYER = new Set(["arel", "activemodel", "activerecord", "activesupport"]);
+  // Data layer summary (arel + activemodel + activerecord)
+  const DATA_LAYER = new Set(["arel", "activemodel", "activerecord"]);
   let dataTotal = 0;
   let dataMatched = 0;
   let dataFiles = 0;
