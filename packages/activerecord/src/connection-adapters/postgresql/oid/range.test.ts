@@ -82,7 +82,7 @@ describe("PostgreSQL::OID::Range", () => {
 
   it("maps range bounds", () => {
     const type = new RangeType(integerSubtype, "int4range");
-    const range = type.map(new Range(1, 10), (value) => Number(value) + 1);
+    const range = type.map(new Range(1, 10), (value) => Number(value) + 1) as Range;
 
     expect(range.begin).toBe(2);
     expect(range.end).toBe(11);

@@ -17,6 +17,8 @@
  *     the subtype and emits `Range` instances from `castValue`/`serialize`.
  */
 
+import { Type } from "@blazetrails/activemodel";
+
 export class Range {
   readonly begin: unknown;
   readonly end: unknown;
@@ -39,22 +41,32 @@ export interface RangeSubtype {
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range.
  */
-export class RangeType {
+export class RangeType extends Type<Range> {
+  readonly name: string;
   readonly subtype: RangeSubtype;
-  readonly type: string;
 
   constructor(subtype: RangeSubtype, type: string = "range") {
+    super();
     this.subtype = subtype;
-    this.type = type;
+    this.name = type;
   }
 
-  typeCastForSchema(value: unknown): string {
+  override type(): string {
+    return this.name;
+  }
+
+  override typeCastForSchema(value: unknown): string {
     return inspect(value).replace(/Infinity/g, "::Float::INFINITY");
   }
 
-  castValue(value: unknown): unknown {
+  castValue(value: unknown): Range | null {
     if (value == null || value === "empty" || value === "") return null;
-    if (typeof value !== "string") return value;
+    // Rails' cast_value passes non-String values through unchanged
+    // (`return value unless value.is_a?(::String)`). The cast is generic in
+    // Ruby so this just trusts the caller. In TS we keep the Rails semantic
+    // but acknowledge the Range | null return type is optimistic for non-
+    // string inputs — callers shouldn't pass garbage here.
+    if (typeof value !== "string") return value as Range | null;
 
     const extracted = this.extractBounds(value);
     const from = this.typeCastSingle(extracted.from);
@@ -70,15 +82,15 @@ export class RangeType {
     return new Range(begin, end, extracted.excludeEnd);
   }
 
-  cast(value: unknown): unknown {
+  cast(value: unknown): Range | null {
     return this.castValue(value);
   }
 
-  deserialize(value: unknown): unknown {
+  override deserialize(value: unknown): Range | null {
     return this.castValue(value);
   }
 
-  serialize(value: unknown): unknown {
+  override serialize(value: unknown): unknown {
     if (!(value instanceof Range)) return value;
     return new Range(
       this.typeCastSingleForDatabase(value.begin),
@@ -87,11 +99,12 @@ export class RangeType {
     );
   }
 
-  map(value: Range, block: (value: unknown) => unknown): Range {
+  override map(value: Range | null, block?: (value: unknown) => unknown): Range | null {
+    if (value == null || !block) return value;
     return new Range(block(value.begin), block(value.end), value.excludeEnd);
   }
 
-  isForceEquality(value: unknown): boolean {
+  override isForceEquality(value: unknown): boolean {
     return value instanceof Range;
   }
 
@@ -114,13 +127,16 @@ export class RangeType {
     excludeEnd: boolean;
   } {
     const fromTo = value.slice(1, -1);
-    const separator = findSeparator(fromTo);
+    const separator = findRangeSeparator(fromTo);
     const from = fromTo.slice(0, separator);
     const to = fromTo.slice(separator + 1);
 
     return {
-      from: from === "" || from === "-infinity" ? this.infinity({ negative: true }) : unquote(from),
-      to: to === "" || to === "infinity" ? this.infinity() : unquote(to),
+      from:
+        from === "" || from === "-infinity"
+          ? this.infinity({ negative: true })
+          : unquoteRangeBound(from),
+      to: to === "" || to === "infinity" ? this.infinity() : unquoteRangeBound(to),
       excludeStart: value.startsWith("("),
       excludeEnd: value.endsWith(")"),
     };
@@ -131,7 +147,13 @@ export class RangeType {
   }
 }
 
-function findSeparator(value: string): number {
+/**
+ * Split a range-literal's inner string (without surrounding `[` / `)`) at
+ * the top-level comma, skipping commas inside double-quoted bounds. PG
+ * range output always uses `""` for an escaped quote, so that's what we
+ * track here — matches Rails' `extract_bounds`.
+ */
+export function findRangeSeparator(value: string): number {
   let inQuotes = false;
   for (let i = 0; i < value.length; i++) {
     const char = value[i];
@@ -148,7 +170,11 @@ function findSeparator(value: string): number {
   return value.length;
 }
 
-function unquote(value: string): string {
+/**
+ * Unquote a range-bound value. PG emits `""` for literal `"` and `\\` for
+ * literal `\` inside double-quoted bounds. Mirrors Rails' `unquote`.
+ */
+export function unquoteRangeBound(value: string): string {
   if (value.startsWith('"') && value.endsWith('"')) {
     return value.slice(1, -1).replace(/""/g, '"').replace(/\\\\/g, "\\");
   }

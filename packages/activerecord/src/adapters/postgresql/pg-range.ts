@@ -3,11 +3,17 @@
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range
  *
- * Rails deserializes PG ranges into Ruby Range objects with typed bounds.
- * We do the same — parseRange returns a Range (from relation.ts) with
- * bounds cast through an optional subtype function, or null for empty ranges.
+ * This is a thin adapter-level helper. The canonical implementation lives
+ * in `connection-adapters/postgresql/oid/range.ts` as `RangeType` — this
+ * function predates that class and is kept for callers that need a plain
+ * parser without constructing a full Type::Value. Both share the
+ * findRangeSeparator / unquoteRangeBound helpers so parsing stays in sync.
  */
 
+import {
+  findRangeSeparator,
+  unquoteRangeBound,
+} from "../../connection-adapters/postgresql/oid/range.js";
 import { Range } from "../../relation.js";
 
 export type SubtypeCast = (value: string) => unknown;
@@ -25,7 +31,7 @@ export function parseRange(input: string, subtype?: SubtypeCast): Range | null {
   const excludeEnd = input[input.length - 1] === ")";
 
   const inner = input.slice(1, -1);
-  const commaIdx = findSeparator(inner);
+  const commaIdx = findRangeSeparator(inner);
 
   let rawBegin: string | null = inner.slice(0, commaIdx).trim();
   let rawEnd: string | null = inner.slice(commaIdx + 1).trim();
@@ -33,8 +39,8 @@ export function parseRange(input: string, subtype?: SubtypeCast): Range | null {
   if (rawBegin === "" || rawBegin === "-infinity") rawBegin = null;
   if (rawEnd === "" || rawEnd === "infinity") rawEnd = null;
 
-  rawBegin = rawBegin && unquoteRange(rawBegin);
-  rawEnd = rawEnd && unquoteRange(rawEnd);
+  rawBegin = rawBegin && unquoteRangeBound(rawBegin);
+  rawEnd = rawEnd && unquoteRangeBound(rawEnd);
 
   if (excludeBegin && rawBegin !== null) {
     throw new Error(
@@ -47,33 +53,4 @@ export function parseRange(input: string, subtype?: SubtypeCast): Range | null {
   const castEnd = rawEnd !== null && subtype ? subtype(rawEnd) : rawEnd;
 
   return new Range(castBegin, castEnd, excludeEnd);
-}
-
-function findSeparator(s: string): number {
-  let inQuote = false;
-  for (let i = 0; i < s.length; i++) {
-    if (s[i] === '"') {
-      let backslashes = 0;
-      let j = i - 1;
-      while (j >= 0 && s[j] === "\\") {
-        backslashes++;
-        j--;
-      }
-      if (backslashes % 2 === 0) inQuote = !inQuote;
-    } else if (!inQuote && s[i] === ",") {
-      return i;
-    }
-  }
-  return s.length;
-}
-
-/**
- * Unquote a range bound value.
- * PG uses "" for literal " and \\\\ for literal \\ inside double-quoted bounds.
- */
-function unquoteRange(s: string): string {
-  if (s.startsWith('"') && s.endsWith('"')) {
-    return s.slice(1, -1).replace(/""/g, '"').replace(/\\\\/g, "\\");
-  }
-  return s;
 }
