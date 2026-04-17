@@ -15,7 +15,7 @@ export class Bind {
     return this;
   }
 
-  addBind(bind: unknown): this {
+  addBind(bind: unknown, _block?: (index: number) => string): this {
     this.binds.push(bind);
     return this;
   }

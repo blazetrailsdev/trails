@@ -1,6 +1,6 @@
 type CollectorLike = {
   append(str: string): unknown;
-  addBind(value: unknown): unknown;
+  addBind(value: unknown, block?: (index: number) => string): unknown;
   addBinds?(binds: unknown[], procForBinds?: ((v: unknown) => unknown) | null): unknown;
   retryable?: boolean;
   value?: unknown;
@@ -27,8 +27,8 @@ export class Composite {
     return this;
   }
 
-  addBind(value: unknown): this {
-    this.left.addBind(value);
+  addBind(value: unknown, block?: (index: number) => string): this {
+    this.left.addBind(value, block);
     this.right.addBind(value);
     return this;
   }

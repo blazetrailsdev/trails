@@ -74,13 +74,15 @@ export class PostgreSQLWithBinds extends PostgreSQL {
     return super.compileWithCollector(node);
   }
 
+  override compileWithBinds(node: Node): [string, unknown[]] {
+    this.bindIndex = 0;
+    return super.compileWithBinds(node);
+  }
+
   protected override visitBindParam(node: Nodes.BindParam): SQLString {
-    if (node.value !== undefined) {
-      this.collector.append(this.quote(node.value));
-    } else {
-      this.bindIndex += 1;
-      this.collector.append(`$${this.bindIndex}`);
-    }
+    this.bindIndex += 1;
+    const value = node.value !== undefined ? node.value : node;
+    this.collector.addBind(value, () => `$${this.bindIndex}`);
     return this.collector;
   }
 }

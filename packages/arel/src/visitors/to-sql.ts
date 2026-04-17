@@ -1,5 +1,7 @@
 import { Node, NodeVisitor } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
+import { Bind } from "../collectors/bind.js";
+import { Composite } from "../collectors/composite.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 
@@ -36,6 +38,21 @@ export class ToSql implements NodeVisitor<SQLString> {
     this.collector = new SQLString();
     this.visit(node);
     return this.collector;
+  }
+
+  /**
+   * Compile an AST node and extract bind values separately.
+   * Returns [sql_with_placeholders, bind_values].
+   *
+   * Mirrors: Rails' compilation with Arel::Collectors::Composite
+   */
+  compileWithBinds(node: Node): [string, unknown[]] {
+    const sqlCollector = new SQLString();
+    const bindCollector = new Bind();
+    this.collector = new Composite(sqlCollector, bindCollector) as unknown as SQLString;
+    this.visit(node);
+    const binds = bindCollector.value.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
+    return [sqlCollector.value, binds];
   }
 
   visit(node: Node): SQLString {
@@ -909,9 +926,9 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   protected visitBindParam(node: Nodes.BindParam): SQLString {
     if (node.value !== undefined) {
-      this.collector.append(this.quote(node.value));
+      this.collector.addBind(node.value);
     } else {
-      this.collector.append("?");
+      this.collector.addBind(node);
     }
     return this.collector;
   }

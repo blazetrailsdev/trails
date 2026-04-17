@@ -125,6 +125,18 @@ describe("PostgresTest", () => {
       expect(sql).toContain("$1");
       expect(sql).toContain("$2");
     });
+
+    it("compileWithBinds extracts values with $N placeholders", () => {
+      const visitor = new Visitors.PostgreSQLWithBinds();
+      const a = users.get("id").eq(new Nodes.BindParam(42));
+      const b = users.get("name").eq(new Nodes.BindParam("alice"));
+      const [sql, binds] = visitor.compileWithBinds(new Nodes.And([a, b]));
+      expect(sql).toContain("$1");
+      expect(sql).toContain("$2");
+      expect(sql).not.toContain("42");
+      expect(sql).not.toContain("alice");
+      expect(binds).toEqual([42, "alice"]);
+    });
   });
 
   describe("Nodes::RollUp", () => {

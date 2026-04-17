@@ -866,7 +866,41 @@ describe("the to_sql visitor", () => {
   it("works with BindParams", () => {
     const v = new Visitors.ToSql();
     expect(v.compile(new Nodes.BindParam())).toBe("?");
-    expect(v.compile(new Nodes.BindParam(1))).toBe("1");
+    // BindParam with a value still emits a placeholder — the value
+    // is extracted via compileWithBinds, not inlined.
+    expect(v.compile(new Nodes.BindParam(1))).toBe("?");
+  });
+
+  it("compileWithBinds extracts bind values", () => {
+    const v = new Visitors.ToSql();
+    const table = new Table("users");
+    const mgr = table.project(star).where(table.get("id").eq(new Nodes.BindParam(42)));
+    const [sql, binds] = v.compileWithBinds(mgr.ast);
+    expect(sql).toContain("?");
+    expect(sql).not.toContain("42");
+    expect(binds).toEqual([42]);
+  });
+
+  it("compileWithBinds handles multiple bind params", () => {
+    const v = new Visitors.ToSql();
+    const table = new Table("users");
+    const mgr = table
+      .project(star)
+      .where(table.get("name").eq(new Nodes.BindParam("alice")))
+      .where(table.get("age").gt(new Nodes.BindParam(21)));
+    const [sql, binds] = v.compileWithBinds(mgr.ast);
+    expect(sql).toContain("?");
+    expect(sql).not.toContain("alice");
+    expect(sql).not.toContain("21");
+    expect(binds).toEqual(["alice", 21]);
+  });
+
+  it("compileWithBinds with undefined BindParam", () => {
+    const v = new Visitors.ToSql();
+    const node = new Nodes.BindParam();
+    const [sql, binds] = v.compileWithBinds(node);
+    expect(sql).toBe("?");
+    expect(binds).toHaveLength(1);
   });
 
   it("works with lists", () => {
