@@ -101,7 +101,17 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
       if (ts.isClassStaticBlockDeclaration(member)) {
         for (const s of member.body.statements) {
           const call = readThisCall(s);
-          if (call) info.calls.push(call);
+          if (call) {
+            info.calls.push(call);
+            continue;
+          }
+          // Static-block `defineEnum(this, "status", { ... })` —
+          // Rails-idiomatic authoring form (matches Ruby's
+          // `enum :status, ...` inside the class body). Walker also
+          // supports the top-level `defineEnum(ClassName, ...)` form
+          // below.
+          const defineEnumCall = readDefineEnumThisCall(s);
+          if (defineEnumCall) info.calls.push(defineEnumCall);
         }
       }
     }
@@ -170,6 +180,25 @@ function recordExistingMember(m: ts.ClassElement, info: ClassInfo): void {
   const isStatic = modifiers?.some((mod) => mod.kind === ts.SyntaxKind.StaticKeyword) ?? false;
   if (isStatic) info.existingStaticMembers.add(name);
   else info.existingMembers.add(name);
+}
+
+function readDefineEnumThisCall(stmt: ts.Statement): DefineEnumCall | null {
+  if (!ts.isExpressionStatement(stmt)) return null;
+  const call = stmt.expression;
+  if (!ts.isCallExpression(call)) return null;
+  if (!ts.isIdentifier(call.expression) || call.expression.text !== "defineEnum") return null;
+  const [targetArg, attrArg, mapArg, optsArg] = call.arguments;
+  if (!targetArg || targetArg.kind !== ts.SyntaxKind.ThisKeyword) return null;
+  if (!attrArg || !ts.isStringLiteralLike(attrArg)) return null;
+  if (!mapArg) return null;
+  const values = readEnumValues(mapArg);
+  if (!values) return null;
+  return {
+    kind: "defineEnum",
+    attr: attrArg.text,
+    values,
+    options: readRecordLiteral(optsArg),
+  };
 }
 
 function readThisCall(stmt: ts.Statement): RuntimeCall | null {

@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:types": "vitest run --config vitest.dx-tests.config.ts",
+    "test:types:virtualized": "tsc -b packages/activerecord && node packages/activerecord/dist/tsc-wrapper/cli.js -p packages/activerecord/virtualized-dx-tests/tsconfig.json",
     "test:db": "PG_TEST_URL=postgres://postgres:postgres@localhost:25432/rails_js_test MYSQL_TEST_URL=mysql://root@localhost:13306/rails_js_test vitest run",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",

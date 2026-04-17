@@ -353,8 +353,17 @@ typed instance properties. Narrow at the use site instead:
 `record.id as number`.
 
 See `packages/activerecord/dx-tests/declare-patterns.test-d.ts` for the
-canonical, compiled reference for every pattern.
+canonical manual-`declare` reference (the escape hatch — use when the
+virtualizer doesn't yet produce the declare you need, or when you want
+the shape documented locally).
+
+`packages/activerecord/virtualized-dx-tests/virtualized-patterns.test-d.ts`
+is the parallel **zero-declare** reference compiled by `trails-tsc`. It
+shows the Rails-fidelity authoring form (pure `static { this.attribute(...) }`
+blocks) and is the default you should prefer. CI runs it as the
+`Virtualized DX Type Tests` job.
 
 `CollectionProxy<T>` and `AssociationProxy<T>` are both generic in the
-element type. Without the `declare`, any of these runtime-attached
-members still resolves to `unknown`.
+element type. Without the `declare` (manual) or without `trails-tsc`
+compiling the file (virtualized), these runtime-attached members still
+resolve to `unknown`.
