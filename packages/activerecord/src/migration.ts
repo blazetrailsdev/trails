@@ -1379,11 +1379,6 @@ export class Migrator {
     return [...this._migrations];
   }
 
-  /** @deprecated Use Migration.logger instead. */
-  get output(): readonly string[] {
-    return [];
-  }
-
   // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32 of googol)
   private static readonly _LOCK_ID = 2053462845;
 

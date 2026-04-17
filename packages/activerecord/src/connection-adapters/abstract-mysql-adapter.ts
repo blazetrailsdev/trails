@@ -181,17 +181,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return exception.errno ?? null;
   }
 
-  async getAdvisoryLock(lockName: string, timeout: number = 0): Promise<boolean> {
-    void lockName;
-    void timeout;
-    return false;
-  }
-
-  async releaseAdvisoryLock(lockName: string): Promise<boolean> {
-    void lockName;
-    return false;
-  }
-
   async disableReferentialIntegrity(): Promise<void> {}
 
   async beginDbTransaction(): Promise<void> {}
