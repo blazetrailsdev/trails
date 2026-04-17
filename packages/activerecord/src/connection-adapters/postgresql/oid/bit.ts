@@ -71,8 +71,11 @@ export class Bit extends Type<string> {
     return this.castValue(value);
   }
 
-  /** Rails' OID::Bit#cast_value */
-  protected castValue(value: unknown): string | null {
+  /**
+   * Rails' OID::Bit#cast_value. Exposed publicly so api:compare matches
+   * the Rails method name and so callers can invoke the hook directly.
+   */
+  castValue(value: unknown): string | null {
     if (value == null) return null;
     if (typeof value === "string") {
       // Rails: `value[2..-1].hex.to_s(2)`. Ruby's String#hex extracts

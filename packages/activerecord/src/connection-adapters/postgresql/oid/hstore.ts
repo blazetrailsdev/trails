@@ -11,6 +11,8 @@
 
 import { Type } from "@blazetrails/activemodel";
 
+import { StringKeyedHashAccessor } from "../../../store.js";
+
 const HSTORE_ERROR = "Invalid Hstore document: %s";
 
 export class Hstore extends Type<Record<string, string | null>> {
@@ -22,6 +24,16 @@ export class Hstore extends Type<Record<string, string | null>> {
 
   override isMutable(): boolean {
     return true;
+  }
+
+  /**
+   * Rails: `def accessor; ActiveRecord::Store::StringKeyedHashAccessor; end`.
+   * Returns the Store accessor class that Rails' store DSL uses to
+   * coerce symbol keys to string keys — matches PG's text-only hstore
+   * key model.
+   */
+  accessor(): typeof StringKeyedHashAccessor {
+    return StringKeyedHashAccessor;
   }
 
   /**

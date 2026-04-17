@@ -88,6 +88,23 @@ export class HashAccessor {
 export class IndifferentHashAccessor extends HashAccessor {}
 
 /**
+ * Mirrors: ActiveRecord::Store::StringKeyedHashAccessor.
+ * Rails uses this for Hstore columns — keys are coerced to strings on
+ * both read and write, matching PG's text-only hstore key model. JS
+ * object keys are already strings natively, so this ends up being a
+ * thin wrapper; kept distinct for Rails API parity.
+ */
+export class StringKeyedHashAccessor extends HashAccessor {
+  static override read(object: Base, attribute: string, key: unknown): unknown {
+    return super.read(object, attribute, String(key));
+  }
+
+  static override write(object: Base, attribute: string, key: unknown, value: unknown): void {
+    super.write(object, attribute, String(key), value);
+  }
+}
+
+/**
  * Store — JSON-backed attribute accessors.
  *
  * Mirrors: ActiveRecord::Store

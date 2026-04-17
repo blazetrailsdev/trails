@@ -138,6 +138,7 @@ export {
   storedAttributes,
   HashAccessor,
   IndifferentHashAccessor,
+  StringKeyedHashAccessor,
 } from "./store.js";
 export { QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
 export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";

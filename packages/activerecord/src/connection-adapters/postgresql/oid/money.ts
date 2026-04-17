@@ -11,16 +11,26 @@ import { DecimalType } from "@blazetrails/activemodel";
 export class Money extends DecimalType {
   override readonly name: string = "money";
 
+  /**
+   * Narrow the constructor options: PG money has a hard-coded scale
+   * of 2 (see the getter below), so accepting a caller-supplied scale
+   * would be misleading. Precision and limit pass through to the
+   * DecimalType base.
+   */
+  constructor(options?: { precision?: number; limit?: number }) {
+    super(options);
+  }
+
   override type(): string {
     return "money";
   }
 
-  constructor(options?: { precision?: number; limit?: number }) {
-    // Rails hard-codes `def scale; 2; end`. Pass scale=2 into the base
-    // options so precision-aware helpers see the right value. The base
-    // Type stores `scale` as a readonly field; in Ruby it's a method but
-    // semantically both resolve the same way at the call site.
-    super({ ...options, scale: 2 });
+  /**
+   * Rails: `def scale; 2; end`. Getter override of Type's scale —
+   * PG money always has 2 decimal places.
+   */
+  override get scale(): number {
+    return 2;
   }
 
   /**
@@ -29,9 +39,19 @@ export class Money extends DecimalType {
    *   (2) $12.345.678,12    (EU-style with period grouping, comma decimal)
    *   (3) -$2.55            (negative with leading minus)
    *   (4) ($2.55)           (accounting-style parentheses)
-   * then delegates to super(value) which strips currency chars and casts.
+   * This method performs the locale-specific stripping and normalization
+   * itself, then delegates to DecimalType via super.cast(...) for
+   * numeric casting.
    */
   override cast(value: unknown): string | null {
+    return this.castValue(value);
+  }
+
+  /**
+   * Rails' cast_value — exposed publicly so api:compare matches the
+   * Rails method name and callers can invoke the hook directly.
+   */
+  castValue(value: unknown): string | null {
     if (typeof value !== "string") return super.cast(value);
 
     // (4) (2.55) → -2.55

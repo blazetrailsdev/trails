@@ -22,6 +22,14 @@ export class Interval extends Type<Duration> {
   }
 
   cast(value: unknown): Duration | null {
+    return this.castValue(value);
+  }
+
+  /**
+   * Rails' cast_value — exposed publicly so api:compare matches the
+   * Rails method name and callers can invoke the hook directly.
+   */
+  castValue(value: unknown): Duration | null {
     if (value == null) return null;
     if (value instanceof Duration) return value;
     if (typeof value === "string") {

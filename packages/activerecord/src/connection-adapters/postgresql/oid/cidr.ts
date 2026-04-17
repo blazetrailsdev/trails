@@ -54,12 +54,41 @@ export class Cidr extends Type<string> {
    * pass-through, but our TS return type is `string | null`, so we
    * return null rather than lie about the type).
    */
-  protected castValue(value: unknown): string | null {
+  castValue(value: unknown): string | null {
     if (value == null) return null;
     if (typeof value !== "string") return null;
     if (value === "") return null;
     return isCidrShaped(value) ? value : null;
   }
+
+  /**
+   * Rails' type_cast_for_schema:
+   *   if value.prefix == 32
+   *     "\"#{value}\""
+   *   else
+   *     "\"#{value}/#{value.prefix}\""
+   *   end
+   *
+   * Rails elides a host prefix (/32 for IPv4, /128 for IPv6) since
+   * that's implicit. Our string-based cidr carries the prefix inline,
+   * so strip /32 / /128 before quoting to match Rails' schema output.
+   * Use JSON.stringify so embedded quotes/backslashes escape properly.
+   * Non-string inputs defer to Type#typeCastForSchema.
+   */
+  override typeCastForSchema(value: unknown): string {
+    if (typeof value === "string") return JSON.stringify(elideHostPrefix(value));
+    return super.typeCastForSchema(value);
+  }
+}
+
+function elideHostPrefix(value: string): string {
+  const slash = value.indexOf("/");
+  if (slash === -1) return value;
+  const address = value.slice(0, slash);
+  const prefix = value.slice(slash + 1);
+  if (prefix === "32" && isIpv4(address)) return address;
+  if (prefix === "128" && isIpv6(address)) return address;
+  return value;
 }
 
 /**

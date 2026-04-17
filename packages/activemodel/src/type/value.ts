@@ -1,13 +1,22 @@
 export abstract class Type<T = unknown> {
   abstract readonly name: string;
   readonly precision?: number;
-  readonly scale?: number;
   readonly limit?: number;
+  protected readonly _scale?: number;
 
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {
     if (options?.precision !== undefined) this.precision = options.precision;
-    if (options?.scale !== undefined) this.scale = options.scale;
+    if (options?.scale !== undefined) this._scale = options.scale;
     if (options?.limit !== undefined) this.limit = options.limit;
+  }
+
+  /**
+   * Rails defines `scale` as a method (`def scale; @scale; end`) so
+   * subclasses like OID::Money can override with a constant value.
+   * Expose it as a getter here so subclass `override get scale()` works.
+   */
+  get scale(): number | undefined {
+    return this._scale;
   }
 
   abstract cast(value: unknown): T | null;
