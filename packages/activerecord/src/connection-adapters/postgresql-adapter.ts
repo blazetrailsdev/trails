@@ -1,6 +1,7 @@
 import pg from "pg";
 import { type Type, ValueType } from "@blazetrails/activemodel";
 import { singularize, underscore } from "@blazetrails/activesupport";
+import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { splitQuotedIdentifier, Utils } from "./postgresql/utils.js";
@@ -101,6 +102,124 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
       this.typeMap.registerType(oid, fallback);
       return fallback;
     });
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#lookup_cast_type_from_column(column).
+   * Synchronous — only consults the already-populated type_map. Rails'
+   * get_oid_type auto-loads on miss because Ruby can block; TS callers
+   * of this method (e.g. the type-caster that runs during attribute
+   * reads) are sync, so missing OIDs resolve to a ValueType here and
+   * callers that need miss-loading should call `loadAdditionalTypes`
+   * first (as `execQuery` does).
+   */
+  lookupCastTypeFromColumn(column: {
+    oid?: number | null;
+    fmod?: number | null;
+    sqlType?: string | null;
+    name?: string;
+  }): Type {
+    const oid = column.oid;
+    if (oid == null) {
+      if (column.sqlType) {
+        // Pass the original sqlType + fmod so registerClassWithLimit /
+        // numeric / interval factories can still extract limit /
+        // precision / scale from the modifier.
+        return this.typeMap.lookup(
+          normalizeFormatType(column.sqlType),
+          column.fmod ?? -1,
+          column.sqlType,
+        );
+      }
+      return new ValueType();
+    }
+    // Rails' lookup_cast_type_from_column only *looks up* — it never
+    // mutates the type_map on miss. Registering a fallback here would
+    // poison the map: subsequent getOidType calls would see
+    // typeMap.has(oid)=true, skip loadAdditionalTypes, and never
+    // resolve the real type. Return a fresh ValueType on miss and
+    // leave miss-loading to getOidType / loadAdditionalTypes.
+    return this.typeMap.fetch(oid, column.fmod ?? -1, column.sqlType ?? "", () => new ValueType());
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#exec_query. Executes a query and returns
+   * an ActiveRecord::Result with `columnTypes` populated from the
+   * adapter's type_map — each field's dataTypeID resolves to a
+   * Type::Value via getOidType so callers can use `result.castValues()`
+   * to deserialize values through the right PG OID type.
+   *
+   * `Result.each()` / `Result.toArray()` build hash-shaped rows from
+   * columnIndexes, which still collapse duplicate column names —
+   * callers that need the raw positional values should read
+   * `result.rows` instead. This override's responsibility is to
+   * attach the right Type metadata so explicit casting has what it
+   * needs.
+   *
+   * The mixin-level execQuery returns a Result with empty columnTypes;
+   * this override is the Rails-faithful PG version that actually
+   * populates them.
+   */
+  override async execQuery(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
+    // Release the query client BEFORE any loadAdditionalTypes call —
+    // that path re-enters execute() and acquires its own pooled client,
+    // and holding both would consume 2 connections per query during
+    // type-map warmup.
+    interface ArrayQueryResult {
+      fields: Array<{ name: string; dataTypeID: number }>;
+      rows: unknown[][];
+    }
+    const client = await this.getClient();
+    let pgResult: ArrayQueryResult;
+    try {
+      // rowMode: "array" returns rows as positional arrays, preserving
+      // duplicate column names and matching the field-index order.
+      // Hash-keyed rows would collide on duplicate names and drop
+      // earlier values.
+      pgResult = (await client.query({
+        text: this.rewriteBinds(sql, binds ?? []),
+        values: binds ?? [],
+        rowMode: "array",
+      })) as unknown as ArrayQueryResult;
+    } finally {
+      this.releaseClient(client);
+    }
+
+    const fields = pgResult.fields ?? [];
+    if (fields.length === 0) return Result.fromRowHashes([]);
+
+    // Batch-load any unknown dataTypeIDs in a single pg_type roundtrip.
+    // Without this, a SELECT with N distinct unknown OIDs would trigger
+    // N sequential getOidType → loadAdditionalTypes queries.
+    const missing = new Set<number>();
+    for (const f of fields) {
+      if (!this.typeMap.has(f.dataTypeID)) missing.add(f.dataTypeID);
+    }
+    if (missing.size > 0) {
+      await this.loadAdditionalTypes([...missing]);
+    }
+
+    const columns = fields.map((f) => f.name);
+    // Store types under BOTH name and numeric index so Result's
+    // columnType lookup works with duplicate column names. Skip the
+    // name entry when the field name is an integer-like string — JS
+    // object keys are all strings, so `{0: type, "0": other}` would
+    // collide and Result would pick the wrong type for one of them.
+    const columnTypes: Record<string | number, Type> = {};
+    for (let i = 0; i < fields.length; i++) {
+      const f = fields[i];
+      // fmod isn't on pg.FieldDef; Rails reads it from PG::Result#fmod(i)
+      // which isn't exposed by node-pg. Pass -1 so numeric/interval
+      // registrations fall into their default (scale-absent) branch.
+      const type = await this.getOidType(f.dataTypeID, -1, f.name, "");
+      columnTypes[i] = type;
+      if (!/^\d+$/.test(f.name)) {
+        columnTypes[f.name] = type;
+      }
+    }
+    // pgResult.rows is already positional arrays thanks to rowMode.
+    const rowArrays = pgResult.rows as unknown[][];
+    return new Result(columns, rowArrays, columnTypes as Record<string, Type>);
   }
 
   /**
@@ -1605,3 +1724,40 @@ export class MoneyDecoder {
     return negative ? -num : num;
   }
 }
+
+/**
+ * Normalize a `pg_catalog.format_type(...)` string to the typname the
+ * static type_map is keyed by. PG returns human-friendly forms like
+ * "integer" / "character varying(255)" / "bigint", but we register
+ * "int4" / "varchar" / "int8". Strip size modifiers and alias common
+ * formatted names so the fallback path in lookupCastTypeFromColumn
+ * resolves well-known *scalar* types.
+ *
+ * Array types (e.g. "integer[]") are deliberately left as-is — they
+ * don't have a static registration, so the lookup misses and returns
+ * ValueType. Mapping them to the scalar typname (int4) would
+ * incorrectly deserialize array values with a scalar type.
+ */
+function normalizeFormatType(sqlType: string): string {
+  if (/\[\]\s*$/.test(sqlType)) return sqlType;
+  const base = sqlType
+    .replace(/\(.*\)/, "")
+    .trim()
+    .toLowerCase();
+  return FORMAT_TYPE_ALIASES[base] ?? base;
+}
+
+const FORMAT_TYPE_ALIASES: Record<string, string> = {
+  smallint: "int2",
+  integer: "int4",
+  bigint: "int8",
+  real: "float4",
+  "double precision": "float8",
+  "character varying": "varchar",
+  character: "bpchar",
+  "timestamp without time zone": "timestamp",
+  "timestamp with time zone": "timestamptz",
+  "time without time zone": "time",
+  "time with time zone": "timetz",
+  boolean: "bool",
+};

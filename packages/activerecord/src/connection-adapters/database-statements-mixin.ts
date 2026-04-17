@@ -32,9 +32,12 @@ type Constructor<T = {}> = new (...args: any[]) => T;
 
 export function DatabaseStatementsMixin<T extends Constructor<any>>(Base: T) {
   return class extends Base {
-    async selectAll(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
-      const rows = await (this as unknown as ExecutionMethods).execute(sql, binds);
-      return Result.fromRowHashes(rows);
+    async selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result> {
+      // Rails: select_all → internal_exec_query → exec_query. Delegating
+      // here means adapters that override execQuery (e.g. PostgreSQLAdapter,
+      // which populates columnTypes via its type_map) have their override
+      // picked up automatically, matching Rails' behavior.
+      return this.execQuery(sql, name, binds);
     }
 
     async selectOne(
