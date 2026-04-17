@@ -1,34 +1,21 @@
 /**
  * PostgreSQL decimal/numeric type.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Decimal
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Decimal.
+ * Rails: `class Decimal < Type::Decimal`. Adds only `infinity(options)`
+ * returning `BigDecimal("Infinity")` (or negative) for range bound
+ * sanitisation.
  */
 
-export class Decimal {
-  get type(): string {
-    return "decimal";
-  }
+import { DecimalType } from "@blazetrails/activemodel";
 
-  cast(value: unknown): number | null {
-    if (value == null) return null;
-    if (typeof value === "number") return value;
-    if (typeof value === "string") {
-      if (value === "" || value === "NaN") return null;
-      const parsed = parseFloat(value);
-      if (isNaN(parsed)) return null;
-      return parsed;
-    }
-    return null;
-  }
-
-  serialize(value: unknown): string | null {
-    if (value == null) return null;
-    if (typeof value === "number") return value.toString();
-    if (typeof value === "string") return value;
-    return null;
-  }
-
-  deserialize(value: unknown): number | null {
-    return this.cast(value);
+export class Decimal extends DecimalType {
+  /**
+   * Mirrors Rails' Decimal#infinity(options = {}).
+   * BigDecimal isn't a primitive in JS, so we return ±Infinity — the
+   * callsite (OID::Range) treats both as "unbounded".
+   */
+  infinity(options: { negative?: boolean } = {}): number {
+    return options.negative ? -Infinity : Infinity;
   }
 }

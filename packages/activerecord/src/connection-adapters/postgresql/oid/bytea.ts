@@ -1,38 +1,32 @@
 /**
  * PostgreSQL bytea type — binary data.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Bytea
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Bytea.
+ *
+ * Rails: `class Bytea < Type::Binary`. Only overrides deserialize, relying
+ * on Type::Binary for cast/serialize/isChangedInPlace.
  */
 
-export class Bytea {
-  get type(): string {
-    return "binary";
-  }
+import { BinaryType, BinaryData } from "@blazetrails/activemodel";
+import { unescapeBytea } from "../quoting.js";
 
-  cast(value: unknown): Buffer | null {
+export class Bytea extends BinaryType {
+  /**
+   * Rails' OID::Bytea#deserialize:
+   *   return if value.nil?
+   *   return value.to_s if value.is_a?(Type::Binary::Data)
+   *   PG::Connection.unescape_bytea(super)
+   *
+   * `unescape_bytea` handles both hex (`\x...`) and legacy octal escape
+   * formats. We delegate to our shared `unescapeBytea` helper (the same
+   * one used by quoting.ts) so octal escapes aren't silently lost.
+   */
+  override deserialize(value: unknown): Uint8Array | null {
     if (value == null) return null;
-    if (Buffer.isBuffer(value)) return value;
-    if (value instanceof Uint8Array) return Buffer.from(value);
-    if (typeof value === "string") return this.decodeBytea(value);
-    return null;
-  }
-
-  serialize(value: unknown): Buffer | null {
-    if (value == null) return null;
-    if (Buffer.isBuffer(value)) return value;
-    if (value instanceof Uint8Array) return Buffer.from(value);
-    if (typeof value === "string") return Buffer.from(value, "utf-8");
-    return null;
-  }
-
-  deserialize(value: unknown): Buffer | null {
-    return this.cast(value);
-  }
-
-  private decodeBytea(str: string): Buffer {
-    if (str.startsWith("\\x")) {
-      return Buffer.from(str.slice(2), "hex");
-    }
-    return Buffer.from(str, "utf-8");
+    if (value instanceof BinaryData) return value.bytes;
+    // Buffer in Node is already a Uint8Array — return it directly instead
+    // of allocating a copy via Uint8Array.from.
+    if (typeof value === "string") return unescapeBytea(value);
+    return super.deserialize(value);
   }
 }

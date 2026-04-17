@@ -2,6 +2,8 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/network_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Cidr } from "../../connection-adapters/postgresql/oid/cidr.js";
+import { Macaddr } from "../../connection-adapters/postgresql/oid/macaddr.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -142,8 +144,35 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       expect(updated[0].cidr_address).toBe("192.168.1.0/25");
     });
+  });
+});
 
-    // Needs Base model with dirty tracking support
-    it.skip("mac address change case does not mark dirty", async () => {});
+// Unit-level tests against the OID types that don't need a live DB.
+// These use Rails test names so `api:compare` can match them.
+describe("PostgresqlNetworkTest", () => {
+  it("mac address change case does not mark dirty", () => {
+    // Rails: test_mac_address_change_case_does_not_mark_dirty — case
+    // differences in a macaddr value must not dirty the attribute.
+    const type = new Macaddr();
+    expect(type.isChanged("aa:bb:cc:dd:ee:ff", "AA:BB:CC:DD:EE:FF")).toBe(false);
+    expect(type.isChanged("aa:bb:cc:dd:ee:ff", "aa:bb:cc:dd:ee:01")).toBe(true);
+  });
+
+  it("invalid network address", () => {
+    // Rails: test_invalid_network_address — IPAddr.new raises on garbage,
+    // so Cidr#cast_value returns nil. Mirror that in TS.
+    const type = new Cidr();
+    expect(type.cast("invalid addr")).toBeNull();
+    expect(type.cast("not-an-ip")).toBeNull();
+    expect(type.cast(42)).toBeNull();
+    // Out-of-range prefixes are rejected too.
+    expect(type.cast("192.168.1.0/999")).toBeNull();
+    // Valid IPv4 / IPv6 / prefixed forms pass through.
+    expect(type.cast("192.168.1.1")).toBe("192.168.1.1");
+    expect(type.cast("192.168.1.0/24")).toBe("192.168.1.0/24");
+    expect(type.cast("::1")).toBe("::1");
+    expect(type.cast("2001:db8::/32")).toBe("2001:db8::/32");
+    // IPv4-embedded IPv6 is valid (e.g. IPv4-mapped addresses).
+    expect(type.cast("::ffff:192.168.0.1")).toBe("::ffff:192.168.0.1");
   });
 });

@@ -230,10 +230,38 @@ export function escapeBytea(value: Buffer | Uint8Array | string): string {
 }
 
 export function unescapeBytea(value: string): Buffer {
-  // Matches Rails' PG-driver-backed contract: this is intentionally not the
-  // inverse of escapeBytea for every possible input representation.
+  // Matches PG::Connection.unescape_bytea's contract: this is intentionally
+  // not the inverse of escapeBytea for every possible input representation.
   if (value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
-  return Buffer.from(value, "binary");
+
+  // Legacy octal escape format: \NNN octet triples and \\ backslash. Parse
+  // byte-by-byte so high bytes aren't UTF-8 re-encoded by Buffer.from.
+  const bytes: number[] = [];
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (ch === "\\") {
+      const next = value[i + 1];
+      if (next === "\\") {
+        bytes.push(0x5c);
+        i += 1;
+        continue;
+      }
+      const octal = value.slice(i + 1, i + 4);
+      if (/^[0-7]{3}$/.test(octal)) {
+        const byte = parseInt(octal, 8);
+        // Bytea octal escapes are byte-sized (0o000..0o377). \400–\777 isn't
+        // valid PG output; treat those as a literal backslash + digits
+        // instead of quietly overflowing.
+        if (byte <= 0o377) {
+          bytes.push(byte);
+          i += 3;
+          continue;
+        }
+      }
+    }
+    bytes.push(ch.charCodeAt(0));
+  }
+  return Buffer.from(bytes);
 }
 
 export function columnNameMatcher(): RegExp {

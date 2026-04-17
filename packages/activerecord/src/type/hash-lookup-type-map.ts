@@ -7,20 +7,21 @@ import { Type, ValueType } from "@blazetrails/activemodel";
  * Mirrors: ActiveRecord::Type::HashLookupTypeMap
  */
 export class HashLookupTypeMap {
-  private _mapping: Map<string, (lookupKey: string, ...args: unknown[]) => Type> = new Map();
-  private _cache: Map<string, Map<string, Type>> = new Map();
+  private _mapping: Map<string | number, (lookupKey: string | number, ...args: unknown[]) => Type> =
+    new Map();
+  private _cache: Map<string | number, Map<string, Type>> = new Map();
 
-  lookup(lookupKey: string, ...args: unknown[]): Type {
+  lookup(lookupKey: string | number, ...args: unknown[]): Type {
     return this.fetch(lookupKey, ...args, () => new ValueType());
   }
 
-  fetch(lookupKey: string, ...rest: unknown[]): Type {
-    let fallback: ((lookupKey: string, ...args: unknown[]) => Type) | undefined;
+  fetch(lookupKey: string | number, ...rest: unknown[]): Type {
+    let fallback: ((lookupKey: string | number, ...args: unknown[]) => Type) | undefined;
     let args: unknown[];
 
     // Last arg is the fallback if it's a function
     if (rest.length > 0 && typeof rest[rest.length - 1] === "function") {
-      fallback = rest[rest.length - 1] as (lookupKey: string, ...a: unknown[]) => Type;
+      fallback = rest[rest.length - 1] as (lookupKey: string | number, ...a: unknown[]) => Type;
       args = rest.slice(0, -1);
     } else {
       args = rest;
@@ -77,8 +78,8 @@ export class HashLookupTypeMap {
   }
 
   registerType(
-    key: string,
-    value?: Type | ((lookupKey: string, ...args: unknown[]) => Type),
+    key: string | number,
+    value?: Type | ((lookupKey: string | number, ...args: unknown[]) => Type),
   ): void {
     if (value == null) throw new Error("registerType requires a value or block");
     if (typeof value === "function") {
@@ -94,24 +95,24 @@ export class HashLookupTypeMap {
     this._cache.clear();
   }
 
-  aliasType(type: string, targetType: string): void {
+  aliasType(type: string | number, targetType: string | number): void {
     this.registerType(type, (_lookupKey: unknown, ...args: unknown[]) =>
       this.lookup(targetType, ...args),
     );
   }
 
-  has(key: string): boolean {
+  has(key: string | number): boolean {
     return this._mapping.has(key);
   }
 
-  keys(): string[] {
+  keys(): Array<string | number> {
     return [...this._mapping.keys()];
   }
 
   private _performFetch(
-    type: string,
+    type: string | number,
     args: unknown[],
-    fallback?: (lookupKey: string, ...args: unknown[]) => Type,
+    fallback?: (lookupKey: string | number, ...args: unknown[]) => Type,
   ): Type {
     const factory = this._mapping.get(type);
     if (factory) return factory(type, ...args);

@@ -3,7 +3,7 @@ import { Type } from "./value.js";
 import { ImmutableStringType } from "./immutable-string.js";
 
 export class StringType extends Type<string> {
-  readonly name = "string";
+  readonly name: string = "string";
 
   cast(value: unknown): string | null {
     if (value === null || value === undefined) return null;

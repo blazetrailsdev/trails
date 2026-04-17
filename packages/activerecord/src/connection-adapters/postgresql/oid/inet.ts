@@ -1,26 +1,16 @@
 /**
  * PostgreSQL inet type — IP address with optional subnet mask.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Inet
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Inet.
+ * Rails: `class Inet < Cidr`, only overrides `type` to return :inet.
  */
 
-export class Inet {
-  get type(): string {
+import { Cidr } from "./cidr.js";
+
+export class Inet extends Cidr {
+  override readonly name = "inet";
+
+  override type(): string {
     return "inet";
-  }
-
-  cast(value: unknown): string | null {
-    if (value == null) return null;
-    if (typeof value === "string") return value === "" ? null : value;
-    return null;
-  }
-
-  serialize(value: unknown): string | null {
-    if (value == null) return null;
-    return String(value);
-  }
-
-  deserialize(value: unknown): string | null {
-    return this.cast(value);
   }
 }

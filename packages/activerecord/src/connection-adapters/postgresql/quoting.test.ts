@@ -72,6 +72,13 @@ describe("PostgreSQL quoting", () => {
     expect(unescapeBytea("\\x6869")).toEqual(Buffer.from("hi"));
   });
 
+  it("unescapes legacy octal bytea with escaped backslashes", () => {
+    // PG::Connection.unescape_bytea handles the pre-9.0 octal format: \NNN
+    // for bytes and \\ for a literal backslash. Parsed byte-by-byte so
+    // high bytes aren't UTF-8 re-encoded.
+    expect(unescapeBytea("a\\134\\000b")).toEqual(Buffer.from([0x61, 0x5c, 0x00, 0x62]));
+  });
+
   it("quoteTableNameForAssignment drops the table prefix", () => {
     expect(quoteTableNameForAssignment("users", "name")).toBe('"name"');
   });
