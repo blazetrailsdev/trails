@@ -1,7 +1,7 @@
 import { Type } from "./value.js";
 
 export class DecimalType extends Type<string> {
-  readonly name = "decimal";
+  readonly name: string = "decimal";
 
   cast(value: unknown): string | null {
     if (value === null || value === undefined) return null;

@@ -1,26 +1,23 @@
 /**
  * PostgreSQL enum OID type — casts PostgreSQL enum column values.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Enum
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Enum.
+ * Rails: `class Enum < Type::Value; def type; :enum; end;
+ * def cast_value(value); value.to_s; end`.
  */
 
-export class Enum {
-  get type(): string {
+import { Type } from "@blazetrails/activemodel";
+
+export class Enum extends Type<string> {
+  readonly name: string = "enum";
+
+  override type(): string {
     return "enum";
   }
 
+  /** Rails' cast_value is `value.to_s` — matches `String(value)` here. */
   cast(value: unknown): string | null {
     if (value == null) return null;
-    if (typeof value === "string") return value === "" ? null : value;
     return String(value);
-  }
-
-  serialize(value: unknown): string | null {
-    if (value == null) return null;
-    return String(value);
-  }
-
-  deserialize(value: unknown): string | null {
-    return this.cast(value);
   }
 }

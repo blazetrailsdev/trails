@@ -1,10 +1,12 @@
 /**
  * PostgreSQL xml type.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Xml
- *
- * Also exports Data class for XML value representation.
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Xml.
+ * Rails: `class Xml < Type::String`. Overrides type and serialize, with
+ * a nested Data class wrapping the serialized output.
  */
+
+import { StringType } from "@blazetrails/activemodel";
 
 export class Data {
   readonly value: string;
@@ -18,25 +20,24 @@ export class Data {
   }
 }
 
-export class Xml {
-  get type(): string {
+export class Xml extends StringType {
+  override readonly name: string = "xml";
+
+  override type(): string {
     return "xml";
   }
 
-  cast(value: unknown): string | null {
+  /**
+   * Rails: `Data.new(super) if value`. super is Type::String#serialize
+   * which stringifies the value; nil passes through. We return a Data
+   * instance so quoting.ts' `value instanceof Data` check routes PG's
+   * `xml '...'` prefix correctly. StringType.serialize is typed as
+   * `unknown` so wrapper returns like this don't need suppression.
+   */
+  override serialize(value: unknown): Data | null {
     if (value == null) return null;
-    if (value instanceof Data) return value.value;
-    if (typeof value === "string") return value === "" ? null : value;
-    return null;
-  }
-
-  serialize(value: unknown): string | null {
-    if (value == null) return null;
-    if (value instanceof Data) return value.value;
-    return String(value);
-  }
-
-  deserialize(value: unknown): string | null {
-    return this.cast(value);
+    if (value instanceof Data) return value;
+    const cast = this.cast(value);
+    return cast == null ? null : new Data(cast);
   }
 }

@@ -1,7 +1,7 @@
 import { Type } from "./value.js";
 
 export class JsonType extends Type<unknown> {
-  readonly name = "json";
+  readonly name: string = "json";
 
   cast(value: unknown): unknown | null {
     if (value === null || value === undefined) return null;

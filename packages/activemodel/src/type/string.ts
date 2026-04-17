@@ -10,7 +10,7 @@ export class StringType extends Type<string> {
     return String(value);
   }
 
-  serialize(value: unknown): string | null {
+  serialize(value: unknown): unknown {
     return this.cast(value);
   }
 

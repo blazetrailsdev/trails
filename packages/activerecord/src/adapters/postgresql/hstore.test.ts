@@ -3,7 +3,11 @@
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { parseHstore, serializeHstore } from "../../connection-adapters/postgresql/oid/hstore.js";
+import {
+  Hstore,
+  parseHstore,
+  serializeHstore,
+} from "../../connection-adapters/postgresql/oid/hstore.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -443,7 +447,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("multiline", () => {
-      expect(parseHstore('"a"=>"b\\nc"')).toEqual({ a: "b\nc" });
+      // Rails' test_multiline does assert_cycle({"a\nb" => "c\nd"}). PG
+      // stores the newline as a literal character inside the quoted
+      // value, not as a \n escape. Round-trip through serializeHstore /
+      // parseHstore and assert the value is preserved.
+      const input = { "a\nb": "c\nd" };
+      expect(parseHstore(serializeHstore(input))).toEqual(input);
     });
 
     it.skip("hstore with serialized attributes", () => {
@@ -467,5 +476,22 @@ describeIfPg("PostgreSQLAdapter", () => {
     it.skip("schema dump with shorthand", async () => {
       /* needs schema dumper */
     });
+  });
+});
+
+// Unit-level tests against Hstore — no DB required. Rails test names.
+describe("PostgresqlHstoreTest", () => {
+  it("deserialize", () => {
+    const type = new Hstore();
+    expect(type.deserialize('"a"=>"b", "c"=>"d"')).toEqual({ a: "b", c: "d" });
+    expect(type.deserialize('"a"=>NULL')).toEqual({ a: null });
+    expect(type.deserialize(null)).toBeNull();
+  });
+
+  it("serialize", () => {
+    const type = new Hstore();
+    expect(type.serialize({ a: "b" })).toBe('"a"=>"b"');
+    expect(type.serialize({ a: null })).toBe('"a"=>NULL');
+    expect(type.serialize({ a: "" })).toBe('"a"=>""');
   });
 });

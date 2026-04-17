@@ -1,7 +1,7 @@
 import { Type } from "./value.js";
 
 export class IntegerType extends Type<number> {
-  readonly name = "integer";
+  readonly name: string = "integer";
   private readonly _range: [number, number];
 
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {

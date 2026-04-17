@@ -1,7 +1,7 @@
 import { Type } from "./value.js";
 
 export class DateTimeType extends Type<Date> {
-  readonly name = "datetime";
+  readonly name: string = "datetime";
 
   cast(value: unknown): Date | null {
     if (value === null || value === undefined) return null;

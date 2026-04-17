@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/money_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Money } from "../../connection-adapters/postgresql/oid/money.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -211,5 +212,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       expect(Number(rows[0].wealth)).toBeCloseTo(123.45, 2);
     });
+  });
+});
+
+// Unit-level tests that don't need a live PG connection — Rails test
+// names so api:compare matches.
+describe("PostgresqlMoneyTest", () => {
+  it("money type cast", () => {
+    const type = new Money();
+    for (const [str, num] of [
+      ["12,345,678.12", 12345678.12],
+      ["12.345.678,12", 12345678.12],
+      ["0.12", 0.12],
+      ["0,12", 0.12],
+    ] as const) {
+      expect(Number(type.cast(str))).toBeCloseTo(num);
+      expect(Number(type.cast(`$${str}`))).toBeCloseTo(num);
+      expect(Number(type.cast(`-${str}`))).toBeCloseTo(-num);
+      expect(Number(type.cast(`-$${str}`))).toBeCloseTo(-num);
+      expect(Number(type.cast(`(${str})`))).toBeCloseTo(-num);
+      expect(Number(type.cast(`($${str})`))).toBeCloseTo(-num);
+    }
   });
 });

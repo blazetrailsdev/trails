@@ -1,86 +1,65 @@
 /**
  * PostgreSQL interval type — represents a time duration.
  *
- * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Interval
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Interval.
+ * Rails: `class Interval < Type::Value`. cast_value accepts Duration
+ * or ISO8601 string; serialize emits ISO8601; type_cast_for_schema
+ * inspects the serialized form.
  */
 
+import { Type } from "@blazetrails/activemodel";
 import { Duration } from "@blazetrails/activesupport";
 
-export interface IntervalValue {
-  years?: number;
-  months?: number;
-  days?: number;
-  hours?: number;
-  minutes?: number;
-  seconds?: number;
-}
+export class Interval extends Type<Duration> {
+  readonly name: string = "interval";
 
-export class Interval {
-  get type(): string {
+  constructor(options?: { precision?: number }) {
+    super(options);
+  }
+
+  override type(): string {
     return "interval";
   }
 
-  cast(value: unknown): IntervalValue | null {
+  cast(value: unknown): Duration | null {
     if (value == null) return null;
-    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-      return value as IntervalValue;
-    }
+    if (value instanceof Duration) return value;
     if (typeof value === "string") {
-      if (value === "") return null;
-      return this.parseInterval(value);
-    }
-    return null;
-  }
-
-  serialize(value: unknown): string | null {
-    if (value == null) return null;
-    if (value instanceof Duration) {
-      return value.iso8601();
+      try {
+        return Duration.parse(value);
+      } catch {
+        return null;
+      }
     }
     if (typeof value === "number") {
-      return Duration.build(value).iso8601();
-    }
-    if (typeof value === "string") return value;
-    if (typeof value === "object" && value !== null) {
-      const v = value as IntervalValue;
-      const parts: string[] = [];
-      if (v.years) parts.push(`${v.years} years`);
-      if (v.months) parts.push(`${v.months} months`);
-      if (v.days) parts.push(`${v.days} days`);
-      if (v.hours || v.minutes || v.seconds) {
-        const h = String(v.hours ?? 0).padStart(2, "0");
-        const m = String(v.minutes ?? 0).padStart(2, "0");
-        const s = String(v.seconds ?? 0).padStart(2, "0");
-        parts.push(`${h}:${m}:${s}`);
-      }
-      return parts.join(" ") || "00:00:00";
+      // Rails' cast_value lets numeric inputs fall through to super (identity),
+      // then serialize converts. TS is typed `Duration | null`, so we upgrade
+      // numeric seconds into a Duration here — same observable behaviour
+      // through the cast → serialize pipeline.
+      return Duration.build(value);
     }
     return null;
   }
 
-  deserialize(value: unknown): IntervalValue | null {
-    return this.cast(value);
+  override serialize(value: unknown): string | null {
+    if (value == null) return null;
+    if (value instanceof Duration) {
+      return value.iso8601({ precision: this.precision ?? null });
+    }
+    if (typeof value === "number") {
+      // Rails: `Time - Time` yields a Float seconds count that reaches
+      // serialize directly (without going through cast). Keep a numeric
+      // branch so that path still round-trips.
+      return Duration.build(value).iso8601({ precision: this.precision ?? null });
+    }
+    if (typeof value === "string") return value;
+    return null;
   }
 
-  private parseInterval(str: string): IntervalValue {
-    const result: IntervalValue = {};
-
-    const yearMatch = str.match(/(-?\d+)\s*years?/i);
-    if (yearMatch) result.years = parseInt(yearMatch[1]);
-
-    const monthMatch = str.match(/(-?\d+)\s*mons?(?:ths?)?/i);
-    if (monthMatch) result.months = parseInt(monthMatch[1]);
-
-    const dayMatch = str.match(/(-?\d+)\s*days?/i);
-    if (dayMatch) result.days = parseInt(dayMatch[1]);
-
-    const timeMatch = str.match(/(-?\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)/);
-    if (timeMatch) {
-      result.hours = parseInt(timeMatch[1]);
-      result.minutes = parseInt(timeMatch[2]);
-      result.seconds = parseFloat(timeMatch[3]);
-    }
-
-    return result;
+  override typeCastForSchema(value: unknown): string {
+    const serialized = this.serialize(value);
+    if (serialized == null) return "nil";
+    // Rails: `serialize(value).inspect` — quote the string for schema dump.
+    return `"${serialized.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
 }
