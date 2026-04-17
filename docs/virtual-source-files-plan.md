@@ -1,7 +1,7 @@
 # Plan: Auto-Typed Models via Virtual Source Files
 
-Status: **proposal / planning draft** (Rails-fidelity revision).
-Last updated: 2026-04-15.
+Status: **Phase 1b shipped; Phase 2 (tsserver plugin) planning.**
+Last updated: 2026-04-16.
 
 Related:
 
@@ -430,20 +430,20 @@ inline `import("@blazetrails/activerecord").<Type>` so zero-declare
 user files don't need to import those types either. One file in
 source + multiple fixture updates; no behavior change beyond emit.
 
-### Phase 1b — `trails-tsc` CLI shell 📋
+### Phase 1b — `trails-tsc` CLI shell ✅
 
 The CLI that users opt into by swapping `tsc` for `trails-tsc` in
 their typecheck script. Biggest phase by surface area, so broken into
 **six sub-PRs**, each independently testable and shippable:
 
-| PR   | Name                                            | Depends on | Blocks                    |
-| ---- | ----------------------------------------------- | ---------- | ------------------------- |
-| 1b.1 | CLI skeleton + single-file virtualization       | —          | 1b.2, 1b.3                |
-| 1b.2 | Diagnostic range remap                          | 1b.1       | —                         |
-| 1b.3 | Transitive-extends walker                       | 1b.1       | 1b.4                      |
-| 1b.4 | Auto-import resolution                          | 1b.3       | 1b.5, 1b.6                |
-| 1b.5 | `--build` / composite project support           | 1b.4       | —                         |
-| 1b.6 | In-repo migration + CI + `virtualized-patterns` | 1b.4       | Phase 2 (tsserver plugin) |
+| PR   | Name                                                      | Depends on | Blocks                    |
+| ---- | --------------------------------------------------------- | ---------- | ------------------------- |
+| 1b.1 | CLI skeleton + single-file virtualization ✅ (#549)       | —          | 1b.2, 1b.3                |
+| 1b.2 | Diagnostic range remap ✅ (#551)                          | 1b.1       | —                         |
+| 1b.3 | Transitive-extends walker ✅ (#553)                       | 1b.1       | 1b.4                      |
+| 1b.4 | Auto-import resolution ✅ (#557)                          | 1b.3       | 1b.5, 1b.6                |
+| 1b.5 | `--build` / composite project support ✅ (#561)           | 1b.4       | —                         |
+| 1b.6 | In-repo migration + CI + `virtualized-patterns` ✅ (#563) | 1b.4       | Phase 2 (tsserver plugin) |
 
 Each sub-section below is scoped so a contributor can pick it up,
 ship it, and merge without the rest of Phase 1b landing first. After
@@ -452,7 +452,7 @@ satisfied and Phase 2 (tsserver plugin) is unblocked.
 
 ---
 
-#### 1b.1 — CLI skeleton + single-file virtualization 📋
+#### 1b.1 — CLI skeleton + single-file virtualization ✅
 
 **Goal:** `trails-tsc` runs, produces tsc-compatible output, and
 virtualizes any source file whose top-level class declaration
@@ -486,7 +486,7 @@ runs from the command line and returns 0.
 
 ---
 
-#### 1b.2 — Diagnostic range remap 📋
+#### 1b.2 — Diagnostic range remap ✅
 
 **Goal:** user-facing error messages reference the user's original
 line numbers, not virtualized ones. Lands right after the CLI skeleton
@@ -519,7 +519,7 @@ number a user would have seen with plain `tsc` against the "before"
 
 ---
 
-#### 1b.3 — Transitive-extends walker 📋
+#### 1b.3 — Transitive-extends walker ✅
 
 **Goal:** `class Admin extends User` (where `User extends Base`) is
 virtualized. Most real codebases have an abstract intermediate class
@@ -549,7 +549,7 @@ from 1b.1 still works.
 
 ---
 
-#### 1b.4 — Auto-import resolution 📋
+#### 1b.4 — Auto-import resolution ✅
 
 **Goal:** zero-declare AND zero-import model files. User writes
 `this.hasMany("comments")`; `Comment` is auto-imported from wherever
@@ -601,7 +601,7 @@ transitive (1b.3) cases still work.
 
 ---
 
-#### 1b.5 — `--build` / composite project support 📋
+#### 1b.5 — `--build` / composite project support ✅
 
 **Goal:** users with `tsc --build` / `references:` in their tsconfigs
 get the same behavior as the `--noEmit` path. Matters for monorepos.
@@ -628,7 +628,7 @@ consumer install path.
 
 ---
 
-#### 1b.6 — In-repo migration + CI + `virtualized-patterns.test-d.ts` 📋
+#### 1b.6 — In-repo migration + CI + `virtualized-patterns.test-d.ts` ✅
 
 **Goal:** dogfood, close the loop. Delete manual declares from in-repo
 models, wire CI to catch regressions, add the parallel dx-tests
@@ -675,22 +675,462 @@ the new job; dx-tests cover both forms; CLAUDE.md updated.
 
 ### Phase 2 — tsserver plugin 📋
 
-- Land `packages/activerecord/src/tsserver-plugin/` shipping as
-  `@blazetrails/activerecord/tsserver-plugin`.
-- Plugin intercepts `getScriptSnapshot` and reuses the Phase 1
-  `virtualize()`.
-- Repo's own `tsconfig.json` enables the plugin.
+The **editor** shell that brings the same virtualization the CLI does
+to IDE autocomplete, hover, go-to-definition, rename, find-references,
+and inline diagnostics. Users opt in with one line in their
+`tsconfig.json`:
 
-**Phase 2 exit criteria:**
+```jsonc
+{
+  "compilerOptions": {
+    "plugins": [{ "name": "@blazetrails/activerecord/tsserver-plugin" }],
+  },
+}
+```
 
-- Plugin produces virtualized snapshots matching `trails-tsc`
-  byte-for-byte.
-- VS Code completions / quick-info / go-to-def work for synthesized
-  members.
-- Perf: plugin overhead <50 ms per file open on a repo with 500+
-  models.
-- Documented install for VS Code, Zed, WebStorm, nvim (tier-1: VS
-  Code).
+Broken into **six sub-PRs**, mirroring the Phase 1b cadence. Each is
+independently testable and shippable:
+
+| PR  | Name                                           | Depends on    | Blocks   |
+| --- | ---------------------------------------------- | ------------- | -------- |
+| 2.1 | Plugin skeleton + `getScriptSnapshot` override | 1b.6          | 2.2, 2.3 |
+| 2.2 | Model-registry build + invalidation on change  | 2.1           | 2.3, 2.5 |
+| 2.3 | Position/range remap for IDE features          | 2.2           | 2.4      |
+| 2.4 | Diagnostic remap + quick-fix interception      | 2.3           | 2.6      |
+| 2.5 | Incremental walker + perf budget               | 2.2           | 2.6      |
+| 2.6 | Editor install docs + cross-editor smoke tests | 2.3, 2.4, 2.5 | Phase 3  |
+
+**Shared prerequisites — what we can reuse verbatim from Phase 1b:**
+
+- `packages/activerecord/src/type-virtualization/virtualize.ts` —
+  `virtualize(originalText, fileName, { baseNames, prependImports })`
+  returns `{ text, deltas }`. Pure syntactic transform; no Program or
+  checker. The plugin calls it exactly the same way the CLI does.
+- `packages/activerecord/src/type-virtualization/transitive-extends-walker.ts` —
+  `collectBaseDescendants(program)` returns `{ baseNames, modelRegistry }`.
+  Runs against the language service's `program` instead of a CLI-built
+  one.
+- `packages/activerecord/src/tsc-wrapper/auto-import.ts` —
+  `resolveAutoImports(text, fileName, modelRegistry, baseNames)`
+  returns the `import type { ... }` lines to prepend. Same call site.
+- `packages/activerecord/src/type-virtualization/resolve-target.ts` —
+  `resolveAssociationTarget(call)` already shared between the
+  virtualizer and auto-import resolver.
+- `packages/activerecord/src/type-virtualization/virtualize.ts#remapLine`
+  - `packages/activerecord/src/tsc-wrapper/remap.ts#remapDiagnostics`
+    (with the optional `originalSfCache`) — reused for mapping IDE
+    positions back to user coordinates.
+
+**New code lives in:**
+`packages/activerecord/src/tsserver-plugin/` with entry
+`index.ts` exporting the canonical TypeScript-plugin factory:
+
+```ts
+import type ts from "typescript/lib/tsserverlibrary";
+
+function init({ typescript: ts }: { typescript: typeof import("typescript/lib/tsserverlibrary") }) {
+  return {
+    create(info: ts.server.PluginCreateInfo): ts.LanguageService {
+      // sub-PRs below wire this up incrementally.
+      return info.languageService;
+    },
+  };
+}
+export = init;
+```
+
+Plugin ships as the subpath export `@blazetrails/activerecord/tsserver-plugin`
+(one install, no version skew with `/tsc`), resolving to a compiled
+CJS file — tsserver's plugin loader requires CommonJS and
+`module.exports = factory` shape. A dedicated
+`tsconfig.tsserver-plugin.json` with `"module": "CommonJS"`,
+`"moduleResolution": "Node"`, and its own `outDir`
+(`dist/tsserver-plugin/`) emits the plugin artifact; the rest of
+`@blazetrails/activerecord` keeps emitting ESM. `package.json`'s
+`exports` map points the subpath at the CJS entry + its `.d.cts`.
+
+**Scopes explicitly deferred to later phases:**
+
+- **Inferred projects** (a file opened in the editor that isn't
+  covered by any `tsconfig.json`). tsserver creates a synthetic
+  project with no plugin config, so the plugin doesn't activate —
+  the user sees plain-`tsc` behavior. Documented in 2.6; opt-in for
+  future Phase 4+.
+- **Composite project references** (`"references": [...]` in
+  `tsconfig.json`). No extra plugin code needed: tsserver already
+  spins up a distinct language service per referenced project, each
+  of which loads the plugin via its own `tsconfig.json`. The 2.6
+  smoke suite exercises a two-project composite fixture lifted from
+  Phase 1b.5 to verify this.
+- **User-written `declare` escape hatches** continue to work
+  unchanged: `virtualize()` already skips injection for any member
+  name present on the class (`memberPresent` in
+  `synthesize.ts#renderCall`), so the plugin inherits this behavior
+  for free.
+
+---
+
+#### 2.1 — Plugin skeleton + `getScriptSnapshot` override 📋
+
+**Goal:** tsserver loads the plugin and returns the virtualized text
+from `getScriptSnapshot` for every Base-rooted file in the project.
+No walker yet — uses the default `baseNames: ["Base"]` heuristic.
+Enough to prove the integration point works and that VS Code / Zed /
+WebStorm pick up simple zero-declare models without any plugin logic
+beyond a one-file text transform.
+
+**Deliverables:**
+
+- `packages/activerecord/src/tsserver-plugin/index.ts` with the
+  canonical `function init({ typescript })` factory. CJS output so
+  tsserver can `require()` it.
+- `packages/activerecord/src/tsserver-plugin/host-proxy.ts` wrapping
+  `info.languageServiceHost` to override `getScriptSnapshot(fileName)`:
+  1. Call the underlying host to get the original snapshot text.
+  2. Read the current file version from
+     `info.languageServiceHost.getScriptVersion(fileName)` — the
+     snapshot itself doesn't carry a version, the host does.
+  3. If it doesn't need virtualization (no `static {` with
+     `extends Base` — same fast pre-filter the CLI uses in
+     `host.ts#STATIC_BLOCK_PATTERN` + `EXTENDS_IDENT` regex), return
+     the original snapshot unchanged.
+  4. Otherwise call `virtualize(originalText, fileName, { baseNames })`.
+  5. Wrap the result in `ts.ScriptSnapshot.fromString(result.text)`.
+  6. Cache by `(fileName, originalVersion)` — when the host's
+     script version changes, re-virtualize. Avoid re-parsing
+     unchanged files.
+- `packages/activerecord/src/tsserver-plugin/snapshot-cache.ts` — a
+  tiny `Map<string, { version: string; snapshot: ts.IScriptSnapshot; deltas: LineDelta[]; originalText: string }>`,
+  where `version` is the host's script version string for that
+  file. The LineDelta + originalText are needed by later sub-PRs
+  for remapping.
+- Override `LanguageServiceHost.getScriptVersion` too — return
+  `<originalVersion>:<virtualizerVersion>` where `virtualizerVersion`
+  is a monotonic counter bumped whenever the plugin's virtualization
+  settings change (e.g. baseNames set refreshes in 2.2). Forces
+  tsserver to invalidate cached SourceFiles after a walker rebuild.
+- `@blazetrails/activerecord/tsserver-plugin` subpath export +
+  dedicated `tsconfig.tsserver-plugin.json` emitting CJS + `.d.ts`.
+- Integration test: spawn `tsserver` (via
+  `typescript/lib/tsserver.js`) in a child process, open a
+  single-file fixture `post.ts` with
+  `this.attribute("title", "string")` and NO manual declares, send
+  a `quickinfo` request at the cursor on `post.title` in an adjacent
+  consumer file, assert the reply's `displayString` is `(property)
+Post.title: string`.
+
+**Non-goals (deferred):** transitive extends, auto-import, position
+remap, diagnostic remap, perf budget.
+
+**Exit:** on a flat `extends Base` fixture, VS Code / tsserver hover
+shows `post.title: string` end-to-end with the plugin installed and
+nothing else touched.
+
+---
+
+#### 2.2 — Model-registry build + invalidation on change 📋
+
+**Goal:** plugin runs the same two-pass walker the CLI uses
+(`program.ts` in Phase 1b.3 + 1b.4), so transitive-extends and
+cross-file auto-imports work in the editor. Rebuilds the registry on
+file add / remove / save, not on every keystroke.
+
+**Deliverables:**
+
+- `packages/activerecord/src/tsserver-plugin/registry.ts`:
+  - `class RegistryCache { readonly baseNames: ReadonlySet<string>; readonly modelRegistry: ReadonlyMap<string, string>; constructor(program: ts.Program); }`
+  - Populated by calling `collectBaseDescendants(program)` from the
+    shared walker. Single pass; cached on the cache instance.
+  - `invalidate(trigger: "fileAdded" | "fileRemoved" | "configChange" | "save")`
+    — drops the cache so the next lookup rebuilds. Typing changes
+    (within a single file) don't invalidate — transitive extends only
+    changes when files are added/removed or when `extends` clauses
+    shift, and those arrive via the save / onSourceFileChanged hook.
+- Wire `info.project.projectService.onProjectUpdatedInBackground`
+  (available on `ts.server.Project`) + polling for
+  `program !== previousProgram` to decide when to rebuild. Program
+  identity changes whenever the language service re-creates one
+  (file add / remove, config change).
+- `getScriptSnapshot` now asks the registry for `baseNames` and
+  passes `modelRegistry` into `resolveAutoImports(...)`, then into
+  `virtualize(..., { baseNames: [...baseNames], prependImports })`.
+  Exact same pipeline as `tsc-wrapper/host.ts#getVirtualizedText`.
+- Cross-file auto-import integration test: fixture with
+  `author.ts` exporting `Author` + `post.ts` declaring
+  `this.belongsTo("author")` and NO import. Open `post.ts` in
+  tsserver; assert a `completionInfo` on `post.<cursor>` includes
+  `author` as a member; assert go-to-def on `author` jumps to
+  `author.ts`.
+
+**Non-goals:** per-keystroke incrementality (that's 2.5). On every
+program rebuild the walker scans the whole program — fine up to a few
+hundred models; 2.5 optimizes.
+
+**Exit:** plugin behaves identically to `trails-tsc` on all Phase 1b
+fixtures (transitive-extends, auto-import, polymorphic belongsTo
+skip). Verified by a parameterized test that runs the same fixtures
+through both the CLI and the plugin and compares `getScriptSnapshot`
+output byte-for-byte.
+
+---
+
+#### 2.3 — Position/range remap for IDE features 📋
+
+**Goal:** every IDE feature returns positions in the user's
+**original** coordinates, not virtualized ones. Without this,
+clicking "go to definition" on `post.title` would land in the wrong
+line; hover cards would underline the wrong range; rename would
+rewrite injected `declare` text the user never wrote.
+
+**Deliverables:**
+
+- `packages/activerecord/src/tsserver-plugin/position-remap.ts` —
+  two inverse helpers:
+  - `virtualToOriginal(fileName, virtualPos, cache)` — the common
+    case. Uses the cached `deltas` + a lazily-parsed original
+    `SourceFile` to translate.
+  - `originalToVirtual(fileName, originalPos, cache)` — needed when
+    the IDE hands us an original-coord position (e.g. cursor pos) to
+    forward into the underlying language service. Walk deltas in
+    forward order, adding each `lineCount` when the original line is
+    past `insertedAtLine`.
+- `LanguageService` proxy wraps each feature with coord remapping.
+  The **full** list of methods touched:
+  - **Definition / implementation / references / rename:**
+    `getDefinitionAtPosition`, `getDefinitionAndBoundSpan`,
+    `getTypeDefinitionAtPosition`, `getImplementationAtPosition`,
+    `getReferencesAtPosition`, `findReferences`, `getRenameInfo`,
+    `findRenameLocations` — all take `position: number` in the file,
+    return spans. Convert position original→virtual before calling;
+    convert returned spans virtual→original.
+  - **Hover / quick info / signature help:** `getQuickInfoAtPosition`,
+    `getSignatureHelpItems` — same pattern. If the resulting
+    `textSpan` falls inside an injected range, clamp to the class
+    body's opening `{` in the original (Phase 1b.2 already ships this
+    heuristic for diagnostics; reuse).
+  - **Completions:** `getCompletionsAtPosition`,
+    `getCompletionEntryDetails`, `getCompletionEntrySymbol` —
+    positions translate; the completion list itself is correct
+    without further work (it's computed against the virtualized
+    source, which is exactly what we want — `post.title` shows up in
+    the list). Verify in tests that suggestions don't include
+    internal synthesized helpers like the `loadBelongsTo` method on
+    classes that have no belongsTo (the virtualizer already avoids
+    emitting these).
+  - **Navigate / outline / folding:** `getNavigateToItems`,
+    `getNavigationTree`, `getNavigationBarItems`, `getOutliningSpans` —
+    return spans that must translate virtual→original. Also filter
+    injected declares out of navigation items: users don't want to
+    see `loadBelongsTo` in VS Code's outline when they didn't write
+    it. Use the `deltas` ranges to detect injected spans.
+  - **Formatting:** `getFormattingEditsForRange`,
+    `getFormattingEditsForDocument`, `getFormattingEditsAfterKeystroke`,
+    `getDocCommentTemplateAtPosition` — forward the range
+    original→virtual, translate returned `TextChange` spans back.
+    Drop any returned edit whose span overlaps an injected range —
+    those are edits to the `declare` lines the user never wrote and
+    shouldn't see.
+  - **Semantic highlight / encoded classifications:**
+    `getEncodedSyntacticClassifications`,
+    `getEncodedSemanticClassifications` — return packed
+    `span: number, length: number, classification` triples. Translate
+    each span virtual→original and drop any inside injected ranges.
+- New test util
+  `packages/activerecord/src/tsserver-plugin/test-utils/language-service-harness.ts`:
+  in-process harness that creates a `ts.server.LanguageService` with
+  our plugin applied, so integration tests can call
+  `service.getQuickInfoAtPosition(...)` directly. Cheaper than
+  spawning `tsserver`; the byte-compatibility test in 2.2 already
+  validates the out-of-process path.
+- Fixture: Phase 1b.4's `auto-import/post.ts`. Tests assert:
+  - Hover over `post.title` (virtual coords shift by N injected
+    lines) returns a `textSpan` whose start/length point at the
+    literal `title` identifier in the ORIGINAL file.
+  - Hover over `post.author` returns
+    `(property) Post.author: Author | null` with the span pointing at
+    `author` in the original.
+  - Rename `author` → `writer` in the original file produces edits
+    only in original-coord spans and never touches the injected
+    `declare author: Author | null;` line (it doesn't exist on disk).
+  - Go-to-def on `Author` (the injected `import type`) jumps to
+    `author.ts` — this exercises the auto-imported module resolving
+    correctly through the virtualized snapshot.
+
+**Non-goals:** diagnostics (2.4), perf (2.5).
+
+**Exit:** every IDE feature returning a span or position returns it
+in the user's original coordinates. No injected members leak into
+navigation / outline / rename.
+
+---
+
+#### 2.4 — Diagnostic remap + quick-fix interception 📋
+
+**Goal:** red squigglies appear on the user's lines, not shifted
+virtual ones; quick-fixes ("Add missing property", "Rename in file")
+produce edits against the original source.
+
+**Deliverables:**
+
+- Proxy `getSemanticDiagnostics`, `getSyntacticDiagnostics`,
+  `getSuggestionDiagnostics` — same pattern as
+  `tsc-wrapper/remap.ts#remapDiagnostics`, reusing the helper
+  verbatim. Share `originalSfCache` across a single call so a file
+  with N diagnostics reparses the original text once.
+- Proxy `getCodeFixesAtPosition`, `getCombinedCodeFix`,
+  `getApplicableRefactors`, `getEditsForRefactor` — each returns
+  `FileTextChanges[]` with `TextChange[]` that must translate
+  virtual→original. Any change whose span overlaps an injected range
+  is dropped (same rule as formatting in 2.3); if the code fix
+  would have inserted a `declare`, drop it outright — the
+  virtualizer will regenerate it on the next pass.
+- Handle the injected-block edge case — if the diagnostic genuinely
+  lands inside an injected range (walker bug, or a declare the
+  virtualizer produced but can't resolve against the user's imports),
+  surface it at the class body's opening `{` with a hint pointing at
+  `trails-tsc --print-virtualized <file>` for debugging. Same
+  convention as Phase 1b.2.
+- Filter diagnostics that reference injected-only symbols. Example:
+  if TS emits "Property 'loadBelongsTo' does not exist" because our
+  walker missed a belongsTo call, that diagnostic points at a user
+  line but the _symbol_ is one we were supposed to synthesize.
+  Don't suppress — users need to see these — but tag them with
+  `messageText: "[trails-tsc] ..."` prefix so they're traceable back
+  to the virtualizer.
+- Fixture: Phase 1b.2's error-in-class-body fixture. Assert the
+  diagnostic's `start`/`length` match the user's original line
+  character-for-character, the `file.fileName` is the original path,
+  and a QuickFix at that position (e.g., "Add missing declaration")
+  produces no edits inside injected ranges.
+
+**Non-goals:** watch-mode performance under large diagnostic bursts
+(that's 2.5).
+
+**Exit:** running `ts-server-test` against a virtualized fixture
+with a genuine type error produces diagnostics indistinguishable
+from the same file authored with hand-written declares — same line,
+same column, same message text.
+
+---
+
+#### 2.5 — Incremental walker + perf budget 📋
+
+**Goal:** plugin overhead is <50ms per file open and <10ms per
+keystroke on a repo with 500+ models. Avoid re-running the walker
+on every snapshot change.
+
+**Deliverables:**
+
+- Per-file incremental snapshot: when `getScriptSnapshot` is asked
+  for a file whose version changed, only re-virtualize THAT file —
+  do not rebuild the model registry. The walker rebuild happens on
+  program identity change only (triggered by file add/remove/config
+  change via the 2.2 hooks). Keystroke edits within a file don't
+  change the program identity.
+- Fast pre-filter: cheap string scan for `static {` + `extends ` +
+  `Base` (or any known base name) before running the AST parse.
+  Early-return the original snapshot if none match. Already used in
+  the CLI host; hoist into a shared
+  `packages/activerecord/src/type-virtualization/fast-filter.ts`
+  module and reuse.
+- Walker memoization keyed on the set of root source files. Since
+  `ts.Program.getSourceFiles()` returns the same `SourceFile` objects
+  across incremental edits within a single program, memoize the
+  walker output by a `WeakSet<ts.SourceFile>` of scanned files; skip
+  files whose symbols were already registered.
+- `IScriptSnapshot.getChangeRange` passthrough. tsserver uses this
+  to skip re-parsing when only a small span changed. Pass the change
+  range through to our virtualized snapshot by composing ranges over
+  the `deltas` array — a change of `[start, end)` in original coords
+  maps to `[start + leadingDelta, end + cumulativeDelta)` in virtual.
+  Fallback to "everything changed" if the change range straddles an
+  injected block.
+- Perf harness
+  `packages/activerecord/src/tsserver-plugin/perf.bench.ts`: generate
+  a synthetic repo with N∈{10, 100, 500, 2000} models, run
+  `getScriptSnapshot` and `getQuickInfoAtPosition` under the plugin,
+  record p50 / p95 / p99 latencies, fail if p95 exceeds the budget.
+  Integrated into CI as a non-blocking job initially; becomes
+  blocking once numbers stabilize.
+
+**Exit:** perf harness green at N=500 with p95 under budget; no
+per-keystroke walker invocations visible in the timeline trace.
+
+---
+
+#### 2.6 — Editor install docs + cross-editor smoke tests 📋
+
+**Goal:** users in each tier-1 editor can install and use the
+plugin without reading this plan.
+
+**Deliverables:**
+
+- `docs/editor-setup.md`:
+  - **VS Code** (tier-1): just a `"plugins"` entry in `tsconfig.json`;
+    VS Code uses its bundled TS automatically. Note the "Select
+    TypeScript Version → Use Workspace Version" step for repos with a
+    pinned TS.
+  - **Zed** (tier-1): same `"plugins"` entry; Zed runs tsserver from
+    the project's `node_modules/typescript`.
+  - **WebStorm / IntelliJ** (tier-1): same `"plugins"` entry; Settings
+    → Languages & Frameworks → TypeScript → "Use types from
+    node_modules/typescript".
+  - **Neovim** (tier-2): `tsserver` via nvim-lspconfig; document that
+    the plugin is picked up automatically once the user's TS sees the
+    tsconfig.
+  - **Cursor / Windsurf / other VS Code forks**: same as VS Code.
+- Smoke test script `scripts/editor-smoke/smoke.ts` — uses
+  `typescript/lib/tsserver.js` directly (no editor) to assert a
+  minimal "open file → receive quickInfo" roundtrip for each plugin
+  feature. Runs in CI on Ubuntu + macOS + Windows to catch
+  OS-specific path issues in the auto-import relative-path logic
+  (Phase 1b.4 already normalizes `\\` → `/`; re-verify via this
+  harness).
+- TypeScript compatibility matrix in the doc: tested against TS
+  5.4, 5.5, 5.6, 5.7, 5.8 (latest LTS range at time of writing).
+  Plugin logic uses only public `LanguageServiceHost` APIs; pinned
+  via `peerDependencies: { "typescript": ">=5.4 <6" }`.
+- CLAUDE.md § "editor support" paragraph pointing at the new doc and
+  noting that `trails-tsc` and the plugin are expected to produce
+  the same diagnostics — if they diverge, file a bug.
+
+**Exit:** someone unfamiliar with the project can follow
+`docs/editor-setup.md` top-to-bottom on any tier-1 editor and get
+zero-declare models working; smoke-test job is green on all three
+OSes.
+
+---
+
+**Phase 2 exit criteria (satisfied after 2.1–2.6 merge):**
+
+- Plugin produces virtualized snapshots that match `trails-tsc`
+  byte-for-byte on every Phase 1b fixture.
+- VS Code / Zed / WebStorm show correct quick-info, completions,
+  go-to-def, references, and rename on synthesized members (zero
+  declares, zero association-target imports in the user's source).
+- Diagnostics in the editor land on the user's original lines — no
+  off-by-N errors from injected declares.
+- p95 plugin overhead <50ms per file open on a 500-model synthetic
+  repo; p95 <10ms per keystroke.
+- Docs cover the tier-1 editors; compatibility matrix pins the
+  tested TS range.
+- `typescript` stays a peerDependency; no version skew with `/tsc`.
+
+### Key risks + mitigations specific to Phase 2
+
+- **tsserver plugin API stability.** The plugin surface is public but
+  evolves. Mitigation: use only `LanguageServiceHost` methods
+  declared in the public `ts.server` types; add a contract test that
+  runs the plugin against the pinned TS range on every push.
+- **Snapshot caching inside tsserver.** Getting `getScriptVersion`
+  wrong causes stale snapshots (edits invisible) OR thrashing (every
+  keystroke re-parses). The 2.1 composite-version scheme
+  (`<original>:<virtualizerVersion>`) is the mitigation; the 2.5
+  perf harness catches regressions.
+- **Plugin load order.** Users with multiple plugins (e.g. a styled-components
+  plugin + ours) need a predictable order. Document that ours should
+  come last so it sees the final snapshot after other plugins
+  transform. Test with one well-known plugin in the smoke suite.
 
 ### Phase 3 — docs + consumer cutover 📋
 
@@ -728,25 +1168,34 @@ Phase 0 ✅ (#528)
    │
    ├── Singular loaders ✅ (#541)  — post.loadBelongsTo(...) / post.loadHasOne(...)
    │
-   └── Phase 1b 📋 — needs Phase 1a + Phase R (all done, unblocked)
+   ├── Phase 1b ✅ — `trails-tsc` CLI shell
+   │      1b.1 ✅ CLI skeleton + single-file virtualization  (#549)
+   │      1b.2 ✅ Diagnostic remap                           (#551)
+   │      1b.3 ✅ Transitive-extends walker                  (#553)
+   │      1b.4 ✅ Auto-import resolution                     (#557)
+   │      1b.5 ✅ --build support                            (#561)
+   │      1b.6 ✅ In-repo migration + CI                     (#563)
+   │
+   └── Phase 2 📋 — tsserver plugin (Phase 1b done; unblocked)
          │
-         ├── 1b.1 CLI skeleton + single-file virtualization
-         ├── 1b.2 Diagnostic remap          (after 1b.1)
-         ├── 1b.3 Transitive-extends walker (after 1b.1)
-         ├── 1b.4 Auto-import resolution    (after 1b.3)
-         ├── 1b.5 --build support           (after 1b.4)
-         └── 1b.6 In-repo migration + CI    (after 1b.4)
+         ├── 2.1 Plugin skeleton + getScriptSnapshot override
+         ├── 2.2 Model-registry build + invalidation  (after 2.1)
+         ├── 2.3 Position/range remap                 (after 2.2)
+         ├── 2.4 Diagnostic remap + quick-fix         (after 2.3)
+         ├── 2.5 Incremental walker + perf budget    (after 2.2)
+         └── 2.6 Editor install docs + smoke tests   (after 2.3/2.4/2.5)
                   │
-                  └── Phase 2 📋 — tsserver plugin (needs 1b.6's dx-tests)
-                        │
-                        └── Phase 3 📋 — docs + consumer cutover
+                  └── Phase 3 📋 — docs + consumer cutover
 ```
 
-All prerequisite work is merged. Phase 1b is the next stretch — six
-sub-PRs totaling the CLI shell and associated dogfooding. 1b.1 and
-1b.2 are independent of each other after the skeleton lands, so two
-contributors can work in parallel. 1b.3 and 1b.4 serialize; 1b.5 and
-1b.6 can run in parallel after 1b.4.
+Phase 1b shipped in six merged PRs. Phase 2 picks up the same cadence
+against the **editor** shell, reusing every module the CLI built:
+`virtualize()`, `collectBaseDescendants()`, `resolveAutoImports()`,
+`remapDiagnostics()`, `resolve-target.ts`. Only new code is the
+tsserver plugin adapter, the position-remap layer, and the perf
+harness. 2.1 must land first; after 2.2 the rest fan out — 2.3 and
+2.5 are independent, 2.4 depends on 2.3's position-remap helpers,
+and 2.6 needs all three for the smoke tests.
 
 ## Key design decisions
 
