@@ -554,10 +554,6 @@ function printReport(
           }
         }
       }
-
-      for (const excluded of pkg.excludedFiles) {
-        console.log(`  ${excluded.padEnd(55)} ${"(excluded)".padEnd(40)}`);
-      }
     }
   }
 

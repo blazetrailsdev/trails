@@ -27,6 +27,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { TestManifest } from "./types.js";
+import { isTestExcluded } from "../api-compare/excluded-files.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
@@ -258,6 +259,7 @@ function main() {
     const rubyPathToFileCount = new Map<string, number>();
     const rubyDescToFileCount = new Map<string, number>();
     for (const file of pkgInfo.files) {
+      if (isTestExcluded(file.file)) continue;
       const seenPaths = new Set<string>();
       const seenDescs = new Set<string>();
       for (const tc of file.testCases) {
@@ -283,6 +285,7 @@ function main() {
     let tsUnmapped = 0;
 
     for (const file of pkgInfo.files) {
+      if (isTestExcluded(file.file)) continue;
       const conventionTs = rubyToConventionTs(file.file, pkg);
       const exists = lookup.allFiles.has(conventionTs);
 
@@ -499,7 +502,7 @@ function main() {
 
     results.push({
       package: pkg,
-      rubyFiles: pkgInfo.files.length,
+      rubyFiles: pkgInfo.files.filter((f) => !isTestExcluded(f.file)).length,
       tsMapped,
       tsUnmapped,
       totalRubyTests: totalRuby,
