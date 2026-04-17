@@ -8,41 +8,14 @@
  */
 
 import { ConfigurationError } from "./errors.js";
+import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
+import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
 
-export type TagValue = string | number | boolean | null | undefined;
+export { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
+export type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
+
 export type TagHandler = (context?: Record<string, TagValue>) => TagValue;
 export type TagDefinition = string | TagHandler | Record<string, TagValue | TagHandler>;
-
-export interface QueryLogsFormatter {
-  format(key: string, value: TagValue): string;
-  join(pairs: string[]): string;
-}
-
-/**
- * Legacy Rails format: key:value pairs.
- * Example: /* application:MyApp, controller:users * /
- */
-export const LegacyFormatter: QueryLogsFormatter = {
-  format(key: string, value: TagValue): string {
-    return `${key}:${value}`;
-  },
-  join(pairs: string[]): string {
-    return pairs.join(", ");
-  },
-};
-
-/**
- * SQLCommenter format (OpenTelemetry standard).
- * Example: /* application='MyApp',controller='users' * /
- */
-export const SQLCommenter: QueryLogsFormatter = {
-  format(key: string, value: TagValue): string {
-    return `${sqlCommenterEncode(key)}='${sqlCommenterEncode(String(value))}'`;
-  },
-  join(pairs: string[]): string {
-    return pairs.join(",");
-  },
-};
 
 /**
  * QueryLogs configuration and SQL comment generation.
@@ -62,6 +35,14 @@ export class QueryLogs {
   set tags(tags: TagDefinition[]) {
     this._tags = tags;
     this._cachedComment = undefined;
+  }
+
+  /**
+   * Alias for tags setter — Rails deprecated taggings= in favor of tags=.
+   * Mirrors: ActiveRecord::QueryLogs.taggings=
+   */
+  set taggings(tags: TagDefinition[]) {
+    this.tags = tags;
   }
 
   get prependComment(): boolean {
@@ -122,18 +103,36 @@ export class QueryLogs {
     this._cachedComment = undefined;
   }
 
-  private comment(): string | null {
-    if (this._cacheEnabled && this._cachedComment !== undefined) {
-      return this._cachedComment;
+  /**
+   * Return the source location of the query caller.
+   * In Rails this walks the call stack to find the first non-framework
+   * caller. In JS we use Error.stack parsing.
+   *
+   * Mirrors: ActiveRecord::QueryLogs.query_source_location
+   */
+  querySourceLocation(): string | null {
+    const stack = new Error().stack;
+    if (!stack) return null;
+    const lines = stack.split("\n").slice(2);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (
+        !trimmed.includes("node_modules") &&
+        !trimmed.includes("query-logs") &&
+        !trimmed.includes("activerecord/dist")
+      ) {
+        const match = trimmed.match(/at\s+(?:.*?\s+\()?(.+):(\d+):\d+\)?$/);
+        if (match) return `${match[1]}:${match[2]}`;
+      }
     }
-    const result = this.uncachedComment();
-    if (this._cacheEnabled) {
-      this._cachedComment = result;
-    }
-    return result;
+    return null;
   }
 
-  private uncachedComment(): string | null {
+  /**
+   * Build the tag content string from current tags and context.
+   * Mirrors: ActiveRecord::QueryLogs.tag_content
+   */
+  tagContent(): string | null {
     const pairs: string[] = [];
     for (const tag of this._tags) {
       if (typeof tag === "string") {
@@ -156,17 +155,29 @@ export class QueryLogs {
       }
     }
     if (pairs.length === 0) return null;
-    const content = this._formatter.join(pairs);
+    return this._formatter.join(pairs);
+  }
+
+  /**
+   * Build the full SQL comment from tags.
+   * Mirrors: ActiveRecord::QueryLogs.comment
+   */
+  comment(): string | null {
+    if (this._cacheEnabled && this._cachedComment !== undefined) {
+      return this._cachedComment;
+    }
+    const result = this.uncachedComment();
+    if (this._cacheEnabled) {
+      this._cachedComment = result;
+    }
+    return result;
+  }
+
+  private uncachedComment(): string | null {
+    const content = this.tagContent();
+    if (!content) return null;
     return `/*${escapeComment(content)}*/`;
   }
-}
-
-/**
- * Encode a value for SQLCommenter format.
- * Uses encodeURIComponent plus additional escaping for single quotes.
- */
-function sqlCommenterEncode(value: string): string {
-  return encodeURIComponent(value).replace(/'/g, "%27");
 }
 
 /**
