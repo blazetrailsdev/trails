@@ -141,6 +141,8 @@ export {
 export { QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
 export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";
 export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
+export * as RuntimeRegistry from "./runtime-registry.js";
+export { Stats as RuntimeStats } from "./runtime-registry.js";
 export { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 export type {
