@@ -563,7 +563,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("defaults");
       const textCol = cols.find((c) => c.name === "text_col");
       expect(textCol).toBeDefined();
-      expect(textCol!.default).toMatch(/some text/);
+      // Domain-typed defaults come back from PG as a double-cast expression
+      // (`('some text'::text)::schema.type`). Rails' extract_value_from_default
+      // strips simple casts but leaves compound domain casts in default_function.
+      // Either slot is acceptable as long as the literal is preserved.
+      const slot = textCol!.default ?? textCol!.defaultFunction ?? "";
+      expect(String(slot)).toMatch(/some text/);
     });
 
     it("default containing quote and colons", async () => {

@@ -1,10 +1,8 @@
 import mysql from "mysql2/promise";
 import type { DatabaseAdapter } from "../adapter.js";
-import { DatabaseStatementsMixin } from "../connection-adapters/database-statements-mixin.js";
+import { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
 import { Column } from "../connection-adapters/column.js";
 import { SqlTypeMetadata } from "../connection-adapters/sql-type-metadata.js";
-
-const AdapterBase = DatabaseStatementsMixin(class {});
 
 /**
  * MySQL adapter — connects ActiveRecord to a real MySQL/MariaDB database.
@@ -14,10 +12,24 @@ const AdapterBase = DatabaseStatementsMixin(class {});
  * Accepts either a connection URI (`mysql://...`) or a `mysql2` pool config
  * object. Uses a connection pool internally for concurrent access.
  */
-export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
-  readonly adapterName = "Mysql2";
+export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
+  override get adapterName(): string {
+    return "Mysql2";
+  }
 
-  private pool: mysql.Pool;
+  override get active(): boolean {
+    return this._driverPool != null;
+  }
+
+  // Mirrors Rails' Mysql2Adapter#connected? — null raw connection means
+  // disconnected. (Rails also checks `@raw_connection.closed?`; our
+  // driver pool exposes no such predicate, so we rely on close() nulling
+  // the pool.)
+  override isConnected(): boolean {
+    return this._driverPool != null;
+  }
+
+  private _driverPool: mysql.Pool | null;
   private _conn: mysql.PoolConnection | null = null;
   private _inTransaction = false;
   // Cached capability flag — information_schema.statistics.expression
@@ -29,9 +41,9 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
   constructor(config: string | mysql.PoolOptions) {
     super();
     if (typeof config === "string") {
-      this.pool = mysql.createPool({ uri: config });
+      this._driverPool = mysql.createPool({ uri: config });
     } else {
-      this.pool = mysql.createPool(config);
+      this._driverPool = mysql.createPool(config);
     }
   }
 
@@ -41,7 +53,8 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
    */
   private async getConn(): Promise<mysql.PoolConnection> {
     if (this._conn) return this._conn;
-    return this.pool.getConnection();
+    if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
+    return this._driverPool.getConnection();
   }
 
   /**
@@ -91,6 +104,7 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
    * Execute a SELECT query and return rows.
    */
   async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+    await this.materializeTransactions();
     const conn = await this.getConn();
     try {
       const [rows] = await conn.query(this.mysqlQuote(sql), this.mysqlBinds(binds));
@@ -104,9 +118,11 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
    * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
    */
   async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
+    await this.materializeTransactions();
     const conn = await this.getConn();
     try {
       const [result] = await conn.query(this.mysqlQuote(sql), this.mysqlBinds(binds));
+      this.dirtyCurrentTransaction();
       const info = result as mysql.ResultSetHeader;
 
       // For INSERT, return the last inserted ID (or affected rows for multi-row)
@@ -128,7 +144,8 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
    * Begin a transaction. Acquires a dedicated connection from the pool.
    */
   async beginTransaction(): Promise<void> {
-    this._conn = await this.pool.getConnection();
+    if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
+    this._conn = await this._driverPool.getConnection();
     await this._conn.query("BEGIN");
     this._inTransaction = true;
   }
@@ -578,7 +595,8 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
   private _advisoryLockConn: mysql.PoolConnection | null = null;
 
   async getAdvisoryLock(lockId: number | string): Promise<boolean> {
-    const conn = await this.pool.getConnection();
+    if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
+    const conn = await this._driverPool.getConnection();
     try {
       const [rows] = await conn.query("SELECT GET_LOCK(?, 0) AS locked", [String(lockId)]);
       const locked = (rows as Record<string, unknown>[])[0]?.locked === 1;
@@ -618,7 +636,10 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
       this._conn.release();
       this._conn = null;
     }
-    await this.pool.end();
+    if (this._driverPool) {
+      await this._driverPool.end();
+      this._driverPool = null;
+    }
   }
 
   /**
@@ -637,6 +658,7 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
    * Escape hatch for advanced usage.
    */
   get raw(): mysql.Pool {
-    return this.pool;
+    if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
+    return this._driverPool;
   }
 }

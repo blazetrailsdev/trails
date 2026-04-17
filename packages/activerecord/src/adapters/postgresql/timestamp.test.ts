@@ -37,7 +37,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("postgresql_timestamps");
       const col = cols.find((c) => c.name === "updated_at");
       expect(col).toBeDefined();
-      expect(col!.default).toContain("now");
+      // Rails' Column#default is nil for expression defaults; the SQL
+      // expression itself lives in #default_function (postgresql/column.rb).
+      expect(col!.defaultFunction).toContain("now");
     });
 
     it("timestamp type cast", async () => {
@@ -94,7 +96,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("datetime default", async () => {
       const cols = await adapter.columns("postgresql_timestamps");
       const col = cols.find((c) => c.name === "updated_at");
-      expect(col!.default).toBeTruthy();
+      expect(col!.defaultFunction).toBeTruthy();
     });
 
     it("datetime type cast", async () => {

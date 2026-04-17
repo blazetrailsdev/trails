@@ -31,7 +31,6 @@ import {
 } from "@blazetrails/activemodel";
 import { getFs } from "@blazetrails/activesupport";
 import { quoteString, quoteTableName, quoteColumnName } from "./sqlite3/quoting.js";
-import { DatabaseStatementsMixin } from "./database-statements-mixin.js";
 import {
   CheckConstraintDefinition,
   type AddForeignKeyOptions,
@@ -44,10 +43,7 @@ import { SqlTypeMetadata } from "./sql-type-metadata.js";
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter
  */
-export class SQLite3Adapter
-  extends DatabaseStatementsMixin(AbstractAdapter)
-  implements DatabaseAdapter
-{
+export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override get adapterName(): string {
     return "SQLite";
   }
@@ -457,6 +453,10 @@ export class SQLite3Adapter
       this._databaseVersion = new Version(row?.v ?? "0.0.0");
     }
     return this._databaseVersion;
+  }
+
+  override get databaseVersion(): Version {
+    return this.getDatabaseVersion();
   }
 
   override checkVersion(): void {

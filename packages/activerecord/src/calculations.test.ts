@@ -6502,7 +6502,7 @@ describe("CalculationsTest", () => {
   });
 
   // Rails guide: load_async schedules background load
-  it("loadAsync returns the relation for chaining", () => {
+  it("loadAsync returns the relation for chaining", async () => {
     const adapter = createTestAdapter();
     class User extends Base {
       static {
@@ -6513,6 +6513,9 @@ describe("CalculationsTest", () => {
     }
     const rel = User.where({ id: 1 }).loadAsync();
     expect(rel).toBeDefined();
+    // Drain the background load so it can't outlive this test and fire
+    // against a dropped table in a later test.
+    await rel.toArray();
   });
 
   // Rails guide: clone — shallow clone preserving id

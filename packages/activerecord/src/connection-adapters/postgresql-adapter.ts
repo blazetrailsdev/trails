@@ -19,9 +19,7 @@ import {
   initializeTypeMap as staticInitializeTypeMap,
 } from "./postgresql/type-map-init.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { DatabaseStatementsMixin } from "./database-statements-mixin.js";
-
-const AdapterBase = DatabaseStatementsMixin(class {});
+import { AbstractAdapter } from "./abstract-adapter.js";
 
 /**
  * PostgreSQL adapter — connects ActiveRecord to a real PostgreSQL database.
@@ -31,11 +29,23 @@ const AdapterBase = DatabaseStatementsMixin(class {});
  * Accepts either a connection string (`postgres://...`) or a `pg.PoolConfig`
  * object. Uses a connection pool internally for concurrent access.
  */
-export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
-  readonly adapterName = "PostgreSQL";
+export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapter {
+  override get adapterName(): string {
+    return "PostgreSQL";
+  }
+
+  override get active(): boolean {
+    return this._driverPool != null;
+  }
+
+  // Mirrors Rails' PostgreSQLAdapter#connected? — checks that the raw
+  // connection (pool in our case) exists and hasn't been finished.
+  override isConnected(): boolean {
+    return this._driverPool != null;
+  }
 
   private static _spCounter = 0;
-  private pool: pg.Pool;
+  private _driverPool: pg.Pool | null;
   private _client: pg.PoolClient | null = null;
   private _inTransaction = false;
   private _databaseVersion: number | null = null;
@@ -44,9 +54,9 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
   constructor(config: string | pg.PoolConfig) {
     super();
     if (typeof config === "string") {
-      this.pool = new pg.Pool({ connectionString: config });
+      this._driverPool = new pg.Pool({ connectionString: config });
     } else {
-      this.pool = new pg.Pool(config);
+      this._driverPool = new pg.Pool(config);
     }
   }
 
@@ -162,6 +172,13 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
    * populates them.
    */
   override async execQuery(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
+    // Note: we do NOT call materializeTransactions() here. If a lazy tx
+    // is pending but un-materialized, a SELECT against an ad-hoc pool
+    // client sees pre-tx state — which is correct read-before-write
+    // semantics. If the tx HAS begun, `_client` is set and getClient()
+    // returns it. Forcing materialization here races with the tx
+    // client's lifecycle and can cause double-release on pool clients.
+
     // Release the query client BEFORE any loadAdditionalTypes call —
     // that path re-enters execute() and acquires its own pooled client,
     // and holding both would consume 2 connections per query during
@@ -308,7 +325,8 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
    */
   private async getClient(): Promise<pg.PoolClient> {
     if (this._client) return this._client;
-    return this.pool.connect();
+    if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
+    return this._driverPool.connect();
   }
 
   /**
@@ -324,6 +342,7 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
    * Execute a SELECT query and return rows.
    */
   async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+    await this.materializeTransactions();
     const client = await this.getClient();
     try {
       const result = await client.query(this.rewriteBinds(sql, binds), binds);
@@ -341,8 +360,10 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
    * `rowCount` is returned.
    */
   async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
+    await this.materializeTransactions();
     const client = await this.getClient();
     try {
+      this.dirtyCurrentTransaction();
       const pgSql = this.rewriteBinds(sql, binds);
       const upper = sql.trimStart().toUpperCase();
 
@@ -395,7 +416,8 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
    * Begin a transaction. Acquires a dedicated client from the pool.
    */
   async beginTransaction(): Promise<void> {
-    this._client = await this.pool.connect();
+    if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
+    this._client = await this._driverPool.connect();
     await this._client.query("BEGIN");
     this._inTransaction = true;
   }
@@ -512,7 +534,10 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
       this._client.release();
       this._client = null;
     }
-    await this.pool.end();
+    if (this._driverPool) {
+      await this._driverPool.end();
+      this._driverPool = null;
+    }
   }
 
   /**
@@ -527,7 +552,8 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
    * Escape hatch for advanced usage.
    */
   get raw(): pg.Pool {
-    return this.pool;
+    if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
+    return this._driverPool;
   }
 
   // ---------------------------------------------------------------------------
@@ -688,7 +714,8 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
   private _advisoryLockClient: pg.PoolClient | null = null;
 
   async getAdvisoryLock(lockId: number | string): Promise<boolean> {
-    const client = await this.pool.connect();
+    if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
+    const client = await this._driverPool.connect();
     try {
       const isNumeric = typeof lockId === "number";
       const sql = `SELECT pg_try_advisory_lock(${isNumeric ? "$1" : "hashtext($1)"}) AS locked`;
@@ -1141,12 +1168,19 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
 
     return rows.map((r) => {
       const sqlType = r.type as string;
-      const defaultExpr = (r.default as string | null) ?? null;
-      const isSerial = typeof defaultExpr === "string" && defaultExpr.startsWith("nextval(");
+      const rawDefault = (r.default as string | null) ?? null;
+      // Mirrors Rails' PG `extract_value_from_default` / `extract_default_function`
+      // split — SQL-expression defaults (nextval, CURRENT_TIMESTAMP,
+      // gen_random_uuid(), etc.) become `defaultFunction`; only literals
+      // become `default`. Without this split, schema reflection would
+      // apply expressions as literal bind values and PG would reject
+      // `nextval(...)` as a bound integer.
+      const { literal, fn } = splitPgDefault(rawDefault);
+      const isSerial = typeof rawDefault === "string" && rawDefault.startsWith("nextval(");
 
       return new Column(
         r.name as string,
-        defaultExpr,
+        literal,
         {
           sqlType,
           oid: r.oid as number,
@@ -1154,6 +1188,7 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
         },
         !(r.notnull as boolean),
         {
+          defaultFunction: fn,
           primaryKey: r.is_primary as boolean,
           serial: isSerial,
           array: sqlType.endsWith("[]"),
@@ -1728,6 +1763,34 @@ export class MoneyDecoder {
     if (isNaN(num)) return NaN;
     return negative ? -num : num;
   }
+}
+
+/**
+ * Parse a raw `pg_attrdef` default expression into a literal value or a
+ * SQL function expression. Mirrors Rails' PG `extract_value_from_default`
+ * / `extract_default_function` split — so schema reflection can carry
+ * expression defaults as `defaultFunction` rather than applying them as
+ * literal bind values.
+ */
+function splitPgDefault(raw: string | null): { literal: unknown; fn: string | null } {
+  if (raw == null) return { literal: null, fn: null };
+  // 'value'::type — quoted literal with an optional cast.
+  const quoted = /^'((?:[^']|'')*)'::[\w"\s.]+$/.exec(raw);
+  if (quoted) return { literal: quoted[1].replace(/''/g, "'"), fn: null };
+  // (N)::type — numeric wrapped in parens with a cast (PG emits this for
+  // things like `DEFAULT 150.55::numeric::money`).
+  const parenNum = /^\((-?\d+(?:\.\d+)?)\)::[\w"\s.]+$/.exec(raw);
+  if (parenNum) return { literal: parenNum[1], fn: null };
+  // N::type — bare numeric with a cast.
+  const castNum = /^(-?\d+(?:\.\d+)?)::[\w"\s.]+$/.exec(raw);
+  if (castNum) return { literal: castNum[1], fn: null };
+  // Bare numeric / boolean / NULL literal.
+  if (/^-?\d+(?:\.\d+)?$/.test(raw)) return { literal: raw, fn: null };
+  if (raw === "true" || raw === "false") return { literal: raw === "true", fn: null };
+  if (raw === "NULL") return { literal: null, fn: null };
+  // Everything else (nextval, CURRENT_TIMESTAMP, gen_random_uuid(), etc.)
+  // is a SQL expression.
+  return { literal: null, fn: raw };
 }
 
 /**
