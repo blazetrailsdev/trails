@@ -17,7 +17,7 @@ import {
   Type,
 } from "@blazetrails/activemodel";
 
-import { Date as ArDate } from "../../type/date.js";
+import { Date as OidDate } from "./oid/date.js";
 import { DecimalWithoutScale } from "../../type/decimal-without-scale.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { Json as ArJson } from "../../type/json.js";
@@ -128,7 +128,7 @@ export function initializeTypeMap(m: HashLookupTypeMap): void {
   m.registerType("bool", new BooleanType());
   registerClassWithLimit(m, "bit", Bit);
   registerClassWithLimit(m, "varbit", BitVarying);
-  m.registerType("date", new ArDate());
+  m.registerType("date", new OidDate());
   m.registerType("money", new Money());
   m.registerType("bytea", new Bytea());
   m.registerType("point", new Point());

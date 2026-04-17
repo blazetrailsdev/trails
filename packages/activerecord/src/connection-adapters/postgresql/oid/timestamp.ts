@@ -2,19 +2,17 @@
  * PostgreSQL timestamp type — timestamp without time zone.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Timestamp.
- * Rails: `class Timestamp < DateTime; def type; real_type_unless_aliased(:timestamp); end`.
- * `real_type_unless_aliased` returns :datetime when DateTime is aliased
- * to :datetime; otherwise returns :timestamp. We don't have the alias
- * registry yet, so report :timestamp directly (matches Rails' non-aliased
- * default).
+ * Rails: `class Timestamp < DateTime`. `type` calls
+ * real_type_unless_aliased(:timestamp). Extends our OID::DateTime so
+ * infinity / BC handling is inherited.
  */
 
-import { DateTimeType } from "@blazetrails/activemodel";
+import { DateTime } from "./date-time.js";
 
-export class Timestamp extends DateTimeType {
+export class Timestamp extends DateTime {
   override readonly name: string = "timestamp";
 
   override type(): string {
-    return "timestamp";
+    return this.realTypeUnlessAliased("timestamp");
   }
 }

@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activemodel";
 import { describe, expect, it } from "vitest";
 
-import { Date as ArDate } from "../../type/date.js";
+import { Date as OidDate } from "./oid/date.js";
 import { Json as ArJson } from "../../type/json.js";
 import { Text as ArText } from "../../type/text.js";
 
@@ -78,7 +78,7 @@ describe("initialize_type_map seeds the PG type_map with known types", () => {
     ["float8", FloatType],
     ["text", ArText],
     ["bool", BooleanType],
-    ["date", ArDate],
+    ["date", OidDate],
     ["money", Money],
     ["bytea", Bytea],
     ["point", Point],
