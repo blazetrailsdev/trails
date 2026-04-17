@@ -385,7 +385,11 @@ export class Base extends Model {
    * any pending encryption decorations (matching Rails' deferred
    * PendingDecorator pattern).
    */
-  static attribute(name: string, typeName: string, options?: { default?: unknown }): void {
+  static attribute(
+    name: string,
+    typeName: string,
+    options?: { default?: unknown; virtual?: boolean; userProvidedDefault?: boolean },
+  ): void {
     super.attribute(name, typeName, options);
     // If we just defined an "id" accessor on a subclass prototype, remove it
     // so Base.prototype.id (which handles CPK) is used instead.
@@ -423,6 +427,36 @@ export class Base extends Model {
   static set adapter(adapter: DatabaseAdapter) {
     this._adapter = adapter;
     if (_onAdapterSet) _onAdapterSet(this);
+    // Kick off schema reflection so the adapter's OID-resolved types
+    // populate _attributeDefinitions. Fire-and-forget; await
+    // Model.loadSchema() to synchronize when ordering matters. Errors are
+    // swallowed here (e.g. adapter closed before reflection completes) —
+    // the next Model.loadSchema() await will surface any real problem.
+    const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
+
+    state._schemaLoadPromise = (ModelSchema.loadSchemaFromAdapter as any).call(this).catch(() => {
+      state._schemaLoadPromise = undefined;
+    });
+  }
+
+  /**
+   * Await schema reflection — ensures `_attributeDefinitions` is populated
+   * from the adapter's schema cache before proceeding. Idempotent; cheap
+   * to call repeatedly.
+   *
+   * Mirrors: ActiveRecord::ModelSchema#load_schema (explicit variant).
+   */
+  static async loadSchema(this: typeof Base): Promise<void> {
+    const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
+    if (!state._schemaLoadPromise) {
+      state._schemaLoadPromise = (ModelSchema.loadSchemaFromAdapter as any).call(this);
+    }
+    try {
+      await state._schemaLoadPromise;
+    } catch (e) {
+      state._schemaLoadPromise = undefined;
+      throw e;
+    }
   }
 
   /**

@@ -12,7 +12,11 @@ import { buildDefaultAttributes, type AttributeDefinition } from "./attributes.j
  * declaration API. Model already implements this via Model.attribute().
  */
 export interface AttributeRegistrationClassMethods {
-  attribute(name: string, typeName: string, options?: { default?: unknown }): void;
+  attribute(
+    name: string,
+    typeName: string,
+    options?: { default?: unknown; virtual?: boolean; userProvidedDefault?: boolean },
+  ): void;
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: (name: string, type: Type) => Type): void;
   attributeTypes(): Record<string, Type>;

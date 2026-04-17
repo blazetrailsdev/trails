@@ -1,10 +1,17 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
-import { Attribute, AttributeSetBuilder, YAMLEncoder } from "@blazetrails/activemodel";
+import {
+  Attribute,
+  AttributeSetBuilder,
+  YAMLEncoder,
+  typeRegistry,
+} from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
 import { quote, quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { detectAdapterName } from "./adapter-name.js";
+import { applyPendingEncryptions } from "./encryption.js";
+import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 
 /**
  * Schema metadata for ActiveRecord models — table name, primary key,
@@ -461,6 +468,141 @@ function getColumnsHash(host: SchemaHost): Record<string, any> {
 }
 
 /**
+ * Register attribute definitions from the adapter's schema cache.
+ *
+ * Mirrors: ActiveRecord::ModelSchema#load_schema! — walks `columns_hash`
+ * and calls `define_attribute(..., user_provided_default: false)` for each
+ * column so the cast type comes from the adapter (e.g. PG OID map) rather
+ * than the generic ActiveModel type registry.
+ *
+ * Populates the schema cache if needed (async). User-declared attributes
+ * (`userProvided: true`) are NEVER overwritten — matching Rails where
+ * `attribute :foo, :bar` always wins over schema-reflected types.
+ */
+export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
+  if (this._abstractClass) return;
+  const startingAdapter = this.adapter;
+  if (!startingAdapter) return;
+  const cache = startingAdapter.schemaCache;
+  if (!cache) return;
+  const table = (this as unknown as typeof Base).tableName;
+  const pool = startingAdapter.pool ?? startingAdapter;
+
+  if (typeof cache.dataSourceExists === "function") {
+    const exists = await cache.dataSourceExists(pool, table);
+    // Only bail on explicit false. `undefined` means the connection
+    // doesn't implement the probe — fall through and let columnsHash
+    // succeed or throw a real error.
+    if (exists === false) return;
+  }
+
+  let hash: Record<string, unknown> | undefined;
+  if (typeof cache.columnsHash === "function") {
+    hash = await cache.columnsHash(pool, table);
+  } else if (typeof cache.getCachedColumnsHash === "function") {
+    hash = cache.getCachedColumnsHash(table);
+  }
+  if (!hash) return;
+
+  // Guard against adapter swaps during the async work above: if a different
+  // adapter was installed, discard this load rather than writing stale types.
+  if (this.adapter !== startingAdapter) return;
+
+  // Copy-on-write: match the ownership check used elsewhere (attributes.ts,
+  // encryption.ts) so we mutate this class's own map, not the inherited one.
+  if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
+    this._attributeDefinitions = new Map(this._attributeDefinitions);
+  }
+
+  const ignored = new Set(this._ignoredColumns ?? []);
+  for (const [name, column] of Object.entries(hash)) {
+    // Honor Base.ignoredColumns — Rails' load_schema! excludes these too.
+    if (ignored.has(name)) {
+      const proto = (this as unknown as { prototype: object }).prototype;
+      if (Object.prototype.hasOwnProperty.call(proto, name)) {
+        delete (proto as Record<string, unknown>)[name];
+      }
+      this._attributeDefinitions.delete(name);
+      continue;
+    }
+    const existing = this._attributeDefinitions.get(name);
+    // Treat absent userProvided as true — externally-constructed defs
+    // (pre-PR shape) are user-authored by definition; schema reflection
+    // must never overwrite them.
+    if (existing && (existing.userProvided ?? true)) continue;
+
+    const castType =
+      typeof startingAdapter.lookupCastTypeFromColumn === "function"
+        ? startingAdapter.lookupCastTypeFromColumn(column)
+        : null;
+    let type = castType ?? typeRegistry.lookup("value");
+
+    // Preserve an existing EncryptedAttributeType wrapper: re-wrap the
+    // fresh adapter-resolved cast type rather than discarding encryption.
+    if (existing?.type instanceof EncryptedAttributeType) {
+      const scheme = (existing.type as EncryptedAttributeType).scheme;
+      type = new EncryptedAttributeType({ scheme, castType: type });
+    }
+
+    const defaultValue = (column as { default?: unknown }).default ?? null;
+
+    this._attributeDefinitions.set(name, {
+      name,
+      type,
+      defaultValue,
+      userProvided: false,
+      source: "schema",
+    });
+
+    // Define the prototype accessor so `record.foo` routes through
+    // readAttribute/writeAttribute. Mirrors what ActiveModel.attribute()
+    // does for user-declared attrs (attributes.ts ~L56).
+    //
+    // Skip "id": Base.prototype.id is an accessor with composite-PK
+    // logic (base.ts). Defining an own "id" on a subclass prototype
+    // would shadow it — Base.attribute has the same skip (base.ts:392).
+    if (name === "id") {
+      const proto = (this as unknown as { prototype: object }).prototype;
+      if (Object.prototype.hasOwnProperty.call(proto, "id")) {
+        delete (proto as Record<string, unknown>).id;
+      }
+      continue;
+    }
+    const proto = (this as unknown as { prototype: object }).prototype;
+    if (!Object.prototype.hasOwnProperty.call(proto, name)) {
+      Object.defineProperty(proto, name, {
+        get(this: { readAttribute(n: string): unknown }) {
+          return this.readAttribute(name);
+        },
+        set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
+          this.writeAttribute(name, value);
+        },
+        configurable: true,
+      });
+    }
+  }
+
+  // Invalidate every cache that derives from _attributeDefinitions —
+  // columns()/columnsHash()/columnForAttribute() would otherwise serve
+  // pre-reflection data forever.
+  const caches = this as unknown as {
+    _attributesBuilder?: unknown;
+    _cachedDefaultAttributes?: unknown;
+    _columnsHash?: unknown;
+    _columns?: unknown;
+  };
+  caches._attributesBuilder = undefined;
+  caches._cachedDefaultAttributes = null;
+  caches._columnsHash = undefined;
+  caches._columns = undefined;
+
+  // Re-run pending encryption decorations so `encrypts :foo` declared before
+  // schema load still wraps the adapter-resolved cast type. Mirrors the
+  // applyPendingEncryptions call in Base.attribute (base.ts).
+  applyPendingEncryptions(this);
+}
+
+/**
  * Module methods wired onto Base as static methods via `extend()` in base.ts.
  *
  * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention: a Concern
@@ -500,4 +642,5 @@ export const ClassMethods = {
   symbolColumnToString,
   resetColumnInformation,
   _returningColumnsForInsert,
+  loadSchemaFromAdapter,
 };

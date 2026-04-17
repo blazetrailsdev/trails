@@ -59,6 +59,12 @@ export class EncryptableRecord {
           name,
           type: encryptedType,
           defaultValue: existingDef?.defaultValue ?? null,
+          // When there's no pre-existing def, this encryption placeholder is
+          // waiting for schema reflection to supply the real cast type.
+          // Mark it schema-sourced so loadSchemaFromAdapter can wrap the
+          // adapter-resolved type (applyPendingEncryptions re-runs after).
+          userProvided: existingDef?.userProvided ?? false,
+          source: existingDef?.source ?? "schema",
         });
       }
 

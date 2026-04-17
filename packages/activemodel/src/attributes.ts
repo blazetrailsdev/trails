@@ -8,6 +8,22 @@ export interface AttributeDefinition {
   type: Type;
   defaultValue: unknown;
   virtual?: boolean;
+  /**
+   * True when the attribute was declared via `this.attribute(...)` (user code).
+   * False when registered from schema reflection (`load_schema`).
+   *
+   * Mirrors: Rails' `user_provided_default:` keyword on `define_attribute`.
+   * The distinction controls how defaults are materialized (user default vs.
+   * database default) and whether schema reflection is allowed to overwrite
+   * the definition — user-provided defs always win.
+   *
+   * Optional for backwards compatibility with downstream consumers that
+   * construct `AttributeDefinition` directly. When absent, treated as
+   * `true` (user-authored) — matching pre-load_schema behavior.
+   */
+  userProvided?: boolean;
+  /** Provenance tag — matches `userProvided` but kept explicit for clarity. */
+  source?: "user" | "schema";
 }
 
 /**
@@ -41,14 +57,32 @@ export function attribute(
   },
   name: string,
   typeName: string,
-  options?: { default?: unknown; virtual?: boolean },
+  options?: {
+    default?: unknown;
+    virtual?: boolean;
+    /**
+     * Mirrors Rails' `user_provided_default:` keyword. Defaults to true —
+     * any call to `attribute(...)` is treated as user-authored. Internal
+     * schema-reflection paths pass `false` so user-declared attributes win
+     * on re-registration.
+     */
+    userProvidedDefault?: boolean;
+  },
 ): void {
   const type = typeRegistry.lookup(typeName);
   const defaultValue = options?.default ?? null;
+  const userProvided = options?.userProvidedDefault !== false;
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     this._attributeDefinitions = new Map(this._attributeDefinitions);
   }
-  this._attributeDefinitions.set(name, { name, type, defaultValue, virtual: options?.virtual });
+  this._attributeDefinitions.set(name, {
+    name,
+    type,
+    defaultValue,
+    virtual: options?.virtual,
+    userProvided,
+    source: userProvided ? "user" : "schema",
+  });
 
   // Mirrors: Rails reset_default_attributes — clear cached AttributeSet
   this._cachedDefaultAttributes = null;
@@ -78,14 +112,20 @@ export function attribute(
 export function buildDefaultAttributes(defs: Map<string, AttributeDefinition>): AttributeSet {
   const attrMap = new Map<string, Attribute>();
   for (const [name, def] of defs) {
-    const base = Attribute.withCastValue(name, null, def.type);
+    const userProvided = def.userProvided ?? true;
     if (def.defaultValue != null) {
-      // withUserDefault creates a UserProvidedDefault that preserves function
-      // defaults and re-evaluates them on each deepDup — matching Rails'
-      // PendingDefault behavior where procs are called per-instance.
-      attrMap.set(name, base.withUserDefault(def.defaultValue));
+      if (userProvided) {
+        // Rails: user_provided_default: true → wraps the default so it is
+        // cast through the user-type (and procs re-evaluate per instance).
+        const base = Attribute.withCastValue(name, null, def.type);
+        attrMap.set(name, base.withUserDefault(def.defaultValue));
+      } else {
+        // Rails: user_provided_default: false → column default comes from
+        // the database; use fromDatabase so deserialize is applied.
+        attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue, def.type));
+      }
     } else {
-      attrMap.set(name, base);
+      attrMap.set(name, Attribute.withCastValue(name, null, def.type));
     }
   }
   return new AttributeSet(attrMap);
