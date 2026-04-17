@@ -1,6 +1,4 @@
-import * as path from "node:path";
-import * as fs from "node:fs";
-import { pathToFileURL } from "node:url";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
 export interface DatabaseConfig {
@@ -87,19 +85,23 @@ function formatUnknown(value: unknown): string {
  * downstream code doesn't need to defensively guard every key lookup.
  */
 export async function loadDatabaseConfigModule(
-  cwd: string = process.cwd(),
+  cwd?: string,
 ): Promise<{ path: string; module: DatabaseConfigModule } | null> {
+  const fs = await getFsAsync();
+  const path = await getPathAsync();
+  const resolvedCwd = cwd ?? fs.cwd();
+
   // Prefer .ts (source of truth) over .js (compiled)
   const candidates = [
-    path.join(cwd, "config", "database.ts"),
-    path.join(cwd, "config", "database.js"),
-    path.join(cwd, "src", "config", "database.ts"),
-    path.join(cwd, "src", "config", "database.js"),
+    path.join(resolvedCwd, "config", "database.ts"),
+    path.join(resolvedCwd, "config", "database.js"),
+    path.join(resolvedCwd, "src", "config", "database.ts"),
+    path.join(resolvedCwd, "src", "config", "database.js"),
   ];
 
   let configPath: string | undefined;
   for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
+    if (await fs.exists(candidate)) {
       configPath = candidate;
       break;
     }
@@ -108,16 +110,13 @@ export async function loadDatabaseConfigModule(
 
   let mod: { default?: unknown } & Record<string, unknown>;
   try {
+    const pathToFileURL = path.pathToFileURL;
+    if (!pathToFileURL) {
+      throw new Error("Config loading requires a path adapter with pathToFileURL support.");
+    }
     mod = (await import(pathToFileURL(configPath).href)) as typeof mod;
   } catch (error: unknown) {
-    const rel = path.relative(cwd, configPath) || configPath;
-    // Extract a useful message even when user code throws a non-Error
-    // (e.g. `throw "boom"` or `throw null`) — `(error as Error).message`
-    // would produce `undefined` or crash. Route non-Errors through
-    // formatUnknown so a thrown object with a poisoned toString()
-    // can't bring down the fallback path too.
-    // Strip trailing punctuation from the inner message so the final
-    // string doesn't end up with a double period like "...message..".
+    const rel = path.relative?.(resolvedCwd, configPath) || configPath;
     const rawMessage = error instanceof Error ? error.message : formatUnknown(error);
     const message = rawMessage.replace(/[.!?]+$/, "");
     const enhanced = new Error(
@@ -127,28 +126,24 @@ export async function loadDatabaseConfigModule(
     (enhanced as { cause?: unknown }).cause = error;
     throw enhanced;
   }
-  // `export default "oops"` loads fine but leaves us with a non-object
-  // default that will crash downstream `in` / Object.keys lookups with
-  // a confusing TypeError. Check up front and throw a clear message
-  // with the offending value's repr.
-  const candidate = mod.default ?? mod;
-  if (candidate === null || (typeof candidate !== "object" && typeof candidate !== "function")) {
-    const rel = path.relative(cwd, configPath) || configPath;
+  const candidateVal = mod.default ?? mod;
+  if (
+    candidateVal === null ||
+    (typeof candidateVal !== "object" && typeof candidateVal !== "function")
+  ) {
+    const rel = path.relative?.(resolvedCwd, configPath) || configPath;
     throw new Error(
-      `Invalid database config in "${rel}": expected an object, got ${formatUnknown(candidate)}.`,
+      `Invalid database config in "${rel}": expected an object, got ${formatUnknown(candidateVal)}.`,
     );
   }
-  return { path: configPath, module: candidate as DatabaseConfigModule };
+  return { path: configPath, module: candidateVal as DatabaseConfigModule };
 }
 
 /**
  * Load the database configuration for the given environment.
  * Looks for config/database.ts or src/config/database.ts in the cwd.
  */
-export async function loadDatabaseConfig(
-  env?: string,
-  cwd: string = process.cwd(),
-): Promise<DatabaseConfig> {
+export async function loadDatabaseConfig(env?: string, cwd?: string): Promise<DatabaseConfig> {
   const resolvedEnv = env ?? resolveEnv();
   const loaded = await loadDatabaseConfigModule(cwd);
   if (!loaded) {
@@ -276,7 +271,7 @@ export interface NamedDatabaseConfig {
  */
 export async function loadAllDatabaseConfigs(
   env?: string,
-  cwd: string = process.cwd(),
+  cwd?: string,
 ): Promise<NamedDatabaseConfig[]> {
   const resolvedEnv = env ?? resolveEnv();
   const loaded = await loadDatabaseConfigModule(cwd);
@@ -352,7 +347,7 @@ export type SchemaFormat = "ts" | "js" | "sql";
  */
 export async function resolveSchemaFormat(
   opts: { format?: string } = {},
-  cwd: string = process.cwd(),
+  cwd?: string,
 ): Promise<SchemaFormat> {
   const normalize = (raw: unknown, source: string): SchemaFormat => {
     // `schemaFormat` in config/database.ts is user-authored with only
@@ -397,20 +392,24 @@ export async function resolveSchemaFormat(
   // both call sites through one function keeps error handling (the
   // "failed to load config" rethrow) in one place and surfaces real
   // import failures instead of silently falling through to inference.
-  const loaded = await loadDatabaseConfigModule(cwd);
+  const fs = await getFsAsync();
+  const path = await getPathAsync();
+  const resolvedCwd = cwd ?? fs.cwd();
+
+  const loaded = await loadDatabaseConfigModule(resolvedCwd);
   if (loaded && "schemaFormat" in loaded.module) {
     // Presence-based: an explicitly-set-but-garbage value (including an
     // empty string) is a misconfig that should throw, not silently fall
     // through to inference. Use a relative path in the error source so
     // it stays short and consistent with other config-loading errors.
-    const loadedRel = path.relative(cwd, loaded.path) || loaded.path;
+    const loadedRel = path.relative?.(resolvedCwd, loaded.path) || loaded.path;
     return normalize(loaded.module.schemaFormat ?? "", `schemaFormat in ${loadedRel}`);
   }
 
-  const dbDir = path.join(cwd, "db");
-  if (fs.existsSync(path.join(dbDir, "structure.sql"))) return "sql";
-  if (fs.existsSync(path.join(dbDir, "schema.js"))) return "js";
-  if (fs.existsSync(path.join(dbDir, "schema.ts"))) return "ts";
+  const dbDir = path.join(resolvedCwd, "db");
+  if (await fs.exists(path.join(dbDir, "structure.sql"))) return "sql";
+  if (await fs.exists(path.join(dbDir, "schema.js"))) return "js";
+  if (await fs.exists(path.join(dbDir, "schema.ts"))) return "ts";
   return "ts";
 }
 

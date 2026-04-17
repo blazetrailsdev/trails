@@ -60,8 +60,21 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     rmSync(): void {
       // no-op
     },
-    statSync(): { isDirectory(): boolean; isFile(): boolean } {
-      return { isDirectory: () => false, isFile: () => true };
+    statSync(path: string) {
+      const entry = vfs.read(path);
+      const content = entry?.content ?? "";
+      return {
+        isDirectory: () => false,
+        isFile: () => entry !== undefined,
+        size: content.length,
+        mtime: new Date(0),
+      };
+    },
+    cwd(): string {
+      return "/";
+    },
+    exists(path: string): Promise<boolean> {
+      return Promise.resolve(vfs.exists(path));
     },
   };
 }

@@ -1,7 +1,5 @@
 import { Command } from "commander";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { pathToFileURL } from "node:url";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import {
   loadDatabaseConfig,
   loadAllDatabaseConfigs,
@@ -62,8 +60,9 @@ function normalizeRawConfig(raw: RawConfig): RawConfig {
   return normalized as RawConfig;
 }
 
-function migrationsDir(): string {
-  return path.join(process.cwd(), "db", "migrations");
+async function migrationsDir(): Promise<string> {
+  const [fs, path] = await Promise.all([getFsAsync(), getPathAsync()]);
+  return path.join(fs.cwd(), "db", "migrations");
 }
 
 /**
@@ -74,17 +73,17 @@ function migrationsDir(): string {
  * default to `db/migrations_<name>`. Returns an array because
  * Rails supports multiple directories per config.
  */
-function migrationsDirsForConfig(name: string, config: RawConfig): string[] {
+async function migrationsDirsForConfig(name: string, config: RawConfig): Promise<string[]> {
+  const [fs, path] = await Promise.all([getFsAsync(), getPathAsync()]);
+  const cwd = fs.cwd();
   const raw = (config as { migrationsPaths?: string | string[] }).migrationsPaths;
-  if (typeof raw === "string" && raw.length > 0) return [path.resolve(process.cwd(), raw)];
+  if (typeof raw === "string" && raw.length > 0) return [path.resolve(cwd, raw)];
   if (Array.isArray(raw)) {
-    const dirs = [
-      ...new Set(raw.filter((p) => p.length > 0).map((p) => path.resolve(process.cwd(), p))),
-    ];
+    const dirs = [...new Set(raw.filter((p) => p.length > 0).map((p) => path.resolve(cwd, p)))];
     if (dirs.length > 0) return dirs;
   }
-  if (name === "primary") return [path.join(process.cwd(), "db", "migrations")];
-  return [path.join(process.cwd(), "db", `migrations_${name}`)];
+  if (name === "primary") return [path.join(cwd, "db", "migrations")];
+  return [path.join(cwd, "db", `migrations_${name}`)];
 }
 
 /**
@@ -396,7 +395,7 @@ async function runMigrate(
   targetVersion?: string,
   options: RunOptions = {},
 ): Promise<void> {
-  const migrations = await discoverMigrations(migrationsDir());
+  const migrations = await discoverMigrations(await migrationsDir());
   if (migrations.length === 0) {
     console.log("No migrations found.");
     return;
@@ -459,7 +458,8 @@ async function runTestLoadSchema(options: {
   const config = toDbConfig(raw, "test");
   await runProtectedEnvCheck(config, "test");
   const filename = DatabaseTasks.schemaDumpPath(config);
-  if (!fs.existsSync(filename)) {
+  const fs = await getFsAsync();
+  if (!(await fs.exists(filename))) {
     console.error(`No schema file found at ${filename}. Run \`trails db schema:dump\` first.`);
     process.exitCode = 1;
     return;
@@ -482,11 +482,16 @@ async function runTestLoadSchema(options: {
 
 let _seedImportCounter = 0;
 async function runSeed(prefix = ""): Promise<void> {
-  const seedCandidates = [
-    path.join(process.cwd(), "db", "seeds.ts"),
-    path.join(process.cwd(), "db", "seeds.js"),
-  ];
-  const seedFile = seedCandidates.find((f) => fs.existsSync(f));
+  const [fs, path] = await Promise.all([getFsAsync(), getPathAsync()]);
+  const cwd = fs.cwd();
+  const seedCandidates = [path.join(cwd, "db", "seeds.ts"), path.join(cwd, "db", "seeds.js")];
+  let seedFile: string | undefined;
+  for (const f of seedCandidates) {
+    if (await fs.exists(f)) {
+      seedFile = f;
+      break;
+    }
+  }
   if (!seedFile) {
     console.log(`${prefix}No seeds file found at db/seeds.ts or db/seeds.js`);
     return;
@@ -498,6 +503,10 @@ async function runSeed(prefix = ""): Promise<void> {
   // without the query string, the second iteration sees a cached module
   // and skips execution entirely. Mirrors Rails' `load` semantics
   // (which always re-evaluates the file).
+  const pathToFileURL = path.pathToFileURL;
+  if (!pathToFileURL) {
+    throw new Error("Seed loading requires a path adapter with pathToFileURL support.");
+  }
   const url = pathToFileURL(seedFile);
   url.searchParams.set("_t", `${++_seedImportCounter}`);
   await import(url.href);
@@ -583,7 +592,7 @@ async function withMigratorForDb(
     afterOutput?: (migrator: Migrator) => void | Promise<void>;
   },
 ): Promise<void> {
-  const mDirs = migrationsDirsForConfig(ctx.name, ctx.raw);
+  const mDirs = await migrationsDirsForConfig(ctx.name, ctx.raw);
   const migrations = await discoverMigrationsFromDirs(mDirs);
   if (migrations.length === 0) {
     console.log(`${ctx.prefix}No migrations found.`);
@@ -729,7 +738,7 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
-        const mDirs = migrationsDirsForConfig(name, raw);
+        const mDirs = await migrationsDirsForConfig(name, raw);
         const migrations = await discoverMigrationsFromDirs(mDirs);
         if (migrations.length === 0) return;
         const migrator = createMigrator(adapter, migrations, raw);
@@ -767,7 +776,7 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix, config }) => {
-        const mDirs = migrationsDirsForConfig(name, raw);
+        const mDirs = await migrationsDirsForConfig(name, raw);
         const migrations = await discoverMigrationsFromDirs(mDirs);
         const migrator = createMigrator(adapter, migrations, raw);
         await migrator.run("up", opts.version);
@@ -783,7 +792,7 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix, config }) => {
-        const mDirs = migrationsDirsForConfig(name, raw);
+        const mDirs = await migrationsDirsForConfig(name, raw);
         const migrations = await discoverMigrationsFromDirs(mDirs);
         const migrator = createMigrator(adapter, migrations, raw);
         await migrator.run("down", opts.version);
@@ -917,7 +926,7 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, raw, name, prefix }) => {
-        const mDirs = migrationsDirsForConfig(name, raw);
+        const mDirs = await migrationsDirsForConfig(name, raw);
         const migrations = await discoverMigrationsFromDirs(mDirs);
         if (migrations.length === 0) {
           console.log(`${prefix}No migrations found.`);
@@ -1033,6 +1042,7 @@ export function dbCommand(): Command {
     .option("--format <format>", "Override schema format: ts, js, or sql")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
+      const fs = await getFsAsync();
       await forEachDatabase(opts, async ({ adapter, config, prefix }) => {
         // schema:load is destructive — Rails gates on
         // check_protected_environments.
@@ -1042,7 +1052,7 @@ export function dbCommand(): Command {
         try {
           DatabaseTasks.schemaFormat = await resolveSchemaFormat(opts);
           const filename = DatabaseTasks.schemaDumpPath(config);
-          if (!fs.existsSync(filename)) {
+          if (!(await fs.exists(filename))) {
             console.error(`${prefix}No schema file found at ${filename}`);
             process.exitCode = 1;
             return;
@@ -1106,6 +1116,7 @@ export function dbCommand(): Command {
     )
     .action(async () => {
       // Rails: `configurations.configs_for(env_name: env).each { |c| clear_schema_cache(cache_dump_filename(c)) }`.
+      const fs = await getFsAsync();
       const envName = resolveEnv();
       const named = await loadAllDatabaseConfigs(envName);
       const configs = named.map(
@@ -1117,7 +1128,7 @@ export function dbCommand(): Command {
           const filename = DatabaseTasks.cacheDumpFilename(config);
           // clearSchemaCache is a no-op on ENOENT; don't log "Cleared"
           // unless we actually removed something.
-          if (!fs.existsSync(filename)) continue;
+          if (!(await fs.exists(filename))) continue;
           DatabaseTasks.clearSchemaCache(filename);
           console.log(`Cleared schema cache at ${filename}`);
         }
