@@ -27,6 +27,7 @@ export class NotImplementedError extends Error {
 export class ToSql implements NodeVisitor<SQLString> {
   protected collector!: SQLString;
   private _inUpdateSet = false;
+  protected _extractBinds = false;
 
   compile(node: Node): string {
     this.collector = new SQLString();
@@ -50,7 +51,12 @@ export class ToSql implements NodeVisitor<SQLString> {
     const sqlCollector = new SQLString();
     const bindCollector = new Bind();
     this.collector = new Composite(sqlCollector, bindCollector) as unknown as SQLString;
-    this.visit(node);
+    this._extractBinds = true;
+    try {
+      this.visit(node);
+    } finally {
+      this._extractBinds = false;
+    }
     const binds = bindCollector.value.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
     return [sqlCollector.value, binds];
   }
@@ -925,8 +931,10 @@ export class ToSql implements NodeVisitor<SQLString> {
   // -- BindParam --
 
   protected visitBindParam(node: Nodes.BindParam): SQLString {
-    if (node.value !== undefined) {
-      this.collector.addBind(node.value);
+    if (this._extractBinds) {
+      this.collector.addBind(node.value !== undefined ? node.value : node);
+    } else if (node.value !== undefined) {
+      this.collector.append(this.quote(node.value));
     } else {
       this.collector.addBind(node);
     }
@@ -1232,8 +1240,13 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitCasted(node: Nodes.Casted): SQLString {
-    this.collector.append(this.quote(node.value));
+  protected visitCasted(node: Nodes.Casted): SQLString {
+    const value = node.valueForDatabase();
+    if (this._extractBinds) {
+      this.collector.addBind(value);
+    } else {
+      this.collector.append(this.quote(value));
+    }
     return this.collector;
   }
 

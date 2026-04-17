@@ -866,9 +866,8 @@ describe("the to_sql visitor", () => {
   it("works with BindParams", () => {
     const v = new Visitors.ToSql();
     expect(v.compile(new Nodes.BindParam())).toBe("?");
-    // BindParam with a value still emits a placeholder — the value
-    // is extracted via compileWithBinds, not inlined.
-    expect(v.compile(new Nodes.BindParam(1))).toBe("?");
+    // compile() inlines values (like Rails' to_sql under unprepared_statement)
+    expect(v.compile(new Nodes.BindParam(1))).toBe("1");
   });
 
   it("compileWithBinds extracts bind values", () => {

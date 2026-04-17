@@ -26,9 +26,13 @@ export class Casted extends Node {
 
   valueForDatabase(): unknown {
     const attr = this.attribute as unknown as {
+      caster?: { typeCastForDatabase(v: unknown): unknown };
       isAbleToTypeCast?: () => boolean;
       typeCastForDatabase?: (v: unknown) => unknown;
     };
+    if (attr?.caster?.typeCastForDatabase) {
+      return attr.caster.typeCastForDatabase(this.value);
+    }
     if (attr?.isAbleToTypeCast?.() && attr.typeCastForDatabase) {
       return attr.typeCastForDatabase(this.value);
     }

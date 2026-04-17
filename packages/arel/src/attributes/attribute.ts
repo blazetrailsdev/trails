@@ -16,7 +16,7 @@ import { NotIn } from "../nodes/binary.js";
 import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
-import { Quoted } from "../nodes/casted.js";
+import { Quoted, Casted } from "../nodes/casted.js";
 import { Grouping } from "../nodes/grouping.js";
 import { And } from "../nodes/and.js";
 import { Or } from "../nodes/or.js";
@@ -105,37 +105,36 @@ export class Attribute extends Node {
       : false;
   }
 
-  private castValue(value: unknown): unknown {
-    if (value instanceof SqlLiteral) return value;
+  private buildCasted(value: unknown): Node {
     if (value instanceof Node) return value;
-    if (this.caster) return this.caster.typeCastForDatabase(value);
-    return value;
+    if (value === null || value === undefined) return new Quoted(null);
+    return new Casted(value, this);
   }
 
   // -- Predicates --
 
   eq(other: unknown): Equality {
-    return new Equality(this, buildQuoted(this.castValue(other)));
+    return new Equality(this, this.buildCasted(other));
   }
 
   notEq(other: unknown): NotEqual {
-    return new NotEqual(this, buildQuoted(this.castValue(other)));
+    return new NotEqual(this, this.buildCasted(other));
   }
 
   gt(other: unknown): GreaterThan {
-    return new GreaterThan(this, buildQuoted(other));
+    return new GreaterThan(this, this.buildCasted(other));
   }
 
   gteq(other: unknown): GreaterThanOrEqual {
-    return new GreaterThanOrEqual(this, buildQuoted(other));
+    return new GreaterThanOrEqual(this, this.buildCasted(other));
   }
 
   lt(other: unknown): LessThan {
-    return new LessThan(this, buildQuoted(other));
+    return new LessThan(this, this.buildCasted(other));
   }
 
   lteq(other: unknown): LessThanOrEqual {
-    return new LessThanOrEqual(this, buildQuoted(other));
+    return new LessThanOrEqual(this, this.buildCasted(other));
   }
 
   matches(
@@ -144,7 +143,7 @@ export class Attribute extends Node {
     caseSensitive = false,
   ): Matches {
     const right =
-      typeof pattern === "string" ? buildQuoted(pattern) : (pattern as { ast: Node }).ast;
+      typeof pattern === "string" ? this.buildCasted(pattern) : (pattern as { ast: Node }).ast;
     return new Matches(this, right, escape, caseSensitive);
   }
 
@@ -154,16 +153,16 @@ export class Attribute extends Node {
     caseSensitive = false,
   ): DoesNotMatch {
     const right =
-      typeof pattern === "string" ? buildQuoted(pattern) : (pattern as { ast: Node }).ast;
+      typeof pattern === "string" ? this.buildCasted(pattern) : (pattern as { ast: Node }).ast;
     return new DoesNotMatch(this, right, escape, caseSensitive);
   }
 
   matchesRegexp(pattern: string, caseSensitive = true): RegexpNode {
-    return new RegexpNode(this, buildQuoted(pattern), caseSensitive);
+    return new RegexpNode(this, this.buildCasted(pattern), caseSensitive);
   }
 
   doesNotMatchRegexp(pattern: string, caseSensitive = true): NotRegexp {
-    return new NotRegexp(this, buildQuoted(pattern), caseSensitive);
+    return new NotRegexp(this, this.buildCasted(pattern), caseSensitive);
   }
 
   in(values: unknown[] | { ast: Node }): In {

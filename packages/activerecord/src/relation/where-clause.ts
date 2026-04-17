@@ -183,6 +183,7 @@ function equalities(predicates: Nodes.Node[]): Nodes.Node[] {
 
 function extractNodeValue(node: unknown): unknown {
   if (node instanceof Nodes.Quoted) return node.value;
+  if (node instanceof Nodes.Casted) return node.valueForDatabase();
   if (Array.isArray(node)) return node.map((v) => extractNodeValue(v));
   return node;
 }

@@ -1,6 +1,7 @@
 import pg from "pg";
 import { type Type, ValueType } from "@blazetrails/activemodel";
 import { singularize, underscore } from "@blazetrails/activesupport";
+import { Visitors } from "@blazetrails/arel";
 import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
@@ -668,6 +669,10 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
 
   indexAlgorithms(): Record<string, string> {
     return { concurrently: "CONCURRENTLY" };
+  }
+
+  get arelVisitor(): Visitors.ToSql {
+    return new Visitors.PostgreSQLWithBinds();
   }
 
   supportsDdlTransactions(): boolean {
