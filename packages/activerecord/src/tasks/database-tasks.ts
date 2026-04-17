@@ -7,7 +7,7 @@
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { ProtectedEnvironmentError } from "../migration.js";
-import { getFs, getPath, getCrypto, getOs } from "@blazetrails/activesupport";
+import { getFs, getPath, getCryptoAsync, getOs } from "@blazetrails/activesupport";
 import { coercePort } from "./task-utils.js";
 
 function sqliteDatabaseFromUrl(url: string): string | undefined {
@@ -742,7 +742,7 @@ export class DatabaseTasks {
     try {
       const { InternalMetadata } = await import("../internal-metadata.js");
       const metadata = new InternalMetadata(adapter);
-      const sha1 = this._schemaSha1(filename);
+      const sha1 = await this._schemaSha1(filename);
       await metadata.createTableAndSetFlags(config.envName, sha1);
     } catch (error) {
       // Best effort — a failed stamp just means schemaUpToDate
@@ -889,13 +889,14 @@ export class DatabaseTasks {
     const storedSha1 = await metadata.get("schema_sha1");
     if (!storedSha1) return false;
 
-    const fileSha1 = this._schemaSha1(filename);
+    const fileSha1 = await this._schemaSha1(filename);
     return storedSha1 === fileSha1;
   }
 
-  private static _schemaSha1(filename: string): string {
+  private static async _schemaSha1(filename: string): Promise<string> {
     const contents = getFs().readFileSync(filename, "utf-8");
-    const hash = getCrypto().createHash("sha1");
+    const crypto = await getCryptoAsync();
+    const hash = crypto.createHash("sha1");
     hash.update(contents);
     return hash.digest("hex");
   }

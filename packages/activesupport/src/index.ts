@@ -8,7 +8,12 @@ export {
 } from "./fs-adapter.js";
 export type { FsAdapter, FsStatResult, FsDirent, PathAdapter } from "./fs-adapter.js";
 
-export { registerCryptoAdapter, getCrypto, cryptoAdapterConfig } from "./crypto-adapter.js";
+export {
+  registerCryptoAdapter,
+  getCrypto,
+  getCryptoAsync,
+  cryptoAdapterConfig,
+} from "./crypto-adapter.js";
 export type {
   CryptoAdapter,
   HashAdapter,

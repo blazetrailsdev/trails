@@ -170,6 +170,40 @@ export function getCrypto(): CryptoAdapter {
   return resolve();
 }
 
+let nodeAsyncPromise: Promise<boolean> | null = null;
+
+function tryAutoRegisterNodeAsync(): Promise<boolean> {
+  if (registry.has("node")) return Promise.resolve(true);
+  if (!nodeAsyncPromise) {
+    nodeAsyncPromise = (async () => {
+      try {
+        if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
+          return false;
+        }
+        const nodeCrypto = (await import("node:crypto")) as unknown as typeof import("node:crypto");
+        registry.set("node", wrapNodeCrypto(nodeCrypto));
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+  }
+  return nodeAsyncPromise;
+}
+
+export async function getCryptoAsync(): Promise<CryptoAdapter> {
+  try {
+    return resolve();
+  } catch (error) {
+    if (currentAdapterName) throw error;
+    if (await tryAutoRegisterNodeAsync()) {
+      resolved = registry.get("node")!;
+      return resolved;
+    }
+    throw error;
+  }
+}
+
 export const cryptoAdapterConfig = {
   get adapter(): string | null {
     return currentAdapterName;

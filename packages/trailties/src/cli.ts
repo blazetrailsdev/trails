@@ -14,6 +14,7 @@ export function createProgram(): Command {
   program
     .name("trails")
     .description("TypeScript framework inspired by Ruby on Rails")
+    .enablePositionalOptions()
     .version(VERSION, "-v, --version");
 
   program.addCommand(newCommand());
