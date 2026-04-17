@@ -27,7 +27,13 @@ export interface PgTypeRow {
   typdelim: string;
   typtype: string;
   typbasetype: number | string;
-  typarray: number | string;
+  /**
+   * typarray is a column on pg_type but Rails' load_types_queries
+   * doesn't SELECT it and TypeMapInitializer doesn't read it. Keep it
+   * optional so PgTypeRow matches the adapter-fetched row shape
+   * (otherwise callers get a silent `undefined` at runtime).
+   */
+  typarray?: number | string;
   typinput?: string;
   rngsubtype?: number | string;
 }

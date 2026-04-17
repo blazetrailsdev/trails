@@ -2,7 +2,10 @@
  * PostgreSQL array type — casts between PG array literals and JS arrays.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Array
+ * (Rails: `class Array < Type::Value; include Helpers::Mutable`).
  */
+
+import { Type } from "@blazetrails/activemodel";
 
 function stableStringify(value: unknown): string {
   try {
@@ -21,20 +24,31 @@ export interface ArraySubtype {
   map?(value: unknown, block?: (value: unknown) => unknown): unknown;
 }
 
-export class Array {
+export class Array extends Type<unknown> {
+  readonly name: string = "array";
   readonly subtype: ArraySubtype;
   readonly delimiter: string;
 
   constructor(subtype: ArraySubtype, delimiter: string = ",") {
+    super();
     this.subtype = subtype;
     this.delimiter = delimiter;
   }
 
-  get type(): string {
+  /**
+   * Rails: `delegate :type, ... to: :subtype`. Array's type() returns
+   * the subtype's type — e.g. an int4 array reports :integer.
+   */
+  override type(): string {
     const subtypeType = this.subtype.type;
     if (typeof subtypeType === "function") return subtypeType.call(this.subtype);
     if (typeof subtypeType === "string") return subtypeType;
     return "array";
+  }
+
+  /** Rails' Helpers::Mutable. */
+  override isMutable(): boolean {
+    return true;
   }
 
   cast(value: unknown): unknown {
@@ -44,13 +58,13 @@ export class Array {
     return this.typeCastArray(value, "cast");
   }
 
-  serialize(value: unknown): unknown {
+  override serialize(value: unknown): unknown {
     if (value == null) return null;
     if (!globalThis.Array.isArray(value)) return value;
     return new Data(this, this.typeCastArray(value, "serialize") as unknown[]);
   }
 
-  deserialize(value: unknown): unknown {
+  override deserialize(value: unknown): unknown {
     if (value == null) return null;
     if (value instanceof Data) return this.typeCastArray(value.values, "deserialize") as unknown[];
     if (typeof value === "string") return this.parseArray(value, "deserialize");
@@ -156,7 +170,7 @@ export class Array {
     }
   }
 
-  typeCastForSchema(value: unknown): string {
+  override typeCastForSchema(value: unknown): string {
     if (!globalThis.Array.isArray(value)) return this.formatValueForSchema(value);
     return `[${value.map((item) => this.formatValueForSchema(item)).join(", ")}]`;
   }
@@ -166,12 +180,12 @@ export class Array {
     return this.subtype.map ? this.subtype.map(value, block) : block ? block(value) : value;
   }
 
-  isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
+  override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const oldValue = this.deserialize(rawOldValue);
     return stableStringify(oldValue) !== stableStringify(newValue);
   }
 
-  isForceEquality(value: unknown): boolean {
+  override isForceEquality(value: unknown): boolean {
     return globalThis.Array.isArray(value);
   }
 

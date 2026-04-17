@@ -1,5 +1,8 @@
 import pg from "pg";
+import { type Type, ValueType } from "@blazetrails/activemodel";
 import { singularize, underscore } from "@blazetrails/activesupport";
+import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
+import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { splitQuotedIdentifier, Utils } from "./postgresql/utils.js";
 import { Column } from "./postgresql/column.js";
 import { ExplainPrettyPrinter } from "./postgresql/explain-pretty-printer.js";
@@ -8,6 +11,11 @@ import {
   quoteColumnName as pgQuoteColumnName,
   quoteString as pgQuoteString,
 } from "./postgresql/quoting.js";
+import { TypeMapInitializer, type PgTypeRow } from "./postgresql/oid/type-map-initializer.js";
+import {
+  initializeInstanceTypeMap,
+  initializeTypeMap as staticInitializeTypeMap,
+} from "./postgresql/type-map-init.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { DatabaseStatementsMixin } from "./database-statements-mixin.js";
 
@@ -29,6 +37,7 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
   private _client: pg.PoolClient | null = null;
   private _inTransaction = false;
   private _databaseVersion: number | null = null;
+  private _typeMap: HashLookupTypeMap | null = null;
 
   constructor(config: string | pg.PoolConfig) {
     super();
@@ -37,6 +46,131 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
     } else {
       this.pool = new pg.Pool(config);
     }
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter.initialize_type_map (class method).
+   * Seeds a HashLookupTypeMap with the ~30 known PG types by typname.
+   * Exposed as a static so tests and external callers can build their
+   * own type_map without instantiating the adapter.
+   */
+  static initializeTypeMap(m: HashLookupTypeMap): void {
+    staticInitializeTypeMap(m);
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#type_map. Lazily builds and caches the
+   * adapter's HashLookupTypeMap on first access. The map is populated
+   * by the instance-level initializer which layers `time`, `timestamp`,
+   * `timestamptz` (timezone-aware) on top of the class-level base.
+   */
+  get typeMap(): HashLookupTypeMap {
+    if (this._typeMap == null) {
+      this._typeMap = new HashLookupTypeMap();
+      // Rails threads @default_timezone into the instance initializer so
+      // time / timestamp registrations use the connection's timezone
+      // preference. We read the repo-wide default here so that
+      // setDefaultTimezone() is honored consistently with the quoting
+      // path.
+      initializeInstanceTypeMap(this._typeMap, getDefaultTimezone());
+    }
+    return this._typeMap;
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#get_oid_type(oid, fmod, column_name, sql_type).
+   * On miss, queries pg_type via `loadAdditionalTypes([oid])` and retries
+   * before falling back to a ValueType. Rails' get_oid_type is sync
+   * because Ruby's PG gem blocks; in Node we return a Promise so the
+   * underlying pg_type query can be awaited.
+   */
+  async getOidType(
+    oid: number,
+    fmod: number,
+    columnName: string,
+    sqlType: string = "",
+  ): Promise<Type> {
+    if (!this.typeMap.has(oid)) {
+      await this.loadAdditionalTypes([oid]);
+    }
+    return this.typeMap.fetch(oid, fmod, sqlType, () => {
+      console.warn(
+        `unknown OID ${oid}: failed to recognize type of '${columnName}'. It will be treated as String.`,
+      );
+      const fallback = new ValueType();
+      this.typeMap.registerType(oid, fallback);
+      return fallback;
+    });
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#load_additional_types(oids = nil). Queries
+   * pg_type for user-defined types (enums, domains, arrays, ranges,
+   * composites) and registers them via OID::TypeMapInitializer.run.
+   *
+   * Rails' signature uses oids=nil to mean "reload everything we know";
+   * pass an array of OIDs to target a specific miss.
+   */
+  async loadAdditionalTypes(oids?: number[]): Promise<void> {
+    const initializer = new TypeMapInitializer(this.typeMap);
+    for await (const query of this.loadTypesQueries(initializer, oids)) {
+      const rows = (await this.execute(query)) as unknown as PgTypeRow[];
+      initializer.run(rows);
+    }
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#load_types_queries(initializer, oids). For a
+   * specific OID list yields one query; for a full reload yields three
+   * (by typname, typtype, array-of-known) — **in order**, because
+   * `queryConditionsForArrayTypes` depends on numeric OIDs registered
+   * by the first query (`aliasType(row.oid, row.typname)`). Ruby does
+   * this with `yield` inside a method; we use an async generator so
+   * each query is built fresh after the prior one has run.
+   */
+  private async *loadTypesQueries(
+    initializer: TypeMapInitializer,
+    oids?: number[],
+  ): AsyncGenerator<string, void, void> {
+    const baseQuery = [
+      "SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput,",
+      "       r.rngsubtype, t.typtype, t.typbasetype",
+      "FROM pg_type as t",
+      "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
+    ].join("\n");
+
+    if (oids && oids.length > 0) {
+      // Validate every OID is a finite integer before interpolating
+      // into SQL. loadAdditionalTypes is public, so untrusted input
+      // could reach us.
+      const safe = oids.map((oid) => {
+        const n = Number(oid);
+        if (!Number.isInteger(n) || n < 0) {
+          throw new Error(`loadAdditionalTypes: invalid OID ${String(oid)}`);
+        }
+        return n;
+      });
+      yield `${baseQuery}\nWHERE t.oid IN (${safe.join(", ")})`;
+      return;
+    }
+    yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeNames()}`;
+    yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeTypes()}`;
+    // Generated AFTER the prior two yields have been awaited and run,
+    // so the initializer has already registered numeric OIDs via
+    // aliasType. If we computed this up front, the array query would
+    // typically be empty and fall through to `WHERE 1=0`.
+    yield `${baseQuery}\n${initializer.queryConditionsForArrayTypes()}`;
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#reload_type_map. Clears the memoized
+   * type_map and re-runs the instance initializer, matching Rails'
+   * reload_type_map behavior when new user-defined types have been
+   * created (CREATE TYPE, CREATE DOMAIN, etc).
+   */
+  async reloadTypeMap(): Promise<void> {
+    this._typeMap = null;
+    await this.loadAdditionalTypes();
   }
 
   /**

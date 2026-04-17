@@ -13,7 +13,7 @@ describe("PostgreSQL::OID::Array", () => {
   it("delegates type to the subtype", () => {
     const type = new OidArray(stringSubtype);
 
-    expect(type.type).toBe("string");
+    expect(type.type()).toBe("string");
   });
 
   it("casts scalar values through the subtype", () => {

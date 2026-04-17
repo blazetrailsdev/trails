@@ -1,7 +1,7 @@
 import { Type } from "./value.js";
 
 export class BigIntegerType extends Type<bigint> {
-  readonly name = "big_integer";
+  readonly name: string = "big_integer";
 
   cast(value: unknown): bigint | null {
     if (value === null || value === undefined) return null;
