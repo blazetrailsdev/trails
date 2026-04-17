@@ -2,8 +2,8 @@ import type { VirtualFS } from "./virtual-fs.js";
 import type { SqlJsAdapter } from "./sql-js-adapter.js";
 import { VfsModelGenerator, VfsMigrationGenerator, VfsAppGenerator } from "./vfs-generator.js";
 import type { MigrationProxy, MigrationLike } from "@blazetrails/activerecord/migration";
-import { Migrator } from "@blazetrails/activerecord/migration";
-import { camelize } from "@blazetrails/activesupport";
+import { Migration, Migrator } from "@blazetrails/activerecord/migration";
+import { camelize, Logger } from "@blazetrails/activesupport";
 
 export interface CliResult {
   success: boolean;
@@ -124,7 +124,13 @@ export function createTrailCLI(deps: TrailCliDeps) {
       return;
     }
     const migrator = new Migrator(adapter, proxies);
-    await fn(migrator);
+    const prevLogger = Migration.logger;
+    Migration.logger = new Logger({ write: (s) => log(s.replace(/\n$/, "")) });
+    try {
+      await fn(migrator);
+    } finally {
+      Migration.logger = prevLogger;
+    }
   }
 
   const commands: Record<string, (args: string[], opts: Record<string, string>) => Promise<void>> =
@@ -174,7 +180,6 @@ export function createTrailCLI(deps: TrailCliDeps) {
         const version = opts.version && opts.version !== "true" ? opts.version : null;
         await withMigrator(async (migrator) => {
           await migrator.migrate(version);
-          for (const line of migrator.output) log(line);
           const pending = await migrator.pendingMigrations();
           log(
             pending.length === 0
@@ -189,7 +194,6 @@ export function createTrailCLI(deps: TrailCliDeps) {
         const step = Number.isNaN(parsed) ? 1 : parsed;
         await withMigrator(async (migrator) => {
           await migrator.rollback(step);
-          for (const line of migrator.output) log(line);
         });
       },
 

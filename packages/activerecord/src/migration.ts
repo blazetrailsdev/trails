@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/activesupport";
+import { getFs, getPath, Logger } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   TableDefinition,
@@ -81,6 +81,7 @@ export abstract class Migration {
   private _name?: string;
   private _version?: string;
   verbose = true;
+  static logger: Logger = new Logger();
   private static _disableDdlTransaction = false;
 
   /** Determine adapter type from the adapter class name. */
@@ -763,7 +764,7 @@ export abstract class Migration {
 
   write(text = ""): void {
     if (this.verbose) {
-      process.stdout.write(text + "\n");
+      Migration.logger.info(text);
     }
   }
 
@@ -1343,7 +1344,6 @@ export class Migrator {
   private _environment: string;
   private _strategy: ExecutionStrategy;
   verbose = true;
-  private _output: string[] = [];
 
   constructor(
     adapter: DatabaseAdapter,
@@ -1379,8 +1379,9 @@ export class Migrator {
     return [...this._migrations];
   }
 
+  /** @deprecated Use Migration.logger instead. */
   get output(): readonly string[] {
-    return [...this._output];
+    return [];
   }
 
   /**
@@ -1714,7 +1715,7 @@ export class Migrator {
   private async _runMigration(proxy: MigrationProxy, direction: "up" | "down"): Promise<void> {
     if (this.verbose) {
       const action = direction === "up" ? "migrating" : "reverting";
-      this._output.push(`== ${proxy.version} ${proxy.name}: ${action} ==`);
+      Migration.logger.info(`== ${proxy.version} ${proxy.name}: ${action} ==`);
     }
 
     const migration = proxy.migration();
@@ -1736,7 +1737,7 @@ export class Migrator {
 
     if (this.verbose) {
       const action = direction === "up" ? "migrated" : "reverted";
-      this._output.push(`== ${proxy.version} ${proxy.name}: ${action} ==`);
+      Migration.logger.info(`== ${proxy.version} ${proxy.name}: ${action} ==`);
     }
   }
 

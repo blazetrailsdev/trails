@@ -184,14 +184,23 @@ export class SchemaMigration {
       }),
     );
 
+    const toInsert: string[] = [];
     if (!migrated.has(normalized)) {
-      await this.createVersion(normalized);
+      toInsert.push(normalized);
     }
-
     for (const { normalized: n, num } of candidates) {
       if (num < versionNum && !migrated.has(n)) {
-        await this.createVersion(n);
+        toInsert.push(n);
       }
+    }
+
+    if (toInsert.length > 0) {
+      const col = this.arelTable.get(this.primaryKey);
+      const im = new InsertManager(this.arelTable);
+      const rows = toInsert.map((v) => [new Nodes.Quoted(v)]);
+      im.ast.columns = [col];
+      im.values(im.createValuesList(rows));
+      await this._adapter.executeMutation(im.toSql());
     }
   }
 }

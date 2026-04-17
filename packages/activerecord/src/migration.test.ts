@@ -3,13 +3,14 @@
  * Mirrors: activerecord/test/cases/migration_test.rb
  *          activerecord/test/cases/invertible_migration_test.rb
  */
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { Base, MigrationContext, MigrationRunner, Migrator } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration } from "./migration.js";
+import { Logger } from "@blazetrails/activesupport";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { Schema } from "./schema.js";
 
@@ -2381,5 +2382,110 @@ describe("SchemaMigration.assumeMigratedUptoVersion", () => {
     ).rejects.toThrow(/Duplicate migration/);
     const versions = await sm.allVersions();
     expect(versions).toHaveLength(0); // no partial writes
+  });
+});
+
+describe("Migration.logger integration", () => {
+  const originalLogger = Migration.logger;
+  afterEach(() => {
+    Migration.logger = originalLogger;
+  });
+
+  it("write routes output through Migration.logger", () => {
+    const lines: string[] = [];
+    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+
+    class TestMig extends Migration {
+      static version = "001";
+      async change() {}
+    }
+
+    const m = new TestMig();
+    m.verbose = true;
+    m.write("hello migration");
+    expect(lines).toContain("hello migration\n");
+  });
+
+  it("write is silent when verbose is false", () => {
+    const lines: string[] = [];
+    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+
+    class TestMig extends Migration {
+      static version = "002";
+      async change() {}
+    }
+
+    const m = new TestMig();
+    m.verbose = false;
+    m.write("should not appear");
+    expect(lines).toHaveLength(0);
+  });
+
+  it("announce formats through logger", () => {
+    const lines: string[] = [];
+    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+
+    class CreateUsers extends Migration {
+      static version = "20260101";
+      async change() {}
+    }
+
+    const m = new CreateUsers();
+    m.verbose = true;
+    m.announce("migrating");
+    expect(lines[0]).toMatch(/== 20260101 CreateUsers: migrating =+/);
+  });
+
+  it("say and sayWithTime route through logger", async () => {
+    const lines: string[] = [];
+    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+
+    class TestMig extends Migration {
+      static version = "003";
+      async change() {}
+    }
+
+    const m = new TestMig();
+    m.verbose = true;
+    m.say("creating table");
+    m.say("0.0010s", true);
+    expect(lines[0]).toContain("-- creating table");
+    expect(lines[1]).toContain("   -> 0.0010s");
+  });
+
+  it("suppressMessages temporarily silences output", async () => {
+    const lines: string[] = [];
+    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+
+    class TestMig extends Migration {
+      static version = "004";
+      async change() {}
+    }
+
+    const m = new TestMig();
+    m.verbose = true;
+    m.write("before");
+    await m.suppressMessages(async () => {
+      m.write("suppressed");
+    });
+    m.write("after");
+    expect(lines.map((l) => l.trim())).toEqual(["before", "after"]);
+  });
+
+  it("logger level filtering works", () => {
+    const lines: string[] = [];
+    const logger = new Logger({ write: (s) => lines.push(s) });
+    logger.level = "warn";
+    Migration.logger = logger;
+
+    class TestMig extends Migration {
+      static version = "005";
+      async change() {}
+    }
+
+    const m = new TestMig();
+    m.verbose = true;
+    m.write("should be filtered");
+    expect(lines).toHaveLength(0);
   });
 });

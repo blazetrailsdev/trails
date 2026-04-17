@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, Logger } from "@blazetrails/activesupport";
 import {
   loadDatabaseConfig,
   loadAllDatabaseConfigs,
@@ -12,6 +12,7 @@ import { discoverMigrations } from "../migration-loader.js";
 import {
   DatabaseTasks,
   HashConfig,
+  Migration,
   Migrator,
   DatabaseAlreadyExists,
   NoDatabaseError,
@@ -404,8 +405,6 @@ async function runMigrate(
   const migrator = createMigrator(adapter, migrations, raw);
   await migrator.migrate(targetVersion ?? null);
 
-  for (const line of migrator.output) console.log(line);
-
   const pending = await migrator.pendingMigrations();
   if (pending.length === 0) console.log("All migrations are up to date.");
 
@@ -586,9 +585,8 @@ async function withMigratorForDb(
   operation: (migrator: Migrator) => Promise<void>,
   opts?: {
     skipDump?: boolean;
-    /** Called after migrator.output has been logged — use for
-     *  messages that should appear after the migration output
-     *  (e.g. "All migrations are up to date."). */
+    /** Called after migration completes — use for messages that
+     *  should appear after the migration output. */
     afterOutput?: (migrator: Migrator) => void | Promise<void>;
   },
 ): Promise<void> {
@@ -602,9 +600,18 @@ async function withMigratorForDb(
     environment: ctx.config.envName,
     internalMetadataEnabled: ctx.config.useMetadataTable,
   });
-  await operation(migrator);
-  for (const line of migrator.output) console.log(`${ctx.prefix}${line}`);
-  if (opts?.afterOutput) await opts.afterOutput(migrator);
+  const prevLogger = Migration.logger;
+  if (ctx.prefix) {
+    Migration.logger = new Logger({
+      write: (s) => process.stdout.write(`${ctx.prefix}${s}`),
+    });
+  }
+  try {
+    await operation(migrator);
+    if (opts?.afterOutput) await opts.afterOutput(migrator);
+  } finally {
+    Migration.logger = prevLogger;
+  }
   if (!opts?.skipDump) await dumpSchemaAfterMigrate(ctx.adapter, ctx.raw, ctx.config);
 }
 
@@ -780,7 +787,6 @@ export function dbCommand(): Command {
         const migrations = await discoverMigrationsFromDirs(mDirs);
         const migrator = createMigrator(adapter, migrations, raw);
         await migrator.run("up", opts.version);
-        for (const line of migrator.output) console.log(`${prefix}${line}`);
         await dumpSchemaAfterMigrate(adapter, raw, config);
       });
     });
@@ -796,7 +802,6 @@ export function dbCommand(): Command {
         const migrations = await discoverMigrationsFromDirs(mDirs);
         const migrator = createMigrator(adapter, migrations, raw);
         await migrator.run("down", opts.version);
-        for (const line of migrator.output) console.log(`${prefix}${line}`);
         await dumpSchemaAfterMigrate(adapter, raw, config);
       });
     });

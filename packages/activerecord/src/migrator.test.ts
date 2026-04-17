@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { Logger } from "@blazetrails/activesupport";
 import {
   Migrator,
   CheckPending,
@@ -307,18 +308,32 @@ describe("MigratorTest", () => {
   });
 
   it("migrator verbosity", async () => {
-    const migrator = new Migrator(adapter, [makeMigration("1", "CreateUsers")]);
-    migrator.verbose = true;
-    await migrator.migrate();
-    expect(migrator.output.some((l) => l.includes("CreateUsers"))).toBe(true);
-    expect(migrator.output.some((l) => l.includes("migrating"))).toBe(true);
+    const lines: string[] = [];
+    const origLogger = Migration.logger;
+    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+    try {
+      const migrator = new Migrator(adapter, [makeMigration("1", "CreateUsers")]);
+      migrator.verbose = true;
+      await migrator.migrate();
+      expect(lines.some((l) => l.includes("CreateUsers"))).toBe(true);
+      expect(lines.some((l) => l.includes("migrating"))).toBe(true);
+    } finally {
+      Migration.logger = origLogger;
+    }
   });
 
   it("migrator verbosity off", async () => {
-    const migrator = new Migrator(adapter, [makeMigration("1", "CreateUsers")]);
-    migrator.verbose = false;
-    await migrator.migrate();
-    expect(migrator.output).toHaveLength(0);
+    const lines: string[] = [];
+    const origLogger = Migration.logger;
+    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+    try {
+      const migrator = new Migrator(adapter, [makeMigration("1", "CreateUsers")]);
+      migrator.verbose = false;
+      await migrator.migrate();
+      expect(lines).toHaveLength(0);
+    } finally {
+      Migration.logger = origLogger;
+    }
   });
 
   it("target version zero should run only once", async () => {
@@ -379,20 +394,34 @@ describe("MigratorTest", () => {
   });
 
   it("migrator output when running multiple migrations", async () => {
-    const migrator = new Migrator(adapter, [
-      makeMigration("1", "CreateUsers"),
-      makeMigration("2", "CreatePosts"),
-    ]);
-    await migrator.migrate();
-    expect(migrator.output.filter((l) => l.includes("migrating")).length).toBe(2);
-    expect(migrator.output.filter((l) => l.includes("migrated")).length).toBe(2);
+    const lines: string[] = [];
+    const origLogger = Migration.logger;
+    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+    try {
+      const migrator = new Migrator(adapter, [
+        makeMigration("1", "CreateUsers"),
+        makeMigration("2", "CreatePosts"),
+      ]);
+      await migrator.migrate();
+      expect(lines.filter((l) => l.includes("migrating")).length).toBe(2);
+      expect(lines.filter((l) => l.includes("migrated")).length).toBe(2);
+    } finally {
+      Migration.logger = origLogger;
+    }
   });
 
   it("migrator output when running single migration", async () => {
-    const migrator = new Migrator(adapter, [makeMigration("1", "CreateUsers")]);
-    await migrator.migrate();
-    expect(migrator.output.filter((l) => l.includes("migrating")).length).toBe(1);
-    expect(migrator.output.filter((l) => l.includes("migrated")).length).toBe(1);
+    const lines: string[] = [];
+    const origLogger = Migration.logger;
+    Migration.logger = new Logger({ write: (s) => lines.push(s) });
+    try {
+      const migrator = new Migrator(adapter, [makeMigration("1", "CreateUsers")]);
+      await migrator.migrate();
+      expect(lines.filter((l) => l.includes("migrating")).length).toBe(1);
+      expect(lines.filter((l) => l.includes("migrated")).length).toBe(1);
+    } finally {
+      Migration.logger = origLogger;
+    }
   });
 
   it("migrator rollback", async () => {
