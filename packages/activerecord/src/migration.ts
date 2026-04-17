@@ -1384,26 +1384,53 @@ export class Migrator {
     return [];
   }
 
+  // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32 of googol)
+  private static readonly _LOCK_ID = 2053462845;
+
+  /**
+   * Wrap a block with an advisory lock to prevent concurrent migrations.
+   * If the adapter doesn't support advisory locks, runs without locking.
+   *
+   * Mirrors: ActiveRecord::Migrator#with_advisory_lock
+   */
+  private async _withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
+    const adapter = this._adapter;
+    if (!adapter.supportsAdvisoryLocks?.() || !adapter.getAdvisoryLock) {
+      return fn();
+    }
+    const locked = await adapter.getAdvisoryLock(Migrator._LOCK_ID);
+    if (!locked) {
+      throw new ConcurrentMigrationError();
+    }
+    try {
+      return await fn();
+    } finally {
+      await adapter.releaseAdvisoryLock?.(Migrator._LOCK_ID);
+    }
+  }
+
   /**
    * Run all pending migrations up, or migrate to a specific version.
    *
    * Mirrors: ActiveRecord::Migrator#migrate
    */
   async migrate(targetVersion?: number | string | null): Promise<void> {
-    await this._ensureSchemaTable();
+    await this._withAdvisoryLock(async () => {
+      await this._ensureSchemaTable();
 
-    if (targetVersion !== undefined && targetVersion !== null) {
-      this._validateTargetVersion(targetVersion);
-      const target = BigInt(targetVersion);
-      const current = BigInt(await this.currentVersion());
-      if (target > current) {
-        await this._migrateUp(targetVersion);
-      } else if (target < current) {
-        await this._migrateDown(targetVersion);
+      if (targetVersion !== undefined && targetVersion !== null) {
+        this._validateTargetVersion(targetVersion);
+        const target = BigInt(targetVersion);
+        const current = BigInt(await this.currentVersion());
+        if (target > current) {
+          await this._migrateUp(targetVersion);
+        } else if (target < current) {
+          await this._migrateDown(targetVersion);
+        }
+      } else {
+        await this._migrateUp(null);
       }
-    } else {
-      await this._migrateUp(null);
-    }
+    });
   }
 
   /**
@@ -1412,8 +1439,10 @@ export class Migrator {
    * Mirrors: ActiveRecord::Migrator.up
    */
   async up(targetVersion?: number | string | null): Promise<void> {
-    await this._ensureSchemaTable();
-    await this._migrateUp(targetVersion ?? null);
+    await this._withAdvisoryLock(async () => {
+      await this._ensureSchemaTable();
+      await this._migrateUp(targetVersion ?? null);
+    });
   }
 
   /**
@@ -1422,8 +1451,10 @@ export class Migrator {
    * Mirrors: ActiveRecord::Migrator.down
    */
   async down(targetVersion?: number | string | null): Promise<void> {
-    await this._ensureSchemaTable();
-    await this._migrateDown(targetVersion ?? 0);
+    await this._withAdvisoryLock(async () => {
+      await this._ensureSchemaTable();
+      await this._migrateDown(targetVersion ?? 0);
+    });
   }
 
   /**
@@ -1435,14 +1466,16 @@ export class Migrator {
     if (!Number.isInteger(steps) || steps < 0) {
       throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
     }
-    await this._ensureSchemaTable();
-    const applied = await this._appliedVersions();
-    const appliedMigrations = this._migrations.filter((m) => applied.has(m.version)).reverse();
-    const toRollback = appliedMigrations.slice(0, steps);
+    await this._withAdvisoryLock(async () => {
+      await this._ensureSchemaTable();
+      const applied = await this._appliedVersions();
+      const appliedMigrations = this._migrations.filter((m) => applied.has(m.version)).reverse();
+      const toRollback = appliedMigrations.slice(0, steps);
 
-    for (const proxy of toRollback) {
-      await this._runMigration(proxy, "down");
-    }
+      for (const proxy of toRollback) {
+        await this._runMigration(proxy, "down");
+      }
+    });
   }
 
   /**
@@ -1454,13 +1487,15 @@ export class Migrator {
     if (!Number.isInteger(steps) || steps < 0) {
       throw new Error(`Invalid steps: ${steps}. Must be a non-negative integer.`);
     }
-    await this._ensureSchemaTable();
-    const pending = await this.pendingMigrations();
-    const toRun = pending.slice(0, steps);
+    await this._withAdvisoryLock(async () => {
+      await this._ensureSchemaTable();
+      const pending = await this.pendingMigrations();
+      const toRun = pending.slice(0, steps);
 
-    for (const proxy of toRun) {
-      await this._runMigration(proxy, "up");
-    }
+      for (const proxy of toRun) {
+        await this._runMigration(proxy, "up");
+      }
+    });
   }
 
   /**
@@ -1668,23 +1703,19 @@ export class Migrator {
    */
   async run(direction: "up" | "down", targetVersion: number | string): Promise<void> {
     this._validateTargetVersion(targetVersion);
-    await this._ensureSchemaTable();
-    // Normalize via BigInt like the constructor does so callers can pass
-    // equivalent forms (leading zeros, `20260101000000` vs the string "20260101000000",
-    // etc.) without hitting a spurious UnknownMigrationVersionError.
-    // The constructor already normalizes every migration's version via
-    // BigInt, so we only need to normalize the incoming targetVersion and
-    // compare directly against the proxy list.
-    const key = String(BigInt(targetVersion));
-    const proxy = this._migrations.find((m) => m.version === key);
-    if (!proxy) {
-      throw new UnknownMigrationVersionError(key);
-    }
-    const applied = await this._appliedVersions();
-    const isApplied = applied.has(key);
-    if (direction === "up" && isApplied) return;
-    if (direction === "down" && !isApplied) return;
-    await this._runMigration(proxy, direction);
+    await this._withAdvisoryLock(async () => {
+      await this._ensureSchemaTable();
+      const key = String(BigInt(targetVersion));
+      const proxy = this._migrations.find((m) => m.version === key);
+      if (!proxy) {
+        throw new UnknownMigrationVersionError(key);
+      }
+      const applied = await this._appliedVersions();
+      const isApplied = applied.has(key);
+      if (direction === "up" && isApplied) return;
+      if (direction === "down" && !isApplied) return;
+      await this._runMigration(proxy, direction);
+    });
   }
 
   private async _migrateUp(targetVersion: number | string | null): Promise<void> {

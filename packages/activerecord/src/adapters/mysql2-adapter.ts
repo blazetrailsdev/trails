@@ -569,10 +569,51 @@ export class Mysql2Adapter extends AdapterBase implements DatabaseAdapter {
     return { schema: checkNonEmpty(first.part), table: checkNonEmpty(second.part) };
   }
 
+  supportsAdvisoryLocks(): boolean {
+    return true;
+  }
+
+  // Advisory locks are connection-scoped — pin a dedicated connection
+  // so acquire and release use the same session.
+  private _advisoryLockConn: mysql.PoolConnection | null = null;
+
+  async getAdvisoryLock(lockId: number | string): Promise<boolean> {
+    const conn = await this.pool.getConnection();
+    try {
+      const [rows] = await conn.query("SELECT GET_LOCK(?, 0) AS locked", [String(lockId)]);
+      const locked = (rows as Record<string, unknown>[])[0]?.locked === 1;
+      if (locked) {
+        this._advisoryLockConn = conn;
+      } else {
+        conn.release();
+      }
+      return locked;
+    } catch (error) {
+      conn.release();
+      throw error;
+    }
+  }
+
+  async releaseAdvisoryLock(lockId: number | string): Promise<boolean> {
+    const conn = this._advisoryLockConn;
+    if (!conn) return false;
+    try {
+      const [rows] = await conn.query("SELECT RELEASE_LOCK(?) AS unlocked", [String(lockId)]);
+      return (rows as Record<string, unknown>[])[0]?.unlocked === 1;
+    } finally {
+      this._advisoryLockConn = null;
+      conn.release();
+    }
+  }
+
   /**
    * Close the connection pool.
    */
   async close(): Promise<void> {
+    if (this._advisoryLockConn) {
+      this._advisoryLockConn.release();
+      this._advisoryLockConn = null;
+    }
     if (this._conn) {
       this._conn.release();
       this._conn = null;

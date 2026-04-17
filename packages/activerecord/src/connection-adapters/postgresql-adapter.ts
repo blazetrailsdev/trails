@@ -250,6 +250,10 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
    * Close the connection pool.
    */
   async close(): Promise<void> {
+    if (this._advisoryLockClient) {
+      this._advisoryLockClient.release();
+      this._advisoryLockClient = null;
+    }
     if (this._client) {
       this._client.release();
       this._client = null;
@@ -419,6 +423,45 @@ export class PostgreSQLAdapter extends AdapterBase implements DatabaseAdapter {
   supportsAdvisoryLocks(): boolean {
     return true;
   }
+
+  // Advisory locks are session-scoped — acquire and release must use the
+  // same connection. We pin a dedicated client from the pool for the
+  // duration of the lock.
+  private _advisoryLockClient: pg.PoolClient | null = null;
+
+  async getAdvisoryLock(lockId: number | string): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      const isNumeric = typeof lockId === "number";
+      const sql = `SELECT pg_try_advisory_lock(${isNumeric ? "$1" : "hashtext($1)"}) AS locked`;
+      const result = await client.query(sql, [isNumeric ? lockId : String(lockId)]);
+      const locked = result.rows[0]?.locked === true;
+      if (locked) {
+        this._advisoryLockClient = client;
+      } else {
+        client.release();
+      }
+      return locked;
+    } catch (error) {
+      client.release();
+      throw error;
+    }
+  }
+
+  async releaseAdvisoryLock(lockId: number | string): Promise<boolean> {
+    const client = this._advisoryLockClient;
+    if (!client) return false;
+    try {
+      const isNumeric = typeof lockId === "number";
+      const sql = `SELECT pg_advisory_unlock(${isNumeric ? "$1" : "hashtext($1)"}) AS unlocked`;
+      const result = await client.query(sql, [isNumeric ? lockId : String(lockId)]);
+      return result.rows[0]?.unlocked === true;
+    } finally {
+      this._advisoryLockClient = null;
+      client.release();
+    }
+  }
+
   supportsExplain(): boolean {
     return true;
   }

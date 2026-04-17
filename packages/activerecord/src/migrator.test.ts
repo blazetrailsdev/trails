@@ -648,3 +648,138 @@ describe("MigratorTest", () => {
     expect(Klass).toBe(Current);
   });
 });
+
+describe("Migrator advisory lock wrapping", () => {
+  it("acquires and releases advisory lock when adapter supports it", async () => {
+    const adapter = createTestAdapter();
+    const lockLog: string[] = [];
+    adapter.supportsAdvisoryLocks = () => true;
+    adapter.getAdvisoryLock = async () => {
+      lockLog.push("lock");
+      return true;
+    };
+    adapter.releaseAdvisoryLock = async () => {
+      lockLog.push("unlock");
+      return true;
+    };
+
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await migrator.migrate();
+    expect(lockLog).toEqual(["lock", "unlock"]);
+  });
+
+  it("throws ConcurrentMigrationError when lock cannot be acquired", async () => {
+    const { ConcurrentMigrationError } = await import("./migration-errors.js");
+    const adapter = createTestAdapter();
+    adapter.supportsAdvisoryLocks = () => true;
+    adapter.getAdvisoryLock = async () => false;
+
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await expect(migrator.migrate()).rejects.toThrow(ConcurrentMigrationError);
+  });
+
+  it("releases lock even when migration throws", async () => {
+    const adapter = createTestAdapter();
+    const lockLog: string[] = [];
+    adapter.supportsAdvisoryLocks = () => true;
+    adapter.getAdvisoryLock = async () => {
+      lockLog.push("lock");
+      return true;
+    };
+    adapter.releaseAdvisoryLock = async () => {
+      lockLog.push("unlock");
+      return true;
+    };
+
+    const migrator = new Migrator(adapter, [
+      makeMigration("1", "Boom", async () => {
+        throw new Error("kaboom");
+      }),
+    ]);
+    await expect(migrator.migrate()).rejects.toThrow("kaboom");
+    expect(lockLog).toEqual(["lock", "unlock"]);
+  });
+
+  it("skips locking when adapter does not support advisory locks", async () => {
+    const adapter = createTestAdapter();
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await migrator.migrate();
+    expect(await migrator.currentVersion()).toBe(1);
+  });
+
+  it("wraps rollback in advisory lock", async () => {
+    const adapter = createTestAdapter();
+    const lockLog: string[] = [];
+    adapter.supportsAdvisoryLocks = () => true;
+    adapter.getAdvisoryLock = async () => {
+      lockLog.push("lock");
+      return true;
+    };
+    adapter.releaseAdvisoryLock = async () => {
+      lockLog.push("unlock");
+      return true;
+    };
+
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await migrator.migrate();
+    lockLog.length = 0;
+    await migrator.rollback(1);
+    expect(lockLog).toEqual(["lock", "unlock"]);
+  });
+
+  it("wraps run in advisory lock", async () => {
+    const adapter = createTestAdapter();
+    const lockLog: string[] = [];
+    adapter.supportsAdvisoryLocks = () => true;
+    adapter.getAdvisoryLock = async () => {
+      lockLog.push("lock");
+      return true;
+    };
+    adapter.releaseAdvisoryLock = async () => {
+      lockLog.push("unlock");
+      return true;
+    };
+
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await migrator.run("up", 1);
+    expect(lockLog).toEqual(["lock", "unlock"]);
+  });
+
+  function lockableAdapter() {
+    const adapter = createTestAdapter();
+    const lockLog: string[] = [];
+    adapter.supportsAdvisoryLocks = () => true;
+    adapter.getAdvisoryLock = async () => {
+      lockLog.push("lock");
+      return true;
+    };
+    adapter.releaseAdvisoryLock = async () => {
+      lockLog.push("unlock");
+      return true;
+    };
+    return { adapter, lockLog };
+  }
+
+  it("wraps up in advisory lock", async () => {
+    const { adapter, lockLog } = lockableAdapter();
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await migrator.up();
+    expect(lockLog).toEqual(["lock", "unlock"]);
+  });
+
+  it("wraps down in advisory lock", async () => {
+    const { adapter, lockLog } = lockableAdapter();
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await migrator.up();
+    lockLog.length = 0;
+    await migrator.down(0);
+    expect(lockLog).toEqual(["lock", "unlock"]);
+  });
+
+  it("wraps forward in advisory lock", async () => {
+    const { adapter, lockLog } = lockableAdapter();
+    const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
+    await migrator.forward(1);
+    expect(lockLog).toEqual(["lock", "unlock"]);
+  });
+});

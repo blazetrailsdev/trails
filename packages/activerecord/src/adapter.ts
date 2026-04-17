@@ -91,4 +91,22 @@ export interface DatabaseAdapter {
    * begin/commit. Optional — defaults to false when absent.
    */
   supportsDdlTransactions?(): boolean;
+
+  /**
+   * Whether the adapter supports advisory locks for migration
+   * concurrency. Optional — defaults to false when absent.
+   */
+  supportsAdvisoryLocks?(): boolean;
+
+  /**
+   * Acquire an advisory lock. Returns true if the lock was obtained.
+   * Optional — only implemented by adapters that support advisory locks.
+   */
+  getAdvisoryLock?(lockId: number | string): Promise<boolean>;
+
+  /**
+   * Release an advisory lock. Returns true if the lock was released.
+   * Optional — only implemented by adapters that support advisory locks.
+   */
+  releaseAdvisoryLock?(lockId: number | string): Promise<boolean>;
 }
