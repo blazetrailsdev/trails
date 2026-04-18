@@ -7,6 +7,7 @@
 import { BinaryData } from "@blazetrails/activemodel";
 import {
   quote as abstractQuote,
+  quotedDate as abstractQuotedDate,
   quotedFalse as abstractQuotedFalse,
   quotedTrue as abstractQuotedTrue,
   typeCast as abstractTypeCast,
@@ -73,12 +74,27 @@ export function unquotedFalse(): boolean {
   return false;
 }
 
+/**
+ * PostgreSQL timestamp literals match Rails' `:db` form: unquoted
+ * `YYYY-MM-DD HH:MM:SS[.microseconds]`. Fractional seconds only
+ * appear when milliseconds > 0. `quote()` wraps the result with
+ * single quotes (or `timestamp '…'` in context-sensitive callers).
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_date
+ */
 export function quotedDate(date: Date): string {
-  return `'${date.toISOString().split("T")[0]}'`;
+  return abstractQuotedDate(date);
 }
 
+/**
+ * Time-only portion of `quotedDate`. Unquoted.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_time
+ */
 export function quotedTimeUtc(date: Date): string {
-  return `'${date.toISOString().replace("T", " ").replace("Z", "")}'`;
+  const full = quotedDate(date);
+  const sep = full.indexOf(" ");
+  return sep === -1 ? full : full.slice(sep + 1);
 }
 
 export function quoteTableName(name: string): string {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { quote, typeCast } from "./quoting.js";
+import { quote, quotedDate, quotedTimeUtc, typeCast } from "./quoting.js";
 
 describe("MySQL quoting — quote", () => {
   it("returns NULL for null / undefined", () => {
@@ -59,5 +59,25 @@ describe("MySQL quoting — typeCast", () => {
     expect(out.startsWith("'")).toBe(false);
     expect(out.endsWith("'")).toBe(false);
     expect(out).toMatch(/^2026-01-02 12:34:56/);
+  });
+});
+
+describe("MySQL quoting — quotedDate / quotedTimeUtc", () => {
+  it("quotedDate returns the unquoted :db form (Rails quoted_date)", () => {
+    const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
+    const out = quotedDate(d);
+    expect(out).toBe("2026-04-18 12:34:56");
+    expect(out.startsWith("'")).toBe(false);
+    expect(out).not.toMatch(/\.000$/);
+  });
+
+  it("quotedDate includes .microseconds when ms > 0", () => {
+    const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56, 250));
+    expect(quotedDate(d)).toMatch(/^2026-04-18 12:34:56\.\d{6}$/);
+  });
+
+  it("quotedTimeUtc returns the time-only tail", () => {
+    const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
+    expect(quotedTimeUtc(d)).toBe("12:34:56");
   });
 });

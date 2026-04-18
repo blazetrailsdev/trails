@@ -39,12 +39,27 @@ export function unquotedFalse(): number {
   return 0;
 }
 
+/**
+ * MySQL's DATETIME/TIMESTAMP literal format matches Rails' `:db`
+ * form: unquoted `YYYY-MM-DD HH:MM:SS[.microseconds]`. Fractional
+ * seconds only appear when milliseconds > 0. `quote()` wraps the
+ * result with single quotes.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_date
+ */
 export function quotedDate(date: Date): string {
-  return `'${date.toISOString().split("T")[0]}'`;
+  return abstractQuotedDate(date);
 }
 
+/**
+ * Time-only portion of `quotedDate`. Unquoted.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_time
+ */
 export function quotedTimeUtc(date: Date): string {
-  return `'${date.toISOString().replace("T", " ").replace("Z", "")}'`;
+  const full = quotedDate(date);
+  const sep = full.indexOf(" ");
+  return sep === -1 ? full : full.slice(sep + 1);
 }
 
 export function quoteTableName(name: string): string {
@@ -95,12 +110,7 @@ export function quote(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   if (typeof value === "number" || typeof value === "bigint") return String(value);
-  // Use abstract's `quotedDate` for the `YYYY-MM-DD HH:MM:SS[.microseconds]`
-  // form (Rails' `:db` format — fractional seconds only when
-  // non-zero), then wrap with single quotes. MySQL's own
-  // `quotedDate` would drop the time; its `quotedTimeUtc` always
-  // trails `.000`.
-  if (value instanceof Date) return `'${abstractQuotedDate(value)}'`;
+  if (value instanceof Date) return `'${quotedDate(value)}'`;
   if (value instanceof Buffer) return quotedBinaryString(value);
   if (typeof value === "symbol") {
     const desc = value.description;
@@ -139,15 +149,9 @@ export function typeCast(value: unknown): unknown {
   if (value === null || value === undefined) return value;
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;
-  if (value instanceof Date) {
-    // Delegate to abstract's `quotedDate` which renders the
-    // unquoted `YYYY-MM-DD HH:MM:SS[.microseconds]` form (optional
-    // fractional seconds only when non-zero, matching Rails'
-    // `:db`-format output). MySQL's own `quotedTimeUtc` relies on
-    // `toISOString()` which always trails `.000`, and MySQL's
-    // `quotedDate` drops the time. Neither matches Rails here;
-    // the abstract formatter does.
-    return abstractQuotedDate(value);
-  }
+  // Rails' `type_cast` returns `quoted_date(value)` — an unquoted
+  // formatted string. EXPLAIN / log-subscriber renderers want the
+  // primitive, not the Date instance.
+  if (value instanceof Date) return quotedDate(value);
   throw new TypeError(`can't cast ${(value as object).constructor?.name ?? typeof value}`);
 }
