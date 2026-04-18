@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import ts from "typescript";
 import * as path from "node:path";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import { fileURLToPath } from "node:url";
 import { createTrailsProgram } from "./program.js";
 import { createTrailsSolutionBuilder } from "./build.js";
@@ -345,6 +346,30 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
 describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
   const SCHEMA_DIR = path.join(FIXTURES_DIR, "schema");
 
+  // Track per-test tmp dirs + mocks so cleanup happens even when an
+  // assertion throws. Matches the pattern used elsewhere in this file.
+  const tmpDirs: string[] = [];
+  afterEach(() => {
+    for (const dir of tmpDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  function writeSchemaJson(contents: unknown): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-"));
+    tmpDirs.push(dir);
+    const p = path.join(dir, "s.json");
+    fs.writeFileSync(p, JSON.stringify(contents));
+    return p;
+  }
+
+  function spyExitAndStderr() {
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    return { exit, err };
+  }
+
   it("types schema-only columns through createTrailsProgram", () => {
     const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
     const { program } = createTrailsProgram(configPath, {
@@ -370,6 +395,74 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     expect(probed["name"]).toBe("string");
     expect(probed["age"]).toBe("number");
     expect(probed["isAdmin"]).toBe("boolean");
+  });
+
+  it("loadSchemaColumns: --schema <path> accepts legacy string shape", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const tmp = writeSchemaJson({ users: { name: "string", age: "integer" } });
+    expect(loadSchemaColumns(["--schema", tmp])).toEqual({
+      users: { name: "string", age: "integer" },
+    });
+  });
+
+  it("loadSchemaColumns: accepts rich shape end-to-end", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const payload = {
+      posts: {
+        title: { type: "string", null: false },
+        body: { type: "text", null: true },
+        tags: { type: "array", null: true, arrayElementType: "integer" },
+      },
+    };
+    const tmp = writeSchemaJson(payload);
+    expect(loadSchemaColumns(["--schema", tmp])).toEqual(payload);
+  });
+
+  it("loadSchemaColumns: mixed legacy + rich in one file", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const payload = {
+      posts: { legacy: "string", modern: { type: "integer", null: false } },
+    };
+    const tmp = writeSchemaJson(payload);
+    expect(loadSchemaColumns(["--schema", tmp])).toEqual(payload);
+  });
+
+  it("loadSchemaColumns: rejects rich shape with non-boolean `null`", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const tmp = writeSchemaJson({ posts: { title: { type: "string", null: "yes" } } });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", tmp])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/`null` must be a boolean/);
+  });
+
+  it("loadSchemaColumns: rejects non-object / non-string column value", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const tmp = writeSchemaJson({ posts: { title: 42 } });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", tmp])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/must be a Rails type string or an object/);
+  });
+
+  it("loadSchemaColumns: reports `null` when a column value is null", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const tmp = writeSchemaJson({ posts: { title: null } });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", tmp])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/\(got null\)/);
+  });
+
+  it("loadSchemaColumns: rejects arrayElementType on non-array type", async () => {
+    const { loadSchemaColumns } = await import("./cli.js");
+    const tmp = writeSchemaJson({
+      posts: { title: { type: "string", arrayElementType: "integer" } },
+    });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", tmp])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/`arrayElementType` is only valid when `type` is "array"/);
   });
 
   it("without schema, those accesses fall back to unknown (declares weren't injected)", () => {

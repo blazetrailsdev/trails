@@ -16,7 +16,12 @@ export interface BuildCompilerHostOptions {
    * When supplied, the virtualizer emits `declare <col>: <tsType>` for
    * any column not already declared by hand or via `this.attribute(...)`.
    */
-  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  schemaColumnsByTable?: Readonly<
+    Record<
+      string,
+      Readonly<Record<string, import("../type-virtualization/synthesize.js").SchemaColumnValue>>
+    >
+  >;
 }
 
 export function buildCompilerHost(

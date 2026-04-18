@@ -166,6 +166,42 @@ describe("virtualize — deltas", () => {
     expect(text).not.toMatch(/declare class: string;/);
   });
 
+  test("schemaColumnsByTable accepts the rich shape (null: true, arrayElementType)", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          title: { type: "string", null: false },
+          bio: { type: "string", null: true },
+          tags: { type: "array", null: true, arrayElementType: "integer" },
+          strict_tags: { type: "array", null: false, arrayElementType: "string" },
+        },
+      },
+    });
+    // null: false → no `| null`
+    expect(text).toMatch(/declare title: string;/);
+    // null: true → `| null`
+    expect(text).toMatch(/declare bio: string \| null;/);
+    // array with known element type → `number[] | null`
+    expect(text).toMatch(/declare tags: number\[\] \| null;/);
+    // non-nullable array → `string[]`
+    expect(text).toMatch(/declare strict_tags: string\[\];/);
+  });
+
+  test("schemaColumnsByTable mixing legacy string and rich shape in same table", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          legacy: "string", // legacy string — backwards-compat
+          modern: { type: "integer", null: false },
+        },
+      },
+    });
+    expect(text).toMatch(/declare legacy: string;/);
+    expect(text).toMatch(/declare modern: number;/);
+  });
+
   test("schemaColumnsByTable emits columns in stable (sorted) order", () => {
     const src = "export class Post extends Base {}\n";
     const { text } = virtualize(src, "post.ts", {

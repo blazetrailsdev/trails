@@ -28,8 +28,24 @@ const INDENT = "  ";
 // (see the plan § "Auto-import resolution under Phase 1b").
 const AR_IMPORT = `import("@blazetrails/activerecord")`;
 
+/**
+ * Column value in a schema-columns JSON map. Either:
+ *   - a plain Rails type string (legacy shape, e.g. `"string"`), or
+ *   - a rich shape with nullability and array element info, emitted by
+ *     `dumpSchemaColumns`. trails-tsc renders `Type | null` for
+ *     nullable columns and `ElementTsType[]` for array columns when
+ *     an `arrayElementType` is supplied.
+ */
+export type SchemaColumnValue =
+  | string
+  | {
+      type: string;
+      null?: boolean;
+      arrayElementType?: string;
+    };
+
 export interface SynthesizeOptions {
-  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, SchemaColumnValue>>>>;
 }
 
 export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}): string[] {
@@ -76,18 +92,36 @@ function renderSchemaColumnDeclares(
   // Sort by column name so emitted declares are stable regardless of
   // JSON key insertion order.
   const entries = Object.entries(cols).sort(([a], [b]) => a.localeCompare(b));
-  for (const [col, railsType] of entries) {
+  for (const [col, value] of entries) {
     if (synthesizedInstanceNames.has(col)) continue;
     if (info.existingMembers.has(col)) continue;
     // Skip "id" — Base already defines a PrimaryKeyValue accessor that
     // handles composite keys; re-declaring here would shadow it.
     if (col === "id") continue;
+    const tsType = renderSchemaValueType(value);
     // Emit a bracket-quoted declare for non-identifier / reserved-word
     // names (e.g. `declare "strange-col": string;`). TypeScript allows
     // string-literal class field names, so this is a valid declare.
-    out.push(`${INDENT}declare ${renderDeclaredMemberName(col)}: ${tsTypeFor(railsType)};`);
+    out.push(`${INDENT}declare ${renderDeclaredMemberName(col)}: ${tsType};`);
   }
   return out;
+}
+
+/**
+ * Convert a `SchemaColumnValue` to the TypeScript type text emitted in
+ * the generated `declare`. Handles the rich shape's nullability and
+ * array element types.
+ */
+function renderSchemaValueType(value: SchemaColumnValue): string {
+  if (typeof value === "string") return tsTypeFor(value);
+  let ts = tsTypeFor(value.type);
+  // For array columns with a known element type, render
+  // `ElementTsType[]` instead of the default `unknown[]`.
+  if (value.type === "array" && value.arrayElementType) {
+    ts = `${tsTypeFor(value.arrayElementType)}[]`;
+  }
+  if (value.null !== false) ts = `${ts} | null`;
+  return ts;
 }
 
 function renderDeclaredMemberName(name: string): string {

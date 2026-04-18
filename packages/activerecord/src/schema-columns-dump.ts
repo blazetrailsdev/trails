@@ -1,7 +1,20 @@
 /**
- * Emits a `{ table: { column: railsType } }` JSON map from a live
- * adapter. Consumed by `trails-tsc --schema <path>` so the virtualizer
- * can inject `declare` members for schema-only columns.
+ * Emits a JSON map from a live adapter consumed by
+ * `trails-tsc --schema <path>` so the virtualizer can inject `declare`
+ * members for schema-only columns.
+ *
+ * Output shape (per column):
+ *   `{ type: <railsType>, null: boolean, arrayElementType?: <railsType> }`
+ *
+ * - `type`: Rails type string (`string`, `integer`, `datetime`, ...).
+ * - `null`: true when the column lacks a NOT NULL constraint, rendered
+ *   as `Type | null` by trails-tsc.
+ * - `arrayElementType`: present for array columns, renders
+ *   `ElementTsType[]` instead of `unknown[]`.
+ *
+ * The virtualizer also accepts the legacy `{ column: "<railsType>" }`
+ * shape for backwards compatibility with hand-authored JSON, but this
+ * dumper always emits the rich object shape.
  *
  * Not in Rails — this is the bridge that gives TypeScript IDE
  * autocomplete parity with Rails' runtime method_missing.
@@ -19,6 +32,24 @@ export interface DumpSchemaColumnsOptions {
   ignoreTables?: readonly string[];
 }
 
+/**
+ * Rich column shape emitted for trails-tsc consumption. The virtualizer
+ * accepts either `string` (legacy, just a Rails type) or this full
+ * object form — the dumper emits the object form so nullability and
+ * array element types can shape the generated TypeScript declares.
+ */
+export interface DumpColumnSchema {
+  /** Rails type name (`string`, `integer`, `datetime`, `array`, ...). */
+  type: string;
+  /** True when the column is nullable (i.e. the generated type gets `| null`). */
+  null: boolean;
+  /**
+   * For array columns, the Rails type of the array's element. trails-tsc
+   * renders `ElementTsType[]` instead of `unknown[]` when present.
+   */
+  arrayElementType?: string;
+}
+
 const ALWAYS_IGNORED = new Set(["schema_migrations", "ar_internal_metadata"]);
 
 type AdapterColumn = {
@@ -26,6 +57,7 @@ type AdapterColumn = {
   sqlTypeMetadata?: { type?: string | null; sqlType?: string | null } | null;
   sqlType?: string | null;
   type?: string | null;
+  null?: boolean | null;
 };
 
 type AdapterWithTables = { tables(): Promise<string[]> };
@@ -41,7 +73,7 @@ function hasColumns(a: unknown): a is AdapterWithColumns {
 export async function dumpSchemaColumns(
   adapter: DatabaseAdapter,
   options: DumpSchemaColumnsOptions = {},
-): Promise<Record<string, Record<string, string>>> {
+): Promise<Record<string, Record<string, DumpColumnSchema>>> {
   // Prefer the adapter's own `tables()` / `columns()` when present —
   // PostgreSQL and SQLite adapters implement them with adapter-
   // specific semantics (e.g. PG respects the current `search_path`).
@@ -54,19 +86,45 @@ export async function dumpSchemaColumns(
   const rawTables = hasTables(adapter) ? await adapter.tables() : await schemaStatements().tables();
   const tables = rawTables.filter((t) => !ignore.has(t)).sort();
 
-  const out: Record<string, Record<string, string>> = Object.create(null);
+  const out: Record<string, Record<string, DumpColumnSchema>> = Object.create(null);
   for (const table of tables) {
     const cols = hasColumns(adapter)
       ? await adapter.columns(table)
       : await schemaStatements().columns(table);
-    const colMap: Record<string, string> = Object.create(null);
+    const colMap: Record<string, DumpColumnSchema> = Object.create(null);
     const sorted = [...cols].sort((a, b) => a.name.localeCompare(b.name));
     for (const col of sorted) {
-      colMap[col.name] = normalizeRailsType(col);
+      colMap[col.name] = buildColumnSchema(col);
     }
     out[table] = colMap;
   }
   return out;
+}
+
+function buildColumnSchema(col: AdapterColumn): DumpColumnSchema {
+  const type = normalizeRailsType(col);
+  // Rails' column introspection returns `null: true` unless the column
+  // has a NOT NULL constraint. Default to true when introspection
+  // didn't populate it, matching Rails' conservative default.
+  const nullable = col.null !== false;
+  const schema: DumpColumnSchema = { type, null: nullable };
+
+  // For PG array types, record the element type so trails-tsc can emit
+  // `ElementTsType[]` instead of `unknown[]`.
+  if (type === "array") {
+    const fullSqlType = (col.sqlTypeMetadata?.sqlType ?? col.sqlType ?? "").toLowerCase();
+    const m = fullSqlType.match(/^(.+?)\s*\[\]\s*$/);
+    if (m && m[1]) {
+      const elementRails = normalizeRailsType({
+        name: col.name,
+        sqlType: m[1],
+      });
+      if (elementRails && elementRails !== "array") {
+        schema.arrayElementType = elementRails;
+      }
+    }
+  }
+  return schema;
 }
 
 /**

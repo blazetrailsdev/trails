@@ -10,7 +10,12 @@ export interface TrailsProgram {
 }
 
 export interface CreateTrailsProgramOptions {
-  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  schemaColumnsByTable?: Readonly<
+    Record<
+      string,
+      Readonly<Record<string, import("../type-virtualization/synthesize.js").SchemaColumnValue>>
+    >
+  >;
 }
 
 export function createTrailsProgram(

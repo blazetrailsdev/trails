@@ -3,16 +3,29 @@
 import ts from "typescript";
 import * as path from "node:path";
 import * as fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createTrailsProgram } from "./program.js";
 import { createTrailsSolutionBuilder } from "./build.js";
 import { remapDiagnostics } from "./remap.js";
 import { virtualize } from "../type-virtualization/virtualize.js";
+import type { SchemaColumnValue } from "../type-virtualization/synthesize.js";
 
 /**
  * Load a schema-columns JSON file produced by the schema dumper.
- * Format: `{ "<table>": { "<column>": "<rails_type>", ... }, ... }`.
+ *
+ * Format (either shape per column, may mix in one file):
+ *   `{ "<table>": { "<column>": "<rails_type>", ... }, ... }` — legacy
+ *   `{ "<table>": { "<column>": { "type": "<rails_type>", "null"?: boolean, "arrayElementType"?: string }, ... }, ... }` — rich
+ *
+ * The rich shape — as emitted by `trails-schema-dump` — drives
+ * nullability (`T | null`) and typed array elements (`ElementTsType[]`)
+ * in the generated TypeScript declares.
  */
-function loadSchemaColumns(args: string[]): Record<string, Record<string, string>> | undefined {
+type RichColumnValue = Extract<SchemaColumnValue, object>;
+
+export function loadSchemaColumns(
+  args: string[],
+): Record<string, Record<string, SchemaColumnValue>> | undefined {
   let schemaPath: string | undefined;
   let schemaProvided = false;
   for (let i = 0; i < args.length; i++) {
@@ -67,35 +80,83 @@ function loadSchemaColumns(args: string[]): Record<string, Record<string, string
 // chain — rejected up front rather than trusted from JSON input.
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
-function validateSchemaShape(value: unknown, path: string): Record<string, Record<string, string>> {
+function validateSchemaShape(
+  value: unknown,
+  path: string,
+): Record<string, Record<string, SchemaColumnValue>> {
   const fail = (reason: string): never => {
     process.stderr.write(`trails-tsc: --schema file ${path} is malformed: ${reason}\n`);
     process.exit(1);
   };
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    fail("expected a top-level object of { [table]: { [column]: railsType } }");
+    fail("expected a top-level object of { [table]: { [column]: railsType | richValue } }");
   }
   // Use null-prototype maps so untrusted keys from the JSON can't reach
   // Object.prototype. Iterate with Object.keys to skip inherited keys on
   // the input (defense-in-depth; JSON.parse never sets them, but the
   // function signature accepts `unknown`).
-  const out: Record<string, Record<string, string>> = Object.create(null);
+  const out: Record<string, Record<string, SchemaColumnValue>> = Object.create(null);
   for (const table of Object.keys(value as object)) {
     if (UNSAFE_KEYS.has(table)) fail(`table name "${table}" is not allowed`);
     const cols = (value as Record<string, unknown>)[table];
     if (cols === null || typeof cols !== "object" || Array.isArray(cols)) {
       fail(`table "${table}" must map to an object of column definitions`);
     }
-    const colMap: Record<string, string> = Object.create(null);
+    const colMap: Record<string, SchemaColumnValue> = Object.create(null);
     for (const col of Object.keys(cols as object)) {
       if (UNSAFE_KEYS.has(col)) fail(`column name "${table}.${col}" is not allowed`);
-      const railsType = (cols as Record<string, unknown>)[col];
-      if (typeof railsType !== "string") {
-        fail(`column "${table}.${col}" must have a string Rails type (got ${typeof railsType})`);
-      }
-      colMap[col] = railsType as string;
+      const raw = (cols as Record<string, unknown>)[col];
+      colMap[col] = validateColumnValue(raw, `${table}.${col}`, fail);
     }
     out[table] = colMap;
+  }
+  return out;
+}
+
+/**
+ * A column value can be either a Rails type string (legacy) or a rich
+ * object `{ type, null?, arrayElementType? }` emitted by
+ * `dumpSchemaColumns`. Reject anything else with a targeted message so
+ * users see the actual problem instead of a downstream crash.
+ */
+function validateColumnValue(
+  raw: unknown,
+  fqColumn: string,
+  fail: (reason: string) => never,
+): SchemaColumnValue {
+  if (typeof raw === "string") return raw;
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    const got = raw === null ? "null" : Array.isArray(raw) ? "array" : typeof raw;
+    fail(
+      `column "${fqColumn}" must be a Rails type string or an object ` +
+        `with at least { type: string } (got ${got})`,
+    );
+  }
+  const r = raw as Record<string, unknown>;
+  if (typeof r.type !== "string") {
+    fail(`column "${fqColumn}" rich shape requires { type: string } (got ${typeof r.type})`);
+  }
+  if (r.null !== undefined && typeof r.null !== "boolean") {
+    fail(`column "${fqColumn}" rich shape: \`null\` must be a boolean when present`);
+  }
+  if (r.arrayElementType !== undefined) {
+    if (typeof r.arrayElementType !== "string") {
+      fail(`column "${fqColumn}" rich shape: \`arrayElementType\` must be a string when present`);
+    }
+    // Catch typos / misconfiguration at load time — a non-"array" `type`
+    // would silently ignore `arrayElementType` downstream, leaving the
+    // user with an unexpectedly-untyped declare.
+    if (r.type !== "array") {
+      fail(
+        `column "${fqColumn}" rich shape: \`arrayElementType\` is only valid when ` +
+          `\`type\` is "array" (got type: "${r.type as string}")`,
+      );
+    }
+  }
+  const out: RichColumnValue = { type: r.type as string };
+  if (r.null !== undefined) out.null = r.null as boolean;
+  if (r.arrayElementType !== undefined) {
+    out.arrayElementType = r.arrayElementType as string;
   }
   return out;
 }
@@ -283,10 +344,38 @@ function main(): void {
   process.exit(0);
 }
 
-try {
-  main();
-} catch (err: unknown) {
-  const msg = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`trails-tsc: ${msg}\n`);
-  process.exit(1);
+// Run main() only when this module is invoked as a binary, not when
+// imported (e.g. by tests that exercise `loadSchemaColumns` directly).
+// Compare decoded filesystem paths to sidestep URL-encoding pitfalls
+// (spaces, Windows drive letters + backslashes) that would trip up a
+// naive `import.meta.url === "file://" + path.resolve(entry)` check.
+const invokedDirectly = (() => {
+  try {
+    const entry = process.argv[1];
+    if (!entry) return false;
+    // Resolve both sides through symlinks so package-manager bin
+    // shims (e.g. `node_modules/.bin/trails-tsc` → the real cli.js)
+    // still match. Without realpath, a shim invocation would leave
+    // `main()` unrun and the CLI becomes a no-op.
+    const resolveReal = (p: string): string => {
+      try {
+        return fs.realpathSync(p);
+      } catch {
+        return path.resolve(p);
+      }
+    };
+    return resolveReal(fileURLToPath(import.meta.url)) === resolveReal(entry);
+  } catch {
+    return false;
+  }
+})();
+
+if (invokedDirectly) {
+  try {
+    main();
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`trails-tsc: ${msg}\n`);
+    process.exit(1);
+  }
 }

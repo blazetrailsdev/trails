@@ -22,7 +22,12 @@ export interface TrailsBuildOptions {
    * virtualizing host so schema-only columns get declares across the
    * whole solution.
    */
-  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  schemaColumnsByTable?: Readonly<
+    Record<
+      string,
+      Readonly<Record<string, import("../type-virtualization/synthesize.js").SchemaColumnValue>>
+    >
+  >;
 }
 
 /**
