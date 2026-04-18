@@ -325,6 +325,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return `EXPLAIN ${parts} for:`;
   }
 
+  // `quote()` and `typeCast()` are inherited from AbstractMysqlAdapter,
+  // which delegates to `mysql/quoting.ts`. No Mysql2-specific override
+  // needed — they'd be duplicates.
+
   /**
    * Set of MySQL EXPLAIN flags that are safe to interpolate into the
    * EXPLAIN clause. MySQL 8.0.18+ supports `EXPLAIN ANALYZE`; older

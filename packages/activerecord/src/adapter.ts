@@ -82,6 +82,48 @@ export interface DatabaseAdapter {
    */
   buildExplainClause?(options?: string[]): string;
 
+  /**
+   * Quote a value for inclusion in a SQL literal (e.g. `"'foo'"`,
+   * `"42"`, `"NULL"`, `"x'DEADBEEF'"`). Concrete adapters override to
+   * use their own string-escape rules — SQLite: `'' only`; PG: `E'\\'`
+   * form when backslash present; MySQL: `\0 \n \r \Z \\` via
+   * MYSQL_ESCAPE_MAP.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote
+   */
+  quote?(value: unknown): string;
+
+  /**
+   * Cast a value to the primitive form drivers expect for binds.
+   * Returns an **unquoted** primitive suitable for passing as a bind
+   * value — distinct from `quote()`, which returns a SQL literal
+   * with its surrounding quotes already attached.
+   *
+   * Adapter-specific behavior (mirrors Rails):
+   * - **booleans**: SQLite / MySQL collapse to `1` / `0`; PostgreSQL
+   *   keeps them as `true` / `false`.
+   * - **Date**: returned as an **unquoted** formatted string
+   *   (`"YYYY-MM-DD HH:MM:SS"` with optional `.microseconds` when
+   *   milliseconds > 0 — matches Rails' `value.to_formatted_s(:db)`).
+   *   `quote()` is responsible for wrapping it in single quotes.
+   * - **null**: returned unchanged.
+   * - **undefined**: adapter-dependent — SQLite coerces to `null`
+   *   to match its nullable-column semantics; PG / MySQL /
+   *   abstract pass through unchanged.
+   * - **strings / numbers / bigints**: passed through.
+   * - **symbols**: adapter-dependent — abstract / MySQL / PG use
+   *   the symbol's description when present and fall back to
+   *   `String(symbol)` otherwise; SQLite coerces description-less
+   *   symbols to `null`.
+   *
+   * Rails' `render_bind` uses this rather than `quote()` so EXPLAIN
+   * headers show the actual bind values instead of their SQL-literal
+   * form.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#type_cast
+   */
+  typeCast?(value: unknown): unknown;
+
   // --- DatabaseStatements (Rails mixin) ---
   // Mirrors ActiveRecord::ConnectionAdapters::DatabaseStatements.
   // Default implementations delegate to execute()/executeMutation().

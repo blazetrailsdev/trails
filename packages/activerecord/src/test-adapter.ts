@@ -690,6 +690,26 @@ class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements Databas
     return `EXPLAIN (${options.map((o) => o.toUpperCase()).join(", ")}) for:`;
   }
 
+  quote(value: unknown): string {
+    const inner = this.inner as { quote?: (v: unknown) => string };
+    if (typeof inner.quote === "function") return inner.quote(value);
+    // `String(value)` is NOT a safe SQL literal for strings / Dates,
+    // and silently using it would produce broken or unsafe SQL. Throw
+    // loudly so the gap surfaces — every adapter we wrap in practice
+    // implements `quote()`.
+    throw new Error(
+      `SchemaAdapter.quote: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quote()`,
+    );
+  }
+
+  typeCast(value: unknown): unknown {
+    const inner = this.inner as { typeCast?: (v: unknown) => unknown };
+    if (typeof inner.typeCast === "function") return inner.typeCast(value);
+    throw new Error(
+      `SchemaAdapter.typeCast: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement typeCast()`,
+    );
+  }
+
   async cleanup(): Promise<void> {
     await dropAllTables(this.inner);
   }

@@ -46,6 +46,7 @@ import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { touchAttributesWithTime } from "./timestamp.js";
 import { ExplainRegistry } from "./explain-registry.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { rubyInspectArray } from "./relation/ruby-inspect.js";
 
 /**
  * A Relation returned from `load()` / `reload()` — a normal Relation with
@@ -1671,7 +1672,7 @@ export class Relation<T extends Base> {
     const parts: string[] = [];
     for (const [sql, binds] of effective) {
       let msg = `${clause} ${sql}`;
-      if (binds.length > 0) msg += ` ${this._renderExplainBinds(binds)}`;
+      if (binds.length > 0) msg += ` ${this._renderExplainBinds(adapter, binds)}`;
       const plan = await adapter.explain(sql, binds, options);
       parts.push(`${msg}\n${plan}`);
     }
@@ -1679,24 +1680,120 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Render a bind array for the EXPLAIN header. Reuses the BigInt-safe
-   * replacer from `log-subscriber.ts`'s `safeJsonStringify` so a bigint
-   * (from trails' `BigIntegerType`) coerces to its string form in the
-   * output — `["1"]` — rather than throwing, the way raw
-   * `JSON.stringify` would.
+   * Render a bind array for the EXPLAIN header. Mirrors Rails'
+   * `exec_explain` rendering:
    *
-   * This is a positional-values-only rendering, deliberately simpler
-   * than LogSubscriber's output: LogSubscriber formats each bind as a
-   * `[name, type_casted_value]` pair (the attribute-name prefix lets
-   * you read the log against the query text). `exec_explain` doesn't
-   * carry attribute names down to this point, and the Rails
-   * equivalent — `render_bind(c, attr).inspect` on the values — is
-   * also a positional list. So we match Rails' shape, not
-   * LogSubscriber's, and the log/explain outputs are intentionally
-   * different at this site.
+   *     msg << binds.map { |attr| render_bind(c, attr) }.inspect
+   *
+   * where `render_bind` does `connection.type_cast(attr.value_for_database)`
+   * — so each bind comes out as its primitive DB-cast value, then
+   * Ruby's `Array#inspect` formats the list (strings double-quoted,
+   * numbers bare, nil as `nil`).
+   *
+   * Rails' `render_bind` returns `[attr.name, value]` pairs when the
+   * bind is an Attribute object; `ExplainRegistry` collects plain
+   * values (no Attribute wrappers here), so we emit the value-only
+   * form — same shape, just without the `[name, value]` tuples.
+   *
+   * Some adapters' `typeCast` can legitimately return non-primitive
+   * shapes (PG's `BinaryData` comes out as `{ value, format }`);
+   * `_normalizeExplainBindValue` below reduces those to something
+   * rubyInspect can render cleanly, and handles binary data the way
+   * Rails' `render_bind` does: `<N bytes of binary data>`.
    */
-  private _renderExplainBinds(binds: unknown[]): string {
-    return JSON.stringify(binds, (_key, v) => (typeof v === "bigint" ? v.toString() : v));
+  private _renderExplainBinds(adapter: DatabaseAdapter, binds: unknown[]): string {
+    const casted = binds.map((b) => {
+      // Rails' `render_bind` short-circuits binary-typed binds BEFORE
+      // calling type_cast:
+      //   if attr.type.binary? && attr.value
+      //     "<#{attr.value_for_database.to_s.bytesize} bytes of binary data>"
+      //   else
+      //     connection.type_cast(attr.value_for_database)
+      //   end
+      // We don't have attribute types at this layer, so we detect
+      // binary structurally (Buffer / Uint8Array / ArrayBuffer) before
+      // handing the value to typeCast — some adapters' typeCast throws
+      // on buffer shapes because they're not bindable primitives.
+      const binaryBytes = this._binaryByteLength(b);
+      if (binaryBytes !== null) return `<${binaryBytes} bytes of binary data>`;
+      if (typeof adapter.typeCast !== "function") {
+        // Match the "throw loudly" contract the SchemaAdapter /
+        // QueryCacheAdapter wrappers use — a silent fallback would
+        // make EXPLAIN output depend on whether the adapter
+        // happens to implement `typeCast`, and nothing we ship does
+        // without it.
+        throw new Error(
+          `Relation#explain: adapter ${this._modelClass.adapter.adapterName} does not implement typeCast()`,
+        );
+      }
+      return this._normalizeExplainBindValue(adapter.typeCast(b));
+    });
+    return rubyInspectArray(casted);
+  }
+
+  /**
+   * Reduce a typeCast'd bind value to a form `rubyInspect` can render
+   * as a primitive:
+   *   - binary (Buffer / Uint8Array / ArrayBuffer) → `"<N bytes of
+   *     binary data>"`, matching Rails' `render_bind` binary branch.
+   *   - PG-style bind wrappers (`{ value, format }` from
+   *     `pg/quoting.ts`'s `BinaryBind` shape) → unwrap `.value` and
+   *     normalize recursively.
+   *   - Dates / primitives (including symbols handled by typeCast
+   *     earlier) → pass through.
+   *   - Anything else → `JSON.stringify`, falling back to
+   *     `Object.prototype.toString.call` when non-serializable.
+   *
+   * Mirrors: the binary branch of
+   * ActiveRecord::Relation#render_bind.
+   */
+  private _normalizeExplainBindValue(value: unknown): unknown {
+    if (
+      value === null ||
+      value === undefined ||
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "bigint" ||
+      typeof value === "boolean"
+    ) {
+      return value;
+    }
+    // Dates CAN slip past typeCast if an adapter returns them
+    // unchanged (e.g. a future adapter that skips Date formatting).
+    // Coerce to ISO-ish string so rubyInspect renders
+    // `"2026-01-02T12:34:56.000Z"` rather than `"[object Date]"`
+    // via JSON.stringify (which would double-quote the date).
+    if (value instanceof Date) return value.toISOString();
+    const binaryBytes = this._binaryByteLength(value);
+    if (binaryBytes !== null) return `<${binaryBytes} bytes of binary data>`;
+    if (typeof value === "object") {
+      // Bind-wrapper objects like PG's BinaryBind (`{ value, format }`)
+      // — recurse on `.value` so the inspected form shows the payload
+      // rather than the wrapper envelope.
+      const keys = Object.keys(value as object);
+      if (
+        "value" in (value as object) &&
+        keys.length > 0 &&
+        keys.every((k) => k === "value" || k === "format")
+      ) {
+        return this._normalizeExplainBindValue((value as { value: unknown }).value);
+      }
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return Object.prototype.toString.call(value);
+      }
+    }
+    return String(value);
+  }
+
+  private _binaryByteLength(value: unknown): number | null {
+    if (typeof Buffer !== "undefined" && value instanceof Buffer) return value.byteLength;
+    if (typeof ArrayBuffer !== "undefined") {
+      if (value instanceof ArrayBuffer) return value.byteLength;
+      if (ArrayBuffer.isView(value)) return (value as ArrayBufferView).byteLength;
+    }
+    return null;
   }
 
   /**

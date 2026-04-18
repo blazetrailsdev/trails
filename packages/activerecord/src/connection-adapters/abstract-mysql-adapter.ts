@@ -11,7 +11,11 @@
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Nodes } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
-import { quoteString as mysqlQuoteString } from "./mysql/quoting.js";
+import {
+  quoteString as mysqlQuoteString,
+  quote as mysqlQuote,
+  typeCast as mysqlTypeCast,
+} from "./mysql/quoting.js";
 
 const NATIVE_DATABASE_TYPES: Record<string, { name: string; limit?: number }> = {
   primary_key: { name: "bigint auto_increment PRIMARY KEY" },
@@ -51,6 +55,33 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   get adapterName(): string {
     return "Mysql2";
+  }
+
+  /**
+   * Quote a value using MySQL-family escape rules (`\0 \n \r \Z \\ ''`
+   * via MYSQL_ESCAPE_MAP, booleans as `1/0`, Dates as
+   * `'YYYY-MM-DD HH:MM:SS[.microseconds]'`). Defined here so every
+   * MySQL-family adapter (Mysql2, Trilogy) inherits MySQL semantics
+   * by default without needing to override themselves; without this,
+   * Trilogy would fall through to the abstract SQL-92 defaults
+   * (booleans → `TRUE/FALSE`, plain `''` string escaping) and
+   * diverge from Rails.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#quote
+   */
+  override quote(value: unknown): string {
+    return mysqlQuote(value);
+  }
+
+  /**
+   * Cast a value to the primitive form MySQL drivers expect for
+   * binds. Same motivation as `quote()` above — inherited by
+   * Trilogy so it gets MySQL semantics automatically.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#type_cast
+   */
+  override typeCast(value: unknown): unknown {
+    return mysqlTypeCast(value);
   }
 
   isMariadb(): boolean {

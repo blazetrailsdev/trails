@@ -220,5 +220,37 @@ describe("SQLite3::Quoting", () => {
     it("throws on unsupported types", () => {
       expect(() => typeCast({})).toThrow(TypeError);
     });
+
+    it("formats Date as the unquoted :db form (no surrounding quotes, no trailing .000)", () => {
+      // typeCast's contract is to return an **unquoted** primitive;
+      // `quote()` adds the surrounding single quotes. Delegates to
+      // `abstract/quoting.ts:quotedDate` so fractional seconds show
+      // up only when ms > 0 (Rails' `:db` behavior) rather than
+      // always `.000` like `toISOString`.
+      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
+      const out = typeCast(d) as string;
+      expect(out.startsWith("'")).toBe(false);
+      expect(out.endsWith("'")).toBe(false);
+      expect(out).toBe("2026-04-18 12:34:56");
+      expect(out).not.toMatch(/\.000$/);
+    });
+
+    it("includes microseconds on Date when milliseconds are non-zero", () => {
+      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56, 123));
+      const out = typeCast(d) as string;
+      expect(out).toMatch(/^2026-04-18 12:34:56\.\d{6}$/);
+    });
+  });
+
+  describe("quote(Date)", () => {
+    it("wraps the :db form with single quotes (consistent with typeCast)", () => {
+      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
+      expect(quote(d)).toBe("'2026-04-18 12:34:56'");
+    });
+
+    it("includes microseconds on Date when milliseconds are non-zero", () => {
+      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56, 123));
+      expect(quote(d)).toMatch(/^'2026-04-18 12:34:56\.\d{6}'$/);
+    });
   });
 });

@@ -302,6 +302,26 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return `EXPLAIN (${parts}) for:`;
   }
 
+  quote(value: unknown): string {
+    const inner = this.inner as { quote?: (v: unknown) => string };
+    if (typeof inner.quote === "function") return inner.quote(value);
+    // `String(value)` is NOT a safe SQL literal (doesn't escape, doesn't
+    // wrap strings in quotes, doesn't format Dates). Throw instead of
+    // returning unsafe output — every wrapped adapter we ship implements
+    // `quote()`.
+    throw new Error(
+      `QueryCacheAdapter.quote: wrapped ${this.inner.adapterName} does not implement quote()`,
+    );
+  }
+
+  typeCast(value: unknown): unknown {
+    const inner = this.inner as { typeCast?: (v: unknown) => unknown };
+    if (typeof inner.typeCast === "function") return inner.typeCast(value);
+    throw new Error(
+      `QueryCacheAdapter.typeCast: wrapped ${this.inner.adapterName} does not implement typeCast()`,
+    );
+  }
+
   // --- DatabaseStatements ---
   // Read methods go through this.execute() to leverage the query cache.
   // Write methods go through this.executeMutation() to clear the cache.

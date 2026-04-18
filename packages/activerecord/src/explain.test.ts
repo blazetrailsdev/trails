@@ -215,26 +215,69 @@ describe("ExplainTest", () => {
     expect(plan.toLowerCase()).toContain("select");
   });
 
-  it("renders BigInt binds without JSON.stringify crashing", async () => {
-    // _renderExplainBinds is the thing we're guarding — plain
-    // `JSON.stringify(BigInt(...))` throws TypeError; the replacer
-    // coerces bigints to their string form, so `[BigInt(42)]` renders
-    // as `["42"]` (quoted, matching log-subscriber.ts's
-    // `safeJsonStringify`). `Relation#explain` on sqlite interpolates
-    // where-literals into the SQL rather than issuing prepared-
-    // statement binds, so we verify the rendering helper directly —
-    // that's the surface this test is guarding.
+  it("renders binds via adapter.typeCast + Ruby-inspect form", async () => {
+    // Mirrors Rails' `exec_explain`:
+    //   binds.map { |attr| render_bind(c, attr) }.inspect
+    // where `render_bind` does
+    // `connection.type_cast(attr.value_for_database)`. That produces
+    // Ruby's `Array#inspect` output: strings double-quoted, numbers
+    // bare, nil as `nil`, booleans as `true/false`. The BigInt case
+    // is the one that used to crash raw `JSON.stringify`.
     const { Post } = makeModel();
     const rel = Post.all() as unknown as {
-      _renderExplainBinds: (binds: unknown[]) => string;
+      _renderExplainBinds: (a: DatabaseAdapter, binds: unknown[]) => string;
     };
-    expect(rel._renderExplainBinds([BigInt(42), "str", 7])).toBe('["42","str",7]');
-    // Make sure the end-to-end path still returns output (no crash
-    // even when binds are absent — this is the path `Relation#explain`
-    // actually takes on sqlite).
+    // Booleans go through the adapter's typeCast: SQLite collapses
+    // them to 1/0, PG/MySQL keep them as true/false. So the rendered
+    // form differs by backend; assert both halves independently.
+    const rendered = rel._renderExplainBinds(adapter, [BigInt(42), "str", 7, null, true, false]);
+    expect(rendered.startsWith('[42, "str", 7, nil, ')).toBe(true);
+    expect(rendered).toMatch(/\b(1, 0|true, false)\]$/);
+    // End-to-end on sqlite: where-literals are interpolated into the
+    // SQL (no binds reach the adapter), so the round-trip still
+    // returns non-empty output.
     await Post.create({ title: "x" });
     const plan = await Post.all().explain();
     expect(plan.length).toBeGreaterThan(0);
+  });
+
+  it("renders binary binds as '<N bytes of binary data>' (Rails parity)", async () => {
+    // Rails' `render_bind` special-cases binary-typed attrs:
+    //   "<#{attr.value_for_database.to_s.bytesize} bytes of binary data>"
+    // We reach the same result structurally — after typeCast, any
+    // Buffer / Uint8Array / ArrayBuffer bind gets normalized to the
+    // same byte-count string before rubyInspect sees it, so an
+    // EXPLAIN over a BYTEA/BLOB column doesn't dump the raw buffer.
+    const { Post } = makeModel();
+    const rel = Post.all() as unknown as {
+      _renderExplainBinds: (a: DatabaseAdapter, binds: unknown[]) => string;
+    };
+    const buf = Buffer.from("hello world"); // 11 bytes
+    const u8 = new Uint8Array([1, 2, 3, 4, 5]); // 5 bytes
+    const rendered = rel._renderExplainBinds(adapter, [buf, u8]);
+    expect(rendered).toBe('["<11 bytes of binary data>", "<5 bytes of binary data>"]');
+  });
+
+  it("unwraps PG-style { value, format } bind shapes when rendering", async () => {
+    // PG's `typeCast(BinaryData)` returns `{ value, format }` — the
+    // raw wrapper would stringify to "[object Object]" via
+    // `rubyInspect`'s object fallback. Normalization recurses on
+    // `.value` so we show the actual payload instead of the envelope.
+    const { Post } = makeModel();
+    const rel = Post.all() as unknown as {
+      _renderExplainBinds: (a: DatabaseAdapter, binds: unknown[]) => string;
+    };
+    // Skip typeCast here — we're testing the normalization of a
+    // pre-cast bind-wrapper value. The inner adapter.typeCast call
+    // would pass these objects through unchanged on non-PG adapters.
+    const stub = {
+      typeCast: (v: unknown) => v,
+    } as unknown as DatabaseAdapter;
+    const rendered = rel._renderExplainBinds(stub, [
+      { value: "raw", format: 1 },
+      { value: 42, format: 0 },
+    ]);
+    expect(rendered).toBe('["raw", 42]');
   });
 
   it("isolates concurrent explain() calls via AsyncLocalStorage scopes", async () => {

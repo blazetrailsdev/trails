@@ -25,6 +25,7 @@ import {
   type QueryCacheHost,
 } from "./abstract/query-cache.js";
 import { DatabaseStatementsMixin } from "./database-statements-mixin.js";
+import { quote as abstractQuote, typeCast as abstractTypeCast } from "./abstract/quoting.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
@@ -108,6 +109,47 @@ export class AbstractAdapter extends AbstractAdapterBase {
     if (options.length === 0) return "EXPLAIN for:";
     const parts = options.map((o) => o.toUpperCase()).join(", ");
     return `EXPLAIN (${parts}) for:`;
+  }
+
+  /**
+   * Quote a value for inclusion in a SQL literal. Concrete adapters
+   * override to use their own string-escape rules (SQLite: `'' only`;
+   * PG: `E'\\' escape form`; MySQL: escapes `\0 \n \r \Z \\`). The
+   * abstract default is SQL-92 with `'' only`, suitable for
+   * identifier-quoting tests and for adapters that haven't specialized
+   * yet.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote
+   */
+  quote(value: unknown): string {
+    return abstractQuote(value);
+  }
+
+  /**
+   * Cast a value to the primitive form drivers expect for binds.
+   * Returns an **unquoted** primitive suitable for passing as a bind
+   * value (distinct from `quote()`, which returns a SQL literal with
+   * surrounding quotes attached).
+   *
+   * Abstract defaults mirror `abstract/quoting.ts`:
+   * - booleans pass through as `true` / `false` (adapters override —
+   *   SQLite / MySQL collapse to `1` / `0`, PG keeps `true` / `false`)
+   * - Date → unquoted `"YYYY-MM-DD HH:MM:SS"` with optional
+   *   `.microseconds` when milliseconds > 0 (no surrounding quotes;
+   *   matches Rails' `value.to_formatted_s(:db)`)
+   * - null → returned unchanged; undefined passes through too at
+   *   the abstract level (SQLite overrides to coerce `undefined →
+   *   null` for its nullable-column semantics)
+   * - strings / numbers / bigints → passed through
+   *
+   * Used by `Relation#_renderExplainBinds` to mirror Rails'
+   * `render_bind(c, attr)` which does
+   * `connection.type_cast(attr.value_for_database)`.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#type_cast
+   */
+  typeCast(value: unknown): unknown {
+    return abstractTypeCast(value);
   }
 
   /**
