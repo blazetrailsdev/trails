@@ -1,5 +1,6 @@
 import { Table, Nodes, sql as arelSql } from "@blazetrails/arel";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
+import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
 import { RangeHandler } from "./predicate-builder/range-handler.js";
 import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js";
@@ -31,7 +32,7 @@ export class PredicateBuilder {
     this.table = table;
     this.arrayHandler = new ArrayHandler(this);
     this.rangeHandler = new RangeHandler();
-    this.basicObjectHandler = new BasicObjectHandler();
+    this.basicObjectHandler = new BasicObjectHandler(this);
     this.relationHandler = new RelationHandler();
   }
 
@@ -223,9 +224,12 @@ export class PredicateBuilder {
     this.handlers.push([klass, handler]);
   }
 
-  buildBindAttribute(columnName: string, value: unknown): Nodes.Node {
-    const attr = this.resolveColumn(columnName);
-    return this.build(attr, value);
+  buildBindAttribute(columnName: string, value: unknown): QueryAttribute {
+    const type = this.table.typeForAttribute(columnName) as
+      | { cast(v: unknown): unknown; serialize(v: unknown): unknown }
+      | undefined;
+    const castType = type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v };
+    return new QueryAttribute(columnName, value, castType);
   }
 
   resolveArelAttribute(tableName: string, columnName: string): Nodes.Attribute {

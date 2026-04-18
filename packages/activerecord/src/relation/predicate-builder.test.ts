@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Table, Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
+import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 
 describe("PredicateBuilderTest", () => {
@@ -104,6 +105,49 @@ describe("PredicateBuilderTest", () => {
       const sql = compile(node);
       expect(sql).toContain('"posts"."author_id"');
       expect(sql).toContain("7");
+    });
+  });
+
+  describe("QueryAttribute bind handling", () => {
+    it("buildBindAttribute creates a QueryAttribute", () => {
+      const table = new Table("users");
+      const builder = new PredicateBuilder(table);
+      const qa = builder.buildBindAttribute("name", "alice");
+      expect(qa.name).toBe("name");
+      expect(qa.value).toBe("alice");
+    });
+
+    it("BasicObjectHandler routes through buildBindAttribute", () => {
+      const table = new Table("users");
+      const builder = new PredicateBuilder(table);
+      const node = builder.build(table.get("name"), "alice");
+      const visitor = new Visitors.ToSql();
+      const [sql, binds] = visitor.compileWithBinds(node);
+      expect(sql).toContain('"users"."name" = ?');
+      expect(binds).toHaveLength(1);
+    });
+
+    it("Substitute flows through as BindParam via QueryAttribute", () => {
+      const table = new Table("users");
+      const builder = new PredicateBuilder(table);
+      const node = builder.build(table.get("name"), new Substitute());
+      const visitor = new Visitors.ToSql();
+      const [sql, binds] = visitor.compileWithBinds(node);
+      expect(sql).toContain('"users"."name" = ?');
+      expect(binds).toHaveLength(1);
+      // The bind is the Substitute itself (unwrapped from QueryAttribute
+      // via valueForDatabase → identity type serialize)
+      expect(binds[0]).toBeInstanceOf(Substitute);
+    });
+
+    it("compile inlines QueryAttribute values for display SQL", () => {
+      const table = new Table("users");
+      const builder = new PredicateBuilder(table);
+      const node = builder.build(table.get("name"), "alice");
+      const visitor = new Visitors.ToSql();
+      const sql = visitor.compile(node);
+      expect(sql).toContain('"users"."name"');
+      expect(sql).toContain("alice");
     });
   });
 });

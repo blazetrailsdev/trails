@@ -17,6 +17,7 @@ import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
 import { Quoted, Casted } from "../nodes/casted.js";
+import { BindParam } from "../nodes/bind-param.js";
 import { Grouping } from "../nodes/grouping.js";
 import { And } from "../nodes/and.js";
 import { Or } from "../nodes/or.js";
@@ -108,6 +109,17 @@ export class Attribute extends Node {
   private buildCasted(value: unknown): Node {
     if (value instanceof Node) return value;
     if (value === null || value === undefined) return new Quoted(null);
+    // QueryAttribute and similar bind objects have valueForDatabase —
+    // wrap them in BindParam so the visitor extracts them as binds
+    // rather than inlining via Casted.
+    if (
+      value &&
+      typeof value === "object" &&
+      typeof (value as Record<string, unknown>).valueForDatabase === "function" &&
+      typeof (value as Record<string, unknown>).name === "string"
+    ) {
+      return new BindParam(value);
+    }
     return new Casted(value, this);
   }
 
