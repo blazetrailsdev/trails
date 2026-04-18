@@ -21,7 +21,7 @@
  */
 
 import type { DatabaseAdapter } from "./adapter.js";
-import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
+import { introspectTables, introspectColumns } from "./schema-introspection.js";
 
 export interface DumpSchemaColumnsOptions {
   /**
@@ -60,37 +60,17 @@ type AdapterColumn = {
   null?: boolean | null;
 };
 
-type AdapterWithTables = { tables(): Promise<string[]> };
-type AdapterWithColumns = { columns(table: string): Promise<AdapterColumn[]> };
-
-function hasTables(a: unknown): a is AdapterWithTables {
-  return typeof (a as AdapterWithTables).tables === "function";
-}
-function hasColumns(a: unknown): a is AdapterWithColumns {
-  return typeof (a as AdapterWithColumns).columns === "function";
-}
-
 export async function dumpSchemaColumns(
   adapter: DatabaseAdapter,
   options: DumpSchemaColumnsOptions = {},
 ): Promise<Record<string, Record<string, DumpColumnSchema>>> {
-  // Prefer the adapter's own `tables()` / `columns()` when present —
-  // PostgreSQL and SQLite adapters implement them with adapter-
-  // specific semantics (e.g. PG respects the current `search_path`).
-  // SchemaStatements is the portable fallback for adapters that don't.
-  let schema: SchemaStatements | undefined;
-  const schemaStatements = () => (schema ??= new SchemaStatements(adapter));
-
   const ignore = new Set([...ALWAYS_IGNORED, ...(options.ignoreTables ?? [])]);
 
-  const rawTables = hasTables(adapter) ? await adapter.tables() : await schemaStatements().tables();
-  const tables = rawTables.filter((t) => !ignore.has(t)).sort();
+  const tables = (await introspectTables(adapter)).filter((t) => !ignore.has(t)).sort();
 
   const out: Record<string, Record<string, DumpColumnSchema>> = Object.create(null);
   for (const table of tables) {
-    const cols = hasColumns(adapter)
-      ? await adapter.columns(table)
-      : await schemaStatements().columns(table);
+    const cols = await introspectColumns(adapter, table);
     const colMap: Record<string, DumpColumnSchema> = Object.create(null);
     const sorted = [...cols].sort((a, b) => a.name.localeCompare(b.name));
     for (const col of sorted) {

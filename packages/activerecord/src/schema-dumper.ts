@@ -16,20 +16,26 @@ import {
   type IndexInfo,
 } from "./connection-adapters/abstract/schema-dumper.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { introspectTables, introspectColumns } from "./schema-introspection.js";
 
 class AdapterSchemaSource implements SchemaSource {
+  private _adapter: DatabaseAdapter;
+  // Only needed for indexes() — tables/columns go through the shared
+  // introspectTables/introspectColumns helpers so the adapter's own
+  // `tables()` / `columns()` are honored (matching `dumpSchemaColumns`).
   private _schema: SchemaStatements;
 
   constructor(adapter: DatabaseAdapter) {
+    this._adapter = adapter;
     this._schema = new SchemaStatements(adapter);
   }
 
   async tables(): Promise<string[]> {
-    return this._schema.tables();
+    return introspectTables(this._adapter);
   }
 
   async columns(tableName: string): Promise<ColumnInfo[]> {
-    const cols = await this._schema.columns(tableName);
+    const cols = await introspectColumns(this._adapter, tableName);
     return cols.map((col) => ({
       name: col.name,
       type: col.sqlType || col.type || "unknown",
