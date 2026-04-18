@@ -149,7 +149,7 @@ export function cacheableQuery(
   }
 
   if (klass.partialQuery) {
-    return [klass.partialQuery(sql), binds as unknown[]];
+    return [klass.partialQuery(typeof sql === "string" ? [sql] : sql), binds as unknown[]];
   }
 
   // Fallback: use query if available, otherwise raw SQL
