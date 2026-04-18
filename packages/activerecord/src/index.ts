@@ -152,6 +152,8 @@ export type {
   ColumnInfo,
   IndexInfo,
 } from "./connection-adapters/abstract/schema-dumper.js";
+export { dumpSchemaColumns } from "./schema-columns-dump.js";
+export type { DumpSchemaColumnsOptions } from "./schema-columns-dump.js";
 export {
   ActiveRecordError,
   SubclassNotFound,

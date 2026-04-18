@@ -32,7 +32,8 @@
     }
   },
   "bin": {
-    "trails-tsc": "./dist/tsc-wrapper/cli.js"
+    "trails-tsc": "./dist/tsc-wrapper/cli.js",
+    "trails-schema-dump": "./dist/bin/trails-schema-dump.js"
   },
   "scripts": {
     "build": "tsc"
