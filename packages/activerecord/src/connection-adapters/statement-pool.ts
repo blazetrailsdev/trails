@@ -42,6 +42,11 @@ export class StatementPool<T = unknown> {
     return this._statements.has(key);
   }
 
+  /** Alias for has() — mirrors Ruby's key? */
+  isKey(key: string): boolean {
+    return this.has(key);
+  }
+
   delete(key: string): T | undefined {
     if (!this._statements.has(key)) return undefined;
     const stmt = this._statements.get(key) as T;

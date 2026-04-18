@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
-import { QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
+import { QueryCache, QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
 
 function setup() {
   const inner = createTestAdapter();
@@ -427,5 +427,46 @@ describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
   });
   it.skip("payload with open transaction", () => {
     /* needs notification payload */
+  });
+});
+
+describe("QueryCache executor hooks", () => {
+  it("run enables query cache on all adapters", () => {
+    const inner = createTestAdapter();
+    const a1 = new QueryCacheAdapter(inner);
+    const a2 = new QueryCacheAdapter(inner);
+    expect(a1.cache.enabled).toBe(false);
+    expect(a2.cache.enabled).toBe(false);
+    QueryCache.run([a1, a2]);
+    expect(a1.cache.enabled).toBe(true);
+    expect(a2.cache.enabled).toBe(true);
+  });
+
+  it("complete disables and clears query cache", async () => {
+    const inner = createTestAdapter();
+    const adapter = new QueryCacheAdapter(inner);
+    adapter.enableQueryCache();
+    await adapter.cache.computeIfAbsent("SELECT 1", async () => [{ id: 1 }]);
+    expect(adapter.cache.size).toBe(1);
+    QueryCache.complete([adapter]);
+    expect(adapter.cache.enabled).toBe(false);
+    expect(adapter.cache.size).toBe(0);
+  });
+
+  it("installExecutorHooks wires run/complete to executor", () => {
+    const inner = createTestAdapter();
+    const adapter = new QueryCacheAdapter(inner);
+    let hook: { run(): void; complete(): void } | null = null;
+    const executor = {
+      registerHook(h: { run(): void; complete(): void }) {
+        hook = h;
+      },
+    };
+    QueryCache.installExecutorHooks(executor, [adapter]);
+    expect(hook).not.toBeNull();
+    hook!.run();
+    expect(adapter.cache.enabled).toBe(true);
+    hook!.complete();
+    expect(adapter.cache.enabled).toBe(false);
   });
 });

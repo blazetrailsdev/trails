@@ -98,6 +98,13 @@ describe("StatementPoolTest", () => {
     expect(pool.has("b")).toBe(false);
     expect(pool.has("c")).toBe(true);
   });
+
+  it("isKey is an alias for has", () => {
+    const pool = new StatementPool<string>();
+    pool.set("a", "1");
+    expect(pool.isKey("a")).toBe(true);
+    expect(pool.isKey("b")).toBe(false);
+  });
 });
 
 describe("SQLite3 StatementPool integration", () => {
