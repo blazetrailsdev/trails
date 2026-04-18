@@ -1993,6 +1993,15 @@ export class Base extends Model {
       return instantiateSti(stiBase, row) as InstanceType<T>;
     }
 
+    // Ensure schema reflection has populated _attributeDefinitions with
+    // adapter-resolved cast types before hydrating from the row —
+    // otherwise writeFromDatabase falls back to ValueType and PG OID
+    // casts (uuid/jsonb/hstore/inet/range) are lost. Sync path only
+    // reads an already-populated schema cache; the preceding query
+    // would have populated it.
+
+    (ModelSchema.loadSchema as any).call(this);
+
     const record = new this() as InstanceType<T>;
     // Load DB values through deserialize (not cast) so encrypted types decrypt
     for (const [key, value] of Object.entries(row)) {
