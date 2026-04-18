@@ -9,6 +9,8 @@
 
 import { Event } from "./notifications/instrumenter.js";
 import type { EventPayload } from "./notifications/instrumenter.js";
+import { getAsyncContext } from "./async-context-adapter.js";
+import type { AsyncContext } from "./async-context-adapter.js";
 
 export type NotificationSubscriber = {
   readonly pattern: string | RegExp | null;
@@ -27,7 +29,43 @@ type Subscriber = {
  */
 export class Notifications {
   private static _subscribers: Set<Subscriber> = new Set();
-  private static _eventStack: Event[] = [];
+
+  /**
+   * Event-nesting stack, scoped per async context.
+   *
+   * Rails tracks the instrumenter stack per-fiber via
+   * `ActiveSupport::IsolatedExecutionState` — so concurrent events
+   * in different fibers (or in our case, different async chains) can
+   * never pop each other's entries. In Node we need the same guarantee
+   * because `instrumentAsync` awaits user code between push and pop; a
+   * shared process-global array corrupts under `Promise.all(...)` over
+   * instrumented calls (event A pushes → B pushes → A awaits → B
+   * awaits → A pops B's entry).
+   *
+   * Fallback stack is used when no AsyncContext scope is established
+   * (e.g. top-level code before any async hop). Once we're inside an
+   * async chain, `_eventStack()` returns the per-context slot.
+   */
+  private static _fallbackStack: Event[] = [];
+  private static _stackContext: AsyncContext<Event[]> | null = null;
+  private static _stackContextAdapter: ReturnType<typeof getAsyncContext> | null = null;
+
+  private static _getStackContext(): AsyncContext<Event[]> {
+    const adapter = getAsyncContext();
+    if (!this._stackContext || this._stackContextAdapter !== adapter) {
+      this._stackContextAdapter = adapter;
+      this._stackContext = adapter.create<Event[]>();
+    }
+    return this._stackContext;
+  }
+
+  private static _eventStack(): Event[] {
+    return this._getStackContext().getStore() ?? this._fallbackStack;
+  }
+
+  private static _runWithStack<T>(stack: Event[], fn: () => T): T {
+    return this._getStackContext().run(stack, fn);
+  }
 
   // -------------------------------------------------------------------------
   // Subscription
@@ -95,7 +133,8 @@ export class Notifications {
     const event = new Event(name, new Date(), payload ?? {});
 
     // Track nesting for child events
-    const parent = this._eventStack[this._eventStack.length - 1];
+    const current = this._eventStack();
+    const parent = current[current.length - 1];
     if (parent) {
       parent.children.push(event);
     }
@@ -106,12 +145,15 @@ export class Notifications {
       return undefined as any;
     }
 
-    this._eventStack.push(event);
+    // Run `block` inside a forked stack with `event` pushed. Because
+    // the fork is AsyncContext-scoped, sibling concurrent instruments
+    // can't see or pop `event` from here — and we never need an
+    // explicit pop, the scope just ends.
+    const inner = [...current, event];
     let result: T;
     try {
-      result = block();
+      result = this._runWithStack(inner, block);
     } finally {
-      this._eventStack.pop();
       event.finish();
       this._notify(event);
     }
@@ -128,7 +170,8 @@ export class Notifications {
   ): Promise<T extends undefined ? void : T> {
     const event = new Event(name, new Date(), payload ?? {});
 
-    const parent = this._eventStack[this._eventStack.length - 1];
+    const current = this._eventStack();
+    const parent = current[current.length - 1];
     if (parent) {
       parent.children.push(event);
     }
@@ -139,12 +182,15 @@ export class Notifications {
       return undefined as any;
     }
 
-    this._eventStack.push(event);
+    // Fork the stack per-call via AsyncContext so concurrent
+    // instrumentAsync calls can't corrupt each other's nesting under
+    // `Promise.all(...)` or other out-of-order resolution. Each
+    // awaited continuation resumes inside its own fork.
+    const inner = [...current, event];
     let result: T;
     try {
-      result = await block();
+      result = await this._runWithStack(inner, block);
     } finally {
-      this._eventStack.pop();
       event.finish();
       this._notify(event);
     }

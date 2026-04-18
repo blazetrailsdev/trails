@@ -60,10 +60,27 @@ export interface DatabaseAdapter {
   readonly inTransaction: boolean;
 
   /**
-   * Return the query execution plan.
-   * Optional — not all adapters support this.
+   * Return the query execution plan for `sql`. `binds` carries the
+   * same bind values the adapter would accept on `execute()`, so a
+   * captured prepared-statement query re-EXPLAINs cleanly; `options`
+   * carries the Rails-style variadic flags (e.g. `analyze`,
+   * `verbose`) for adapters that support them. Both are optional for
+   * adapters that pre-date the options surface.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#explain
    */
-  explain?(sql: string): Promise<string>;
+  explain?(sql: string, binds?: unknown[], options?: string[]): Promise<string>;
+
+  /**
+   * Build the printed header prefix used by `Relation#explain` — e.g.
+   * `"EXPLAIN for:"` (default), `"EXPLAIN (ANALYZE, VERBOSE) for:"`
+   * (PG), `"EXPLAIN ANALYZE for:"` (MySQL), `"EXPLAIN QUERY PLAN for:"`
+   * (SQLite). Distinct from `explain()` itself — this builds the
+   * label row, not the actual SQL clause.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
+   */
+  buildExplainClause?(options?: string[]): string;
 
   // --- DatabaseStatements (Rails mixin) ---
   // Mirrors ActiveRecord::ConnectionAdapters::DatabaseStatements.

@@ -923,6 +923,24 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 }
 
 /**
+ * Extract database-cast primitive values from a bind array for the
+ * `type_casted_binds` slot on `sql.active_record` payloads — matches
+ * Rails' `type_casted_binds` contract: subscribers (LogSubscriber,
+ * QueryCache, etc) see the primitive values that were actually sent to
+ * the driver, not the Attribute / bind objects used to build the query.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#type_casted_binds
+ */
+export function typeCastedBinds(binds: unknown[] | undefined): unknown[] {
+  return (binds ?? []).map((b: any) => {
+    if (b && typeof b === "object" && typeof b.valueForDatabase === "function") {
+      return b.valueForDatabase();
+    }
+    return b && typeof b === "object" && "value" in b ? b.value : b;
+  });
+}
+
+/**
  * Wraps query execution in a `sql.active_record` instrumentation event,
  * mirroring Rails' `AbstractAdapter#log`.
  */
@@ -941,12 +959,7 @@ async function logSql<T>(
     sql,
     name,
     binds: bindArray,
-    type_casted_binds: bindArray.map((b: any) => {
-      if (b && typeof b === "object" && typeof b.valueForDatabase === "function") {
-        return b.valueForDatabase();
-      }
-      return b && typeof b === "object" && "value" in b ? b.value : b;
-    }),
+    type_casted_binds: typeCastedBinds(bindArray),
     connection: host,
     row_count: 0,
   };

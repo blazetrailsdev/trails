@@ -278,11 +278,28 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return this.inner.inTransaction;
   }
 
-  async explain(sql: string): Promise<string> {
-    if (typeof (this.inner as any).explain === "function") {
-      return (this.inner as any).explain(sql);
+  async explain(sql: string, binds: unknown[] = [], options: string[] = []): Promise<string> {
+    const inner = this.inner as {
+      explain?: (sql: string, binds?: unknown[], options?: string[]) => Promise<string>;
+    };
+    if (typeof inner.explain === "function") {
+      // Forward binds/options so `Relation#explain("analyze", ...)` and
+      // prepared-statement binds flow through the wrapper. Dropping
+      // them here would make behavior diverge depending on whether
+      // QueryCacheAdapter sits in front of the real adapter.
+      return inner.explain(sql, binds, options);
     }
     return "EXPLAIN is not supported by the underlying adapter";
+  }
+
+  buildExplainClause(options: string[] = []): string {
+    const inner = this.inner as { buildExplainClause?: (options: string[]) => string };
+    if (typeof inner.buildExplainClause === "function") {
+      return inner.buildExplainClause(options);
+    }
+    if (options.length === 0) return "EXPLAIN for:";
+    const parts = options.map((o) => o.toUpperCase()).join(", ");
+    return `EXPLAIN (${parts}) for:`;
   }
 
   // --- DatabaseStatements ---

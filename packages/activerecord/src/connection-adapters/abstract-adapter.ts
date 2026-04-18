@@ -96,6 +96,51 @@ export class AbstractAdapter extends AbstractAdapterBase {
   logger: unknown = null;
   lock: unknown = null;
 
+  /**
+   * Default header prefix for `Relation#explain` output. Concrete
+   * adapters (PG: `"EXPLAIN (ANALYZE, VERBOSE) for:"`; SQLite:
+   * `"EXPLAIN QUERY PLAN for:"`; MySQL: `"EXPLAIN ANALYZE for:"`)
+   * override to include adapter-specific flags.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
+   */
+  buildExplainClause(options: string[] = []): string {
+    if (options.length === 0) return "EXPLAIN for:";
+    const parts = options.map((o) => o.toUpperCase()).join(", ");
+    return `EXPLAIN (${parts}) for:`;
+  }
+
+  /**
+   * Run an adapter-internal schema/introspection query and return raw
+   * rows. Emits `sql.active_record` with `name = "SCHEMA"` so
+   * LogSubscriber / RuntimeRegistry / ExplainSubscriber filter it out
+   * of normal query output the same way Rails does (LogSubscriber's
+   * `IGNORE_PAYLOAD_NAMES` / ExplainSubscriber's `IGNORED_PAYLOADS`).
+   *
+   * Use for pg_class / pg_attribute / information_schema /
+   * sqlite_master / PRAGMA / etc. — anything the adapter runs on its
+   * own behalf. Migrations' user-visible DDL stays on regular
+   * `executeMutation`.
+   *
+   * Mirrors: ActiveRecord's `internal_exec_query(sql, "SCHEMA")` usage
+   * pattern in SchemaStatements / SchemaCache.
+   */
+  schemaQuery(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+    const execute = (
+      this as unknown as {
+        execute?: (
+          sql: string,
+          binds?: unknown[],
+          name?: string,
+        ) => Promise<Record<string, unknown>[]>;
+      }
+    ).execute;
+    if (typeof execute !== "function") {
+      throw new Error("schemaQuery requires the adapter to implement execute()");
+    }
+    return execute.call(this, sql, binds, "SCHEMA");
+  }
+
   // --- QueryCache mixin (mirrors ActiveRecord::ConnectionAdapters::QueryCache) ---
   // Single source of truth lives in abstract/query-cache.ts; these delegate.
 

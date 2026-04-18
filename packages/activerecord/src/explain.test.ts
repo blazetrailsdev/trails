@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base } from "./index.js";
+import { Base, registerModel } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -159,5 +159,101 @@ describe("ExplainTest", () => {
     const plan = await Post.all().explain();
     expect(typeof plan).toBe("string");
     expect(plan.length).toBeGreaterThan(0);
+  });
+
+  it("prints one EXPLAIN block per collected query with the header prefix", async () => {
+    const { Post } = makeModel();
+    await Post.create({ title: "a" });
+    const plan = await Post.where({ title: "a" }).explain();
+    expect(plan).toMatch(/EXPLAIN.*for:/);
+    expect(plan.toLowerCase()).toContain("select");
+  });
+
+  it("captures queries for eager-loaded associations, one block per query", async () => {
+    class Blog extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("blog_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Blog.hasMany("articles", { className: "Article" });
+    registerModel(Blog);
+    registerModel(Article);
+    const blog = (await Blog.create({ name: "dev" })) as any;
+    await Article.create({ title: "a", blog_id: blog.id });
+    await Article.create({ title: "b", blog_id: blog.id });
+
+    const plan = await Blog.all().preload("articles").explain();
+    const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
+    expect(blocks.length).toBeGreaterThanOrEqual(2);
+    expect(plan.toLowerCase()).toContain("blogs");
+    expect(plan.toLowerCase()).toContain("articles");
+  });
+
+  it("resets ExplainRegistry after the call (no leaked collection state)", async () => {
+    const { Post } = makeModel();
+    const { ExplainRegistry } = await import("./index.js");
+    await Post.all().explain();
+    expect(ExplainRegistry.collect).toBe(false);
+    expect(ExplainRegistry.queries).toEqual([]);
+  });
+
+  it("falls back to explaining toSql when no queries were collected", async () => {
+    const { Post } = makeModel();
+    // `none()` short-circuits before any SQL runs — collectingQueries
+    // captures nothing. The fallback should still produce a non-empty
+    // plan instead of a silent empty string.
+    const plan = await Post.none().explain();
+    expect(plan.length).toBeGreaterThan(0);
+    expect(plan.toLowerCase()).toContain("select");
+  });
+
+  it("renders BigInt binds without JSON.stringify crashing", async () => {
+    // _renderExplainBinds is the thing we're guarding — plain
+    // `JSON.stringify(BigInt(...))` throws TypeError; the replacer
+    // coerces bigints to their string form, so `[BigInt(42)]` renders
+    // as `["42"]` (quoted, matching log-subscriber.ts's
+    // `safeJsonStringify`). `Relation#explain` on sqlite interpolates
+    // where-literals into the SQL rather than issuing prepared-
+    // statement binds, so we verify the rendering helper directly —
+    // that's the surface this test is guarding.
+    const { Post } = makeModel();
+    const rel = Post.all() as unknown as {
+      _renderExplainBinds: (binds: unknown[]) => string;
+    };
+    expect(rel._renderExplainBinds([BigInt(42), "str", 7])).toBe('["42","str",7]');
+    // Make sure the end-to-end path still returns output (no crash
+    // even when binds are absent — this is the path `Relation#explain`
+    // actually takes on sqlite).
+    await Post.create({ title: "x" });
+    const plan = await Post.all().explain();
+    expect(plan.length).toBeGreaterThan(0);
+  });
+
+  it("isolates concurrent explain() calls via AsyncLocalStorage scopes", async () => {
+    // Two parallel explain() calls must not trample each other's
+    // collected queries. Without async-context isolation a global
+    // collect flag + shared queries array leaks across the await
+    // boundaries of concurrent tasks.
+    const { Post } = makeModel();
+    await Post.create({ title: "a" });
+
+    const [plan1, plan2] = await Promise.all([
+      Post.where({ title: "a" }).explain(),
+      Post.all().explain(),
+    ]);
+    expect(plan1.length).toBeGreaterThan(0);
+    expect(plan2.length).toBeGreaterThan(0);
+    // plan1's SELECT had a WHERE clause; plan2's did not. Each plan's
+    // header block should reference only its own SQL.
+    expect(plan1.toLowerCase()).toContain("where");
+    expect(plan2.toLowerCase()).not.toContain("where");
   });
 });

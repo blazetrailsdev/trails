@@ -658,3 +658,38 @@ describe("Wrapper", () => {
     expect(wrapper.instrumenter).toBe(wrapper.instrumenter);
   });
 });
+
+describe("Notifications.instrumentAsync — concurrent nesting isolation", () => {
+  it("keeps per-async-context stacks from popping each other", async () => {
+    // Prior to the AsyncContext-scoped stack, two instrumentAsync
+    // calls racing under Promise.all interleaved their push/pop on a
+    // shared global stack, so one would pop the other's entry and
+    // child-event nesting collapsed. With context-scoped forks each
+    // chain sees only its own ancestors, so a child fired inside
+    // block A is attributed to A, not to whichever event happens to
+    // be at the top of the shared stack.
+    const finished: Record<string, Event> = {};
+    const sub = Notifications.subscribe(null, (e) => {
+      finished[e.name] = e;
+    });
+    try {
+      const outerA = Notifications.instrumentAsync("outer.a", {}, async () => {
+        await new Promise((r) => setTimeout(r, 5));
+        await Notifications.instrumentAsync("child.a", {}, async () => {
+          await new Promise((r) => setTimeout(r, 1));
+        });
+      });
+      const outerB = Notifications.instrumentAsync("outer.b", {}, async () => {
+        await new Promise((r) => setTimeout(r, 1));
+        await Notifications.instrumentAsync("child.b", {}, async () => {
+          await new Promise((r) => setTimeout(r, 3));
+        });
+      });
+      await Promise.all([outerA, outerB]);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(finished["outer.a"].children.map((c) => c.name)).toEqual(["child.a"]);
+    expect(finished["outer.b"].children.map((c) => c.name)).toEqual(["child.b"]);
+  });
+});

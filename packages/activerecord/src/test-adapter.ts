@@ -672,10 +672,22 @@ class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements Databas
     return execDdlWithSavepoint(this.inner, sql);
   }
 
-  async explain(sql: string): Promise<string> {
+  async explain(sql: string, binds: unknown[] = [], options: string[] = []): Promise<string> {
     await this.setup();
-    if (this.inner.explain) return this.inner.explain(sql);
+    const inner = this.inner as {
+      explain?: (sql: string, binds?: unknown[], options?: string[]) => Promise<string>;
+    };
+    if (inner.explain) return inner.explain(sql, binds, options);
     return `EXPLAIN not supported`;
+  }
+
+  buildExplainClause(options: string[] = []): string {
+    const inner = this.inner as { buildExplainClause?: (options: string[]) => string };
+    if (typeof inner.buildExplainClause === "function") {
+      return inner.buildExplainClause(options);
+    }
+    if (options.length === 0) return "EXPLAIN for:";
+    return `EXPLAIN (${options.map((o) => o.toUpperCase()).join(", ")}) for:`;
   }
 
   async cleanup(): Promise<void> {

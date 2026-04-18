@@ -44,6 +44,8 @@ import { TableMetadata } from "./table-metadata.js";
 import { WhereClause, predicatesWithWrappedSqlLiterals } from "./relation/where-clause.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { touchAttributesWithTime } from "./timestamp.js";
+import { ExplainRegistry } from "./explain-registry.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
 /**
  * A Relation returned from `load()` / `reload()` — a normal Relation with
@@ -1627,17 +1629,91 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Return the query execution plan.
+   * Return the query execution plan for this relation and every query run
+   * as a side effect of executing it (eager loads, preloads, association
+   * loads). Matches Rails' `ActiveRecord::Relation#explain`: the relation
+   * is actually executed while `ExplainRegistry.collect = true`, the
+   * subscriber captures every `sql.active_record` notification, and
+   * `exec_explain` runs EXPLAIN against each captured SQL.
+   *
+   * `options` mirrors Rails' variadic symbols (e.g. `explain("analyze",
+   * "verbose")` → `EXPLAIN (ANALYZE, VERBOSE) ...`) and is forwarded to
+   * the adapter's `buildExplainClause` / `explain` implementations.
    *
    * Mirrors: ActiveRecord::Relation#explain
    */
-  async explain(): Promise<string> {
-    const sql = this._toSql();
-    const adapter = this._modelClass.adapter as any;
-    if (typeof adapter.explain === "function") {
-      return adapter.explain(sql);
+  async explain(...options: string[]): Promise<string> {
+    const { queries } = await ExplainRegistry.collectingQueries(() => this.toArray());
+    return this._execExplain(queries, options);
+  }
+
+  /**
+   * Render the EXPLAIN output for a list of collected queries. For each
+   * [sql, binds] pair, prints the adapter's EXPLAIN clause + SQL header
+   * (with binds appended when present) followed by the adapter's plan
+   * output — one block per query, separated by blank lines.
+   *
+   * Mirrors: ActiveRecord::Relation#exec_explain
+   * @internal
+   */
+  async _execExplain(queries: [string, unknown[]][], options: string[] = []): Promise<string> {
+    const adapter = this._modelClass.adapter;
+    if (typeof adapter?.explain !== "function") {
+      return "EXPLAIN not supported by this adapter";
     }
-    return `EXPLAIN not supported by this adapter`;
+    // If no queries were collected (e.g. the relation was already
+    // loaded, or `.none()` short-circuited), fall back to explaining
+    // `toSql()` directly so `Relation#explain` never returns a blank
+    // string. Matches Rails' behavior of always producing output even
+    // for degenerate cases.
+    const effective: [string, unknown[]][] = queries.length > 0 ? queries : [[this._toSql(), []]];
+    const clause = this._buildExplainClause(adapter, options);
+    const parts: string[] = [];
+    for (const [sql, binds] of effective) {
+      let msg = `${clause} ${sql}`;
+      if (binds.length > 0) msg += ` ${this._renderExplainBinds(binds)}`;
+      const plan = await adapter.explain(sql, binds, options);
+      parts.push(`${msg}\n${plan}`);
+    }
+    return parts.join("\n\n");
+  }
+
+  /**
+   * Render a bind array for the EXPLAIN header. Reuses the BigInt-safe
+   * replacer from `log-subscriber.ts`'s `safeJsonStringify` so a bigint
+   * (from trails' `BigIntegerType`) coerces to its string form in the
+   * output — `["1"]` — rather than throwing, the way raw
+   * `JSON.stringify` would.
+   *
+   * This is a positional-values-only rendering, deliberately simpler
+   * than LogSubscriber's output: LogSubscriber formats each bind as a
+   * `[name, type_casted_value]` pair (the attribute-name prefix lets
+   * you read the log against the query text). `exec_explain` doesn't
+   * carry attribute names down to this point, and the Rails
+   * equivalent — `render_bind(c, attr).inspect` on the values — is
+   * also a positional list. So we match Rails' shape, not
+   * LogSubscriber's, and the log/explain outputs are intentionally
+   * different at this site.
+   */
+  private _renderExplainBinds(binds: unknown[]): string {
+    return JSON.stringify(binds, (_key, v) => (typeof v === "bigint" ? v.toString() : v));
+  }
+
+  /**
+   * Build the "EXPLAIN for:" header (Rails prints `EXPLAIN for: <sql>` /
+   * `EXPLAIN (ANALYZE, VERBOSE) for: <sql>`). Adapters override via
+   * `buildExplainClause(options)`; we fall back to a minimal form for
+   * adapters that don't implement it yet.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
+   */
+  private _buildExplainClause(adapter: DatabaseAdapter, options: string[]): string {
+    if (typeof adapter.buildExplainClause === "function") {
+      return adapter.buildExplainClause(options);
+    }
+    if (options.length === 0) return "EXPLAIN for:";
+    const parts = options.map((o) => o.toUpperCase()).join(", ");
+    return `EXPLAIN (${parts}) for:`;
   }
 
   // count, sum, average, minimum, maximum are mixed in via

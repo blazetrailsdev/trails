@@ -1,8 +1,11 @@
 import mysql from "mysql2/promise";
+import { Notifications } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "../adapter.js";
 import { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
 import { Column } from "../connection-adapters/column.js";
 import { SqlTypeMetadata } from "../connection-adapters/sql-type-metadata.js";
+import { ExplainPrettyPrinter } from "../connection-adapters/mysql/explain-pretty-printer.js";
+import { typeCastedBinds } from "../connection-adapters/abstract/database-statements.js";
 
 /**
  * MySQL adapter — connects ActiveRecord to a real MySQL/MariaDB database.
@@ -101,53 +104,103 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Execute a SELECT query and return rows.
+   * Execute a SELECT query and return rows. Wrapped in a
+   * `sql.active_record` notification — mirrors Rails'
+   * `AbstractAdapter#log` so LogSubscriber / ExplainSubscriber /
+   * QueryCache observe the same query stream.
    */
-  async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+  async execute(
+    sql: string,
+    binds: unknown[] = [],
+    name: string = "SQL",
+  ): Promise<Record<string, unknown>[]> {
     await this.materializeTransactions();
-    const conn = await this.getConn();
-    try {
-      const quotedSql = this.mysqlQuote(sql);
-      const mappedBinds = this.mysqlBinds(binds);
-      const [rows] =
-        this.preparedStatements && binds.length > 0
-          ? await conn.execute(quotedSql, mappedBinds as any[])
-          : await conn.query(quotedSql, mappedBinds);
-      return rows as Record<string, unknown>[];
-    } finally {
-      this.releaseConn(conn);
-    }
+    const driverSql = this.mysqlQuote(sql);
+    const driverBinds = this.mysqlBinds(binds);
+    // payload records the exact values sent to mysql2 so LogSubscriber /
+    // ExplainSubscriber / QueryCache all observe what actually ran.
+    const payload: Record<string, unknown> = {
+      sql: driverSql,
+      name,
+      binds: driverBinds,
+      type_casted_binds: typeCastedBinds(driverBinds),
+      connection: this,
+      row_count: 0,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      let conn: mysql.PoolConnection | undefined;
+      try {
+        conn = await this.getConn();
+        // Use server-side prepared statements when enabled and binds
+        // are present — matches PR #589's preparedStatements toggle.
+        const [rows] =
+          this.preparedStatements && binds.length > 0
+            ? await conn.execute(driverSql, driverBinds as any[])
+            : await conn.query(driverSql, driverBinds);
+        const r = rows as Record<string, unknown>[];
+        payload.row_count = Array.isArray(r) ? r.length : 0;
+        return r;
+      } catch (e: any) {
+        // getConn() itself can throw (pool exhausted / connection
+        // refused / closed pool); catching here lets subscribers see
+        // acquisition failures as `payload.exception` too.
+        payload.exception = e;
+        payload.exception_object = e;
+        throw e;
+      } finally {
+        if (conn) this.releaseConn(conn);
+      }
+    });
   }
 
   /**
    * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
+   * Wrapped in a `sql.active_record` notification — see `execute`.
    */
-  async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
+  async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     await this.materializeTransactions();
-    const conn = await this.getConn();
-    try {
-      const quotedSql = this.mysqlQuote(sql);
-      const mappedBinds = this.mysqlBinds(binds);
-      const [result] =
-        this.preparedStatements && binds.length > 0
-          ? await conn.execute(quotedSql, mappedBinds as any[])
-          : await conn.query(quotedSql, mappedBinds);
-      this.dirtyCurrentTransaction();
-      const info = result as mysql.ResultSetHeader;
+    const driverSql = this.mysqlQuote(sql);
+    const driverBinds = this.mysqlBinds(binds);
+    const payload: Record<string, unknown> = {
+      sql: driverSql,
+      name,
+      binds: driverBinds,
+      type_casted_binds: typeCastedBinds(driverBinds),
+      connection: this,
+      row_count: 0,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      let conn: mysql.PoolConnection | undefined;
+      try {
+        conn = await this.getConn();
+        const [result] =
+          this.preparedStatements && binds.length > 0
+            ? await conn.execute(driverSql, driverBinds as any[])
+            : await conn.query(driverSql, driverBinds);
+        this.dirtyCurrentTransaction();
+        const info = result as mysql.ResultSetHeader;
+        payload.row_count = info.affectedRows ?? 0;
 
-      // For INSERT, return the last inserted ID (or affected rows for multi-row)
-      if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-        if (info.affectedRows > 1) {
-          return info.affectedRows;
+        // For INSERT, return the last inserted ID (or affected rows for multi-row)
+        if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
+          if (info.affectedRows > 1) {
+            return info.affectedRows;
+          }
+          return info.insertId;
         }
-        return info.insertId;
-      }
 
-      // For UPDATE/DELETE, return affected rows
-      return info.affectedRows;
-    } finally {
-      this.releaseConn(conn);
-    }
+        // For UPDATE/DELETE, return affected rows
+        return info.affectedRows;
+      } catch (e: any) {
+        // Guard acquisition failures (pool exhausted / refused /
+        // closed) so subscribers still see `payload.exception`.
+        payload.exception = e;
+        payload.exception_object = e;
+        throw e;
+      } finally {
+        if (conn) this.releaseConn(conn);
+      }
+    });
   }
 
   /**
@@ -235,16 +288,71 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Return the query execution plan.
+   * Return the query execution plan. Accepts Rails-style options (e.g.
+   * `["analyze"]` → `EXPLAIN ANALYZE <sql>` on MySQL 8.0.18+). Binds
+   * flow through in the same driver form `execute()` uses
+   * (`mysqlBinds(binds)` — booleans → 1/0), so a collected
+   * prepared-statement SQL with `?` placeholders re-EXPLAINs
+   * correctly.
    */
-  async explain(sql: string): Promise<string> {
+  async explain(sql: string, binds: unknown[] = [], options: string[] = []): Promise<string> {
     const conn = await this.getConn();
     try {
-      const [rows] = await conn.query(`EXPLAIN ${this.mysqlQuote(sql)}`);
-      return (rows as any[]).map((r: any) => JSON.stringify(r)).join("\n");
+      const clause = this._explainStatementClause(options);
+      const start = Date.now();
+      // Forward binds in the same driver form execute() uses
+      // (booleans → 1/0). Without this, an EXPLAIN over a bind-
+      // carrying prepared-statement query would fail with a mysql
+      // parameter-count error.
+      const [rows] = await conn.query(`${clause} ${this.mysqlQuote(sql)}`, this.mysqlBinds(binds));
+      const elapsed = (Date.now() - start) / 1000;
+      const printer = new ExplainPrettyPrinter();
+      return printer.pp(rows as Array<Record<string, unknown>>, elapsed);
     } finally {
       this.releaseConn(conn);
     }
+  }
+
+  /**
+   * Build the printed header prefix used by `Relation#explain`
+   * (e.g. `"EXPLAIN for:"` / `"EXPLAIN ANALYZE for:"`).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#build_explain_clause
+   */
+  buildExplainClause(options: string[] = []): string {
+    if (options.length === 0) return "EXPLAIN for:";
+    const parts = options.map((o) => o.toUpperCase()).join(" ");
+    return `EXPLAIN ${parts} for:`;
+  }
+
+  /**
+   * Set of MySQL EXPLAIN flags that are safe to interpolate into the
+   * EXPLAIN clause. MySQL 8.0.18+ supports `EXPLAIN ANALYZE`; older
+   * versions and MariaDB support at least `EXTENDED`. Anything else is
+   * rejected — options come from user code via `Relation#explain(...)`
+   * and unsanitized interpolation would be a SQL injection vector.
+   */
+  private static readonly EXPLAIN_OPTIONS = new Set(["analyze", "extended", "partitions"]);
+
+  private _validateExplainOptions(options: string[]): string[] {
+    return options.map((o) => {
+      const key = String(o).toLowerCase();
+      if (!Mysql2Adapter.EXPLAIN_OPTIONS.has(key)) {
+        throw new Error(`Unknown MySQL EXPLAIN option: ${o}`);
+      }
+      return key.toUpperCase();
+    });
+  }
+
+  /**
+   * Compose the actual `EXPLAIN ...` SQL clause that prefixes the query —
+   * distinct from `buildExplainClause`, which builds the printed header.
+   * Options are validated against the adapter's allowlist before
+   * interpolation.
+   */
+  private _explainStatementClause(options: string[]): string {
+    if (options.length === 0) return "EXPLAIN";
+    return `EXPLAIN ${this._validateExplainOptions(options).join(" ")}`;
   }
 
   /**
@@ -269,7 +377,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `data_source_sql(type: "BASE TABLE")` shape.
    */
   async tables(): Promise<string[]> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT table_name AS name FROM information_schema.tables
          WHERE table_schema = database() AND table_type = 'BASE TABLE'
          ORDER BY table_name`,
@@ -282,7 +390,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `data_source_sql(type: "VIEW")`.
    */
   async views(): Promise<string[]> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT table_name AS name FROM information_schema.tables
          WHERE table_schema = database() AND table_type = 'VIEW'
          ORDER BY table_name`,
@@ -298,7 +406,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * contract explicit for future callers.
    */
   async dataSources(): Promise<string[]> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT table_name AS name FROM information_schema.tables
          WHERE table_schema = database()
          ORDER BY table_name`,
@@ -329,7 +437,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const typeClause = type ? "AND table_type = ?" : "";
     const params: unknown[] = [schemaBind, table];
     if (type) params.push(type);
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT 1 AS one FROM information_schema.tables
          WHERE table_schema = COALESCE(?, database())
          AND table_name = ?
@@ -348,7 +456,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     const { schema, table } = this.parseMysqlName(tableName);
-    const rows = (await this.execute(
+    const rows = (await this.schemaQuery(
       `SELECT column_name AS name FROM information_schema.statistics
          WHERE index_name = 'PRIMARY'
          AND table_schema = COALESCE(?, database())
@@ -370,7 +478,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async columns(tableName: string): Promise<Column[]> {
     const { schema, table } = this.parseMysqlName(tableName);
-    const rows = (await this.execute(
+    const rows = (await this.schemaQuery(
       `SELECT column_name AS name,
               column_default AS default_value,
               is_nullable AS nullable,
@@ -440,7 +548,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const { schema, table } = this.parseMysqlName(tableName);
     const hasExpr = await this.statisticsHasExpressionColumn();
     const exprSelect = hasExpr ? "expression AS expr" : "NULL AS expr";
-    const rows = (await this.execute(
+    const rows = (await this.schemaQuery(
       `SELECT index_name AS name,
               column_name AS col,
               ${exprSelect},
@@ -496,7 +604,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       return this._statisticsHasExpression;
     }
     try {
-      const rows = (await this.execute(
+      const rows = (await this.schemaQuery(
         `SELECT 1 AS one FROM information_schema.columns
            WHERE table_schema = 'information_schema'
            AND table_name = 'STATISTICS'

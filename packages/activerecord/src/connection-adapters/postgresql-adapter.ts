@@ -1,6 +1,6 @@
 import pg from "pg";
 import { type Type, ValueType } from "@blazetrails/activemodel";
-import { singularize, underscore } from "@blazetrails/activesupport";
+import { singularize, underscore, Notifications } from "@blazetrails/activesupport";
 import { Visitors } from "@blazetrails/arel";
 import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -20,6 +20,7 @@ import {
 } from "./postgresql/type-map-init.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
+import { typeCastedBinds } from "./abstract/database-statements.js";
 
 /**
  * PostgreSQL adapter — connects ActiveRecord to a real PostgreSQL database.
@@ -171,13 +172,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * this override is the Rails-faithful PG version that actually
    * populates them.
    */
-  override async execQuery(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
+  override async execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result> {
     // Note: we do NOT call materializeTransactions() here. If a lazy tx
     // is pending but un-materialized, a SELECT against an ad-hoc pool
     // client sees pre-tx state — which is correct read-before-write
-    // semantics. If the tx HAS begun, `_client` is set and getClient()
-    // returns it. Forcing materialization here races with the tx
-    // client's lifecycle and can cause double-release on pool clients.
+    // semantics. If the tx HAS begun, `_client` is set and withClient()
+    // uses it.
 
     // Release the query client BEFORE any loadAdditionalTypes call —
     // that path re-enters execute() and acquires its own pooled client,
@@ -187,21 +187,39 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       fields: Array<{ name: string; dataTypeID: number }>;
       rows: unknown[][];
     }
-    const client = await this.getClient();
-    let pgResult: ArrayQueryResult;
-    try {
-      // rowMode: "array" returns rows as positional arrays, preserving
-      // duplicate column names and matching the field-index order.
-      // Hash-keyed rows would collide on duplicate names and drop
-      // earlier values.
-      pgResult = (await client.query({
-        text: this.rewriteBinds(sql, binds ?? []),
-        values: binds ?? [],
-        rowMode: "array",
-      })) as unknown as ArrayQueryResult;
-    } finally {
-      this.releaseClient(client);
-    }
+    const bindArray = binds ?? [];
+    const rewritten = this.rewriteBinds(sql, bindArray);
+    const payload: Record<string, unknown> = {
+      sql: rewritten,
+      name: name ?? "SQL",
+      binds: bindArray,
+      type_casted_binds: typeCastedBinds(bindArray),
+      connection: this,
+      row_count: 0,
+    };
+    const pgResult: ArrayQueryResult = await Notifications.instrumentAsync(
+      "sql.active_record",
+      payload,
+      async () => {
+        try {
+          const r = await this.withClient(async (client) => {
+            // rowMode: "array" returns rows as positional arrays, preserving
+            // duplicate column names and matching the field-index order.
+            return (await client.query({
+              text: rewritten,
+              values: bindArray,
+              rowMode: "array",
+            })) as unknown as ArrayQueryResult;
+          });
+          payload.row_count = r.rows?.length ?? 0;
+          return r;
+        } catch (e: any) {
+          payload.exception = e;
+          payload.exception_object = e;
+          throw e;
+        }
+      },
+    );
 
     const fields = pgResult.fields ?? [];
     if (fields.length === 0) return Result.fromRowHashes([]);
@@ -251,7 +269,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async loadAdditionalTypes(oids?: number[]): Promise<void> {
     const initializer = new TypeMapInitializer(this.typeMap);
     for await (const query of this.loadTypesQueries(initializer, oids)) {
-      const rows = (await this.execute(query)) as unknown as PgTypeRow[];
+      const rows = (await this.schemaQuery(query)) as unknown as PgTypeRow[];
       initializer.run(rows);
     }
   }
@@ -321,7 +339,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /**
    * Get the active client — either the transaction client or a fresh one from
-   * the pool.
+   * the pool. Prefer `withClient` for query paths so ownership is tracked
+   * per-acquisition and can't drift when a commit nulls `_client` between
+   * acquire and release.
    */
   private async getClient(): Promise<pg.PoolClient> {
     if (this._client) return this._client;
@@ -330,32 +350,80 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Release a client back to the pool (only if it's not a transaction client).
+   * Execute `fn` with a client acquired from the adapter, then return it
+   * to the pool on exit. Mirrors Rails' `with_connection do |c| ... end` —
+   * the key property is that ownership is decided **at acquisition**
+   * (`ownedByTransaction`) and captured in a closure, so a mid-query
+   * commit that nulls `this._client` can't flip the release decision.
+   * Without this, the earlier symptom — "Release called on client which
+   * has already been released to the pool" — surfaced whenever a
+   * commit's `this._client.release()` raced with a pending finally in
+   * an instrumented query path; both ran `.release()` on the same
+   * `pg.PoolClient` reference.
    */
-  private releaseClient(client: pg.PoolClient): void {
-    if (client !== this._client) {
-      try {
-        client.release();
-      } catch {
-        // Client may have already been released if materializeTransactions
-        // acquired it as the transaction client and commit/rollback released
-        // it before we get here.
-      }
+  private async withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+    const txClient = this._client;
+    // Route through getClient() so tests that stub it (see
+    // postgresql-adapter.exec-query.test.ts) keep working. getClient's
+    // own behavior matches our snapshot: returns `this._client` when
+    // set, otherwise a fresh pool connection.
+    const client = await this.getClient();
+    const ownedByTransaction = client === txClient;
+    try {
+      return await fn(client);
+    } finally {
+      if (!ownedByTransaction) client.release();
     }
   }
 
   /**
-   * Execute a SELECT query and return rows.
+   * Legacy release path for the schema-introspection call sites that
+   * still use `getClient()` + `releaseClient()` (synchronous ownership;
+   * not in the commit-race path). New code should reach for
+   * `withClient()` instead.
    */
-  async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+  private releaseClient(client: pg.PoolClient): void {
+    if (client === this._client) return;
+    client.release();
+  }
+
+  /**
+   * Execute a SELECT query and return rows. Wrapped in a
+   * `sql.active_record` notification — mirrors Rails'
+   * `AbstractAdapter#log` so LogSubscriber / ExplainSubscriber /
+   * QueryCache observe the same query stream.
+   */
+  async execute(
+    sql: string,
+    binds: unknown[] = [],
+    name: string = "SQL",
+  ): Promise<Record<string, unknown>[]> {
     await this.materializeTransactions();
-    const client = await this.getClient();
-    try {
-      const result = await client.query(this.rewriteBinds(sql, binds), binds);
-      return result.rows;
-    } finally {
-      this.releaseClient(client);
-    }
+    const rewritten = this.rewriteBinds(sql, binds);
+    // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
+    // stores something that can be re-EXPLAIN'd on the same adapter
+    // without re-running rewriteBinds.
+    const payload: Record<string, unknown> = {
+      sql: rewritten,
+      name,
+      binds,
+      type_casted_binds: typeCastedBinds(binds),
+      connection: this,
+      row_count: 0,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        return await this.withClient(async (client) => {
+          const result = await client.query(rewritten, binds);
+          payload.row_count = result.rows.length;
+          return result.rows;
+        });
+      } catch (e: any) {
+        payload.exception = e;
+        payload.exception_object = e;
+        throw e;
+      }
+    });
   }
 
   /**
@@ -365,57 +433,85 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * of the first returned row is treated as the inserted ID. Otherwise, the
    * `rowCount` is returned.
    */
-  async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
+  async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     await this.materializeTransactions();
-    const client = await this.getClient();
-    try {
-      this.dirtyCurrentTransaction();
-      const pgSql = this.rewriteBinds(sql, binds);
-      const upper = sql.trimStart().toUpperCase();
+    const pgSql = this.rewriteBinds(sql, binds);
+    // payload.sql records the rewritten SQL — ExplainSubscriber captures
+    // something that can be re-EXPLAIN'd without re-running rewriteBinds
+    // (and without re-appending RETURNING for bare INSERTs, which isn't
+    // part of the logical query).
+    const payload: Record<string, unknown> = {
+      sql: pgSql,
+      name,
+      binds,
+      type_casted_binds: typeCastedBinds(binds),
+      connection: this,
+      row_count: 0,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        return await this.withClient(async (client) => {
+          this.dirtyCurrentTransaction();
+          const upper = sql.trimStart().toUpperCase();
 
-      // For INSERT without RETURNING, append RETURNING id automatically
-      if (upper.startsWith("INSERT") && !upper.includes("RETURNING")) {
-        const withReturning = `${pgSql} RETURNING id`;
-        const useSavepoint = this._inTransaction;
-        const spName = useSavepoint ? `_bt_ret_${++PostgreSQLAdapter._spCounter}` : "";
-        try {
-          if (useSavepoint) await client.query(`SAVEPOINT "${spName}"`);
-          const result = await client.query(withReturning, binds);
-          if (useSavepoint) await client.query(`RELEASE SAVEPOINT "${spName}"`);
-          if (result.rows.length > 1) {
-            return result.rowCount ?? result.rows.length;
+          // For INSERT without RETURNING, append RETURNING id automatically
+          if (upper.startsWith("INSERT") && !upper.includes("RETURNING")) {
+            const withReturning = `${pgSql} RETURNING id`;
+            const useSavepoint = this._inTransaction;
+            const spName = useSavepoint ? `_bt_ret_${++PostgreSQLAdapter._spCounter}` : "";
+            // Update payload.sql to the exact statement we're about to
+            // run so subscribers (LogSubscriber / ExplainSubscriber /
+            // QueryCache keys) see what actually hit pg. The fallback
+            // branch below resets it to pgSql if the RETURNING attempt
+            // fails and we re-run without it.
+            payload.sql = withReturning;
+            try {
+              if (useSavepoint) await client.query(`SAVEPOINT "${spName}"`);
+              const result = await client.query(withReturning, binds);
+              if (useSavepoint) await client.query(`RELEASE SAVEPOINT "${spName}"`);
+              payload.row_count = result.rowCount ?? 0;
+              if (result.rows.length > 1) {
+                return result.rowCount ?? result.rows.length;
+              }
+              if (result.rows.length > 0) {
+                const firstCol = Object.keys(result.rows[0])[0];
+                return Number(result.rows[0][firstCol]);
+              }
+              return result.rowCount ?? 0;
+            } catch {
+              if (useSavepoint) {
+                await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
+                await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
+              }
+              payload.sql = pgSql;
+              const result = await client.query(pgSql, binds);
+              payload.row_count = result.rowCount ?? 0;
+              return result.rowCount ?? 0;
+            }
           }
-          if (result.rows.length > 0) {
-            const firstCol = Object.keys(result.rows[0])[0];
-            return Number(result.rows[0][firstCol]);
+
+          // For INSERT with explicit RETURNING
+          if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
+            const result = await client.query(pgSql, binds);
+            payload.row_count = result.rowCount ?? 0;
+            if (result.rows.length > 0) {
+              const firstCol = Object.keys(result.rows[0])[0];
+              return Number(result.rows[0][firstCol]);
+            }
+            return result.rowCount ?? 0;
           }
-          return result.rowCount ?? 0;
-        } catch {
-          if (useSavepoint) {
-            await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
-            await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
-          }
+
+          // For UPDATE/DELETE, return affected rows
           const result = await client.query(pgSql, binds);
+          payload.row_count = result.rowCount ?? 0;
           return result.rowCount ?? 0;
-        }
+        });
+      } catch (e: any) {
+        payload.exception = e;
+        payload.exception_object = e;
+        throw e;
       }
-
-      // For INSERT with explicit RETURNING
-      if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
-        const result = await client.query(pgSql, binds);
-        if (result.rows.length > 0) {
-          const firstCol = Object.keys(result.rows[0])[0];
-          return Number(result.rows[0][firstCol]);
-        }
-        return result.rowCount ?? 0;
-      }
-
-      // For UPDATE/DELETE, return affected rows
-      const result = await client.query(pgSql, binds);
-      return result.rowCount ?? 0;
-    } finally {
-      this.releaseClient(client);
-    }
+    });
   }
 
   /**
@@ -470,62 +566,118 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    const client = await this.getClient();
-    try {
+    await this.withClient(async (client) => {
       await client.query(`SAVEPOINT "${name}"`);
-    } finally {
-      this.releaseClient(client);
-    }
+    });
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    const client = await this.getClient();
-    try {
+    await this.withClient(async (client) => {
       await client.query(`RELEASE SAVEPOINT "${name}"`);
-    } finally {
-      this.releaseClient(client);
-    }
+    });
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    const client = await this.getClient();
-    try {
+    await this.withClient(async (client) => {
       await client.query(`ROLLBACK TO SAVEPOINT "${name}"`);
-    } finally {
-      this.releaseClient(client);
-    }
+    });
   }
 
   /**
    * Return the query execution plan.
+   *
+   * Accepts Rails-style options (`["analyze", "verbose"]`) which get
+   * composed into the EXPLAIN clause via `buildExplainClause` — e.g.
+   * `EXPLAIN (ANALYZE, VERBOSE) <sql>`. Binds pass through in the
+   * same rewritten form `execute()`/`execQuery()` use (`?` → `$1`
+   * placeholders + the values array) so a collected
+   * prepared-statement query re-EXPLAINs cleanly without pg
+   * rejecting it for "no parameter $1".
    */
-  async explain(sql: string): Promise<string> {
-    const client = await this.getClient();
-    try {
-      const result = await client.query(`EXPLAIN ${sql}`);
+  async explain(sql: string, binds: unknown[] = [], options: string[] = []): Promise<string> {
+    return this.withClient(async (client) => {
+      const clause = this._explainStatementClause(options);
+      // Rewrite `?` → `$1` the same way execute/execQuery do, so a
+      // collected query with driver-neutral placeholders (`?`) can be
+      // re-EXPLAIN'd. Bind values pass through to pg as the values
+      // array so `EXPLAIN` with parameters doesn't error with
+      // "there is no parameter $1".
+      const rewritten = this.rewriteBinds(sql, binds);
+      const result = await client.query(`${clause} ${rewritten}`, binds);
       const printer = new ExplainPrettyPrinter();
       return printer.pp(result.rows);
-    } finally {
-      this.releaseClient(client);
-    }
+    });
+  }
+
+  // Note: PG's `buildExplainClause` — `"EXPLAIN for:"` /
+  // `"EXPLAIN (ANALYZE, VERBOSE) for:"` — is inherited from
+  // AbstractAdapter#buildExplainClause, which encodes the Rails default
+  // that happens to match PG's format. MySQL and SQLite override with
+  // adapter-specific flags.
+
+  /**
+   * Set of PG EXPLAIN flags that are safe to interpolate into the
+   * EXPLAIN clause. Rails' `PostgreSQL::DatabaseStatements#explain`
+   * accepts symbols (`:analyze`, `:verbose`, `:costs`, `:buffers`,
+   * `:settings`, `:wal`, `:timing`, `:summary`, `:format`); we restrict
+   * to the same set and uppercase for the SQL clause. Everything else
+   * throws — options come from `Relation#explain(...args)` which is
+   * user-supplied, so unsanitized interpolation would be a SQL injection
+   * vector.
+   */
+  // PG's `FORMAT` flag is intentionally excluded — it's a key/value
+  // option (`FORMAT JSON` / `FORMAT YAML`), not a boolean toggle, so
+  // including it would generate invalid `EXPLAIN (FORMAT) ...` SQL.
+  // Rails supports it via a keyword arg (`explain(format: :json)`)
+  // rather than a positional flag; we can add that surface when the
+  // Relation#explain API is extended — for now the boolean-only flags
+  // below match what `Relation#explain("analyze", "verbose")` accepts.
+  private static readonly EXPLAIN_OPTIONS = new Set([
+    "analyze",
+    "verbose",
+    "costs",
+    "buffers",
+    "settings",
+    "wal",
+    "timing",
+    "summary",
+  ]);
+
+  private _validateExplainOptions(options: string[]): string[] {
+    return options.map((o) => {
+      const key = String(o).toLowerCase();
+      if (!PostgreSQLAdapter.EXPLAIN_OPTIONS.has(key)) {
+        throw new Error(`Unknown PostgreSQL EXPLAIN option: ${o}`);
+      }
+      return key.toUpperCase();
+    });
+  }
+
+  /**
+   * Compose the actual `EXPLAIN ...` SQL statement clause that prefixes
+   * the query — distinct from `buildExplainClause`, which builds the
+   * printed header. Options are validated against the adapter's
+   * allowlist before interpolation.
+   */
+  private _explainStatementClause(options: string[]): string {
+    if (options.length === 0) return "EXPLAIN";
+    const validated = this._validateExplainOptions(options);
+    return `EXPLAIN (${validated.join(", ")})`;
   }
 
   /**
    * Execute raw SQL (for DDL and other non-query statements).
    */
   async exec(sql: string): Promise<void> {
-    const client = await this.getClient();
-    try {
+    await this.withClient(async (client) => {
       await client.query(sql);
-    } finally {
-      this.releaseClient(client);
-    }
+    });
   }
 
   /**
@@ -576,29 +728,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (this._databaseVersion !== null) return this._databaseVersion;
     // Use raw client directly to avoid re-entering execute() which could
     // interfere with savepoint nesting in test adapters or wrappers.
-    const client = await this.getClient();
-    try {
+    await this.withClient(async (client) => {
       const result = await client.query("SHOW server_version_num");
       this._databaseVersion = parseInt(String(result.rows[0]?.server_version_num ?? "0"), 10);
-    } finally {
-      this.releaseClient(client);
-    }
+    });
     // Eagerly populate optimizer hints flag
     if (this._hasOptimizerHints === null) {
-      const client2 = await this.getClient();
       try {
-        const result = await client2.query(
-          "SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1",
-          ["pg_hint_plan"],
-        );
-        this._hasOptimizerHints = Number(result.rows[0]?.count) > 0;
+        await this.withClient(async (client) => {
+          const result = await client.query(
+            "SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1",
+            ["pg_hint_plan"],
+          );
+          this._hasOptimizerHints = Number(result.rows[0]?.count) > 0;
+        });
       } catch {
         this._hasOptimizerHints = false;
-      } finally {
-        this.releaseClient(client2);
       }
     }
-    return this._databaseVersion;
+    return this._databaseVersion!;
   }
 
   /**
@@ -788,7 +936,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // ---------------------------------------------------------------------------
 
   async schemaNames(): Promise<string[]> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT nspname FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname != 'information_schema' ORDER BY nspname`,
     );
     return rows.map((r) => r.nspname as string);
@@ -818,7 +966,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async schemaExists(name: string): Promise<boolean> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT COUNT(*) AS count FROM pg_namespace WHERE nspname = $1`,
       [name],
     );
@@ -826,29 +974,29 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async currentSchema(): Promise<string> {
-    const rows = await this.execute("SELECT current_schema() AS schema");
+    const rows = await this.schemaQuery("SELECT current_schema() AS schema");
     return rows[0].schema as string;
   }
 
   get schemaSearchPath(): Promise<string> {
-    return this.execute("SHOW search_path").then((rows) => rows[0].search_path as string);
+    return this.schemaQuery("SHOW search_path").then((rows) => rows[0].search_path as string);
   }
 
   async setSchemaSearchPath(searchPath: string | null): Promise<void> {
     if (searchPath == null) return;
-    await this.execute("SELECT set_config('search_path', $1, false)", [searchPath]);
+    await this.schemaQuery("SELECT set_config('search_path', $1, false)", [searchPath]);
   }
 
   async dataSourceExists(name: string): Promise<boolean> {
     const { schema, table } = this.parseSchemaQualifiedName(name);
     if (schema) {
-      const rows = await this.execute(
+      const rows = await this.schemaQuery(
         `SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2`,
         [schema, table],
       );
       return Number(rows[0].count) > 0;
     }
-    const rows = await this.execute(`SELECT to_regclass($1) AS oid`, [name]);
+    const rows = await this.schemaQuery(`SELECT to_regclass($1) AS oid`, [name]);
     return rows[0].oid != null;
   }
 
@@ -866,12 +1014,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async extensions(): Promise<string[]> {
-    const rows = await this.execute(`SELECT extname FROM pg_extension WHERE extname != 'plpgsql'`);
+    const rows = await this.schemaQuery(
+      `SELECT extname FROM pg_extension WHERE extname != 'plpgsql'`,
+    );
     return rows.map((r) => r.extname as string);
   }
 
   async extensionEnabled(name: string): Promise<boolean> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT COUNT(*) AS count FROM pg_extension WHERE extname = $1`,
       [name],
     );
@@ -879,7 +1029,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async extensionAvailable(name: string): Promise<boolean> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT COUNT(*) AS count FROM pg_available_extensions WHERE name = $1`,
       [name],
     );
@@ -896,8 +1046,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): Promise<void> {
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     if (options.schema) {
-      const client = await this.getClient();
-      try {
+      await this.withClient(async (client) => {
         const { rows } = await client.query(`SHOW search_path`);
         const originalSearchPath = rows[0]?.search_path as string;
         await client.query(`SELECT set_config('search_path', $1, false)`, [options.schema]);
@@ -908,16 +1057,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             originalSearchPath ?? "public",
           ]);
         }
-      } finally {
-        this.releaseClient(client);
-      }
+      });
     } else {
       await this.exec(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(name)}${cascade}`);
     }
   }
 
   async databaseExists(name: string): Promise<boolean> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT COUNT(*) AS count FROM pg_database WHERE datname = $1`,
       [name],
     );
@@ -938,7 +1085,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT i.relname AS index_name,
               ix.indisunique AS is_unique,
               am.amname AS using,
@@ -1022,7 +1169,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // non-deterministic order pg_attribute happens to yield rows.
     // `array_position(i.indkey, a.attnum)` gives each column's
     // 1-based position inside the index definition.
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT a.attname
        FROM pg_index i
        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
@@ -1055,7 +1202,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT a.attname AS pk,
               pg_get_serial_sequence(quote_ident(n.nspname) || '.' || quote_ident(t.relname), a.attname) AS seq,
               pg_get_expr(ad.adbin, ad.adrelid) AS default_expr,
@@ -1108,14 +1255,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const qi = (s: string) => this.quoteIdentifier(s);
     const seqName = `${seq.schema}.${seq.name}`;
 
-    const maxRows = await this.execute(
+    const maxRows = await this.schemaQuery(
       `SELECT COALESCE(MAX(${qi(pk)}), 0) AS max_val FROM ${qualifiedTable}`,
     );
     const maxVal = Number(maxRows[0].max_val);
     if (maxVal === 0) {
-      await this.execute(`SELECT setval($1::regclass, 1, false)`, [seqName]);
+      await this.schemaQuery(`SELECT setval($1::regclass, 1, false)`, [seqName]);
     } else {
-      await this.execute(`SELECT setval($1::regclass, $2, true)`, [seqName, maxVal]);
+      await this.schemaQuery(`SELECT setval($1::regclass, $2, true)`, [seqName, maxVal]);
     }
   }
 
@@ -1124,7 +1271,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (!result) return;
     const [, seq] = result;
     const seqName = `${seq.schema}.${seq.name}`;
-    await this.execute(`SELECT setval($1::regclass, $2)`, [seqName, value]);
+    await this.schemaQuery(`SELECT setval($1::regclass, $2)`, [seqName, value]);
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -1149,7 +1296,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT a.attname AS name,
               pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
               pg_get_expr(d.adbin, d.adrelid) AS "default",
@@ -1286,7 +1433,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async tables(): Promise<string[]> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false)) ORDER BY tablename`,
     );
     return rows.map((r) => r.tablename as string);
@@ -1301,7 +1448,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * directly catches both.
    */
   async views(): Promise<string[]> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT c.relname FROM pg_class c
          LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE n.nspname = ANY(current_schemas(false))
@@ -1356,7 +1503,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (schema) {
       // $1=schema, $2=table, $3..=relkinds
       const relPlaceholders = relkinds.map((_, i) => `$${i + 3}`).join(", ");
-      const rows = await this.execute(
+      const rows = await this.schemaQuery(
         `SELECT 1 AS one FROM pg_class c
            LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
            WHERE n.nspname = $1 AND c.relname = $2
@@ -1372,7 +1519,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // compared against `relname = '"widgets"'` in pg_class, which
     // never matches (the catalog stores names unquoted).
     const relPlaceholders = relkinds.map((_, i) => `$${i + 2}`).join(", ");
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT 1 AS one FROM pg_class c
          LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE n.nspname = ANY(current_schemas(false))
@@ -1520,7 +1667,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       toSchemaCondition = `tc2.table_schema = ANY(current_schemas(false))`;
     }
 
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT COUNT(*) AS count
        FROM information_schema.table_constraints tc
        JOIN information_schema.referential_constraints rc
@@ -1647,7 +1794,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       params.push(enumName);
     }
 
-    const rows = await this.execute(sql, params);
+    const rows = await this.schemaQuery(sql, params);
     return rows.map((r) => r.value as string);
   }
 

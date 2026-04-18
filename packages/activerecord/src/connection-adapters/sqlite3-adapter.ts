@@ -29,7 +29,8 @@ import {
   BigIntegerType,
   DecimalType,
 } from "@blazetrails/activemodel";
-import { getFs } from "@blazetrails/activesupport";
+import { getFs, Notifications } from "@blazetrails/activesupport";
+import { typeCastedBinds } from "./abstract/database-statements.js";
 import { quoteString, quoteTableName, quoteColumnName } from "./sqlite3/quoting.js";
 import {
   CheckConstraintDefinition,
@@ -92,17 +93,39 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /**
-   * Execute a SELECT query and return rows.
+   * Execute a SELECT query and return rows. Wrapped in a
+   * `sql.active_record` instrumentation event — mirrors Rails'
+   * `AbstractAdapter#log`, so LogSubscriber / ExplainSubscriber /
+   * QueryCache / custom subscribers all observe the same query stream.
    */
-  async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+  async execute(
+    sql: string,
+    binds: unknown[] = [],
+    name: string = "SQL",
+  ): Promise<Record<string, unknown>[]> {
     await this.materializeTransactions();
 
-    try {
-      const stmt = this._cachedStatement(sql);
-      return stmt.all(...binds) as Record<string, unknown>[];
-    } catch (e) {
-      throw this._translateException(e, sql, binds);
-    }
+    const payload: Record<string, unknown> = {
+      sql,
+      name,
+      binds,
+      type_casted_binds: typeCastedBinds(binds),
+      connection: this,
+      row_count: 0,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        const stmt = this._cachedStatement(sql);
+        const rows = stmt.all(...binds) as Record<string, unknown>[];
+        payload.row_count = rows.length;
+        return rows;
+      } catch (e: any) {
+        const translated = this._translateException(e, sql, binds);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
+      }
+    });
   }
 
   private _cachedStatement(sql: string): Database.Statement {
@@ -146,27 +169,42 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /**
    * Execute an INSERT/UPDATE/DELETE and return affected rows or insert ID.
+   * Wrapped in a `sql.active_record` notification — see `execute`.
    */
-  async executeMutation(sql: string, binds: unknown[] = []): Promise<number> {
+  async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     await this.materializeTransactions();
     if (this._preventWrites) {
       throw new ReadOnlyError("Write query attempted while preventing writes");
     }
-    try {
-      const stmt = this._cachedStatement(sql);
-      const result = stmt.run(...binds);
-      this.dirtyCurrentTransaction();
+    const payload: Record<string, unknown> = {
+      sql,
+      name,
+      binds,
+      type_casted_binds: typeCastedBinds(binds),
+      connection: this,
+      row_count: 0,
+    };
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        const stmt = this._cachedStatement(sql);
+        const result = stmt.run(...binds);
+        this.dirtyCurrentTransaction();
+        payload.row_count = typeof result.changes === "number" ? result.changes : 0;
 
-      // For INSERT, return the last inserted rowid
-      if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-        return Number(result.lastInsertRowid);
+        // For INSERT, return the last inserted rowid
+        if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
+          return Number(result.lastInsertRowid);
+        }
+
+        // For UPDATE/DELETE, return affected rows
+        return result.changes;
+      } catch (e: any) {
+        const translated = this._translateException(e, sql, binds);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
       }
-
-      // For UPDATE/DELETE, return affected rows
-      return result.changes;
-    } catch (e) {
-      throw this._translateException(e, sql, binds);
-    }
+    });
   }
 
   /**
@@ -232,10 +270,29 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /**
    * Return the query execution plan.
+   *
+   * Binds are forwarded to the prepared `EXPLAIN QUERY PLAN`
+   * statement (`.all(...binds)`) so a collected prepared-statement
+   * query with `?` placeholders EXPLAINs without SQLite complaining
+   * about missing parameter values. Options are accepted for
+   * signature parity with `Relation#explain` but ignored — SQLite
+   * has no equivalent to PG's `:analyze` / `:verbose` toggles.
    */
-  async explain(sql: string): Promise<string> {
-    const rows = this.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() as Record<string, unknown>[];
+  async explain(sql: string, binds: unknown[] = [], _options: string[] = []): Promise<string> {
+    const rows = this.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...binds) as Record<
+      string,
+      unknown
+    >[];
     return rows.map((r) => `${r.id}|${r.parent}|${r.notused}|${r.detail}`).join("\n");
+  }
+
+  /**
+   * Build the printed header prefix used by `Relation#explain`.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#build_explain_clause
+   */
+  buildExplainClause(_options: string[] = []): string {
+    return "EXPLAIN QUERY PLAN for:";
   }
 
   /**
@@ -505,7 +562,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async primaryKeys(tableName: string): Promise<string[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = await this.execute(`PRAGMA ${prefix}table_info(${quoteColumnName(bare)})`);
+    const rows = await this.execute(
+      `PRAGMA ${prefix}table_info(${quoteColumnName(bare)})`,
+      [],
+      "SCHEMA",
+    );
     return rows
       .filter((r) => Number(r.pk) > 0)
       .sort((a, b) => Number(a.pk) - Number(b.pk))
@@ -544,6 +605,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async virtualTables(): Promise<string[]> {
     const rows = await this.execute(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND sql LIKE '%VIRTUAL%'",
+      [],
+      "SCHEMA",
     );
     return rows.map((r) => String(r.name));
   }
@@ -711,7 +774,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   > {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = await this.execute(`PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`);
+    const rows = await this.execute(
+      `PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`,
+      [],
+      "SCHEMA",
+    );
     const grouped = new Map<number, Array<Record<string, unknown>>>();
     for (const row of rows) {
       const id = row.id as number;
@@ -882,6 +949,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async tables(): Promise<string[]> {
     const rows = (await this.execute(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+      [],
+      "SCHEMA",
     )) as Array<{ name: string }>;
     return rows.map((r) => r.name);
   }
@@ -889,6 +958,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async views(): Promise<string[]> {
     const rows = (await this.execute(
       "SELECT name FROM sqlite_master WHERE type='view' ORDER BY name",
+      [],
+      "SCHEMA",
     )) as Array<{ name: string }>;
     return rows.map((r) => r.name);
   }
@@ -918,6 +989,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const { sqliteMaster, bare } = this._sqliteMasterFor(name);
     const rows = (await this.execute(
       `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name=${quoteString(bare)}`,
+      [],
+      "SCHEMA",
     )) as Array<{ one: number }>;
     return rows.length > 0;
   }
@@ -926,6 +999,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const { sqliteMaster, bare } = this._sqliteMasterFor(name);
     const rows = (await this.execute(
       `SELECT 1 AS one FROM ${sqliteMaster} WHERE type IN ('table','view') AND name=${quoteString(bare)}`,
+      [],
+      "SCHEMA",
     )) as Array<{ one: number }>;
     return rows.length > 0;
   }
@@ -946,6 +1021,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const rows = (await this.execute(
       `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bare)})`,
+      [],
+      "SCHEMA",
     )) as Array<{ name: string; pk: number }>;
     const pks = rows.filter((r) => r.pk > 0).sort((a, b) => a.pk - b.pk);
     if (pks.length === 0) return null;
@@ -963,6 +1040,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const rows = (await this.execute(
       `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bare)})`,
+      [],
+      "SCHEMA",
     )) as Array<{
       name: string;
       type: string;
@@ -990,6 +1069,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const rows = (await this.execute(
       `PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bare)})`,
+      [],
+      "SCHEMA",
     )) as Array<{ name: string; unique: number; origin: string }>;
     // Skip auto-indexes that SQLite generates for PRIMARY KEY / UNIQUE
     // constraints — Rails' schema cache records user-defined indexes
@@ -1001,6 +1082,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       // any, comes before the PRAGMA keyword — same shape as above.
       const cols = (await this.execute(
         `PRAGMA ${pragmaPrefix}index_info(${quoteColumnName(idx.name)})`,
+        [],
+        "SCHEMA",
       )) as Array<{ name: string; seqno: number }>;
       result.push({
         name: idx.name,
