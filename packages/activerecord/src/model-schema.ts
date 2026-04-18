@@ -12,8 +12,7 @@ import { isStiSubclass, getStiBase } from "./inheritance.js";
 import { quote, quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { detectAdapterName } from "./adapter-name.js";
 import { applyPendingEncryptions } from "./encryption.js";
-import { EncryptedAttributeType as SchemeEncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
-import { EncryptedAttributeType as EncryptorEncryptedAttributeType } from "./encrypted-attribute-type.js";
+import { isWrappedType } from "./encryption/wrapped-type.js";
 
 /**
  * Schema metadata for ActiveRecord models — table name, primary key,
@@ -686,14 +685,13 @@ function applyColumnsHash(
         : null;
     let type = (castType as Type | null) ?? typeRegistry.lookup("value");
 
-    // Preserve encryption wrappers across schema reflection — two
-    // distinct EncryptedAttributeType classes exist (scheme-based
-    // `encrypts()` macro vs encryptor-based internal path); handle both.
-    if (existing?.type instanceof SchemeEncryptedAttributeType) {
-      const scheme = existing.type.scheme;
-      type = new SchemeEncryptedAttributeType({ scheme, castType: type });
-    } else if (existing?.type instanceof EncryptorEncryptedAttributeType) {
-      type = existing.type.withInnerType(type);
+    // Preserve encryption wrappers across schema reflection. Both
+    // EncryptedAttributeType variants implement `WrappedType`; any
+    // future type implementing the same contract is automatically
+    // supported. No `instanceof` branching on concrete classes.
+    const existingType = existing?.type;
+    if (isWrappedType(existingType)) {
+      type = existingType.withInnerType(type);
     }
 
     const defaultValue = (column as { default?: unknown }).default ?? null;

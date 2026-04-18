@@ -3,6 +3,7 @@ import { ValueType, typeRegistry } from "@blazetrails/activemodel";
 type Type = ValueType;
 import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
+import type { WrappedType } from "./encryption/wrapped-type.js";
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";
@@ -303,6 +304,51 @@ describe("set adapter auto-loads schema", () => {
     const def = Post._attributeDefinitions.get("guid");
     expect(def?.type.name).toBe("uuid");
     expect(def?.source).toBe("schema");
+  });
+});
+
+describe("schema reflection preserves any wrapper with withInnerType", () => {
+  it("calls withInnerType on an existing non-user-provided wrapped type", async () => {
+    // Custom wrapper — not an EncryptedAttributeType, just implements
+    // the shared WrappedType contract. applyColumnsHash should route
+    // through it when preserving the wrapper on reflect.
+    const rewrappedWith: Type[] = [];
+    class WrapperType extends ValueType implements WrappedType {
+      withInnerType(innerType: Type): WrapperType {
+        rewrappedWith.push(innerType);
+        return new WrapperType();
+      }
+    }
+
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    const adapter = makeAdapter({ payload: { sqlType: "uuid" } }, { uuid: new UuidType() });
+    // Set adapter first (it resets column info), THEN seed a
+    // schema-sourced wrapper so the adapter-setter's reset doesn't
+    // clobber it before reflection runs.
+    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    (Post as unknown as { _attributeDefinitions: Map<string, unknown> })._attributeDefinitions =
+      new Map([
+        [
+          "payload",
+          {
+            name: "payload",
+            type: new WrapperType(),
+            defaultValue: null,
+            userProvided: false,
+            source: "schema",
+          },
+        ],
+      ]);
+
+    await loadSchemaFromAdapter.call(Post);
+
+    // The wrapper's withInnerType received the freshly-reflected
+    // UuidType, and the wrapper was preserved on the def.
+    expect(rewrappedWith).toHaveLength(1);
+    expect((rewrappedWith[0] as ValueType).name).toBe("uuid");
+    expect(Post._attributeDefinitions.get("payload")?.type).toBeInstanceOf(WrapperType);
   });
 });
 

@@ -1,5 +1,6 @@
 import { Type } from "@blazetrails/activemodel";
 import type { Encryptor } from "./encryption.js";
+import type { WrappedType } from "./encryption/wrapped-type.js";
 
 /**
  * Type decorator that transparently encrypts/decrypts attribute values.
@@ -10,7 +11,7 @@ import type { Encryptor } from "./encryption.js";
  * and decrypted on read (deserialize → decrypt). The inner type handles
  * normal casting; this layer adds the encryption envelope.
  */
-export class EncryptedAttributeType extends Type<unknown> {
+export class EncryptedAttributeType extends Type<unknown> implements WrappedType {
   readonly name: string;
   readonly innerType: Type;
   private readonly encryptor: Encryptor;
