@@ -618,21 +618,18 @@ function getColumnsHash(host: SchemaHost): Record<string, any> {
  * cache) to `_attributeDefinitions`. Shared by sync `loadSchema` and
  * async `loadSchemaFromAdapter`.
  *
- * STI note 1: for STI subclasses, `host` is the STI base, so the base's
+ * STI note: for STI subclasses, `host` is the STI base, so the base's
  * `_ignoredColumns` governs which columns get accessors on the shared
  * prototype. Per-subclass `ignoredColumns` is still honored at read
  * time in `columnsHash()` (filters the returned hash), but it cannot
  * retroactively remove a prototype accessor already defined on the
  * base — a consequence of TypeScript not having Ruby's method_missing.
- *
- * STI note 2: reflection is applied to the STI base only. If a subclass
- * previously forked `_attributeDefinitions` (via its own `attribute()`,
- * `decorateAttributes`, or `encrypts` call), its forked map shadows the
- * base's, so newly-reflected schema types won't be visible on the
- * subclass. The follow-up fix is to route STI-subclass `attribute()`
- * writes through the base (Rails-faithful: STI subclasses share
- * attribute_types), which belongs in a separate PR that touches
- * Base.attribute and attribute-registration.
+ * Subclass `attribute()` and `encrypts()` calls route through the STI
+ * base (see base.ts), so those specific flows don't create forked-map
+ * shadowing. Other decorators that mutate `_attributeDefinitions`
+ * directly on the calling class may still fork until they're routed
+ * through the same shared owner — add them to the STI redirect list
+ * in base.ts when they're introduced.
  */
 function applyColumnsHash(
   host: SchemaHost,

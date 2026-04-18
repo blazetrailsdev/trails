@@ -390,6 +390,17 @@ export class Base extends Model {
     typeName: string,
     options?: { default?: unknown; virtual?: boolean; userProvidedDefault?: boolean },
   ): void {
+    // STI subclasses share the base's `_attributeDefinitions` — matching
+    // Rails' `ActiveRecord::Inheritance` where `attribute_types` is a
+    // shared `class_attribute`. Route the registration through the STI
+    // base so `Circle.attribute("radius", ...)` lands on `Shape._attributeDefinitions`
+    // instead of forking a subclass-local map that later schema
+    // reflection on the base wouldn't see.
+    if (isStiSubclass(this)) {
+      const stiBase = getStiBase(this);
+      stiBase.attribute(name, typeName, options);
+      return;
+    }
     super.attribute(name, typeName, options);
     // If we just defined an "id" accessor on a subclass prototype, remove it
     // so Base.prototype.id (which handles CPK) is used instead.
@@ -756,7 +767,16 @@ export class Base extends Model {
   static encrypts(
     ...args: Array<string | { encryptor?: import("./encryption.js").Encryptor }>
   ): void {
-    _encrypts(this, ...args);
+    // Route through the STI base for the same reason `attribute()`
+    // does: Rails' `encrypts` lands on the shared attribute_types map.
+    // Without this, a subclass `encrypts()` would record pending
+    // encryptions on the subclass while the attribute def lives on
+    // the base — the type wrapper would never apply, or
+    // `applyPendingEncryptions` would fork `_attributeDefinitions` on
+    // the subclass and reintroduce the shadowing the STI-routing fix
+    // is trying to eliminate.
+    const target = isStiSubclass(this) ? (getStiBase(this) as typeof Base) : this;
+    _encrypts(target, ...args);
   }
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {
