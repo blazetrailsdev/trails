@@ -63,6 +63,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
   private _filename: string;
+  private _statementPool = new GenericStatementPool<Database.Statement>();
 
   private static _isMemoryFilename(filename: string): boolean {
     if (filename === ":memory:") return true;
@@ -97,11 +98,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.materializeTransactions();
 
     try {
-      const stmt = this.db.prepare(sql);
+      const stmt = this._cachedStatement(sql);
       return stmt.all(...binds) as Record<string, unknown>[];
     } catch (e) {
       throw this._translateException(e, sql, binds);
     }
+  }
+
+  private _cachedStatement(sql: string): Database.Statement {
+    let stmt = this._statementPool.get(sql);
+    if (!stmt) {
+      stmt = this.db.prepare(sql);
+      this._statementPool.set(sql, stmt);
+    }
+    return stmt;
   }
 
   /**
@@ -143,7 +153,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       throw new ReadOnlyError("Write query attempted while preventing writes");
     }
     try {
-      const stmt = this.db.prepare(sql);
+      const stmt = this._cachedStatement(sql);
       const result = stmt.run(...binds);
       this.dirtyCurrentTransaction();
 
@@ -400,6 +410,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   isActive(): boolean {
     return this.db.open;
+  }
+
+  override clearCacheBang(): void {
+    super.clearCacheBang();
+    this._statementPool.clear();
   }
 
   override disconnectBang(): void {

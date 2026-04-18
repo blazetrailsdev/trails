@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { StatementPool } from "./statement-pool.js";
 
 describe("StatementPoolTest", () => {
@@ -97,5 +97,37 @@ describe("StatementPoolTest", () => {
     expect(pool.has("a")).toBe(true);
     expect(pool.has("b")).toBe(false);
     expect(pool.has("c")).toBe(true);
+  });
+});
+
+describe("SQLite3 StatementPool integration", () => {
+  it("caches prepared statements across execute calls", async () => {
+    const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
+    const adapter = new SQLite3Adapter(":memory:");
+    const prepareSpy = vi.spyOn((adapter as any).db, "prepare");
+
+    try {
+      await adapter.executeMutation(
+        'CREATE TABLE "test_pool" ("id" INTEGER PRIMARY KEY, "name" TEXT)',
+      );
+      await adapter.executeMutation('INSERT INTO "test_pool" ("name") VALUES (?)', ["a"]);
+      await adapter.executeMutation('INSERT INTO "test_pool" ("name") VALUES (?)', ["b"]);
+
+      // Same SQL executed twice — db.prepare called once, cached for second
+      const selectSql = 'SELECT * FROM "test_pool" WHERE "name" = ?';
+      const rows1 = await adapter.execute(selectSql, ["a"]);
+      const rows2 = await adapter.execute(selectSql, ["b"]);
+      expect(rows1).toHaveLength(1);
+      expect(rows1[0].name).toBe("a");
+      expect(rows2).toHaveLength(1);
+      expect(rows2[0].name).toBe("b");
+
+      // db.prepare should have been called once for the SELECT, not twice
+      const selectCalls = prepareSpy.mock.calls.filter((c) => c[0] === selectSql);
+      expect(selectCalls).toHaveLength(1);
+    } finally {
+      prepareSpy.mockRestore();
+      adapter.disconnectBang();
+    }
   });
 });

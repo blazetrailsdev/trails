@@ -107,7 +107,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     await this.materializeTransactions();
     const conn = await this.getConn();
     try {
-      const [rows] = await conn.query(this.mysqlQuote(sql), this.mysqlBinds(binds));
+      const quotedSql = this.mysqlQuote(sql);
+      const mappedBinds = this.mysqlBinds(binds);
+      const [rows] =
+        this.preparedStatements && binds.length > 0
+          ? await conn.execute(quotedSql, mappedBinds as any[])
+          : await conn.query(quotedSql, mappedBinds);
       return rows as Record<string, unknown>[];
     } finally {
       this.releaseConn(conn);
@@ -121,7 +126,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     await this.materializeTransactions();
     const conn = await this.getConn();
     try {
-      const [result] = await conn.query(this.mysqlQuote(sql), this.mysqlBinds(binds));
+      const quotedSql = this.mysqlQuote(sql);
+      const mappedBinds = this.mysqlBinds(binds);
+      const [result] =
+        this.preparedStatements && binds.length > 0
+          ? await conn.execute(quotedSql, mappedBinds as any[])
+          : await conn.query(quotedSql, mappedBinds);
       this.dirtyCurrentTransaction();
       const info = result as mysql.ResultSetHeader;
 

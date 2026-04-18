@@ -83,7 +83,7 @@ export class AbstractAdapter extends AbstractAdapterBase {
   private _connection: DatabaseAdapter | null = null;
   private _owner: string | null = null;
   private _inUse = false;
-  private _prepared_statements = false;
+  private _preparedStatements = false;
   private _schemaCache: SchemaCache | null = null;
   private _idleSince = Date.now();
   protected _lastActivity = 0;
@@ -153,7 +153,11 @@ export class AbstractAdapter extends AbstractAdapterBase {
   }
 
   get preparedStatements(): boolean {
-    return this._prepared_statements;
+    return this._preparedStatements;
+  }
+
+  set preparedStatements(value: boolean) {
+    this._preparedStatements = value;
   }
 
   get active(): boolean {
@@ -260,12 +264,12 @@ export class AbstractAdapter extends AbstractAdapterBase {
   }
 
   async unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> {
-    const was = this._prepared_statements;
-    this._prepared_statements = false;
+    const was = this._preparedStatements;
+    this._preparedStatements = false;
     try {
       return await fn();
     } finally {
-      this._prepared_statements = was;
+      this._preparedStatements = was;
     }
   }
 

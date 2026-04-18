@@ -334,7 +334,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   private releaseClient(client: pg.PoolClient): void {
     if (client !== this._client) {
-      client.release();
+      try {
+        client.release();
+      } catch {
+        // Client may have already been released if materializeTransactions
+        // acquired it as the transaction client and commit/rollback released
+        // it before we get here.
+      }
     }
   }
 
