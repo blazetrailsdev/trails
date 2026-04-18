@@ -25,6 +25,26 @@ describeIfMysql("Mysql2Adapter", () => {
     it.skip("explain with options as strings", () => {});
     it.skip("explain options with eager loading", () => {});
 
+    it("buildExplainClause renders FORMAT=JSON without parens for { format: 'json' }", () => {
+      const clause = adapter.buildExplainClause([{ format: "json" }]);
+      expect(clause).toBe("EXPLAIN FORMAT=JSON for:");
+    });
+
+    it("buildExplainClause combines string flag and format hash space-separated", () => {
+      const clause = adapter.buildExplainClause(["analyze", { format: "json" }]);
+      expect(clause).toBe("EXPLAIN ANALYZE FORMAT=JSON for:");
+    });
+
+    it("buildExplainClause rejects unknown format", () => {
+      expect(() => adapter.buildExplainClause([{ format: "bogus" }])).toThrow();
+    });
+
+    it("explain executes with { format: 'json' } and returns JSON plan", async () => {
+      const result = await adapter.explain("SELECT 1", [], [{ format: "json" }]);
+      expect(typeof result).toBe("string");
+      expect(result.length).toBeGreaterThan(0);
+    });
+
     it("Relation#explain on MySQL captures the SELECT via sql.active_record", async () => {
       // End-to-end: the full ExplainRegistry → ExplainSubscriber →
       // adapter.explain pipeline only works on MySQL if execute()

@@ -20,7 +20,8 @@ import {
   initializeInstanceTypeMap,
   initializeTypeMap as staticInitializeTypeMap,
 } from "./postgresql/type-map-init.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { inspectExplainOption } from "../adapter.js";
+import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { typeCastedBinds } from "./abstract/database-statements.js";
 
@@ -591,7 +592,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * prepared-statement query re-EXPLAINs cleanly without pg
    * rejecting it for "no parameter $1".
    */
-  async explain(sql: string, binds: unknown[] = [], options: string[] = []): Promise<string> {
+  async explain(
+    sql: string,
+    binds: unknown[] = [],
+    options: ExplainOption[] = [],
+  ): Promise<string> {
     return this.withClient(async (client) => {
       const clause = this._explainStatementClause(options);
       // Rewrite `?` → `$1` the same way execute/execQuery do, so a
@@ -606,30 +611,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     });
   }
 
-  // Note: PG's `buildExplainClause` — `"EXPLAIN for:"` /
-  // `"EXPLAIN (ANALYZE, VERBOSE) for:"` — is inherited from
-  // AbstractAdapter#buildExplainClause, which encodes the Rails default
-  // that happens to match PG's format. MySQL and SQLite override with
-  // adapter-specific flags.
+  /**
+   * Build the printed header prefix used by `Relation#explain`. PG
+   * accepts the boolean flags in `EXPLAIN_FLAGS` plus a `format`
+   * keyword (`{ format: "json" }`), composed into the same clause shape
+   * the adapter sends to the server: `EXPLAIN (ANALYZE, FORMAT JSON) for:`.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#build_explain_clause
+   */
+  override buildExplainClause(options: ExplainOption[] = []): string {
+    if (options.length === 0) return "EXPLAIN for:";
+    const parts = this._validateExplainOptions(options);
+    return `EXPLAIN (${parts.join(", ")}) for:`;
+  }
 
   /**
-   * Set of PG EXPLAIN flags that are safe to interpolate into the
-   * EXPLAIN clause. Rails' `PostgreSQL::DatabaseStatements#explain`
-   * accepts symbols (`:analyze`, `:verbose`, `:costs`, `:buffers`,
-   * `:settings`, `:wal`, `:timing`, `:summary`, `:format`); we restrict
-   * to the same set and uppercase for the SQL clause. Everything else
-   * throws — options come from `Relation#explain(...args)` which is
-   * user-supplied, so unsanitized interpolation would be a SQL injection
-   * vector.
+   * Boolean PG EXPLAIN flags. Rails' `PostgreSQL::DatabaseStatements#explain`
+   * accepts the Symbols `:analyze :verbose :costs :buffers :settings
+   * :wal :timing :summary`; `format` is handled separately as a
+   * key/value hash entry (`{ format: "json" }`) because it requires a
+   * value.
    */
-  // PG's `FORMAT` flag is intentionally excluded — it's a key/value
-  // option (`FORMAT JSON` / `FORMAT YAML`), not a boolean toggle, so
-  // including it would generate invalid `EXPLAIN (FORMAT) ...` SQL.
-  // Rails supports it via a keyword arg (`explain(format: :json)`)
-  // rather than a positional flag; we can add that surface when the
-  // Relation#explain API is extended — for now the boolean-only flags
-  // below match what `Relation#explain("analyze", "verbose")` accepts.
-  private static readonly EXPLAIN_OPTIONS = new Set([
+  private static readonly EXPLAIN_FLAGS = new Set([
     "analyze",
     "verbose",
     "costs",
@@ -640,14 +643,45 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     "summary",
   ]);
 
-  private _validateExplainOptions(options: string[]): string[] {
-    return options.map((o) => {
-      const key = String(o).toLowerCase();
-      if (!PostgreSQLAdapter.EXPLAIN_OPTIONS.has(key)) {
-        throw new Error(`Unknown PostgreSQL EXPLAIN option: ${o}`);
+  /**
+   * Allowed values for the `format` keyword option. PG supports
+   * `TEXT` (default), `XML`, `JSON`, `YAML` — see
+   * https://www.postgresql.org/docs/current/sql-explain.html.
+   * Values come from user code via `Relation#explain(...)`, so
+   * interpolation has to be allowlisted.
+   */
+  private static readonly EXPLAIN_FORMATS = new Set(["text", "xml", "json", "yaml"]);
+
+  private _validateExplainOptions(options: ExplainOption[]): string[] {
+    const parts: string[] = [];
+    let seenFormat = false;
+    for (const o of options) {
+      if (typeof o === "string") {
+        const key = o.toLowerCase();
+        if (!PostgreSQLAdapter.EXPLAIN_FLAGS.has(key)) {
+          throw new Error(`Unknown PostgreSQL EXPLAIN option: ${o}`);
+        }
+        parts.push(key.toUpperCase());
+        continue;
       }
-      return key.toUpperCase();
-    });
+      if (!o || typeof o !== "object" || typeof o.format !== "string") {
+        throw new Error(
+          `Unknown PostgreSQL EXPLAIN option: ${inspectExplainOption(o)} (expected a string flag or an object with a string 'format')`,
+        );
+      }
+      if (seenFormat) {
+        throw new Error("PostgreSQL EXPLAIN accepts at most one FORMAT option");
+      }
+      const fmt = o.format.toLowerCase();
+      if (!PostgreSQLAdapter.EXPLAIN_FORMATS.has(fmt)) {
+        throw new Error(
+          `Unknown PostgreSQL EXPLAIN format: ${o.format}. Allowed: text, xml, json, yaml.`,
+        );
+      }
+      parts.push(`FORMAT ${fmt.toUpperCase()}`);
+      seenFormat = true;
+    }
+    return parts;
   }
 
   /**
@@ -656,7 +690,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * printed header. Options are validated against the adapter's
    * allowlist before interpolation.
    */
-  private _explainStatementClause(options: string[]): string {
+  private _explainStatementClause(options: ExplainOption[]): string {
     if (options.length === 0) return "EXPLAIN";
     const validated = this._validateExplainOptions(options);
     return `EXPLAIN (${validated.join(", ")})`;

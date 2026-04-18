@@ -280,6 +280,20 @@ describe("ExplainTest", () => {
     expect(rendered).toBe('["raw", 42]');
   });
 
+  it("rejects multiple hash options (Rails extract_options! semantics)", async () => {
+    const { Post } = makeModel();
+    await expect(
+      Post.all().explain({ format: "json" }, { format: "xml" } as never),
+    ).rejects.toThrow(/at most one option hash/);
+  });
+
+  it("rejects a non-trailing hash option", async () => {
+    const { Post } = makeModel();
+    await expect(Post.all().explain({ format: "json" } as never, "analyze")).rejects.toThrow(
+      /last argument/,
+    );
+  });
+
   it("isolates concurrent explain() calls via AsyncLocalStorage scopes", async () => {
     // Two parallel explain() calls must not trample each other's
     // collected queries. Without async-context isolation a global

@@ -45,7 +45,8 @@ import { WhereClause, predicatesWithWrappedSqlLiterals } from "./relation/where-
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { touchAttributesWithTime } from "./timestamp.js";
 import { ExplainRegistry } from "./explain-registry.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { inspectExplainOption } from "./adapter.js";
+import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 
 /**
@@ -56,6 +57,37 @@ import { rubyInspectArray } from "./relation/ruby-inspect.js";
  * `.finally` aren't part of `Awaited<>`'s unwrap rules, so they stay.)
  */
 export type LoadedRelation<R> = Omit<R, "then">;
+
+/**
+ * Enforce Rails' `extract_options!` shape on variadic `explain(...)`
+ * inputs: at most one hash option, and if present it must be the last
+ * positional argument. This keeps adapters (especially MySQL, whose
+ * `EXPLAIN FORMAT=X ANALYZE` is invalid) from receiving orderings they
+ * can't render.
+ */
+function validateExplainOptions(options: ExplainOption[]): void {
+  let seenHash = false;
+  for (let i = 0; i < options.length; i++) {
+    const o = options[i];
+    if (typeof o === "string") {
+      if (seenHash) {
+        throw new Error(
+          "EXPLAIN option hash must be the last argument (Rails' extract_options! semantics)",
+        );
+      }
+      continue;
+    }
+    if (!o || typeof o !== "object") {
+      throw new TypeError(
+        `EXPLAIN option must be a string flag or an options hash; got ${String(o)}`,
+      );
+    }
+    if (seenHash) {
+      throw new Error("EXPLAIN accepts at most one option hash");
+    }
+    seenHash = true;
+  }
+}
 
 /**
  * Relation — the lazy, chainable query interface.
@@ -1637,13 +1669,25 @@ export class Relation<T extends Base> {
    * subscriber captures every `sql.active_record` notification, and
    * `exec_explain` runs EXPLAIN against each captured SQL.
    *
-   * `options` mirrors Rails' variadic symbols (e.g. `explain("analyze",
-   * "verbose")` → `EXPLAIN (ANALYZE, VERBOSE) ...`) and is forwarded to
-   * the adapter's `buildExplainClause` / `explain` implementations.
+   * `options` is a mix of flag strings and an optional trailing keyword
+   * hash. Supported keyword options are adapter-specific — PG and MySQL
+   * each allowlist their own set of `format` values, SQLite ignores
+   * options entirely. Ruby's `extract_options!` allows at most one
+   * trailing Hash; we enforce the same shape here so MySQL's
+   * order-sensitive SQL (`EXPLAIN FORMAT=JSON ANALYZE` is invalid) can't
+   * be produced by accident. Examples:
+   *
+   *     await Post.all().explain("analyze", "verbose")
+   *     // → EXPLAIN (ANALYZE, VERBOSE) for: SELECT …
+   *
+   *     await Post.all().explain("analyze", { format: "json" })
+   *     // → EXPLAIN (ANALYZE, FORMAT JSON) for: SELECT …  (PG)
+   *     // → EXPLAIN ANALYZE FORMAT=JSON for: SELECT …     (MySQL)
    *
    * Mirrors: ActiveRecord::Relation#explain
    */
-  async explain(...options: string[]): Promise<string> {
+  async explain(...options: ExplainOption[]): Promise<string> {
+    validateExplainOptions(options);
     const { queries } = await ExplainRegistry.collectingQueries(() => this.toArray());
     return this._execExplain(queries, options);
   }
@@ -1657,7 +1701,10 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#exec_explain
    * @internal
    */
-  async _execExplain(queries: [string, unknown[]][], options: string[] = []): Promise<string> {
+  async _execExplain(
+    queries: [string, unknown[]][],
+    options: ExplainOption[] = [],
+  ): Promise<string> {
     const adapter = this._modelClass.adapter;
     if (typeof adapter?.explain !== "function") {
       return "EXPLAIN not supported by this adapter";
@@ -1804,13 +1851,21 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
    */
-  private _buildExplainClause(adapter: DatabaseAdapter, options: string[]): string {
+  private _buildExplainClause(adapter: DatabaseAdapter, options: ExplainOption[]): string {
     if (typeof adapter.buildExplainClause === "function") {
       return adapter.buildExplainClause(options);
     }
     if (options.length === 0) return "EXPLAIN for:";
-    const parts = options.map((o) => o.toUpperCase()).join(", ");
-    return `EXPLAIN (${parts}) for:`;
+    const parts = options.map((o) => {
+      if (typeof o === "string") return o.toUpperCase();
+      if (!o || typeof o !== "object" || typeof o.format !== "string") {
+        throw new TypeError(
+          `EXPLAIN option hash requires a string 'format'; got ${inspectExplainOption(o)}`,
+        );
+      }
+      return `FORMAT ${o.format.toUpperCase()}`;
+    });
+    return `EXPLAIN (${parts.join(", ")}) for:`;
   }
 
   // count, sum, average, minimum, maximum are mixed in via

@@ -4,7 +4,8 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter
  */
 
-import type { DatabaseAdapter } from "../adapter.js";
+import { inspectExplainOption } from "../adapter.js";
+import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
 import { type Nodes, Visitors } from "@blazetrails/arel";
 import { ReadOnlyError } from "../errors.js";
 import { SchemaCache } from "./schema-cache.js";
@@ -105,10 +106,18 @@ export class AbstractAdapter extends AbstractAdapterBase {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
    */
-  buildExplainClause(options: string[] = []): string {
+  buildExplainClause(options: ExplainOption[] = []): string {
     if (options.length === 0) return "EXPLAIN for:";
-    const parts = options.map((o) => o.toUpperCase()).join(", ");
-    return `EXPLAIN (${parts}) for:`;
+    const parts = options.map((o) => {
+      if (typeof o === "string") return o.toUpperCase();
+      if (o && typeof o === "object" && typeof o.format === "string") {
+        return `FORMAT ${o.format.toUpperCase()}`;
+      }
+      throw new TypeError(
+        `EXPLAIN option hash requires a string 'format'; got ${inspectExplainOption(o)}`,
+      );
+    });
+    return `EXPLAIN (${parts.join(", ")}) for:`;
   }
 
   /**

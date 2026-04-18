@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { Visitors } from "@blazetrails/arel";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -284,7 +284,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * signature parity with `Relation#explain` but ignored — SQLite
    * has no equivalent to PG's `:analyze` / `:verbose` toggles.
    */
-  async explain(sql: string, binds: unknown[] = [], _options: string[] = []): Promise<string> {
+  async explain(
+    sql: string,
+    binds: unknown[] = [],
+    _options: ExplainOption[] = [],
+  ): Promise<string> {
     const rows = this.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...binds) as Record<
       string,
       unknown
@@ -297,7 +301,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#build_explain_clause
    */
-  buildExplainClause(_options: string[] = []): string {
+  override buildExplainClause(_options: ExplainOption[] = []): string {
     return "EXPLAIN QUERY PLAN for:";
   }
 

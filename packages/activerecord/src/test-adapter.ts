@@ -16,7 +16,8 @@
  * creation from model definitions — not SQL guessing.
  */
 
-import type { DatabaseAdapter } from "./adapter.js";
+import { inspectExplainOption } from "./adapter.js";
+import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { DatabaseStatementsMixin } from "./connection-adapters/database-statements-mixin.js";
 import { _setOnAdapterSetHook } from "./base.js";
 
@@ -672,22 +673,35 @@ class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements Databas
     return execDdlWithSavepoint(this.inner, sql);
   }
 
-  async explain(sql: string, binds: unknown[] = [], options: string[] = []): Promise<string> {
+  async explain(
+    sql: string,
+    binds: unknown[] = [],
+    options: ExplainOption[] = [],
+  ): Promise<string> {
     await this.setup();
     const inner = this.inner as {
-      explain?: (sql: string, binds?: unknown[], options?: string[]) => Promise<string>;
+      explain?: (sql: string, binds?: unknown[], options?: ExplainOption[]) => Promise<string>;
     };
     if (inner.explain) return inner.explain(sql, binds, options);
     return `EXPLAIN not supported`;
   }
 
-  buildExplainClause(options: string[] = []): string {
-    const inner = this.inner as { buildExplainClause?: (options: string[]) => string };
+  buildExplainClause(options: ExplainOption[] = []): string {
+    const inner = this.inner as { buildExplainClause?: (options: ExplainOption[]) => string };
     if (typeof inner.buildExplainClause === "function") {
       return inner.buildExplainClause(options);
     }
     if (options.length === 0) return "EXPLAIN for:";
-    return `EXPLAIN (${options.map((o) => o.toUpperCase()).join(", ")}) for:`;
+    const parts = options.map((o) => {
+      if (typeof o === "string") return o.toUpperCase();
+      if (!o || typeof o !== "object" || typeof o.format !== "string") {
+        throw new TypeError(
+          `EXPLAIN option hash requires a string 'format'; got ${inspectExplainOption(o)}`,
+        );
+      }
+      return `FORMAT ${o.format.toUpperCase()}`;
+    });
+    return `EXPLAIN (${parts.join(", ")}) for:`;
   }
 
   quote(value: unknown): string {

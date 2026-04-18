@@ -97,6 +97,25 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result).toContain("Result");
     });
 
+    it("buildExplainClause renders FORMAT JSON for { format: 'json' }", () => {
+      const clause = adapter.buildExplainClause([{ format: "json" }]);
+      expect(clause).toBe("EXPLAIN (FORMAT JSON) for:");
+    });
+
+    it("buildExplainClause combines string flags and format hash", () => {
+      const clause = adapter.buildExplainClause(["analyze", { format: "json" }]);
+      expect(clause).toBe("EXPLAIN (ANALYZE, FORMAT JSON) for:");
+    });
+
+    it("buildExplainClause rejects unknown format", () => {
+      expect(() => adapter.buildExplainClause([{ format: "bogus" }])).toThrow();
+    });
+
+    it("explain executes with { format: 'json' } and returns JSON plan", async () => {
+      const result = await adapter.explain("SELECT 1", [], [{ format: "json" }]);
+      expect(result).toContain("[");
+    });
+
     it.skip("explain options with eager loading", async () => {});
   });
 });

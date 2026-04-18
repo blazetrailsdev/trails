@@ -1,6 +1,6 @@
 import mysql from "mysql2/promise";
 import { Notifications } from "@blazetrails/activesupport";
-import type { DatabaseAdapter } from "../adapter.js";
+import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
 import { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
 import { Column } from "../connection-adapters/column.js";
 import { SqlTypeMetadata } from "../connection-adapters/sql-type-metadata.js";
@@ -295,7 +295,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * prepared-statement SQL with `?` placeholders re-EXPLAINs
    * correctly.
    */
-  async explain(sql: string, binds: unknown[] = [], options: string[] = []): Promise<string> {
+  async explain(
+    sql: string,
+    binds: unknown[] = [],
+    options: ExplainOption[] = [],
+  ): Promise<string> {
     const conn = await this.getConn();
     try {
       const clause = this._explainStatementClause(options);
@@ -313,51 +317,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  /**
-   * Build the printed header prefix used by `Relation#explain`
-   * (e.g. `"EXPLAIN for:"` / `"EXPLAIN ANALYZE for:"`).
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#build_explain_clause
-   */
-  buildExplainClause(options: string[] = []): string {
-    if (options.length === 0) return "EXPLAIN for:";
-    const parts = options.map((o) => o.toUpperCase()).join(" ");
-    return `EXPLAIN ${parts} for:`;
-  }
-
   // `quote()` and `typeCast()` are inherited from AbstractMysqlAdapter,
   // which delegates to `mysql/quoting.ts`. No Mysql2-specific override
   // needed — they'd be duplicates.
-
-  /**
-   * Set of MySQL EXPLAIN flags that are safe to interpolate into the
-   * EXPLAIN clause. MySQL 8.0.18+ supports `EXPLAIN ANALYZE`; older
-   * versions and MariaDB support at least `EXTENDED`. Anything else is
-   * rejected — options come from user code via `Relation#explain(...)`
-   * and unsanitized interpolation would be a SQL injection vector.
-   */
-  private static readonly EXPLAIN_OPTIONS = new Set(["analyze", "extended", "partitions"]);
-
-  private _validateExplainOptions(options: string[]): string[] {
-    return options.map((o) => {
-      const key = String(o).toLowerCase();
-      if (!Mysql2Adapter.EXPLAIN_OPTIONS.has(key)) {
-        throw new Error(`Unknown MySQL EXPLAIN option: ${o}`);
-      }
-      return key.toUpperCase();
-    });
-  }
-
-  /**
-   * Compose the actual `EXPLAIN ...` SQL clause that prefixes the query —
-   * distinct from `buildExplainClause`, which builds the printed header.
-   * Options are validated against the adapter's allowlist before
-   * interpolation.
-   */
-  private _explainStatementClause(options: string[]): string {
-    if (options.length === 0) return "EXPLAIN";
-    return `EXPLAIN ${this._validateExplainOptions(options).join(" ")}`;
-  }
+  //
+  // `buildExplainClause` / `_validateExplainOptions` / `_explainStatementClause`
+  // and the EXPLAIN_FLAGS / EXPLAIN_FORMATS allowlists live on
+  // AbstractMysqlAdapter so TrilogyAdapter inherits the same MySQL
+  // clause shape.
 
   /**
    * Execute raw SQL (for DDL and other non-query statements).

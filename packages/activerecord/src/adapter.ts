@@ -1,6 +1,65 @@
 import type { Result } from "./result.js";
 
 /**
+ * A single entry in `Relation#explain`'s options list. Either a bare
+ * flag name (`"analyze"`, `"verbose"`) or a keyword hash (`{ format:
+ * "json" }`) — mirrors Rails' `explain(*options)` where options can
+ * be a mix of Symbols and a single Hash. Each adapter decides which
+ * flags / keys it supports and throws on unknown ones.
+ *
+ * Mirrors: the `options` array shape used by Rails'
+ * `ActiveRecord::Relation#explain` and its adapter `build_explain_clause`.
+ */
+export type ExplainOption = string | { format: string };
+
+/**
+ * Stringify an arbitrary value for inclusion in an EXPLAIN validation
+ * error message. `as any` callers can hand us arbitrary shapes —
+ * circular objects, BigInts, Symbols, functions — and a raw
+ * `JSON.stringify` either throws or silently drops non-JSON values,
+ * masking the validation error the caller actually needs to see.
+ *
+ * Uses `JSON.stringify` with a custom replacer that:
+ *   - replaces circular refs with `"[Circular]"` (WeakSet-tracked)
+ *   - renders `BigInt` as `"123n"`, `Symbol` as `"Symbol(desc)"`, and
+ *     `function` as `"[Function: name]"` so the shape is visible
+ *
+ * `util.inspect` would be the idiomatic choice but is forbidden by the
+ * repo's `blazetrails/no-node-builtins` rule (browser compat).
+ */
+export function inspectExplainOption(o: unknown): string {
+  if (o === null) return "null";
+  if (o === undefined) return "undefined";
+  if (typeof o === "bigint") return `${o}n`;
+  if (typeof o === "symbol") return o.toString();
+  if (typeof o === "function") return `[Function: ${o.name || "anonymous"}]`;
+  if (typeof o !== "object") return String(o);
+  const seen = new WeakSet<object>();
+  try {
+    return JSON.stringify(o, (_k, v) => {
+      if (typeof v === "bigint") return `${v}n`;
+      if (typeof v === "symbol") return v.toString();
+      if (typeof v === "function") return `[Function: ${v.name || "anonymous"}]`;
+      if (v !== null && typeof v === "object") {
+        if (seen.has(v as object)) return "[Circular]";
+        seen.add(v as object);
+      }
+      return v;
+    });
+  } catch {
+    // String(o) would invoke a user-defined toString/valueOf, which can
+    // itself throw — masking the validation error we're here to preserve.
+    // Object.prototype.toString.call(o) is spec-defined to produce
+    // `[object Type]` without consulting user code.
+    try {
+      return Object.prototype.toString.call(o);
+    } catch {
+      return "[object Object]";
+    }
+  }
+}
+
+/**
  * Database adapter interface — pluggable backends.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter
@@ -64,12 +123,13 @@ export interface DatabaseAdapter {
    * same bind values the adapter would accept on `execute()`, so a
    * captured prepared-statement query re-EXPLAINs cleanly; `options`
    * carries the Rails-style variadic flags (e.g. `analyze`,
-   * `verbose`) for adapters that support them. Both are optional for
-   * adapters that pre-date the options surface.
+   * `verbose`) and keyword options (`{ format: "json" }`) for
+   * adapters that support them. Both are optional for adapters that
+   * pre-date the options surface.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#explain
    */
-  explain?(sql: string, binds?: unknown[], options?: string[]): Promise<string>;
+  explain?(sql: string, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
 
   /**
    * Build the printed header prefix used by `Relation#explain` — e.g.
@@ -80,7 +140,7 @@ export interface DatabaseAdapter {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
    */
-  buildExplainClause?(options?: string[]): string;
+  buildExplainClause?(options?: ExplainOption[]): string;
 
   /**
    * Quote a value for inclusion in a SQL literal (e.g. `"'foo'"`,
