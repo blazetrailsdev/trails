@@ -130,9 +130,14 @@ export class BindMap {
     this._indexes = [];
     for (let i = 0; i < boundAttributes.length; i++) {
       const attr = boundAttributes[i];
-      if (attr instanceof Substitute) {
-        this._indexes.push(i);
-      } else if (attr instanceof Attribute && attr.value instanceof Substitute) {
+      const isSubstitute =
+        attr instanceof Substitute ||
+        (attr instanceof Attribute && attr.value instanceof Substitute) ||
+        (attr !== null &&
+          typeof attr === "object" &&
+          "valueBeforeTypeCast" in (attr as Record<string, unknown>) &&
+          (attr as any).valueBeforeTypeCast instanceof Substitute);
+      if (isSubstitute) {
         this._indexes.push(i);
       }
     }
@@ -145,6 +150,12 @@ export class BindMap {
       const attr = bas[offset];
       if (attr instanceof Attribute) {
         bas[offset] = attr.withCastValue(values[i]);
+      } else if (
+        attr !== null &&
+        typeof attr === "object" &&
+        typeof (attr as any).withCastValue === "function"
+      ) {
+        bas[offset] = (attr as { withCastValue(v: unknown): unknown }).withCastValue(values[i]);
       } else {
         bas[offset] = values[i];
       }
@@ -224,8 +235,16 @@ export class StatementCache {
     const sql = this._queryBuilder.sqlFor(bindValues, connection);
     // PartialQuery inlines values into the SQL string — pass empty binds
     // to avoid findBySql trying to re-substitute them.
-    const binds = this._queryBuilder instanceof PartialQuery ? [] : bindValues;
-    return this._model.findBySql(sql, binds);
+    if (this._queryBuilder instanceof PartialQuery) {
+      return this._model.findBySql(sql);
+    }
+    // Type-cast bind objects to primitives for the adapter
+    const castedBinds = bindValues.map((b) =>
+      b !== null && typeof b === "object" && typeof (b as any).valueForDatabase === "function"
+        ? (b as { valueForDatabase(): unknown }).valueForDatabase()
+        : b,
+    );
+    return this._model.findBySql(sql, castedBinds);
   }
 
   /**

@@ -81,15 +81,13 @@ export async function _queryBySql(
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
 ): Promise<Record<string, unknown>[]> {
-  let sanitized: string;
   if (Array.isArray(sql)) {
-    sanitized = sanitizeSql(sql);
-  } else if (binds.length > 0) {
-    sanitized = sanitizeSql([sql, ...binds] as [string, ...unknown[]]);
-  } else {
-    sanitized = sql;
+    // Array form [sql, ...values] — interpolate into the string
+    return this.adapter.execute(sanitizeSql(sql));
   }
-  return this.adapter.execute(sanitized);
+  // String SQL with separate binds — pass directly to adapter
+  // (matching Rails where binds go to connection.select_all)
+  return this.adapter.execute(sql, binds);
 }
 
 /**

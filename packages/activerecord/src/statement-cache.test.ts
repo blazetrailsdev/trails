@@ -134,4 +134,41 @@ describe("StatementCacheTest", () => {
       adapter.disconnectBang();
     }
   });
+
+  it("StatementCache.create → execute round-trip with Substitute", async () => {
+    await import("./relation.js");
+    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { Base } = await import("./base.js");
+
+    const adapter = new SQLite3Adapter(":memory:");
+    try {
+      await adapter.executeMutation(
+        'CREATE TABLE "authors" ("id" INTEGER PRIMARY KEY, "name" TEXT)',
+      );
+      await adapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["Matz"]);
+      await adapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["DHH"]);
+
+      class Author extends Base {
+        static {
+          this.tableName = "authors";
+          this.adapter = adapter;
+        }
+      }
+
+      adapter.preparedStatements = true;
+      const cache = StatementCache.create(adapter, (params) => {
+        return Author.where({ name: params.bind() }) as any;
+      });
+
+      const r1 = await cache.execute(["Matz"], adapter);
+      expect(r1).toHaveLength(1);
+      expect(r1[0].readAttribute("name")).toBe("Matz");
+
+      const r2 = await cache.execute(["DHH"], adapter);
+      expect(r2).toHaveLength(1);
+      expect(r2[0].readAttribute("name")).toBe("DHH");
+    } finally {
+      adapter.disconnectBang();
+    }
+  });
 });

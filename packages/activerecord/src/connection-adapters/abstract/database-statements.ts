@@ -117,7 +117,20 @@ export function toSqlAndBinds(
     const visitor = (this as any)?.arelVisitor as Visitors.ToSql | undefined;
     if (visitor && node instanceof Nodes.Node) {
       const [sql, extractedBinds] = visitor.compileWithBinds(node);
-      return [sql, extractedBinds, preparable, allowRetry];
+      // Type-cast bind objects (QueryAttribute) to primitive values
+      // for adapter execution, matching Rails' type_casted_binds
+      const castedBinds = extractedBinds.map((b) => {
+        if (
+          b &&
+          typeof b === "object" &&
+          "valueForDatabase" in b &&
+          typeof (b as Record<string, unknown>).valueForDatabase === "function"
+        ) {
+          return (b as { valueForDatabase(): unknown }).valueForDatabase();
+        }
+        return b;
+      });
+      return [sql, castedBinds, preparable, allowRetry];
     }
     const sql = (node as any).toSql();
     return [sql, [], preparable, allowRetry];
@@ -142,7 +155,28 @@ export function cacheableQuery(
   arel: unknown,
 ): [unknown, unknown[]] {
   const host = this as DatabaseStatementsHost;
-  const [sql, binds] = toSqlAndBinds(arel);
+  // Use compileWithBinds directly to get raw binds (QueryAttribute
+  // objects with Substitute values) that BindMap needs for indexing.
+  // toSqlAndBinds would type-cast them to primitives, losing Substitute.
+  const visitor = (host as any)?.arelVisitor as Visitors.ToSql | undefined;
+  let sql: string;
+  let binds: unknown[];
+
+  // Unwrap TreeManager → Node
+  let node = arel;
+  if (node && (node as any).ast != null && typeof (node as any).ast === "object") {
+    node = (node as any).ast;
+  }
+
+  if (visitor && node instanceof Nodes.Node) {
+    [sql, binds] = visitor.compileWithBinds(node);
+  } else if (typeof arel === "string") {
+    sql = arel;
+    binds = [];
+  } else {
+    sql = (node as any).toSql?.() ?? String(node);
+    binds = [];
+  }
 
   if (host?.preparedStatements && klass.query) {
     return [klass.query(sql), binds as unknown[]];

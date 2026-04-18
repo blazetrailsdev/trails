@@ -9,6 +9,7 @@
 
 import { isWriteQuerySql } from "./sql-classification.js";
 import { Result } from "../result.js";
+import { cacheableQuery } from "./abstract/database-statements.js";
 
 /**
  * Minimum interface required by the mixin — the base class must provide
@@ -94,6 +95,17 @@ export function DatabaseStatementsMixin<T extends Constructor<any>>(Base: T) {
 
     emptyInsertStatementValue(_pk?: string | null): string {
       return "DEFAULT VALUES";
+    }
+
+    cacheableQuery(
+      klass: {
+        query?(sql: string): unknown;
+        partialQuery?(parts: unknown): unknown;
+        partialQueryCollector?(): unknown;
+      },
+      arel: unknown,
+    ): [unknown, unknown[]] {
+      return cacheableQuery.call(this as any, klass, arel);
     }
   };
 }
