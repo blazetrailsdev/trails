@@ -113,7 +113,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("explain executes with { format: 'json' } and returns JSON plan", async () => {
       const result = await adapter.explain("SELECT 1", [], [{ format: "json" }]);
-      expect(result).toContain("[");
+      // The prior stringifier rendered pg-auto-parsed plans as
+      // "[object Object]" — assert structure instead of just "[".
+      expect(result).not.toContain("[object Object]");
+      const parsed = JSON.parse(result);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed[0]).toHaveProperty("Plan");
     });
 
     it.skip("explain options with eager loading", async () => {});
