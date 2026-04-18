@@ -191,14 +191,31 @@ import {
 } from "@blazetrails/activerecord";
 ```
 
-**Attributes** (`this.attribute(name, type)`):
+**Attributes** — two flavors:
+
+1. **Schema reflection** (Rails-default): columns come from the migration.
+   ActiveRecord's `load_schema!` pulls `columnsHash` from the adapter's
+   schema cache and registers each column as an attribute whose cast
+   type comes from `adapter.lookupCastTypeFromColumn(column)` — including
+   PG OID types (uuid, jsonb, hstore, inet, range, ...). No
+   `this.attribute(...)` call needed for columns that exist in the table.
+
+2. **User override** (`this.attribute(name, type)`): use when you want to
+   pin a type or add a virtual attribute. `attribute()` is now an
+   _override_ — it defaults to `userProvidedDefault: true` (Rails' keyword)
+   and wins over the schema-reflected type. Schema reflection instead
+   registers attributes as schema-sourced and non-user-provided
+   (`source: "schema"`, `userProvided: false`).
 
 ```ts
 class User extends Base {
+  // `name` and `admin` come from the schema cache when present; the
+  // `declare` still adds the TypeScript field. The `static` block is
+  // only needed for overrides or virtual attributes.
   declare name: string;
   declare admin: boolean;
   static {
-    this.attribute("name", "string");
+    // Override: pin `admin` to boolean even if the column is tinyint.
     this.attribute("admin", "boolean", { default: false });
   }
 }
