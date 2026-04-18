@@ -183,6 +183,26 @@ describe("loadSchemaFromAdapter integration details", () => {
     expect(Post._attributeDefinitions.has("guid")).toBe(true);
   });
 
+  it("preserves user-declared defs for ignoredColumns (only strips accessor)", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+      static {
+        this.attribute("age", "integer");
+      }
+    }
+    (Post as unknown as { _ignoredColumns: string[] })._ignoredColumns = ["age"];
+
+    const adapter = makeAdapter({ age: { sqlType: "integer" } }, { integer: new UuidType() });
+    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    await Post.loadSchema();
+
+    // User-declared def survives ignoredColumns.
+    expect(Post._attributeDefinitions.has("age")).toBe(true);
+    expect(Post._attributeDefinitions.get("age")?.userProvided).toBe(true);
+    // Accessor stripped.
+    expect(Object.getOwnPropertyDescriptor(Post.prototype, "age")).toBeUndefined();
+  });
+
   it("invalidates _columnsHash and _columns after reflection", async () => {
     class Post extends Base {
       static override tableName = "posts";

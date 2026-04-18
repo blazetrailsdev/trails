@@ -22,6 +22,15 @@ export class EncryptedAttributeType extends Type<unknown> {
     this.name = innerType.name;
   }
 
+  /**
+   * Return a fresh EncryptedAttributeType wrapping `innerType` with the
+   * same encryptor. Used by schema reflection to re-wrap with the
+   * adapter-resolved cast type without exposing the encryptor field.
+   */
+  withInnerType(innerType: Type): EncryptedAttributeType {
+    return new EncryptedAttributeType(innerType, this.encryptor);
+  }
+
   cast(value: unknown): unknown {
     return this.innerType.cast(value);
   }
