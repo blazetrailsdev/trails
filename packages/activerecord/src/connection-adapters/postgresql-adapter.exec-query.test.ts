@@ -19,14 +19,12 @@ const UUID_OID = 2950;
 function makeAdapter(queryImpl: (...args: unknown[]) => Promise<unknown>): PostgreSQLAdapter {
   const adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
   // Stub the client acquisition so tests don't touch a real pool.
+  // `fakeClient.release` is a no-op; `withClient()` / `execQuery()` call
+  // it directly once the block resolves.
   const fakeClient = { query: queryImpl, release: () => {} };
   vi.spyOn(adapter as unknown as { getClient: () => unknown }, "getClient").mockResolvedValue(
     fakeClient,
   );
-  vi.spyOn(
-    adapter as unknown as { releaseClient: (c: unknown) => void },
-    "releaseClient",
-  ).mockImplementation(() => {});
   // In a live PG adapter, loadAdditionalTypes queries pg_type and
   // aliases numeric OIDs → typnames registered in the static map.
   // Pre-register the known base OIDs so execQuery's miss path resolves

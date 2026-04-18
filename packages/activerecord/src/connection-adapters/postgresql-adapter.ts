@@ -377,17 +377,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Legacy release path for the schema-introspection call sites that
-   * still use `getClient()` + `releaseClient()` (synchronous ownership;
-   * not in the commit-race path). New code should reach for
-   * `withClient()` instead.
-   */
-  private releaseClient(client: pg.PoolClient): void {
-    if (client === this._client) return;
-    client.release();
-  }
-
-  /**
    * Execute a SELECT query and return rows. Wrapped in a
    * `sql.active_record` notification — mirrors Rails'
    * `AbstractAdapter#log` so LogSubscriber / ExplainSubscriber /
