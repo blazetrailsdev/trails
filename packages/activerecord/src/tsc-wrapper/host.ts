@@ -10,10 +10,20 @@ export interface TrailsCompilerHost extends ts.CompilerHost {
   getOriginalText(fileName: string): string | undefined;
 }
 
+export interface BuildCompilerHostOptions {
+  /**
+   * Column metadata loaded from a schema-dump JSON, keyed by table name.
+   * When supplied, the virtualizer emits `declare <col>: <tsType>` for
+   * any column not already declared by hand or via `this.attribute(...)`.
+   */
+  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+}
+
 export function buildCompilerHost(
   options: ts.CompilerOptions,
   baseNames?: readonly string[],
   modelRegistry?: ReadonlyMap<string, string>,
+  extra: BuildCompilerHostOptions = {},
 ): TrailsCompilerHost {
   // Incremental host seeds `createHash` and attaches file versions —
   // required by `ts.createEmitAndSemanticDiagnosticsBuilderProgram`
@@ -27,8 +37,15 @@ export function buildCompilerHost(
   // Match valid JS/TS identifiers (including $) after `extends`.
   const EXTENDS_IDENT = /\bextends\s+([\w$]+)/g;
 
+  const hasSchemaColumns =
+    extra.schemaColumnsByTable && Object.keys(extra.schemaColumnsByTable).length > 0;
+
   function shouldVirtualize(text: string): boolean {
-    if (!STATIC_BLOCK_PATTERN.test(text)) return false;
+    // Fast-path skip for files that don't reference a Base-like class.
+    // When schema columns are available, a class extending Base may
+    // need declares even without a `static {}` block — so the static-
+    // block pre-filter only applies when no schema info is present.
+    if (!hasSchemaColumns && !STATIC_BLOCK_PATTERN.test(text)) return false;
     EXTENDS_IDENT.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = EXTENDS_IDENT.exec(text))) {
@@ -48,7 +65,11 @@ export function buildCompilerHost(
     const prependImports = modelRegistry
       ? resolveAutoImports(originalText, resolved, modelRegistry, baseNames)
       : undefined;
-    const result = virtualize(originalText, resolved, { baseNames, prependImports });
+    const result = virtualize(originalText, resolved, {
+      baseNames,
+      prependImports,
+      schemaColumnsByTable: extra.schemaColumnsByTable,
+    });
     virtualizedTextCache.set(resolved, result.text);
     originalTextCache.set(resolved, originalText);
     deltaMap.set(resolved, result.deltas);

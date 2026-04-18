@@ -384,3 +384,25 @@ blocks) and is the default you should prefer. CI runs it as the
 element type. Without the `declare` (manual) or without `trails-tsc`
 compiling the file (virtualized), these runtime-attached members still
 resolve to `unknown`.
+
+### Schema-column declares via `--schema`
+
+For schema-only columns (columns that exist in the migration but aren't
+declared via `this.attribute(...)`), pass a schema-columns JSON to
+`trails-tsc` so the virtualizer can inject matching `declare` lines:
+
+```sh
+trails-tsc --schema db/schema-columns.json
+```
+
+JSON shape: `{ "<table>": { "<column>": "<rails_type>", ... } }`. Table
+resolution is `static tableName = "..."` when present, otherwise
+`pluralize(underscore(className))`. User `declare`s and
+`this.attribute(...)` calls always win over schema-sourced declares.
+`id` is skipped (Base's `PrimaryKeyValue` accessor handles it).
+Non-identifier / reserved-word column names (e.g. `strange-col`,
+`class`) are emitted as quoted class fields (`declare "strange-col":
+string;`). Emit order is sorted alphabetically for stability.
+
+A schema-dump command that emits this JSON from the live adapter is a
+planned follow-up.

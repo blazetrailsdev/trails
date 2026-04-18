@@ -4,7 +4,8 @@
 // user has already declared by hand. Output is plain text — the splicer
 // in virtualize.ts inserts it verbatim after the class body's opening `{`.
 
-import { camelize } from "@blazetrails/activesupport";
+import ts from "typescript";
+import { camelize, pluralize, underscore } from "@blazetrails/activesupport";
 import { resolveAssociationTarget, stripQuotes } from "./resolve-target.js";
 import type {
   ClassInfo,
@@ -27,17 +28,84 @@ const INDENT = "  ";
 // (see the plan § "Auto-import resolution under Phase 1b").
 const AR_IMPORT = `import("@blazetrails/activerecord")`;
 
-export function synthesizeDeclares(info: ClassInfo): string[] {
+export interface SynthesizeOptions {
+  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+}
+
+export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}): string[] {
   const out: string[] = [];
+  // Track ALL synthesized instance member names so schema-reflected
+  // declares don't collide with attribute() / hasMany() / belongsTo() /
+  // hasOne() / scope() etc. Rails allows an association named "comments"
+  // and a column named "comments" to coexist (distinct concepts);
+  // emitting two `declare comments: ...` members is a TS error.
+  const synthesizedInstanceNames = new Set<string>();
   for (const call of info.calls) {
     for (const line of renderCall(info, call)) {
-      if (!line.skipIfPresent || !memberPresent(info, line)) out.push(line.text);
+      if (!line.skipIfPresent || !memberPresent(info, line)) {
+        out.push(line.text);
+        if (!line.isStatic) synthesizedInstanceNames.add(line.declaredName);
+      }
     }
   }
   for (const l of renderLoaderOverloads(info)) {
-    if (!info.existingMembers.has(l.declaredName)) out.push(l.text);
+    if (!info.existingMembers.has(l.declaredName)) {
+      out.push(l.text);
+      synthesizedInstanceNames.add(l.declaredName);
+    }
+  }
+  // Schema-reflected declares for columns not covered by any user or
+  // synthesized member.
+  for (const line of renderSchemaColumnDeclares(info, synthesizedInstanceNames, opts)) {
+    out.push(line);
   }
   return out;
+}
+
+function renderSchemaColumnDeclares(
+  info: ClassInfo,
+  synthesizedInstanceNames: Set<string>,
+  opts: SynthesizeOptions,
+): string[] {
+  const map = opts.schemaColumnsByTable;
+  if (!map) return [];
+  const table = info.tableName ?? pluralize(underscore(info.name));
+  const cols = map[table];
+  if (!cols) return [];
+  const out: string[] = [];
+  // Sort by column name so emitted declares are stable regardless of
+  // JSON key insertion order.
+  const entries = Object.entries(cols).sort(([a], [b]) => a.localeCompare(b));
+  for (const [col, railsType] of entries) {
+    if (synthesizedInstanceNames.has(col)) continue;
+    if (info.existingMembers.has(col)) continue;
+    // Skip "id" — Base already defines a PrimaryKeyValue accessor that
+    // handles composite keys; re-declaring here would shadow it.
+    if (col === "id") continue;
+    // Emit a bracket-quoted declare for non-identifier / reserved-word
+    // names (e.g. `declare "strange-col": string;`). TypeScript allows
+    // string-literal class field names, so this is a valid declare.
+    out.push(`${INDENT}declare ${renderDeclaredMemberName(col)}: ${tsTypeFor(railsType)};`);
+  }
+  return out;
+}
+
+function renderDeclaredMemberName(name: string): string {
+  return isValidIdentifier(name) ? name : JSON.stringify(name);
+}
+
+// Identifier-safe check: use TypeScript's scanner so every reserved
+// word AND TS-specific keyword (`static`, `private`, `public`,
+// `interface`, `let`, `await`, etc.) is detected. If the scanner
+// consumes the whole string and emits an Identifier token, the name
+// is safe to emit unquoted. Otherwise (keyword, invalid start char,
+// non-identifier continue char) it must be quoted.
+const identifierScanner = ts.createScanner(ts.ScriptTarget.ES2022, /* skipTrivia */ true);
+function isValidIdentifier(name: string): boolean {
+  if (name.length === 0) return false;
+  identifierScanner.setText(name);
+  const token = identifierScanner.scan();
+  return token === ts.SyntaxKind.Identifier && identifierScanner.getTextPos() === name.length;
 }
 
 /**
@@ -112,7 +180,8 @@ function renderCall(info: ClassInfo, call: RuntimeCall): RenderedLine[] {
 
 function renderAttribute(call: AttributeCall): RenderedLine[] {
   const tsType = tsTypeFor(call.railsType);
-  return [line(`declare ${call.name}: ${tsType};`, call.name, false)];
+  const memberName = renderDeclaredMemberName(call.name);
+  return [line(`declare ${memberName}: ${tsType};`, call.name, false)];
 }
 
 function renderCollectionAssoc(call: AssociationCall): RenderedLine[] {
@@ -123,8 +192,9 @@ function renderCollectionAssoc(call: AssociationCall): RenderedLine[] {
   // covered by `loadBelongsTo` / `loadHasOne` overloads rendered by
   // `renderLoaderOverloads` at the end of `synthesizeDeclares`.
   const target = resolveTarget(call);
+  const memberName = renderDeclaredMemberName(call.name);
   return [
-    line(`declare ${call.name}: ${AR_IMPORT}.AssociationProxy<${target}>;`, call.name, false),
+    line(`declare ${memberName}: ${AR_IMPORT}.AssociationProxy<${target}>;`, call.name, false),
   ];
 }
 
@@ -135,7 +205,8 @@ function renderSingularAssoc(call: AssociationCall): RenderedLine[] {
   // `declare loadBelongsTo: ...` / `declare loadHasOne: ...` lines
   // by `renderLoaderOverloads` below.
   const target = call.options["polymorphic"] === "true" ? "Base" : resolveTarget(call);
-  return [line(`declare ${call.name}: ${target} | null;`, call.name, false)];
+  const memberName = renderDeclaredMemberName(call.name);
+  return [line(`declare ${memberName}: ${target} | null;`, call.name, false)];
 }
 
 function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {

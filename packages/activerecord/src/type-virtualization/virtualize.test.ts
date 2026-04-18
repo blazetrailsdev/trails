@@ -49,6 +49,147 @@ describe("virtualize — deltas", () => {
     expect(text).toBe("export class NotAModel {}\n");
   });
 
+  test("schemaColumnsByTable injects declares for columns without attribute()", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static override tableName = "posts";\n' +
+      "  static {\n" +
+      '    this.attribute("title", "string");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: { title: "string", body: "text", published_at: "datetime", views: "integer" },
+      },
+    });
+    // User-declared `title` is NOT re-emitted.
+    expect(text).toMatch(/declare title: string;/);
+    expect(text.match(/declare title: string;/g)?.length).toBe(1);
+    // Schema-only columns ARE emitted.
+    expect(text).toMatch(/declare body: string;/);
+    expect(text).toMatch(/declare published_at: Date;/);
+    expect(text).toMatch(/declare views: number;/);
+  });
+
+  test("schemaColumnsByTable skips user-authored declares", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static override tableName = "posts";\n' +
+      "  declare body: string;\n" +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: { posts: { body: "text" } },
+    });
+    // User already declared `body` — the virtualizer must not duplicate.
+    expect(text.match(/declare body:/g)?.length).toBe(1);
+  });
+
+  test("schemaColumnsByTable skips `id`", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: { posts: { id: "integer", name: "string" } },
+    });
+    expect(text).not.toMatch(/declare id:/);
+    expect(text).toMatch(/declare name: string;/);
+  });
+
+  test("schemaColumnsByTable quotes non-identifier and reserved-word column names", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          "strange-col": "string",
+          "2bad": "string",
+          class: "string", // JS reserved — must be quoted
+          static: "string", // TS-class reserved — also must be quoted
+          interface: "string", // TS reserved — must be quoted
+          private: "string", // TS reserved — must be quoted
+          safe: "string",
+        },
+      },
+    });
+    expect(text).toMatch(/declare safe: string;/);
+    expect(text).toMatch(/declare "strange-col": string;/);
+    expect(text).toMatch(/declare "2bad": string;/);
+    expect(text).toMatch(/declare "class": string;/);
+    expect(text).toMatch(/declare "static": string;/);
+    expect(text).toMatch(/declare "interface": string;/);
+    expect(text).toMatch(/declare "private": string;/);
+    // Bare (unquoted) reserved names would be parse errors.
+    expect(text).not.toMatch(/declare class: string;/);
+    expect(text).not.toMatch(/declare static: string;/);
+  });
+
+  test("schemaColumnsByTable de-dupes against user-authored quoted members", () => {
+    const src = "export class Post extends Base {\n" + '  declare "strange-col": string;\n' + "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: { "strange-col": "string", safe: "string" },
+      },
+    });
+    // User-authored quoted member is only written once.
+    expect(text.match(/declare "strange-col":/g)?.length).toBe(1);
+    // Other schema column still emitted.
+    expect(text).toMatch(/declare safe: string;/);
+  });
+
+  test("schemaColumnsByTable doesn't collide with hasMany / belongsTo names", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      "  static {\n" +
+      '    this.hasMany("comments");\n' +
+      '    this.belongsTo("author");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: { comments: "string", author: "string", body: "string" },
+      },
+    });
+    // Only one declare per name — association wins over schema column.
+    expect(text.match(/declare comments:/g)?.length).toBe(1);
+    expect(text.match(/declare author:/g)?.length).toBe(1);
+    // Non-colliding schema column is still emitted.
+    expect(text).toMatch(/declare body: string;/);
+  });
+
+  test("runtime-macro declares quote reserved / non-identifier names", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      "  static {\n" +
+      '    this.attribute("class", "string");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "post.ts");
+    // Bare `declare class: ...` would be a parse error.
+    expect(text).toMatch(/declare "class": string;/);
+    expect(text).not.toMatch(/declare class: string;/);
+  });
+
+  test("schemaColumnsByTable emits columns in stable (sorted) order", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: { zulu: "string", alpha: "string", mike: "string" },
+      },
+    });
+    const alphaIdx = text.indexOf("declare alpha:");
+    const mikeIdx = text.indexOf("declare mike:");
+    const zuluIdx = text.indexOf("declare zulu:");
+    expect(alphaIdx).toBeGreaterThan(-1);
+    expect(mikeIdx).toBeGreaterThan(alphaIdx);
+    expect(zuluIdx).toBeGreaterThan(mikeIdx);
+  });
+
+  test("schemaColumnsByTable infers table name from class name when absent", () => {
+    const src = "export class BlogPost extends Base {}\n";
+    const { text } = virtualize(src, "blog-post.ts", {
+      // pluralize(underscore("BlogPost")) === "blog_posts"
+      schemaColumnsByTable: { blog_posts: { slug: "string" } },
+    });
+    expect(text).toMatch(/declare slug: string;/);
+  });
+
   test("skip marker yields no deltas", () => {
     const src =
       "/** @trails-typegen skip */\n" +

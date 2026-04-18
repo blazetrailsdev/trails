@@ -341,3 +341,58 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
     });
   });
 });
+
+describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
+  const SCHEMA_DIR = path.join(FIXTURES_DIR, "schema");
+
+  it("types schema-only columns through createTrailsProgram", () => {
+    const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
+    const { program } = createTrailsProgram(configPath, {
+      schemaColumnsByTable: {
+        users: { name: "string", age: "integer", is_admin: "boolean" },
+      },
+    });
+    const checker = program.getTypeChecker();
+
+    const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));
+    expect(consumer).toBeDefined();
+
+    const probed: Record<string, string> = {};
+    function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        const t = checker.getTypeAtLocation(node.initializer);
+        probed[node.name.text] = checker.typeToString(t);
+      }
+      node.forEachChild(visit);
+    }
+    consumer!.forEachChild(visit);
+
+    expect(probed["name"]).toBe("string");
+    expect(probed["age"]).toBe("number");
+    expect(probed["isAdmin"]).toBe("boolean");
+  });
+
+  it("without schema, those accesses fall back to unknown (declares weren't injected)", () => {
+    const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
+    const { program } = createTrailsProgram(configPath);
+    const checker = program.getTypeChecker();
+
+    const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));
+    const probed: Record<string, string> = {};
+    function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        probed[node.name.text] = checker.typeToString(checker.getTypeAtLocation(node.initializer));
+      }
+      node.forEachChild(visit);
+    }
+    consumer!.forEachChild(visit);
+
+    // Without the schema option, consumer.ts's explicit `: string` etc. would
+    // be assigning `unknown` → a type error. Diagnostics should surface.
+    const diags = [
+      ...program.getSemanticDiagnostics(consumer),
+      ...program.getSyntacticDiagnostics(consumer),
+    ];
+    expect(diags.length).toBeGreaterThan(0);
+  });
+});

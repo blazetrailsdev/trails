@@ -9,7 +9,14 @@ export interface TrailsProgram {
   configDiagnostics: readonly ts.Diagnostic[];
 }
 
-export function createTrailsProgram(configPath: string): TrailsProgram {
+export interface CreateTrailsProgramOptions {
+  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+}
+
+export function createTrailsProgram(
+  configPath: string,
+  extra: CreateTrailsProgramOptions = {},
+): TrailsProgram {
   // Resolve config path the same way tsc does: accept either a file or
   // a directory (appends /tsconfig.json). Unlike ts.findConfigFile, we
   // don't search upward — tsc -p <dir> expects <dir>/tsconfig.json and
@@ -65,7 +72,9 @@ export function createTrailsProgram(configPath: string): TrailsProgram {
   // Rebuild with the full allow-list + model registry so transitive
   // classes are virtualized AND missing `import type` lines are
   // auto-injected.
-  const host = buildCompilerHost(parsed.options, [...baseNames], modelRegistry);
+  const host = buildCompilerHost(parsed.options, [...baseNames], modelRegistry, {
+    schemaColumnsByTable: extra.schemaColumnsByTable,
+  });
   const program = ts.createProgram({
     rootNames: parsed.fileNames,
     options: parsed.options,

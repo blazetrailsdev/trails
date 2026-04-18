@@ -16,6 +16,13 @@ export interface TrailsBuildOptions {
   onDiagnostic?: (d: ts.Diagnostic) => void;
   /** Called with each solution-builder status message. */
   onStatus?: (d: ts.Diagnostic) => void;
+  /**
+   * Schema columns keyed by table name — same shape as
+   * `createTrailsProgram`'s option. Threaded into every per-project
+   * virtualizing host so schema-only columns get declares across the
+   * whole solution.
+   */
+  schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /**
@@ -72,7 +79,9 @@ export function createTrailsSolutionBuilder(
     // Pass 2: virtualizing host + registry feed the real builder
     // program. Cache the host per-project so diagnostics remap can
     // look up deltas and original text after build completes.
-    const host = buildCompilerHost(options, [...baseNames], modelRegistry);
+    const host = buildCompilerHost(options, [...baseNames], modelRegistry, {
+      schemaColumnsByTable: buildOpts.schemaColumnsByTable,
+    });
     const configFilePath = options.configFilePath;
     if (typeof configFilePath === "string") {
       hostsByProject.set(path.resolve(configFilePath), host);
