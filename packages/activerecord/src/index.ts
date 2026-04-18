@@ -47,13 +47,14 @@ export {
   loadHasManyThrough,
   processDependentAssociations,
   association,
+  isAssociationCached,
   loadHabtm,
   updateCounterCaches,
   touchBelongsToParents,
 } from "./associations.js";
 export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationProxy } from "./associations/collection-proxy.js";
-export { AssociationRelation } from "./associations/association-relation.js";
+export { AssociationRelation } from "./association-relation.js";
 export type { AssociationOptions } from "./associations.js";
 export { Transaction } from "./connection-adapters/abstract/transaction.js";
 export { ActiveRecordTransaction } from "./transaction.js";

@@ -23,8 +23,14 @@ export class InverseOfAssociationNotFoundError extends Error {
   readonly reflection: string;
   readonly inverseOf: string;
   readonly corrections: string[];
+  readonly associatedClass: string | null;
 
-  constructor(reflection: string, inverseOf: string, corrections: string[] = []) {
+  constructor(
+    reflection: string,
+    inverseOf: string,
+    corrections: string[] = [],
+    associatedClass: string | null = null,
+  ) {
     const suggestion = corrections.length > 0 ? `\nDid you mean? ${corrections.join(", ")}` : "";
     super(
       `Could not find the inverse association for ${reflection} (inverse_of: :${inverseOf}).${suggestion}`,
@@ -33,6 +39,7 @@ export class InverseOfAssociationNotFoundError extends Error {
     this.reflection = reflection;
     this.inverseOf = inverseOf;
     this.corrections = corrections;
+    this.associatedClass = associatedClass;
   }
 
   detailedMessage(): string {
@@ -55,9 +62,14 @@ export class InverseOfAssociationRecursiveError extends Error {
 }
 
 export class HasManyThroughAssociationNotFoundError extends Error {
-  constructor(owner: string, through: string) {
+  readonly ownerClass: string;
+  readonly reflection: string;
+
+  constructor(owner: string, through: string, reflection: string = through) {
     super(`Could not find the association :${through} in model ${owner}`);
     this.name = "HasManyThroughAssociationNotFoundError";
+    this.ownerClass = owner;
+    this.reflection = reflection;
   }
 }
 

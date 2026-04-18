@@ -199,9 +199,15 @@ describe("InverseBelongsToTests", () => {
     registerModel(Face);
     const h = await Human.create({ name: "Gordon" });
     await Face.create({ description: "pretty", human_id: h.id });
-    await expect(
-      loadHasOne(h, "confusedFace", { className: "Face", inverseOf: "cnffusedHuman" }),
-    ).rejects.toThrow(InverseOfAssociationNotFoundError);
+    // Capture the rejection once so we can assert both the class AND
+    // Rails attr_reader parity (associatedClass exposes the target model
+    // name so error handlers can branch on it).
+    const err = await loadHasOne(h, "confusedFace", {
+      className: "Face",
+      inverseOf: "cnffusedHuman",
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(InverseOfAssociationNotFoundError);
+    expect((err as InverseOfAssociationNotFoundError).associatedClass).toBe("Face");
   });
 
   it("trying to use inverses that dont exist should have suggestions for fix", async () => {

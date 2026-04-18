@@ -1262,7 +1262,11 @@ export class ThroughReflection extends AbstractReflection {
 
   checkValidityBang(): void {
     if (!this.throughReflection) {
-      throw new HasManyThroughAssociationNotFoundError(this.activeRecord.name, this.through);
+      throw new HasManyThroughAssociationNotFoundError(
+        this.activeRecord.name,
+        this.through,
+        this.name,
+      );
     }
 
     if (this.throughReflection.isPolymorphic()) {

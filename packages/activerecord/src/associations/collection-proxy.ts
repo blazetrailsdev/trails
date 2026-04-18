@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
-import type { AssociationRelation as AssociationRelationType } from "./association-relation.js";
+import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import { wrapWithScopeProxy } from "../relation/delegation.js";
 
 // Late-bound AssociationRelation constructor to break circular imports

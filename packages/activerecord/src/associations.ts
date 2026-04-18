@@ -7,6 +7,7 @@ import {
   InverseOfAssociationNotFoundError,
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./associations/errors.js";
+import { ForeignAssociation } from "./associations/foreign-association.js";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { getInheritanceColumn, findStiClass } from "./inheritance.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -112,7 +113,7 @@ function validateInverseOf(targetModel: typeof Base, assocName: string, inverseO
       corrections.push(a.name);
     }
   }
-  throw new InverseOfAssociationNotFoundError(assocName, inverseOf, corrections);
+  throw new InverseOfAssociationNotFoundError(assocName, inverseOf, corrections, targetModel.name);
 }
 
 function levenshtein(a: string, b: string): number {
@@ -233,6 +234,22 @@ export class Associations {
       modelRegistry,
     });
   }
+}
+
+/**
+ * Returns true if an Association instance (the wrapper that owns
+ * load/build/create for a given macro) has already been built for this
+ * record. Rails' `@association_cache` stores wrapper instances, populated
+ * by `record.association(name)` — see
+ * `activerecord/lib/active_record/associations.rb:51-67`. Our equivalent
+ * caches are `_associationInstances` (singular: belongsTo/hasOne) and
+ * `_collectionProxies` (collection: hasMany/habtm).
+ *
+ * Mirrors: ActiveRecord::Associations#association_cached?
+ */
+export function isAssociationCached(record: Base, assocName: string): boolean {
+  if (record._associationInstances.has(assocName)) return true;
+  return record._collectionProxies.has(assocName);
 }
 
 /**
@@ -1021,9 +1038,13 @@ export async function processDependentAssociations(record: Base): Promise<void> 
           ? (assoc.options.foreignKey ?? `${underscore(asName)}_id`)
           : (assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`);
         const typeCol = asName ? `${underscore(asName)}_type` : null;
+        const nullifiedEntries = Object.entries(
+          ForeignAssociation.nullifiedOwnerAttributes({ foreignKey, type: typeCol }),
+        );
         for (const child of children) {
-          child.writeAttribute(foreignKey as string, null);
-          if (typeCol) child.writeAttribute(typeCol, null);
+          for (const [col, val] of nullifiedEntries) {
+            child.writeAttribute(col, val);
+          }
           await child.save();
         }
       } else if (dep === "restrictWithException") {
@@ -1050,8 +1071,14 @@ export async function processDependentAssociations(record: Base): Promise<void> 
         const foreignKey = hasOneAsName
           ? (assoc.options.foreignKey ?? `${underscore(hasOneAsName)}_id`)
           : (assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`);
-        child.writeAttribute(foreignKey as string, null);
-        if (hasOneAsName) child.writeAttribute(`${underscore(hasOneAsName)}_type`, null);
+        const typeCol = hasOneAsName ? `${underscore(hasOneAsName)}_type` : null;
+        const nullified = ForeignAssociation.nullifiedOwnerAttributes({
+          foreignKey,
+          type: typeCol,
+        });
+        for (const [col, val] of Object.entries(nullified)) {
+          child.writeAttribute(col, val);
+        }
         await child.save();
       } else if (dep === "restrictWithException") {
         throw new DeleteRestrictionError(record, assoc.name);
