@@ -100,6 +100,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   constructor(config: string | (pg.PoolConfig & TrailsAdapterOptions)) {
     super();
+    // Rails: `PostgreSQLAdapter` inherits the abstract adapter's
+    // `default_prepared_statements = true`.
+    this.preparedStatements = true;
     if (typeof config === "string") {
       this._driverPool = new pg.Pool({ connectionString: config });
       return;
@@ -962,6 +965,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   _statementPoolForTest(): StatementPool | undefined {
     return this._client ? this._statementPools.get(this._client) : undefined;
+  }
+
+  /**
+   * Clear cached prepared statements on the currently-held transaction
+   * client. Mirrors Rails' `PostgreSQLAdapter#clear_cache!` which
+   * sends DEALLOCATE for each cached entry on the adapter's sole
+   * PG::Connection. Rails has exactly one connection per adapter
+   * instance; we back multiple via pg.Pool, so "the connection" is
+   * ambiguous outside a transaction. Non-active per-client pools are
+   * intentionally left attached: resetting the WeakMap would orphan
+   * our counter + sql→name map while the server-side PREPAREs still
+   * exist, and a later checkout of that same pg.PoolClient would
+   * restart the counter at `a1` — colliding with the statement
+   * already PREPAREd on that session.
+   */
+  override clearCacheBang(): void {
+    super.clearCacheBang();
+    if (this._client) {
+      this._statementPools.get(this._client)?.clear();
+    }
   }
 
   /**

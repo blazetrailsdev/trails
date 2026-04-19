@@ -196,5 +196,23 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter2.close();
       }
     });
+
+    it("clearCacheBang drops cached plans on the active connection", async () => {
+      await adapter.beginDbTransaction();
+      try {
+        await adapter.execute("SELECT $1::int", [1]);
+        await adapter.execute("SELECT $1::text", ["a"]);
+        const pool = adapter._statementPoolForTest()!;
+        expect(pool.length).toBe(2);
+        adapter.clearCacheBang();
+        expect(pool.length).toBe(0);
+        // Pool itself remains attached — counter continues from where
+        // it left off so we never collide with a still-PREPAREd name
+        // on this session after the server DEALLOCATEs complete.
+        expect(adapter._statementPoolForTest()).toBe(pool);
+      } finally {
+        await adapter.rollback();
+      }
+    });
   });
 });

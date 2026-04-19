@@ -22,6 +22,10 @@
       "types": "./dist/adapters/mysql2-adapter.d.ts",
       "default": "./dist/adapters/mysql2-adapter.js"
     },
+    "./connection-adapters/mysql2-adapter.js": {
+      "types": "./dist/connection-adapters/mysql2-adapter.d.ts",
+      "default": "./dist/connection-adapters/mysql2-adapter.js"
+    },
     "./tsc": {
       "types": "./dist/tsc-wrapper/index.d.ts",
       "default": "./dist/tsc-wrapper/index.js"

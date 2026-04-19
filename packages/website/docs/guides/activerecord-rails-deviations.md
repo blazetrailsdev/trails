@@ -151,6 +151,52 @@ pools are acquired per query rather than checked out per thread.
 underlying pool model is different because there are no threads to
 pool over. See `packages/activerecord/src/connection-handling.ts`.
 
+### Adapter config: `statementLimit` and `preparedStatements`
+
+Rails reads `statement_limit` and `prepared_statements` off the
+merged `database.yml` hash in `AbstractAdapter#initialize`. The same
+shape works here — pass them alongside driver connection options in
+the single config hash:
+
+PG and MySQL take a single merged config hash (driver params + adapter
+knobs), matching Rails' `database.yml` shape. SQLite3 takes `(filename,
+options)` because the driver's first argument is a path, not a hash;
+the second argument accepts the same adapter knobs.
+
+```ts
+import { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
+import { Mysql2Adapter } from "@blazetrails/activerecord/connection-adapters/mysql2-adapter.js";
+import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
+
+// PG defaults preparedStatements to true (matches Rails, where
+// PostgreSQLAdapter inherits AbstractAdapter#default_prepared_statements = true).
+new PostgreSQLAdapter({
+  connectionString: "postgres://localhost/app",
+  statementLimit: 500, // default 1000
+  preparedStatements: true,
+});
+
+// MySQL2 defaults preparedStatements to false (matches Rails'
+// Mysql2Adapter#default_prepared_statements override).
+new Mysql2Adapter({
+  uri: "mysql://localhost/app",
+  statementLimit: 0, // 0 disables caching entirely
+});
+
+// SQLite3 defaults preparedStatements to true (matches Rails' abstract default).
+new SQLite3Adapter("db/app.sqlite3", { statementLimit: 200 });
+```
+
+Adapter-level keys are stripped from the config hash before it's
+handed to the driver pool; invalid values (non-integer / negative
+`statementLimit`, non-boolean `preparedStatements`) throw at
+construction so misconfiguration fails loudly at boot instead of
+silently leaking unbounded prepared statements later. A
+`statementLimit` of 0 disables the named-prepared-statement path on
+PG and MySQL (Rails' `PG::StatementPool#set` / MySQL equivalent are
+likewise no-ops at 0); queries still run, they just go through the
+unprepared path on that call.
+
 ## 5. Relation `method_missing` → typed `Proxy`
 
 Rails' `ActiveRecord::Relation` uses `method_missing` to forward

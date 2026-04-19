@@ -159,5 +159,22 @@ describeIfMysql("Mysql2Adapter", () => {
         await adapter2.close();
       }
     });
+
+    it("clearCacheBang drops cached plans on the active connection", async () => {
+      await adapter.beginDbTransaction();
+      try {
+        await adapter.execute("SELECT ? AS n", [1]);
+        await adapter.execute("SELECT ? AS s", ["a"]);
+        const pool = adapter._statementPoolForTest()!;
+        expect(pool.length).toBe(2);
+        adapter.clearCacheBang();
+        expect(pool.length).toBe(0);
+        // Pool stays attached; counter continues so we never reissue
+        // a name that's still PREPAREd on this session post-dealloc.
+        expect(adapter._statementPoolForTest()).toBe(pool);
+      } finally {
+        await adapter.rollback();
+      }
+    });
   });
 });
