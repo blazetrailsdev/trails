@@ -6,5 +6,5 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../activesupport" }]
+  "references": [{ "path": "../activesupport" }, { "path": "../activemodel" }]
 }

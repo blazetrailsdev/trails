@@ -51,6 +51,15 @@ const RULES: DepRule[] = [
     tsIdentifiers: [],
     blocking: false,
   },
+  {
+    // Rails Arel references ActiveModel::Attribute in nodes/casted.rb,
+    // nodes/homogeneous_in.rb, and visitors/{to_sql,dot}.rb.
+    package: "arel",
+    dependency: "activemodel",
+    tsImport: "@blazetrails/activemodel",
+    tsIdentifiers: [],
+    blocking: false,
+  },
 ];
 
 // ---------------------------------------------------------------------------

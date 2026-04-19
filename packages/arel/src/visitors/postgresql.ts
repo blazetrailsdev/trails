@@ -1,7 +1,7 @@
 import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { ToSql } from "./to-sql.js";
+import { ToSql, resolveValueForDatabase } from "./to-sql.js";
 import { quoteArrayLiteral } from "../quote-array.js";
 
 /**
@@ -95,14 +95,7 @@ export class PostgreSQLWithBinds extends PostgreSQL {
       const value = node.value !== undefined ? node.value : node;
       this.collector.addBind(value, () => `$${this.bindIndex}`);
     } else if (node.value !== undefined) {
-      const val =
-        node.value &&
-        typeof node.value === "object" &&
-        "valueForDatabase" in node.value &&
-        typeof (node.value as Record<string, unknown>).valueForDatabase === "function"
-          ? (node.value as { valueForDatabase(): unknown }).valueForDatabase()
-          : node.value;
-      this.collector.append(this.quote(val));
+      this.collector.append(this.quote(resolveValueForDatabase(node.value)));
     } else {
       this.bindIndex += 1;
       this.collector.append(`$${this.bindIndex}`);

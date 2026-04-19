@@ -120,6 +120,9 @@ importers:
 
   packages/arel:
     dependencies:
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../activemodel
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport

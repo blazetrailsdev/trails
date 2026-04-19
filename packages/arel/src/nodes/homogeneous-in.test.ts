@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, Visitors } from "../index.js";
+import { Attribute as AMAttribute } from "@blazetrails/activemodel";
 
 describe("Arel::Nodes::HomogeneousInTest", () => {
   const users = new Table("users");
@@ -45,6 +46,28 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
       const node = new Nodes.HomogeneousIn(["a", "b"], users.get("name"), "in");
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toBe("\"users\".\"name\" IN ('a', 'b')");
+    });
+  });
+
+  describe("procForBinds", () => {
+    it("wraps a value as ActiveModel::Attribute bound to the attribute name", () => {
+      const node = new Nodes.HomogeneousIn([1, 2], users.get("id"), "in");
+      const bound = node.procForBinds(42);
+      expect(bound).toBeInstanceOf(AMAttribute);
+      expect((bound as AMAttribute).name).toBe("id");
+      // Rails' ActiveModel::Type.default_value is a no-op Value type, so
+      // valueForDatabase should round-trip the raw value unchanged.
+      expect((bound as AMAttribute).valueForDatabase).toBe(42);
+    });
+
+    it("binds successive values to the same attribute", () => {
+      const node = new Nodes.HomogeneousIn(["x"], users.get("name"), "in");
+      const a = node.procForBinds("a") as AMAttribute;
+      const b = node.procForBinds("b") as AMAttribute;
+      expect(a.name).toBe("name");
+      expect(b.name).toBe("name");
+      expect(a.valueForDatabase).toBe("a");
+      expect(b.valueForDatabase).toBe("b");
     });
   });
 });

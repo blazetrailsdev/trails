@@ -16,7 +16,7 @@ import { NotIn } from "../nodes/binary.js";
 import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
-import { Quoted, Casted } from "../nodes/casted.js";
+import { Quoted, Casted, buildQuoted } from "../nodes/casted.js";
 import { BindParam } from "../nodes/bind-param.js";
 import { Grouping } from "../nodes/grouping.js";
 import { And } from "../nodes/and.js";
@@ -39,11 +39,6 @@ import {
 import { Over } from "../nodes/over.js";
 import { NamedWindow, Window } from "../nodes/window.js";
 import { True } from "../nodes/true.js";
-
-function buildQuoted(value: unknown): Node {
-  if (value instanceof Node) return value;
-  return new Quoted(value);
-}
 
 /**
  * Combines multiple nodes with OR, wrapped in a Grouping.

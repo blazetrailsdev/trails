@@ -6,5 +6,5 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../arel" }, { "path": "../activesupport" }]
+  "references": [{ "path": "../activesupport" }]
 }

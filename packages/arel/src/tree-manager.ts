@@ -3,14 +3,7 @@ import { PlainString } from "./collectors/plain-string.js";
 import { Dot } from "./visitors/dot.js";
 import { ToSql } from "./visitors/to-sql.js";
 import { Limit, Offset } from "./nodes/unary.js";
-import { Quoted } from "./nodes/casted.js";
-
-// Mirrors Arel's `Nodes.build_quoted`: pass Nodes through untouched,
-// wrap primitives in Quoted so `take(Nodes::BindParam.new)` works.
-function buildQuoted(value: unknown): Node {
-  if (value instanceof Node) return value;
-  return new Quoted(value);
-}
+import { buildQuoted } from "./nodes/casted.js";
 
 /**
  * Methods from Arel::TreeManager::StatementMethods — mixed into

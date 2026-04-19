@@ -1,5 +1,13 @@
 import { Node, NodeVisitor } from "./node.js";
 import { Quoted } from "./casted.js";
+import { Attribute as AMAttribute, ValueType } from "@blazetrails/activemodel";
+
+// Rails memoizes ActiveModel::Type.default_value as `@default_value ||= Value.new`.
+// Mirror that here so we don't allocate a fresh ValueType for every bind.
+let _defaultType: ValueType | null = null;
+function defaultType(): ValueType {
+  return (_defaultType ??= new ValueType());
+}
 
 export class HomogeneousIn extends Node {
   readonly attribute: Node;
@@ -48,8 +56,11 @@ export class HomogeneousIn extends Node {
     return result;
   }
 
-  get procForBinds(): ((value: unknown) => unknown) | null {
-    return null;
+  get procForBinds(): (value: unknown) => unknown {
+    // Rails: -> value { ActiveModel::Attribute.with_cast_value(
+    //   attribute.name, value, ActiveModel::Type.default_value) }
+    const attrName = (this.attribute as unknown as { name?: string }).name ?? "";
+    return (value: unknown) => AMAttribute.withCastValue(attrName, value, defaultType());
   }
 
   fetchAttribute(block: (attr: Node) => unknown): unknown {

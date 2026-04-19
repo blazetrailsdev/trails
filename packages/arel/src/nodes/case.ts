@@ -1,14 +1,9 @@
 import { Node, NodeVisitor } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
-import { Quoted } from "./casted.js";
+import { buildQuoted } from "./casted.js";
 import { As, Binary } from "./binary.js";
 import { Unary } from "./unary.js";
-
-function buildQuoted(value: unknown): Node {
-  if (value instanceof Node) return value;
-  return new Quoted(value);
-}
 
 /**
  * Represents a CASE WHEN ... THEN ... ELSE ... END expression.
