@@ -5,6 +5,7 @@ import {
   type ValueTransformation,
 } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
+import type { Relation } from "../relation.js";
 import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
 
@@ -47,10 +48,13 @@ function singleColumnKey(key: string | string[], label: string): string {
  * is returned to the caller (or wrapped in a `DisableJoinsAssociationRelation`
  * when the source has no order but an upstream step was ordered).
  *
- * Because intermediate `pluck` calls must be async in this codebase, this
- * subclass' `scope()` returns a `Promise<Relation>` rather than the
- * synchronous `Relation` Rails returns. Routing in `associations.ts`
- * awaits the promise before driving the final query.
+ * Intermediate `pluck` calls are async in this codebase (Rails' are
+ * sync DB calls), so the chain walk itself cannot be synchronous.
+ * `scope()` returns a `DisableJoinsAssociationRelation` in deferred-
+ * chain mode — a sync `Relation` whose `toArray()` runs the async
+ * walk on first load. This matches Rails' `Relation`-returning
+ * signature without forcing callers into a `Promise<{ relation }>`
+ * boxing dance.
  *
  * Mirrors: ActiveRecord::Associations::DisableJoinsAssociationScope
  */
@@ -63,36 +67,38 @@ export class DisableJoinsAssociationScope extends AssociationScope {
   }
 
   /**
-   * Async override of `AssociationScope#scope`. Walks the reverse chain,
-   * executing intermediate `pluck`s, and returns the final unexecuted
-   * relation (regular `Relation` or `DisableJoinsAssociationRelation`).
-   *
-   * Mirrors: DisableJoinsAssociationScope#scope (lines 6-15 of
-   * disable_joins_association_scope.rb).
+   * Sync override of `AssociationScope#scope`. Returns a deferred-
+   * chain `DisableJoinsAssociationRelation` — the async chain walk
+   * runs on first `toArray()`. Matches Rails' `Relation`-returning
+   * signature (`DisableJoinsAssociationScope#scope` at
+   * disable_joins_association_scope.rb:6-15) without the boxing
+   * workaround our async pluck would otherwise force.
    */
-  override async scope(association: AssociationScopeable): Promise<unknown> {
+  override scope(association: AssociationScopeable): unknown {
     const sourceReflection = association.reflection;
     const owner = association.owner;
-    const reverseChain = this._getChain(sourceReflection).slice().reverse();
-
-    const [lastReflection, lastOrdered, lastJoinIds] = await this._lastScopeChain(
-      reverseChain,
-      owner,
-    );
-
-    const key = (lastReflection as { joinPrimaryKey: string | string[] }).joinPrimaryKey;
-    const keyStr = singleColumnKey(key, "joinPrimaryKey");
-    const relation = this._addConstraintsDj(
-      lastReflection,
-      keyStr,
-      lastJoinIds,
-      owner,
-      lastOrdered,
-    );
-    // Box the Relation so awaiting the Promise<{relation}> doesn't trip
-    // the Relation's thenable (Relation.then → records array). Callers
-    // read `.relation` off the resolved value.
-    return { relation };
+    const klass = association.klass;
+    // Boxed walker — see `DJAR.deferred` doc. The bare Relation must
+    // never cross an `await` boundary, or Promise/A+ unwraps it via
+    // the Relation thenable (`.then` → `toArray`). Build sync, box,
+    // return the box.
+    return DisableJoinsAssociationRelation.deferred(klass, async () => {
+      const reverseChain = this._getChain(sourceReflection).slice().reverse();
+      const [lastReflection, lastOrdered, lastJoinIds] = await this._lastScopeChain(
+        reverseChain,
+        owner,
+      );
+      const key = (lastReflection as { joinPrimaryKey: string | string[] }).joinPrimaryKey;
+      const keyStr = singleColumnKey(key, "joinPrimaryKey");
+      const relation = this._addConstraintsDj(
+        lastReflection,
+        keyStr,
+        lastJoinIds,
+        owner,
+        lastOrdered,
+      ) as Relation<Base>;
+      return { relation };
+    });
   }
 
   /**

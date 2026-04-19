@@ -441,16 +441,18 @@ async function _loadThroughViaDisableJoinsScope(
   const { DisableJoinsAssociationScope } =
     await import("./associations/disable-joins-association-scope.js");
   const klass = (reflection as { klass: typeof Base }).klass;
-  const built = (await DisableJoinsAssociationScope.INSTANCE.scope({
+  // DJAS.scope() now returns a sync deferred-chain Relation — the
+  // async chain walk runs on first toArray(). No more Promise<{relation}>
+  // boxing to unwrap.
+  let rel: unknown = DisableJoinsAssociationScope.INSTANCE.scope({
     owner: record,
     reflection: reflection as any,
     klass,
-  })) as { relation: { toArray: () => Promise<Base[]> } };
+  });
   // Apply caller-supplied `options.scope` when it differs from the
   // reflection's own scope — same rule the JOIN-based loaders use
   // (line 488 etc.). Skipping when equal avoids double-application
   // since DJAS already consumed the reflection's scope via constraints.
-  let rel: unknown = built.relation;
   const reflScope = (reflection as { scope?: unknown }).scope;
   if (options?.scope && options.scope !== reflScope) {
     rel = options.scope(rel as never);

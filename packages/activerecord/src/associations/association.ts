@@ -101,20 +101,20 @@ export class Association {
   }
 
   /**
-   * Build (or return cached) association scope via the
-   * `AssociationScope` machinery. Mirrors Rails'
-   * `Association#association_scope` (association.rb:300-308):
-   * memoized for the JOIN-based path; fresh-each-call for
-   * `disable_joins`.
+   * Build (or return cached) JOIN-based association scope. Mirrors
+   * Rails' `Association#association_scope` (association.rb:300-308):
+   * memoized per-instance, reset on `reload()`.
    *
-   * Return shape:
-   *  - JOIN-based path: a `Relation` (the base scope). Caller is
-   *    responsible for any additional `.where(...)` / `.order(...)`
-   *    chaining (e.g. `options.scope`). The cache stores the
-   *    unfiltered base only.
-   *  - `disable_joins` path: a `Promise<{ relation }>` per DJAS' boxed
-   *    contract (the box dodges the Relation thenable when awaited).
-   *    Caller awaits + unwraps `.relation`.
+   * **Disable-joins routing happens upstream of this method.** Loaders
+   * detect `disable_joins: true` early and route to the dedicated
+   * DJAS loader (`_loadThroughViaDisableJoinsScope`); they never call
+   * `associationScope()` for disable_joins associations. Keeping that
+   * branch here would create a TDZ cycle:
+   * base.ts → associations/association.ts → DJAS → DJAR → relation.ts
+   * → base.ts. So `associationScope` is JOIN-only; calling it on a
+   * disable-joins instance returns the JOIN-based scope (which is
+   * not what disable_joins users want, but is also not how loaders
+   * reach this code).
    *
    * Cache contract (Rails-equivalent): the cached scope captures
    * owner FK / polymorphic-type values at build time. Mutating the
@@ -140,19 +140,6 @@ export class Association {
       _reflectOnAssociation?: (n: string) => unknown;
     };
     const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
-    if (this.disableJoins) {
-      // Lazy import — DJAS' module pulls in
-      // disable-joins-association-relation → relation.ts → associations.ts,
-      // which transitively imports us. Dynamic import keeps the cycle
-      // safe. Returns a Promise<{relation}> per DJAS' boxed contract.
-      return import("./disable-joins-association-scope.js").then((m) =>
-        m.DisableJoinsAssociationScope.INSTANCE.scope({
-          owner: this.owner,
-          reflection: richReflection as never,
-          klass: klass as never,
-        }),
-      );
-    }
     if (this._cachedAssociationScope === undefined) {
       this._cachedAssociationScope = AssociationScope.scope({
         owner: this.owner,

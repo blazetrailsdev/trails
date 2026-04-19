@@ -92,7 +92,15 @@ describe("Association scope cache", () => {
     expect(spy.mock.calls.length).toBe(afterFirst + 1);
   });
 
-  it("disable_joins associations bypass the cache (fresh DJAS each call, Rails association.rb:107-117)", async () => {
+  it("disable_joins associations route through the dedicated DJAS loader, not Association.associationScope()", async () => {
+    // Loaders detect `disable_joins: true` early and route to
+    // `_loadThroughViaDisableJoinsScope` (which calls DJAS directly,
+    // returning a deferred-chain DJAR). They never call
+    // `Association.associationScope()` for disable-joins reflections,
+    // so the JOIN-based cache contract doesn't apply — DJAS owns
+    // its own per-call construction matching Rails' per-call DJAS
+    // (association.rb:107-117).
+    const { loadHasMany } = await import("../associations.js");
     Associations.hasMany.call(CacheAuthor, "cacheCommentsDj", {
       className: "CacheComment",
       through: "cachePosts",
@@ -102,19 +110,13 @@ describe("Association scope cache", () => {
     const author = await CacheAuthor.create({ name: "A" });
     const post = await CachePost.create({ cache_author_id: author.id, title: "p" });
     await CacheComment.create({ cache_post_id: post.id, body: "c" });
-    const assoc = (author as any).association("cacheCommentsDj");
-    expect(assoc.disableJoins).toBe(true);
-    // The associationScope() returns a Promise on the disableJoins
-    // path (DJAS' boxed contract). The cache field stays untouched —
-    // calling it twice yields two distinct Promises (fresh builds),
-    // matching Rails' per-call DJAS construction. Await both so any
-    // scope-build failure surfaces as a test error rather than an
-    // unhandled rejection.
-    const a = assoc.associationScope();
-    const b = assoc.associationScope();
-    expect(a).not.toBe(b);
-    await a;
-    await b;
+
+    const spy = vi.spyOn(AssociationScope, "scope");
+    const reflection = (CacheAuthor as any)._reflectOnAssociation("cacheCommentsDj");
+    const records = await loadHasMany(author, "cacheCommentsDj", reflection.options);
+    expect(records.map((r: any) => r.body)).toEqual(["c"]);
+    // JOIN-based AssociationScope was never invoked — DJAS handled it.
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("loader paths hit the cache too (not just explicit record.association(name) calls)", async () => {
