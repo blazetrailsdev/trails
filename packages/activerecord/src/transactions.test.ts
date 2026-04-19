@@ -1703,5 +1703,45 @@ describe("TransactionTest", () => {
       ).rejects.toBeInstanceOf(PreparedStatementCacheExpired);
       expect(clearCacheBang).toHaveBeenCalledTimes(1);
     });
+
+    // Rails-fidelity guard: TransactionManager#after_failure_actions only
+    // fires for RealTransaction frames (abstract/transaction.rb:670 —
+    // `return unless transaction.is_a?(RealTransaction)`). Savepoints
+    // don't drop the underlying connection's cached plans, so clearing
+    // them on a savepoint failure would be wasted work (and on PG would
+    // pointlessly DEALLOCATE the outer-txn cache).
+    it("does not call clearCacheBang for SavepointTransaction failures (RealTransaction-only guard)", async () => {
+      const { PreparedStatementCacheExpired } = await import("./errors.js");
+      const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
+      const clearCacheBang = vi.fn();
+      const conn = {
+        clearCacheBang,
+        beginDbTransaction: vi.fn(),
+        commitDbTransaction: vi.fn(),
+        rollbackDbTransaction: vi.fn(),
+        rollbackToSavepoint: vi.fn(),
+        releaseSavepoint: vi.fn(),
+        createSavepoint: vi.fn(),
+        supportsLazyTransactions: () => false,
+        supportsRestartDbTransaction: () => false,
+        addTransactionRecord: vi.fn(),
+        active: true,
+      };
+      const tm = new TransactionManager(conn as never);
+      // Force inner frame to SavepointTransaction (not
+      // RestartParentTransaction): outer must be non-restartable, which
+      // requires `joinable: false`.
+      await expect(
+        tm.withinNewTransaction({ joinable: false }, async () => {
+          await tm.withinNewTransaction({}, () => {
+            throw new PreparedStatementCacheExpired("inner savepoint plan miss");
+          });
+        }),
+      ).rejects.toBeInstanceOf(PreparedStatementCacheExpired);
+      // Inner savepoint frame raised — guard skipped clear. Outer
+      // frame also raised (PSCE bubbled), is a RealTransaction, so
+      // clear fires exactly once for the outer.
+      expect(clearCacheBang).toHaveBeenCalledTimes(1);
+    });
   });
 });

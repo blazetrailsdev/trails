@@ -214,5 +214,68 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.rollback();
       }
     });
+
+    it("clearCacheBang clears the just-released txn pool when called post-rollback", async () => {
+      // TransactionManager calls `clearCacheBang` AFTER `rollback()`
+      // (Rails' after_failure_actions ordering, abstract/transaction.rb
+      // :627-631). Our PG `rollback()` releases `_client`, so the hook
+      // needs to reach the pool of the just-released client. Exercises
+      // the `_lastReleasedTxnClient` fallback path in `clearCacheBang`.
+      await adapter.beginDbTransaction();
+      await adapter.execute("SELECT $1::int", [1]);
+      await adapter.execute("SELECT $1::text", ["a"]);
+      const pool = adapter._statementPoolForTest()!;
+      expect(pool.length).toBe(2);
+      await adapter.rollback();
+      // After rollback, _client is null but the released-client pool
+      // is still reachable.
+      const releasedPool = adapter._lastReleasedStatementPoolForTest()!;
+      expect(releasedPool).toBe(pool);
+      // clearCacheBang falls back to the released pool and `reset()`s
+      // it (local-only — can't fire DEALLOCATE on a released client),
+      // then drops the WeakRef so we don't pin longer than needed.
+      adapter.clearCacheBang();
+      expect(pool.length).toBe(0);
+      expect(adapter._lastReleasedStatementPoolForTest()).toBeUndefined();
+    });
+
+    it("clearCacheBang resets the released-client pool even when a new txn is in progress", async () => {
+      // Repro for the after_rollback-callback-opens-new-txn race: if
+      // an after_rollback callback begins a new transaction before
+      // TransactionManager calls clearCacheBang, _client points at the
+      // NEW client while _lastReleasedTxnClient still points at the
+      // failed one. The hook must reset the failed pool AND clear the
+      // new-txn pool (both branches fire in clearCacheBang).
+      //
+      // pg.Pool can either re-checkout the same physical client
+      // (pool size 1, no concurrency) or hand back a different one;
+      // the test has to work with both. When same-client, `failedPool`
+      // and `newTxnPool` are the same pool object; when different,
+      // they are distinct. Both paths still have to end with all
+      // relevant pools empty after clearCacheBang.
+      await adapter.beginDbTransaction();
+      await adapter.execute("SELECT $1::int", [1]);
+      const failedPool = adapter._statementPoolForTest()!;
+      expect(failedPool.length).toBe(1);
+      await adapter.rollback();
+      await adapter.beginDbTransaction();
+      try {
+        await adapter.execute("SELECT $1::int", [2]);
+        const newTxnPool = adapter._statementPoolForTest()!;
+        // Precondition: at least one entry exists to be cleared.
+        expect(newTxnPool.length).toBeGreaterThan(0);
+        adapter.clearCacheBang();
+        // Hook behavior: the failed pool (via _lastReleasedTxnClient)
+        // gets reset(), and the current txn pool (via _client) gets
+        // clear()'d. Whether the pools are the same object or not, both
+        // end up empty.
+        expect(failedPool.length).toBe(0);
+        expect(newTxnPool.length).toBe(0);
+        // Released-client ref dropped regardless.
+        expect(adapter._lastReleasedStatementPoolForTest()).toBeUndefined();
+      } finally {
+        await adapter.rollback();
+      }
+    });
   });
 });

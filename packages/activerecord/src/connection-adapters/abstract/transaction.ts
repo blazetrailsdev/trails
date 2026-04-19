@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "../../adapter.js";
-import { PreparedStatementCacheExpired } from "../../errors.js";
 import { ActiveRecordTransaction } from "../../transaction.js";
+import { PreparedStatementCacheExpired } from "../../errors.js";
 import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
 
 /**
@@ -953,6 +953,29 @@ export class TransactionManager {
     await txn.rollbackRecords();
   }
 
+  /**
+   * Clear the connection's prepared-statement cache after a failed
+   * (now rolled-back) transaction. The exact effect is adapter-defined
+   * (PG fires DEALLOCATE per entry on a held client; on a released
+   * client it drops the local map only — see `clearCacheBang` docs).
+   * Runs only when the rolled-back frame is a `RealTransaction` and
+   * the error is `PreparedStatementCacheExpired` — Savepoint frames
+   * don't drop the underlying connection's cached plans, and other
+   * errors aren't related to plan invalidation.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager
+   *   #after_failure_actions (abstract/transaction.rb:669-673):
+   *
+   *     return unless transaction.is_a?(RealTransaction)
+   *     return unless error.is_a?(ActiveRecord::PreparedStatementCacheExpired)
+   *     @connection.clear_cache!
+   */
+  private _afterFailureActions(transaction: unknown, error: unknown): void {
+    if (!(transaction instanceof RealTransaction)) return;
+    if (!(error instanceof PreparedStatementCacheExpired)) return;
+    this._connection.clearCacheBang?.();
+  }
+
   async withinNewTransaction<T>(
     options: { isolation?: string | null; joinable?: boolean },
     fn: (tx: ActiveRecordTransaction) => Promise<T> | T,
@@ -966,10 +989,18 @@ export class TransactionManager {
       result = await fn(transaction.userTransaction);
     } catch (e) {
       await this.rollbackTransaction();
+      // Rails' ordering (abstract/transaction.rb:627-631):
+      // `after_failure_actions` runs AFTER `rollback_transaction` so
+      // the ROLLBACK isn't delayed behind DEALLOCATE traffic on the
+      // same client (PG StatementPool fires DEALLOCATE per entry via
+      // `.clear()`), and so the server is in a non-aborted state when
+      // cache-clear work runs. PG's adapter retains a WeakRef to the
+      // just-released txn client so the post-rollback `clearCacheBang`
+      // can still reach the StatementPool (see `_lastReleasedTxnClient`).
+      this._afterFailureActions(transaction, e);
       if (!transaction.state.isCompleted()) {
         transaction.incompleteBang();
       }
-      this._afterFailureActions(e);
       throw e;
     }
 
@@ -989,22 +1020,5 @@ export class TransactionManager {
       transaction.incompleteBang();
     }
     return result;
-  }
-
-  /**
-   * Mirrors Rails' `TransactionManager#after_failure_actions`:
-   * when a transaction fails with `PreparedStatementCacheExpired`,
-   * drop cached prepared statements so subsequent statements
-   * re-PREPARE on the same connection. Rails does NOT retry the
-   * transaction body — it clears the cache and re-raises; user
-   * code decides whether to retry.
-   *
-   * Reference: activerecord/lib/active_record/connection_adapters/abstract/
-   * transaction.rb: `TransactionManager#after_failure_actions`.
-   */
-  private _afterFailureActions(error: unknown): void {
-    if (error instanceof PreparedStatementCacheExpired) {
-      this._connection.clearCacheBang?.();
-    }
   }
 }

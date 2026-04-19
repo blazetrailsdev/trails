@@ -65,6 +65,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // its own counter (matching Rails' `PostgreSQL::StatementPool`).
   // The WeakMap lets pg.Pool reap clients without us leaking entries.
   private _statementPools = new WeakMap<pg.PoolClient, StatementPool>();
+  // The most recently released txn client. Held via WeakRef so that
+  // pg.Pool reaping an idle client can still GC it — strong-holding
+  // would defeat the WeakMap design above. Used by `clearCacheBang`
+  // to reach the released client's StatementPool when the
+  // TransactionManager's `after_failure_actions` hook fires AFTER
+  // `rollback()` has nulled `_client`. Lifecycle: set on every
+  // `rollback()` (overwriting the previous WeakRef); cleared inside
+  // `clearCacheBang` after `reset()` runs. NOT cleared on
+  // `beginTransaction` — after-rollback callbacks can open a new
+  // transaction before `after_failure_actions` reaches the hook, and
+  // nulling the ref there would lose the pointer to the failed client.
+  private _lastReleasedTxnClientRef: WeakRef<pg.PoolClient> | null = null;
+
+  private get _lastReleasedTxnClient(): pg.PoolClient | null {
+    return this._lastReleasedTxnClientRef?.deref() ?? null;
+  }
+  private set _lastReleasedTxnClient(client: pg.PoolClient | null) {
+    this._lastReleasedTxnClientRef = client == null ? null : new WeakRef(client);
+  }
   // Rails' `statement_limit` database.yml key — max prepared
   // statements cached per session before LRU eviction (default 1000).
   private _statementLimit = 1000;
@@ -725,8 +744,30 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async beginTransaction(): Promise<void> {
     if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
     this._client = await this._driverPool.connect();
-    await this._client.query("BEGIN");
-    this._inTransaction = true;
+    try {
+      await this._client.query("BEGIN");
+      this._inTransaction = true;
+      // Note: do NOT null `_lastReleasedTxnClient` here. After-rollback
+      // callbacks (rollback_records) run BEFORE TransactionManager's
+      // `after_failure_actions` hook fires; if such a callback opens a
+      // new transaction (this beginTransaction call), nulling the ref
+      // would lose the pointer to the just-failed client and the hook
+      // would clear the wrong pool. The ref is dropped instead inside
+      // `clearCacheBang` after `reset()` — bounded to the failure-hook
+      // window, while still WeakRef-held so pg.Pool can reap idles.
+    } catch (error) {
+      // If BEGIN fails (e.g. network blip after connect), release the
+      // acquired client so it returns to the pool. Leaving `_client`
+      // set would leak a pool slot and eventually deadlock acquires.
+      // Pass the error to release() so node-postgres discards the
+      // (potentially damaged) client instead of returning a bad
+      // socket to the idle set.
+      const client = this._client;
+      this._client = null;
+      this._inTransaction = false;
+      client?.release(error instanceof Error ? error : undefined);
+      throw error;
+    }
   }
 
   async beginDbTransaction(): Promise<void> {
@@ -764,13 +805,43 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async rollback(): Promise<void> {
     if (!this._client) throw new Error("No active transaction");
-    await this._client.query("ROLLBACK");
-    // See commit() — ROLLBACK doesn't drop server-side prepared
-    // statements, so we keep the pool attached to the pg.PoolClient
-    // for the duration of the connection's life.
-    this._client.release();
-    this._client = null;
-    this._inTransaction = false;
+    const releasedClient = this._client;
+    let rollbackError: unknown;
+    try {
+      await this._client.query("ROLLBACK");
+    } catch (e) {
+      // If ROLLBACK itself throws (e.g. network drop mid-txn), we still
+      // have to release the client or the pool leaks. Rethrow after
+      // cleanup. Pass the error to release() so pg.Pool discards the
+      // client rather than returning it to the idle set.
+      rollbackError = e;
+    } finally {
+      // See commit() — ROLLBACK doesn't drop server-side prepared
+      // statements, so we keep the pool attached to the pg.PoolClient
+      // for the duration of the connection's life.
+      this._client = null;
+      this._inTransaction = false;
+      // Normalize to Error before passing to release() — node-postgres
+      // expects an Error to discard the client, and downstream code
+      // (and our own rethrow path) may read `.message`. Matches the
+      // pattern in beginTransaction's catch.
+      releasedClient.release(
+        rollbackError === undefined
+          ? undefined
+          : rollbackError instanceof Error
+            ? rollbackError
+            : new Error(String(rollbackError)),
+      );
+      // Retain a reference to the just-released client so a
+      // post-rollback `clearCacheBang` (Rails' `after_failure_actions`)
+      // can still reach the StatementPool. This reference is dropped
+      // by `clearCacheBang` after the cache reset runs; it's NOT
+      // cleared by `beginDbTransaction` (after-rollback callbacks can
+      // open a new txn before the failure hook fires, and nulling
+      // the ref there would lose the pointer to the failed client).
+      this._lastReleasedTxnClient = releasedClient;
+    }
+    if (rollbackError !== undefined) throw rollbackError;
   }
 
   async rollbackDbTransaction(): Promise<void> {
@@ -967,6 +1038,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return this._client ? this._statementPools.get(this._client) : undefined;
   }
 
+  /** @internal — pool for the most recently released txn client. */
+  _lastReleasedStatementPoolForTest(): StatementPool | undefined {
+    // Deref once: the WeakRef behind `_lastReleasedTxnClient` can flip
+    // to null between two getter calls if the GC runs between them,
+    // and `WeakMap.get(null)` throws (keys must be objects).
+    const client = this._lastReleasedTxnClient;
+    return client ? this._statementPools.get(client) : undefined;
+  }
+
   /**
    * Clear cached prepared statements on the currently-held transaction
    * client. Mirrors Rails' `PostgreSQLAdapter#clear_cache!` which
@@ -982,9 +1062,59 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   override clearCacheBang(): void {
     super.clearCacheBang();
-    if (this._client) {
-      this._statementPools.get(this._client)?.clear();
+    // Always handle the just-released txn client first when set —
+    // this is the failure-hook target. After-rollback callbacks may
+    // have opened a new transaction (so `_client` is non-null) before
+    // `after_failure_actions` reached us; without this branch we'd
+    // clear the WRONG pool (the new txn's) and leave the failed
+    // session's stale entries behind. Bounded to the failure-hook
+    // window: we drop the ref immediately after.
+    const lastReleased = this._lastReleasedTxnClient;
+    const currentClient = this._client;
+    if (lastReleased) {
+      try {
+        if (lastReleased === currentClient) {
+          // pg.Pool handed back the same physical client to the new
+          // txn — we own the session again, so prefer full `clear()`
+          // which fires DEALLOCATE per entry (cleans up the orphaned
+          // server-side PREPAREs that `reset()` would have left).
+          this._statementPools.get(lastReleased)?.clear();
+        } else {
+          // Released client (different from any current txn): we
+          // can't fire DEALLOCATE on a session we don't own. We also
+          // can't SKIP the reset: the WeakMap-stored pool persists
+          // across pg.Pool checkouts of the same physical client. If
+          // we left the stale entries in place, a future checkout of
+          // this same pg.PoolClient would find the invalidated name
+          // in the pool and call `exec_prepared(staleName)`, hitting
+          // the same PSCE error again. `reset()` forces re-PREPARE
+          // with a fresh name (counter never resets, so no collision
+          // with the orphaned server-side statement).
+          this._statementPools.get(lastReleased)?.reset();
+        }
+      } finally {
+        this._lastReleasedTxnClient = null;
+      }
     }
+    if (currentClient && currentClient !== lastReleased) {
+      // Live txn client (distinct from the failed one we already
+      // handled above): full clear() — fires DEALLOCATE per entry
+      // (via StatementPool's pg-specific dealloc override).
+      this._statementPools.get(currentClient)?.clear();
+    }
+    // Trade-off (follow-up) for the released-client `reset()` path
+    // above: we can't fire DEALLOCATE on a released client, so
+    // server-side PREPAREs persist until the connection is recycled.
+    // Repeated PSCE on the same physical client could accumulate
+    // orphaned server statements beyond what statement_limit / LRU
+    // would normally evict (we discarded the local entries that drive
+    // eviction). Our per-pool counter never resets, so name collisions
+    // are impossible — but memory on the server session grows. The
+    // proper fix is to tag the released client (per-client WeakMap
+    // flag) and have the next checkout run `DEALLOCATE ALL` (or
+    // `DISCARD ALL`) before user code; that requires a pool-checkout
+    // interception not wired here. Tracked as a follow-up; this PR's
+    // scope is the `after_failure_actions` hook itself.
   }
 
   /**
