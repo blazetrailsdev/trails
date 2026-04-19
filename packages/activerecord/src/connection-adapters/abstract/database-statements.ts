@@ -5,6 +5,7 @@
  */
 
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
+import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Notifications } from "@blazetrails/activesupport";
 import { TransactionIsolationError } from "../../errors.js";
 import { quote, quoteTableName, quoteColumnName } from "./quoting.js";
@@ -119,17 +120,9 @@ export function toSqlAndBinds(
       const [sql, extractedBinds] = visitor.compileWithBinds(node);
       // Type-cast bind objects (QueryAttribute) to primitive values
       // for adapter execution, matching Rails' type_casted_binds
-      const castedBinds = extractedBinds.map((b) => {
-        if (
-          b &&
-          typeof b === "object" &&
-          "valueForDatabase" in b &&
-          typeof (b as Record<string, unknown>).valueForDatabase === "function"
-        ) {
-          return (b as { valueForDatabase(): unknown }).valueForDatabase();
-        }
-        return b;
-      });
+      const castedBinds = extractedBinds.map((b) =>
+        b instanceof ModelAttribute ? b.valueForDatabase : b,
+      );
       return [sql, castedBinds, preparable, allowRetry];
     }
     const sql = (node as any).toSql();

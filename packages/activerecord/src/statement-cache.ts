@@ -63,12 +63,6 @@ export class PartialQuery extends Query {
       let value = bindsCopy.shift();
       if (value instanceof Attribute) {
         value = value.valueForDatabase;
-      } else if (
-        value !== null &&
-        typeof value === "object" &&
-        typeof (value as Record<string, unknown>).valueForDatabase === "function"
-      ) {
-        value = (value as { valueForDatabase(): unknown }).valueForDatabase();
       }
       const conn = connection as { quote?(v: unknown): string };
       val[i] = conn.quote ? conn.quote(value) : quoteValue(value);
@@ -140,14 +134,10 @@ export class BindMap {
     this._indexes = [];
     for (let i = 0; i < boundAttributes.length; i++) {
       const attr = boundAttributes[i];
-      const isSubstitute =
+      if (
         attr instanceof Substitute ||
-        (attr instanceof Attribute && attr.value instanceof Substitute) ||
-        (attr !== null &&
-          typeof attr === "object" &&
-          "valueBeforeTypeCast" in (attr as Record<string, unknown>) &&
-          (attr as any).valueBeforeTypeCast instanceof Substitute);
-      if (isSubstitute) {
+        (attr instanceof Attribute && attr.valueBeforeTypeCast instanceof Substitute)
+      ) {
         this._indexes.push(i);
       }
     }
@@ -160,12 +150,6 @@ export class BindMap {
       const attr = bas[offset];
       if (attr instanceof Attribute) {
         bas[offset] = attr.withCastValue(values[i]);
-      } else if (
-        attr !== null &&
-        typeof attr === "object" &&
-        typeof (attr as any).withCastValue === "function"
-      ) {
-        bas[offset] = (attr as { withCastValue(v: unknown): unknown }).withCastValue(values[i]);
       } else {
         bas[offset] = values[i];
       }
@@ -249,11 +233,7 @@ export class StatementCache {
       return this._model.findBySql(sql);
     }
     // Type-cast bind objects to primitives for the adapter
-    const castedBinds = bindValues.map((b) =>
-      b !== null && typeof b === "object" && typeof (b as any).valueForDatabase === "function"
-        ? (b as { valueForDatabase(): unknown }).valueForDatabase()
-        : b,
-    );
+    const castedBinds = bindValues.map((b) => (b instanceof Attribute ? b.valueForDatabase : b));
     return this._model.findBySql(sql, castedBinds);
   }
 

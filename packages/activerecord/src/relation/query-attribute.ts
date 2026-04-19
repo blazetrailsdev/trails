@@ -1,61 +1,59 @@
 /**
  * QueryAttribute — a value object for use when constructing query conditions.
  *
- * Wraps a value with its type, memoizing cast and serialized values.
+ * Extends ActiveModel::Attribute so instanceof checks work throughout
+ * the system (BindMap, visitors, buildCasted, extractNodeValue).
  *
- * Mirrors: ActiveRecord::Relation::QueryAttribute
+ * Mirrors: ActiveRecord::Relation::QueryAttribute < ActiveModel::Attribute
  */
 
-import type { Type } from "@blazetrails/activemodel";
+import { Attribute, Type } from "@blazetrails/activemodel";
 
 type CastType = Pick<Type, "cast" | "serialize">;
 
-export class QueryAttribute {
-  readonly name: string;
-  readonly valueBeforeTypeCast: unknown;
-  readonly type: CastType;
-  private _castValue: unknown = undefined;
-  private _hasCastValue = false;
-  private _serializedValue: unknown = undefined;
-  private _hasSerialized = false;
+/**
+ * Wraps a duck-typed {cast, serialize} as a full Type for the
+ * Attribute constructor.
+ */
+class DelegatingType extends Type<unknown> {
+  readonly name = "query";
+  private _delegate: CastType;
 
-  constructor(name: string, value: unknown, type: CastType) {
-    this.name = name;
-    this.valueBeforeTypeCast = value;
-    this.type = type;
+  constructor(delegate: CastType) {
+    super();
+    this._delegate = delegate;
   }
 
-  /**
-   * Construct with an already-cast value (skips re-casting).
-   */
-  static withCastValue(name: string, value: unknown, type: CastType): QueryAttribute {
+  cast(value: unknown): unknown {
+    return this._delegate.cast(value);
+  }
+
+  override serialize(value: unknown): unknown {
+    return this._delegate.serialize(value);
+  }
+}
+
+function ensureType(type: CastType): Type {
+  if (type instanceof Type) return type;
+  return new DelegatingType(type);
+}
+
+export class QueryAttribute extends Attribute {
+  constructor(name: string, value: unknown, type: CastType) {
+    super(name, value, ensureType(type));
+  }
+
+  typeCast(value: unknown): unknown {
+    return this.type.cast(value);
+  }
+
+  static override withCastValue(name: string, value: unknown, type: CastType): QueryAttribute {
     const attr = new QueryAttribute(name, value, type);
-    attr._castValue = value;
-    attr._hasCastValue = true;
+    attr.overrideCastValue(value);
     return attr;
   }
 
-  get value(): unknown {
-    if (!this._hasCastValue) {
-      this._castValue = this.type.cast(this.valueBeforeTypeCast);
-      this._hasCastValue = true;
-    }
-    return this._castValue;
-  }
-
-  typeCast(): unknown {
-    return this.value;
-  }
-
-  valueForDatabase(): unknown {
-    if (!this._hasSerialized) {
-      this._serializedValue = this.type.serialize(this.value);
-      this._hasSerialized = true;
-    }
-    return this._serializedValue;
-  }
-
-  withCastValue(value: unknown): QueryAttribute {
+  override withCastValue(value: unknown): QueryAttribute {
     return QueryAttribute.withCastValue(this.name, value, this.type);
   }
 
@@ -69,20 +67,6 @@ export class QueryAttribute {
   }
 
   isUnboundable(): boolean {
-    return false;
-  }
-
-  equals(other: QueryAttribute): boolean {
-    if (this.name !== other.name) return false;
-    if (this.valueBeforeTypeCast !== other.valueBeforeTypeCast) return false;
-    if (this.type === other.type) return true;
-    if ("equals" in this.type && typeof (this.type as any).equals === "function") {
-      return (this.type as any).equals(other.type);
-    }
-    // Compare by constructor for proper Type classes (not plain objects)
-    const thisCtor = this.type.constructor;
-    const otherCtor = other.type.constructor;
-    if (thisCtor !== Object && thisCtor === otherCtor) return true;
     return false;
   }
 }
