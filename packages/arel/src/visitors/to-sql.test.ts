@@ -902,6 +902,38 @@ describe("the to_sql visitor", () => {
     expect(binds).toHaveLength(1);
   });
 
+  it("compileWithCollector accepts external collector", () => {
+    const v = new Visitors.ToSql();
+    const table = new Table("users");
+    const mgr = table.project(star).where(table.get("name").eq("alice"));
+
+    // Use a custom collector that tracks parts and binds
+    const parts: unknown[] = [];
+    const binds: unknown[] = [];
+    const collector = {
+      preparable: false,
+      retryable: true,
+      append(str: string) {
+        parts.push(str);
+        return collector;
+      },
+      addBind(value: unknown) {
+        binds.push(value);
+        parts.push("?");
+        return collector;
+      },
+      get value() {
+        return [parts, binds];
+      },
+    };
+
+    v.compileWithCollector(mgr.ast, collector);
+    // The collector received addBind calls for Casted values
+    expect(binds.length).toBeGreaterThan(0);
+    // SQL parts are accumulated
+    expect(parts.some((p) => typeof p === "string" && p.includes("users"))).toBe(true);
+  });
+
   it("works with lists", () => {
     const node = new Nodes.ValuesList([[new Nodes.Quoted(1)], [new Nodes.Quoted(2)]]);
     const sql = new Visitors.ToSql().compile(node);

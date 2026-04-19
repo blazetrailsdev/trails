@@ -35,7 +35,17 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector.value;
   }
 
-  compileWithCollector(node: Node): SQLString {
+  compileWithCollector(node: Node, externalCollector?: unknown): SQLString {
+    if (externalCollector) {
+      this.collector = externalCollector as SQLString;
+      this._extractBinds = true;
+      try {
+        this.visit(node);
+      } finally {
+        this._extractBinds = false;
+      }
+      return this.collector;
+    }
     this.collector = new SQLString();
     this.visit(node);
     return this.collector;

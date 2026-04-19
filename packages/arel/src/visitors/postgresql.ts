@@ -69,9 +69,9 @@ export class PostgreSQLWithBinds extends PostgreSQL {
     return super.compile(node);
   }
 
-  override compileWithCollector(node: Node): SQLString {
+  override compileWithCollector(node: Node, externalCollector?: unknown): SQLString {
     this.bindIndex = 0;
-    return super.compileWithCollector(node);
+    return super.compileWithCollector(node, externalCollector);
   }
 
   override compileWithBinds(node: Node): [string, unknown[]] {

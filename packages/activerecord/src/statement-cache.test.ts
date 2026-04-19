@@ -171,4 +171,26 @@ describe("StatementCacheTest", () => {
       adapter.disconnectBang();
     }
   });
+
+  it("PartialQueryCollector produces Substitute slots via compileWithCollector", async () => {
+    const { Table, Visitors, star } = await import("@blazetrails/arel");
+    const v = new Visitors.ToSql();
+    const table = new Table("users");
+    const mgr = table.project(star).where(table.get("name").eq("alice"));
+
+    const collector = new PartialQueryCollector();
+    v.compileWithCollector(mgr.ast, collector);
+    const [parts, binds] = collector.value;
+
+    const hasSubstitute = parts.some((p: unknown) => p instanceof Substitute);
+    expect(hasSubstitute).toBe(true);
+    expect(binds.length).toBeGreaterThan(0);
+
+    // PartialQuery can interpolate values at these Substitute positions
+    const pq = new PartialQuery(parts);
+    const sql = pq.sqlFor(binds, { quote: (v: unknown) => `'${v}'` });
+    expect(sql).toContain('"users"."name"');
+    expect(sql).toContain("alice");
+    expect(sql).not.toContain("?");
+  });
 });

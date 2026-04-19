@@ -86,13 +86,17 @@ export class PartialQueryCollector {
     return this;
   }
 
-  addBind(obj: unknown): this {
+  addBind(obj: unknown, _block?: (index: number) => string): this {
     this._binds.push(obj);
     this._parts.push(new Substitute());
     return this;
   }
 
-  addBinds(binds: unknown[], procForBinds?: (v: unknown) => unknown): this {
+  addBinds(
+    binds: unknown[],
+    procForBinds?: ((v: unknown) => unknown) | null,
+    _block?: (index: number) => string,
+  ): this {
     const mapped = procForBinds ? binds.map(procForBinds) : binds;
     this._binds.push(...mapped);
     for (let i = 0; i < binds.length; i++) {
