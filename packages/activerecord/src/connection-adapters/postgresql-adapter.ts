@@ -22,7 +22,9 @@ import {
 } from "./postgresql/type-map-init.js";
 import { inspectExplainOption } from "../adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
+import { PreparedStatementCacheExpired } from "../errors.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
+import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import { typeCastedBinds } from "./abstract/database-statements.js";
 
 /**
@@ -54,6 +56,43 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _inTransaction = false;
   private _databaseVersion: number | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
+  // Per-pg.Client statement pool. PG's prepared statements are
+  // session-scoped, so each physical client gets its own pool with
+  // its own counter (matching Rails' `PostgreSQL::StatementPool`).
+  // The WeakMap lets pg.Pool reap clients without us leaking entries.
+  private _statementPools = new WeakMap<pg.PoolClient, StatementPool>();
+  // Rails' `statement_limit` database.yml key — max prepared
+  // statements cached per session before LRU eviction (default 1000).
+  private _statementLimit = 1000;
+
+  /**
+   * Maximum prepared statements cached per connection.
+   *
+   * Mirrors: `database.yml`'s `statement_limit` — read by Rails as
+   * `config[:statement_limit]` in PostgreSQLAdapter#initialize.
+   */
+  get statementLimit(): number {
+    return this._statementLimit;
+  }
+
+  set statementLimit(value: number) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new RangeError(
+        `statementLimit must be a finite non-negative integer; got ${String(value)}`,
+      );
+    }
+    this._statementLimit = value;
+    // Resize the active transaction client's pool immediately so a
+    // mid-session change is visible. Other per-client pools keep the
+    // size they were built with (Rails reads `statement_limit` once
+    // at pool construction). We can't iterate a WeakMap to retrofit
+    // them, and dropping entries would orphan their counter /
+    // sql→name mapping while server-side PREPAREd statements still
+    // exist on the reusable pg.PoolClient, risking name collisions.
+    if (this._client) {
+      this._statementPools.get(this._client)?.setMaxSize(value);
+    }
+  }
 
   constructor(config: string | pg.PoolConfig) {
     super();
@@ -205,15 +244,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       payload,
       async () => {
         try {
-          const r = await this.withClient(async (client) => {
+          const r = await this.withClient(async (client) =>
             // rowMode: "array" returns rows as positional arrays, preserving
             // duplicate column names and matching the field-index order.
-            return (await client.query({
-              text: rewritten,
-              values: bindArray,
-              rowMode: "array",
-            })) as unknown as ArrayQueryResult;
-          });
+            // Delegates to `_runQuery` so prepared-statement caching and
+            // in-txn / out-of-txn cached-plan handling stay in one place.
+            this._runQuery<ArrayQueryResult>(client, rewritten, bindArray, { rowMode: "array" }),
+          );
           payload.row_count = r.rows?.length ?? 0;
           return r;
         } catch (e: any) {
@@ -380,6 +417,156 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
+   * Look up the statement pool for `client`, lazily creating it.
+   * Kept per-client because PG prepared statements are session-
+   * scoped — once the client is released back to pg.Pool and
+   * re-acquired, the server state may differ.
+   */
+  private _poolFor(client: pg.PoolClient): StatementPool {
+    let pool = this._statementPools.get(client);
+    if (!pool) {
+      pool = new StatementPool(client, this._statementLimit);
+      this._statementPools.set(client, pool);
+    }
+    // Matches Rails: statement_limit is read at pool construction
+    // time. A mid-session change to `adapter.statementLimit` is
+    // applied to the currently-active pool by the setter; other
+    // per-client pools keep the limit they were built with. Syncing
+    // them here would stomp on direct setMaxSize calls from tests or
+    // callers that want a tighter bound than the adapter default.
+    return pool;
+  }
+
+  /**
+   * Tear down the statement pool attached to `client`. Called from
+   * `close()` only — commit / rollback intentionally keep the pool
+   * attached because PG prepared statements are session-scoped, not
+   * transaction-scoped (see Rails' PG::StatementPool, which only
+   * clears on disconnect). Detaching here stops late DEALLOCATE
+   * calls from racing with a released client, AND we drop the
+   * WeakMap entry so a later checkout that hands back the same
+   * pg.PoolClient wrapper gets a fresh pool.
+   */
+  private _releaseStatementPool(client: pg.PoolClient): void {
+    const pool = this._statementPools.get(client);
+    if (!pool) return;
+    pool.detach();
+    this._statementPools.delete(client);
+  }
+
+  /**
+   * Run a query on `client`, routing through the statement pool when
+   * binds are present and `preparedStatements` is on. On Rails-parity
+   * "invalid cached plan" (SQLSTATE 0A000 + "cached plan" in the
+   * message), purges the pool entry and either re-runs once (outside
+   * a txn) or raises `PreparedStatementCacheExpired` (inside one, so
+   * the transaction machinery can retry the whole txn).
+   *
+   * Shared by execute/executeMutation so every bound path benefits
+   * from prepared-statement reuse — matches Rails where `exec_cache`
+   * backs both exec_query and exec_delete / exec_update / exec_insert.
+   */
+  private async _runQuery<R = pg.QueryResult>(
+    client: pg.PoolClient,
+    sql: string,
+    binds: unknown[],
+    extra: { rowMode?: "array" } = {},
+  ): Promise<R> {
+    const prepare = this._shouldPrepare(binds, client);
+    const attempt = async (): Promise<R> => {
+      if (prepare) {
+        const name = this._preparedNameFor(client, sql);
+        return (await client.query({ name, text: sql, values: binds, ...extra })) as R;
+      }
+      if (extra.rowMode) {
+        return (await client.query({ text: sql, values: binds, ...extra })) as R;
+      }
+      return (await client.query(sql, binds)) as R;
+    };
+    try {
+      return await attempt();
+    } catch (e) {
+      if (prepare && this._isInvalidCachedPlan(e)) {
+        this._poolFor(client).delete(sql);
+        if (this._inTransaction) {
+          throw new PreparedStatementCacheExpired(
+            (e as { message?: string })?.message ?? "cached plan expired",
+            { sql, binds, cause: e },
+          );
+        }
+        return await attempt();
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Return the prepared-statement name for `sql` on `client`. Names
+   * are allocated from the per-pool counter (`StatementPool#nextKey`)
+   * so each session has its own `a1`, `a2`, ... sequence. Mirrors
+   * Rails' `PostgreSQL::StatementPool#[]` / `#[]=` — present key →
+   * cached name, absent → `next_key` + store.
+   */
+  private _preparedNameFor(client: pg.PoolClient, sql: string): string {
+    const pool = this._poolFor(client);
+    const existing = pool.get(sql);
+    if (existing) return existing.name;
+    const name = pool.nextKey();
+    pool.set(sql, { name });
+    return name;
+  }
+
+  /**
+   * True when the adapter should try a named prepared statement for
+   * this call. Rails' gate: `prepared_statements && !binds.empty?`
+   * (there's no point naming an unparameterized statement — the
+   * parse cost is the same either way and the name never gets
+   * reused without binds).
+   */
+  private _shouldPrepare(binds: unknown[], client?: pg.PoolClient): boolean {
+    if (!this.preparedStatements || binds.length === 0) return false;
+    // Gate on the actual pool's maxSize (or the adapter default if
+    // no pool exists yet). A direct `pool.setMaxSize(0)` — by a test
+    // or an operator shrinking one specific session — must reliably
+    // disable preparation for that client, because `StatementPool#set`
+    // is a no-op at maxSize=0 and we'd otherwise keep allocating a
+    // fresh `a<n>` name per execution and leak server-side PREPAREs.
+    const poolLimit = client
+      ? (this._statementPools.get(client)?.maxSize ?? this._statementLimit)
+      : this._statementLimit;
+    return poolLimit > 0;
+  }
+
+  /**
+   * True if a pg driver error indicates the cached plan has been
+   * invalidated by DDL on a referenced object (typical: `ALTER TABLE`,
+   * `DROP COLUMN`, schema change). PG emits SQLSTATE `0A000`
+   * FEATURE_NOT_SUPPORTED with the server message "cached plan must
+   * not change result type" — Rails checks the source function
+   * `RevalidateCachedQuery`, which the node-pg driver does not expose,
+   * so we fall back to the message substring.
+   *
+   * `26000` (invalid_sql_statement_name) is intentionally NOT included
+   * here: pg-js's own client-side name cache handles the session-lost
+   * case on its own, and retrying behind the driver's back masks
+   * genuine "this name never existed" bugs. Rails' equivalent path
+   * (`exec_cache`) also only retries on cached-plan failure — not on
+   * unknown-statement-name — so this matches the activerecord
+   * contract.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#is_cached_plan_failure?
+   * (postgresql_adapter.rb:901-906).
+   */
+  private _isInvalidCachedPlan(e: unknown): boolean {
+    const err = e as { code?: string; message?: string } | null;
+    if (err?.code !== "0A000") return false;
+    // "cached plan must not change result type" is the only
+    // 0A000 subtype we retry on — other FEATURE_NOT_SUPPORTED
+    // errors (e.g. RETURNING on a view) must surface unchanged.
+    return typeof err.message === "string" && err.message.includes("cached plan");
+  }
+
+  /**
    * Execute a SELECT query and return rows. Wrapped in a
    * `sql.active_record` notification — mirrors Rails'
    * `AbstractAdapter#log` so LogSubscriber / ExplainSubscriber /
@@ -406,7 +593,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         return await this.withClient(async (client) => {
-          const result = await client.query(rewritten, binds);
+          const result = await this._runQuery(client, rewritten, binds);
           payload.row_count = result.rows.length;
           return result.rows;
         });
@@ -459,7 +646,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             payload.sql = withReturning;
             try {
               if (useSavepoint) await client.query(`SAVEPOINT "${spName}"`);
-              const result = await client.query(withReturning, binds);
+              const result = await this._runQuery(client, withReturning, binds);
               if (useSavepoint) await client.query(`RELEASE SAVEPOINT "${spName}"`);
               payload.row_count = result.rowCount ?? 0;
               if (result.rows.length > 1) {
@@ -470,13 +657,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
                 return Number(result.rows[0][firstCol]);
               }
               return result.rowCount ?? 0;
-            } catch {
+            } catch (err) {
+              // Cached-plan failures must propagate to the
+              // transaction-retry machinery (Rails raises
+              // PreparedStatementCacheExpired for exactly this
+              // reason — retrying inside an aborted txn would fail
+              // with 25P02). Everything else falls through to the
+              // "retry without RETURNING" path this catch was
+              // originally written for.
+              if (err instanceof PreparedStatementCacheExpired) throw err;
               if (useSavepoint) {
                 await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
                 await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
               }
               payload.sql = pgSql;
-              const result = await client.query(pgSql, binds);
+              const result = await this._runQuery(client, pgSql, binds);
               payload.row_count = result.rowCount ?? 0;
               return result.rowCount ?? 0;
             }
@@ -484,7 +679,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
           // For INSERT with explicit RETURNING
           if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
-            const result = await client.query(pgSql, binds);
+            const result = await this._runQuery(client, pgSql, binds);
             payload.row_count = result.rowCount ?? 0;
             if (result.rows.length > 0) {
               const firstCol = Object.keys(result.rows[0])[0];
@@ -494,7 +689,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           }
 
           // For UPDATE/DELETE, return affected rows
-          const result = await client.query(pgSql, binds);
+          const result = await this._runQuery(client, pgSql, binds);
           payload.row_count = result.rowCount ?? 0;
           return result.rowCount ?? 0;
         });
@@ -530,6 +725,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async commit(): Promise<void> {
     if (!this._client) throw new Error("No active transaction");
     await this._client.query("COMMIT");
+    // Keep the per-client StatementPool attached through the pg.Pool
+    // checkin/checkout cycle. PG prepared statements are session-
+    // scoped, not transaction-scoped (COMMIT/ROLLBACK don't drop
+    // them), so detaching here and rebuilding on next checkout would
+    // reset the counter → `a1` collides with the still-prepared `a1`
+    // on the server. Matches Rails, which only clears its
+    // StatementPool on disconnect, not on commit.
     this._client.release();
     this._client = null;
     this._inTransaction = false;
@@ -545,6 +747,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async rollback(): Promise<void> {
     if (!this._client) throw new Error("No active transaction");
     await this._client.query("ROLLBACK");
+    // See commit() — ROLLBACK doesn't drop server-side prepared
+    // statements, so we keep the pool attached to the pg.PoolClient
+    // for the duration of the connection's life.
     this._client.release();
     this._client = null;
     this._inTransaction = false;
@@ -714,13 +919,34 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this._advisoryLockClient = null;
     }
     if (this._client) {
+      this._releaseStatementPool(this._client);
       this._client.release();
       this._client = null;
     }
+    // Drop adapter-held references to any remaining pools so late
+    // errors can't fire DEALLOCATE against a pool.end()-ed client.
+    // The pool objects become unreachable once pg releases the
+    // corresponding clients anyway — this is about breaking our
+    // own reference, not an explicit detach step per pool.
+    this._statementPools = new WeakMap<pg.PoolClient, StatementPool>();
     if (this._driverPool) {
       await this._driverPool.end();
       this._driverPool = null;
     }
+  }
+
+  /**
+   * Test-only accessor for the statement pool attached to the
+   * currently-held transaction client. Returns undefined outside a
+   * transaction, because without a held client every adapter call
+   * grabs a fresh pool. Mirrors Rails' `raw_connection
+   * .instance_variable_get(:@statement_pool)` escape hatch used by
+   * `PostgreSQL::StatementPoolTest`.
+   *
+   * @internal
+   */
+  _statementPoolForTest(): StatementPool | undefined {
+    return this._client ? this._statementPools.get(this._client) : undefined;
   }
 
   /**
@@ -1939,7 +2165,82 @@ class SimpleTableBuilder {
   }
 }
 
-export { StatementPool } from "./statement-pool.js";
+/**
+ * A prepared-statement entry tracked in the per-client pool. `name` is
+ * the server-side name passed to `client.query({ name, text, values })`;
+ * pg auto-PREPAREs on first use with that name and EXECUTEs on reuse.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::StatementPool entry shape.
+ */
+export interface PreparedStatement {
+  name: string;
+}
+
+/**
+ * PG-flavored StatementPool. Backs the per-client statement cache;
+ * `dealloc` sends `DEALLOCATE` for the evicted name. PG prepared
+ * statements are session-scoped, so an instance of this pool is
+ * attached per-pg.PoolClient via a WeakMap on the adapter.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::StatementPool
+ */
+export class StatementPool extends GenericStatementPool<PreparedStatement> {
+  private _client: pg.PoolClient | null;
+  // Per-pool counter. Rails' PG StatementPool uses `@counter` on the
+  // pool instance so names are scoped to the session — matches the
+  // session-scoped nature of PG prepared statements and lets the
+  // adapter own zero state about naming.
+  private _counter = 0;
+
+  constructor(client: pg.PoolClient, maxSize = 1000) {
+    super(maxSize);
+    this._client = client;
+  }
+
+  /**
+   * Allocate a fresh prepared-statement name. Rails' equivalent is
+   * `next_key` on `PostgreSQL::StatementPool` — `"a#{@counter += 1}"`.
+   */
+  nextKey(): string {
+    return `a${++this._counter}`;
+  }
+
+  /**
+   * Called when an entry is evicted (LRU overflow or explicit delete).
+   * Rails swallows PG::InvalidSqlStatementName ("prepared statement
+   * does not exist") and errors against a closed connection — the
+   * statement is already gone on the server either way. Node-pg
+   * surfaces the same as error codes / messages.
+   */
+  protected override dealloc(stmt: PreparedStatement): void {
+    const client = this._client;
+    if (!client) return;
+    // Best-effort async cleanup: we don't await DEALLOCATE, but pg
+    // still queues it on this client and it runs before later queries
+    // on the same connection — eviction doesn't block the caller
+    // that triggered it (pg.write path) but it isn't free either.
+    // The server also drops prepared statements on session close, so
+    // a swallowed failure here is safe. Errors are intentionally
+    // ignored — Rails' PG::StatementPool#dealloc likewise rescues
+    // PG::InvalidSqlStatementName / connection errors — and the
+    // empty `.catch` keeps node from treating a post-close
+    // DEALLOCATE as an unhandled rejection.
+    // `pgQuoteColumnName` escapes any embedded `"` instead of
+    // raising, so a leaked caller-supplied name can't produce a
+    // synchronous throw that would escape the `.catch(() => {})`.
+    client.query(`DEALLOCATE ${pgQuoteColumnName(stmt.name)}`).catch(() => {});
+  }
+
+  /**
+   * Mark the pool detached from its client (e.g. on connection release
+   * or close). Prevents late DEALLOCATE calls from racing with a
+   * client that's already back in the pg.Pool — the server will
+   * discard statements on session end anyway.
+   */
+  detach(): void {
+    this._client = null;
+  }
+}
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::MoneyDecoder

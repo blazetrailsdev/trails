@@ -137,4 +137,51 @@ describe("SQLite3 StatementPool integration", () => {
       adapter.disconnectBang();
     }
   });
+
+  it("setMaxSize shrinks and evicts LRU entries through dealloc", () => {
+    const dealloced: string[] = [];
+    class TestPool extends StatementPool<string> {
+      protected dealloc(stmt: string): void {
+        dealloced.push(stmt);
+      }
+    }
+    const pool = new TestPool(5);
+    pool.set("a", "stmt_a");
+    pool.set("b", "stmt_b");
+    pool.set("c", "stmt_c");
+    // Touch "a" so it's moved to MRU — LRU order becomes b, c, a.
+    pool.get("a");
+    pool.setMaxSize(1);
+    expect(pool.length).toBe(1);
+    expect(pool.has("a")).toBe(true);
+    expect(dealloced).toEqual(["stmt_b", "stmt_c"]);
+  });
+
+  it("setMaxSize(0) evicts everything and blocks new inserts", () => {
+    const dealloced: string[] = [];
+    class TestPool extends StatementPool<string> {
+      protected dealloc(stmt: string): void {
+        dealloced.push(stmt);
+      }
+    }
+    const pool = new TestPool(5);
+    pool.set("a", "stmt_a");
+    pool.set("b", "stmt_b");
+    pool.setMaxSize(0);
+    expect(pool.length).toBe(0);
+    expect(dealloced.sort()).toEqual(["stmt_a", "stmt_b"]);
+    // set() is a no-op when maxSize is 0 — matches Rails' behavior
+    // where statement_limit = 0 disables caching.
+    pool.set("c", "stmt_c");
+    expect(pool.length).toBe(0);
+  });
+
+  it("setMaxSize rejects negative / non-integer values", () => {
+    const pool = new StatementPool<string>(5);
+    expect(() => pool.setMaxSize(-1)).toThrow(RangeError);
+    expect(() => pool.setMaxSize(1.5)).toThrow(RangeError);
+    expect(() => pool.setMaxSize(NaN)).toThrow(RangeError);
+    expect(() => pool.setMaxSize(Infinity)).toThrow(RangeError);
+    expect(pool.maxSize).toBe(5);
+  });
 });

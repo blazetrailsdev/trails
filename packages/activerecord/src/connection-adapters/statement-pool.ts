@@ -16,6 +16,31 @@ export class StatementPool<T = unknown> {
     return this._statements.size;
   }
 
+  get maxSize(): number {
+    return this._maxSize;
+  }
+
+  /**
+   * Shrink (or grow) the LRU bound. Shrinking evicts the
+   * least-recently-used statements via `dealloc` — matches Rails'
+   * behavior when `statement_limit` is changed mid-session.
+   */
+  setMaxSize(maxSize: number): void {
+    if (!Number.isInteger(maxSize) || maxSize < 0) {
+      throw new RangeError(
+        `StatementPool#setMaxSize expected a finite non-negative integer; got ${String(maxSize)}`,
+      );
+    }
+    this._maxSize = maxSize;
+    while (this._statements.size > this._maxSize) {
+      const firstKey = this._statements.keys().next().value;
+      if (firstKey === undefined) break;
+      const evicted = this._statements.get(firstKey)!;
+      this._statements.delete(firstKey);
+      this.dealloc(evicted);
+    }
+  }
+
   get(key: string): T | undefined {
     if (!this._statements.has(key)) return undefined;
     const stmt = this._statements.get(key) as T;

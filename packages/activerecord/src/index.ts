@@ -197,6 +197,7 @@ export {
   DatabaseConnectionError,
   ValueTooLong,
   PreparedStatementInvalid,
+  PreparedStatementCacheExpired,
   NoDatabaseError,
   DatabaseAlreadyExists,
   AttributeAssignmentError,
