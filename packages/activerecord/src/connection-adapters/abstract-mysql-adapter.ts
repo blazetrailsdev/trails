@@ -54,6 +54,41 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   protected _mariadb = false;
   protected _databaseVersion: Version | null = null;
+  // Rails' `statement_limit` database.yml key — max prepared
+  // statements cached per session before LRU eviction (default 1000).
+  // Mirrors the same surface we expose on PostgreSQLAdapter; driver-
+  // specific subclasses (Mysql2Adapter, TrilogyAdapter) decide how to
+  // actually wire the per-connection pool.
+  protected _statementLimit = 1000;
+
+  /**
+   * Maximum prepared statements cached per MySQL connection.
+   *
+   * Mirrors: `database.yml`'s `statement_limit` — read by Rails as
+   * `config[:statement_limit]` in AbstractMysqlAdapter#initialize.
+   */
+  get statementLimit(): number {
+    return this._statementLimit;
+  }
+
+  set statementLimit(value: number) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new RangeError(
+        `statementLimit must be a finite non-negative integer; got ${String(value)}`,
+      );
+    }
+    this._statementLimit = value;
+    // Driver-specific subclasses override this to resize their active
+    // per-connection pool. Base impl is a no-op.
+    this._onStatementLimitChanged(value);
+  }
+
+  /**
+   * Hook for driver-specific subclasses to propagate a statementLimit
+   * change to the currently-held connection's StatementPool, if any.
+   * Base impl intentionally does nothing.
+   */
+  protected _onStatementLimitChanged(_value: number): void {}
 
   get adapterName(): string {
     return "Mysql2";
@@ -567,11 +602,38 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 }
 
 /**
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::StatementPool
+ * Shape of a cached MySQL prepared statement. `sql` is the key the
+ * mysql2 driver uses for its own internal client-side cache — passing
+ * it back to `connection.unprepare(sql)` closes the server-side
+ * statement (COM_STMT_CLOSE). `key` is the Rails-style `a<n>` identifier
+ * we use only for logging / diagnostics.
  *
- * MySQL-specific statement pool that inherits the base eviction logic
- * from ConnectionAdapters::StatementPool.
+ * Mirrors: the Statement struct in Rails'
+ * `ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements`.
+ */
+export interface MysqlPreparedStatement {
+  sql: string;
+  key: string;
+}
+
+/**
+ * MySQL-family StatementPool. Adds Rails-parity `nextKey()` on top of
+ * the base LRU cache. Driver-specific subclasses (Mysql2Adapter's
+ * inline subclass) override `dealloc` to send COM_STMT_CLOSE via
+ * `connection.unprepare`.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::StatementPool
  */
 // Named to avoid collision with the base StatementPool import — consumers
 // can import this under the AbstractMysqlAdapter namespace.
-export class StatementPool extends ConnectionStatementPool {}
+export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatement> {
+  private _counter = 0;
+
+  /**
+   * Allocate a fresh prepared-statement key. Mirrors Rails' per-pool
+   * `@counter += 1` on `AbstractMysqlAdapter::StatementPool`.
+   */
+  nextKey(): string {
+    return `a${++this._counter}`;
+  }
+}

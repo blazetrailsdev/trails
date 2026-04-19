@@ -1,11 +1,50 @@
 import mysql from "mysql2/promise";
 import { Notifications } from "@blazetrails/activesupport";
 import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
-import { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
+import {
+  AbstractMysqlAdapter,
+  StatementPool as MysqlStatementPool,
+  type MysqlPreparedStatement,
+} from "../connection-adapters/abstract-mysql-adapter.js";
 import { Column } from "../connection-adapters/column.js";
 import { SqlTypeMetadata } from "../connection-adapters/sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "../connection-adapters/mysql/explain-pretty-printer.js";
 import { typeCastedBinds } from "../connection-adapters/abstract/database-statements.js";
+
+/**
+ * Mysql2-flavored StatementPool. Evicted entries send COM_STMT_CLOSE
+ * via `connection.unprepare(sql)` so the mysql2 driver's internal
+ * cache (and the server's) stay in step with our `statement_limit`.
+ *
+ * Mirrors: Mysql2Adapter::StatementPool in activerecord. Errors are
+ * intentionally swallowed — Rails' equivalent rescues Mysql2::Error.
+ */
+class Mysql2StatementPool extends MysqlStatementPool {
+  private _conn: mysql.PoolConnection | null;
+
+  constructor(conn: mysql.PoolConnection, maxSize: number) {
+    super(maxSize);
+    this._conn = conn;
+  }
+
+  protected override dealloc(stmt: MysqlPreparedStatement): void {
+    const conn = this._conn;
+    if (!conn) return;
+    // `unprepare` is synchronous in node-mysql2 (it only touches the
+    // client-side cache and queues COM_STMT_CLOSE on the socket), but
+    // wrap in try/catch in case the client was already destroyed —
+    // eviction can't throw or it escapes the base class's loop.
+    try {
+      (conn as unknown as { unprepare: (sql: string) => void }).unprepare(stmt.sql);
+    } catch {
+      // swallow — matches Rails' Mysql2::Error rescue on stmt close
+    }
+  }
+
+  detach(): void {
+    this._conn = null;
+  }
+}
 
 /**
  * MySQL adapter — connects ActiveRecord to a real MySQL/MariaDB database.
@@ -35,6 +74,70 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _driverPool: mysql.Pool | null;
   private _conn: mysql.PoolConnection | null = null;
   private _inTransaction = false;
+  // Per-mysql.PoolConnection StatementPool. Mirrors the PG adapter's
+  // WeakMap approach — prepared statements are session-scoped, so the
+  // pool stays attached to the physical connection across the pool's
+  // checkin/checkout cycle. WeakMap lets mysql2.Pool reap connections
+  // without us leaking entries.
+  private _statementPools = new WeakMap<mysql.PoolConnection, Mysql2StatementPool>();
+
+  protected override _onStatementLimitChanged(value: number): void {
+    if (this._conn) this._statementPools.get(this._conn)?.setMaxSize(value);
+  }
+
+  /**
+   * Look up (or lazily create) the statement pool for `conn`. Matches
+   * the PG adapter's `_poolFor`.
+   */
+  private _poolFor(conn: mysql.PoolConnection): Mysql2StatementPool {
+    let pool = this._statementPools.get(conn);
+    if (!pool) {
+      pool = new Mysql2StatementPool(conn, this._statementLimit);
+      this._statementPools.set(conn, pool);
+    }
+    return pool;
+  }
+
+  /**
+   * Gate named-prepared-statement routing through our pool. Mirrors
+   * Rails' `prepared_statements && !binds.empty?` plus the extra
+   * `statement_limit > 0` check that disables caching (and therefore
+   * the whole prepared-statement path) when the operator sets
+   * `statement_limit = 0`.
+   */
+  private _shouldPrepare(conn: mysql.PoolConnection, binds: unknown[]): boolean {
+    if (!this.preparedStatements || binds.length === 0) return false;
+    const poolLimit = this._statementPools.get(conn)?.maxSize ?? this._statementLimit;
+    return poolLimit > 0;
+  }
+
+  /**
+   * Track a SQL string in the per-connection pool BEFORE handing it
+   * to `conn.execute()`. If the insert evicts an older entry, our
+   * pool's `dealloc` sends COM_STMT_CLOSE via `unprepare` so the
+   * mysql2 driver's internal cache and the server both release the
+   * prepared statement. No-op when caching is disabled.
+   */
+  private _trackPrepared(conn: mysql.PoolConnection, sql: string): void {
+    const pool = this._poolFor(conn);
+    if (pool.maxSize === 0) return;
+    // Use `get` (not `has`) so an already-cached entry is moved to
+    // the MRU end of the LRU. Otherwise a hot statement executed
+    // repeatedly would keep its original insertion position and get
+    // evicted the moment any other distinct query came along.
+    if (pool.get(sql)) return;
+    pool.set(sql, { sql, key: pool.nextKey() });
+  }
+
+  /**
+   * Test-only accessor for the statement pool attached to the
+   * currently-held transaction connection. Returns undefined outside
+   * a transaction — matches the PG adapter's equivalent hook.
+   * @internal
+   */
+  _statementPoolForTest(): Mysql2StatementPool | undefined {
+    return this._conn ? this._statementPools.get(this._conn) : undefined;
+  }
   // Cached capability flag — information_schema.statistics.expression
   // is MySQL 8.0.13+. Pre-8 MySQL and MariaDB (through at least 10.x)
   // don't expose it, so we detect once and remember. `undefined` =
@@ -133,10 +236,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         conn = await this.getConn();
         // Use server-side prepared statements when enabled and binds
         // are present — matches PR #589's preparedStatements toggle.
-        const [rows] =
-          this.preparedStatements && binds.length > 0
-            ? await conn.execute(driverSql, driverBinds as any[])
-            : await conn.query(driverSql, driverBinds);
+        // Track the SQL in our per-connection pool first so LRU
+        // eviction sends COM_STMT_CLOSE (via unprepare) when we
+        // exceed `statement_limit`.
+        const prepare = this._shouldPrepare(conn, binds);
+        if (prepare) this._trackPrepared(conn, driverSql);
+        const [rows] = prepare
+          ? await conn.execute(driverSql, driverBinds as any[])
+          : await conn.query(driverSql, driverBinds);
         const r = rows as Record<string, unknown>[];
         payload.row_count = Array.isArray(r) ? r.length : 0;
         return r;
@@ -173,10 +280,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       let conn: mysql.PoolConnection | undefined;
       try {
         conn = await this.getConn();
-        const [result] =
-          this.preparedStatements && binds.length > 0
-            ? await conn.execute(driverSql, driverBinds as any[])
-            : await conn.query(driverSql, driverBinds);
+        const prepare = this._shouldPrepare(conn, binds);
+        if (prepare) this._trackPrepared(conn, driverSql);
+        const [result] = prepare
+          ? await conn.execute(driverSql, driverBinds as any[])
+          : await conn.query(driverSql, driverBinds);
         this.dirtyCurrentTransaction();
         const info = result as mysql.ResultSetHeader;
         payload.row_count = info.affectedRows ?? 0;
@@ -722,9 +830,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       this._advisoryLockConn = null;
     }
     if (this._conn) {
+      this._statementPools.get(this._conn)?.detach();
       this._conn.release();
       this._conn = null;
     }
+    // Drop adapter-held references; pools become unreachable once
+    // mysql2 releases the underlying connections. Matches PG's
+    // close() — we never detach on commit/rollback because prepared
+    // statements are session-scoped, not transaction-scoped.
+    this._statementPools = new WeakMap<mysql.PoolConnection, Mysql2StatementPool>();
     if (this._driverPool) {
       await this._driverPool.end();
       this._driverPool = null;
