@@ -17,7 +17,7 @@
  *     the subtype and emits `Range` instances from `castValue`/`serialize`.
  */
 
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
 export class Range {
   readonly begin: unknown;
@@ -41,7 +41,7 @@ export interface RangeSubtype {
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range.
  */
-export class RangeType extends Type<Range> {
+export class RangeType extends ValueType<Range> {
   readonly name: string;
   readonly subtype: RangeSubtype;
 

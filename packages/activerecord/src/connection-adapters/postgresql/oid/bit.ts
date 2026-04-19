@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Bit
  */
 
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
 export class Data {
   readonly value: string;
@@ -47,7 +47,7 @@ export class Data {
   }
 }
 
-export class Bit extends Type<string> {
+export class Bit extends ValueType<string> {
   readonly name: string = "bit";
 
   override type(): string {

@@ -7,9 +7,9 @@
  * subtype.cast, but current Rails behavior is the raw passthrough).
  */
 
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
-export class Vector extends Type<unknown> {
+export class Vector extends ValueType<unknown> {
   readonly name: string = "vector";
   readonly delim: string;
   readonly subtype: unknown;

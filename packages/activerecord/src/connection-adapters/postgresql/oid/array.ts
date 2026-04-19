@@ -5,7 +5,7 @@
  * (Rails: `class Array < Type::Value; include Helpers::Mutable`).
  */
 
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
 function stableStringify(value: unknown): string {
   try {
@@ -24,7 +24,7 @@ export interface ArraySubtype {
   map?(value: unknown, block?: (value: unknown) => unknown): unknown;
 }
 
-export class Array extends Type<unknown> {
+export class Array extends ValueType<unknown> {
   readonly name: string = "array";
   readonly subtype: ArraySubtype;
   readonly delimiter: string;

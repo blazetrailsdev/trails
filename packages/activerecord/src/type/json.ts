@@ -1,10 +1,10 @@
 /**
  * Mirrors: ActiveRecord::Type::Json
  */
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 
-export class Json extends Type<unknown> {
+export class Json extends ValueType<unknown> {
   readonly name = "json";
 
   cast(value: unknown): unknown {
@@ -35,7 +35,7 @@ export class Json extends Type<unknown> {
     return ActiveSupportJSON.encode(value);
   }
 
-  changedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
+  override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     return this.serialize(this.deserialize(rawOldValue)) !== this.serialize(newValue);
   }
 }

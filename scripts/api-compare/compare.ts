@@ -180,10 +180,15 @@ export function nameMatches(rubyName: string, tsName: string): boolean {
 //   `Struct.new(...)`), TS roots them at `Node` for uniform AST walking.
 // - ActiveModel ValueType: Rails' `Value` has no super, TS adds an
 //   abstract `Type` above so subclasses can declare `abstract cast`.
+// - AR LockingType / Serialized: Rails uses `DelegateClass(Type::Value)`
+//   — a dynamic parent our extractor can't resolve (comes through as
+//   null). TS extends `ValueType` directly, which matches the intent.
 const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   ["Table", "Node"],
   ["Attribute", "Node"],
   ["ValueType", "Type"],
+  ["LockingType", "ValueType"],
+  ["Serialized", "ValueType"],
 ]);
 
 // Per-class TS renames that don't fit the systematic alias patterns
@@ -196,6 +201,44 @@ const TS_CLASS_RENAMES: Record<string, string> = {
   Name: "ModelName",
   Registry: "TypeRegistry",
 };
+
+/**
+ * Resolve the TS class that corresponds to a Ruby class. Tries, in order:
+ *
+ *   1. The direct short-name match in the expected file.
+ *   2. The Trails rename aliases (`Abstract<X>`, `Base<X>`,
+ *      `ActiveModel<X>`, `<X>Type`) in the same file.
+ *   3. Explicit per-class renames (TS_CLASS_RENAMES).
+ *
+ * When both (1) and (2) hit, prefer whichever declares a superclass —
+ * TS files sometimes keep a query-value helper under the plain Ruby
+ * name while the real Rails-shape class lives under the alias
+ * (`oid/range.ts`: the bounds helper `Range` + the OID cast type
+ * `RangeType extends ValueType<Range>`).
+ */
+export function resolveTsClassForRuby(
+  short: string,
+  expectedFile: string,
+  tsByFileName: Map<string, ClassInfo>,
+): ClassInfo | undefined {
+  const direct = tsByFileName.get(`${expectedFile}::${short}`);
+  const aliasMatches = TS_PARENT_ALIASES.map(({ transform }) =>
+    tsByFileName.get(`${expectedFile}::${transform(short)}`),
+  ).filter((c): c is ClassInfo => Boolean(c));
+
+  let resolved = direct;
+  if (!resolved) {
+    resolved = aliasMatches[0];
+  } else if (!resolved.superclass) {
+    const withSuper = aliasMatches.find((c) => Boolean(c.superclass));
+    if (withSuper) resolved = withSuper;
+  }
+  if (!resolved) {
+    const rename = TS_CLASS_RENAMES[short];
+    if (rename) resolved = tsByFileName.get(`${expectedFile}::${rename}`);
+  }
+  return resolved;
+}
 
 export function superclassesMatch(
   rubySuper: string | null,
@@ -686,25 +729,7 @@ function main() {
         const short = shortName(fqn)!;
         const rubySuper = shortName(info.superclass);
 
-        // Look up the TS class by the Ruby short name, falling back to
-        // the same rename aliases the superclass matcher uses — TS files
-        // sometimes rename the class itself to avoid builtin collisions
-        // (e.g. Rails' Type::Integer ↔ our type/integer.ts#IntegerType).
-        let tsCls = tsByFileName.get(`${expectedTs}::${short}`);
-        if (!tsCls) {
-          for (const { transform } of TS_PARENT_ALIASES) {
-            const alias = transform(short);
-            const found = tsByFileName.get(`${expectedTs}::${alias}`);
-            if (found) {
-              tsCls = found;
-              break;
-            }
-          }
-        }
-        if (!tsCls) {
-          const rename = TS_CLASS_RENAMES[short];
-          if (rename) tsCls = tsByFileName.get(`${expectedTs}::${rename}`);
-        }
+        const tsCls = resolveTsClassForRuby(short, expectedTs, tsByFileName);
         inheritance.checked++;
 
         if (!tsCls) {

@@ -1,4 +1,4 @@
-import { Type, StringType } from "@blazetrails/activemodel";
+import { Type, ValueType, StringType } from "@blazetrails/activemodel";
 import type { Scheme } from "./scheme.js";
 import type { Encryptor } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
@@ -13,7 +13,7 @@ import { Encryption as EncryptionError } from "./errors.js";
  *
  * Mirrors: ActiveRecord::Encryption::EncryptedAttributeType
  */
-export class EncryptedAttributeType extends Type implements WrappedType {
+export class EncryptedAttributeType extends ValueType implements WrappedType {
   readonly name = "encrypted";
   readonly scheme: Scheme;
   readonly castType: Type;
@@ -80,7 +80,7 @@ export class EncryptedAttributeType extends Type implements WrappedType {
     return this.encrypt(toEncrypt);
   }
 
-  changedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
+  override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const oldValue = rawOldValue === null ? null : this.deserialize(rawOldValue);
     return oldValue !== newValue;
   }

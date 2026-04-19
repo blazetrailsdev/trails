@@ -1,5 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { nameMatches, superclassesMatch } from "./compare.js";
+import { nameMatches, superclassesMatch, resolveTsClassForRuby } from "./compare.js";
+import type { ClassInfo } from "./types.js";
+
+function cls(file: string, name: string, superclass?: string): ClassInfo {
+  return {
+    file,
+    name,
+    superclass,
+    includes: [],
+    extends: [],
+    instanceMethods: [],
+    classMethods: [],
+  };
+}
 
 describe("nameMatches", () => {
   it("matches identical names", () => {
@@ -104,5 +117,53 @@ describe("superclassesMatch", () => {
     // Only Table/Attribute/ValueType are on the intermediate whitelist.
     expect(superclassesMatch(null, ["Node"], "Something")).toBe(false);
     expect(superclassesMatch(null, ["Type"], "Something")).toBe(false);
+  });
+});
+
+describe("resolveTsClassForRuby", () => {
+  const file = "type/integer.ts";
+
+  it("returns the direct-name match when it has a superclass", () => {
+    const direct = cls(file, "Integer", "Value");
+    const map = new Map([[`${file}::Integer`, direct]]);
+    expect(resolveTsClassForRuby("Integer", file, map)).toBe(direct);
+  });
+
+  it("falls back to an alias match when the direct name is absent", () => {
+    const aliased = cls(file, "IntegerType", "ValueType");
+    const map = new Map([[`${file}::IntegerType`, aliased]]);
+    expect(resolveTsClassForRuby("Integer", file, map)).toBe(aliased);
+  });
+
+  it("prefers an alias match with a super over a direct match without one", () => {
+    // Mirrors oid/range.ts: `Range` is a bare bounds helper (no super);
+    // `RangeType extends ValueType<Range>` is the real OID cast type.
+    const direct = cls("oid/range.ts", "Range"); // no super
+    const alias = cls("oid/range.ts", "RangeType", "ValueType");
+    const map = new Map([
+      ["oid/range.ts::Range", direct],
+      ["oid/range.ts::RangeType", alias],
+    ]);
+    expect(resolveTsClassForRuby("Range", "oid/range.ts", map)).toBe(alias);
+  });
+
+  it("keeps the direct match when it has a super, even if an alias also exists", () => {
+    const direct = cls(file, "Integer", "Value");
+    const alias = cls(file, "IntegerType", "ValueType");
+    const map = new Map([
+      [`${file}::Integer`, direct],
+      [`${file}::IntegerType`, alias],
+    ]);
+    expect(resolveTsClassForRuby("Integer", file, map)).toBe(direct);
+  });
+
+  it("honors TS_CLASS_RENAMES when neither direct nor alias match (e.g. Registry → TypeRegistry)", () => {
+    const renamed = cls("type/registry.ts", "TypeRegistry");
+    const map = new Map([["type/registry.ts::TypeRegistry", renamed]]);
+    expect(resolveTsClassForRuby("Registry", "type/registry.ts", map)).toBe(renamed);
+  });
+
+  it("returns undefined when nothing resolves", () => {
+    expect(resolveTsClassForRuby("Nothing", "nowhere.ts", new Map())).toBeUndefined();
   });
 });

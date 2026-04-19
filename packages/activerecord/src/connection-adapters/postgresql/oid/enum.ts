@@ -6,9 +6,9 @@
  * def cast_value(value); value.to_s; end`.
  */
 
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
-export class Enum extends Type<string> {
+export class Enum extends ValueType<string> {
   readonly name: string = "enum";
 
   override type(): string {

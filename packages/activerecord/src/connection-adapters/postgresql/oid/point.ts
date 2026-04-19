@@ -8,7 +8,7 @@
  * struct) and the `Point` Type::Value (the OID class).
  */
 
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
 /**
  * Mirrors Rails' `ActiveRecord::Point = Struct.new(:x, :y)`.
@@ -23,7 +23,7 @@ export class PointValue {
   }
 }
 
-export class Point extends Type<PointValue> {
+export class Point extends ValueType<PointValue> {
   readonly name: string = "point";
 
   override type(): string {

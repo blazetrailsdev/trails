@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Uuid
  */
 
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
 // Rails uses /\A(\{)?([a-fA-F0-9]{4}-?){8}(?(1)\}|)\z/ — a conditional
 // pattern that enforces balanced braces. JS regex has no conditional, so
@@ -21,7 +21,7 @@ export const CANONICAL_UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/;
 export const ACCEPTABLE_UUID_REGEX =
   /^\{?[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}\}?$/i;
 
-export class Uuid extends Type<string> {
+export class Uuid extends ValueType<string> {
   readonly name = "uuid";
 
   override type(): string {

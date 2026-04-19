@@ -1,5 +1,5 @@
 import type { Base } from "../base.js";
-import { Type } from "@blazetrails/activemodel";
+import { Type, ValueType } from "@blazetrails/activemodel";
 
 /**
  * Optimistic locking support for ActiveRecord models.
@@ -40,16 +40,14 @@ export function lockingEnabled(modelClass: typeof Base): boolean {
  *
  * Mirrors: ActiveRecord::Locking::LockingType
  */
-export class LockingType extends Type {
+export class LockingType extends ValueType<number> {
   private _subtype: Type;
+  override readonly name: string;
 
   constructor(subtype: Type) {
     super();
     this._subtype = subtype;
-  }
-
-  get name(): string {
-    return this._subtype.name;
+    this.name = subtype.name;
   }
 
   cast(value: unknown): number {

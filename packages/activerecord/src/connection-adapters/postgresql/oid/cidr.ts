@@ -9,9 +9,9 @@
  * the consumer.
  */
 
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
-export class Cidr extends Type<string> {
+export class Cidr extends ValueType<string> {
   readonly name: string = "cidr";
 
   override type(): string {

@@ -9,13 +9,13 @@
  * dirty.
  */
 
-import { Type } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 
 import { StringKeyedHashAccessor } from "../../../store.js";
 
 const HSTORE_ERROR = "Invalid Hstore document: %s";
 
-export class Hstore extends Type<Record<string, string | null>> {
+export class Hstore extends ValueType<Record<string, string | null>> {
   readonly name: string = "hstore";
 
   override type(): string {
