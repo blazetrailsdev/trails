@@ -2,8 +2,33 @@ import type { Base } from "./base.js";
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
-import { Rollback, TransactionIsolationError } from "./errors.js";
+import { PreparedStatementCacheExpired, Rollback, TransactionIsolationError } from "./errors.js";
 export { Rollback };
+
+/**
+ * Mirrors Rails' `TransactionManager#after_failure_actions`: when a
+ * transaction fails with `PreparedStatementCacheExpired`, clear the
+ * cached prepared statements on the current connection so subsequent
+ * statements re-PREPARE. The error itself re-raises unchanged —
+ * Rails does NOT retry the body.
+ *
+ * This helper is only used by the fallback transaction path below
+ * (for adapters that don't route through TransactionManager, like
+ * the test adapter). `TransactionManager` has its own
+ * `_afterFailureActions` implementation in
+ * `connection-adapters/abstract/transaction.ts`.
+ *
+ * Reference: activerecord/lib/active_record/connection_adapters/
+ * abstract/transaction.rb `TransactionManager#after_failure_actions`.
+ */
+function _afterFailureActions(
+  adapter: import("./adapter.js").DatabaseAdapter,
+  error: unknown,
+): void {
+  if (error instanceof PreparedStatementCacheExpired) {
+    adapter.clearCacheBang?.();
+  }
+}
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
 import { transaction as dbTransaction } from "./connection-adapters/abstract/database-statements.js";
 
@@ -140,6 +165,7 @@ async function _transactionFallback<T>(
         releaseLock = null;
         await tx.rollback();
         await tx.runAfterRollbackCallbacks();
+        _afterFailureActions(adapter, error);
         if (error instanceof Rollback) return undefined;
         throw error;
       }
@@ -156,6 +182,7 @@ async function _transactionFallback<T>(
         releaseLock = null;
         await tx.rollback();
         await tx.runAfterRollbackCallbacks();
+        _afterFailureActions(adapter, error);
         if (error instanceof Rollback) return undefined;
         throw error;
       }

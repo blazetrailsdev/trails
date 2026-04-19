@@ -649,6 +649,9 @@ class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements Databas
   async rollbackToSavepoint(name: string): Promise<void> {
     return this.inner.rollbackToSavepoint(name);
   }
+  clearCacheBang(): void {
+    this.inner.clearCacheBang?.();
+  }
   get inTransaction(): boolean {
     return this.inner.inTransaction;
   }

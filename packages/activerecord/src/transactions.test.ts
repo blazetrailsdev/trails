@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base, transaction, savepoint, Rollback } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -1643,5 +1643,65 @@ describe("TransactionTest", () => {
         throw new Error("specific error message");
       }),
     ).rejects.toThrow("specific error message");
+  });
+
+  describe("after_failure_actions on PreparedStatementCacheExpired", () => {
+    // Mirrors Rails' TransactionManager#after_failure_actions: when a
+    // transaction fails with PreparedStatementCacheExpired we must drop
+    // cached prepared statements on the connection. The error itself
+    // re-raises unchanged — Rails does NOT retry the body.
+    // A shared afterEach restores spies so a mid-test throw can't leak
+    // mocks into later tests.
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("calls clearCacheBang and re-raises when the body throws the expired error", async () => {
+      const { PreparedStatementCacheExpired } = await import("./errors.js");
+      const spy = vi.spyOn(adapter as Required<DatabaseAdapter>, "clearCacheBang");
+      await expect(
+        transaction(Account, async () => {
+          throw new PreparedStatementCacheExpired("cached plan expired");
+        }),
+      ).rejects.toBeInstanceOf(PreparedStatementCacheExpired);
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call clearCacheBang for unrelated errors", async () => {
+      const spy = vi.spyOn(adapter as Required<DatabaseAdapter>, "clearCacheBang");
+      await expect(
+        transaction(Account, async () => {
+          throw new Error("unrelated");
+        }),
+      ).rejects.toThrow("unrelated");
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    // The tests above exercise the fallback path (test-adapter has no
+    // withinNewTransaction). The TransactionManager path is reached
+    // when an adapter defines withinNewTransaction — cover that branch
+    // explicitly so it can't regress without a failing test.
+    it("calls clearCacheBang via TransactionManager.withinNewTransaction", async () => {
+      const { PreparedStatementCacheExpired } = await import("./errors.js");
+      const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
+      const clearCacheBang = vi.fn();
+      const conn = {
+        clearCacheBang,
+        beginDbTransaction: vi.fn(),
+        commitDbTransaction: vi.fn(),
+        rollbackDbTransaction: vi.fn(),
+        supportsLazyTransactions: () => false,
+        supportsRestartDbTransaction: () => false,
+        addTransactionRecord: vi.fn(),
+        active: true,
+      };
+      const tm = new TransactionManager(conn as never);
+      await expect(
+        tm.withinNewTransaction({}, () => {
+          throw new PreparedStatementCacheExpired("cached plan expired");
+        }),
+      ).rejects.toBeInstanceOf(PreparedStatementCacheExpired);
+      expect(clearCacheBang).toHaveBeenCalledTimes(1);
+    });
   });
 });
