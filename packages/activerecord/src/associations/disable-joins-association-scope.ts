@@ -6,6 +6,7 @@ import {
 } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import type { Relation } from "../relation.js";
+import type { UnscopeType } from "../relation/query-methods.js";
 import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
 
@@ -179,12 +180,13 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       // :eager_load, :joins, :left_outer_joins)` strips those query parts
       // before merging. Our `Relation#except` is the SQL set-operation
       // EXCEPT (Rails-faithful for that name); the query-part strip is
-      // `unscope(...)`. `createWith`, `preload`, `eagerLoad` aren't in
-      // our UnscopeType set yet (follow-up); the supported keys cover
-      // the practical cases (select / includes / joins / leftOuterJoins).
-      const stripped = (sfa as { unscope: (...keys: string[]) => unknown }).unscope(
+      // `unscope(...)`. The full Rails set is now supported.
+      const stripped = (sfa as { unscope: (...keys: UnscopeType[]) => unknown }).unscope(
         "select",
+        "createWith",
         "includes",
+        "preload",
+        "eagerLoad",
         "joins",
         "leftOuterJoins",
       );
