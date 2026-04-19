@@ -1,6 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { resolveModel, buildHasManyRelation } from "../associations.js";
+import { AssociationScope } from "./association-scope.js";
 import { camelize, singularize } from "@blazetrails/activesupport";
 
 /**
@@ -21,6 +22,16 @@ export class Association {
   target: Base | Base[] | null;
 
   private _staleState: unknown = undefined;
+  /**
+   * Memoized result of `associationScope()` — Rails' `@association_scope`
+   * (association.rb:300-308). Built lazily on first access; reset by
+   * `resetScope()` (called from `reload()` and on init). Skipped for
+   * `disable_joins` paths — Rails creates a fresh
+   * `DisableJoinsAssociationScope` per call (association.rb:107-117)
+   * because the scope's chain walk depends on owner FK snapshots that
+   * a long-lived cache would mask.
+   */
+  private _cachedAssociationScope: unknown = undefined;
 
   constructor(owner: Base, reflection: AssociationDefinition) {
     this.owner = owner;
@@ -86,7 +97,70 @@ export class Association {
   }
 
   resetScope(): void {
-    // Subclasses may cache the scope; reset any cached value.
+    this._cachedAssociationScope = undefined;
+  }
+
+  /**
+   * Build (or return cached) association scope via the
+   * `AssociationScope` machinery. Mirrors Rails'
+   * `Association#association_scope` (association.rb:300-308):
+   * memoized for the JOIN-based path; fresh-each-call for
+   * `disable_joins`.
+   *
+   * Return shape:
+   *  - JOIN-based path: a `Relation` (the base scope). Caller is
+   *    responsible for any additional `.where(...)` / `.order(...)`
+   *    chaining (e.g. `options.scope`). The cache stores the
+   *    unfiltered base only.
+   *  - `disable_joins` path: a `Promise<{ relation }>` per DJAS' boxed
+   *    contract (the box dodges the Relation thenable when awaited).
+   *    Caller awaits + unwraps `.relation`.
+   *
+   * Cache contract (Rails-equivalent): the cached scope captures
+   * owner FK / polymorphic-type values at build time. Mutating the
+   * owner's FK after a first load does NOT invalidate the cache —
+   * Rails behaves the same (`@association_scope` only resets via
+   * `reset_scope`, called on init and `reload()`). Callers that
+   * mutate FKs and want a fresh query must `reload()`.
+   */
+  associationScope(): unknown {
+    // Mirror Rails' `if klass` guard (association.rb:301): polymorphic
+    // belongs_to with a blank type column has no resolvable target
+    // class. Return undefined and skip caching so the next access
+    // (after the type column is set) builds a fresh scope.
+    const klass = this.klass as typeof Base | undefined;
+    if (!klass) return undefined;
+    // `this.reflection` here is the lightweight AssociationDefinition
+    // attached at macro time. AssociationScope needs the rich
+    // Reflection (with `chain`, `joinPrimaryKey`, etc.) that lives on
+    // the model class via `_reflectOnAssociation(name)`. Resolve once
+    // per call — the result is small and the cache stores the BUILT
+    // scope, not the reflection.
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
+    if (this.disableJoins) {
+      // Lazy import — DJAS' module pulls in
+      // disable-joins-association-relation → relation.ts → associations.ts,
+      // which transitively imports us. Dynamic import keeps the cycle
+      // safe. Returns a Promise<{relation}> per DJAS' boxed contract.
+      return import("./disable-joins-association-scope.js").then((m) =>
+        m.DisableJoinsAssociationScope.INSTANCE.scope({
+          owner: this.owner,
+          reflection: richReflection as never,
+          klass: klass as never,
+        }),
+      );
+    }
+    if (this._cachedAssociationScope === undefined) {
+      this._cachedAssociationScope = AssociationScope.scope({
+        owner: this.owner,
+        reflection: richReflection as never,
+        klass: klass as never,
+      });
+    }
+    return this._cachedAssociationScope;
   }
 
   /**
