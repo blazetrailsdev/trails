@@ -316,6 +316,91 @@ function _canRouteThroughViaAssociationScope(
 }
 
 /**
+ * Disable-joins routing gate. Mirrors `_canRouteThroughViaAssociationScope`
+ * but for `disable_joins: true` through associations — runs the chain
+ * via the Rails-faithful `DisableJoinsAssociationScope` (per-step pluck
+ * + IN list) rather than the legacy `loadHasManyThrough` 2-step. PR 4
+ * routes the simple non-polymorphic shape only; polymorphic / sourceType
+ * stays on the existing loader.
+ */
+function _canRouteThroughViaDisableJoinsAssociationScope(
+  reflection: unknown,
+  options: AssociationOptions,
+): boolean {
+  if (!reflection) return false;
+  if (!options.disableJoins) return false;
+  const refl = reflection as {
+    isThroughReflection?: () => boolean;
+    isNested?: () => boolean;
+  };
+  if (typeof refl.isThroughReflection !== "function" || !refl.isThroughReflection()) return false;
+  if (typeof refl.isNested === "function" && refl.isNested()) return false;
+  const src = (reflection as { sourceReflection?: unknown }).sourceReflection as
+    | { isPolymorphic?: () => boolean }
+    | undefined;
+  if (!src) return false;
+  if (typeof src.isPolymorphic === "function" && src.isPolymorphic()) return false;
+  if (options.sourceType) return false;
+  // Composite-key through associations need per-column predicates (or
+  // tuple IN) at every chain step; DJAS only supports single-column keys
+  // today. Bail out if any chain entry has a composite join key so we
+  // fall back to loadHasManyThrough rather than silently truncating.
+  const chain =
+    (reflection as { chain?: Array<{ joinPrimaryKey?: unknown; joinForeignKey?: unknown }> })
+      .chain ?? [];
+  for (const entry of chain) {
+    if (Array.isArray(entry.joinPrimaryKey) && entry.joinPrimaryKey.length > 1) return false;
+    if (Array.isArray(entry.joinForeignKey) && entry.joinForeignKey.length > 1) return false;
+  }
+  return true;
+}
+
+async function _loadThroughViaDisableJoinsScope(
+  record: Base,
+  reflection: unknown,
+  options?: AssociationOptions,
+): Promise<Base[]> {
+  // Null-PK short-circuit: an unsaved owner has no through-table FK to
+  // chain off, so DJAS would build `WHERE through.<fk> IN ([null])` and
+  // either return 0 rows or (worse) match rows with null FKs. Read the
+  // owner-side column the chain seeds from — `joinForeignKey` on the
+  // through_reflection is the owner's PK column on the through table,
+  // and on the owner record itself it's the owner's PK attribute. For
+  // chain length 1 (non-through), this code isn't reached. For through,
+  // the chain reverse walk seeds with `owner.readAttribute(throughRefl
+  // .joinForeignKey)`, so checking that here matches what DJAS reads.
+  const throughRefl = (reflection as { throughReflection?: unknown }).throughReflection as
+    | { joinForeignKey?: string | string[] }
+    | undefined;
+  const fk = throughRefl?.joinForeignKey;
+  const fkCols = Array.isArray(fk) ? fk : fk ? [fk] : [];
+  for (const col of fkCols) {
+    const v = record.readAttribute(col);
+    if (v === null || v === undefined) return [];
+  }
+  // Lazy-import to avoid an eager cycle: DJAS imports
+  // DisableJoinsAssociationRelation → relation.ts → associations.ts.
+  const { DisableJoinsAssociationScope } =
+    await import("./associations/disable-joins-association-scope.js");
+  const klass = (reflection as { klass: typeof Base }).klass;
+  const built = (await DisableJoinsAssociationScope.INSTANCE.scope({
+    owner: record,
+    reflection: reflection as any,
+    klass,
+  })) as { relation: { toArray: () => Promise<Base[]> } };
+  // Apply caller-supplied `options.scope` when it differs from the
+  // reflection's own scope — same rule the JOIN-based loaders use
+  // (line 488 etc.). Skipping when equal avoids double-application
+  // since DJAS already consumed the reflection's scope via constraints.
+  let rel: unknown = built.relation;
+  const reflScope = (reflection as { scope?: unknown }).scope;
+  if (options?.scope && options.scope !== reflScope) {
+    rel = options.scope(rel as never);
+  }
+  return (rel as { toArray: () => Promise<Base[]> }).toArray();
+}
+
+/**
  * Sync loaded result to the association instance if one exists.
  */
 function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
@@ -470,6 +555,10 @@ export async function loadHasOne(
   if (options.through) {
     const ctorEarly = record.constructor as typeof Base;
     const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
+    if (_canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
+      const records = await _loadThroughViaDisableJoinsScope(record, reflEarly, options);
+      return records[0] ?? null;
+    }
     if (!_canRouteThroughViaAssociationScope(reflEarly, options)) {
       return loadHasOneThrough(record, assocName, options);
     }
@@ -672,6 +761,9 @@ export async function loadHasMany(
   if (options.through) {
     const ctorEarly = record.constructor as typeof Base;
     const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
+    if (_canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
+      return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
+    }
     if (!_canRouteThroughViaAssociationScope(reflEarly, options)) {
       return loadHasManyThrough(record, assocName, options);
     }

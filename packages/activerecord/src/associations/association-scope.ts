@@ -379,7 +379,7 @@ export class AssociationScope {
    * Mirrors: ActiveRecord::Associations::AssociationScope#get_chain
    * (association_scope.rb:112-122).
    */
-  private _getChain(
+  protected _getChain(
     reflection: AssociationReflection,
   ): Array<AbstractReflection | ReflectionProxy> {
     const chain: Array<AbstractReflection | ReflectionProxy> = [reflection];
@@ -634,7 +634,7 @@ export class AssociationScope {
    * so we re-add `where(type: stiNames)` for subclasses to keep the
    * filter on intermediate / source relation builds.
    */
-  private _buildEntryScope(entryKlass: typeof Base): unknown {
+  protected _buildEntryScope(entryKlass: typeof Base): unknown {
     let entryScope: unknown = (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
     if (isStiSubclass(entryKlass)) {
       const col = getInheritanceColumn(getStiBase(entryKlass));
@@ -658,7 +658,7 @@ export class AssociationScope {
    * select / joins / etc override the main scope, which Rails
    * explicitly avoids.
    */
-  private _pushScopeIntoRelation(scope: unknown, evaluated: unknown): unknown {
+  protected _pushScopeIntoRelation(scope: unknown, evaluated: unknown): unknown {
     if (!evaluated) return scope;
     const evalWhere = (evaluated as { _whereClause?: { predicates?: unknown[] } })._whereClause;
     const evalPredicates = evalWhere?.predicates ?? [];
