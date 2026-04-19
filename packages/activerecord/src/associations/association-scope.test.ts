@@ -317,6 +317,170 @@ describe("AssociationScope", () => {
     expect(sql).toMatch(/"active"\s*=\s*TRUE/i);
   });
 
+  it("hasMany :as adds the polymorphic type WHERE on the target table", () => {
+    // For `hasMany :comments, as: :commentable`, Rails' AssociationScope
+    // builds `WHERE comments.commentable_id = owner.id AND
+    // comments.commentable_type = OwnerClass.name`. The type filter
+    // comes from reflection.type === foreignType (`commentable_type`).
+    class AsOwner extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class AsComment extends Base {
+      static {
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(AsOwner);
+    registerModel(AsComment);
+    Associations.hasMany.call(AsOwner, "as_comments", {
+      className: "AsComment",
+      as: "commentable",
+    });
+    const owner = new AsOwner({ id: 7 });
+    const reflection = (AsOwner as any)._reflectOnAssociation("as_comments");
+    const sql = (
+      AssociationScope.scope({ owner, reflection, klass: reflection.klass }) as any
+    ).toSql();
+    expect(sql).toMatch(/"commentable_id"\s*=\s*7/);
+    expect(sql).toMatch(/"commentable_type"\s*=\s*'AsOwner'/);
+  });
+
+  it("hasOne :as adds the polymorphic type WHERE plus LIMIT 1", () => {
+    class AsOneOwner extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class AsOneImage extends Base {
+      static {
+        this.attribute("imageable_id", "integer");
+        this.attribute("imageable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(AsOneOwner);
+    registerModel(AsOneImage);
+    Associations.hasOne.call(AsOneOwner, "as_one_image", {
+      className: "AsOneImage",
+      as: "imageable",
+    });
+    const owner = new AsOneOwner({ id: 3 });
+    const reflection = (AsOneOwner as any)._reflectOnAssociation("as_one_image");
+    const sql = (
+      AssociationScope.scope({ owner, reflection, klass: reflection.klass }) as any
+    ).toSql();
+    expect(sql).toMatch(/"imageable_id"\s*=\s*3/);
+    expect(sql).toMatch(/"imageable_type"\s*=\s*'AsOneOwner'/);
+    expect(sql).toMatch(/LIMIT\s+1/);
+  });
+
+  it("polymorphic belongsTo accepts a runtime-resolved klass via AssociationScopeable", () => {
+    // Polymorphic belongsTo: target klass is resolved at runtime from
+    // owner's <assoc>_type column. Callers (loadBelongsTo) pass the
+    // resolved klass via the AssociationScopeable.klass field; the
+    // reflection's joinPrimaryKey returns the target's PK and
+    // joinForeignKey returns the owner-side FK column.
+    class PolyTarget extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PolyComment extends Base {
+      static {
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(PolyTarget);
+    registerModel(PolyComment);
+    Associations.belongsTo.call(PolyComment, "commentable", { polymorphic: true });
+    const comment = new PolyComment({ commentable_id: 99, commentable_type: "PolyTarget" });
+    const reflection = (PolyComment as any)._reflectOnAssociation("commentable");
+    const sql = (
+      AssociationScope.scope({ owner: comment, reflection, klass: PolyTarget }) as any
+    ).toSql();
+    // Target side: WHERE poly_targets.id = 99 (the FK value), LIMIT 1.
+    expect(sql).toMatch(/"poly_targets"/);
+    expect(sql).toMatch(/"id"\s*=\s*99/);
+    expect(sql).toMatch(/LIMIT\s+1/);
+  });
+
+  it("loadHasMany rejects composite primary key with :as polymorphic", async () => {
+    // Rails doesn't support polymorphic :as combined with composite
+    // owner PK / composite FK — the polymorphic FK column is a single
+    // <as>_id by convention. Loaders must throw fast rather than
+    // silently building a broken WHERE via readAttribute(undefined).
+    const { loadHasMany, CompositePrimaryKeyMismatchError } = await import("../index.js");
+    class CpkAsOwner extends Base {
+      static {
+        this.attribute("a", "integer");
+        this.attribute("b", "integer");
+        this.primaryKey = ["a", "b"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkAsTarget extends Base {
+      static {
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(CpkAsOwner);
+    registerModel(CpkAsTarget);
+    const owner = new CpkAsOwner({ a: 1, b: 2 });
+    await expect(
+      loadHasMany(owner, "comments", {
+        className: "CpkAsTarget",
+        as: "commentable",
+      }),
+    ).rejects.toThrow(CompositePrimaryKeyMismatchError);
+  });
+
+  it("polymorphic belongsTo uses runtime klass's primary key (non-id PK)", () => {
+    // BelongsToReflection#joinPrimaryKey hard-codes "id" for polymorphic
+    // associations because the target klass isn't known at definition
+    // time. AssociationScope must route through joinPrimaryKeyFor(klass)
+    // so a target with a non-default PK (e.g. "uuid") gets the right
+    // WHERE column. Regression for Copilot review on PR #618.
+    class UuidTarget extends Base {
+      static {
+        this.attribute("uuid", "string");
+        this.primaryKey = "uuid";
+        this.adapter = adapter;
+      }
+    }
+    class UuidComment extends Base {
+      static {
+        this.attribute("commentable_id", "string");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(UuidTarget);
+    registerModel(UuidComment);
+    Associations.belongsTo.call(UuidComment, "commentable", { polymorphic: true });
+    const comment = new UuidComment({
+      commentable_id: "abc-123",
+      commentable_type: "UuidTarget",
+    });
+    const reflection = (UuidComment as any)._reflectOnAssociation("commentable");
+    const sql = (
+      AssociationScope.scope({ owner: comment, reflection, klass: UuidTarget }) as any
+    ).toSql();
+    // Must WHERE on uuid (the target's actual PK), NOT id.
+    expect(sql).toMatch(/"uuid"\s*=\s*'abc-123'/);
+    expect(sql).not.toMatch(/"id"\s*=/);
+  });
+
   it("static scope() routes through this.INSTANCE (subclass dispatch)", async () => {
     const { DisableJoinsAssociationScope } = await import("./disable-joins-association-scope.js");
     expect(DisableJoinsAssociationScope.INSTANCE).toBeInstanceOf(DisableJoinsAssociationScope);

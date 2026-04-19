@@ -6,6 +6,7 @@ import {
   DeleteRestrictionError,
   InverseOfAssociationNotFoundError,
   HasOneThroughNestedAssociationsAreReadonly,
+  CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
 import { ForeignAssociation } from "./associations/foreign-association.js";
 import { AssociationScope } from "./associations/association-scope.js";
@@ -284,6 +285,7 @@ export async function loadBelongsTo(
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
+  const ctor = record.constructor as typeof Base;
   const defaultFk = `${underscore(assocName)}_id`;
 
   // Polymorphic: use the _type column to determine the target model
@@ -303,7 +305,7 @@ export async function loadBelongsTo(
     validateInverseOf(targetModel, assocName, options.inverseOf);
   }
 
-  // Resolve foreign key and primary key (may be arrays for CPK)
+  // Resolve foreign key and primary key (may be arrays for CPK).
   const foreignKey =
     options.foreignKey ??
     (options.queryConstraints
@@ -313,28 +315,62 @@ export async function loadBelongsTo(
         : defaultFk);
   const primaryKey = options.primaryKey ?? targetModel.primaryKey;
 
-  // Composite FK/PK: build multi-column where
-  if (Array.isArray(foreignKey)) {
-    const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
-    const conditions: Record<string, unknown> = {};
-    for (let i = 0; i < foreignKey.length; i++) {
-      const fkVal = record.readAttribute(foreignKey[i]);
-      if (fkVal === null || fkVal === undefined) return null;
-      conditions[pkCols[i]] = fkVal;
-    }
-    const result = await targetModel.findBy(conditions);
-    if (result && options.inverseOf) {
-      (result as any)._cachedAssociations = (result as any)._cachedAssociations ?? new Map();
-      (result as any)._cachedAssociations.set(options.inverseOf, record);
-    }
-    syncToAssociationInstance(record, assocName, result);
-    return result;
+  // Route through AssociationScope when reflection is registered.
+  // For polymorphic belongsTo, AssociationScope receives the
+  // runtime-resolved klass; the reflection's own joinPrimaryKey
+  // returns associationPrimaryKey (target's PK) and joinForeignKey
+  // returns the owner-side FK, so the WHERE shape is identical to
+  // the non-polymorphic case.
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  // Null-FK short-circuit: avoid a query when owner's FK column is null.
+  // The check must read the SAME columns the eventual query uses —
+  // reflection.joinForeignKey when routing through AssociationScope,
+  // options-derived foreignKey otherwise. Reading from a different
+  // column would silently return null while a real query would have
+  // found the row (or vice versa).
+  const fkColsForCheck = reflection
+    ? Array.isArray((reflection as any).joinForeignKey)
+      ? ((reflection as any).joinForeignKey as string[])
+      : [(reflection as any).joinForeignKey as string]
+    : Array.isArray(foreignKey)
+      ? foreignKey
+      : [foreignKey as string];
+  for (const fk of fkColsForCheck) {
+    const v = record.readAttribute(fk);
+    if (v === null || v === undefined) return null;
   }
 
-  const fkValue = record.readAttribute(foreignKey as string);
-  if (fkValue === null || fkValue === undefined) return null;
-
-  const result = await targetModel.findBy({ [primaryKey as string]: fkValue });
+  let result: Base | null;
+  if (reflection) {
+    const built = AssociationScope.scope({
+      owner: record,
+      reflection,
+      klass: targetModel,
+    }) as any;
+    const baseRelation = (targetModel as any).scopeForAssociation?.() ?? (targetModel as any).all();
+    let rel = baseRelation.merge(built);
+    if (options.scope && options.scope !== (reflection as any).scope) {
+      rel = options.scope(rel);
+    }
+    result = await rel.first();
+  } else {
+    // Inline fallback: no reflection registered.
+    if (Array.isArray(foreignKey)) {
+      const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      if (pkCols.length !== foreignKey.length) {
+        throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+      }
+      const conditions: Record<string, unknown> = {};
+      for (let i = 0; i < foreignKey.length; i++) {
+        conditions[pkCols[i]] = record.readAttribute(foreignKey[i]);
+      }
+      result = await targetModel.findBy(conditions);
+    } else {
+      result = await targetModel.findBy({
+        [primaryKey as string]: record.readAttribute(foreignKey as string),
+      });
+    }
+  }
 
   // Set inverse_of: store reference back to the owner
   if (result && options.inverseOf) {
@@ -382,55 +418,87 @@ export async function loadHasOne(
     validateInverseOf(targetModel, assocName, options.inverseOf);
   }
 
-  // Polymorphic "as" option: has_one :image, as: :imageable
-  if (options.as) {
-    const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
-    const pkValue = record.readAttribute(primaryKey as string);
-    if (pkValue === null || pkValue === undefined) return null;
-    const typeCol = `${underscore(options.as)}_type`;
-    return targetModel.findBy({
-      [foreignKey as string]: pkValue,
-      [typeCol]: ctor.name,
-    });
+  // Resolve FK columns (may be array for CPK; `:as` swaps to the
+  // polymorphic FK column).
+  const foreignKey = options.as
+    ? (options.foreignKey ?? `${underscore(options.as)}_id`)
+    : (options.foreignKey ??
+      (options.queryConstraints
+        ? options.queryConstraints
+        : Array.isArray(primaryKey)
+          ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+          : `${underscore(ctor.name)}_id`));
+
+  // Polymorphic `:as` doesn't model composite owner-PK or composite
+  // FK in Rails. Reject explicitly so the caller gets a clear error
+  // rather than `readAttribute(undefined)` building a broken WHERE.
+  if (options.as && (Array.isArray(primaryKey) || Array.isArray(foreignKey))) {
+    throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
   }
-
-  // Resolve FK columns (may be array for CPK)
-  const foreignKey =
-    options.foreignKey ??
-    (options.queryConstraints
-      ? options.queryConstraints
-      : Array.isArray(primaryKey)
-        ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
-        : `${underscore(ctor.name)}_id`);
-
-  // Composite FK/PK: build multi-column where
-  if (Array.isArray(foreignKey)) {
-    const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
-    const conditions: Record<string, unknown> = {};
-    for (let i = 0; i < foreignKey.length; i++) {
-      const pkVal = record.readAttribute(pkCols[i]);
-      if (pkVal === null || pkVal === undefined) return null;
-      conditions[foreignKey[i]] = pkVal;
-    }
-    const result = await targetModel.findBy(conditions);
-    if (result && options.inverseOf) {
-      (result as any)._cachedAssociations = (result as any)._cachedAssociations ?? new Map();
-      (result as any)._cachedAssociations.set(options.inverseOf, record);
-    }
-    syncToAssociationInstance(record, assocName, result);
-    return result;
+  // Route through AssociationScope (handles scalar, composite, :as, STI
+  // in a single Rails-faithful path). reflection.isCollection() === false
+  // for hasOne, so AssociationScope.scope adds limit(1) automatically.
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  // Null-PK short-circuit: read the SAME columns the eventual query
+  // reads — reflection.joinForeignKey when routing through
+  // AssociationScope (= owner-side FK = activeRecordPrimaryKey for
+  // hasOne), options-derived primaryKey otherwise. Reading from a
+  // different column would silently return null while the real query
+  // would have found the row.
+  const pkCheckCols = reflection
+    ? Array.isArray((reflection as any).joinForeignKey)
+      ? ((reflection as any).joinForeignKey as string[])
+      : [(reflection as any).joinForeignKey as string]
+    : Array.isArray(primaryKey)
+      ? primaryKey
+      : [primaryKey as string];
+  for (const pk of pkCheckCols) {
+    const v = record.readAttribute(pk);
+    if (v === null || v === undefined) return null;
   }
-
-  const pkValue = record.readAttribute(primaryKey as string);
-  if (pkValue === null || pkValue === undefined) return null;
 
   let result: Base | null;
-  if (options.scope) {
-    let rel = (targetModel as any).all().where({ [foreignKey]: pkValue });
-    rel = options.scope(rel);
+  if (reflection) {
+    const built = AssociationScope.scope({
+      owner: record,
+      reflection,
+      klass: targetModel,
+    }) as any;
+    const baseRelation = (targetModel as any).scopeForAssociation?.() ?? (targetModel as any).all();
+    let rel = baseRelation.merge(built);
+    if (options.scope && options.scope !== (reflection as any).scope) {
+      rel = options.scope(rel);
+    }
     result = await rel.first();
   } else {
-    result = await targetModel.findBy({ [foreignKey]: pkValue });
+    // Inline fallback: no reflection registered.
+    if (Array.isArray(foreignKey)) {
+      const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      if (pkCols.length !== foreignKey.length) {
+        throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+      }
+      const conditions: Record<string, unknown> = {};
+      for (let i = 0; i < foreignKey.length; i++) {
+        conditions[foreignKey[i]] = record.readAttribute(pkCols[i]);
+      }
+      result = await targetModel.findBy(conditions);
+    } else if (options.as) {
+      const typeCol = `${underscore(options.as)}_type`;
+      result = await targetModel.findBy({
+        [foreignKey as string]: record.readAttribute(primaryKey as string),
+        [typeCol]: ctor.name,
+      });
+    } else if (options.scope) {
+      let rel = (targetModel as any)
+        .all()
+        .where({ [foreignKey as string]: record.readAttribute(primaryKey as string) });
+      rel = options.scope(rel);
+      result = await rel.first();
+    } else {
+      result = await targetModel.findBy({
+        [foreignKey as string]: record.readAttribute(primaryKey as string),
+      });
+    }
   }
 
   // Set inverse_of: store reference back to the owner
@@ -538,76 +606,60 @@ export async function loadHasMany(
     validateInverseOf(targetModel, assocName, options.inverseOf);
   }
 
-  // Polymorphic "as" option: has_many :comments, as: :commentable
-  if (options.as) {
-    const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
-    const pkValue = record.readAttribute(primaryKey as string);
-    if (pkValue === null || pkValue === undefined) return [];
-    const typeCol = `${underscore(options.as)}_type`;
-    const rel = (targetModel as any).all().where({
-      [foreignKey as string]: pkValue,
-      [typeCol]: ctor.name,
-    });
-    return rel.toArray();
+  // Resolve FK columns (may be array for CPK; `:as` swaps to the
+  // polymorphic FK column).
+  const foreignKey = options.as
+    ? (options.foreignKey ?? `${underscore(options.as)}_id`)
+    : (options.foreignKey ??
+      (options.queryConstraints
+        ? options.queryConstraints
+        : Array.isArray(primaryKey)
+          ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
+          : `${underscore(ctor.name)}_id`));
+
+  // Polymorphic `:as` doesn't model composite owner-PK or composite
+  // FK in Rails. Reject explicitly so the caller gets a clear error
+  // rather than `readAttribute(undefined)` building a broken WHERE.
+  if (options.as && (Array.isArray(primaryKey) || Array.isArray(foreignKey))) {
+    throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
   }
-
-  // Resolve FK columns (may be array for CPK)
-  const foreignKey =
-    options.foreignKey ??
-    (options.queryConstraints
-      ? options.queryConstraints
-      : Array.isArray(primaryKey)
-        ? primaryKey.map((col: string) => `${underscore(ctor.name)}_${col}`)
-        : `${underscore(ctor.name)}_id`);
-
-  // Composite FK/PK: build multi-column where
-  if (Array.isArray(foreignKey)) {
-    const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
-    const conditions: Record<string, unknown> = {};
-    for (let i = 0; i < foreignKey.length; i++) {
-      const pkVal = record.readAttribute(pkCols[i]);
-      if (pkVal === null || pkVal === undefined) return [];
-      conditions[foreignKey[i]] = pkVal;
-    }
-    let rel = (targetModel as any).all().where(conditions);
-    if (options.scope) rel = options.scope(rel);
-    const results: Base[] = await rel.toArray();
-    if (options.inverseOf) {
-      for (const child of results) {
-        (child as any)._cachedAssociations = (child as any)._cachedAssociations ?? new Map();
-        (child as any)._cachedAssociations.set(options.inverseOf, record);
-      }
-    }
-    syncToAssociationInstance(record, assocName, results);
-    return results;
-  }
-
-  const pkValue = record.readAttribute(primaryKey as string);
-  if (pkValue === null || pkValue === undefined) return [];
-
-  // Route through AssociationScope when we have a reflection registered
-  // for this association — single code path with the explicit loaders in
-  // `load*` sharing WHERE/FK construction. Falls back to the inline
-  // builder when the reflection hasn't been registered (happens in
-  // tests that define associations via the lower-level API without
-  // going through the full Reflection.create path).
+  // Route through AssociationScope when we have a reflection registered.
+  // AssociationScope handles scalar, composite, polymorphic `:as`, and
+  // STI in a single path matching Rails' `AssociationScope.scope`.
+  // Inline fallback only when the reflection hasn't been registered
+  // (happens in tests that define associations via the lower-level API
+  // without going through Reflection.create).
   const reflection = ctor._reflectOnAssociation?.(assocName);
+  // Null-FK short-circuit: read the SAME columns the eventual query
+  // reads — reflection.joinForeignKey when routing through
+  // AssociationScope (= owner-side activeRecordPrimaryKey for hasMany),
+  // options-derived primaryKey otherwise. Reading from a different
+  // column would silently return [] while the real query would have
+  // found rows.
+  const fkCheckPks = reflection
+    ? Array.isArray((reflection as any).joinForeignKey)
+      ? ((reflection as any).joinForeignKey as string[])
+      : [(reflection as any).joinForeignKey as string]
+    : Array.isArray(primaryKey)
+      ? primaryKey
+      : [primaryKey as string];
+  for (const pk of fkCheckPks) {
+    const v = record.readAttribute(pk);
+    if (v === null || v === undefined) return [];
+  }
+
   let rel: any;
-  // `options.through` is handled by the early-return above, so we don't
-  // need to re-check it here.
-  if (reflection && !options.as) {
+  if (reflection) {
     // Rails' `Association#scope` is
     //   AssociationRelation.create(klass, self).merge!(klass.scope_for_association)
-    // (association.rb:313), so the unscoped+constraints relation built
-    // by AssociationScope.scope MUST be merged with the target's
-    // scope_for_association — otherwise the target model's default_scope
-    // / scope extensions would silently disappear on the reflection-
-    // backed path. AssociationScope.scope already merges
-    // `reflection.scope` (the macro-time user lambda) via scopeFor, so
-    // skip re-applying it ONLY when `options.scope` is that exact same
+    // (association.rb:313), so the unscoped+constraints relation MUST
+    // be merged with `klass.scope_for_association` — otherwise default_scope
+    // / scope extensions silently disappear. AssociationScope.scope
+    // already merges `reflection.scope` (macro-time lambda) via scopeFor;
+    // skip re-applying `options.scope` ONLY when it's that exact same
     // function. Callers like `loadHasManyThrough` synthesize a NEW
-    // `options.scope` (e.g. wrapping with `sourceType` filtering) —
-    // those must still run.
+    // `options.scope` (wrapping with `sourceType` filtering) — those
+    // must still run.
     const built = AssociationScope.scope({
       owner: record,
       reflection,
@@ -619,10 +671,29 @@ export async function loadHasMany(
       rel = options.scope(rel);
     }
   } else {
-    rel = (targetModel as any).all().where({ [foreignKey]: pkValue });
-    if (options.scope) {
-      rel = options.scope(rel);
+    // Inline fallback: no reflection (lower-level test helpers).
+    if (Array.isArray(foreignKey)) {
+      const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      if (pkCols.length !== foreignKey.length) {
+        throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+      }
+      const conditions: Record<string, unknown> = {};
+      for (let i = 0; i < foreignKey.length; i++) {
+        conditions[foreignKey[i]] = record.readAttribute(pkCols[i]);
+      }
+      rel = (targetModel as any).all().where(conditions);
+    } else if (options.as) {
+      const typeCol = `${underscore(options.as)}_type`;
+      rel = (targetModel as any).all().where({
+        [foreignKey as string]: record.readAttribute(primaryKey as string),
+        [typeCol]: ctor.name,
+      });
+    } else {
+      rel = (targetModel as any)
+        .all()
+        .where({ [foreignKey as string]: record.readAttribute(primaryKey as string) });
     }
+    if (options.scope) rel = options.scope(rel);
   }
   const results: Base[] = await rel.toArray();
 

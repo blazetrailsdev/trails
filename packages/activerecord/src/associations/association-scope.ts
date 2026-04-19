@@ -61,6 +61,21 @@ export class ReflectionProxy {
     return this.reflection.joinPrimaryKey;
   }
 
+  /**
+   * Forwarding `joinPrimaryKeyFor(klass)` so AssociationScope's
+   * runtime-klass path (polymorphic belongsTo) finds the correct
+   * primary key column on the resolved target. Falls back to the
+   * static `joinPrimaryKey` if the reflection doesn't expose it.
+   */
+  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
+    const r = this.reflection as unknown as {
+      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
+    };
+    return typeof r.joinPrimaryKeyFor === "function"
+      ? r.joinPrimaryKeyFor(klass)
+      : this.reflection.joinPrimaryKey;
+  }
+
   get joinForeignKey(): string | string[] {
     return this.reflection.joinForeignKey;
   }
@@ -206,7 +221,7 @@ export class AssociationScope {
       }
     }
     const chain = this._getChain(reflection);
-    scope = this._addConstraints(scope, owner, chain);
+    scope = this._addConstraints(scope, owner, chain, klass);
     if (!reflection.isCollection()) {
       scope = (scope as { limit: (n: number) => unknown }).limit(1);
     }
@@ -244,14 +259,25 @@ export class AssociationScope {
     scope: unknown,
     reflection: AbstractReflection | ReflectionProxy,
     owner: Base,
+    klass?: typeof Base,
   ): unknown {
     const r = reflection as {
       joinPrimaryKey: string | string[];
       joinForeignKey: string | string[];
+      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
       type?: string | null;
     };
     const table = (reflection as ReflectionProxy).aliasedTable ?? null;
-    const joinPks = Array.isArray(r.joinPrimaryKey) ? r.joinPrimaryKey : [r.joinPrimaryKey];
+    // For polymorphic belongsTo, `joinPrimaryKey` is hard-coded to "id"
+    // because the target klass isn't known at definition time. The
+    // runtime klass comes from `AssociationScopeable.klass`; route
+    // through `joinPrimaryKeyFor(klass)` so the correct PK column (incl.
+    // composite / non-"id") is used. Mirrors Rails'
+    // `BelongsToReflection#join_primary_key_for(klass)`
+    // (reflection.rb:968 in our codebase).
+    const joinPk =
+      typeof r.joinPrimaryKeyFor === "function" ? r.joinPrimaryKeyFor(klass) : r.joinPrimaryKey;
+    const joinPks = Array.isArray(joinPk) ? joinPk : [joinPk];
     const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
     // Same guard `AbstractReflection#joinScope` uses — mismatched
     // composite join-key lengths would silently read
@@ -309,9 +335,10 @@ export class AssociationScope {
     scope: unknown,
     owner: Base,
     chain: Array<AbstractReflection | ReflectionProxy>,
+    klass?: typeof Base,
   ): unknown {
     const last = chain[chain.length - 1];
-    scope = this._lastChainScope(scope, last, owner);
+    scope = this._lastChainScope(scope, last, owner, klass);
     // Use scopeFor (Rails: reflection.rb:448, scope_for) so 0-arity
     // scopes get `this`=relation, and >=1-arity scopes receive
     // (relation, owner) — matches Rails' `relation.instance_exec(owner,
