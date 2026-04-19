@@ -489,7 +489,134 @@ describe("AssociationScope", () => {
     expect(DisableJoinsAssociationScope.INSTANCE).not.toBe(AssociationScope.INSTANCE);
   });
 
-  it("scope() raises for through chains (PR 1 limitation)", () => {
+  it("through chain query loads actual records end-to-end (Author -> Memberships -> Tags)", async () => {
+    // Real DB roundtrip: insert records, build the through scope via
+    // AssociationScope, execute it, assert the right rows come back.
+    // Proves the chain-walking machinery isn't just generating valid-
+    // looking SQL — it actually returns the correct records.
+    class IntAuthor extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class IntMembership extends Base {
+      static {
+        this.attribute("int_author_id", "integer");
+        this.attribute("int_tag_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class IntTag extends Base {
+      declare label: string;
+      static {
+        this.attribute("id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(IntAuthor);
+    registerModel(IntMembership);
+    registerModel(IntTag);
+    Associations.hasMany.call(IntAuthor, "int_memberships", {
+      className: "IntMembership",
+      foreignKey: "int_author_id",
+    });
+    Associations.hasMany.call(IntAuthor, "int_tags", {
+      className: "IntTag",
+      through: "int_memberships",
+      source: "int_tag",
+    });
+    Associations.belongsTo.call(IntMembership, "int_tag", {
+      className: "IntTag",
+      foreignKey: "int_tag_id",
+    });
+
+    const alice = await IntAuthor.create({ name: "Alice" });
+    const bob = await IntAuthor.create({ name: "Bob" });
+    const ruby = await IntTag.create({ label: "ruby" });
+    const ts = await IntTag.create({ label: "typescript" });
+    const go = await IntTag.create({ label: "go" });
+    await IntMembership.create({ int_author_id: alice.id, int_tag_id: ruby.id });
+    await IntMembership.create({ int_author_id: alice.id, int_tag_id: ts.id });
+    await IntMembership.create({ int_author_id: bob.id, int_tag_id: go.id });
+
+    const reflection = (IntAuthor as any)._reflectOnAssociation("int_tags");
+    const tags: IntTag[] = await (
+      AssociationScope.scope({
+        owner: alice,
+        reflection,
+        klass: reflection.klass,
+      }) as any
+    ).toArray();
+    expect(tags.map((t) => t.label).sort()).toEqual(["ruby", "typescript"]);
+  });
+
+  it("hasOne :through chain emits a JOIN with LIMIT 1", () => {
+    class HotUser extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class HotAccount extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("hot_user_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class HotSettings extends Base {
+      static {
+        this.attribute("hot_account_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(HotUser);
+    registerModel(HotAccount);
+    registerModel(HotSettings);
+    Associations.hasOne.call(HotUser, "hot_account", {
+      className: "HotAccount",
+      foreignKey: "hot_user_id",
+    });
+    Associations.hasOne.call(HotUser, "hot_settings", {
+      className: "HotSettings",
+      through: "hot_account",
+    });
+    Associations.hasOne.call(HotAccount, "hot_settings", {
+      className: "HotSettings",
+      foreignKey: "hot_account_id",
+    });
+
+    const user = new HotUser({ id: 5 });
+    const reflection = (HotUser as any)._reflectOnAssociation("hot_settings");
+    const sql = (
+      AssociationScope.scope({
+        owner: user,
+        reflection,
+        klass: reflection.klass,
+      }) as any
+    ).toSql();
+    expect(sql).toMatch(/FROM\s+"hot_settings"/);
+    expect(sql).toMatch(/INNER JOIN\s+"?hot_accounts"?/i);
+    // Pin the ON condition so a regression where the join keys flip
+    // (or get dropped) doesn't slip through. PR 3 builds these via
+    // _nextChainScope using joinPrimaryKey / joinForeignKey from the
+    // chain's pair.
+    expect(sql).toMatch(/ON\s+"hot_settings"\."hot_account_id"\s*=\s*"hot_accounts"\."id"/);
+    expect(sql).toMatch(/"hot_accounts"\."hot_user_id"\s*=\s*5/);
+    expect(sql).toMatch(/LIMIT\s+1/);
+  });
+
+  it("through chain emits a JOIN-based query against the through table", () => {
+    // PR 3: chain length 2 (a has_many :through). The generated SQL
+    // selects from the source table, INNER JOINs the through table, and
+    // table-qualifies the owner-FK WHERE on the through.
+    //   SELECT through_posts.* FROM through_posts
+    //   INNER JOIN through_memberships
+    //     ON through_posts.id = through_memberships.through_post_id
+    //   WHERE through_memberships.through_author_id = 1
     class ThroughAuthor extends Base {
       static {
         this.attribute("id", "integer");
@@ -527,12 +654,16 @@ describe("AssociationScope", () => {
 
     const author = new ThroughAuthor({ id: 1 });
     const reflection = (ThroughAuthor as any)._reflectOnAssociation("through_posts");
-    expect(() =>
+    const sql = (
       AssociationScope.scope({
         owner: author,
         reflection,
         klass: reflection.klass,
-      }),
-    ).toThrow(/multi-step association chains/);
+      }) as any
+    ).toSql();
+    expect(sql).toMatch(/FROM\s+"through_posts"/);
+    expect(sql).toMatch(/INNER JOIN\s+"?through_memberships"?/i);
+    expect(sql).toMatch(/"through_posts"\."id"\s*=\s*"through_memberships"\."through_post_id"/);
+    expect(sql).toMatch(/"through_memberships"\."through_author_id"\s*=\s*1/);
   });
 });
