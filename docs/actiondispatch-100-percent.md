@@ -1,8 +1,8 @@
 # ActionDispatch: Road to 100% Test Coverage
 
-Current state: **37.3%** (534 matched / 1,432 total Rails tests). 23/60 files matched, 0 misplaced.
+Current state: **30.9%** real (500 matched / 1,620 total Rails tests). 0 stub, 1,120 missing, 713 extra.
 
-Unlike ActiveRecord (which has many `it.skip` stubs to convert), ActionDispatch's gap is entirely **missing tests** — tests that exist in Rails but have no TypeScript counterpart at all. This means the work is about implementing features and writing new test files, not unskipping existing tests.
+Unlike ActiveRecord (which has many `it.skip` stubs to convert), ActionDispatch's remaining work is mostly **missing tests** — Rails tests with no TS counterpart — so it's primarily about implementing features and writing new test files, not unskipping. The 713 "extra" count also shows there are existing tests that don't match Rails by name or placement; those need reconciling (rename / move / delete) alongside the feature work.
 
 ## How coverage is measured
 
@@ -321,41 +321,39 @@ Full view rendering (ERB, partials, layouts) is probably out of scope initially.
 
 ## Recommended execution order
 
+Phase totals below are the original plan's gap estimates. Re-run
+`pnpm test:compare` for current per-stream numbers.
+
 ```
 Phase 1 — Standalone areas (parallel):
-  Stream B: Request/Response (177 missing)
-  Stream C: Middleware (109 missing)
-  Stream D: Cookies (96 missing)
-  Stream F: Security Middleware (81 missing)
-  Stream G: Error Handling (73 missing)
-  Stream H: Security Policies (26 missing)
-  Stream J: Small areas (75 missing)
-  Total: ~637 tests, would bring coverage to ~37%
+  Stream B: Request/Response
+  Stream C: Middleware
+  Stream D: Cookies
+  Stream F: Security Middleware
+  Stream G: Error Handling
+  Stream H: Security Policies
+  Stream J: Small areas
 
 Phase 2 — Routing (sequential):
-  Stream A1: Journey internals (72 missing)
-  Stream A2: Core routing (248 missing)
-  Stream A3: Resource routing (78 missing)
-  Stream A4: URL generation (120 missing)
-  Total: ~518 tests, would bring coverage to ~52%
+  Stream A1: Journey internals
+  Stream A2: Core routing
+  Stream A3: Resource routing
+  Stream A4: URL generation
 
 Phase 3 — Sessions:
-  Stream E: Sessions (87 missing)
-  Total: ~87 tests, would bring coverage to ~55%
+  Stream E: Sessions
 
 Phase 4 — Controller (sequential):
-  Stream I1: Minimal controller base (~200 tests)
-  Stream I2: Parameters deep (~170 tests)
-  Stream I3: Rendering (~295 tests)
-  Stream I4: Testing harness (~132 tests)
-  Stream I5: Remaining features (~300 tests)
-  Total: ~1,097 tests, would bring coverage to ~88%
+  Stream I1: Minimal controller base
+  Stream I2: Parameters deep
+  Stream I3: Rendering
+  Stream I4: Testing harness
+  Stream I5: Remaining features
 
 Phase 5 — Cleanup:
-  System testing (44 missing — may defer, requires browser)
-  Translation (21 missing — requires I18n)
+  System testing — may defer, requires browser
+  Translation — requires I18n
   Remaining edge cases
-  Total: ~100+ tests to reach 100%
 ```
 
 ## Key differences from ActiveRecord roadmap

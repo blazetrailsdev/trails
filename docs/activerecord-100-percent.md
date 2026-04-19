@@ -1,10 +1,11 @@
 # ActiveRecord: Road to 100%
 
-Current: **47.9% API** (1,359 / 2,835 methods). **All relation files at 100%. All core association classes at 100%.**
+Current: **87% API** (2,453 / 2,819 methods). **78% inheritance** (163 / 209).
 
 ```bash
 pnpm run api:compare -- --package activerecord
-pnpm run api:compare -- --package activerecord --missing  # show missing methods per file
+pnpm run api:compare -- --package activerecord --missing      # missing methods per file
+pnpm run api:compare -- --package activerecord --inheritance  # inheritance mismatches
 ```
 
 ## How to work on this
@@ -34,28 +35,11 @@ at runtime (e.g., `User.build()`, `User.currentRole()`).
 **Fix:** Use the `include()` pattern from `@blazetrails/activesupport` to mix
 class methods onto `Base`, similar to how `Relation` includes its modules.
 
-### AsyncLocalStorage for connected_to_stack
-
-`core.ts` stores `connectedToStack` in a process-global array. Rails uses
-`ActiveSupport::IsolatedExecutionState` (per-fiber/thread). In Node.js, this
-leaks state between concurrent async requests.
-
-**Fix:** Use `AsyncLocalStorage` (see `encryption/context.ts` for an existing
-pattern in this repo).
-
-### PredicateBuilder in core.ts
-
-`core.ts#predicateBuilder` returns a `{ table }` stub because importing
-`PredicateBuilder` directly creates a circular dependency.
-Rails: `PredicateBuilder.new(TableMetadata.new(self, arel_table))`.
-
-**Fix:** Register `PredicateBuilder` class at module load time (when
-`relation.ts` loads) so `core.ts` can access it without circular imports.
-
 ### TypeCaster::Map
 
-`core.ts#typeCaster` creates a new object per call with minimal type casting.
-Rails returns `TypeCaster::Map.new(self)` which delegates to the full type system.
+`core.ts#typeCaster` currently returns an ad-hoc object that reads from
+`_attributeDefinitions`. Rails returns `TypeCaster::Map.new(self)`, a proper
+class that delegates to the full type system and memoizes per class.
 
 **Fix:** Implement `TypeCaster::Map` and memoize per class.
 
@@ -67,65 +51,21 @@ keys in reflection.
 
 ---
 
-## Completed (100%)
+## Remaining module files
 
-### Relation files (21/21)
+Files with methods still missing. Run `api:compare --missing` to see per-method gaps.
 
-All relation files at 100%: `relation.rb`, `query_methods.rb`,
-`finder_methods.rb`, `calculations.rb`, `spawn_methods.rb`,
-`where_clause.rb`, `predicate_builder.rb` (+ all sub-handlers),
-`delegation.rb`, `merger.rb`, `from_clause.rb`, `batch_enumerator.rb`,
-`query_attribute.rb`.
-
-### Base module files (4/4 recently completed)
-
-`persistence.rb` (100%), `core.rb` (100%), `model_schema.rb` (100%),
-`scoping.rb` (100%).
-
-### Association class files (7/7)
-
-All core association classes at 100%: `association.rb` (29/29),
-`collection_association.rb` (24/24), `belongs_to_association.rb` (11/11),
-`belongs_to_polymorphic_association.rb` (4/4),
-`has_many_association.rb` (2/2), `has_one_association.rb` (2/2),
-`singular_association.rb` (5/5).
-
-Also at 100%: `join_dependency/join_association.rb`,
-`join_dependency/join_base.rb`, `join_dependency/join_part.rb`,
-`nested_error.rb`, `preloader/batch.rb`.
-
----
-
-## Remaining module files (~80 methods across 21 files)
-
-| File                                       | Matched | Missing | Total | %   |
-| ------------------------------------------ | ------- | ------- | ----- | --- |
-| attribute_methods.rb                       | 6       | 15      | 21    | 29% |
-| attribute_methods/primary_key.rb           | 6       | 9       | 15    | 40% |
-| normalization.rb                           | 1       | 9       | 10    | 10% |
-| attribute_methods/composite_primary_key.rb | 1       | 6       | 7     | 14% |
-| enum.rb                                    | 2       | 6       | 8     | 25% |
-| sanitization.rb                            | 2       | 5       | 7     | 29% |
-| timestamp.rb                               | 0       | 5       | 5     | 0%  |
-| store.rb                                   | 7       | 4       | 11    | 64% |
-| inheritance.rb                             | 8       | 4       | 12    | 67% |
-| autosave_association.rb                    | 5       | 4       | 9     | 56% |
-| scoping/default.rb                         | 4       | 2       | 6     | 67% |
-| scoping/named.rb                           | 2       | 3       | 5     | 40% |
-| locking/optimistic.rb                      | 5       | 3       | 8     | 63% |
-| counter_cache.rb                           | 4       | 2       | 6     | 67% |
-| no_touching.rb                             | 4       | 2       | 6     | 67% |
-| attribute_methods/before_type_cast.rb      | 2       | 2       | 4     | 50% |
-| integration.rb                             | 4       | 1       | 5     | 80% |
-| signed_id.rb                               | 4       | 1       | 5     | 80% |
-| secure_token.rb                            | 1       | 1       | 2     | 50% |
-| attribute_methods/dirty.rb                 | 12      | 1       | 13    | 92% |
-| attribute_methods/time_zone_conversion.rb  | 2       | 1       | 3     | 67% |
+| File                    | Matched | Missing | %   |
+| ----------------------- | ------- | ------- | --- |
+| store.rb                | 7       | 5       | 58% |
+| inheritance.rb          | 8       | 4       | 67% |
+| autosave_association.rb | 6       | 3       | 67% |
+| counter_cache.rb        | 5       | 1       | 83% |
 
 ## Bigger gaps (not in scope yet)
 
-| Area                | Missing | Notes                                                                               |
-| ------------------- | ------- | ----------------------------------------------------------------------------------- |
-| Connection adapters | ~400    | Abstract adapter, schema statements, pool, transaction                              |
-| Associations        | ~116    | Builders (0-33%), preloader (16-44%), collection_proxy (68%), join_dependency (11%) |
-| Migration           | ~50     | Command recorder, schema migration                                                  |
+| Area                | Notes                                                                             |
+| ------------------- | --------------------------------------------------------------------------------- |
+| Connection adapters | Abstract adapter / schema statements / pool / transaction still have missing bits |
+| Associations        | Builders, preloader, and join_dependency still have major gaps                    |
+| Migration           | Command recorder, schema migration                                                |

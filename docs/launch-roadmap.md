@@ -3,19 +3,26 @@
 The goal: announce BlazeTrails publicly with a compelling story — "Rails,
 rewritten in TypeScript" — backed by a working demo and rock-solid core packages.
 
-## Current State (2026-03-30)
+## Current State (2026-04-19)
 
-| Package          | Tests             | Coverage | Status                     |
-| ---------------- | ----------------- | -------- | -------------------------- |
-| activerecord     | 5,187/8,385       | 61.9%    | In progress                |
-| activesupport    | 2,164/2,862       | 75.6%    | In progress                |
-| actiondispatch   | 406/1,432         | 28.4%    | In progress (27 misplaced) |
-| actioncontroller | 7/1,860           | 0.4%     | Early (229 misplaced)      |
-| actionview       | 0/2,497           | 0%       | Not started                |
-| trailties        | 93/2,411          | 3.9%     | Early                      |
-| **Overall**      | **10,296/21,890** | **47%**  |                            |
+Live counts via `pnpm test:compare` (real matches only — stubs don't count).
 
-Overall includes completed packages (arel 100%, activemodel 100%, rack 100%).
+| Package          | Real matched | Total | Coverage | Status           |
+| ---------------- | ------------ | ----- | -------- | ---------------- |
+| arel             | 540          | 592   | 91.2%    | Near-done        |
+| activemodel      | 754          | 807   | 93.4%    | Near-done        |
+| rack             | 763          | 773   | 98.7%    | Effectively done |
+| activerecord     | 3,769        | 5,775 | 65.3%    | In progress      |
+| activesupport    | 829          | 2,826 | 29.3%    | In progress      |
+| actiondispatch   | 500          | 1,620 | 30.9%    | In progress      |
+| actioncontroller | 310          | 1,734 | 17.9%    | Early            |
+| actionview       | —            | —     | 0%       | Not started      |
+| trailties        | —            | —     | —        | Early            |
+
+API-surface coverage is a separate metric (`pnpm api:compare`) — arel +
+rack are at 100%, activerecord is at 87%, activemodel at 99.7%,
+activesupport at 24.8%, actioncontroller at 66.4%, actiondispatch at
+6.1%, actionview at 3.6%.
 
 **Frontiers** (PR #281, draft): Interactive browser sandbox with WASM SQLite,
 Monaco editor, CLI, sample databases, project management, and auth. 246 tests
@@ -30,8 +37,8 @@ Before we announce, these must be true:
 These packages are the core story. They need to be fully passing so we can say
 "we actually implemented this" without caveats.
 
-- [ ] **activerecord** — 61.9%, biggest lift. ~3,200 tests to go (plus 2,960 skipped to unskip)
-- [ ] **activesupport** — 75.6%, ~700 tests to go (plus 626 skipped to unskip)
+- [ ] **activerecord** — 65.3% real, biggest lift. ~111 missing + ~1,863 stub to unskip.
+- [ ] **activesupport** — 29.3% real. ~817 missing + ~1,180 stub to unskip.
 - [ ] **Frontiers** — split from PR #281 and deployed (see Frontiers Split Plan below)
 
 ### Must work enough for demos
@@ -40,12 +47,12 @@ These don't need 100%, but they need to support the Frontiers demo flow: scaffol
 a model, run migrations, start a server, hit JSON and HTML endpoints.
 
 - [ ] **actioncontroller** — needs basic `render json:`, `render` (EJS templates),
-      `before_action`, params, and standard CRUD actions. Currently at 0.4% — most
-      tests are misplaced (229), not missing. Fix the misplacement first, then
-      implement the basics.
-- [ ] **actiondispatch** — routing, request/response, session basics. At 28.4%
-      with 27 misplaced. Already has a foundation — needs the routes that scaffold
-      generates (`resources`) to actually dispatch to controllers.
+      `before_action`, params, and standard CRUD actions. Currently at 17.9% real
+      tests and 66.4% API — the controller base exists but filter/render/render
+      flows still have gaps.
+- [ ] **actiondispatch** — routing, request/response, session basics. At 30.9%
+      real tests / 6.1% API. Already has a foundation — needs the routes that
+      scaffold generates (`resources`) to actually dispatch to controllers.
 - [ ] **CLI** (`packages/cli`) — `trails new`, `trails generate`, `trails server`,
       `trails db:migrate`. The Frontiers sandbox already implements these commands
       in-browser; the real CLI needs to match.
@@ -60,13 +67,14 @@ a model, run migrations, start a server, hit JSON and HTML endpoints.
 
 ## Suggested Order of Attack
 
-1. **ActiveSupport to 100%** — 626 skipped tests to unskip, ~700 remaining.
+1. **ActiveSupport to 100%** — ~1,180 stub tests to unskip, ~817 missing.
    Many are utility functions that can be knocked out methodically.
 2. **ActiveRecord to 100%** — the big one. Work through the 100% plan in
    `docs/activerecord-100-percent.md`. Associations, migrations, validations,
    query interface are the priority areas.
-3. **ActionController basics** — fix the 229 misplaced tests, then implement
-   the rendering pipeline (JSON + EJS), params, filters, and CRUD.
+3. **ActionController basics** — implement the rendering pipeline
+   (JSON + EJS), params, filters, and CRUD. See the per-file 0% list
+   in `docs/actioncontroller-100-percent.md`.
 4. **ActionDispatch routing** — `resources`, `root`, `get`/`post`/etc, and
    route-to-controller dispatch.
 5. **CLI** — wire up the real CLI commands to match what Frontiers does in the

@@ -1,6 +1,7 @@
 # ActiveSupport: Road to 100%
 
-Current state: **23.8%** API (336 / 1,411 methods). **77.9%** tests (2,229 / 2,862).
+Current state: **24.8%** API (351 / 1,413 methods). Run `api:compare` for the
+live count — this snapshot lags the PRs that trickle ActiveSupport methods in.
 
 ```bash
 pnpm run api:compare -- --package activesupport
