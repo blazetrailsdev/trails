@@ -84,6 +84,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private set _lastReleasedTxnClient(client: pg.PoolClient | null) {
     this._lastReleasedTxnClientRef = client == null ? null : new WeakRef(client);
   }
+  // Clients tagged for `DEALLOCATE ALL` on the next fresh checkout.
+  // Set by the released-client `reset()` branch of `clearCacheBang` —
+  // that path drops the local sql→name map but can't fire DEALLOCATE
+  // on a released session, so server-side PREPAREs leak. When pg.Pool
+  // hands the same physical client back later, `_acquireFreshClient`
+  // checks this set and runs `DEALLOCATE ALL` before user code, so
+  // any fresh checkout path (e.g. `getClient`, `getAdvisoryLock`,
+  // `beginTransaction`) drains those orphans. WeakSet so pg.Pool
+  // reaping the client GCs the entry.
+  private _clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
   // Rails' `statement_limit` database.yml key — max prepared
   // statements cached per session before LRU eviction (default 1000).
   private _statementLimit = 1000;
@@ -422,8 +432,48 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   private async getClient(): Promise<pg.PoolClient> {
     if (this._client) return this._client;
+    return this._acquireFreshClient();
+  }
+
+  /**
+   * Acquire a fresh client from the pool and drain any orphaned
+   * server-side prepared statements left by a prior PSCE event. All
+   * direct pool checkouts MUST go through this helper so the drain
+   * guarantee holds for every code path (getClient, beginTransaction,
+   * getAdvisoryLock, etc.).
+   *
+   * On drain failure, the client is released with the error so node-
+   * postgres discards it, then the error propagates — callers don't
+   * have a client to release on this path.
+   */
+  private async _acquireFreshClient(): Promise<pg.PoolClient> {
     if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
-    return this._driverPool.connect();
+    const client = await this._driverPool.connect();
+    try {
+      await this._maybeDrainOrphanedPreparedStatements(client);
+    } catch (error) {
+      client.release(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+    return client;
+  }
+
+  /**
+   * If `client` was tagged for `DEALLOCATE ALL` (by the released-client
+   * `reset()` branch in `clearCacheBang`), drain its server-side
+   * prepared statements before handing it to user code. Centralized
+   * here so EVERY checkout path benefits, by routing all direct
+   * `pool.connect()` callers through `_acquireFreshClient` (which
+   * calls this).
+   *
+   * Failure of `DEALLOCATE ALL` propagates: the caller's existing
+   * error path will release the (broken) client with the error so
+   * node-postgres discards it.
+   */
+  private async _maybeDrainOrphanedPreparedStatements(client: pg.PoolClient): Promise<void> {
+    if (!this._clientsNeedingDeallocateAll.has(client)) return;
+    this._clientsNeedingDeallocateAll.delete(client);
+    await client.query("DEALLOCATE ALL");
   }
 
   /**
@@ -742,8 +792,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Begin a transaction. Acquires a dedicated client from the pool.
    */
   async beginTransaction(): Promise<void> {
-    if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
-    this._client = await this._driverPool.connect();
+    // Routes through `_acquireFreshClient` so the drain runs on every
+    // checkout (a tagged client returned here gets `DEALLOCATE ALL`'d
+    // before BEGIN). Drain failures are released-with-error inside
+    // the helper, so a thrown drain doesn't leak `_client`.
+    this._client = await this._acquireFreshClient();
     try {
       await this._client.query("BEGIN");
       this._inTransaction = true;
@@ -1047,6 +1100,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return client ? this._statementPools.get(client) : undefined;
   }
 
+  /** @internal — the most recently released txn client (deref'd once). */
+  _lastReleasedClientForTest(): pg.PoolClient | null {
+    return this._lastReleasedTxnClient;
+  }
+
+  /** @internal — the currently-held txn client. */
+  _currentClientForTest(): pg.PoolClient | null {
+    return this._client;
+  }
+
+  /** @internal — whether a client is tagged for DEALLOCATE ALL on next checkout. */
+  _needsDeallocateAllForTest(client: pg.PoolClient): boolean {
+    return this._clientsNeedingDeallocateAll.has(client);
+  }
+
+  /** @internal — underlying pg.Pool, for test instrumentation. */
+  _driverPoolForTest(): pg.Pool | null {
+    return this._driverPool;
+  }
+
   /**
    * Clear cached prepared statements on the currently-held transaction
    * client. Mirrors Rails' `PostgreSQLAdapter#clear_cache!` which
@@ -1089,8 +1162,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           // in the pool and call `exec_prepared(staleName)`, hitting
           // the same PSCE error again. `reset()` forces re-PREPARE
           // with a fresh name (counter never resets, so no collision
-          // with the orphaned server-side statement).
+          // with the orphaned server-side statement). Tag the client
+          // so the next checkout through `_acquireFreshClient` runs
+          // `DEALLOCATE ALL` to drain the orphaned server-side
+          // statements left behind by the local-only reset.
           this._statementPools.get(lastReleased)?.reset();
+          this._clientsNeedingDeallocateAll.add(lastReleased);
         }
       } finally {
         this._lastReleasedTxnClient = null;
@@ -1102,19 +1179,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // (via StatementPool's pg-specific dealloc override).
       this._statementPools.get(currentClient)?.clear();
     }
-    // Trade-off (follow-up) for the released-client `reset()` path
-    // above: we can't fire DEALLOCATE on a released client, so
-    // server-side PREPAREs persist until the connection is recycled.
-    // Repeated PSCE on the same physical client could accumulate
-    // orphaned server statements beyond what statement_limit / LRU
-    // would normally evict (we discarded the local entries that drive
-    // eviction). Our per-pool counter never resets, so name collisions
-    // are impossible — but memory on the server session grows. The
-    // proper fix is to tag the released client (per-client WeakMap
-    // flag) and have the next checkout run `DEALLOCATE ALL` (or
-    // `DISCARD ALL`) before user code; that requires a pool-checkout
-    // interception not wired here. Tracked as a follow-up; this PR's
-    // scope is the `after_failure_actions` hook itself.
+    // Server-side accumulation note: the released-client `reset()`
+    // path above only drops the local sql→name map. Server-side
+    // PREPAREs are drained by `_clientsNeedingDeallocateAll` +
+    // `DEALLOCATE ALL` on next checkout (any path that goes through
+    // `_acquireFreshClient` — getClient / beginTransaction /
+    // getAdvisoryLock / etc.). Until that checkout happens, the
+    // orphans live on the idle pg.PoolClient.
   }
 
   /**
@@ -1287,8 +1358,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _advisoryLockClient: pg.PoolClient | null = null;
 
   async getAdvisoryLock(lockId: number | string): Promise<boolean> {
-    if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
-    const client = await this._driverPool.connect();
+    const client = await this._acquireFreshClient();
     try {
       const isNumeric = typeof lockId === "number";
       const sql = `SELECT pg_try_advisory_lock(${isNumeric ? "$1" : "hashtext($1)"}) AS locked`;

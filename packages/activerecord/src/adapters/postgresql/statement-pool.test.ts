@@ -1,7 +1,8 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/statement_pool_test.rb
  */
-import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import { describe, it, beforeEach, afterEach, expect, vi } from "vitest";
+import type pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -11,6 +12,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter.preparedStatements = true;
   });
   afterEach(async () => {
+    vi.restoreAllMocks();
     await adapter.close();
   });
 
@@ -237,6 +239,71 @@ describeIfPg("PostgreSQLAdapter", () => {
       adapter.clearCacheBang();
       expect(pool.length).toBe(0);
       expect(adapter._lastReleasedStatementPoolForTest()).toBeUndefined();
+    });
+
+    it("tags the released client and runs DEALLOCATE ALL on its next checkout", async () => {
+      // Released-client `reset()` path can't fire DEALLOCATE on a
+      // session it doesn't own, so server-side PREPAREs leak. The
+      // deferred half: tag the client; on next checkout, drain via
+      // `DEALLOCATE ALL` before user code.
+      //
+      // Use a dedicated pool-size-1 adapter so pg.Pool always hands
+      // back the same physical client on re-checkout — makes the
+      // DEALLOCATE-before-BEGIN assertion deterministic. The shared
+      // `adapter` from beforeEach uses pg.Pool's default max (10) and
+      // could hand back a different client, weakening the assertion.
+      const max1 = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, max: 1 });
+      max1.preparedStatements = true;
+      try {
+        await max1.beginDbTransaction();
+        await max1.execute("SELECT $1::int", [1]);
+        await max1.execute("SELECT $1::text", ["a"]);
+        await max1.rollback();
+        // Capture the released client BEFORE clearCacheBang — its
+        // finally block nulls _lastReleasedTxnClient (so a post-clear
+        // _lastReleasedClientForTest() would return null and the
+        // tag check would silently fail with `WeakSet.has(null)` → false).
+        const taggedClient = max1._lastReleasedClientForTest();
+        expect(taggedClient).not.toBeNull();
+        max1.clearCacheBang();
+        expect(max1._needsDeallocateAllForTest(taggedClient!)).toBe(true);
+
+        // vi.spyOn both pool.connect AND the returned client's query
+        // so vi.restoreAllMocks() handles cleanup for both.
+        const observed: string[] = [];
+        const pool = max1._driverPoolForTest()!;
+        const originalConnect = pool.connect.bind(pool);
+        vi.spyOn(pool, "connect").mockImplementation((async (...args: unknown[]) => {
+          const client = await (originalConnect as (...a: unknown[]) => Promise<pg.PoolClient>)(
+            ...args,
+          );
+          const origQuery = client.query.bind(client);
+          vi.spyOn(client, "query").mockImplementation(((sql: unknown, ...rest: unknown[]) => {
+            if (typeof sql === "string") observed.push(sql);
+            return (origQuery as (...a: unknown[]) => unknown)(sql, ...rest);
+          }) as typeof client.query);
+          return client;
+        }) as unknown as typeof pool.connect);
+
+        await max1.beginDbTransaction();
+        try {
+          // max:1 guarantees pg.Pool returned the same physical client.
+          const newClient = max1._currentClientForTest();
+          expect(newClient).toBe(taggedClient);
+          // Drain ran → no longer tagged.
+          expect(max1._needsDeallocateAllForTest(newClient!)).toBe(false);
+          // DEALLOCATE ALL fired BEFORE BEGIN.
+          expect(observed).toContain("DEALLOCATE ALL");
+          const deallocIdx = observed.indexOf("DEALLOCATE ALL");
+          const beginIdx = observed.indexOf("BEGIN");
+          expect(deallocIdx).toBeGreaterThanOrEqual(0);
+          expect(beginIdx).toBeGreaterThan(deallocIdx);
+        } finally {
+          await max1.rollback();
+        }
+      } finally {
+        await max1.close();
+      }
     });
 
     it("clearCacheBang resets the released-client pool even when a new txn is in progress", async () => {
