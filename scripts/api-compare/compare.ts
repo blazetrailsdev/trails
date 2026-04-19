@@ -72,6 +72,68 @@ interface PackageResult {
   filesExist: number;
   excludedFiles: string[];
   files: FileResult[];
+  inheritance: InheritanceResult;
+}
+
+interface InheritanceMismatch {
+  rubyFqn: string;
+  rubyFile: string;
+  tsFile: string;
+  tsName: string;
+  rubySuper: string | null;
+  tsSuper: string | null;
+  tsChain: string[];
+  reason: "super-mismatch" | "ts-class-missing";
+}
+
+interface InheritanceResult {
+  checked: number;
+  matched: number;
+  mismatches: InheritanceMismatch[];
+}
+
+// Ruby builtin exception classes → TS `Error` is the accepted equivalent.
+const RUBY_ERROR_BUILTINS = new Set([
+  "StandardError",
+  "RuntimeError",
+  "Exception",
+  "ArgumentError",
+  "TypeError",
+  "NotImplementedError",
+  "NameError",
+  "NoMethodError",
+  "IndexError",
+  "KeyError",
+  "RangeError",
+  "IOError",
+]);
+
+function shortName(fqn: string | undefined | null): string | null {
+  if (!fqn) return null;
+  const parts = fqn.split("::");
+  return parts[parts.length - 1] || null;
+}
+
+function nameMatches(rubyName: string, tsName: string): boolean {
+  if (rubyName === tsName) return true;
+  if (RUBY_ERROR_BUILTINS.has(rubyName) && tsName === "Error") return true;
+  // Trails convention: when a subclass in one adapter shadows its parent's
+  // name (e.g. PG's `TableDefinition extends TableDefinition`), the parent is
+  // import-aliased as `Abstract<Name>`. Treat the alias as the same class.
+  if (tsName === `Abstract${rubyName}`) return true;
+  return false;
+}
+
+/**
+ * Ruby inheritance is preserved on the TS side if Ruby's immediate
+ * superclass appears *anywhere* in TS's ancestor chain. This accepts
+ * Trails' common pattern of inserting an abstract intermediate class
+ * (e.g. `TableDefinition extends AbstractTableDefinition extends TableDefinition`).
+ */
+function superclassesMatch(rubySuper: string | null, tsChain: string[]): boolean {
+  if (!rubySuper && tsChain.length === 0) return true;
+  if (!rubySuper || tsChain.length === 0) return false;
+  return tsChain.some((ancestor) => nameMatches(rubySuper, ancestor));
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +155,7 @@ function main() {
   const showMissing = args.includes("--missing");
   const showFiles = args.includes("--files");
   const showIncomplete = args.includes("--incomplete");
+  const showInheritance = args.includes("--inheritance");
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
   const tsPath = path.join(OUTPUT_DIR, "ts-api.json");
@@ -478,6 +541,120 @@ function main() {
     const totalMethods = totalMatched + totalMissing;
     const pct = totalMethods > 0 ? Math.round((totalMatched / totalMethods) * 1000) / 10 : 0;
 
+    // ---- Inheritance check ----
+    // For each primary Ruby class, locate the matching TS class (same expected
+    // file + same short name) and verify Ruby's immediate superclass appears
+    // somewhere in TS's ancestor chain. If the TS class is absent entirely,
+    // surface that as a mismatch so regressions don't hide.
+    const inheritance: InheritanceResult = { checked: 0, matched: 0, mismatches: [] };
+    if (tsPkg) {
+      // Index TS classes by (file, shortName) and by short name for ancestor walks.
+      const tsByFileName = new Map<string, ClassInfo>();
+      const tsByShort = new Map<string, ClassInfo[]>();
+      for (const cls of Object.values(tsPkg.classes)) {
+        if (!cls.file) continue;
+        tsByFileName.set(`${cls.file}::${cls.name}`, cls);
+        const list = tsByShort.get(cls.name) || [];
+        list.push(cls);
+        tsByShort.set(cls.name, list);
+      }
+
+      // Resolve the most likely parent class among duplicates by file-path
+      // proximity, mirroring the `resolveParent` heuristic above.
+      const resolveAncestor = (name: string, childFile: string): ClassInfo | null => {
+        const candidates = tsByShort.get(name) || [];
+        if (candidates.length === 0) return null;
+        if (candidates.length === 1) return candidates[0];
+        const childParts = (childFile || "").split("/");
+        let best: ClassInfo | null = null;
+        let bestScore = -1;
+        for (const c of candidates) {
+          if (c.file === childFile && c.name === name) continue;
+          const parts = (c.file || "").split("/");
+          let shared = 0;
+          for (let i = 0; i < Math.min(childParts.length, parts.length); i++) {
+            if (childParts[i] === parts[i]) shared++;
+            else break;
+          }
+          if (shared > bestScore) {
+            bestScore = shared;
+            best = c;
+          }
+        }
+        return best ?? candidates[0];
+      };
+
+      const ancestorChain = (cls: ClassInfo): string[] => {
+        const chain: string[] = [];
+        const seen = new Set<string>();
+        let cursor: ClassInfo | null = cls;
+        while (cursor?.superclass) {
+          const name = shortName(cursor.superclass);
+          if (!name) break;
+          chain.push(name);
+          const key = `${cursor.file}::${name}`;
+          if (seen.has(key)) break;
+          seen.add(key);
+          cursor = resolveAncestor(name, cursor.file || "");
+        }
+        return chain;
+      };
+
+      for (const { fqn, info } of allRuby) {
+        if (!info.file || isExcluded(info.file)) continue;
+        if (primaryClassPerFile.get(info.file) !== fqn) continue;
+        // `allRuby` mixes classes and modules; modules don't carry superclass.
+        if (!(fqn in rubyPkg.classes)) continue;
+
+        const expectedTs = rubyFileToTs(info.file);
+        const short = shortName(fqn)!;
+        const rubySuper = shortName(info.superclass);
+
+        const tsCls = tsByFileName.get(`${expectedTs}::${short}`);
+        inheritance.checked++;
+
+        if (!tsCls) {
+          // If the method-comparison already flags the TS file as missing,
+          // don't double-count a ts-class-missing — the file-level signal
+          // covers it. Only surface when the file exists but this class is
+          // absent (a genuine inheritance blind spot).
+          const pkgSrcDir = packageSrcDir(pkg);
+          const fileExists = fs.existsSync(path.join(pkgSrcDir, expectedTs));
+          if (!fileExists) {
+            inheritance.checked--; // don't score; file-missing is tracked elsewhere
+            continue;
+          }
+          inheritance.mismatches.push({
+            rubyFqn: fqn,
+            rubyFile: info.file,
+            tsFile: expectedTs,
+            tsName: short,
+            rubySuper,
+            tsSuper: null,
+            tsChain: [],
+            reason: "ts-class-missing",
+          });
+          continue;
+        }
+
+        const chain = ancestorChain(tsCls);
+        if (superclassesMatch(rubySuper, chain)) {
+          inheritance.matched++;
+        } else {
+          inheritance.mismatches.push({
+            rubyFqn: fqn,
+            rubyFile: info.file,
+            tsFile: expectedTs,
+            tsName: short,
+            rubySuper,
+            tsSuper: chain[0] ?? null,
+            tsChain: chain,
+            reason: "super-mismatch",
+          });
+        }
+      }
+    }
+
     results.push({
       package: pkg,
       totalMethods,
@@ -488,6 +665,7 @@ function main() {
       filesExist,
       excludedFiles: [...excludedFiles].sort(),
       files: fileResults,
+      inheritance,
     });
   }
 
@@ -498,7 +676,7 @@ function main() {
     JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
   );
 
-  printReport(results, showMissing, showFiles, filterPkg, showIncomplete);
+  printReport(results, showMissing, showFiles, filterPkg, showIncomplete, showInheritance);
 }
 
 // ---------------------------------------------------------------------------
@@ -511,25 +689,48 @@ function printReport(
   showFiles: boolean,
   filterPkg: string | null,
   showIncomplete = false,
+  showInheritance = false,
 ) {
   let grandTotal = 0;
   let grandMatched = 0;
   let grandFiles = 0;
   let grandFilesExist = 0;
+  let grandInhChecked = 0;
+  let grandInhMatched = 0;
 
   for (const pkg of results) {
     grandTotal += pkg.totalMethods;
     grandMatched += pkg.matched;
     grandFiles += pkg.totalFiles;
     grandFilesExist += pkg.filesExist;
+    grandInhChecked += pkg.inheritance.checked;
+    grandInhMatched += pkg.inheritance.matched;
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
       pkg.excludedFiles.length > 0 ? "  (some intentionally excluded, see excluded-files.ts)" : "";
+    const inh = pkg.inheritance;
+    const inhPct = inh.checked > 0 ? Math.round((inh.matched / inh.checked) * 1000) / 10 : 0;
+    const inhNote =
+      inh.checked > 0 ? `  |  inheritance: ${inh.matched}/${inh.checked} (${inhPct}%)` : "";
     console.log(
-      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${excludedNote}`,
+      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${inhNote}${excludedNote}`,
     );
     console.log(`${"=".repeat(100)}`);
+
+    if (showInheritance && inh.mismatches.length > 0) {
+      console.log(`\n  Inheritance mismatches:`);
+      for (const m of inh.mismatches) {
+        if (m.reason === "ts-class-missing") {
+          const rs = m.rubySuper ?? "(none)";
+          console.log(`    ${m.tsFile}:${m.tsName}  ruby<${rs}>  ts<class missing>`);
+          continue;
+        }
+        const rs = m.rubySuper ?? "(none)";
+        const tsDesc = m.tsChain.length > 0 ? m.tsChain.join(" → ") : "(none)";
+        console.log(`    ${m.tsFile}:${m.tsName}  ruby<${rs}>  ts<${tsDesc}>`);
+      }
+    }
 
     // Per-file table (only for detail packages or when filtered)
     if (DETAIL_PACKAGES.has(pkg.package) || filterPkg || showFiles) {
@@ -580,8 +781,14 @@ function printReport(
       `  Data layer: ${dataMatched}/${dataTotal} methods (${dataPct}%)  |  files: ${dataFilesExist}/${dataFiles}`,
     );
   }
+  const inhPct =
+    grandInhChecked > 0 ? Math.round((grandInhMatched / grandInhChecked) * 1000) / 10 : 0;
+  const inhSummary =
+    grandInhChecked > 0
+      ? `  |  inheritance: ${grandInhMatched}/${grandInhChecked} (${inhPct}%)`
+      : "";
   console.log(
-    `  Overall: ${grandMatched}/${grandTotal} methods (${grandPct}%)  |  files: ${grandFilesExist}/${grandFiles}`,
+    `  Overall: ${grandMatched}/${grandTotal} methods (${grandPct}%)  |  files: ${grandFilesExist}/${grandFiles}${inhSummary}`,
   );
   console.log(`${"=".repeat(100)}\n`);
 }
