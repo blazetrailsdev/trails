@@ -193,4 +193,41 @@ describe("StatementCacheTest", () => {
     expect(sql).toContain("alice");
     expect(sql).not.toContain("?");
   });
+
+  it("StatementCache.create unprepared path uses PartialQuery with Substitute slots", async () => {
+    await import("./relation.js");
+    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    const { Base } = await import("./base.js");
+
+    const adapter = new SQLite3Adapter(":memory:");
+    try {
+      await adapter.executeMutation(
+        'CREATE TABLE "books" ("id" INTEGER PRIMARY KEY, "title" TEXT)',
+      );
+      await adapter.executeMutation('INSERT INTO "books" ("title") VALUES (?)', ["Ruby"]);
+      await adapter.executeMutation('INSERT INTO "books" ("title") VALUES (?)', ["TypeScript"]);
+
+      class Book extends Base {
+        static {
+          this.tableName = "books";
+          this.adapter = adapter;
+        }
+      }
+
+      // preparedStatements defaults to false — uses PartialQuery path
+      const cache = StatementCache.create(adapter, (params) => {
+        return Book.where({ title: params.bind() }) as any;
+      });
+
+      const r1 = await cache.execute(["Ruby"], adapter);
+      expect(r1).toHaveLength(1);
+      expect(r1[0].readAttribute("title")).toBe("Ruby");
+
+      const r2 = await cache.execute(["TypeScript"], adapter);
+      expect(r2).toHaveLength(1);
+      expect(r2[0].readAttribute("title")).toBe("TypeScript");
+    } finally {
+      adapter.disconnectBang();
+    }
+  });
 });

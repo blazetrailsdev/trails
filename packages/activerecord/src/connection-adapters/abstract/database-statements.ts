@@ -155,12 +155,7 @@ export function cacheableQuery(
   arel: unknown,
 ): [unknown, unknown[]] {
   const host = this as DatabaseStatementsHost;
-  // Use compileWithBinds directly to get raw binds (QueryAttribute
-  // objects with Substitute values) that BindMap needs for indexing.
-  // toSqlAndBinds would type-cast them to primitives, losing Substitute.
   const visitor = (host as any)?.arelVisitor as Visitors.ToSql | undefined;
-  let sql: string;
-  let binds: unknown[];
 
   // Unwrap TreeManager → Node
   let node = arel;
@@ -168,27 +163,39 @@ export function cacheableQuery(
     node = (node as any).ast;
   }
 
-  if (visitor && node instanceof Nodes.Node) {
-    [sql, binds] = visitor.compileWithBinds(node);
-  } else if (typeof arel === "string") {
-    sql = arel;
-    binds = [];
-  } else {
-    sql = (node as any).toSql?.() ?? String(node);
-    binds = [];
+  // Prepared path: compile with bind extraction, return Query + raw binds
+  if (host?.preparedStatements && klass.query && visitor && node instanceof Nodes.Node) {
+    const [sql, binds] = visitor.compileWithBinds(node);
+    return [klass.query(sql), binds];
   }
 
-  if (host?.preparedStatements && klass.query) {
-    return [klass.query(sql), binds as unknown[]];
+  // Unprepared path: compile through PartialQueryCollector to produce
+  // parts with Substitute slots, matching Rails' cacheable_query when
+  // prepared_statements is false.
+  if (klass.partialQueryCollector && klass.partialQuery && visitor && node instanceof Nodes.Node) {
+    const collector = klass.partialQueryCollector() as {
+      value: [unknown[], unknown[]];
+    };
+    visitor.compileWithCollector(node, collector);
+    const [parts, collectedBinds] = collector.value;
+    return [klass.partialQuery(parts), collectedBinds];
+  }
+
+  // Fallback: compile to SQL string
+  let sql: string;
+  if (typeof arel === "string") {
+    sql = arel;
+  } else if (visitor && node instanceof Nodes.Node) {
+    sql = visitor.compile(node);
+  } else {
+    sql = (node as any).toSql?.() ?? String(node);
   }
 
   if (klass.partialQuery) {
-    return [klass.partialQuery(typeof sql === "string" ? [sql] : sql), binds as unknown[]];
+    return [klass.partialQuery([sql]), []];
   }
-
-  // Fallback: use query if available, otherwise raw SQL
   const queryObj = klass.query ? klass.query(sql) : sql;
-  return [queryObj, binds as unknown[]];
+  return [queryObj, []];
 }
 
 // --- Query execution ---

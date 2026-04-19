@@ -63,6 +63,12 @@ export class PartialQuery extends Query {
       let value = bindsCopy.shift();
       if (value instanceof Attribute) {
         value = value.valueForDatabase;
+      } else if (
+        value !== null &&
+        typeof value === "object" &&
+        typeof (value as Record<string, unknown>).valueForDatabase === "function"
+      ) {
+        value = (value as { valueForDatabase(): unknown }).valueForDatabase();
       }
       const conn = connection as { quote?(v: unknown): string };
       val[i] = conn.quote ? conn.quote(value) : quoteValue(value);
