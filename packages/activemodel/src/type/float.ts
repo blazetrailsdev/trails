@@ -1,6 +1,6 @@
-import { Type } from "./value.js";
+import { ValueType } from "./value.js";
 
-export class FloatType extends Type<number> {
+export class FloatType extends ValueType {
   readonly name = "float";
 
   cast(value: unknown): number | null {

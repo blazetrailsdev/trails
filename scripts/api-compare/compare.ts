@@ -93,8 +93,9 @@ interface InheritanceResult {
 }
 
 // Ruby builtin types whose TS equivalent cannot meaningfully extend them
-// (e.g. `class X < String`, `class X < Struct.new(...)`). Treat the TS side's
-// choice of base class as always matching when Ruby uses one of these.
+// (e.g. `class X < String`, `class X < Struct.new(...)`, `class X < Module`
+// for Ruby metaprogramming primitives). Treat the TS side's choice of
+// base class as always matching when Ruby uses one of these.
 const RUBY_UNEXTENDABLE_BUILTINS = new Set([
   "String",
   "Struct",
@@ -106,6 +107,7 @@ const RUBY_UNEXTENDABLE_BUILTINS = new Set([
   "Set",
   "Delegator",
   "SimpleDelegator",
+  "Module",
 ]);
 
 // Ruby builtin exception classes → TS `Error` is the accepted equivalent.
@@ -126,7 +128,10 @@ const RUBY_ERROR_BUILTINS = new Set([
 
 function shortName(fqn: string | undefined | null): string | null {
   if (!fqn) return null;
-  const parts = fqn.split("::");
+  // Ruby uses `::` as the namespace separator; TS extractor stores the
+  // raw superclass expression, so `extends globalThis.Error` ends up as
+  // `globalThis.Error` — strip either separator to reach the leaf name.
+  const parts = fqn.split(/::|\./);
   return parts[parts.length - 1] || null;
 }
 
@@ -166,11 +171,31 @@ export function nameMatches(rubyName: string, tsName: string): boolean {
  * Trails' common pattern of inserting an abstract intermediate class
  * (e.g. `TableDefinition extends AbstractTableDefinition extends TableDefinition`).
  */
-// Arel's TS port treats every AST participant as a `Node` for uniform
-// traversal, even when the Ruby equivalent is a plain object (Table) or
-// uses a dynamic parent (Attribute < Struct.new(...)). Count these as
-// matched to reflect the structural choice rather than a fidelity gap.
-const AREL_ROOT_NODE_CLASSES = new Set(["Table", "Attribute"]);
+// Rails classes where the TS port adds an abstract intermediate above
+// what Rails treats as the root. Accept null-ruby-super + TS extending
+// that intermediate as a matched deviation rather than a fidelity gap.
+//
+// Keyed by ts class name → ts superclass name that should be accepted.
+// - Arel Table/Attribute: Rails has no super (plain object or
+//   `Struct.new(...)`), TS roots them at `Node` for uniform AST walking.
+// - ActiveModel ValueType: Rails' `Value` has no super, TS adds an
+//   abstract `Type` above so subclasses can declare `abstract cast`.
+const TS_ROOT_INTERMEDIATE = new Map<string, string>([
+  ["Table", "Node"],
+  ["Attribute", "Node"],
+  ["ValueType", "Type"],
+]);
+
+// Per-class TS renames that don't fit the systematic alias patterns
+// (Abstract<X>, Base<X>, ActiveModel<X>, <X>Type). Keyed by the Ruby
+// short name → the literal TS class name in the expected file.
+// - `Name` → `ModelName`: Rails `ActiveModel::Name`. `Name` alone is
+//   too generic in TS, so the flattened class keeps the `Model` prefix.
+// - `Registry` → `TypeRegistry`: same rationale for `ActiveModel::Type::Registry`.
+const TS_CLASS_RENAMES: Record<string, string> = {
+  Name: "ModelName",
+  Registry: "TypeRegistry",
+};
 
 export function superclassesMatch(
   rubySuper: string | null,
@@ -181,7 +206,8 @@ export function superclassesMatch(
   // Ruby builtins have no faithful TS superclass; accept whatever TS uses.
   if (rubySuper && RUBY_UNEXTENDABLE_BUILTINS.has(rubySuper)) return true;
   // Rails-idiomatic "plain object" classes extend Arel.Node in TS.
-  if (!rubySuper && tsChain.includes("Node") && AREL_ROOT_NODE_CLASSES.has(tsName)) return true;
+  const expectedIntermediate = TS_ROOT_INTERMEDIATE.get(tsName);
+  if (!rubySuper && expectedIntermediate && tsChain.includes(expectedIntermediate)) return true;
   if (!rubySuper || tsChain.length === 0) return false;
   return tsChain.some((ancestor) => nameMatches(rubySuper, ancestor));
 }
@@ -660,7 +686,25 @@ function main() {
         const short = shortName(fqn)!;
         const rubySuper = shortName(info.superclass);
 
-        const tsCls = tsByFileName.get(`${expectedTs}::${short}`);
+        // Look up the TS class by the Ruby short name, falling back to
+        // the same rename aliases the superclass matcher uses — TS files
+        // sometimes rename the class itself to avoid builtin collisions
+        // (e.g. Rails' Type::Integer ↔ our type/integer.ts#IntegerType).
+        let tsCls = tsByFileName.get(`${expectedTs}::${short}`);
+        if (!tsCls) {
+          for (const { transform } of TS_PARENT_ALIASES) {
+            const alias = transform(short);
+            const found = tsByFileName.get(`${expectedTs}::${alias}`);
+            if (found) {
+              tsCls = found;
+              break;
+            }
+          }
+        }
+        if (!tsCls) {
+          const rename = TS_CLASS_RENAMES[short];
+          if (rename) tsCls = tsByFileName.get(`${expectedTs}::${rename}`);
+        }
         inheritance.checked++;
 
         if (!tsCls) {
@@ -688,7 +732,10 @@ function main() {
         }
 
         const chain = ancestorChain(tsCls);
-        if (superclassesMatch(rubySuper, chain, short)) {
+        // Pass the resolved TS class name (not the Ruby short name) so
+        // the `TS_ROOT_INTERMEDIATE` whitelist keys on what the TS file
+        // actually declares (e.g. "ValueType", not Ruby's "Value").
+        if (superclassesMatch(rubySuper, chain, tsCls.name)) {
           inheritance.matched++;
         } else {
           inheritance.mismatches.push({

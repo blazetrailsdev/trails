@@ -1,6 +1,6 @@
-import { Type } from "./value.js";
+import { ValueType } from "./value.js";
 
-export class DecimalType extends Type<string> {
+export class DecimalType extends ValueType {
   readonly name: string = "decimal";
 
   cast(value: unknown): string | null {

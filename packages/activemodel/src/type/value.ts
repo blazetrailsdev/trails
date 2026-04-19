@@ -85,7 +85,7 @@ export abstract class Type<T = unknown> {
 }
 
 export class ValueType extends Type<unknown> {
-  readonly name = "value";
+  readonly name: string = "value";
 
   cast(value: unknown): unknown {
     return value;

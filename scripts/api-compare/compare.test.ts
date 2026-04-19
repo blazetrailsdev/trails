@@ -85,6 +85,8 @@ describe("superclassesMatch", () => {
     // still counts it as matched.
     expect(superclassesMatch("String", ["Node", "NodeExpression"], "SqlLiteral")).toBe(true);
     expect(superclassesMatch("Struct", [], "Attribute")).toBe(true);
+    // Ruby's `Module` metaprogramming primitive has no TS analog.
+    expect(superclassesMatch("Module", [], "InstanceMethodsOnActivation")).toBe(true);
   });
 
   it("accepts arel Table/Attribute extending Node when Ruby has no super", () => {
@@ -92,8 +94,15 @@ describe("superclassesMatch", () => {
     expect(superclassesMatch(null, ["Node"], "Attribute")).toBe(true);
   });
 
-  it("does not auto-accept other classes extending Node with null Ruby super", () => {
-    // Only Table/Attribute are on the arel-root whitelist.
+  it("accepts activemodel ValueType extending Type when Ruby Value has no super", () => {
+    // Rails' `Type::Value` has no super; TS adds an abstract `Type`
+    // intermediate so subclasses can declare `abstract cast`.
+    expect(superclassesMatch(null, ["Type"], "ValueType")).toBe(true);
+  });
+
+  it("does not auto-accept other classes extending the intermediates with null Ruby super", () => {
+    // Only Table/Attribute/ValueType are on the intermediate whitelist.
     expect(superclassesMatch(null, ["Node"], "Something")).toBe(false);
+    expect(superclassesMatch(null, ["Type"], "Something")).toBe(false);
   });
 });

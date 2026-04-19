@@ -1,8 +1,6 @@
-import { Type } from "./value.js";
-
 import { ImmutableStringType } from "./immutable-string.js";
 
-export class StringType extends Type<string> {
+export class StringType extends ImmutableStringType {
   readonly name: string = "string";
 
   cast(value: unknown): string | null {
@@ -10,6 +8,9 @@ export class StringType extends Type<string> {
     return String(value);
   }
 
+  // Return type stays `unknown` so subclass overrides (e.g. PG OID's
+  // Xml which wraps the cast result in a Data node) can widen the
+  // output type the way Rails' loosely-typed `serialize` does.
   serialize(value: unknown): unknown {
     return this.cast(value);
   }

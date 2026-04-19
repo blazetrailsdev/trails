@@ -144,11 +144,3 @@ export class ModelName {
     return [scope, "models"];
   }
 }
-
-/**
- * Mirrors: ActiveModel::Name
- *
- * Inherits from ModelName — matches the Rails class name exactly.
- * ModelName remains the primary export for backwards compatibility.
- */
-export class Name extends ModelName {}

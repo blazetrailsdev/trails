@@ -1,6 +1,6 @@
-import { Type } from "./value.js";
+import { ValueType } from "./value.js";
 
-export class IntegerType extends Type<number> {
+export class IntegerType extends ValueType {
   readonly name: string = "integer";
   private readonly _range: [number, number];
 

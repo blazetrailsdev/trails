@@ -1,7 +1,7 @@
-import { Type } from "./value.js";
+import { ValueType } from "./value.js";
 
-export class ImmutableStringType extends Type<string> {
-  readonly name = "immutable_string";
+export class ImmutableStringType extends ValueType {
+  readonly name: string = "immutable_string";
 
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {
     super(options);
@@ -13,7 +13,7 @@ export class ImmutableStringType extends Type<string> {
     return Object.freeze(str) as string;
   }
 
-  serialize(value: unknown): string | null {
+  serialize(value: unknown): unknown {
     return this.cast(value);
   }
 

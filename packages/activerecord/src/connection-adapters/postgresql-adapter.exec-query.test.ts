@@ -141,15 +141,17 @@ describe("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
     // pg_catalog.format_type returns "integer", "character varying(255)",
     // etc. Our type_map is keyed by typname (int4, varchar). The
     // fallback needs to map between them so the well-known types
-    // resolve when oid is missing.
-    expect(adapter.lookupCastTypeFromColumn({ oid: null, sqlType: "integer" })).not.toBeInstanceOf(
-      ValueType,
-    );
-    expect(
-      adapter.lookupCastTypeFromColumn({ oid: null, sqlType: "character varying(255)" }),
-    ).not.toBeInstanceOf(ValueType);
-    expect(adapter.lookupCastTypeFromColumn({ oid: null, sqlType: "bigint" })).not.toBeInstanceOf(
-      ValueType,
-    );
+    // resolve when oid is missing. Check for specific resolved types
+    // rather than `not ValueType` — concrete types now extend
+    // ValueType, so every typed instance is also an instanceof ValueType.
+    const integer = adapter.lookupCastTypeFromColumn({ oid: null, sqlType: "integer" });
+    expect(integer.constructor).not.toBe(ValueType);
+    const varchar = adapter.lookupCastTypeFromColumn({
+      oid: null,
+      sqlType: "character varying(255)",
+    });
+    expect(varchar.constructor).not.toBe(ValueType);
+    const bigint = adapter.lookupCastTypeFromColumn({ oid: null, sqlType: "bigint" });
+    expect(bigint.constructor).not.toBe(ValueType);
   });
 });

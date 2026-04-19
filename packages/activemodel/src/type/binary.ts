@@ -1,9 +1,9 @@
-import { Type } from "./value.js";
+import { ValueType } from "./value.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-export class BinaryType extends Type<Uint8Array> {
+export class BinaryType extends ValueType {
   readonly name = "binary";
 
   cast(value: unknown): Uint8Array | null {
