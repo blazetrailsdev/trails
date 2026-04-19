@@ -130,13 +130,33 @@ function shortName(fqn: string | undefined | null): string | null {
   return parts[parts.length - 1] || null;
 }
 
-function nameMatches(rubyName: string, tsName: string): boolean {
+// Trails rename prefixes/suffixes used to disambiguate when a Rails class
+// name would collide with a built-in, a TS keyword, or another identifier
+// already in scope. Each entry lets `<ruby>` match `<prefix><ruby>` /
+// `<ruby><suffix>` on the TS side so the inheritance check sees through the
+// alias.
+// - `Abstract<X>`: parent import-aliased so an adapter can shadow its name
+//   (e.g. PG's `TableDefinition extends TableDefinition`).
+// - `Base<X>`: TS-added intermediate base class (`BaseLogSubscriber`,
+//   `BaseAbsenceValidator`) — Rails has a single class Trails splits in two.
+// - `ActiveModel<X>`: ActiveRecord's `Type::Date` collides with the JS
+//   `Date` constructor, so we import the ActiveModel type aliased.
+// - `<X>Type` suffix: Trails suffixes attribute-type classes to avoid
+//   clashing with the value they represent (e.g. `Json` value vs
+//   `JsonType` the cast type).
+const TS_PARENT_ALIASES: { transform: (ruby: string) => string }[] = [
+  { transform: (r) => `Abstract${r}` },
+  { transform: (r) => `Base${r}` },
+  { transform: (r) => `ActiveModel${r}` },
+  { transform: (r) => `${r}Type` },
+];
+
+export function nameMatches(rubyName: string, tsName: string): boolean {
   if (rubyName === tsName) return true;
   if (RUBY_ERROR_BUILTINS.has(rubyName) && tsName === "Error") return true;
-  // Trails convention: when a subclass in one adapter shadows its parent's
-  // name (e.g. PG's `TableDefinition extends TableDefinition`), the parent is
-  // import-aliased as `Abstract<Name>`. Treat the alias as the same class.
-  if (tsName === `Abstract${rubyName}`) return true;
+  for (const { transform } of TS_PARENT_ALIASES) {
+    if (tsName === transform(rubyName)) return true;
+  }
   return false;
 }
 
@@ -152,7 +172,11 @@ function nameMatches(rubyName: string, tsName: string): boolean {
 // matched to reflect the structural choice rather than a fidelity gap.
 const AREL_ROOT_NODE_CLASSES = new Set(["Table", "Attribute"]);
 
-function superclassesMatch(rubySuper: string | null, tsChain: string[], tsName: string): boolean {
+export function superclassesMatch(
+  rubySuper: string | null,
+  tsChain: string[],
+  tsName: string,
+): boolean {
   if (!rubySuper && tsChain.length === 0) return true;
   // Ruby builtins have no faithful TS superclass; accept whatever TS uses.
   if (rubySuper && RUBY_UNEXTENDABLE_BUILTINS.has(rubySuper)) return true;
@@ -819,4 +843,11 @@ function printReport(
   console.log(`${"=".repeat(100)}\n`);
 }
 
-main();
+// Only run the CLI when invoked as a script. `import`s (e.g. from tests)
+// should be able to pull in exported helpers without triggering main().
+const invokedAsScript =
+  typeof process !== "undefined" &&
+  Array.isArray(process.argv) &&
+  typeof process.argv[1] === "string" &&
+  process.argv[1].endsWith("compare.ts");
+if (invokedAsScript) main();
