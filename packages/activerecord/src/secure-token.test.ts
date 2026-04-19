@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
-import { hasSecureToken } from "./secure-token.js";
+import { hasSecureToken, MinimumLengthError } from "./secure-token.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -221,6 +221,29 @@ describe("has_secure_token (Rails-guided)", () => {
     const newToken = await (user as any).regenerateToken();
     expect(newToken).not.toBe(original);
     expect(user.token).toBe(newToken);
+  });
+
+  // Rails: test "assert_equal, assert_raises"  —  see secure_token.rb
+  //   MINIMUM_TOKEN_LENGTH = 24; lengths < 24 must raise.
+  it("raises MinimumLengthError when length is below 24", () => {
+    class User1 extends Base {
+      static {
+        this.attribute("token", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(() => hasSecureToken(User1, "token", { length: 23 })).toThrow(MinimumLengthError);
+    expect(() => hasSecureToken(User1, "token", { length: 23 })).toThrow(/minimum length of 24/);
+  });
+
+  it("accepts length >= 24 without raising", () => {
+    class User2 extends Base {
+      static {
+        this.attribute("token", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(() => hasSecureToken(User2, "token", { length: 24 })).not.toThrow();
   });
 
   // Rails: test "custom attribute name"

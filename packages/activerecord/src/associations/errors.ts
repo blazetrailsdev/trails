@@ -4,8 +4,9 @@
  * Mirrors: ActiveRecord::Associations error classes defined in
  * activerecord/lib/active_record/associations/errors.rb
  */
+import { ActiveRecordError, ConfigurationError } from "../errors.js";
 
-export class AssociationNotFoundError extends Error {
+export class AssociationNotFoundError extends ConfigurationError {
   readonly record: any;
   readonly associationName: string;
 
@@ -19,7 +20,7 @@ export class AssociationNotFoundError extends Error {
   }
 }
 
-export class InverseOfAssociationNotFoundError extends Error {
+export class InverseOfAssociationNotFoundError extends ActiveRecordError {
   readonly reflection: string;
   readonly inverseOf: string;
   readonly corrections: string[];
@@ -47,7 +48,7 @@ export class InverseOfAssociationNotFoundError extends Error {
   }
 }
 
-export class InverseOfAssociationRecursiveError extends Error {
+export class InverseOfAssociationRecursiveError extends ActiveRecordError {
   readonly reflection: string;
   readonly inverseOf: string;
 
@@ -61,7 +62,7 @@ export class InverseOfAssociationRecursiveError extends Error {
   }
 }
 
-export class HasManyThroughAssociationNotFoundError extends Error {
+export class HasManyThroughAssociationNotFoundError extends ActiveRecordError {
   readonly ownerClass: string;
   readonly reflection: string;
 
@@ -73,7 +74,7 @@ export class HasManyThroughAssociationNotFoundError extends Error {
   }
 }
 
-export class HasManyThroughAssociationPolymorphicSourceError extends Error {
+export class HasManyThroughAssociationPolymorphicSourceError extends ActiveRecordError {
   constructor(owner: string, association: string, source: string) {
     super(
       `Cannot have a has_many :through association '${association}' on ${owner} which goes through the polymorphic association '${source}'.`,
@@ -82,7 +83,7 @@ export class HasManyThroughAssociationPolymorphicSourceError extends Error {
   }
 }
 
-export class HasManyThroughAssociationPolymorphicThroughError extends Error {
+export class HasManyThroughAssociationPolymorphicThroughError extends ActiveRecordError {
   constructor(owner: string, association: string) {
     super(
       `Cannot have a has_many :through association '${association}' on ${owner} that has a polymorphic :through association.`,
@@ -91,7 +92,7 @@ export class HasManyThroughAssociationPolymorphicThroughError extends Error {
   }
 }
 
-export class HasManyThroughAssociationPointlessSourceTypeError extends Error {
+export class HasManyThroughAssociationPointlessSourceTypeError extends ActiveRecordError {
   constructor(owner: string, association: string, source: string) {
     super(
       `Cannot have a has_many :through association '${association}' on ${owner} with a :source_type but the :source '${source}' is not polymorphic.`,
@@ -100,7 +101,7 @@ export class HasManyThroughAssociationPointlessSourceTypeError extends Error {
   }
 }
 
-export class HasOneThroughCantAssociateThroughCollection extends Error {
+export class HasOneThroughCantAssociateThroughCollection extends ActiveRecordError {
   constructor(owner: string, association: string, through: string) {
     super(
       `Cannot have a has_one :through association '${association}' on ${owner} going through '${through}' which is a collection. Specify a has_one or belongs_to association instead.`,
@@ -109,7 +110,7 @@ export class HasOneThroughCantAssociateThroughCollection extends Error {
   }
 }
 
-export class HasOneAssociationPolymorphicThroughError extends Error {
+export class HasOneAssociationPolymorphicThroughError extends ActiveRecordError {
   constructor(owner: string, association: string) {
     super(
       `Cannot have a has_one :through association '${association}' on ${owner} that has a polymorphic :through association.`,
@@ -118,7 +119,7 @@ export class HasOneAssociationPolymorphicThroughError extends Error {
   }
 }
 
-export class HasManyThroughSourceAssociationNotFoundError extends Error {
+export class HasManyThroughSourceAssociationNotFoundError extends ActiveRecordError {
   constructor(owner: string, through: string, source: string, association: string) {
     super(
       `Could not find the source association(s) :${source} on ${owner} through '${through}'. Try 'hasMany ${association}, { through: "${through}", source: "<source_name>" }' with a valid source association defined on ${through}.`,
@@ -127,7 +128,7 @@ export class HasManyThroughSourceAssociationNotFoundError extends Error {
   }
 }
 
-export class HasManyThroughOrderError extends Error {
+export class HasManyThroughOrderError extends ActiveRecordError {
   constructor(owner: string, association: string, through: string) {
     super(
       `Cannot have a has_many :through association '${association}' on ${owner} which goes through '${through}' before the through association is defined.`,
@@ -136,7 +137,7 @@ export class HasManyThroughOrderError extends Error {
   }
 }
 
-export class ThroughCantAssociateThroughHasOneOrManyReflection extends Error {
+export class ThroughCantAssociateThroughHasOneOrManyReflection extends ActiveRecordError {
   constructor(owner: string, association: string) {
     super(
       `Cannot modify association '${association}' on ${owner} because the source reflection is through a has_one or has_many reflection.`,
@@ -159,14 +160,14 @@ export class HasOneThroughCantAssociateThroughHasOneOrManyReflection extends Thr
   }
 }
 
-export class CompositePrimaryKeyMismatchError extends Error {
+export class CompositePrimaryKeyMismatchError extends ActiveRecordError {
   constructor(owner: string, association: string) {
     super(`Association ${association} on ${owner} has a composite primary key mismatch.`);
     this.name = "CompositePrimaryKeyMismatchError";
   }
 }
 
-export class AmbiguousSourceReflectionForThroughAssociation extends Error {
+export class AmbiguousSourceReflectionForThroughAssociation extends ActiveRecordError {
   constructor(owner: string, association: string, sources: string[]) {
     super(
       `Ambiguous source reflection for through association '${association}' on ${owner}. Possible sources: ${sources.join(", ")}. Specify :source to resolve.`,
@@ -175,7 +176,7 @@ export class AmbiguousSourceReflectionForThroughAssociation extends Error {
   }
 }
 
-export class ThroughNestedAssociationsAreReadonly extends Error {
+export class ThroughNestedAssociationsAreReadonly extends ActiveRecordError {
   constructor(owner: string, association: string) {
     super(
       `Cannot modify association '${association}' on ${owner} because it goes through a nested through association.`,
@@ -198,7 +199,7 @@ export class HasOneThroughNestedAssociationsAreReadonly extends ThroughNestedAss
   }
 }
 
-export class EagerLoadPolymorphicError extends Error {
+export class EagerLoadPolymorphicError extends ActiveRecordError {
   readonly reflection: string;
 
   constructor(reflection: string) {
@@ -208,7 +209,7 @@ export class EagerLoadPolymorphicError extends Error {
   }
 }
 
-export class DeleteRestrictionError extends Error {
+export class DeleteRestrictionError extends ActiveRecordError {
   readonly record: any;
   readonly association: string;
 

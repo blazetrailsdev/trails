@@ -1,8 +1,21 @@
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
-import { UnknownAttributeError } from "./errors.js";
+import { ActiveRecordError, UnknownAttributeError } from "./errors.js";
 import { singularize, camelize, underscore } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
+
+/**
+ * Raised when more nested-attribute records are provided than the
+ * association's `limit` option allows.
+ *
+ * Mirrors: ActiveRecord::NestedAttributes::TooManyRecords
+ */
+export class TooManyRecords extends ActiveRecordError {
+  constructor(message?: string) {
+    super(message);
+    this.name = "TooManyRecords";
+  }
+}
 
 interface NestedAttributeOptions {
   allowDestroy?: boolean;
@@ -101,6 +114,20 @@ export function assignNestedAttributes(
     attrs = sortedKeys.map((k) => (attributesArray as Record<string, Record<string, unknown>>)[k]);
   }
 
+  // Rails raises TooManyRecords synchronously from
+  // `assign_nested_attribute_for_collection_association` when `limit:`
+  // is exceeded — mirror that here so callers see the misconfiguration
+  // at assign time, not at save time.
+  const ctor = record.constructor as typeof Base;
+  const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
+  const config = configs.find((c) => c.associationName === associationName);
+  if (config?.options.limit !== undefined && attrs.length > config.options.limit) {
+    throw new TooManyRecords(
+      `Maximum ${config.options.limit} records are allowed. ` +
+        `Got ${attrs.length} records instead.`,
+    );
+  }
+
   // Store on instance for later processing
   if (!(record as any)._pendingNestedAttributes) {
     (record as any)._pendingNestedAttributes = new Map();
@@ -139,13 +166,8 @@ async function processNestedAttributes(record: Base): Promise<void> {
 
     const foreignKey = assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
 
-    // Apply limit check
-    if (config.options.limit && attrsList.length > config.options.limit) {
-      record.errors.add(assocName, "invalid", {
-        message: `exceeds the limit of ${config.options.limit}`,
-      });
-      continue;
-    }
+    // limit-check already fired in assignNestedAttributes (Rails
+    // raises synchronously at assign time).
 
     const childPk = (targetModel as any).primaryKey || "id";
 

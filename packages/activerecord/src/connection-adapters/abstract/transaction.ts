@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "../../adapter.js";
 import { ActiveRecordTransaction } from "../../transaction.js";
-import { PreparedStatementCacheExpired } from "../../errors.js";
+import { ActiveRecordError, PreparedStatementCacheExpired } from "../../errors.js";
 import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
 
 /**
@@ -104,7 +104,7 @@ export class TransactionState {
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationNotStartedError
  */
-export class InstrumentationNotStartedError extends Error {
+export class InstrumentationNotStartedError extends ActiveRecordError {
   constructor(message = "Called finish on a transaction that hasn't started") {
     super(message);
     this.name = "InstrumentationNotStartedError";
@@ -114,7 +114,7 @@ export class InstrumentationNotStartedError extends Error {
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationAlreadyStartedError
  */
-export class InstrumentationAlreadyStartedError extends Error {
+export class InstrumentationAlreadyStartedError extends ActiveRecordError {
   constructor(message = "Called start on an already started transaction") {
     super(message);
     this.name = "InstrumentationAlreadyStartedError";

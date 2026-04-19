@@ -9,6 +9,7 @@ import {
   registerModel,
   acceptsNestedAttributesFor,
   assignNestedAttributes,
+  TooManyRecords,
 } from "./index.js";
 import { Associations } from "./associations.js";
 
@@ -373,10 +374,9 @@ describe("NestedAttributesTest", () => {
     registerModel(NArticleE);
 
     const article = await NArticleE.create({ title: "Test" });
-    assignNestedAttributes(article, "nTagEs", [{ name: "a" }, { name: "b" }, { name: "c" }]);
-    await article.save();
-
-    expect(article.errors.size).toBeGreaterThan(0);
+    expect(() =>
+      assignNestedAttributes(article, "nTagEs", [{ name: "a" }, { name: "b" }, { name: "c" }]),
+    ).toThrow(TooManyRecords);
     const tags = await NTagE.where({ narticleE_id: article.id }).toArray();
     expect(tags.length).toBe(0);
   });

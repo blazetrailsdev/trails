@@ -7,7 +7,9 @@
  * `@blazetrails/activerecord/migration` keep working.
  */
 
-export class MigrationError extends Error {
+import { ActiveRecordError } from "./errors.js";
+
+export class MigrationError extends ActiveRecordError {
   constructor(message?: string) {
     super(message);
     this.name = "MigrationError";

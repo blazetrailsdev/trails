@@ -2,6 +2,19 @@ import { getCrypto } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 /**
+ * Raised when `hasSecureToken` is configured with a length below the
+ * allowed minimum (24).
+ *
+ * Mirrors: ActiveRecord::SecureToken::MinimumLengthError
+ */
+export class MinimumLengthError extends Error {
+  constructor(message?: string) {
+    super(message);
+    this.name = "MinimumLengthError";
+  }
+}
+
+/**
  * Generate a unique random token.
  *
  * Mirrors: SecureRandom.base58(24) used by has_secure_token
@@ -27,12 +40,19 @@ function generateToken(length: number = 24): string {
  * Generates a unique token before create if the attribute is blank.
  * Adds a `regenerateToken()` (or `regenerateAuthToken()`) instance method.
  */
+const MINIMUM_TOKEN_LENGTH = 24;
+
 export function hasSecureToken(
   modelClass: typeof Base,
   attribute: string = "token",
   options?: { length?: number },
 ): void {
-  const tokenLength = options?.length ?? 24;
+  const tokenLength = options?.length ?? MINIMUM_TOKEN_LENGTH;
+  if (tokenLength < MINIMUM_TOKEN_LENGTH) {
+    throw new MinimumLengthError(
+      `Token requires a minimum length of ${MINIMUM_TOKEN_LENGTH} characters.`,
+    );
+  }
 
   // Before create: auto-generate token if blank
   modelClass.beforeCreate((record: any) => {

@@ -250,7 +250,11 @@ export {
   reflectOnAllAutosaveAssociations,
   type AssociationLikeReflection,
 } from "./reflection.js";
-export { acceptsNestedAttributesFor, assignNestedAttributes } from "./nested-attributes.js";
+export {
+  acceptsNestedAttributesFor,
+  assignNestedAttributes,
+  TooManyRecords,
+} from "./nested-attributes.js";
 // hasSecureToken requires node:crypto — use subpath: @blazetrails/activerecord/secure-token
 export { composedOf } from "./composed-of.js";
 export { serialize } from "./serialize.js";

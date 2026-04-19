@@ -17,7 +17,10 @@ import { Data as BitData } from "./oid/bit.js";
 import { Range } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 
-export class IntegerOutOf64BitRange extends RangeError {
+// Rails inherits from StandardError — use plain Error in TS for
+// parity. JS's `RangeError` is a built-in that extends Error; it
+// implies numeric-range semantics we don't need here.
+export class IntegerOutOf64BitRange extends Error {
   constructor(value: bigint | number) {
     super(
       `${value} is out of range for PostgreSQL bigint (64-bit signed integer): ` +

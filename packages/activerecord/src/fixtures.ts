@@ -3,6 +3,7 @@
  *
  * Mirrors: ActiveRecord::Fixture and related error classes
  */
+import { ActiveRecordError } from "./errors.js";
 
 export class FixtureError extends Error {
   constructor(message: string) {
@@ -11,7 +12,10 @@ export class FixtureError extends Error {
   }
 }
 
-export class FixtureClassNotFound extends FixtureError {
+// Rails nests FixtureClassNotFound directly under ActiveRecordError
+// (not FixtureError), so keep the inheritance edge there — the class
+// is still surfaced via FixtureSet.FixtureClassNotFound for callers.
+export class FixtureClassNotFound extends ActiveRecordError {
   constructor(className: string) {
     super(`No model class found for fixture: ${className}`);
     this.name = "FixtureClassNotFound";
