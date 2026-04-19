@@ -13,6 +13,21 @@ import type { Result } from "./result.js";
 export type ExplainOption = string | { format: string };
 
 /**
+ * Adapter-level options that travel alongside driver connection
+ * params in a single config hash (Rails' database.yml shape).
+ * Constructors strip these keys out before handing the rest to the
+ * driver.
+ *
+ * Mirrors: the adapter-level keys read in
+ * `ActiveRecord::ConnectionAdapters::AbstractAdapter#initialize`
+ * (`:statement_limit`, `:prepared_statements`).
+ */
+export interface TrailsAdapterOptions {
+  statementLimit?: number;
+  preparedStatements?: boolean;
+}
+
+/**
  * Stringify an arbitrary value for inclusion in an EXPLAIN validation
  * error message. `as any` callers can hand us arbitrary shapes —
  * circular objects, BigInts, Symbols, functions — and a raw

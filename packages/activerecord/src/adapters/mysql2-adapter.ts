@@ -1,6 +1,6 @@
 import mysql from "mysql2/promise";
 import { Notifications } from "@blazetrails/activesupport";
-import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
+import type { DatabaseAdapter, ExplainOption, TrailsAdapterOptions } from "../adapter.js";
 import {
   AbstractMysqlAdapter,
   StatementPool as MysqlStatementPool,
@@ -51,8 +51,12 @@ class Mysql2StatementPool extends MysqlStatementPool {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2Adapter
  *
- * Accepts either a connection URI (`mysql://...`) or a `mysql2` pool config
- * object. Uses a connection pool internally for concurrent access.
+ * Accepts either a connection URI (`mysql://...`) or a merged config
+ * hash — `mysql2` pool-options keys for the driver, plus Rails' adapter-
+ * level keys (`statementLimit`, `preparedStatements`) stripped into the
+ * adapter before `mysql.createPool` is called. Matches Rails' database.yml
+ * shape where driver params and adapter knobs share one hash.
+ * Uses a connection pool internally for concurrent access.
  */
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
   override get adapterName(): string {
@@ -144,13 +148,22 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // not yet probed, `true`/`false` = result.
   private _statisticsHasExpression: boolean | undefined;
 
-  constructor(config: string | mysql.PoolOptions) {
+  constructor(config: string | (mysql.PoolOptions & TrailsAdapterOptions)) {
     super();
     if (typeof config === "string") {
       this._driverPool = mysql.createPool({ uri: config });
-    } else {
-      this._driverPool = mysql.createPool(config);
+      return;
     }
+    // See PostgreSQLAdapter#constructor: Rails' database.yml merges
+    // driver + adapter config, and AbstractAdapter#initialize reads
+    // `:statement_limit` / `:prepared_statements` off that single
+    // hash. Validate & apply the adapter-level keys FIRST so an
+    // invalid value fails before `mysql.createPool` runs — otherwise
+    // a throw would leave a live pool with no cleanup path.
+    const { statementLimit, preparedStatements, ...mysqlConfig } = config;
+    if (statementLimit !== undefined) this.statementLimit = statementLimit;
+    if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
+    this._driverPool = mysql.createPool(mysqlConfig);
   }
 
   /**

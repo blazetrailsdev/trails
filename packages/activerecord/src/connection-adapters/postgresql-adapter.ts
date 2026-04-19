@@ -21,7 +21,7 @@ import {
   initializeTypeMap as staticInitializeTypeMap,
 } from "./postgresql/type-map-init.js";
 import { inspectExplainOption } from "../adapter.js";
-import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
+import type { DatabaseAdapter, ExplainOption, TrailsAdapterOptions } from "../adapter.js";
 import { PreparedStatementCacheExpired } from "../errors.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
@@ -32,8 +32,12 @@ import { typeCastedBinds } from "./abstract/database-statements.js";
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter
  *
- * Accepts either a connection string (`postgres://...`) or a `pg.PoolConfig`
- * object. Uses a connection pool internally for concurrent access.
+ * Accepts either a connection string (`postgres://...`) or a merged
+ * config hash — `pg.PoolConfig` keys for the driver, plus Rails'
+ * adapter-level keys (`statementLimit`, `preparedStatements`) stripped
+ * into the adapter before `pg.Pool` is built. Matches Rails' database.yml
+ * shape where driver params and adapter knobs share one hash.
+ * Uses a connection pool internally for concurrent access.
  */
 export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapter {
   override get adapterName(): string {
@@ -94,13 +98,24 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
   }
 
-  constructor(config: string | pg.PoolConfig) {
+  constructor(config: string | (pg.PoolConfig & TrailsAdapterOptions)) {
     super();
     if (typeof config === "string") {
       this._driverPool = new pg.Pool({ connectionString: config });
-    } else {
-      this._driverPool = new pg.Pool(config);
+      return;
     }
+    // Rails' database.yml merges driver connection params + adapter
+    // options into one hash; AbstractAdapter#initialize reads
+    // `config[:statement_limit]` / `config[:prepared_statements]`
+    // and hands the rest to the driver. Validate & apply the
+    // adapter-level keys FIRST so an invalid value fails before
+    // `pg.Pool` is constructed — otherwise a throw here would leave
+    // a live driver pool with no cleanup path on the half-built
+    // adapter.
+    const { statementLimit, preparedStatements, ...pgConfig } = config;
+    if (statementLimit !== undefined) this.statementLimit = statementLimit;
+    if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
+    this._driverPool = new pg.Pool(pgConfig);
   }
 
   /**

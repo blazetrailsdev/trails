@@ -253,6 +253,11 @@ export class AbstractAdapter extends AbstractAdapterBase {
   }
 
   set preparedStatements(value: boolean) {
+    if (typeof value !== "boolean") {
+      throw new TypeError(
+        `preparedStatements must be a boolean; got ${typeof value}: ${String(value)}`,
+      );
+    }
     this._preparedStatements = value;
   }
 

@@ -104,5 +104,60 @@ describeIfMysql("Mysql2Adapter", () => {
       await adapter.close();
       expect(() => pool.clear()).not.toThrow();
     });
+
+    it("reads statementLimit from the config hash (database.yml shape)", async () => {
+      const configured = new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 7 });
+      expect(configured.statementLimit).toBe(7);
+      await configured.close();
+    });
+
+    it("reads preparedStatements from the config hash", async () => {
+      const configured = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        preparedStatements: false,
+      });
+      expect(configured.preparedStatements).toBe(false);
+      await configured.close();
+    });
+
+    it("rejects invalid statementLimit at construction time", () => {
+      expect(() => new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: -1 })).toThrow(
+        RangeError,
+      );
+      expect(() => new Mysql2Adapter({ uri: MYSQL_TEST_URL, statementLimit: 1.5 })).toThrow(
+        RangeError,
+      );
+    });
+
+    it("rejects non-boolean preparedStatements at construction time and via assignment", async () => {
+      // Mirror coverage to PG's statement-pool tests — without an
+      // explicit guard test the runtime TypeError could regress
+      // silently when adapter options are wired.
+      expect(
+        () =>
+          new Mysql2Adapter({
+            uri: MYSQL_TEST_URL,
+            preparedStatements: "false" as unknown as boolean,
+          }),
+      ).toThrow(TypeError);
+      expect(
+        () =>
+          new Mysql2Adapter({
+            uri: MYSQL_TEST_URL,
+            preparedStatements: 0 as unknown as boolean,
+          }),
+      ).toThrow(TypeError);
+
+      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
+      try {
+        expect(() => {
+          (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
+        }).toThrow(TypeError);
+      } finally {
+        // mysql2 pool keeps open handles — close to avoid leaked
+        // sockets / Vitest hangs.
+        await adapter2.close();
+      }
+    });
   });
 });

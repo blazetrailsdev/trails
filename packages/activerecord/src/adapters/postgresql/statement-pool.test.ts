@@ -137,5 +137,64 @@ describeIfPg("PostgreSQLAdapter", () => {
       const { PreparedStatementCacheExpired } = await import("../../errors.js");
       expect(new PreparedStatementCacheExpired("test").name).toBe("PreparedStatementCacheExpired");
     });
+
+    it("reads statementLimit from the config hash (database.yml shape)", async () => {
+      const configured = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        statementLimit: 7,
+      });
+      expect(configured.statementLimit).toBe(7);
+      await configured.close();
+    });
+
+    it("reads preparedStatements from the config hash", async () => {
+      const configured = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        preparedStatements: false,
+      });
+      expect(configured.preparedStatements).toBe(false);
+      await configured.close();
+    });
+
+    it("rejects invalid statementLimit at construction time", () => {
+      expect(
+        () => new PostgreSQLAdapter({ connectionString: PG_TEST_URL, statementLimit: -1 }),
+      ).toThrow(RangeError);
+      expect(
+        () => new PostgreSQLAdapter({ connectionString: PG_TEST_URL, statementLimit: 1.5 }),
+      ).toThrow(RangeError);
+    });
+
+    it("rejects non-boolean preparedStatements at construction time and via assignment", async () => {
+      // Construction-time validation routes preparedStatements through
+      // the setter, so a non-boolean (string, number, etc.) hits the
+      // same TypeError guard as direct assignment. Without this test
+      // the runtime guard could regress silently.
+      expect(
+        () =>
+          new PostgreSQLAdapter({
+            connectionString: PG_TEST_URL,
+            preparedStatements: "false" as unknown as boolean,
+          }),
+      ).toThrow(TypeError);
+      expect(
+        () =>
+          new PostgreSQLAdapter({
+            connectionString: PG_TEST_URL,
+            preparedStatements: 0 as unknown as boolean,
+          }),
+      ).toThrow(TypeError);
+
+      const adapter2 = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        expect(() => {
+          (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
+        }).toThrow(TypeError);
+      } finally {
+        // pg.Pool keeps sockets/timers alive — close to avoid Vitest
+        // hangs / flakiness from leaked handles.
+        await adapter2.close();
+      }
+    });
   });
 });
