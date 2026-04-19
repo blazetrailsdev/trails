@@ -550,6 +550,274 @@ describe("AssociationScope", () => {
     expect(sql).toMatch(/"cc_memberships"\."active"\s*=\s*TRUE/i);
   });
 
+  it("loadHasMany through with sourceType filters by polymorphic source type (PR 3c)", async () => {
+    // Gallery belongsTo :imageable, polymorphic: true (the Gallery
+    // model holds the polymorphic FK + type pair). When we hop through
+    // galleries with a sourceType filter, PolymorphicReflection wraps
+    // the chain entry and adds a type constraint
+    // `where(imageable_type: sourceType)`. PR 3c's
+    // _mergeReflectionScopeChain detects PolymorphicReflection and
+    // applies its constraints() — including the source_type_scope —
+    // to the chain JOIN so only the right polymorphic rows match.
+    const { loadHasMany } = await import("../associations.js");
+    class StAuthor extends Base {
+      declare name: string;
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StGallery extends Base {
+      static {
+        this.attribute("st_author_id", "integer");
+        this.attribute("imageable_id", "integer");
+        this.attribute("imageable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StPhoto extends Base {
+      declare title: string;
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StVideo extends Base {
+      declare title: string;
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(StAuthor);
+    registerModel(StGallery);
+    registerModel(StPhoto);
+    registerModel(StVideo);
+    Associations.hasMany.call(StAuthor, "st_galleries", {
+      className: "StGallery",
+      foreignKey: "st_author_id",
+    });
+    Associations.belongsTo.call(StGallery, "imageable", { polymorphic: true });
+    // Through with sourceType — only StPhoto galleries should match.
+    Associations.hasMany.call(StAuthor, "st_photos", {
+      className: "StPhoto",
+      through: "st_galleries",
+      source: "imageable",
+      sourceType: "StPhoto",
+    });
+
+    const author = await StAuthor.create({ name: "Alice" });
+    const photo = await StPhoto.create({ title: "p1" });
+    const video = await StVideo.create({ title: "v1" });
+    await StGallery.create({
+      st_author_id: author.id,
+      imageable_id: photo.id,
+      imageable_type: "StPhoto",
+    });
+    await StGallery.create({
+      st_author_id: author.id,
+      imageable_id: video.id,
+      imageable_type: "StVideo",
+    });
+
+    const photos = (await loadHasMany(author, "st_photos", {
+      className: "StPhoto",
+      through: "st_galleries",
+      source: "imageable",
+      sourceType: "StPhoto",
+    })) as StPhoto[];
+    // Without sourceType filtering, the through join would return BOTH
+    // gallery rows; we'd then JOIN to the wrong rows in st_photos.
+    // With the filter, only the StPhoto-typed gallery participates.
+    expect(photos.map((p) => p.title)).toEqual(["p1"]);
+  });
+
+  it("loadHasMany through with sourceType + non-id target PK uses correct join column", async () => {
+    // Regression: BelongsToReflection.joinPrimaryKey hard-codes "id"
+    // for polymorphic sources, but the sourceType target may use a
+    // different PK. Without per-klass JOIN routing, we'd emit
+    // target."id" = through."<fk>" instead of target."<custom_pk>".
+    const { loadHasMany } = await import("../associations.js");
+    class NpAuthor extends Base {
+      declare name: string;
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NpGallery extends Base {
+      static {
+        this.attribute("np_author_id", "integer");
+        this.attribute("imageable_uuid", "string");
+        this.attribute("imageable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NpPhoto extends Base {
+      declare title: string;
+      static {
+        this.attribute("uuid", "string");
+        this.attribute("title", "string");
+        this.primaryKey = "uuid";
+        this.adapter = adapter;
+      }
+    }
+    registerModel(NpAuthor);
+    registerModel(NpGallery);
+    registerModel(NpPhoto);
+    Associations.hasMany.call(NpAuthor, "np_galleries", {
+      className: "NpGallery",
+      foreignKey: "np_author_id",
+    });
+    Associations.belongsTo.call(NpGallery, "imageable", {
+      polymorphic: true,
+      foreignKey: "imageable_uuid",
+    });
+    Associations.hasMany.call(NpAuthor, "np_photos", {
+      className: "NpPhoto",
+      through: "np_galleries",
+      source: "imageable",
+      sourceType: "NpPhoto",
+    });
+
+    const author = await NpAuthor.create({ name: "Alice" });
+    const photo = await NpPhoto.create({ uuid: "u1", title: "p1" });
+    await NpGallery.create({
+      np_author_id: author.id,
+      imageable_uuid: "u1",
+      imageable_type: "NpPhoto",
+    });
+
+    const photos = (await loadHasMany(author, "np_photos", {
+      className: "NpPhoto",
+      through: "np_galleries",
+      source: "imageable",
+      sourceType: "NpPhoto",
+    })) as NpPhoto[];
+    expect(photos.map((p) => p.title)).toEqual(["p1"]);
+  });
+
+  it("loadHasOne through with hasOne source routes via AssociationScope and returns one record", async () => {
+    // PR 3c also covers hasOne source on the through model. e.g.,
+    // User has_one :account; Account has_one :preferences;
+    // User has_one :preferences through :account (source is hasOne,
+    // not belongsTo). Verifies the join direction differs from
+    // belongsTo-source — target's FK back to through, not the other
+    // way — and that loadHasOne returns exactly one record.
+    const { loadHasOne } = await import("../associations.js");
+    class Ho1User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Ho1Account extends Base {
+      static {
+        this.attribute("ho1_user_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Ho1Pref extends Base {
+      declare theme: string;
+      static {
+        this.attribute("ho1_account_id", "integer");
+        this.attribute("theme", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Ho1User);
+    registerModel(Ho1Account);
+    registerModel(Ho1Pref);
+    Associations.hasOne.call(Ho1User, "ho1_account", {
+      className: "Ho1Account",
+      foreignKey: "ho1_user_id",
+    });
+    Associations.hasOne.call(Ho1Account, "ho1_pref", {
+      className: "Ho1Pref",
+      foreignKey: "ho1_account_id",
+    });
+    Associations.hasOne.call(Ho1User, "ho1_pref", {
+      className: "Ho1Pref",
+      through: "ho1_account",
+      source: "ho1_pref",
+    });
+
+    const user = await Ho1User.create({ name: "Alice" });
+    const account = await Ho1Account.create({ ho1_user_id: user.id });
+    await Ho1Pref.create({ ho1_account_id: account.id, theme: "dark" });
+
+    const pref = (await loadHasOne(user, "ho1_pref", {
+      className: "Ho1Pref",
+      through: "ho1_account",
+      source: "ho1_pref",
+    })) as Ho1Pref | null;
+    expect(pref).not.toBeNull();
+    expect(pref!.theme).toBe("dark");
+  });
+
+  it("loadHasMany through with has_many source routes via AssociationScope (PR 3c widening)", async () => {
+    // Author has_many :posts; Post has_many :comments; Author has_many
+    // :comments, through: :posts (source: :comments → has_many on Post,
+    // NOT belongsTo). PR 3b only routed belongsTo-source shapes; PR 3c
+    // widens to has_many source — the chain machinery already handles
+    // the join direction via reflection.joinPrimaryKey/joinForeignKey
+    // delegation, the gate just needed dropping.
+    const { loadHasMany } = await import("../associations.js");
+    class HsAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class HsPost extends Base {
+      static {
+        this.attribute("hs_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class HsComment extends Base {
+      declare body: string;
+      static {
+        this.attribute("hs_post_id", "integer");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(HsAuthor);
+    registerModel(HsPost);
+    registerModel(HsComment);
+    Associations.hasMany.call(HsAuthor, "hs_posts", {
+      className: "HsPost",
+      foreignKey: "hs_author_id",
+    });
+    Associations.hasMany.call(HsPost, "hs_comments", {
+      className: "HsComment",
+      foreignKey: "hs_post_id",
+    });
+    Associations.hasMany.call(HsAuthor, "hs_comments", {
+      className: "HsComment",
+      through: "hs_posts",
+      source: "hs_comments",
+    });
+
+    const author = await HsAuthor.create({ name: "Alice" });
+    const p1 = await HsPost.create({ hs_author_id: author.id });
+    const p2 = await HsPost.create({ hs_author_id: author.id });
+    await HsComment.create({ hs_post_id: p1.id, body: "first" });
+    await HsComment.create({ hs_post_id: p2.id, body: "second" });
+    // Another author's comment shouldn't show up
+    const other = await HsAuthor.create({ name: "Bob" });
+    const op = await HsPost.create({ hs_author_id: other.id });
+    await HsComment.create({ hs_post_id: op.id, body: "other" });
+
+    const comments = (await loadHasMany(author, "hs_comments", {
+      className: "HsComment",
+      through: "hs_posts",
+      source: "hs_comments",
+    })) as HsComment[];
+    expect(comments.map((c) => c.body).sort()).toEqual(["first", "second"]);
+  });
+
   it("loadHasOne through chain (belongsTo source) routes via AssociationScope and returns one record", async () => {
     // PR 3b migration covers loadHasOne too. End-to-end: insert,
     // call loadHasOne with a through reflection, assert single result.

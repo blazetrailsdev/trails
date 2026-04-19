@@ -269,14 +269,49 @@ function _canRouteThroughViaAssociationScope(
   options: AssociationOptions,
 ): boolean {
   if (!reflection) return false;
-  if (options.sourceType) return false;
   if (options.disableJoins) return false;
+  // Only ThroughReflection has a real distinct sourceReflection.
+  // AssociationReflection.sourceReflection returns `this` (line 793 in
+  // reflection.ts), which means HABTM and other non-through reflections
+  // would falsely match. Gate explicitly on isThroughReflection so HABTM's
+  // anonymous-join-model machinery (with its own load path) keeps using
+  // the existing 2-step loaders.
+  const refl = reflection as {
+    isThroughReflection?: () => boolean;
+    isNested?: () => boolean;
+  };
+  if (typeof refl.isThroughReflection !== "function" || !refl.isThroughReflection()) {
+    return false;
+  }
+  // Through-a-through (nested) cases — either the throughReflection
+  // OR the sourceReflection is itself a ThroughReflection. Rails
+  // exposes both via ThroughReflection#isNested (reflection.ts:1187);
+  // PR 3c sticks with chain-length-2, so any nested shape falls back
+  // to the 2-step loader.
+  if (typeof refl.isNested === "function" && refl.isNested()) return false;
   const src = (reflection as { sourceReflection?: unknown }).sourceReflection as
     | { belongsTo?: () => boolean; isPolymorphic?: () => boolean }
     | undefined;
   if (!src) return false;
-  if (typeof src.belongsTo !== "function" || !src.belongsTo()) return false;
-  if (typeof src.isPolymorphic === "function" && src.isPolymorphic()) return false;
+  // Polymorphic has_many / has_one source (rare): the chain walker
+  // would need inversion machinery not present in PR 3c. Polymorphic
+  // belongsTo source WITH sourceType is routed — AssociationScope's
+  // _nextChainScope now uses ThroughReflection#joinPrimaryKeyFor(klass)
+  // so the resolved sourceType class's PK drives the JOIN.
+  if (
+    typeof src.isPolymorphic === "function" &&
+    src.isPolymorphic() &&
+    (typeof src.belongsTo !== "function" || !src.belongsTo())
+  ) {
+    return false;
+  }
+  // Polymorphic belongsTo source requires sourceType to resolve the
+  // target class. Without sourceType the JOIN can't pick a single
+  // target table — fall back to the 2-step loader which handles that
+  // by grouping through records by type.
+  if (typeof src.isPolymorphic === "function" && src.isPolymorphic() && !options.sourceType) {
+    return false;
+  }
   return true;
 }
 

@@ -1150,6 +1150,24 @@ export class ThroughReflection extends AbstractReflection {
     return this.sourceReflection?.joinPrimaryKey ?? this._delegate.joinPrimaryKey;
   }
 
+  /**
+   * Resolve the join primary key against a runtime klass, mirroring
+   * BelongsToReflection#joinPrimaryKeyFor. Needed when the source is
+   * a polymorphic belongsTo with sourceType: the static joinPrimaryKey
+   * hardcodes "id", but the resolved sourceType class may use a
+   * different PK column (e.g. `uuid`).
+   */
+  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
+    const src = this.sourceReflection as unknown as {
+      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
+      joinPrimaryKey?: string | string[];
+    } | null;
+    if (src && typeof src.joinPrimaryKeyFor === "function") {
+      return src.joinPrimaryKeyFor(klass);
+    }
+    return src?.joinPrimaryKey ?? this._delegate.joinPrimaryKey;
+  }
+
   get joinForeignKey(): string | string[] {
     return this.sourceReflection?.joinForeignKey ?? this._delegate.joinForeignKey;
   }
