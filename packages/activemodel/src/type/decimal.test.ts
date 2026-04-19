@@ -39,8 +39,14 @@ describe("DecimalTest", () => {
   });
 
   it("type cast decimal from invalid string", () => {
+    // Mirrors Rails' decimal_test.rb#test_type_cast_decimal_from_invalid_string:
+    // empty string -> nil, leading-numeric prefix keeps the prefix,
+    // non-numeric leading chars return BigDecimal(0).
     const type = new Types.DecimalType();
-    expect(type.cast("not-a-number")).toBe(null);
+    expect(type.cast("")).toBe(null);
+    expect(type.cast("1ignore")).toBe("1");
+    expect(type.cast("bad1")).toBe("0");
+    expect(type.cast("bad")).toBe("0");
   });
 
   it("changed?", () => {

@@ -3,7 +3,7 @@ import { ValueType } from "./value.js";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-export class BinaryType extends ValueType {
+export class BinaryType extends ValueType<Uint8Array> {
   readonly name = "binary";
 
   cast(value: unknown): Uint8Array | null {

@@ -84,11 +84,13 @@ export abstract class Type<T = unknown> {
   }
 }
 
-export class ValueType extends Type<unknown> {
+export class ValueType<T = unknown> extends Type<T> {
   readonly name: string = "value";
 
-  cast(value: unknown): unknown {
-    return value;
+  cast(value: unknown): T | null {
+    // No-op default: pass the value through. Subclasses narrow by
+    // overriding `cast` with a concrete return type.
+    return value as T | null;
   }
 
   equals(other: Type): boolean {

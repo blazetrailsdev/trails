@@ -1,6 +1,6 @@
 import { ValueType } from "./value.js";
 
-export class TimeType extends ValueType {
+export class TimeType extends ValueType<Date> {
   readonly name = "time";
 
   cast(value: unknown): Date | null {

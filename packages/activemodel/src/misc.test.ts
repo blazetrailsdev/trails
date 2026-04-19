@@ -929,7 +929,12 @@ describe("ActiveModel", () => {
       });
 
       it("type cast decimal from invalid string", () => {
-        expect(type.cast("not-a-number")).toBe(null);
+        // Mirrors Rails decimal_test.rb — "" nils out; leading-numeric
+        // prefix is kept; no-numeric-prefix returns BigDecimal(0).
+        expect(type.cast("")).toBe(null);
+        expect(type.cast("1ignore")).toBe("1");
+        expect(type.cast("bad1")).toBe("0");
+        expect(type.cast("bad")).toBe("0");
       });
     });
 

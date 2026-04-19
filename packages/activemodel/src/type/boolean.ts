@@ -1,6 +1,6 @@
 import { ValueType } from "./value.js";
 
-export class BooleanType extends ValueType {
+export class BooleanType extends ValueType<boolean> {
   readonly name = "boolean";
 
   private static readonly TRUE_VALUES: ReadonlySet<unknown> = new Set([

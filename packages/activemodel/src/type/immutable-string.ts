@@ -1,6 +1,6 @@
 import { ValueType } from "./value.js";
 
-export class ImmutableStringType extends ValueType {
+export class ImmutableStringType extends ValueType<string> {
   readonly name: string = "immutable_string";
 
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {
