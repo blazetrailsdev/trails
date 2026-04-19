@@ -255,6 +255,32 @@ export function isAssociationCached(record: Base, assocName: string): boolean {
 }
 
 /**
+ * Decide whether a `:through` reflection's load can route through
+ * AssociationScope's JOIN-based path. PR 3b only handles the simplest
+ * shape: source is non-polymorphic `belongsTo`, no `sourceType`, no
+ * `disableJoins`. Other shapes (has_many/has_one source, polymorphic
+ * source, sourceType, disable-joins) need machinery this PR doesn't
+ * yet provide and stay on the existing 2-step IN-list loaders.
+ *
+ * Shared by loadHasMany and loadHasOne so the gating rules can't drift.
+ */
+function _canRouteThroughViaAssociationScope(
+  reflection: unknown,
+  options: AssociationOptions,
+): boolean {
+  if (!reflection) return false;
+  if (options.sourceType) return false;
+  if (options.disableJoins) return false;
+  const src = (reflection as { sourceReflection?: unknown }).sourceReflection as
+    | { belongsTo?: () => boolean; isPolymorphic?: () => boolean }
+    | undefined;
+  if (!src) return false;
+  if (typeof src.belongsTo !== "function" || !src.belongsTo()) return false;
+  if (typeof src.isPolymorphic === "function" && src.isPolymorphic()) return false;
+  return true;
+}
+
+/**
  * Sync loaded result to the association instance if one exists.
  */
 function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
@@ -403,9 +429,16 @@ export async function loadHasOne(
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
-  // Handle has_one :through
+  // Handle has_one :through. Same routing rules as loadHasMany —
+  // route through AssociationScope's JOIN-based path for the simple
+  // shape; everything else falls back to the 2-step loadHasOneThrough.
   if (options.through) {
-    return loadHasOneThrough(record, assocName, options);
+    const ctorEarly = record.constructor as typeof Base;
+    const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
+    if (!_canRouteThroughViaAssociationScope(reflEarly, options)) {
+      return loadHasOneThrough(record, assocName, options);
+    }
+    // Fall through into the AssociationScope path below.
   }
 
   const ctor = record.constructor as typeof Base;
@@ -440,15 +473,21 @@ export async function loadHasOne(
   // for hasOne, so AssociationScope.scope adds limit(1) automatically.
   const reflection = ctor._reflectOnAssociation?.(assocName);
   // Null-PK short-circuit: read the SAME columns the eventual query
-  // reads — reflection.joinForeignKey when routing through
-  // AssociationScope (= owner-side FK = activeRecordPrimaryKey for
-  // hasOne), options-derived primaryKey otherwise. Reading from a
-  // different column would silently return null while the real query
-  // would have found the row.
-  const pkCheckCols = reflection
-    ? Array.isArray((reflection as any).joinForeignKey)
-      ? ((reflection as any).joinForeignKey as string[])
-      : [(reflection as any).joinForeignKey as string]
+  // reads. For non-through, reflection.joinForeignKey is the owner-
+  // side activeRecordPrimaryKey for hasOne. For through reflections,
+  // joinForeignKey delegates to the SOURCE reflection (whose FK is on
+  // the through table, not the owner). The relevant owner-side
+  // column is on the through_reflection.
+  const reflForOwnerFk =
+    reflection && (reflection as any).throughReflection
+      ? ((reflection as any).throughReflection as { joinForeignKey: string | string[] })
+      : reflection
+        ? (reflection as { joinForeignKey: string | string[] })
+        : null;
+  const pkCheckCols = reflForOwnerFk
+    ? Array.isArray(reflForOwnerFk.joinForeignKey)
+      ? reflForOwnerFk.joinForeignKey
+      : [reflForOwnerFk.joinForeignKey]
     : Array.isArray(primaryKey)
       ? primaryKey
       : [primaryKey as string];
@@ -591,9 +630,17 @@ export async function loadHasMany(
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
-  // Handle through associations
+  // Handle through associations. Routes through AssociationScope's
+  // JOIN-based path for the simple shape (see
+  // _canRouteThroughViaAssociationScope); everything else stays on the
+  // 2-step loadHasManyThrough.
   if (options.through) {
-    return loadHasManyThrough(record, assocName, options);
+    const ctorEarly = record.constructor as typeof Base;
+    const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
+    if (!_canRouteThroughViaAssociationScope(reflEarly, options)) {
+      return loadHasManyThrough(record, assocName, options);
+    }
+    // Fall through into the AssociationScope path below.
   }
 
   const ctor = record.constructor as typeof Base;
@@ -631,15 +678,22 @@ export async function loadHasMany(
   // without going through Reflection.create).
   const reflection = ctor._reflectOnAssociation?.(assocName);
   // Null-FK short-circuit: read the SAME columns the eventual query
-  // reads — reflection.joinForeignKey when routing through
-  // AssociationScope (= owner-side activeRecordPrimaryKey for hasMany),
-  // options-derived primaryKey otherwise. Reading from a different
-  // column would silently return [] while the real query would have
-  // found rows.
-  const fkCheckPks = reflection
-    ? Array.isArray((reflection as any).joinForeignKey)
-      ? ((reflection as any).joinForeignKey as string[])
-      : [(reflection as any).joinForeignKey as string]
+  // reads. For non-through, reflection.joinForeignKey is the owner-
+  // side activeRecordPrimaryKey for hasMany. For through reflections,
+  // joinForeignKey delegates to the SOURCE reflection (whose FK is on
+  // the through table, not the owner) — wrong column. The relevant
+  // owner-side column is on the through_reflection (chain.last in the
+  // chain ordering).
+  const reflForOwnerFk =
+    reflection && (reflection as any).throughReflection
+      ? ((reflection as any).throughReflection as { joinForeignKey: string | string[] })
+      : reflection
+        ? (reflection as { joinForeignKey: string | string[] })
+        : null;
+  const fkCheckPks = reflForOwnerFk
+    ? Array.isArray(reflForOwnerFk.joinForeignKey)
+      ? reflForOwnerFk.joinForeignKey
+      : [reflForOwnerFk.joinForeignKey]
     : Array.isArray(primaryKey)
       ? primaryKey
       : [primaryKey as string];

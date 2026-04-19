@@ -498,20 +498,169 @@ export class AssociationScope {
     for (let i = 0; i < chain.length - 1; i++) {
       scope = this._nextChainScope(scope, chain[i], chain[i + 1]);
     }
-    // Use scopeFor (Rails: reflection.rb:448, scope_for) so 0-arity
-    // scopes get `this`=relation, and >=1-arity scopes receive
-    // (relation, owner) — matches Rails' `relation.instance_exec(owner,
-    // &scope) || relation`. Calling `reflection.scope(scope)` directly
-    // would lose the binding. The full Rails `add_constraints`
-    // chain.reverseEach merges every reflection's constraints; for
-    // chain-1 the simplified head-only path matches, and for through
-    // chains we call scopeFor on the source reflection (chain[0])
-    // matching Rails' behavior for the chain-head item.
-    const scopeFor = (chain[0] as { scopeFor?: (rel: unknown, owner: unknown) => unknown })
-      .scopeFor;
-    if (typeof scopeFor === "function") {
-      scope = scopeFor.call(chain[0], scope, owner);
+    // Rails' chain.reverse_each over reflection.constraints (Rails:
+    // association_scope.rb:131-156) merges scope-chain items into the
+    // relation. For each non-head reflection in the chain (in REVERSE
+    // order to match Rails' chain.reverse_each), we apply its scope
+    // lambda to a fresh klass.(unscoped + STI type filter), then push
+    // only the WHERE and ORDER predicates onto the main scope —
+    // matching Rails' `where_clause +=` / `order_values |=` granular
+    // merging (NOT a full Relation#merge, which would let the chain
+    // entry's limit/select/etc override the main scope). The head
+    // reflection (chain[0]) is handled by the scope/scopeFor branch
+    // below — Rails' chain_head item in add_constraints.
+    for (let i = chain.length - 1; i >= 1; i--) {
+      scope = this._mergeReflectionScopeChain(scope, chain[i], owner);
+    }
+    // Apply the head reflection's scope. Rails: reflection.rb:448,
+    // scope_for — 0-arity scopes get `this`=relation, >=1-arity get
+    // (relation, owner) per `relation.instance_exec(owner, &scope) ||
+    // relation`. For ordinary AssociationReflections we call `scopeFor`
+    // when present. ThroughReflection does NOT implement `scopeFor`;
+    // it only exposes `.scope` (delegated to the underlying source
+    // association's scope), so detect through explicitly and invoke
+    // `.scope` directly with the same arity / `this` semantics.
+    const head = chain[0] as {
+      scopeFor?: (rel: unknown, owner: unknown) => unknown;
+      scope?: ((rel: unknown, owner?: unknown) => unknown) | null;
+      isThroughReflection?: () => boolean;
+    };
+    const isThrough = typeof head.isThroughReflection === "function" && head.isThroughReflection();
+    if (!isThrough && typeof head.scopeFor === "function") {
+      scope = head.scopeFor.call(head, scope, owner);
+    } else if (typeof head.scope === "function") {
+      // Match Rails instance_exec arity: 0-arg scope → this=scope;
+      // 1+-arg → (scope, owner).
+      const fn = head.scope;
+      const result =
+        fn.length === 0 ? (fn as () => unknown).call(scope) : fn.call(scope, scope, owner);
+      if (result) scope = result;
     }
     return scope;
   }
+
+  /**
+   * Apply a non-head chain entry's scope lambda. Rails' add_constraints
+   * does this via `eval_scope` + `scope.where_clause += item.where_clause`
+   * + `scope.order_values = item.order_values | scope.order_values` —
+   * granular per-attribute merging that pushes ONLY where and order
+   * predicates onto the main relation. A through-reflection scope's
+   * limit / select / joins / etc must NOT override the main scope.
+   *
+   * For non-head entries we evaluate the lambda against a fresh
+   * `entry.klass.unscoped` (with STI type_condition re-applied for
+   * subclasses, matching the head-scope path in `scope()`) so its
+   * `where(...)` calls bind to the correct table. We then push the
+   * resulting WHERE predicates onto the main scope and union the
+   * ORDER clauses.
+   *
+   * Mirrors: ActiveRecord::Associations::AssociationScope#add_constraints
+   * (association_scope.rb:131-156).
+   */
+  private _mergeReflectionScopeChain(
+    scope: unknown,
+    reflection: AbstractReflection | ReflectionProxy,
+    owner: Base,
+  ): unknown {
+    const r = reflection as {
+      scope?: ((rel: unknown, owner?: unknown) => unknown) | null;
+      scopeFor?: (rel: unknown, owner?: unknown) => unknown;
+      klass?: typeof Base;
+    };
+    if (typeof r.scope !== "function") return scope;
+    const entryKlass = r.klass;
+    if (!entryKlass) return scope;
+    // Build the entry-side scope with STI type_condition, matching the
+    // head-scope path so STI subclasses get the right type filter
+    // (Base.unscoped strips it; we re-add per the same compensation).
+    let entryScope: unknown = (entryKlass as unknown as { unscoped: () => unknown }).unscoped();
+    if (isStiSubclass(entryKlass)) {
+      const col = getInheritanceColumn(getStiBase(entryKlass));
+      if (col) {
+        const stiNames = [
+          entryKlass.name,
+          ...descendants(entryKlass).map((d: typeof Base) => d.name),
+        ];
+        entryScope = (entryScope as { where: (c: Record<string, unknown>) => unknown }).where({
+          [col]: stiNames.length === 1 ? stiNames[0] : stiNames,
+        });
+      }
+    }
+    // Same arity / `this` semantics as AssociationReflection.scopeFor
+    // for the fallback path: 0-arg → `this=relation`; 1+-arg →
+    // `this=relation, args=(relation, owner)`. Without this binding,
+    // a scope written as `function () { return this.where(...) }`
+    // (the common 0-arg form) would lose the relation.
+    const evaluated =
+      typeof r.scopeFor === "function"
+        ? r.scopeFor.call(reflection, entryScope, owner)
+        : r.scope.length === 0
+          ? (r.scope as () => unknown).call(entryScope)
+          : r.scope.call(entryScope, entryScope, owner);
+    if (!evaluated) return scope;
+    // Push ONLY the entry's WHERE predicates and ORDER clauses onto
+    // the main scope — Rails' `where_clause += ...` / `order_values |=`
+    // semantics. A full Relation#merge would let the entry's limit /
+    // select / joins / etc override the main scope, which Rails
+    // explicitly avoids.
+    const evalWhere = (evaluated as { _whereClause?: { predicates?: unknown[] } })._whereClause;
+    const evalPredicates = evalWhere?.predicates ?? [];
+    const evalOrders = (evaluated as { _orderClauses?: unknown[] })._orderClauses ?? [];
+    const evalRawOrders = (evaluated as { _rawOrderClauses?: string[] })._rawOrderClauses ?? [];
+    const merged = scope as {
+      _whereClause?: { predicates?: unknown[] };
+      _orderClauses?: unknown[];
+      _rawOrderClauses?: string[];
+    };
+    // Rails: `scope.where_clause += item.where_clause`. Mutate the
+    // existing _whereClause's predicates array in place — appending all
+    // entry predicates in one shot — instead of looping with `.where()`
+    // which would clone the relation per-predicate. Safe because `scope`
+    // here is owned by this _addConstraints call (built fresh from
+    // klass.unscoped + per-step .where clones; not shared externally).
+    if (evalPredicates.length > 0) {
+      const existingPredicates = merged._whereClause?.predicates ?? [];
+      existingPredicates.push(...evalPredicates);
+      if (merged._whereClause) {
+        merged._whereClause.predicates = existingPredicates;
+      }
+    }
+    // Rails: `scope.order_values = item.order_values | scope.order_values`
+    // (association_scope.rb:153). Ordering lives in both _orderClauses
+    // (string | [col, dir] tuples) and _rawOrderClauses (string like
+    // `inOrderOf` produces). Merge both with chain-entry-first +
+    // structural dedup so tuples compare by value, not reference.
+    if (evalOrders.length > 0) {
+      merged._orderClauses = unionOrderClauses(evalOrders, merged._orderClauses ?? []);
+    }
+    if (evalRawOrders.length > 0) {
+      const existingRaw = merged._rawOrderClauses ?? [];
+      merged._rawOrderClauses = Array.from(new Set([...evalRawOrders, ...existingRaw]));
+    }
+    return merged;
+  }
+}
+
+/**
+ * Structurally dedupe `_orderClauses` entries (plain strings or
+ * `[col, "asc"|"desc"]` tuples). `Array#includes` only does reference
+ * equality, so two tuples with equal contents created separately
+ * wouldn't match. Rails' `|` operator on order_values is structural.
+ */
+function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
+  const result: unknown[] = [];
+  const seen = new Set<string>();
+  for (const o of [...first, ...second]) {
+    const key =
+      Array.isArray(o) && o.length === 2
+        ? `T:${String(o[0])}:${String(o[1])}`
+        : typeof o === "string"
+          ? `S:${o}`
+          : `J:${JSON.stringify(o)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(o);
+    }
+  }
+  return result;
 }
