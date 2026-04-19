@@ -1,4 +1,14 @@
 import { Node } from "../nodes/node.js";
+import { Visitor } from "./visitor.js";
+import { PlainString } from "../collectors/plain-string.js";
+
+type AppendableCollector = { append(s: string): unknown; value: string };
+
+function isAppendableCollector(c: unknown): c is AppendableCollector {
+  if (typeof c !== "object" || c === null) return false;
+  const obj = c as Record<string, unknown>;
+  return typeof obj.append === "function" && typeof obj.value === "string";
+}
 
 export class DotNode {
   readonly name: string;
@@ -29,14 +39,16 @@ export class DotEdge {
  *
  * Mirrors: Arel::Visitors::Dot (loosely)
  */
-export class Dot {
-  accept(
-    object: Node,
-    collector: { append(s: string): unknown; value: string },
-  ): { value: string } {
+export class Dot extends Visitor {
+  protected visit(object: Node): unknown {
+    return this.compile(object);
+  }
+
+  accept(object: Node, collector?: unknown): { value: string } {
     const dot = this.compile(object);
-    collector.append(dot);
-    return collector as { value: string };
+    const sink = isAppendableCollector(collector) ? collector : new PlainString();
+    sink.append(dot);
+    return sink as { value: string };
   }
 
   compile(node: Node): string {

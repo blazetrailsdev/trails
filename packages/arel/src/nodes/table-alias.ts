@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
 import { Attribute } from "../attributes/attribute.js";
 
@@ -9,12 +10,12 @@ interface TypeCastable {
   isAbleToTypeCast?: () => boolean;
 }
 
-export class TableAlias extends Node {
+export class TableAlias extends Binary {
   readonly relation: Node;
   readonly name: string;
 
   constructor(relation: Node, name: string) {
-    super();
+    super(relation, name);
     this.relation = relation;
     this.name = name;
   }

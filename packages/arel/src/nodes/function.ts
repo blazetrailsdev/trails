@@ -1,7 +1,8 @@
 import { Node, NodeVisitor } from "./node.js";
+import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
 
-export class Function extends Node {
+export class Function extends NodeExpression {
   readonly expressions: Node[];
   alias: Node | null;
   distinct: boolean;

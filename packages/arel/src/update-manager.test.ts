@@ -128,7 +128,7 @@ describe("UpdateManagerTest", () => {
     it("can be set", () => {
       const manager = new UpdateManager();
       manager.table(users);
-      manager.key(users.attr("id").eq(1));
+      manager.key = users.attr("id").eq(1);
       expect(manager.ast.key).not.toBeNull();
     });
 

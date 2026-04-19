@@ -1,62 +1,40 @@
 import { Node } from "./nodes/node.js";
+import { TreeManager, StatementMethods } from "./tree-manager.js";
+import { include } from "@blazetrails/activesupport";
 import { DeleteStatement } from "./nodes/delete-statement.js";
-import { Limit, Group } from "./nodes/unary.js";
-import { Quoted } from "./nodes/casted.js";
+import { Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
-import { ToSql } from "./visitors/to-sql.js";
 
 /**
  * DeleteManager — chainable API for building DELETE statements.
  *
  * Mirrors: Arel::DeleteManager
  */
-export class DeleteManager {
+export class DeleteManager extends TreeManager {
   readonly ast: DeleteStatement;
+  // Installed via include(DeleteManager, StatementMethods) below. Rails
+  // mixes these in via `include TreeManager::StatementMethods`.
+  declare key: unknown;
+  declare wheres: Node[];
+  declare where: (expr: Node) => this;
+  declare take: (limit: unknown) => this;
+  declare offset: (offset: unknown) => this;
+  declare order: (...expr: Node[]) => this;
 
   constructor() {
+    super();
     this.ast = new DeleteStatement();
   }
 
   /**
    * Set the target table.
+   *
+   * Mirrors: Arel::DeleteManager#from
    */
   from(table: Table): this {
     this.ast.relation = table;
     return this;
-  }
-
-  /**
-   * Add a WHERE condition.
-   */
-  where(condition: Node): this {
-    this.ast.wheres.push(condition);
-    return this;
-  }
-
-  /**
-   * Add ORDER BY.
-   */
-  order(...exprs: Node[]): this {
-    this.ast.orders.push(...exprs);
-    return this;
-  }
-
-  /**
-   * Set LIMIT.
-   */
-  take(amount: number): this {
-    this.ast.limit = new Limit(new Quoted(amount));
-    return this;
-  }
-
-  /**
-   * Return the current WHERE conditions.
-   *
-   * Mirrors: Arel::DeleteManager#wheres
-   */
-  get wheres(): Node[] {
-    return [...this.ast.wheres];
   }
 
   /**
@@ -85,11 +63,6 @@ export class DeleteManager {
     this.ast.havings.push(condition);
     return this;
   }
-
-  /**
-   * Generate SQL string.
-   */
-  toSql(): string {
-    return new ToSql().compile(this.ast);
-  }
 }
+
+include(DeleteManager, StatementMethods);

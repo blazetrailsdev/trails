@@ -45,17 +45,52 @@ export type Included<M extends Module> = {
     : never;
 };
 
-export function include(klass: AnyClass, mod: Module): void {
+export function include(klass: AnyClass, mod: Module | AnyClass): void {
   const descriptors: PropertyDescriptorMap = {};
-  for (const key of Object.keys(mod)) {
-    // Ruby's include doesn't replace methods already defined on the class
-    if (Object.prototype.hasOwnProperty.call(klass.prototype, key)) continue;
-    descriptors[key] = {
-      value: mod[key],
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    };
+
+  // When `mod` is a class (has a prototype with own descriptors), read
+  // descriptors directly — this preserves accessor properties (Ruby's
+  // `def key=` / `def key` translate to getters/setters in TS) alongside
+  // plain methods. Plain-object modules still work via Object.keys.
+  const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
+  if (isClassModule) {
+    const proto = (mod as AnyClass).prototype;
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      if (key === "constructor") continue;
+      const modDesc = Object.getOwnPropertyDescriptor(proto, key);
+      if (!modDesc) continue;
+      const existing = Object.getOwnPropertyDescriptor(klass.prototype, key);
+      if (!existing) {
+        descriptors[key] = modDesc;
+        continue;
+      }
+      // Accessor pairs: preserve the existing half, fill in whichever the
+      // including class didn't define. Ruby's include supplies only the
+      // missing methods, but in TS `get`/`set` share a single property
+      // name — re-apply the whole pair so both halves end up live.
+      const isAccessorPair =
+        ("get" in modDesc || "set" in modDesc) && ("get" in existing || "set" in existing);
+      if (isAccessorPair) {
+        descriptors[key] = {
+          get: existing.get ?? modDesc.get,
+          set: existing.set ?? modDesc.set,
+          configurable: true,
+          enumerable: existing.enumerable ?? modDesc.enumerable ?? false,
+        };
+      }
+      // Value (method) collision: Ruby's include doesn't replace — leave it.
+    }
+  } else {
+    for (const key of Object.keys(mod as Module)) {
+      // Ruby's include doesn't replace methods already defined on the class
+      if (Object.prototype.hasOwnProperty.call(klass.prototype, key)) continue;
+      descriptors[key] = {
+        value: (mod as Module)[key],
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      };
+    }
   }
   Object.defineProperties(klass.prototype, descriptors);
 

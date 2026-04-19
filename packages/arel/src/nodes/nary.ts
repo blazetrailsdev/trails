@@ -1,6 +1,7 @@
 import { Node, NodeVisitor } from "./node.js";
+import { NodeExpression } from "./node-expression.js";
 
-export class Nary extends Node {
+export class Nary extends NodeExpression {
   readonly children: Node[];
 
   constructor(children: Node[]) {

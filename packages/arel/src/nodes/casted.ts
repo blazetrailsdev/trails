@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { NodeExpression } from "./node-expression.js";
 import type { Attribute } from "../attributes/attribute.js";
 
 export interface Nodes {
@@ -10,7 +11,7 @@ export interface Nodes {
  *
  * Mirrors: Arel::Nodes::Casted
  */
-export class Casted extends Node {
+export class Casted extends NodeExpression {
   readonly value: unknown;
   readonly attribute: Attribute;
 

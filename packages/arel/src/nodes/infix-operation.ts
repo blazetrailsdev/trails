@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { Binary } from "./binary.js";
 import { As } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
 
@@ -7,13 +8,13 @@ import { SqlLiteral } from "./sql-literal.js";
  *
  * Mirrors: Arel::Nodes::InfixOperation
  */
-export class InfixOperation extends Node {
+export class InfixOperation extends Binary {
   readonly operator: string;
   readonly left: Node;
   readonly right: Node;
 
   constructor(operator: string, left: Node, right: Node) {
-    super();
+    super(left, right);
     this.operator = operator;
     this.left = left;
     this.right = right;

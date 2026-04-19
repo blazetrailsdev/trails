@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { NodeExpression } from "./node-expression.js";
 import { SelectCore } from "./select-core.js";
 import { Comment } from "./comment.js";
 
@@ -7,7 +8,7 @@ import { Comment } from "./comment.js";
  *
  * Mirrors: Arel::Nodes::SelectStatement
  */
-export class SelectStatement extends Node {
+export class SelectStatement extends NodeExpression {
   cores: SelectCore[];
   orders: Node[];
   limit: Node | null;

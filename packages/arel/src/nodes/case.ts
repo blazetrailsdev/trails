@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Quoted } from "./casted.js";
 import { As, Binary } from "./binary.js";
@@ -16,7 +17,7 @@ function buildQuoted(value: unknown): Node {
  *
  * Mirrors: Arel::Nodes::Case
  */
-export class Case extends Node {
+export class Case extends NodeExpression {
   readonly case: Node | null;
   readonly conditions: When[];
   default: Else | null;

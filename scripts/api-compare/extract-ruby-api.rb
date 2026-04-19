@@ -720,6 +720,15 @@ class ApiExtractor
       const_name(node[1])
     when :var_ref
       const_name(node[1])
+    when :method_add_arg
+      # e.g. `Struct.new(:a, :b)` — capture the receiver const so that
+      # `class X < Struct.new(...)` records `X`'s superclass as `Struct`.
+      inner = node[1]
+      inner.is_a?(Array) && inner[0] == :call ? const_name(inner[1]) : nil
+    when :call, :command_call
+      # :call     → `Struct.new(:a)` (with parens)
+      # :command_call → `Struct.new :a` (no parens)
+      const_name(node[1])
     else
       nil
     end

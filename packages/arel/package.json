@@ -8,6 +8,9 @@
   "scripts": {
     "build": "tsc"
   },
+  "dependencies": {
+    "@blazetrails/activesupport": "workspace:*"
+  },
   "files": [
     "dist"
   ],

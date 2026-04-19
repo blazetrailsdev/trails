@@ -65,6 +65,89 @@ describe("include", () => {
     });
     expect(new (User as any)().greet()).toBe("hello");
   });
+
+  describe("class-prototype module (accessor descriptors)", () => {
+    it("copies a getter/setter pair from a class module", () => {
+      class Host {
+        data: Record<string, unknown> = {};
+      }
+      class Mod {
+        set key(v: unknown) {
+          (this as unknown as Host).data.key = v;
+        }
+        get key(): unknown {
+          return (this as unknown as Host).data.key;
+        }
+      }
+      include(Host, Mod);
+      const h = new Host();
+      (h as any).key = 42;
+      expect((h as any).key).toBe(42);
+      expect(h.data.key).toBe(42);
+    });
+
+    it("copies plain methods from a class module", () => {
+      class Host {}
+      class Mod {
+        greet(): string {
+          return "hi";
+        }
+      }
+      include(Host, Mod);
+      expect((new Host() as any).greet()).toBe("hi");
+    });
+
+    it("does not replace a method already defined on the host (Ruby include semantics)", () => {
+      class Host {
+        greet(): string {
+          return "original";
+        }
+      }
+      class Mod {
+        greet(): string {
+          return "replaced";
+        }
+      }
+      include(Host, Mod);
+      expect(new Host().greet()).toBe("original");
+    });
+
+    it("fills in the missing half of an accessor pair", () => {
+      class Host {
+        data: Record<string, unknown> = {};
+        // Only a getter — no setter. include() should install the mixin's setter.
+        get key(): unknown {
+          return this.data.key;
+        }
+      }
+      class Mod {
+        set key(v: unknown) {
+          (this as unknown as Host).data.key = v;
+        }
+        get key(): unknown {
+          return "mod-getter";
+        }
+      }
+      include(Host, Mod);
+      const h = new Host();
+      (h as any).key = 7;
+      expect(h.data.key).toBe(7);
+      // Host's getter wins; mod's getter never runs.
+      expect((h as any).key).toBe(7);
+    });
+
+    it("skips the class constructor", () => {
+      class Host {}
+      class Mod {
+        constructor() {}
+        greet(): string {
+          return "hi";
+        }
+      }
+      include(Host, Mod);
+      expect(Object.getOwnPropertyDescriptor(Host.prototype, "constructor")?.value).toBe(Host);
+    });
+  });
 });
 
 describe("extend", () => {

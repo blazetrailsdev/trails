@@ -10,9 +10,12 @@ describe("TestNamedFunction", () => {
   });
 
   it("function alias", () => {
-    const fn = new Nodes.NamedFunction("COUNT", [star]);
-    const aliased = fn.as("total");
-    expect(aliased).toBeInstanceOf(Nodes.As);
+    const fn = new Nodes.NamedFunction("omg", [new Nodes.SqlLiteral("zomg")]);
+    const returned = fn.as("wth");
+    expect(returned).toBe(fn);
+    expect(fn.name).toBe("omg");
+    expect(fn.alias).toBeInstanceOf(Nodes.SqlLiteral);
+    expect((fn.alias as Nodes.SqlLiteral).value).toBe("wth");
   });
 
   it("construct with alias", () => {

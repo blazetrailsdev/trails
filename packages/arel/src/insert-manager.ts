@@ -1,20 +1,21 @@
 import { Node } from "./nodes/node.js";
+import { TreeManager } from "./tree-manager.js";
 import { InsertStatement } from "./nodes/insert-statement.js";
 import { Attribute } from "./attributes/attribute.js";
 import { ValuesList } from "./nodes/values-list.js";
 import { Quoted } from "./nodes/casted.js";
 import { Table } from "./table.js";
-import { ToSql } from "./visitors/to-sql.js";
 
 /**
  * InsertManager — chainable API for building INSERT statements.
  *
  * Mirrors: Arel::InsertManager
  */
-export class InsertManager {
+export class InsertManager extends TreeManager {
   readonly ast: InsertStatement;
 
   constructor(table?: Table | null) {
+    super();
     this.ast = new InsertStatement();
     if (table) this.into(table);
   }
@@ -85,12 +86,5 @@ export class InsertManager {
    */
   createValuesList(rows: Node[][]): ValuesList {
     return new ValuesList(rows);
-  }
-
-  /**
-   * Generate SQL string.
-   */
-  toSql(): string {
-    return new ToSql().compile(this.ast);
   }
 }

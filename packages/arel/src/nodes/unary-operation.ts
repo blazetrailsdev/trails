@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { Unary } from "./unary.js";
 import { As } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Ascending } from "./ascending.js";
@@ -9,12 +10,12 @@ import { Descending } from "./descending.js";
  *
  * Mirrors: Arel::Nodes::UnaryOperation
  */
-export class UnaryOperation extends Node {
+export class UnaryOperation extends Unary {
   readonly operator: string;
   readonly operand: Node;
 
   constructor(operator: string, operand: Node) {
-    super();
+    super(operand);
     this.operator = operator;
     this.operand = operand;
   }

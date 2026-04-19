@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Quoted } from "./casted.js";
 
@@ -9,7 +10,7 @@ import { Quoted } from "./casted.js";
  *
  * Mirrors: Arel::Nodes::BoundSqlLiteral
  */
-export class BoundSqlLiteral extends Node {
+export class BoundSqlLiteral extends NodeExpression {
   readonly sql: string;
   readonly positionalBinds: unknown[];
   readonly namedBinds: Record<string, unknown>;

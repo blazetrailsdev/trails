@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { Binary } from "./binary.js";
 import { Table } from "../table.js";
 
 /**
@@ -6,13 +7,13 @@ import { Table } from "../table.js";
  *
  * Mirrors: Arel::Nodes::Cte
  */
-export class Cte extends Node {
+export class Cte extends Binary {
   readonly name: string;
   readonly relation: Node;
   readonly materialized?: "materialized" | "not_materialized";
 
   constructor(name: string, relation: Node, materialized?: "materialized" | "not_materialized") {
-    super();
+    super(name, relation);
     this.name = name;
     this.relation = relation;
     this.materialized = materialized;

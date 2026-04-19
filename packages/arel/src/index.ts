@@ -17,12 +17,14 @@ import { Grouping } from "./nodes/grouping.js";
 import { Or } from "./nodes/or.js";
 import { And } from "./nodes/and.js";
 import { ToSql } from "./visitors/to-sql.js";
-import { registerBinaryInversions } from "./nodes/binary.js";
+import { registerBinaryInversions, _registerCteFactory } from "./nodes/binary.js";
 import { Equality } from "./nodes/equality.js";
 import { In } from "./nodes/in.js";
+import { Cte } from "./nodes/cte.js";
 
 registerNodeDeps({ Not, Grouping, Or, And, ToSql });
 registerBinaryInversions({ Equality, In });
+_registerCteFactory((name, relation) => new Cte(name, relation));
 
 /**
  * Arel.sql() — escape hatch for raw SQL.

@@ -1,5 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
-import { As } from "./binary.js";
+import { Function } from "./function.js";
 import { Addition, Subtraction, Multiplication, Division } from "./infix-operation.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Over } from "./over.js";
@@ -19,22 +19,13 @@ import {
  *
  * Mirrors: Arel::Nodes::NamedFunction
  */
-export class NamedFunction extends Node {
+export class NamedFunction extends Function {
   readonly name: string;
-  readonly expressions: Node[];
-  readonly distinct: boolean;
-  readonly alias: Node | null;
 
   constructor(name: string, expressions: Node[], aliasName?: string, distinct = false) {
-    super();
+    super(expressions, aliasName ?? null);
     this.name = name;
-    this.expressions = expressions;
     this.distinct = distinct;
-    this.alias = aliasName ? new SqlLiteral(aliasName) : null;
-  }
-
-  as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName));
   }
 
   /**

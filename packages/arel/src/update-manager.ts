@@ -1,26 +1,38 @@
 import { Node } from "./nodes/node.js";
+import { TreeManager, StatementMethods } from "./tree-manager.js";
+import { include } from "@blazetrails/activesupport";
 import { UpdateStatement } from "./nodes/update-statement.js";
 import { Assignment } from "./nodes/binary.js";
 import { Quoted } from "./nodes/casted.js";
-import { Limit, Group } from "./nodes/unary.js";
+import { Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
-import { ToSql } from "./visitors/to-sql.js";
 
 /**
  * UpdateManager — chainable API for building UPDATE statements.
  *
  * Mirrors: Arel::UpdateManager
  */
-export class UpdateManager {
+export class UpdateManager extends TreeManager {
   readonly ast: UpdateStatement;
+  // Installed via include(UpdateManager, StatementMethods) below. Rails
+  // mixes these in via `include TreeManager::StatementMethods`.
+  declare key: unknown;
+  declare wheres: Node[];
+  declare where: (expr: Node) => this;
+  declare take: (limit: unknown) => this;
+  declare offset: (offset: unknown) => this;
+  declare order: (...expr: Node[]) => this;
 
   constructor() {
+    super();
     this.ast = new UpdateStatement();
   }
 
   /**
    * Set the target table.
+   *
+   * Mirrors: Arel::UpdateManager#table
    */
   table(table: Table): this {
     this.ast.relation = table;
@@ -29,55 +41,14 @@ export class UpdateManager {
 
   /**
    * Set column = value assignments.
+   *
+   * Mirrors: Arel::UpdateManager#set
    */
   set(values: [Node, unknown][]): this {
     this.ast.values = values.map(([col, val]) => {
       const right = val instanceof Node ? val : new Quoted(val);
       return new Assignment(col, right);
     });
-    return this;
-  }
-
-  /**
-   * Add a WHERE condition.
-   */
-  where(condition: Node): this {
-    this.ast.wheres.push(condition);
-    return this;
-  }
-
-  /**
-   * Add ORDER BY.
-   */
-  order(...exprs: Node[]): this {
-    this.ast.orders.push(...exprs);
-    return this;
-  }
-
-  /**
-   * Set LIMIT.
-   */
-  take(amount: number): this {
-    this.ast.limit = new Limit(new Quoted(amount));
-    return this;
-  }
-
-  /**
-   * Return the current WHERE conditions.
-   *
-   * Mirrors: Arel::UpdateManager#wheres
-   */
-  get wheres(): Node[] {
-    return [...this.ast.wheres];
-  }
-
-  /**
-   * Set a primary key condition for the update.
-   *
-   * Mirrors: Arel::UpdateManager#key=
-   */
-  key(keyNode: Node): this {
-    this.ast.key = keyNode;
     return this;
   }
 
@@ -107,11 +78,6 @@ export class UpdateManager {
     this.ast.havings.push(condition);
     return this;
   }
-
-  /**
-   * Generate SQL string.
-   */
-  toSql(): string {
-    return new ToSql().compile(this.ast);
-  }
 }
+
+include(UpdateManager, StatementMethods);

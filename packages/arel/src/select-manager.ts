@@ -1,4 +1,6 @@
 import { Node } from "./nodes/node.js";
+import { TreeManager } from "./tree-manager.js";
+import { ToSql } from "./visitors/to-sql.js";
 import { SelectStatement } from "./nodes/select-statement.js";
 import { SelectCore } from "./nodes/select-core.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
@@ -18,7 +20,6 @@ import { TableAlias } from "./nodes/table-alias.js";
 import { Exists } from "./nodes/function.js";
 import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
-import { ToSql } from "./visitors/to-sql.js";
 import { UpdateStatement } from "./nodes/update-statement.js";
 import { Assignment } from "./nodes/binary.js";
 import { DeleteStatement } from "./nodes/delete-statement.js";
@@ -37,10 +38,11 @@ import { InsertManager } from "./insert-manager.js";
  *
  * Mirrors: Arel::SelectManager
  */
-export class SelectManager {
+export class SelectManager extends TreeManager {
   readonly ast: SelectStatement;
 
   constructor(table?: Table | null) {
+    super();
     this.ast = new SelectStatement();
     if (table) {
       this.from(table);
@@ -594,12 +596,5 @@ export class SelectManager {
    */
   cast(expr: Node, type: string): NamedFunction {
     return new NamedFunction("CAST", [new SqlLiteral(`${expr} AS ${type}`)]);
-  }
-
-  /**
-   * Generate SQL string.
-   */
-  toSql(): string {
-    return new ToSql().compile(this.ast);
   }
 }
