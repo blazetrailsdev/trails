@@ -8,6 +8,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./associations/errors.js";
 import { ForeignAssociation } from "./associations/foreign-association.js";
+import { AssociationScope } from "./associations/association-scope.js";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { getInheritanceColumn, findStiClass } from "./inheritance.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -584,10 +585,44 @@ export async function loadHasMany(
   const pkValue = record.readAttribute(primaryKey as string);
   if (pkValue === null || pkValue === undefined) return [];
 
-  let rel = (targetModel as any).all().where({ [foreignKey]: pkValue });
-  // Apply association scope
-  if (options.scope) {
-    rel = options.scope(rel);
+  // Route through AssociationScope when we have a reflection registered
+  // for this association — single code path with the explicit loaders in
+  // `load*` sharing WHERE/FK construction. Falls back to the inline
+  // builder when the reflection hasn't been registered (happens in
+  // tests that define associations via the lower-level API without
+  // going through the full Reflection.create path).
+  const reflection = ctor._reflectOnAssociation?.(assocName);
+  let rel: any;
+  // `options.through` is handled by the early-return above, so we don't
+  // need to re-check it here.
+  if (reflection && !options.as) {
+    // Rails' `Association#scope` is
+    //   AssociationRelation.create(klass, self).merge!(klass.scope_for_association)
+    // (association.rb:313), so the unscoped+constraints relation built
+    // by AssociationScope.scope MUST be merged with the target's
+    // scope_for_association — otherwise the target model's default_scope
+    // / scope extensions would silently disappear on the reflection-
+    // backed path. AssociationScope.scope already merges
+    // `reflection.scope` (the macro-time user lambda) via scopeFor, so
+    // skip re-applying it ONLY when `options.scope` is that exact same
+    // function. Callers like `loadHasManyThrough` synthesize a NEW
+    // `options.scope` (e.g. wrapping with `sourceType` filtering) —
+    // those must still run.
+    const built = AssociationScope.scope({
+      owner: record,
+      reflection,
+      klass: targetModel,
+    }) as any;
+    const baseRelation = (targetModel as any).scopeForAssociation?.() ?? (targetModel as any).all();
+    rel = baseRelation.merge(built);
+    if (options.scope && options.scope !== (reflection as any).scope) {
+      rel = options.scope(rel);
+    }
+  } else {
+    rel = (targetModel as any).all().where({ [foreignKey]: pkValue });
+    if (options.scope) {
+      rel = options.scope(rel);
+    }
   }
   const results: Base[] = await rel.toArray();
 
