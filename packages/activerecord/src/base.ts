@@ -110,7 +110,11 @@ import * as _Persistence from "./persistence.js";
 import { argumentError } from "./relation/query-methods.js";
 import { ScopeRegistry } from "./scoping.js";
 
-import { Default as DefaultScoping } from "./scoping/default.js";
+import {
+  Default as DefaultScoping,
+  defaultScope as _defaultScope,
+  unscoped as _unscoped,
+} from "./scoping/default.js";
 import * as NamedScoping from "./scoping/named.js";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import { Associations as _Associations, loadBelongsTo, loadHasOne } from "./associations.js";
@@ -1043,36 +1047,23 @@ export class Base extends Model {
   static _scopes: Map<string, (rel: any, ...args: any[]) => any> = new Map();
   static _defaultScope: ((rel: any) => any) | null = null;
 
-  /**
-   * Define a default scope applied to all queries.
-   *
-   * Mirrors: ActiveRecord::Base.default_scope
-   */
-  static defaultScope<T extends typeof Base>(
-    this: T,
-    fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
-  ): void {
-    this._defaultScope = fn as (rel: any) => any;
-  }
-
-  /**
-   * Return a relation that bypasses the default scope.
-   *
-   * Mirrors: ActiveRecord::Base.unscoped
-   */
-  static unscoped<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
-    return DefaultScoping.unscoped(this, () => {
-      if (!_RelationCtor) {
-        throw new Error("Relation not loaded. Import relation.ts first.");
-      }
-      const rel = new _RelationCtor(this);
-      return _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
-    });
-  }
+  // --- Default scope (wired via extend() after class body) ---
+  declare static defaultScope: typeof _defaultScope;
+  declare static unscoped: typeof _unscoped;
 
   /** @internal Like all() but skips currentScope — used by the preloader. */
   static _allForPreload(): any {
     return this._buildDefaultRelation();
+  }
+
+  /** @internal Build a scope-proxy-wrapped Relation with no default scope
+   *  applied. Used by `unscoped()` in scoping/default.ts. */
+  static _buildUnscopedRelation(): any {
+    if (!_RelationCtor) {
+      throw new Error("Relation not loaded. Import relation.ts first.");
+    }
+    const rel = new _RelationCtor(this);
+    return _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
   }
 
   private static _buildDefaultRelation(): any {
@@ -3379,6 +3370,10 @@ extend(Base, ReadonlyAttributes.ClassMethods);
 extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
+extend(Base, {
+  defaultScope: _defaultScope,
+  unscoped: _unscoped,
+});
 extend(Base, ModelSchema.ClassMethods);
 
 include(Base, {

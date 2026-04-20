@@ -52,6 +52,28 @@ describe("DefaultScopingTest", () => {
     expect(result.length).toBe(2);
   });
 
+  // Rails: unscoped(&block) runs the block with the unscoped relation
+  // as the current scope, so any queries inside bypass default scopes.
+  it("unscoped with a block runs queries without the default scope", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("published", "boolean");
+        this.adapter = adapter;
+        this.defaultScope((rel: any) => rel.where({ published: true }));
+      }
+    }
+    await Post.create({ title: "a", published: true });
+    await Post.create({ title: "b", published: false });
+
+    const insideBlock = await Post.unscoped(async () => await Post.all().toArray());
+    expect(insideBlock.length).toBe(2);
+
+    // Outside the block, default scope is back in effect.
+    const outsideBlock = await Post.all().toArray();
+    expect(outsideBlock.length).toBe(1);
+  });
+
   it("named scope creates a chainable query", () => {
     class Post extends Base {
       static {
