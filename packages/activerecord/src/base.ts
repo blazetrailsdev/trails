@@ -102,6 +102,7 @@ import {
   isBlank as _isBlank,
 } from "./core.js";
 import * as _Core from "./core.js";
+import * as _Persistence from "./persistence.js";
 import { argumentError } from "./relation/query-methods.js";
 import { ScopeRegistry } from "./scoping.js";
 
@@ -2022,7 +2023,7 @@ export class Base extends Model {
   _newRecord = true;
   _destroyed = false;
   _readonly = false;
-  private _previouslyNewRecord = false;
+  _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
   _strictLoading = false;
@@ -2036,32 +2037,12 @@ export class Base extends Model {
     super(attrs);
   }
 
-  /**
-   * Returns true if the record has not been saved yet.
-   *
-   * Mirrors: ActiveRecord::Base#new_record?
-   */
-  isNewRecord(): boolean {
-    return this._newRecord;
-  }
-
-  /**
-   * Returns true if the record has been saved and not destroyed.
-   *
-   * Mirrors: ActiveRecord::Base#persisted?
-   */
-  isPersisted(): boolean {
-    return !this._newRecord && !this._destroyed;
-  }
-
-  /**
-   * Returns true if the record has been destroyed.
-   *
-   * Mirrors: ActiveRecord::Base#destroyed?
-   */
-  isDestroyed(): boolean {
-    return this._destroyed;
-  }
+  // --- Persistence instance predicates (wired via include() after class body) ---
+  declare isNewRecord: typeof _Persistence.isNewRecord;
+  declare isPersisted: typeof _Persistence.isPersisted;
+  declare isDestroyed: typeof _Persistence.isDestroyed;
+  declare isPreviouslyNewRecord: typeof _Persistence.isPreviouslyNewRecord;
+  declare isPreviouslyPersisted: typeof _Persistence.isPreviouslyPersisted;
 
   // --- Core instance methods (wired via include() after class body) ---
   declare isReadonly: typeof _Core.isReadonly;
@@ -2073,15 +2054,6 @@ export class Base extends Model {
   declare isStrictLoadingNPlusOneOnly: typeof _Core.isStrictLoadingNPlusOneOnly;
   declare isFrozen: typeof _Core.isFrozen;
   declare freeze: typeof _Core.freeze;
-
-  /**
-   * Returns true if this record was a new record before the last save.
-   *
-   * Mirrors: ActiveRecord::Base#previously_new_record?
-   */
-  isPreviouslyNewRecord(): boolean {
-    return this._previouslyNewRecord;
-  }
 
   /**
    * Get the association that triggered the destruction of this record (if any).
@@ -3056,15 +3028,6 @@ export class Base extends Model {
   }
 
   /**
-   * Returns true if the record was previously persisted but is now destroyed.
-   *
-   * Mirrors: ActiveRecord::Base#previously_persisted?
-   */
-  isPreviouslyPersisted(): boolean {
-    return !this._newRecord && this._destroyed;
-  }
-
-  /**
    * Re-instantiate as the given class, raising on failure.
    *
    * Mirrors: ActiveRecord::Base#becomes!
@@ -3423,6 +3386,12 @@ extend(Base, NamedScoping.ClassMethods);
 extend(Base, ModelSchema.ClassMethods);
 
 include(Base, {
+  // Persistence
+  isNewRecord: _Persistence.isNewRecord,
+  isPersisted: _Persistence.isPersisted,
+  isDestroyed: _Persistence.isDestroyed,
+  isPreviouslyNewRecord: _Persistence.isPreviouslyNewRecord,
+  isPreviouslyPersisted: _Persistence.isPreviouslyPersisted,
   // Core
   inspect: _inspect,
   attributeForInspect: _attributeForInspect,

@@ -4376,4 +4376,38 @@ describe("PersistenceTest", () => {
       expect(true).toBe(true);
     });
   }); // QueryConstraintsTest
+
+  // Rails' `previously_persisted?` is defined as `!new_record? && destroyed?`
+  // — dispatched through `self`, so subclass overrides of either predicate
+  // change the result. Locks in the dispatch-through-this implementation.
+  describe("previously_persisted? dispatches through new_record? / destroyed?", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+
+    it("returns true when record is not new and is destroyed", () => {
+      const p = new Post();
+      p._newRecord = false;
+      p._destroyed = true;
+      expect(p.isPreviouslyPersisted()).toBe(true);
+    });
+
+    it("honors an instance override of isDestroyed", () => {
+      const p = new Post();
+      p._newRecord = false;
+      // underlying _destroyed is false, but the instance override says true
+      p.isDestroyed = () => true;
+      expect(p._destroyed).toBe(false);
+      expect(p.isPreviouslyPersisted()).toBe(true);
+    });
+
+    it("honors an instance override of isNewRecord", () => {
+      const p = new Post();
+      p._newRecord = false; // raw field says not new
+      p._destroyed = true;
+      // override makes isNewRecord() report true, which gates isPreviouslyPersisted
+      p.isNewRecord = () => true;
+      expect(p.isPreviouslyPersisted()).toBe(false);
+    });
+  });
 });
