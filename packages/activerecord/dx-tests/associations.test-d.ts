@@ -85,8 +85,19 @@ describe("associations DX", () => {
   it("CollectionProxy is generic in its element type", () => {
     const proxy = {} as CollectionProxy<Post>;
     expectTypeOf(proxy.toArray).returns.resolves.toEqualTypeOf<Post[]>();
-    expectTypeOf(proxy.first).returns.resolves.toEqualTypeOf<Post | null>();
-    expectTypeOf(proxy.last).returns.resolves.toEqualTypeOf<Post | null>();
+    // first / last / take are overloaded: () → T | null, (n) → T[].
+    // Call the zero-arg form explicitly so the assertion picks the
+    // intended overload.
+    expectTypeOf(proxy.first()).resolves.toEqualTypeOf<Post | null>();
+    expectTypeOf(proxy.first(2)).resolves.toEqualTypeOf<Post[]>();
+    expectTypeOf(proxy.last()).resolves.toEqualTypeOf<Post | null>();
+    expectTypeOf(proxy.last(2)).resolves.toEqualTypeOf<Post[]>();
+    expectTypeOf(proxy.take()).resolves.toEqualTypeOf<Post | null>();
+    expectTypeOf(proxy.take(2)).resolves.toEqualTypeOf<Post[]>();
+    // find is overloaded: (id) → T, ([ids]) → T[], (...ids) → T | T[].
+    expectTypeOf(proxy.find(1)).resolves.toEqualTypeOf<Post>();
+    expectTypeOf(proxy.find([1, 2])).resolves.toEqualTypeOf<Post[]>();
+    expectTypeOf(proxy.find(1, 2)).resolves.toMatchTypeOf<Post | Post[]>();
     expectTypeOf(proxy.build).returns.toEqualTypeOf<Post>();
     expectTypeOf(proxy.create).returns.resolves.toEqualTypeOf<Post>();
     expectTypeOf(proxy.target).toEqualTypeOf<Post[]>();
