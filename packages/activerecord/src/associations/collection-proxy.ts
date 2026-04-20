@@ -19,7 +19,7 @@ import {
   normalizeFindArgs,
   raiseNotFoundAll,
   raiseNotFoundSingle,
-} from "../relation/find-normalization.js";
+} from "../relation/finder-methods.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";

@@ -1,12 +1,14 @@
 /**
- * Focused tests for the find-normalization helpers. The behavior is
- * exercised transitively through `Relation.find` / `CollectionProxy#find`,
+ * Focused tests for the FinderMethods shared id-normalization and
+ * not-found helpers (`normalizeFindArgs`, `raiseNotFoundAll`,
+ * `raiseNotFoundSingle`). The behavior is exercised transitively
+ * through `Relation.find` / `CollectionProxy#find`,
  * but the normalizer's branch matrix (scalar / tuple / variadic /
  * flatten / composite arity / empty) is easier to pin here.
  */
 
 import { describe, it, expect } from "vitest";
-import { normalizeFindArgs, raiseNotFoundAll, raiseNotFoundSingle } from "./find-normalization.js";
+import { normalizeFindArgs, raiseNotFoundAll, raiseNotFoundSingle } from "./finder-methods.js";
 import { RecordNotFound } from "../errors.js";
 
 describe("normalizeFindArgs — simple primary key", () => {
