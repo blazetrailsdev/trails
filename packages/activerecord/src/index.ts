@@ -56,8 +56,12 @@ export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationProxy } from "./associations/collection-proxy.js";
 export { AssociationRelation } from "./association-relation.js";
 export type { AssociationOptions } from "./associations.js";
-export { Transaction } from "./connection-adapters/abstract/transaction.js";
-export { ActiveRecordTransaction } from "./transaction.js";
+// Public Rails-facing Transaction wrapper. The internal transaction
+// class lives at connection-adapters/abstract/transaction.ts and is
+// intentionally NOT re-exported at the top level — Rails doesn't
+// expose ConnectionAdapters::Transaction as part of the
+// ActiveRecord:: surface either.
+export { Transaction } from "./transaction.js";
 export {
   LogSubscriber,
   getVerboseQueryLogs,

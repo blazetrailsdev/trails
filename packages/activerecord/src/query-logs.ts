@@ -18,6 +18,22 @@ export type TagHandler = (context?: Record<string, TagValue>) => TagValue;
 export type TagDefinition = string | TagHandler | Record<string, TagValue | TagHandler>;
 
 /**
+ * Handler that resolves a tag value by looking up a named key in the
+ * QueryLogs context hash.
+ *
+ * Mirrors: ActiveRecord::QueryLogs::GetKeyHandler — Rails builds one
+ * of these per string tag (`build_handler` in query_logs.rb) so
+ * `[name, handler]` pairs can be uniformly dispatched via `.call`.
+ */
+export class GetKeyHandler {
+  constructor(private readonly name: string) {}
+
+  call(context: Record<string, TagValue>): TagValue {
+    return context[this.name];
+  }
+}
+
+/**
  * QueryLogs configuration and SQL comment generation.
  */
 export class QueryLogs {
@@ -27,6 +43,11 @@ export class QueryLogs {
   private _cacheEnabled = false;
   private _cachedComment: string | null | undefined = undefined;
   private _context: Record<string, TagValue> = {};
+  // One GetKeyHandler per string tag, built when tags= is set so we
+  // don't allocate one per query inside `tagContent()`. Matches
+  // Rails' build_handler path (query_logs.rb:180) which builds the
+  // handler list once during configuration.
+  private _keyHandlers: Map<string, GetKeyHandler> = new Map();
 
   get tags(): TagDefinition[] {
     return this._tags;
@@ -34,6 +55,12 @@ export class QueryLogs {
 
   set tags(tags: TagDefinition[]) {
     this._tags = tags;
+    this._keyHandlers = new Map<string, GetKeyHandler>();
+    for (const tag of tags) {
+      if (typeof tag === "string") {
+        this._keyHandlers.set(tag, new GetKeyHandler(tag));
+      }
+    }
     this._cachedComment = undefined;
   }
 
@@ -67,10 +94,34 @@ export class QueryLogs {
       this._formatter = LegacyFormatter;
     } else if (format === "sqlcommenter") {
       this._formatter = SQLCommenter;
-    } else if (typeof format === "object" && format !== null) {
-      this._formatter = format;
+    } else if (
+      format !== null &&
+      (typeof format === "object" || typeof format === "function") &&
+      typeof (format as QueryLogsFormatter).format === "function" &&
+      typeof (format as QueryLogsFormatter).join === "function"
+    ) {
+      // Accept anything with the right call shape — an instance, a
+      // const object, or a class / function with static `format` /
+      // `join` (matches how Rails' singleton-class formatters are
+      // invoked: `MyFormatter.format(k, v)`).
+      this._formatter = format as QueryLogsFormatter;
     } else {
-      throw new ConfigurationError(`Formatter is unsupported: ${format}`);
+      // Describe the bad value without dumping a full function body
+      // (classes stringify to their whole source) — prefer the
+      // constructor name and type for a useful diagnostic.
+      const describe = (v: unknown): string => {
+        if (v === null) return "null";
+        if (v === undefined) return "undefined";
+        if (typeof v === "function") return `class/function ${v.name || "<anonymous>"}`;
+        if (typeof v === "object") {
+          const name = (v as { constructor?: { name?: string } })?.constructor?.name;
+          return `${typeof v}${name ? ` (${name})` : ""}`;
+        }
+        return `${typeof v} ${String(v)}`;
+      };
+      throw new ConfigurationError(
+        `Formatter is unsupported: ${describe(format)} — expected "legacy", "sqlcommenter", or an object/class with callable \`format\` and \`join\``,
+      );
     }
     this._cachedComment = undefined;
   }
@@ -136,7 +187,20 @@ export class QueryLogs {
     const pairs: string[] = [];
     for (const tag of this._tags) {
       if (typeof tag === "string") {
-        const value = this._context[tag];
+        // Dispatch via the pre-built GetKeyHandler (rebuilt in `tags=`),
+        // matching Rails' build_handler caching. The handler is
+        // guaranteed present because `tags=` populated it.
+        // Prefer the pre-built handler (warm path — populated by
+        // tags= setter). Fall back to a fresh one if callers mutated
+        // the live _tags array without going through the setter —
+        // better to pay the allocation than crash on a non-null
+        // assertion.
+        let handler = this._keyHandlers.get(tag);
+        if (!handler) {
+          handler = new GetKeyHandler(tag);
+          this._keyHandlers.set(tag, handler);
+        }
+        const value = handler.call(this._context);
         if (value != null) {
           pairs.push(this._formatter.format(tag, value));
         }

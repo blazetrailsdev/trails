@@ -16,31 +16,37 @@ export interface QueryLogsFormatter {
  * Legacy Rails format: key:value pairs separated by commas.
  * Example: application:MyApp,controller:users
  *
- * Mirrors: ActiveRecord::QueryLogs::LegacyFormatter
+ * Mirrors: ActiveRecord::QueryLogs::LegacyFormatter — Rails exposes
+ * this as a singleton class (`class << self`). In TS we model it as
+ * a class with static methods so consumers call
+ * `LegacyFormatter.format(k, v)` the same way they'd call
+ * `LegacyFormatter.format` in Ruby.
  */
-export const LegacyFormatter: QueryLogsFormatter = {
-  format(key: string, value: TagValue): string {
+export class LegacyFormatter {
+  static format(key: string, value: TagValue): string {
     return `${key}:${value}`;
-  },
-  join(pairs: string[]): string {
+  }
+  static join(pairs: string[]): string {
     return pairs.join(",");
-  },
-};
+  }
+}
 
 /**
  * SQLCommenter format (OpenTelemetry standard).
  * Example: application='MyApp',controller='users'
  *
- * Mirrors: ActiveRecord::QueryLogs::SQLCommenter
+ * Mirrors: ActiveRecord::QueryLogs::SQLCommenter (Rails singleton
+ * class). Static-method class keeps the `SQLCommenter.format(...)` /
+ * `.join(...)` call shape users write in Ruby.
  */
-export const SQLCommenter: QueryLogsFormatter = {
-  format(key: string, value: TagValue): string {
+export class SQLCommenter {
+  static format(key: string, value: TagValue): string {
     return `${sqlCommenterEncode(key)}='${sqlCommenterEncode(String(value))}'`;
-  },
-  join(pairs: string[]): string {
+  }
+  static join(pairs: string[]): string {
     return pairs.join(",");
-  },
-};
+  }
+}
 
 function sqlCommenterEncode(value: string): string {
   return encodeURIComponent(value).replace(/'/g, "%27");

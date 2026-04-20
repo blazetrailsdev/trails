@@ -1,5 +1,5 @@
 import type { DatabaseAdapter } from "../../adapter.js";
-import { ActiveRecordTransaction } from "../../transaction.js";
+import { Transaction as UserTransaction } from "../../transaction.js";
 import { ActiveRecordError, PreparedStatementCacheExpired } from "../../errors.js";
 import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
 
@@ -222,8 +222,8 @@ export class NullTransaction {
 
   afterRollback(_fn?: () => void | Promise<void>): void {}
 
-  get userTransaction(): ActiveRecordTransaction {
-    return ActiveRecordTransaction.NULL_TRANSACTION;
+  get userTransaction(): UserTransaction {
+    return UserTransaction.NULL_TRANSACTION;
   }
 }
 
@@ -290,7 +290,7 @@ export class Transaction {
   private _runCommitCallbacks: boolean;
   private _dirty = false;
   written = false;
-  readonly userTransaction: ActiveRecordTransaction;
+  readonly userTransaction: UserTransaction;
   protected _instrumenter: TransactionInstrumenter;
 
   static readonly Callback = TransactionCallback;
@@ -308,8 +308,8 @@ export class Transaction {
     this.isolationLevel = options.isolation ?? null;
     this._runCommitCallbacks = options.runCommitCallbacks ?? false;
     this.userTransaction = this._joinable
-      ? new ActiveRecordTransaction(this)
-      : ActiveRecordTransaction.NULL_TRANSACTION;
+      ? new UserTransaction(this)
+      : UserTransaction.NULL_TRANSACTION;
     this._instrumenter = new TransactionInstrumenter({
       connection,
       transaction: this.userTransaction,
@@ -978,7 +978,7 @@ export class TransactionManager {
 
   async withinNewTransaction<T>(
     options: { isolation?: string | null; joinable?: boolean },
-    fn: (tx: ActiveRecordTransaction) => Promise<T> | T,
+    fn: (tx: UserTransaction) => Promise<T> | T,
   ): Promise<T> {
     const transaction = await this.beginTransaction({
       isolation: options.isolation,

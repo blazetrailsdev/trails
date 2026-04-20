@@ -9,7 +9,7 @@ import { Transaction as InternalTransaction } from "./connection-adapters/abstra
  *
  * Mirrors: ActiveRecord::Transaction
  */
-export class ActiveRecordTransaction {
+export class Transaction {
   private _internalTransaction: InternalTransaction | null;
   private _uuid: string | null = null;
 
@@ -83,5 +83,5 @@ export class ActiveRecordTransaction {
     return this._uuid;
   }
 
-  static readonly NULL_TRANSACTION = new ActiveRecordTransaction(null);
+  static readonly NULL_TRANSACTION = new Transaction(null);
 }
