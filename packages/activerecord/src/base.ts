@@ -107,6 +107,7 @@ import {
 } from "./core.js";
 import * as _Core from "./core.js";
 import * as _Persistence from "./persistence.js";
+import * as _EnumModule from "./enum.js";
 import { argumentError } from "./relation/query-methods.js";
 import { ScopeRegistry } from "./scoping.js";
 
@@ -898,110 +899,11 @@ export class Base extends Model {
 
   /**
    * Declare an enum attribute. Maps symbolic names to integer values.
-   * Defines scopes, predicate methods, and bang setter methods.
+   * Implementation lives in enum.ts; wired via extend() after the class body.
    *
    * Mirrors: ActiveRecord::Enum.enum
    */
-  static enum(
-    attribute: string,
-    mapping: Record<string, number>,
-    options?: { prefix?: boolean | string; suffix?: boolean | string },
-  ): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
-      this._enums = new Map(this._enums);
-    }
-    this._enums.set(attribute, mapping);
-
-    const prefix =
-      options?.prefix === true
-        ? `${attribute}_`
-        : typeof options?.prefix === "string"
-          ? `${options.prefix}_`
-          : "";
-    const suffix =
-      options?.suffix === true
-        ? `_${attribute}`
-        : typeof options?.suffix === "string"
-          ? `_${options.suffix}`
-          : "";
-
-    // Override readAttribute to return the symbol name
-    const origRead = this.prototype.readAttribute;
-    const attrName = attribute;
-    const reverseMap: Record<number, string> = {};
-    for (const [name, value] of Object.entries(mapping)) {
-      reverseMap[value] = name;
-    }
-
-    // Define getter that returns the symbol name
-    Object.defineProperty(this.prototype, attribute, {
-      get(this: Base) {
-        const raw = this._attributes.get(attrName);
-        if (typeof raw === "number" && raw in reverseMap) return reverseMap[raw];
-        if (typeof raw === "string" && raw in mapping) return raw;
-        return raw;
-      },
-      set(this: Base, value: unknown) {
-        if (typeof value === "string" && value in mapping) {
-          this.writeAttribute(attrName, mapping[value as string]);
-        } else {
-          this.writeAttribute(attrName, value);
-        }
-      },
-      configurable: true,
-    });
-
-    // Define predicate methods and bang setters for each enum value
-    for (const [name, value] of Object.entries(mapping)) {
-      const methodBase = `${prefix}${name}${suffix}`;
-
-      // Predicate: user.active? → user.isActive()
-      Object.defineProperty(
-        this.prototype,
-        `is${methodBase.charAt(0).toUpperCase()}${methodBase.slice(1)}`,
-        {
-          value: function (this: Base) {
-            return this._attributes.get(attrName) === value;
-          },
-          writable: true,
-          configurable: true,
-        },
-      );
-
-      // Bang setter: user.active! → user.activeBang()
-      Object.defineProperty(this.prototype, `${methodBase}Bang`, {
-        value: function (this: Base) {
-          this.writeAttribute(attrName, value);
-          return this;
-        },
-        writable: true,
-        configurable: true,
-      });
-
-      // Scope: User.active → User.where({ status: 0 })
-      if (!Object.prototype.hasOwnProperty.call(this, "_scopes")) {
-        this._scopes = new Map(this._scopes);
-      }
-      this._scopes.set(methodBase, (rel: any) => rel.where({ [attrName]: value }));
-
-      // Static method that delegates to the scope
-      Object.defineProperty(this, methodBase, {
-        value: function () {
-          return ((this as typeof Base).all() as any)[methodBase]();
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
-
-    // Static method to get the mapping
-    Object.defineProperty(this, `${attribute}s`, {
-      get() {
-        return { ...mapping };
-      },
-      configurable: true,
-    });
-  }
+  declare static enum: typeof _EnumModule.enumMethod;
 
   // -- Store --
   static _storedAttributes: Map<string, { accessors?: string[] }> = new Map();
@@ -3370,6 +3272,7 @@ extend(Base, ReadonlyAttributes.ClassMethods);
 extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
+extend(Base, { enum: _EnumModule.enumMethod });
 extend(Base, {
   defaultScope: _defaultScope,
   unscoped: _unscoped,

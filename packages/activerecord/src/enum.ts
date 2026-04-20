@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { camelize } from "@blazetrails/activesupport";
+import { camelize, pluralize } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
 
 /**
@@ -244,6 +244,127 @@ export class EnumType extends ValueType<string> {
     throw new Error(`'${value}' is not a valid ${this.name}`);
   }
 }
+
+/**
+ * Declare an enum attribute via `Base.enum(attribute, mapping, options)`.
+ * Maps symbolic names to integer values; defines a getter/setter on the
+ * prototype, `is{Name}()` predicates, `{name}Bang()` in-memory setters,
+ * per-value scopes, and a static `pluralize(attribute)` accessor for the
+ * mapping (e.g. `status` → `statuses`, `priority` → `priorities`).
+ *
+ * This is the simpler-semantics sibling to `defineEnum` — the bang setter
+ * only mutates in-memory state (returns `this`), matching the historical
+ * inline `Base.enum` behavior. Use `defineEnum(klass, ...)` for the
+ * Rails-persisting variant with `not*` scopes.
+ *
+ * Mirrors: ActiveRecord::Enum.enum (the ClassMethods macro).
+ */
+export function enumMethod(
+  this: typeof Base,
+  attribute: string,
+  mapping: Record<string, number>,
+  options?: { prefix?: boolean | string; suffix?: boolean | string },
+): void {
+  if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
+    this._enums = new Map(this._enums);
+  }
+  this._enums.set(attribute, mapping);
+
+  const prefix =
+    options?.prefix === true
+      ? `${attribute}_`
+      : typeof options?.prefix === "string"
+        ? `${options.prefix}_`
+        : "";
+  const suffix =
+    options?.suffix === true
+      ? `_${attribute}`
+      : typeof options?.suffix === "string"
+        ? `_${options.suffix}`
+        : "";
+
+  const attrName = attribute;
+  const reverseMap: Record<number, string> = {};
+  for (const [name, value] of Object.entries(mapping)) {
+    reverseMap[value] = name;
+  }
+
+  // Define getter that returns the symbol name. Use hasOwnProperty checks so
+  // inherited prototype keys like "toString" don't masquerade as enum values.
+  const hasOwn = Object.prototype.hasOwnProperty;
+  Object.defineProperty(this.prototype, attribute, {
+    get(this: Base) {
+      const raw = this._attributes.get(attrName);
+      if (typeof raw === "number" && hasOwn.call(reverseMap, raw)) return reverseMap[raw];
+      if (typeof raw === "string" && hasOwn.call(mapping, raw)) return raw;
+      return raw;
+    },
+    set(this: Base, value: unknown) {
+      if (typeof value === "string" && hasOwn.call(mapping, value)) {
+        this.writeAttribute(attrName, mapping[value as string]);
+      } else {
+        this.writeAttribute(attrName, value);
+      }
+    },
+    configurable: true,
+  });
+
+  for (const [name, value] of Object.entries(mapping)) {
+    const methodBase = `${prefix}${name}${suffix}`;
+
+    // Predicate: user.active? → user.isActive()
+    Object.defineProperty(
+      this.prototype,
+      `is${methodBase.charAt(0).toUpperCase()}${methodBase.slice(1)}`,
+      {
+        value: function (this: Base) {
+          return this._attributes.get(attrName) === value;
+        },
+        writable: true,
+        configurable: true,
+      },
+    );
+
+    // Bang setter: user.active! → user.activeBang() (in-memory only)
+    Object.defineProperty(this.prototype, `${methodBase}Bang`, {
+      value: function (this: Base) {
+        this.writeAttribute(attrName, value);
+        return this;
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    // Scope: User.active → User.where({ status: 0 })
+    if (!Object.prototype.hasOwnProperty.call(this, "_scopes")) {
+      this._scopes = new Map(this._scopes);
+    }
+    this._scopes.set(methodBase, (rel: any) => rel.where({ [attrName]: value }));
+
+    // Static method that delegates to the scope
+    Object.defineProperty(this, methodBase, {
+      value: function () {
+        return ((this as typeof Base).all() as any)[methodBase]();
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  // Mapping accessor under the pluralized attribute name (e.g. User.statuses
+  // for `status`). Rails: `singleton_class.define_method(name.to_s.pluralize)`.
+  Object.defineProperty(this, pluralize(attribute), {
+    get() {
+      return { ...mapping };
+    },
+    configurable: true,
+  });
+}
+
+// Alias the Base.enum implementation under the Rails-idiomatic name so
+// api:compare can match `ActiveRecord::Enum#enum` to this file. The runtime
+// binding wired onto Base uses the real (un-reserved-word) internal name.
+export { enumMethod as enum };
 
 /**
  * Get the human-readable enum value for an attribute.

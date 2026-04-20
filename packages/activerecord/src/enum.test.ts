@@ -1271,7 +1271,8 @@ describe("EnumTest", () => {
         this.enum("status", { active: 0, inactive: 1 });
       }
     }
-    expect((User as any).statuss).toEqual({ active: 0, inactive: 1 });
+    // Rails: `singleton_class.define_method(name.to_s.pluralize)` → `User.statuses`.
+    expect((User as any).statuses).toEqual({ active: 0, inactive: 1 });
   });
 
   it("creates scopes for each enum value", async () => {
@@ -1670,7 +1671,8 @@ describe("EnumTest", () => {
         }
       }
 
-      expect((Task as any).prioritys).toEqual({ low: 0, medium: 1, high: 2 });
+      // Rails pluralizes the enum name: priority → priorities.
+      expect((Task as any).priorities).toEqual({ low: 0, medium: 1, high: 2 });
     });
 
     it("supports prefix option", () => {
