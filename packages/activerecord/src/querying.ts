@@ -7,6 +7,7 @@
 
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import type { Relation } from "./relation.js";
 import { sanitizeSql } from "./sanitization.js";
 
 /**
@@ -107,4 +108,94 @@ export function _loadFromSql<T extends typeof Base>(
   );
   if (block) records.forEach(block);
   return records;
+}
+
+// ---------------------------------------------------------------------------
+// Thin static delegators to `all()` — Rails' `Querying::QUERYING_METHODS`
+// list, delegated via `delegate(*QUERYING_METHODS, to: :all)`. Each forwards
+// to the default relation, so calling `Model.where(...)` is equivalent to
+// `Model.all.where(...)`.
+// ---------------------------------------------------------------------------
+
+/** Mirrors: ActiveRecord::Querying#from */
+export function from<T extends typeof Base>(
+  this: T,
+  source: string | Relation<any>,
+  subqueryName?: string,
+): Relation<InstanceType<T>> {
+  return this.all().from(source, subqueryName);
+}
+
+/** Mirrors: ActiveRecord::Querying#select */
+export function select<T extends typeof Base>(
+  this: T,
+  ...columns: string[]
+): Relation<InstanceType<T>> {
+  return this.all().select(...columns);
+}
+
+/** Mirrors: ActiveRecord::Querying#order */
+export function order<T extends typeof Base>(
+  this: T,
+  ...args: Array<string | Record<string, "asc" | "desc">>
+): Relation<InstanceType<T>> {
+  return this.all().order(...args);
+}
+
+/** Mirrors: ActiveRecord::Querying#group */
+export function group<T extends typeof Base>(
+  this: T,
+  ...columns: string[]
+): Relation<InstanceType<T>> {
+  return this.all().group(...columns);
+}
+
+/** Mirrors: ActiveRecord::Querying#limit */
+export function limit<T extends typeof Base>(
+  this: T,
+  value: number | null,
+): Relation<InstanceType<T>> {
+  return this.all().limit(value);
+}
+
+/** Mirrors: ActiveRecord::Querying#offset */
+export function offset<T extends typeof Base>(this: T, value: number): Relation<InstanceType<T>> {
+  return this.all().offset(value);
+}
+
+/** Mirrors: ActiveRecord::Querying#distinct */
+export function distinct<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
+  return this.all().distinct();
+}
+
+/** Mirrors: ActiveRecord::Querying#joins */
+export function joins<T extends typeof Base>(
+  this: T,
+  tableOrSql?: string,
+  on?: string,
+): Relation<InstanceType<T>> {
+  return this.all().joins(tableOrSql, on);
+}
+
+/** Mirrors: ActiveRecord::Querying#left_joins */
+export function leftJoins<T extends typeof Base>(
+  this: T,
+  table: string,
+  on?: string,
+): Relation<InstanceType<T>> {
+  return this.all().leftJoins(table, on);
+}
+
+/** Mirrors: ActiveRecord::Querying#left_outer_joins */
+export function leftOuterJoins<T extends typeof Base>(
+  this: T,
+  table?: string,
+  on?: string,
+): Relation<InstanceType<T>> {
+  return this.all().leftOuterJoins(table, on);
+}
+
+/** Mirrors: ActiveRecord::Querying#none */
+export function none<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
+  return this.all().none();
 }

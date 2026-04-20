@@ -1377,19 +1377,6 @@ export class Base extends Model {
   }
 
   /**
-   * Shorthand for all().from(source).
-   *
-   * Mirrors: ActiveRecord::Base.from
-   */
-  static from<T extends typeof Base>(
-    this: T,
-    source: string | Relation<any>,
-    subqueryName?: string,
-  ): Relation<InstanceType<T>> {
-    return this.all().from(source, subqueryName);
-  }
-
-  /**
    * Shorthand for all().where(conditions).
    *
    * Mirrors: ActiveRecord::Base.where
@@ -1834,108 +1821,6 @@ export class Base extends Model {
   }
 
   /**
-   * Scope: SELECT specific columns.
-   *
-   * Mirrors: ActiveRecord::Base.select
-   */
-  static select(...columns: string[]) {
-    return this.all().select(...columns);
-  }
-
-  /**
-   * Scope: ORDER BY.
-   *
-   * Mirrors: ActiveRecord::Base.order
-   */
-  static order(...args: Array<string | Record<string, "asc" | "desc">>) {
-    return this.all().order(...args);
-  }
-
-  /**
-   * Scope: GROUP BY.
-   *
-   * Mirrors: ActiveRecord::Base.group
-   */
-  static group(...columns: string[]) {
-    return this.all().group(...columns);
-  }
-
-  /**
-   * Scope: LIMIT.
-   *
-   * Mirrors: ActiveRecord::Base.limit
-   */
-  static limit(value: number | null) {
-    return this.all().limit(value);
-  }
-
-  /**
-   * Scope: OFFSET.
-   *
-   * Mirrors: ActiveRecord::Base.offset
-   */
-  static offset(value: number) {
-    return this.all().offset(value);
-  }
-
-  /**
-   * Scope: DISTINCT.
-   *
-   * Mirrors: ActiveRecord::Base.distinct
-   */
-  static distinct<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
-    return this.all().distinct();
-  }
-
-  /**
-   * Scope: JOIN.
-   *
-   * Mirrors: ActiveRecord::Base.joins
-   */
-  static joins<T extends typeof Base>(
-    this: T,
-    tableOrSql?: string,
-    on?: string,
-  ): Relation<InstanceType<T>> {
-    return this.all().joins(tableOrSql, on);
-  }
-
-  /**
-   * Scope: LEFT OUTER JOIN.
-   *
-   * Mirrors: ActiveRecord::Base.left_joins
-   */
-  static leftJoins<T extends typeof Base>(
-    this: T,
-    table: string,
-    on?: string,
-  ): Relation<InstanceType<T>> {
-    return this.all().leftJoins(table, on);
-  }
-
-  /**
-   * Scope: add a LEFT OUTER JOIN.
-   *
-   * Mirrors: ActiveRecord::Base.left_outer_joins
-   */
-  static leftOuterJoins<T extends typeof Base>(
-    this: T,
-    table?: string,
-    on?: string,
-  ): Relation<InstanceType<T>> {
-    return this.all().leftOuterJoins(table, on);
-  }
-
-  /**
-   * Scope: return an empty relation.
-   *
-   * Mirrors: ActiveRecord::Base.none
-   */
-  static none<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
-    return this.all().none();
-  }
-
-  /**
    * Find the first record matching conditions, or create one.
    *
    * Mirrors: ActiveRecord::Base.find_or_create_by
@@ -2057,6 +1942,17 @@ export class Base extends Model {
   declare static asyncFindBySql: typeof Querying.asyncFindBySql;
   declare static countBySql: typeof Querying.countBySql;
   declare static asyncCountBySql: typeof Querying.asyncCountBySql;
+  declare static from: typeof Querying.from;
+  declare static select: typeof Querying.select;
+  declare static order: typeof Querying.order;
+  declare static group: typeof Querying.group;
+  declare static limit: typeof Querying.limit;
+  declare static offset: typeof Querying.offset;
+  declare static distinct: typeof Querying.distinct;
+  declare static joins: typeof Querying.joins;
+  declare static leftJoins: typeof Querying.leftJoins;
+  declare static leftOuterJoins: typeof Querying.leftOuterJoins;
+  declare static none: typeof Querying.none;
 
   /**
    * Increment counter columns for a record by primary key.
