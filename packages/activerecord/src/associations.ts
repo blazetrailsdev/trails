@@ -294,7 +294,7 @@ export function isAssociationCached(record: Base, assocName: string): boolean {
  *
  * Shared by loadHasMany and loadHasOne so the gating rules can't drift.
  */
-function _canRouteThroughViaAssociationScope(
+export function _canRouteThroughViaAssociationScope(
   reflection: unknown,
   options: AssociationOptions,
 ): boolean {
