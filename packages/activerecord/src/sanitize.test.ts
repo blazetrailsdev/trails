@@ -307,4 +307,69 @@ describe("sanitizeSql", () => {
       /wrong number of bind variables \(1 for 2\)/,
     );
   });
+
+  it("sanitizeSql dispatches through this.sanitizeSqlArray (subclass override)", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+      static override sanitizeSqlArray(_template: string, ..._binds: unknown[]): string {
+        return "OVERRIDDEN";
+      }
+    }
+    expect(Post.sanitizeSql(["title = ?", "x"])).toBe("OVERRIDDEN");
+  });
+
+  it("sanitizeSqlForConditions dispatches through this.sanitizeSql", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+      static override sanitizeSql(_input: string | [string, ...unknown[]]): string {
+        return "VIA_SANITIZE_SQL";
+      }
+    }
+    expect(Post.sanitizeSqlForConditions(["a = ?", 1])).toBe("VIA_SANITIZE_SQL");
+    expect(Post.sanitizeSqlForConditions(null)).toBeNull();
+    expect(Post.sanitizeSqlForConditions("")).toBeNull();
+  });
+
+  it("sanitizeSqlForAssignment dispatches array-form through this.sanitizeSql", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+      static override sanitizeSql(_input: string | [string, ...unknown[]]): string {
+        return "VIA_SANITIZE_SQL";
+      }
+    }
+    expect(Post.sanitizeSqlForAssignment(["a = ?", 1])).toBe("VIA_SANITIZE_SQL");
+  });
+
+  it("sanitizeSqlForOrder dispatches through this.sanitizeSqlArray and this.disallowRawSqlBang", () => {
+    let disallowCalled = false;
+    class Post extends Base {
+      static _tableName = "posts";
+      static override sanitizeSqlArray(_template: string, ..._binds: unknown[]): string {
+        return "id, 1, 2";
+      }
+      static override disallowRawSqlBang(_args: unknown[]): void {
+        disallowCalled = true;
+      }
+    }
+    const result = Post.sanitizeSqlForOrder(["field(id, ?)", [1, 2]]);
+    // sanitizeSqlForOrder wraps the sanitized string in Arel.sql() (a SqlLiteral
+    // node). Read `.value` to confirm the subclass's sanitizeSqlArray override
+    // produced the sanitized text.
+    expect((result as { value?: string }).value).toBe("id, 1, 2");
+    expect(disallowCalled).toBe(true);
+  });
+
+  it("Base exposes the full Rails Sanitization::ClassMethods surface", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    // sanitize_sql_like
+    expect(Post.sanitizeSqlLike("50%_off")).toBe("50\\%\\_off");
+    // sanitize_sql_for_order passes raw Arel/strings through
+    expect(Post.sanitizeSqlForOrder("id asc")).toBe("id asc");
+    // sanitize_sql_for_assignment hash form
+    expect(Post.sanitizeSqlForAssignment({ title: "hi" }, "posts")).toContain("= 'hi'");
+    // disallow_raw_sql! rejects non-column-ish input
+    expect(() => Post.disallowRawSqlBang(["DROP TABLE users"])).toThrow(/Dangerous query method/);
+  });
 });

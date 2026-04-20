@@ -73,7 +73,7 @@ const loadSignedId = async () => {
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import * as Translation from "./translation.js";
-import { sanitizeSqlArray, sanitizeSqlLike } from "./sanitization.js";
+import * as Sanitization from "./sanitization.js";
 import * as Querying from "./querying.js";
 import { include, extend, type Included } from "@blazetrails/activesupport";
 import {
@@ -195,6 +195,16 @@ export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): 
 export class Base extends Model {
   // --- Translation mixin (wired via extend() after class) ---
   declare static lookupAncestors: typeof Translation.lookupAncestors;
+
+  // --- Sanitization mixin (wired via extend() after class) ---
+  declare static sanitizeSql: typeof Sanitization.ClassMethods.sanitizeSql;
+  declare static sanitizeSqlArray: typeof Sanitization.sanitizeSqlArray;
+  declare static sanitizeSqlLike: typeof Sanitization.sanitizeSqlLike;
+  declare static sanitizeSqlForConditions: typeof Sanitization.ClassMethods.sanitizeSqlForConditions;
+  declare static sanitizeSqlForAssignment: typeof Sanitization.ClassMethods.sanitizeSqlForAssignment;
+  declare static sanitizeSqlForOrder: typeof Sanitization.ClassMethods.sanitizeSqlForOrder;
+  declare static sanitizeSqlHashForAssignment: typeof Sanitization.sanitizeSqlHashForAssignment;
+  declare static disallowRawSqlBang: typeof Sanitization.disallowRawSqlBang;
 
   // --- Associations (wired below after class body) ---
   declare static belongsTo: typeof _Associations.belongsTo;
@@ -3093,20 +3103,6 @@ export class Base extends Model {
     return this.toParam();
   }
 
-  static sanitizeSqlArray(template: string, ...binds: unknown[]): string {
-    return sanitizeSqlArray(template, ...binds);
-  }
-
-  static sanitizeSql(input: string | [string, ...unknown[]]): string {
-    if (typeof input === "string") return input;
-    const [template, ...binds] = input;
-    return this.sanitizeSqlArray(template, ...binds);
-  }
-
-  static sanitizeSqlLike(value: string, escapeChar: string = "\\"): string {
-    return sanitizeSqlLike(value, escapeChar);
-  }
-
   /**
    * Returns true if the record was previously persisted but is now destroyed.
    *
@@ -3467,6 +3463,7 @@ extend(Base, {
   hasAndBelongsToMany: _Associations.hasAndBelongsToMany,
 });
 extend(Base, Translation.ClassMethods);
+extend(Base, Sanitization.ClassMethods);
 extend(Base, ReadonlyAttributes.ClassMethods);
 extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
