@@ -6,7 +6,7 @@ export { KeyGenerator } from "./key-generator.js";
 export { Cipher } from "./cipher/aes256-gcm.js";
 export { MessageSerializer } from "./message-serializer.js";
 export { Encryptor } from "./encryptor.js";
-export type { EncryptorOptions, KeyProviderLike } from "./encryptor.js";
+export type { EncryptorOptions, EncryptorLike, KeyProviderLike } from "./encryptor.js";
 export { NullEncryptor } from "./null-encryptor.js";
 export { ReadOnlyNullEncryptor } from "./read-only-null-encryptor.js";
 export { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
@@ -37,3 +37,13 @@ export {
   ExtendedDeterministicUniquenessValidator,
   EncryptedUniquenessValidator,
 } from "./extended-deterministic-uniqueness-validator.js";
+
+// The wiring entry points used by `Base.encrypts` are re-exported here
+// so the subpath is the canonical encryption surface.
+export {
+  encrypts,
+  applyPendingEncryptions,
+  isEncryptedAttribute,
+  defaultEncryptor,
+} from "../encryption.js";
+export type { Encryptor as LegacyEncryptor, EncryptsOptions } from "../encryption.js";

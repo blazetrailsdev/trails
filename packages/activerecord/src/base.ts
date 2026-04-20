@@ -44,7 +44,11 @@ import {
   performValidations,
   _setSuperIsValid,
 } from "./validations.js";
-import { encrypts as _encrypts, applyPendingEncryptions } from "./encryption.js";
+import {
+  encrypts as _encrypts,
+  applyPendingEncryptions,
+  type EncryptsOptions,
+} from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
 import * as Timestamp from "./timestamp.js";
@@ -787,9 +791,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Encryption.encrypts
    */
-  static encrypts(
-    ...args: Array<string | { encryptor?: import("./encryption.js").Encryptor }>
-  ): void {
+  static encrypts(...args: Array<string | EncryptsOptions>): void {
     // Route through the STI base for the same reason `attribute()`
     // does: Rails' `encrypts` lands on the shared attribute_types map.
     // Without this, a subclass `encrypts()` would record pending

@@ -263,9 +263,9 @@ export {
 // hasSecureToken requires node:crypto — use subpath: @blazetrails/activerecord/secure-token
 export { composedOf } from "./composed-of.js";
 export { serialize } from "./serialize.js";
-export { encrypts, defaultEncryptor, isEncryptedAttribute } from "./encryption.js";
-export { EncryptedAttributeType } from "./encrypted-attribute-type.js";
-export type { Encryptor } from "./encryption.js";
+// Encryption is exposed via the subpath export. Use:
+// `import { ... } from "@blazetrails/activerecord/encryption"`.
+// `Base.encrypts(name, ...)` is still the idiomatic declaration site.
 // generatesTokenFor requires node:crypto — use subpath: @blazetrails/activerecord/generates-token-for
 export { delegatedType, getDelegatedTypeConfig } from "./delegated-type.js";
 export { DatabaseConfig } from "./database-configurations/database-config.js";

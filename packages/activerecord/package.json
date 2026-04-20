@@ -26,6 +26,14 @@
       "types": "./dist/tsc-wrapper/index.d.ts",
       "default": "./dist/tsc-wrapper/index.js"
     },
+    "./encryption": {
+      "types": "./dist/encryption/index.d.ts",
+      "default": "./dist/encryption/index.js"
+    },
+    "./encryption/*": {
+      "types": "./dist/encryption/*.d.ts",
+      "default": "./dist/encryption/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

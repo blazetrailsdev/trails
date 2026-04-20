@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Scheme
  */
 
-import { Encryptor } from "./encryptor.js";
+import { Encryptor, type EncryptorLike } from "./encryptor.js";
 import { ConfigError } from "./errors.js";
 import type { Compressor } from "./config.js";
 
@@ -17,7 +17,7 @@ export interface SchemeOptions {
   previousSchemes?: Scheme[];
   compress?: boolean;
   compressor?: Compressor;
-  encryptor?: Encryptor;
+  encryptor?: EncryptorLike;
 }
 
 export class Scheme {
@@ -27,7 +27,7 @@ export class Scheme {
   downcase: boolean;
   ignoreCase: boolean;
   previousSchemes: Scheme[];
-  private _encryptor?: Encryptor;
+  private _encryptor?: EncryptorLike;
 
   constructor(options: SchemeOptions = {}) {
     this.keyProvider = options.keyProvider;
@@ -49,7 +49,7 @@ export class Scheme {
     this._validate();
   }
 
-  get encryptor(): Encryptor {
+  get encryptor(): EncryptorLike {
     return this._encryptor!;
   }
 

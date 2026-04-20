@@ -16,6 +16,19 @@ export interface EncryptorOptions {
   compressor?: Compressor;
 }
 
+/**
+ * Structural encryptor surface accepted by `Scheme.encryptor`. The
+ * concrete `Encryptor` class satisfies this interface. Keeps the
+ * scheme decoupled from any one implementation so a compatible
+ * subtype (or test double) can be passed in without casting through
+ * `never`.
+ */
+export interface EncryptorLike {
+  encrypt(clearText: string, options?: Record<string, unknown>): string;
+  decrypt(encryptedText: string, options?: Record<string, unknown>): string;
+  encrypted(text: string): boolean;
+}
+
 export interface KeyProviderLike {
   encryptionKey(): { secret: string; publicTags?: Record<string, unknown> };
   decryptionKeys(message: Message): Array<{ secret: string; publicTags?: Record<string, unknown> }>;

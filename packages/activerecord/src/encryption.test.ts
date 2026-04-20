@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 
 // -- Helpers --
 
@@ -70,5 +71,38 @@ describe("encrypts()", () => {
     // Serialized value should use custom encryptor
     const dbValues = user._attributes.valuesForDatabase();
     expect(dbValues.token).toBe("ENC:abc123");
+  });
+
+  it("wires scheme options (deterministic, downcase) through to the attribute type", () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+        this.encrypts("email", { deterministic: true, downcase: true });
+      }
+    }
+
+    // Trigger construction so applyPendingEncryptions runs.
+    new User();
+    const def = (User as any)._attributeDefinitions.get("email");
+    expect(def.type).toBeInstanceOf(EncryptedAttributeType);
+    expect(def.type.deterministic).toBe(true);
+    expect(def.type.scheme.downcase).toBe(true);
+  });
+
+  it("registers encrypted attributes on the class", () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("ssn", "string");
+        this.adapter = adapter;
+        this.encrypts("ssn");
+      }
+    }
+
+    expect((User as any)._encryptedAttributes.has("ssn")).toBe(true);
   });
 });

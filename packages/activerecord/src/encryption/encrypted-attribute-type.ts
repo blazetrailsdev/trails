@@ -1,6 +1,6 @@
 import { Type, ValueType, StringType } from "@blazetrails/activemodel";
 import type { Scheme } from "./scheme.js";
-import type { Encryptor } from "./encryptor.js";
+import type { EncryptorLike } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
 import { isEncryptionDisabled, isProtectedMode } from "./context.js";
 import { Configurable } from "./configurable.js";
@@ -19,7 +19,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   readonly castType: Type;
   private _previousType: boolean;
   private _default?: unknown;
-  private _encryptor: Encryptor;
+  private _encryptor: EncryptorLike;
   private _previousTypes?: EncryptedAttributeType[];
 
   constructor(options: {
