@@ -1,6 +1,7 @@
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
+import { AliasTracker } from "./alias-tracker.js";
 import {
   isStiSubclass,
   getStiBase,
@@ -246,7 +247,15 @@ export class AssociationScope {
         });
       }
     }
-    const chain = this._getChain(reflection);
+    // Per-scope-build AliasTracker. Rails seeds it from
+    // `scope.alias_tracker` (associations/association_scope.rb:26);
+    // we don't expose one on Relation yet, so create a fresh tracker
+    // here seeded with the owning klass's table name (matches Rails'
+    // default seeding with `klass.arel_table`). The tracker is
+    // shared across the chain walk within this call so repeated
+    // joins to the same table get unique aliases.
+    const tracker = AliasTracker.create(null, klass.arelTable.name, []);
+    const chain = this._getChain(reflection, tracker);
     scope = this._addConstraints(scope, owner, chain, klass);
     if (!reflection.isCollection()) {
       scope = (scope as { limit: (n: number) => unknown }).limit(1);
@@ -369,29 +378,43 @@ export class AssociationScope {
   /**
    * Build the chain of reflections to walk. Rails wraps all-but-head in
    * `ReflectionProxy` with an aliased_table from `AliasTracker` so
-   * repeated joins to the same table get unique aliases.
-   *
-   * PR 3 doesn't share an AliasTracker across calls (single-query through
-   * loads typically don't collide), so each non-head reflection gets its
-   * klass.tableName as the table identifier. Sharing a tracker for
-   * repeated/eager-loaded joins is a follow-up.
+   * repeated joins to the same table get unique aliases — e.g. a
+   * self-referential `has_many :through` that visits the same table
+   * twice in one chain. `tracker.aliasedTableFor(arelTable, candidate)`
+   * returns the base Arel table on the first visit and, on subsequent
+   * visits, an Arel table aliased to the supplied candidate — with a
+   * numeric suffix (`candidate_2`, `_3`, ...) only when the candidate
+   * itself has already been used.
    *
    * Mirrors: ActiveRecord::Associations::AssociationScope#get_chain
    * (association_scope.rb:112-122).
    */
   protected _getChain(
     reflection: AssociationReflection,
+    tracker?: AliasTracker,
   ): Array<AbstractReflection | ReflectionProxy> {
     const chain: Array<AbstractReflection | ReflectionProxy> = [reflection];
     const tail = reflection.chain.slice(1);
+    const name = reflection.name;
     for (const refl of tail) {
-      const tableName =
-        (refl as unknown as { klass?: { tableName?: string } }).klass?.tableName ?? "";
-      // ReflectionProxy expects an AssociationReflection; tail entries
-      // ARE AssociationReflection in the through case (the through-target
-      // hasMany / belongsTo on the through model). Cast for the type
-      // shape — the proxy only reads structural fields.
-      chain.push(new ReflectionProxy(refl, tableName));
+      const klass = (refl as unknown as { klass?: typeof Base }).klass;
+      let aliased: unknown;
+      if (tracker && klass) {
+        // Rails: `tracker.aliased_table_for(refl.klass.arel_table) {
+        // refl.alias_candidate(name) }`. Pass a thunk so
+        // `aliasCandidate` is only invoked on repeat visits — first
+        // visits return the base arel table without ever building
+        // the candidate string.
+        aliased = tracker.aliasedTableFor(klass.arelTable, () => {
+          const fn = (refl as unknown as { aliasCandidate?: (n: string) => string }).aliasCandidate;
+          return typeof fn === "function" ? fn.call(refl, name) : klass.tableName;
+        });
+      } else {
+        // Fallback for the legacy single-call path where no tracker
+        // is provided — bare table name, same behavior as before.
+        aliased = klass?.tableName ?? "";
+      }
+      chain.push(new ReflectionProxy(refl, aliased));
     }
     return chain;
   }

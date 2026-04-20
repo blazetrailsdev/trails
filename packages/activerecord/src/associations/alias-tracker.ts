@@ -70,21 +70,27 @@ export class AliasTracker {
     return 0;
   }
 
-  aliasedTableFor(arelTable: Table | any, tableNameOrBlock?: string | (() => string)): Table | any {
-    const tableName =
-      typeof tableNameOrBlock === "string" ? tableNameOrBlock : (arelTable.name ?? arelTable);
-
+  /**
+   * Return `arelTable` unaliased on first visit, or a freshly
+   * aliased Arel table on repeat visits. The alias candidate is
+   * provided by `aliasCandidate` (a string — or a thunk, which is
+   * only invoked when the base name is already taken; Rails uses a
+   * block so the candidate string isn't built when it isn't needed).
+   *
+   * Mirrors: ActiveRecord::Associations::AliasTracker#aliased_table_for
+   * (alias_tracker.rb) — keyed off `arelTable.name`, not the candidate.
+   */
+  aliasedTableFor(arelTable: Table | any, aliasCandidate?: string | (() => string)): Table | any {
+    const tableName = arelTable.name ?? String(arelTable);
     const count = this._getCount(tableName);
     if (count === 0) {
       this.aliases.set(tableName, 1);
-      if (arelTable.name !== tableName) {
-        return typeof arelTable.alias === "function" ? arelTable.alias(tableName) : arelTable;
-      }
       return arelTable;
     }
 
-    const aliasCandidate = typeof tableNameOrBlock === "function" ? tableNameOrBlock() : tableName;
-    const aliasedName = this._tableAliasFor(aliasCandidate);
+    const candidate =
+      typeof aliasCandidate === "function" ? aliasCandidate() : (aliasCandidate ?? tableName);
+    const aliasedName = this._tableAliasFor(candidate);
 
     const newCount = this._getCount(aliasedName) + 1;
     this.aliases.set(aliasedName, newCount);
