@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base } from "./index.js";
+import { Base, ReadonlyAttributeError } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -1778,6 +1778,10 @@ describe("AttributeMethodsTest", () => {
 
   describe("readonly attributes", () => {
     it("readonly attributes are not updated after create", async () => {
+      // Rails raises ReadonlyAttributeError on a persisted-record write to an
+      // attr_readonly column (readonly_attributes.rb line 49). The test name's
+      // "are not updated" wording pre-dates Rails adding the raise; the
+      // attribute isn't updated because the write itself is rejected.
       class Item extends Base {
         static {
           this.attribute("code", "string");
@@ -1787,11 +1791,12 @@ describe("AttributeMethodsTest", () => {
         }
       }
       const item = await Item.create({ code: "ABC", name: "Widget" });
-      item.code = "XYZ";
+      expect(() => {
+        item.code = "XYZ";
+      }).toThrow(ReadonlyAttributeError);
       item.name = "Updated";
       await item.save();
       const found = await Item.find(item.id);
-      // code should remain unchanged because it's readonly
       expect(found.code).toBe("ABC");
       expect(found.name).toBe("Updated");
     });

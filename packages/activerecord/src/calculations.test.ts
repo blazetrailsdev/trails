@@ -14,6 +14,7 @@ import {
   registerModel,
 } from "./index.js";
 import { Associations, loadBelongsTo } from "./associations.js";
+import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -5088,7 +5089,11 @@ describe("CalculationsTest", () => {
     }
 
     const product = await Product.create({ sku: "ABC-123", name: "Widget" });
-    product.sku = "CHANGED";
+    // Rails: writing a readonly attribute on a persisted record raises.
+    expect(() => {
+      product.sku = "CHANGED";
+    }).toThrow(ReadonlyAttributeError);
+
     product.name = "Better Widget";
     await product.save();
     await product.reload();

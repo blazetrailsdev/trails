@@ -1,4 +1,27 @@
 import type { Base } from "./base.js";
+import { Model } from "@blazetrails/activemodel";
+import { ActiveRecordError } from "./errors.js";
+
+/**
+ * Raised when a persisted record attempts to write to a column declared
+ * via `attr_readonly`.
+ *
+ * The message is just the attribute name — matching Rails, which defines
+ * `class ReadonlyAttributeError < ActiveRecordError; end` with no custom
+ * initializer and raises via `ReadonlyAttributeError.new(attr_name)`. The
+ * `.attribute` property gives programmatic access to the same value.
+ *
+ * Mirrors: ActiveRecord::ReadonlyAttributeError (defined alongside
+ * HasReadonlyAttributes in Rails' readonly_attributes.rb).
+ */
+export class ReadonlyAttributeError extends ActiveRecordError {
+  readonly attribute: string;
+  constructor(attribute: string) {
+    super(attribute);
+    this.name = "ReadonlyAttributeError";
+    this.attribute = attribute;
+  }
+}
 
 /**
  * Track and enforce readonly attributes on ActiveRecord models.
@@ -42,6 +65,39 @@ export function readonlyAttributes(this: typeof Base): string[] {
  */
 export function readonlyAttributeQ(this: typeof Base, attribute: string): boolean {
   return ((this as any)._readonlyAttributes as Set<string> | undefined)?.has(attribute) ?? false;
+}
+
+/**
+ * AR's `write_attribute` override — Rails' `HasReadonlyAttributes` mixin in
+ * readonly_attributes.rb (line 49). Adds two guards before delegating to the
+ * base Model implementation:
+ *
+ *   - frozen record: raises `Cannot modify a frozen X` (matching the
+ *     pre-extraction message and test coverage).
+ *   - readonly column on a persisted record: raises ReadonlyAttributeError,
+ *     matching Rails' HasReadonlyAttributes#write_attribute.
+ *
+ * During construction the `_newRecord` field initializer on `Base` hasn't
+ * run yet when `Model`'s constructor invokes `writeAttribute` — gate the
+ * readonly check on the definitively-persisted state (`_newRecord === false`)
+ * rather than `!isNewRecord()` so initial assignments during `new X(...)`
+ * aren't mistakenly blocked.
+ *
+ * `Base.prototype.writeAttribute` installed via include() in base.ts.
+ *
+ * Mirrors: ActiveRecord::HasReadonlyAttributes#write_attribute
+ */
+export function writeAttribute(this: Base, name: string, value: unknown): void {
+  if (this._attributes.isFrozen()) {
+    throw new Error(`Cannot modify a frozen ${(this.constructor as typeof Base).name}`);
+  }
+  const ctor = this.constructor as typeof Base;
+  if (this._newRecord === false && ctor.readonlyAttributeQ(String(name))) {
+    throw new ReadonlyAttributeError(String(name));
+  }
+  // `super` — route through Model's writeAttribute (the next ancestor with
+  // a writeAttribute impl, matching Rails' `super` in HasReadonlyAttributes).
+  Model.prototype.writeAttribute.call(this, name, value);
 }
 
 /**

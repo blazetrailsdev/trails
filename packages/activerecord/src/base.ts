@@ -2077,12 +2077,7 @@ export class Base extends Model {
   declare cacheKeyWithVersion: () => string;
   declare cacheVersion: () => string | null;
 
-  writeAttribute(name: string, value: unknown): void {
-    if (this._attributes.isFrozen()) {
-      throw new Error(`Cannot modify a frozen ${(this.constructor as typeof Base).name}`);
-    }
-    super.writeAttribute(name, value);
-  }
+  declare writeAttribute: typeof ReadonlyAttributes.writeAttribute;
 
   /**
    * The primary key value. When the concrete PK type is known, narrow it at
@@ -2458,11 +2453,10 @@ export class Base extends Model {
       this.writeAttribute("updated_at", new Date());
     }
 
-    // Filter out readonly attributes from changes (they can only be set on create)
+    // Rails raises ReadonlyAttributeError at write time (HasReadonlyAttributes),
+    // so by the time we reach save the change set can never contain a readonly
+    // column on a persisted record. No silent-filter needed.
     const changedAttrs = { ...this.changes };
-    for (const readonlyAttr of ctor._readonlyAttributes) {
-      delete changedAttrs[readonlyAttr];
-    }
 
     if (Object.keys(changedAttrs).length === 0) return;
 
@@ -3386,6 +3380,8 @@ extend(Base, NamedScoping.ClassMethods);
 extend(Base, ModelSchema.ClassMethods);
 
 include(Base, {
+  // ReadonlyAttributes
+  writeAttribute: ReadonlyAttributes.writeAttribute,
   // Persistence
   isNewRecord: _Persistence.isNewRecord,
   isPersisted: _Persistence.isPersisted,

@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, ReadOnlyRecord } from "./index.js";
+import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -255,6 +256,10 @@ describe("ReadonlyTest", () => {
   });
 
   it("ignores readonly attribute changes on update", async () => {
+    // Rails' HasReadonlyAttributes#write_attribute raises ReadonlyAttributeError
+    // on a persisted-record write to an attr_readonly column (readonly_attributes.rb
+    // line 49). The Rails test by this name in newer Rails asserts that
+    // behavior — the "ignores" wording pre-dates the raise being added.
     const adapter = freshAdapter();
     class Product extends Base {
       static _tableName = "products";
@@ -266,11 +271,13 @@ describe("ReadonlyTest", () => {
     Product.attrReadonly("sku");
 
     const product = await Product.create({ sku: "ABC-123", name: "Widget" });
-    product.sku = "CHANGED";
+    expect(() => {
+      product.sku = "CHANGED";
+    }).toThrow(ReadonlyAttributeError);
+
+    // Non-readonly columns still update normally.
     product.name = "Updated Widget";
     await product.save();
-
-    // The in-memory value changes, but the SQL should not include sku
     await product.reload();
     expect(product.sku).toBe("ABC-123");
     expect(product.name).toBe("Updated Widget");
