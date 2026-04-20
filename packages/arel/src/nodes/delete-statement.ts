@@ -15,9 +15,9 @@ export class DeleteStatement extends Node {
   offset: Node | null;
   key: Node | Node[] | null;
 
-  constructor() {
+  constructor(relation: Node | null = null) {
     super();
-    this.relation = null;
+    this.relation = relation;
     this.wheres = [];
     this.orders = [];
     this.groups = [];

@@ -16,9 +16,9 @@ export class UpdateStatement extends Node {
   offset: Node | null;
   key: Node | null;
 
-  constructor() {
+  constructor(relation: Node | null = null) {
     super();
-    this.relation = null;
+    this.relation = relation;
     this.values = [];
     this.wheres = [];
     this.orders = [];

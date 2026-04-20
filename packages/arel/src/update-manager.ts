@@ -6,7 +6,9 @@ import { Assignment } from "./nodes/binary.js";
 import { Quoted } from "./nodes/casted.js";
 import { Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
+import { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
 import { Table } from "./table.js";
+import type { UpdateValues } from "./crud.js";
 
 /**
  * UpdateManager — chainable API for building UPDATE statements.
@@ -24,9 +26,9 @@ export class UpdateManager extends TreeManager {
   declare offset: (offset: unknown) => this;
   declare order: (...expr: Node[]) => this;
 
-  constructor() {
+  constructor(table: Table | Node | null = null) {
     super();
-    this.ast = new UpdateStatement();
+    this.ast = new UpdateStatement(table);
   }
 
   /**
@@ -44,11 +46,17 @@ export class UpdateManager extends TreeManager {
    *
    * Mirrors: Arel::UpdateManager#set
    */
-  set(values: [Node, unknown][]): this {
-    this.ast.values = values.map(([col, val]) => {
-      const right = val instanceof Node ? val : new Quoted(val);
-      return new Assignment(col, right);
-    });
+  set(values: UpdateValues): this {
+    if (typeof values === "string") {
+      this.ast.values = [new SqlLiteral(values)];
+    } else if (values instanceof SqlLiteral || values instanceof BoundSqlLiteral) {
+      this.ast.values = [values];
+    } else {
+      this.ast.values = values.map(([col, val]) => {
+        const right = val instanceof Node ? val : new Quoted(val);
+        return new Assignment(col, right);
+      });
+    }
     return this;
   }
 

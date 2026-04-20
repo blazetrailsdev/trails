@@ -86,8 +86,22 @@ describe("UpdateManagerTest", () => {
     it("takes a string", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
-      mgr.set([[users.get("name"), "test"]]);
-      expect(mgr.toSql()).toContain("test");
+      mgr.set(new Nodes.SqlLiteral("foo = bar"));
+      expect(mgr.toSql()).toBe('UPDATE "users" SET foo = bar');
+    });
+
+    it("takes a plain string literal", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      mgr.set("foo = bar");
+      expect(mgr.toSql()).toBe('UPDATE "users" SET foo = bar');
+    });
+
+    it("takes a BoundSqlLiteral", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      mgr.set(new Nodes.BoundSqlLiteral("name = ?", ["dean"], {}));
+      expect(mgr.toSql()).toBe(`UPDATE "users" SET name = 'dean'`);
     });
   });
 

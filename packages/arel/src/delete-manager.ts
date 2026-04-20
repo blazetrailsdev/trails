@@ -22,9 +22,9 @@ export class DeleteManager extends TreeManager {
   declare offset: (offset: unknown) => this;
   declare order: (...expr: Node[]) => this;
 
-  constructor() {
+  constructor(table: Table | Node | null = null) {
     super();
-    this.ast = new DeleteStatement();
+    this.ast = new DeleteStatement(table);
   }
 
   /**

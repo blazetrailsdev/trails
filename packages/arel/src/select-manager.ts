@@ -20,9 +20,9 @@ import { TableAlias } from "./nodes/table-alias.js";
 import { Exists } from "./nodes/function.js";
 import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
-import { UpdateStatement } from "./nodes/update-statement.js";
-import { Assignment } from "./nodes/binary.js";
-import { DeleteStatement } from "./nodes/delete-statement.js";
+import { UpdateManager } from "./update-manager.js";
+import { DeleteManager } from "./delete-manager.js";
+import type { UpdateValues } from "./crud.js";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
 import { True } from "./nodes/true.js";
@@ -474,32 +474,55 @@ export class SelectManager extends TreeManager {
   }
 
   /**
-   * Create an UpdateStatement from values.
+   * Build an UpdateManager that applies this SELECT's constraints,
+   * ordering, limit, offset, and grouping to an UPDATE.
    *
    * Mirrors: Arel::SelectManager#compile_update
    */
-  compileUpdate(values: [Node, unknown][], key?: Node): UpdateStatement {
-    const stmt = new UpdateStatement();
-    stmt.relation = this.core.source.left;
-    stmt.values = values.map(([col, val]) => {
-      const right = val instanceof Node ? val : new Quoted(val);
-      return new Assignment(col, right);
-    });
-    stmt.wheres = [...this.core.wheres];
-    if (key) stmt.key = key;
-    return stmt;
+  compileUpdate(
+    values: UpdateValues,
+    key: Node | null = null,
+    havingClause: Node | null = null,
+    groupValuesColumns: Node[] = [],
+  ): UpdateManager {
+    const um = new UpdateManager(this.source);
+    um.set(values);
+    um.take((this.ast.limit as Limit | null)?.expr ?? null);
+    um.offset((this.ast.offset as Offset | null)?.expr ?? null);
+    um.order(...this.orders);
+    um.wheres = this.constraints;
+    if (key !== null) um.key = key;
+    if (groupValuesColumns.length > 0) {
+      const [first, ...rest] = groupValuesColumns;
+      um.group(first, ...rest);
+    }
+    if (havingClause !== null) um.having(havingClause);
+    return um;
   }
 
   /**
-   * Create a DeleteStatement from this SelectManager.
+   * Build a DeleteManager that applies this SELECT's constraints,
+   * ordering, limit, offset, and grouping to a DELETE.
    *
    * Mirrors: Arel::SelectManager#compile_delete
    */
-  compileDelete(): DeleteStatement {
-    const stmt = new DeleteStatement();
-    stmt.relation = this.core.source.left;
-    stmt.wheres = [...this.core.wheres];
-    return stmt;
+  compileDelete(
+    key: Node | null = null,
+    havingClause: Node | null = null,
+    groupValuesColumns: Node[] = [],
+  ): DeleteManager {
+    const dm = new DeleteManager(this.source);
+    dm.take((this.ast.limit as Limit | null)?.expr ?? null);
+    dm.offset((this.ast.offset as Offset | null)?.expr ?? null);
+    dm.order(...this.orders);
+    dm.wheres = this.constraints;
+    if (key !== null) dm.key = key;
+    if (groupValuesColumns.length > 0) {
+      const [first, ...rest] = groupValuesColumns;
+      dm.group(first, ...rest);
+    }
+    if (havingClause !== null) dm.having(havingClause);
+    return dm;
   }
 
   // -- FactoryMethods (via TreeManager) --

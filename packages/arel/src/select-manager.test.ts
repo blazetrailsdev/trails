@@ -571,10 +571,17 @@ describe("SelectManagerTest", () => {
 
   describe("delete", () => {
     it("copies from", () => {
-      const mgr = new SelectManager(users);
-      mgr.from(posts);
-      const sql = mgr.toSql();
-      expect(sql).toContain('"posts"');
+      const mgr = new SelectManager();
+      mgr.from(users);
+      const stmt = mgr.compileDelete();
+      expect(stmt.toSql()).toBe('DELETE FROM "users"');
+    });
+
+    it("copies where", () => {
+      const mgr = new SelectManager();
+      mgr.from(users).where(users.get("id").eq(10));
+      const stmt = mgr.compileDelete();
+      expect(stmt.toSql()).toBe('DELETE FROM "users" WHERE "users"."id" = 10');
     });
   });
 
@@ -605,40 +612,61 @@ describe("SelectManagerTest", () => {
 
   describe("update", () => {
     it("creates an update statement", () => {
-      const mgr = users.project(star);
-      mgr.where(users.get("id").eq(1));
-      // compileUpdate exists on SelectManager
-      expect(mgr).toHaveProperty("compileUpdate");
+      const mgr = new SelectManager();
+      mgr.from(users);
+      const stmt = mgr.compileUpdate([[users.get("id"), 1]], users.get("id"));
+      expect(stmt.toSql()).toBe('UPDATE "users" SET "id" = 1');
     });
 
     it("takes a string", () => {
-      const mgr = users.project(new Nodes.SqlLiteral("count(*)"));
-      expect(mgr.toSql()).toContain("count(*)");
+      const mgr = new SelectManager();
+      mgr.from(users);
+      const stmt = mgr.compileUpdate("foo = bar", users.get("id"));
+      expect(stmt.toSql()).toBe('UPDATE "users" SET foo = bar');
+    });
+
+    it("takes a bound sql literal", () => {
+      const mgr = new SelectManager();
+      mgr.from(users);
+      const stmt = mgr.compileUpdate(
+        new Nodes.BoundSqlLiteral("foo = ?", [1], {}),
+        users.get("id"),
+      );
+      expect(stmt.toSql()).toBe('UPDATE "users" SET foo = 1');
     });
 
     it("copies limits", () => {
-      const mgr = users.project(star).take(10);
-      expect(mgr.toSql()).toContain("LIMIT 10");
+      const mgr = new SelectManager();
+      mgr.from(users).take(1);
+      const stmt = mgr.compileUpdate(new Nodes.SqlLiteral("foo = bar"), users.get("id"));
+      expect(stmt.toSql()).toBe(
+        'UPDATE "users" SET foo = bar WHERE ("users"."id") IN (SELECT "users"."id" FROM "users" LIMIT 1)',
+      );
     });
 
     it("copies order", () => {
-      const mgr = users.project(star).order(users.get("id").asc());
-      expect(mgr.toSql()).toContain("ORDER BY");
+      const mgr = new SelectManager();
+      mgr.from(users).order(new Nodes.SqlLiteral("foo"));
+      const stmt = mgr.compileUpdate(new Nodes.SqlLiteral("foo = bar"), users.get("id"));
+      expect(stmt.toSql()).toBe(
+        'UPDATE "users" SET foo = bar WHERE ("users"."id") IN (SELECT "users"."id" FROM "users" ORDER BY foo)',
+      );
     });
 
     it("copies where clauses", () => {
-      const mgr = users.project(star).where(users.get("id").eq(1));
-      expect(mgr.toSql()).toContain("WHERE");
+      const mgr = new SelectManager();
+      mgr.where(users.get("id").eq(10)).from(users);
+      const stmt = mgr.compileUpdate([[users.get("id"), 1]], users.get("id"));
+      expect(stmt.toSql()).toBe('UPDATE "users" SET "id" = 1 WHERE "users"."id" = 10');
     });
 
     it("copies where clauses when nesting is triggered", () => {
-      const mgr = users
-        .project(star)
-        .where(users.get("id").eq(1))
-        .where(users.get("name").eq("test"));
-      const result = mgr.toSql();
-      expect(result).toContain('"users"."id" = 1');
-      expect(result).toContain("AND");
+      const mgr = new SelectManager();
+      mgr.where(users.get("foo").eq(10)).take(42).from(users);
+      const stmt = mgr.compileUpdate([[users.get("id"), 1]], users.get("id"));
+      expect(stmt.toSql()).toBe(
+        'UPDATE "users" SET "id" = 1 WHERE ("users"."id") IN (SELECT "users"."id" FROM "users" WHERE "users"."foo" = 10 LIMIT 42)',
+      );
     });
   });
 
