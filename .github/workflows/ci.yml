@@ -7,8 +7,62 @@ on:
     branches: [main]
 
 jobs:
+  # Preflight that sets `docs_only=true` when every changed path is under
+  # top-level `docs/`. Downstream jobs gate on this via `if:` so they're
+  # reported as skipped on docs-only PRs. Skipped required checks in
+  # branch protection DO block merges, so point branch protection at the
+  # aggregate `CI` job at the bottom of this file instead of individual
+  # jobs — `CI` always runs and treats skipped needs as success.
+  # `packages/website/docs` does not qualify; it lives under
+  # `packages/website/` and affects the site build.
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: filter
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+          # First push to a branch has a zero-SHA base; force-push may
+          # rewrite history out from under us. In either case we can't
+          # reliably compute a diff — fall back to running the full matrix.
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! files=$(git diff --name-only "$base" "$head" 2>/dev/null); then
+            echo "git diff failed (base may be unreachable after force-push) — running full matrix"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Changed files:"
+          echo "$files"
+          if [ -z "$files" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Any line that does NOT start with `docs/` flips the switch.
+          if echo "$files" | grep -qv '^docs/'; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build-and-typecheck:
     name: Build & Type Check
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +78,8 @@ jobs:
       - run: pnpm typecheck
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +109,8 @@ jobs:
 
   guides-typecheck:
     name: Guides Code Type Check
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +127,8 @@ jobs:
 
   dx-type-tests:
     name: DX Type Tests
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -84,6 +144,8 @@ jobs:
 
   virtualized-dx-type-tests:
     name: Virtualized DX Type Tests
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -99,6 +161,8 @@ jobs:
 
   unit-tests:
     name: Unit Tests
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -123,6 +187,8 @@ jobs:
 
   sqlite-tests:
     name: SQLite Tests
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,6 +204,8 @@ jobs:
 
   postgres-tests:
     name: PostgreSQL Tests
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -169,6 +237,8 @@ jobs:
 
   mariadb-tests:
     name: MariaDB Tests
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     services:
       mariadb:
@@ -202,6 +272,8 @@ jobs:
 
   website:
     name: Website
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -221,6 +293,8 @@ jobs:
 
   rails-comparison:
     name: Rails API/Test Comparison
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -249,3 +323,35 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/lint-deps.ts
       - name: Test comparison
         run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts
+
+  ci:
+    name: CI
+    if: ${{ always() }}
+    needs:
+      - changes
+      - build-and-typecheck
+      - lint
+      - prettier
+      - guides-typecheck
+      - dx-type-tests
+      - virtualized-dx-type-tests
+      - unit-tests
+      - sqlite-tests
+      - postgres-tests
+      - mariadb-tests
+      - website
+      - rails-comparison
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job failed or was cancelled
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS_JSON"
+          bad=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | .key')
+          if [ -n "$bad" ]; then
+            echo "Failed/cancelled jobs:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "All jobs passed or were intentionally skipped."

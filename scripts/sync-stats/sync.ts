@@ -839,7 +839,7 @@ async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
     "isDraft",
   ].join(",");
 
-  const limit = mode === "latest" ? 100 : 5000;
+  const limit = mode === "latest" ? 1000 : 5000;
   const allPrs = ghJson<GhPrData[]>(
     `pr list --repo ${REPO} --state all --limit ${limit} --json ${fields} --jq '[.[] | select(.number > ${lastSynced})]'`,
   );
@@ -899,22 +899,20 @@ async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
         `UPDATE pull_requests SET is_draft = 0 WHERE is_draft IS NULL`,
       );
     }
+  }
 
-    const openRows = await PullRequest.findBySql(
-      `SELECT number FROM pull_requests WHERE state = 'open' ORDER BY number DESC`,
-    );
-    if (openRows.length > 0) {
-      console.log(`Re-fetching ${openRows.length} open PRs to check for state changes...`);
-      for (const row of openRows) {
-        const num = row.readAttribute("number") as number;
-        try {
-          const pr = ghJson<GhPrData>(`pr view ${num} --repo ${REPO} --json ${fields}`);
-          await PullRequest.upsertAll([mapPr(pr)], { uniqueBy: "number" });
-        } catch (err) {
-          console.warn(
-            `  Failed to refresh PR #${num}: ${err instanceof Error ? err.message : err}`,
-          );
-        }
+  const openRows = await PullRequest.findBySql(
+    `SELECT number FROM pull_requests WHERE state = 'open' OR state IS NULL ORDER BY number DESC`,
+  );
+  if (openRows.length > 0) {
+    console.log(`Re-fetching ${openRows.length} open PRs to check for state changes...`);
+    for (const row of openRows) {
+      const num = row.readAttribute("number") as number;
+      try {
+        const pr = ghJson<GhPrData>(`pr view ${num} --repo ${REPO} --json ${fields}`);
+        await PullRequest.upsertAll([mapPr(pr)], { uniqueBy: "number" });
+      } catch (err) {
+        console.warn(`  Failed to refresh PR #${num}: ${err instanceof Error ? err.message : err}`);
       }
     }
   }
@@ -1766,7 +1764,7 @@ async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
 // Summary
 // ---------------------------------------------------------------------------
 
-async function printSummary(mode: "latest" | "refresh") {
+async function printSummary() {
   const count = async (table: string) => {
     const rows = await Base.adapter.execute(`SELECT COUNT(*) as cnt FROM ${table}`);
     return (rows[0] as { cnt: number }).cnt;
@@ -1804,38 +1802,36 @@ async function printSummary(mode: "latest" | "refresh") {
   console.log("\n=== Database Summary ===");
   console.log(`  PRs: ${prCount} (${stateParts})`);
 
-  if (mode === "refresh") {
-    const [
-      fileCount,
-      commitCount,
-      commentCount,
-      reviewCount,
-      requestedReviewerCount,
-      linkedIssueCount,
-      timelineEventCount,
-      reactionCount,
-      annotationCount,
-    ] = await Promise.all([
-      count("pr_files"),
-      count("pr_commits"),
-      count("pr_comments"),
-      count("pr_reviews"),
-      count("pr_requested_reviewers"),
-      count("pr_linked_issues"),
-      count("pr_timeline_events"),
-      count("pr_reactions"),
-      count("check_annotations"),
-    ]);
-    console.log(`  PR files: ${fileCount}`);
-    console.log(`  PR commits: ${commitCount}`);
-    console.log(`  PR comments: ${commentCount}`);
-    console.log(`  PR reviews: ${reviewCount}`);
-    console.log(`  PR requested reviewers: ${requestedReviewerCount}`);
-    console.log(`  PR linked issues: ${linkedIssueCount}`);
-    console.log(`  PR timeline events: ${timelineEventCount}`);
-    console.log(`  PR reactions: ${reactionCount}`);
-    console.log(`  Check annotations: ${annotationCount}`);
-  }
+  const [
+    fileCount,
+    commitCount,
+    commentCount,
+    reviewCount,
+    requestedReviewerCount,
+    linkedIssueCount,
+    timelineEventCount,
+    reactionCount,
+    annotationCount,
+  ] = await Promise.all([
+    count("pr_files"),
+    count("pr_commits"),
+    count("pr_comments"),
+    count("pr_reviews"),
+    count("pr_requested_reviewers"),
+    count("pr_linked_issues"),
+    count("pr_timeline_events"),
+    count("pr_reactions"),
+    count("check_annotations"),
+  ]);
+  console.log(`  PR files: ${fileCount}`);
+  console.log(`  PR commits: ${commitCount}`);
+  console.log(`  PR comments: ${commentCount}`);
+  console.log(`  PR reviews: ${reviewCount}`);
+  console.log(`  PR requested reviewers: ${requestedReviewerCount}`);
+  console.log(`  PR linked issues: ${linkedIssueCount}`);
+  console.log(`  PR timeline events: ${timelineEventCount}`);
+  console.log(`  PR reactions: ${reactionCount}`);
+  console.log(`  Check annotations: ${annotationCount}`);
 
   console.log(`  Workflow runs: ${runCount}`);
   console.log(`  Workflow jobs: ${jobCount} (${rawLogCount} logs fetched)`);
@@ -1911,7 +1907,9 @@ async function main() {
       : "latest";
 
   if (mode === "latest") {
-    console.log("Running in latest mode (default). Use --refresh for full sync.\n");
+    console.log(
+      "Running in latest mode (default): re-verify open PRs, fetch new PRs, and deep-sync. Use --refresh for full sync.\n",
+    );
   } else if (mode === "compare-only") {
     console.log("Running compare-only mode: syncing PRs, workflow runs, and compare logs.\n");
   } else {
@@ -1929,7 +1927,7 @@ async function main() {
     console.log("=== Syncing PR data ===");
     const prsSynced = await syncPullRequests(fetchMode);
 
-    if (mode === "refresh") {
+    if (mode !== "compare-only") {
       console.log("\n=== Syncing PR files ===");
       await syncPrFiles();
 
@@ -1971,7 +1969,7 @@ async function main() {
       logs_parsed: logsParsed,
     });
 
-    await printSummary(mode === "refresh" ? "refresh" : "latest");
+    await printSummary();
   } finally {
     adapter.close();
   }
