@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import { DatabaseTasks } from "./database-tasks.js";
+import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { createTestAdapter } from "../test-adapter.js";
@@ -51,6 +51,13 @@ describe("DatabaseTasksRegisterTask", () => {
 
   it("unregistered task", () => {
     expect(DatabaseTasks.resolveTask("nonexistent")).toBeUndefined();
+  });
+
+  it("routing a config through an unregistered adapter raises DatabaseNotSupported", async () => {
+    // Rails raises Tasks::DatabaseNotSupported from class_for_adapter
+    // when no pattern matches. _resolveTaskOrThrow is the TS analog.
+    const config = new HashConfig("test", "primary", { adapter: "nonexistent" });
+    await expect(DatabaseTasks.create(config)).rejects.toThrow(DatabaseNotSupported);
   });
 });
 

@@ -10,6 +10,20 @@ import { ProtectedEnvironmentError } from "../migration.js";
 import { getFs, getPath, getCryptoAsync, getOs } from "@blazetrails/activesupport";
 import { coercePort } from "./task-utils.js";
 
+/**
+ * Raised when a database task is invoked against an adapter that
+ * has no registered task handler. Mirrors Rails'
+ * `ActiveRecord::Tasks::DatabaseNotSupported` (tasks/database_tasks.rb:7),
+ * which is raised by `class_for_adapter` when no pattern matches.
+ * Our `DatabaseTasks._resolveTaskOrThrow` is the direct analog.
+ */
+export class DatabaseNotSupported extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DatabaseNotSupported";
+  }
+}
+
 function sqliteDatabaseFromUrl(url: string): string | undefined {
   try {
     const parsed = new URL(url);
@@ -151,7 +165,7 @@ export class DatabaseTasks {
   private static _resolveTaskOrThrow(adapter: string): DatabaseTaskHandler {
     const handler = this.resolveTask(adapter);
     if (!handler) {
-      throw new Error(
+      throw new DatabaseNotSupported(
         `No database task handler registered for adapter '${adapter}'. ` +
           `Register one with DatabaseTasks.registerTask().`,
       );
