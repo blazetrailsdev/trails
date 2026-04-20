@@ -7,6 +7,7 @@
 import { Notifications, ParameterFilter, getAsyncContext } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
+import { argumentError } from "./relation/query-methods.js";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -22,7 +23,10 @@ export interface Core {
   isReadonly(): boolean;
   readonlyBang(): this;
   isStrictLoading(): boolean;
-  strictLoadingBang(value?: boolean): this;
+  strictLoadingBang(value?: boolean, options?: { mode?: StrictLoadingMode }): this;
+  strictLoadingMode(): StrictLoadingMode | null;
+  isStrictLoadingAll(): boolean;
+  isStrictLoadingNPlusOneOnly(): boolean;
   isFrozen(): boolean;
   freeze(): this;
 }
@@ -131,6 +135,78 @@ export function isBlank(this: CoreRecord): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Readonly / strict-loading / freeze instance predicates and setters.
+// Mirrors the corresponding defs in activerecord/lib/active_record/core.rb.
+// ---------------------------------------------------------------------------
+
+interface ReadonlyFields {
+  _readonly: boolean;
+}
+
+interface StrictLoadingFields {
+  _strictLoading: boolean;
+  _strictLoadingMode?: StrictLoadingMode;
+}
+
+export type StrictLoadingMode = "all" | "n_plus_one_only";
+
+interface FrozenFields {
+  _frozen: boolean;
+}
+
+/** Mirrors: ActiveRecord::Core#readonly? */
+export function isReadonly(this: ReadonlyFields): boolean {
+  return this._readonly;
+}
+
+/** Mirrors: ActiveRecord::Core#readonly! */
+export function readonlyBang<T extends ReadonlyFields>(this: T): T {
+  this._readonly = true;
+  return this;
+}
+
+/** Mirrors: ActiveRecord::Core#strict_loading? */
+export function isStrictLoading(this: StrictLoadingFields): boolean {
+  return this._strictLoading;
+}
+
+/**
+ * Enable (or disable with `value: false`) strict loading on this record.
+ * An optional `mode` selects strictness: "all" (default, raises on any
+ * lazily-loaded association) or "n_plus_one_only" (only raises on
+ * associations that would lead to N+1 queries).
+ *
+ * Mirrors: ActiveRecord::Core#strict_loading!
+ */
+export function strictLoadingBang<T extends StrictLoadingFields>(
+  this: T,
+  value: boolean = true,
+  options: { mode?: StrictLoadingMode } = {},
+): T {
+  const mode = options.mode ?? "all";
+  if (mode !== "all" && mode !== "n_plus_one_only") {
+    // Rails: `raise ArgumentError, "The :mode option must be one of ..."`
+    throw argumentError(
+      `The :mode option must be one of ["all", "n_plus_one_only"] but ${JSON.stringify(mode)} was provided.`,
+    );
+  }
+  this._strictLoadingMode = mode;
+  this._strictLoading = value;
+  return this;
+}
+
+/** Mirrors: ActiveRecord::Core#frozen? */
+export function isFrozen(this: FrozenFields): boolean {
+  return this._frozen;
+}
+
+/** Mirrors: ActiveRecord::Core#freeze */
+export function freeze<T extends FrozenFields>(this: T): T {
+  this._frozen = true;
+  return this;
+}
+
+// ---------------------------------------------------------------------------
 // Instance methods missing from api:compare
 // ---------------------------------------------------------------------------
 
@@ -157,18 +233,20 @@ export function initAttributes(
 }
 
 export function strictLoadingMode(
-  this: CoreRecord & { _strictLoadingMode?: string },
-): string | null {
+  this: CoreRecord & { _strictLoadingMode?: StrictLoadingMode },
+): StrictLoadingMode | null {
   return this._strictLoadingMode ?? null;
 }
 
 export function isStrictLoadingNPlusOneOnly(
-  this: CoreRecord & { _strictLoadingMode?: string },
+  this: CoreRecord & { _strictLoadingMode?: StrictLoadingMode },
 ): boolean {
   return this._strictLoadingMode === "n_plus_one_only";
 }
 
-export function isStrictLoadingAll(this: CoreRecord & { _strictLoadingMode?: string }): boolean {
+export function isStrictLoadingAll(
+  this: CoreRecord & { _strictLoadingMode?: StrictLoadingMode },
+): boolean {
   return this._strictLoadingMode === "all";
 }
 

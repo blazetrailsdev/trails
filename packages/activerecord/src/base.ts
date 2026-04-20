@@ -101,6 +101,7 @@ import {
   isPresent as _isPresent,
   isBlank as _isBlank,
 } from "./core.js";
+import * as _Core from "./core.js";
 import { argumentError } from "./relation/query-methods.js";
 import { ScopeRegistry } from "./scoping.js";
 
@@ -2019,13 +2020,14 @@ export class Base extends Model {
   // -- Instance state --
 
   _newRecord = true;
-  private _destroyed = false;
-  private _readonly = false;
-  private _frozen = false;
+  _destroyed = false;
+  _readonly = false;
+  _frozen = false;
   private _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
   _strictLoading = false;
+  _strictLoadingMode?: _Core.StrictLoadingMode;
   _strictLoadingBypassCount = 0;
   _preloadedAssociations: Map<string, unknown> = new Map();
   _collectionProxies: Map<string, unknown> = new Map();
@@ -2062,46 +2064,16 @@ export class Base extends Model {
     return this._destroyed;
   }
 
-  /**
-   * Returns true if the record is marked readonly.
-   *
-   * Mirrors: ActiveRecord::Base#readonly?
-   */
-  isReadonly(): boolean {
-    return this._readonly;
-  }
-
-  /**
-   * Mark the record as readonly. Raises on save/update/destroy.
-   *
-   * Mirrors: ActiveRecord::Base#readonly!
-   */
-  readonlyBang(): this {
-    this._readonly = true;
-    return this;
-  }
-
-  /**
-   * Returns true if strict loading is enabled.
-   *
-   * Mirrors: ActiveRecord::Base#strict_loading?
-   */
-  isStrictLoading(): boolean {
-    return this._strictLoading;
-  }
-
-  /**
-   * Enable (or disable, with `value: false`) strict loading —
-   * lazily-loaded associations will raise. Matches Rails'
-   * `strict_loading!(value = true)` which accepts an explicit argument
-   * for symmetrical on/off.
-   *
-   * Mirrors: ActiveRecord::Base#strict_loading!
-   */
-  strictLoadingBang(value: boolean = true): this {
-    this._strictLoading = value;
-    return this;
-  }
+  // --- Core instance methods (wired via include() after class body) ---
+  declare isReadonly: typeof _Core.isReadonly;
+  declare readonlyBang: typeof _Core.readonlyBang;
+  declare isStrictLoading: typeof _Core.isStrictLoading;
+  declare strictLoadingBang: typeof _Core.strictLoadingBang;
+  declare strictLoadingMode: typeof _Core.strictLoadingMode;
+  declare isStrictLoadingAll: typeof _Core.isStrictLoadingAll;
+  declare isStrictLoadingNPlusOneOnly: typeof _Core.isStrictLoadingNPlusOneOnly;
+  declare isFrozen: typeof _Core.isFrozen;
+  declare freeze: typeof _Core.freeze;
 
   /**
    * Returns true if this record was a new record before the last save.
@@ -2110,25 +2082,6 @@ export class Base extends Model {
    */
   isPreviouslyNewRecord(): boolean {
     return this._previouslyNewRecord;
-  }
-
-  /**
-   * Returns true if the record is frozen (e.g. after destroy).
-   *
-   * Mirrors: ActiveRecord::Base#frozen?
-   */
-  isFrozen(): boolean {
-    return this._frozen;
-  }
-
-  /**
-   * Freeze the record, preventing further modifications.
-   *
-   * Mirrors: ActiveRecord::Base#freeze
-   */
-  freeze(): this {
-    this._frozen = true;
-    return this;
   }
 
   /**
@@ -3477,6 +3430,15 @@ include(Base, {
   isEqual: _isEqual,
   isPresent: _isPresent,
   isBlank: _isBlank,
+  isReadonly: _Core.isReadonly,
+  readonlyBang: _Core.readonlyBang,
+  isStrictLoading: _Core.isStrictLoading,
+  strictLoadingBang: _Core.strictLoadingBang,
+  strictLoadingMode: _Core.strictLoadingMode,
+  isStrictLoadingAll: _Core.isStrictLoadingAll,
+  isStrictLoadingNPlusOneOnly: _Core.isStrictLoadingNPlusOneOnly,
+  isFrozen: _Core.isFrozen,
+  freeze: _Core.freeze,
   // Integration
   toParam: _toParam,
   cacheKey: _cacheKey,
