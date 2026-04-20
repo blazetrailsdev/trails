@@ -1267,6 +1267,26 @@ describe("AssociationReflection", () => {
     expect(all).toHaveLength(3);
   });
 
+  // Rails exposes reflect_on_association / reflect_on_all_associations on
+  // every model class (ActiveRecord::Reflection::ClassMethods). Exercises the
+  // Base-wired variants so `Model.reflectOnAssociation("name")` works
+  // idiomatically.
+  it("test_class_method_reflection_api_is_callable_on_base", () => {
+    class Author extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Author, "books", {});
+    Associations.belongsTo.call(Author, "publisher", {});
+
+    expect(Author.reflectOnAssociation("books")?.name).toBe("books");
+    expect(Author.reflectOnAssociation("publisher")?.name).toBe("publisher");
+    expect(Author.reflectOnAssociation("unknown")).toBeNull();
+    expect(Author.reflectOnAllAssociations()).toHaveLength(2);
+    expect(Author.reflectOnAllAssociations("hasMany").map((r) => r.name)).toEqual(["books"]);
+  });
+
   // Rails: test_reflect_on_all_associations_with_macro_filter
   it("test_reflect_on_all_associations_filtered_by_macro", () => {
     class Author extends Base {

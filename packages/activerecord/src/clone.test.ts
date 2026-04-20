@@ -28,7 +28,7 @@ describe("CloneTest", () => {
     expect(topic.isPersisted()).toBe(true);
     expect(cloned.isPersisted()).toBe(true);
     expect(cloned.isNewRecord()).toBe(false);
-    expect(cloned.previouslyNewRecord()).toBe(false);
+    expect(cloned.isPreviouslyNewRecord()).toBe(false);
   });
 
   it("shallow", async () => {

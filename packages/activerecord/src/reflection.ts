@@ -1657,18 +1657,20 @@ export function addAggregateReflection(
 // functions that take the model class as the first argument.
 // ---------------------------------------------------------------------------
 
-export function reflections(modelClass: typeof Base): Record<string, any> {
+export function reflections(
+  modelClass: typeof Base,
+): Readonly<Record<string, AssociationReflection | ThroughReflection>> {
   return normalizedReflections(modelClass);
 }
 
 const _normalizedReflectionsCache = new WeakMap<
   typeof Base,
-  Record<string, AssociationReflection | ThroughReflection>
+  Readonly<Record<string, AssociationReflection | ThroughReflection>>
 >();
 
 export function normalizedReflections(
   modelClass: typeof Base,
-): Record<string, AssociationReflection | ThroughReflection> {
+): Readonly<Record<string, AssociationReflection | ThroughReflection>> {
   const cached = _normalizedReflectionsCache.get(modelClass);
   if (cached) return cached;
 
@@ -1717,6 +1719,20 @@ export function _reflectOnAssociation(
 ): AssociationReflection | ThroughReflection | null {
   const rawReflections: Record<string, any> = (modelClass as any)._reflections ?? {};
   return rawReflections[name] ?? null;
+}
+
+/**
+ * `this`-typed class-method variant of {@link _reflectOnAssociation} for
+ * wiring onto Base via `extend()`. Same behavior — reads the raw
+ * `_reflections` registry without normalization.
+ *
+ * Mirrors: ActiveRecord::Reflection::ClassMethods#_reflect_on_association
+ */
+export function _reflectOnAssociationClassMethod(
+  this: typeof Base,
+  name: string,
+): AssociationReflection | ThroughReflection | null {
+  return _reflectOnAssociation(this, name);
 }
 
 export function reflectOnAssociation(
@@ -1776,3 +1792,46 @@ export function reflectOnAllAutosaveAssociations(
  * Union type for reflections returned by the public API.
  */
 export type AssociationLikeReflection = AssociationReflection | ThroughReflection;
+
+// ---------------------------------------------------------------------------
+// `this`-typed wrappers for wiring onto Base via extend(). The module-level
+// functions above take `modelClass` as the first arg for internal callers;
+// these variants read `this` so user code can call them Rails-style:
+// `Post.reflectOnAssociation("comments")`.
+// Mirrors: ActiveRecord::Reflection::ClassMethods — methods on the class.
+// ---------------------------------------------------------------------------
+
+export const ClassMethods = {
+  reflections(
+    this: typeof Base,
+  ): Readonly<Record<string, AssociationReflection | ThroughReflection>> {
+    return reflections(this);
+  },
+  normalizedReflections(
+    this: typeof Base,
+  ): Readonly<Record<string, AssociationReflection | ThroughReflection>> {
+    return normalizedReflections(this);
+  },
+  reflectOnAssociation(
+    this: typeof Base,
+    name: string,
+  ): AssociationReflection | ThroughReflection | null {
+    return reflectOnAssociation(this, name);
+  },
+  reflectOnAllAssociations(
+    this: typeof Base,
+    macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany",
+  ): Array<AssociationReflection | ThroughReflection> {
+    return reflectOnAllAssociations(this, macro);
+  },
+  reflectOnAllAggregations(this: typeof Base): AggregateReflection[] {
+    return reflectOnAllAggregations(this);
+  },
+  reflectOnAggregation(this: typeof Base, name: string): AggregateReflection | null {
+    return reflectOnAggregation(this, name);
+  },
+  reflectOnAllAutosaveAssociations(this: typeof Base): AssociationLikeReflection[] {
+    return reflectOnAllAutosaveAssociations(this);
+  },
+  _reflectOnAssociation: _reflectOnAssociationClassMethod,
+};

@@ -108,6 +108,7 @@ import {
 import * as _Core from "./core.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
+import * as _Reflection from "./reflection.js";
 import { argumentError } from "./relation/query-methods.js";
 import { ScopeRegistry } from "./scoping.js";
 
@@ -817,12 +818,15 @@ export class Base extends Model {
     return _isSuppressed(this);
   }
 
-  /**
-   * Mirrors: ActiveRecord::Reflection::ClassMethods#_reflect_on_association
-   */
-  static _reflectOnAssociation(name: string): any {
-    return (this as any)._reflections?.[name] ?? null;
-  }
+  // --- Reflection::ClassMethods (wired via extend() after class body) ---
+  declare static _reflectOnAssociation: typeof _Reflection.ClassMethods._reflectOnAssociation;
+  declare static reflections: typeof _Reflection.ClassMethods.reflections;
+  declare static normalizedReflections: typeof _Reflection.ClassMethods.normalizedReflections;
+  declare static reflectOnAssociation: typeof _Reflection.ClassMethods.reflectOnAssociation;
+  declare static reflectOnAllAssociations: typeof _Reflection.ClassMethods.reflectOnAllAssociations;
+  declare static reflectOnAllAggregations: typeof _Reflection.ClassMethods.reflectOnAllAggregations;
+  declare static reflectOnAggregation: typeof _Reflection.ClassMethods.reflectOnAggregation;
+  declare static reflectOnAllAutosaveAssociations: typeof _Reflection.ClassMethods.reflectOnAllAutosaveAssociations;
 
   /**
    * Mirrors: ActiveRecord::Validations.validates
@@ -3217,10 +3221,6 @@ export class Base extends Model {
     return this.findByBang(conditions);
   }
 
-  previouslyNewRecord(): boolean {
-    return this.isPreviouslyNewRecord();
-  }
-
   static async tableExists(): Promise<boolean> {
     return true; // TODO: query adapter for table existence
   }
@@ -3273,6 +3273,7 @@ extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, { enum: _EnumModule.enumMethod });
+extend(Base, _Reflection.ClassMethods);
 extend(Base, {
   defaultScope: _defaultScope,
   unscoped: _unscoped,
