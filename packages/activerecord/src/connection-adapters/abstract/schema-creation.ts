@@ -243,7 +243,13 @@ export class SchemaCreation {
         else sql = "INTEGER PRIMARY KEY AUTOINCREMENT";
         break;
       default:
-        throw new Error(`Unknown column type: ${String(type)}`);
+        // Pass-through for adapter-specific type strings (e.g.
+        // "timestamptz", "inet", "hstore", custom PG enum names).
+        // Rails' `type_to_sql` does the equivalent fallthrough to the
+        // native-db-types map for unrecognized types. Uppercasing
+        // matches SQL-DDL convention.
+        sql = String(type).toUpperCase();
+        break;
     }
 
     if (options.array && type !== "primary_key") {

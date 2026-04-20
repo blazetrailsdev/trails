@@ -20,7 +20,12 @@ export type ColumnType =
   | "jsonb"
   | "char"
   | "primary_key"
-  | "uuid";
+  | "uuid"
+  // Accept arbitrary adapter-specific type strings (e.g. "timestamptz",
+  // "inet", custom PG enum names) emitted by SchemaDumper's
+  // `t.column(name, sqlType, ...)` fallback. The `& {}` preserves
+  // literal autocomplete for the known types above.
+  | (string & {});
 
 export type PrimaryKeyType = "uuid";
 

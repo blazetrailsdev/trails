@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { SchemaDumper, type SchemaSource } from "./schema-dumper.js";
+import { SchemaDumper } from "./schema-dumper.js";
+import type { SchemaSource } from "../../schema-dumper.js";
 
 const emptySource: SchemaSource = {
   tables: () => [],

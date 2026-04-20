@@ -161,11 +161,7 @@ export * as RuntimeRegistry from "./runtime-registry.js";
 export { Stats as RuntimeStats } from "./runtime-registry.js";
 export { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
-export type {
-  SchemaSource,
-  ColumnInfo,
-  IndexInfo,
-} from "./connection-adapters/abstract/schema-dumper.js";
+export type { SchemaSource, ColumnInfo, IndexInfo } from "./schema-dumper.js";
 export { dumpSchemaColumns } from "./schema-columns-dump.js";
 export type { DumpSchemaColumnsOptions } from "./schema-columns-dump.js";
 export {
