@@ -4,14 +4,10 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Column
  */
 
-export class Column {
-  readonly name: string;
-  readonly sqlType: string | null;
-  readonly null: boolean;
-  readonly default: unknown;
-  readonly defaultFunction: string | null;
-  readonly collation: string | null;
-  readonly primaryKey: boolean;
+import { Column as BaseColumn } from "../column.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
+
+export class Column extends BaseColumn {
   readonly unsigned: boolean;
   readonly autoIncrement: boolean;
   readonly virtual: boolean;
@@ -30,20 +26,18 @@ export class Column {
       virtual?: boolean;
     } = {},
   ) {
-    this.name = name;
-    this.default = defaultValue;
-    this.sqlType = sqlTypeMetadata.sqlType ?? null;
-    this.null = null_;
-    this.collation = options.collation ?? null;
-    this.defaultFunction = options.defaultFunction ?? null;
-    this.primaryKey = options.primaryKey ?? false;
+    const meta = new SqlTypeMetadata({
+      sqlType: sqlTypeMetadata.sqlType ?? undefined,
+      type: sqlTypeMetadata.type,
+    });
+    super(name, defaultValue, meta, null_, {
+      collation: options.collation,
+      defaultFunction: options.defaultFunction,
+      primaryKey: options.primaryKey,
+    });
     this.unsigned = options.unsigned ?? false;
     this.autoIncrement = options.autoIncrement ?? false;
     this.virtual = options.virtual ?? false;
-  }
-
-  get hasDefault(): boolean {
-    return this.default != null || this.defaultFunction != null;
   }
 
   isUnsigned(): boolean {

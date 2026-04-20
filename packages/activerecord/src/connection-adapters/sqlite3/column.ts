@@ -4,16 +4,13 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::Column
  */
 
-export class Column {
-  readonly name: string;
-  readonly sqlType: string | null;
-  readonly null: boolean;
-  readonly default: unknown;
-  readonly defaultFunction: string | null;
-  readonly collation: string | null;
-  readonly primaryKey: boolean;
+import { Column as BaseColumn } from "../column.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
+
+export class Column extends BaseColumn {
   readonly autoIncrement: boolean;
   readonly rowid: boolean;
+  private _generatedType: "stored" | "virtual" | null;
 
   constructor(
     name: string,
@@ -29,22 +26,18 @@ export class Column {
       generatedType?: "stored" | "virtual" | null;
     } = {},
   ) {
-    this.name = name;
-    this.default = defaultValue;
-    this.sqlType = sqlTypeMetadata.sqlType ?? null;
-    this.null = null_;
-    this.collation = options.collation ?? null;
-    this.defaultFunction = options.defaultFunction ?? null;
-    this.primaryKey = options.primaryKey ?? false;
+    const meta = new SqlTypeMetadata({
+      sqlType: sqlTypeMetadata.sqlType ?? undefined,
+      type: sqlTypeMetadata.type,
+    });
+    super(name, defaultValue, meta, null_, {
+      collation: options.collation,
+      defaultFunction: options.defaultFunction,
+      primaryKey: options.primaryKey,
+    });
     this.autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;
     this._generatedType = options.generatedType ?? null;
-  }
-
-  private _generatedType: "stored" | "virtual" | null;
-
-  get hasDefault(): boolean {
-    return this.default !== null || this.defaultFunction !== null;
   }
 
   isAutoIncrementedByDb(): boolean {

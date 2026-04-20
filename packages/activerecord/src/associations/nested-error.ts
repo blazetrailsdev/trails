@@ -1,23 +1,50 @@
-import type { Base } from "../base.js";
+import { NestedError as ActiveModelNestedError } from "@blazetrails/activemodel";
+
+interface AssociationLike {
+  owner: unknown;
+  reflection: { name: string };
+  isCollection?(): boolean;
+  target?: unknown[];
+  options?: { indexErrors?: boolean };
+}
+
+interface InnerErrorLike {
+  attribute: string;
+  type: string;
+  rawType?: string;
+  message: string;
+  options?: Record<string, unknown>;
+  base?: unknown;
+}
 
 /**
- * Wraps validation errors from nested associations, providing
- * the inner error and the association that caused it.
+ * Wraps validation errors from nested associations, rewriting the
+ * attribute so it reads as `association.attr` (or `association[i].attr`
+ * when `index_errors` is enabled on a collection association).
  *
  * Mirrors: ActiveRecord::Associations::NestedError
  */
-export class NestedError {
-  readonly attribute: string;
-  readonly innerError: Error;
-  readonly record: Base;
+export class NestedError extends ActiveModelNestedError {
+  readonly association: AssociationLike;
 
-  constructor(record: Base, innerError: Error, attribute: string) {
-    this.record = record;
-    this.innerError = innerError;
-    this.attribute = attribute;
+  constructor(association: AssociationLike, innerError: InnerErrorLike) {
+    const attribute = NestedError.computeAttribute(association, innerError);
+    super(association.owner, innerError, { attribute });
+    this.association = association;
   }
 
-  get message(): string {
-    return this.innerError.message;
+  private static computeAttribute(
+    association: AssociationLike,
+    innerError: InnerErrorLike,
+  ): string {
+    const name = association.reflection.name;
+    const isCollection = association.isCollection?.() ?? false;
+    if (isCollection && association.options?.indexErrors) {
+      const index = association.target?.findIndex((r) => r === innerError.base);
+      if (index != null && index >= 0) {
+        return `${name}[${index}].${innerError.attribute}`;
+      }
+    }
+    return `${name}.${innerError.attribute}`;
   }
 }

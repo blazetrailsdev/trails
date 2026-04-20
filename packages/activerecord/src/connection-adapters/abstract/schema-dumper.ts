@@ -11,9 +11,9 @@ export interface ColumnInfo {
   primaryKey?: boolean;
   null?: boolean;
   default?: unknown;
-  limit?: number;
-  precision?: number;
-  scale?: number;
+  limit?: number | null;
+  precision?: number | null;
+  scale?: number | null;
 }
 
 export interface IndexInfo {
