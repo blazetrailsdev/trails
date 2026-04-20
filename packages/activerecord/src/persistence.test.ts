@@ -1003,9 +1003,18 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "test" });
     const oldId = t.id;
-    // updateColumns can change the id column directly
+    // updateColumns can change the id column directly. The WHERE clause
+    // must target the *original* id — otherwise the UPDATE would bind
+    // the post-mutation id and affect zero rows.
     await t.updateColumns({ id: 999 });
     expect(t.id).toBe(999);
+    // The original row should have the new id now (proves the WHERE
+    // captured the pre-mutation id correctly).
+    const refreshed = await Topic.find(999);
+    expect(refreshed.id).toBe(999);
+    expect(refreshed.title).toBe("test");
+    // The old id no longer exists.
+    await expect(Topic.find(oldId)).rejects.toThrow();
   });
 
   it("create bang many with block", async () => {

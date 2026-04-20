@@ -8,7 +8,6 @@ import {
   DeleteManager,
   Nodes,
   sql as arelSql,
-  star as arelStar,
 } from "@blazetrails/arel";
 import type { DatabaseAdapter } from "./adapter.js";
 import type { Relation } from "./relation.js";
@@ -28,9 +27,8 @@ import {
   StaleObjectError,
   ReadOnlyRecord,
   ConnectionNotDefined,
-  AttributeAssignmentError,
 } from "./errors.js";
-import { AutosaveAssociation, clearAutosaveState } from "./autosave-association.js";
+import { AutosaveAssociation } from "./autosave-association.js";
 import {
   RecordInvalid,
   isValid as validationsIsValid,
@@ -2357,38 +2355,7 @@ export class Base extends Model {
     return this.adapter.execDelete(dm.toSql(), "Delete");
   }
 
-  /**
-   * Reload the record from the database.
-   *
-   * Mirrors: ActiveRecord::Base#reload
-   */
-  async reload(): Promise<this> {
-    const ctor = this.constructor as typeof Base;
-    const sm = ctor.arelTable.project(arelStar).where(ctor._buildPkWhereNode(this.id));
-    const result = await ctor.adapter.selectAll(sm.toSql(), "Reload");
-    const row = result.first();
-
-    if (row === undefined) {
-      throw new RecordNotFound(
-        `${ctor.name} with ${ctor.primaryKey}=${this.id} not found`,
-        ctor.name,
-        String(ctor.primaryKey),
-        this.id,
-      );
-    }
-
-    for (const [key, value] of Object.entries(row)) {
-      this._attributes.set(key, value);
-    }
-
-    (this as any)._dirty.snapshot(this._attributes);
-    this._collectionProxies.clear();
-    this._preloadedAssociations.clear();
-    this._associationInstances.clear();
-    (this as any)._cachedAssociations?.clear();
-    clearAutosaveState(this);
-    return this;
-  }
+  // reload extracted to persistence.ts; wired via include() below.
 
   /**
    * Reload the record with a pessimistic lock (SELECT ... FOR UPDATE), and
@@ -2408,18 +2375,7 @@ export class Base extends Model {
   declare inspect: () => string;
   declare attributeForInspect: (attr: string) => string;
 
-  /**
-   * Return a subset of the record's attributes as a plain object.
-   *
-   * Mirrors: ActiveRecord::Base#slice
-   */
-  slice(...keys: string[]): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const key of keys) {
-      result[key] = this.readAttribute(key);
-    }
-    return result;
-  }
+  // slice extracted to persistence.ts.
 
   /**
    * Return a GlobalID-like URI for this record.
@@ -2445,39 +2401,7 @@ export class Base extends Model {
     return Buffer.from(gid).toString("base64");
   }
 
-  /**
-   * Return attribute values for the given keys as an array.
-   *
-   * Mirrors: ActiveRecord::Base#values_at
-   */
-  valuesAt(...keys: string[]): unknown[] {
-    return keys.map((key) => this.readAttribute(key));
-  }
-
-  /**
-   * Assign attributes without saving.
-   *
-   * Mirrors: ActiveRecord::Base#assign_attributes
-   */
-  assignAttributes(attrs: Record<string, unknown>): void {
-    for (const [key, value] of Object.entries(attrs)) {
-      try {
-        this.writeAttribute(key, value);
-      } catch (e) {
-        let repr: string;
-        try {
-          repr = JSON.stringify(value);
-        } catch {
-          repr = String(value);
-        }
-        throw new AttributeAssignmentError(
-          `error on assignment ${repr} to ${key} (${e instanceof Error ? e.message : String(e)})`,
-          e instanceof Error ? e : undefined,
-          key,
-        );
-      }
-    }
-  }
+  // valuesAt / assignAttributes extracted to persistence.ts.
 
   /**
    * Update the updated_at timestamp (and optionally other timestamp
@@ -2488,114 +2412,8 @@ export class Base extends Model {
    */
   declare touch: typeof Timestamp.touch;
 
-  /**
-   * Update a single attribute and save, skipping validations.
-   * Runs callbacks, unlike updateColumn.
-   *
-   * Mirrors: ActiveRecord::Base#update_attribute
-   */
-  async updateAttribute(name: string, value: unknown): Promise<boolean> {
-    this.writeAttribute(name, value);
-    return this.save({ validate: false });
-  }
-
-  /**
-   * Update a single column directly in the database, skipping
-   * validations and callbacks.
-   *
-   * Mirrors: ActiveRecord::Base#update_column
-   */
-  async updateColumn(name: string, value: unknown): Promise<void> {
-    return this.updateColumns({ [name]: value });
-  }
-
-  /**
-   * Update multiple columns directly in the database, skipping
-   * validations and callbacks.
-   *
-   * Mirrors: ActiveRecord::Base#update_columns
-   */
-  async updateColumns(attrs: Record<string, unknown>): Promise<void> {
-    if (this._readonly) throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-    if (!this.isPersisted()) {
-      throw new Error("Cannot update columns on a new or destroyed record");
-    }
-
-    const ctor = this.constructor as typeof Base;
-    const table = ctor.arelTable;
-
-    // Set attributes directly (no dirty tracking through writeAttribute)
-    for (const [key, value] of Object.entries(attrs)) {
-      const def = ctor._attributeDefinitions.get(key);
-      this._attributes.set(key, def ? def.type.cast(value) : value);
-    }
-
-    const setClauses = Object.entries(attrs)
-      .map(([key, _]) => {
-        const val = this._attributes.get(key);
-        if (val === null) return `"${key}" = NULL`;
-        if (typeof val === "number") return `"${key}" = ${val}`;
-        if (typeof val === "boolean") return `"${key}" = ${val ? "TRUE" : "FALSE"}`;
-        if (val instanceof Date) return `"${key}" = '${val.toISOString()}'`;
-        if (typeof val === "object")
-          return `"${key}" = '${JSON.stringify(val).replace(/'/g, "''")}'`;
-        return `"${key}" = '${String(val).replace(/'/g, "''")}'`;
-      })
-      .join(", ");
-
-    const sql = `UPDATE "${table.name}" SET ${setClauses} WHERE ${ctor._buildPkWhere(this.id)}`;
-    await ctor.adapter.execUpdate(sql, "Update Columns");
-
-    // Reset dirty tracking to reflect the new persisted state
-    this.changesApplied();
-  }
-
-  /**
-   * Create an unsaved duplicate of this record (new_record = true, no id).
-   *
-   * Mirrors: ActiveRecord::Base#dup
-   */
-  dup(): this {
-    const ctor = this.constructor as typeof Base;
-    const attrs = { ...this.attributes };
-    const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
-    for (const col of pkCols) {
-      delete attrs[col]; // Remove PK so it's a new record
-    }
-    const copy = new ctor(attrs);
-    return copy as this;
-  }
-
-  /**
-   * Shallow clone preserving the primary key and persisted state.
-   *
-   * Mirrors: ActiveRecord::Core#clone
-   */
-  clone(): this {
-    const copy = Object.create(Object.getPrototypeOf(this)) as this;
-    Object.assign(copy, this);
-    copy._attributes = this._attributes;
-    copy._previouslyNewRecord = false;
-    copy.errors = new (this.errors.constructor as new (base: unknown) => typeof this.errors)(copy);
-    return copy;
-  }
-
-  /**
-   * Returns an instance of the specified class with the attributes of this record.
-   *
-   * Mirrors: ActiveRecord::Base#becomes
-   */
-  becomes<K extends typeof Base>(klass: K): InstanceType<K> {
-    const instance = new klass({}) as InstanceType<K>;
-    // Share the same attributes map (Rails behavior)
-    instance._attributes = this._attributes;
-    instance._newRecord = this._newRecord;
-    if (!this._newRecord) {
-      (instance as any)._dirty.snapshot(instance._attributes);
-      instance.changesApplied();
-    }
-    return instance;
-  }
+  // updateAttribute / updateColumn / updateColumns / dup / clone / becomes
+  // extracted to persistence.ts; wired via include() below.
 
   declare hasAttribute: (name: string) => boolean;
   declare attributePresent: (name: string) => boolean;
@@ -2721,33 +2539,7 @@ export class Base extends Model {
     return this.toParam();
   }
 
-  /**
-   * Re-instantiate as the given class, raising on failure.
-   *
-   * Mirrors: ActiveRecord::Base#becomes!
-   */
-  becomesBang<K extends typeof Base>(klass: K): InstanceType<K> {
-    const instance = this.becomes(klass);
-    // Set the STI type column — find it from the base class
-    const base = getStiBase(klass);
-    const inheritanceCol = getInheritanceColumn(base);
-    if (inheritanceCol) {
-      // For the base class itself, set to null; for subclasses, set to class name
-      const value = isStiSubclass(klass) ? klass.name : null;
-      instance._attributes.set(inheritanceCol, value);
-    }
-    return instance;
-  }
-
-  /**
-   * Update a single attribute and save, raising on validation failure.
-   *
-   * Mirrors: ActiveRecord::Base#update_attribute!
-   */
-  async updateAttributeBang(name: string, value: unknown): Promise<true> {
-    this.writeAttribute(name, value);
-    return this.saveBang();
-  }
+  // becomesBang / updateAttributeBang extracted to persistence.ts.
 
   /**
    * Instance-level transaction wrapper.
@@ -2856,6 +2648,18 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   update(attrs: Record<string, unknown>): Promise<boolean>;
   updateBang(attrs: Record<string, unknown>): Promise<true>;
   delete(): Promise<this>;
+  reload(): Promise<this>;
+  slice(...keys: string[]): Record<string, unknown>;
+  valuesAt(...keys: string[]): unknown[];
+  assignAttributes(attrs: Record<string, unknown>): void;
+  updateAttribute(name: string, value: unknown): Promise<boolean>;
+  updateAttributeBang(name: string, value: unknown): Promise<true>;
+  updateColumn(name: string, value: unknown): Promise<void>;
+  updateColumns(attrs: Record<string, unknown>): Promise<void>;
+  dup(): this;
+  clone(): this;
+  becomes<K extends typeof Base>(klass: K): InstanceType<K>;
+  becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;
 }
 
 // ---------------------------------------------------------------------------
@@ -2913,6 +2717,18 @@ include(Base, {
   update: _Persistence.update,
   updateBang: _Persistence.updateBang,
   delete: _Persistence.deleteRow,
+  reload: _Persistence.reload,
+  slice: _Persistence.slice,
+  valuesAt: _Persistence.valuesAt,
+  assignAttributes: _Persistence.assignAttributes,
+  updateAttribute: _Persistence.updateAttribute,
+  updateAttributeBang: _Persistence.updateAttributeBang,
+  updateColumn: _Persistence.updateColumn,
+  updateColumns: _Persistence.updateColumns,
+  dup: _Persistence.dup,
+  clone: _Persistence.clone,
+  becomes: _Persistence.becomes,
+  becomesBang: _Persistence.becomesBang,
   // Core
   inspect: _inspect,
   attributeForInspect: _attributeForInspect,
