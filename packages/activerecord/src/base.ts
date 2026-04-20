@@ -157,8 +157,18 @@ export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
 
 // Late-bound Relation constructor to break circular dependency.
 // Set by relation.ts when it loads.
-let _RelationCtor: (new (modelClass: typeof Base) => any) | null = null;
-let _wrapWithScopeProxy: ((rel: any) => any) | null = null;
+//
+// `var` (rather than `let`) with no initializer is deliberate: these are
+// assigned from other modules' top-level code (relation.ts's
+// `_setRelationCtor(Relation)` call runs during module init). With
+// `extends Relation` chains, base.ts's own imports can trigger that
+// call before base.ts reaches this line. `let` would throw TDZ; `var
+// x = null` would hoist then RESET the value back to null; `var x;`
+// hoists as `undefined` without clobbering a later-set value.
+// eslint-disable-next-line no-var
+var _RelationCtor: (new (modelClass: typeof Base) => any) | undefined;
+// eslint-disable-next-line no-var
+var _wrapWithScopeProxy: ((rel: any) => any) | undefined;
 
 /** @internal Called by relation.ts to register itself. */
 export function _setRelationCtor(ctor: new (modelClass: typeof Base) => any): void {

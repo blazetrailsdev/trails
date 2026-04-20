@@ -2,6 +2,7 @@ import type { Base } from "./base.js";
 import { Relation } from "./relation.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import { _setAssociationRelationCtor } from "./associations/collection-proxy.js";
+import { StrictLoadingViolationError } from "./errors.js";
 
 /**
  * A Relation produced by a collection association (e.g. `blog.posts`,
@@ -96,15 +97,37 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   /**
-   * Override the load path to propagate inverse_of and strict_loading onto
-   * records fetched through this relation — mirrors Rails'
-   * `AssociationRelation#exec_queries`, which calls
-   * `set_inverse_instance_from_queries` and applies `strict_loading!` when
-   * the owner or the reflection has it set. Without this, a record loaded
-   * via `blog.posts.where(...)` wouldn't cache `post.blog = blog` on the
+   * Throw `StrictLoadingViolationError` if the owning record has
+   * strict-loading on and isn't inside a bypass block. Called from
+   * every AR query-executing entry point (toArray, count, pluck,
+   * pick, calculate, updateAll, deleteAll). Centralized here because
+   * with `CP extends Relation`, chained queries (blog.posts.where
+   * (...)) bypass the old `wrapCollectionProxy` `get` trap that used
+   * to enforce this.
+   */
+  private _checkStrictLoading(): void {
+    const owner = this._association.owner;
+    const ownerAny = owner as unknown as {
+      _strictLoading?: boolean;
+      _strictLoadingBypassCount?: number;
+    };
+    if (ownerAny._strictLoading && !ownerAny._strictLoadingBypassCount) {
+      throw StrictLoadingViolationError.forAssociation(owner, this._association.associationName);
+    }
+  }
+
+  /**
+   * Override the load path to enforce owner strict-loading and to
+   * propagate inverse_of / per-record strict-loading onto the fetched
+   * records — mirrors Rails' `AssociationRelation#exec_queries`, which
+   * calls `set_inverse_instance_from_queries` and applies
+   * `strict_loading!` when the owner or the reflection has it set.
+   * Without the inverse wiring, a record loaded via
+   * `blog.posts.where(...)` wouldn't cache `post.blog = blog` on the
    * way back, so accessing the inverse would re-query.
    */
   async toArray(): Promise<T[]> {
+    this._checkStrictLoading();
     const records = await super.toArray();
     const owner = this._association.owner;
     const reflection = this._association.reflection;
@@ -117,21 +140,112 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       }
     }
 
-    const ownerAny = owner as unknown as {
+    const ownerFlags = owner as unknown as {
       _strictLoading?: boolean;
       isStrictLoadingNPlusOneOnly?: () => boolean;
     };
     const nPlusOneOnly =
-      typeof ownerAny.isStrictLoadingNPlusOneOnly === "function" &&
-      ownerAny.isStrictLoadingNPlusOneOnly() &&
+      typeof ownerFlags.isStrictLoadingNPlusOneOnly === "function" &&
+      ownerFlags.isStrictLoadingNPlusOneOnly() &&
       reflection.type === "hasMany";
-    if (nPlusOneOnly || ownerAny._strictLoading || reflection.options.strictLoading) {
+    if (nPlusOneOnly || ownerFlags._strictLoading || reflection.options.strictLoading) {
       for (const r of records) {
         (r as unknown as { strictLoadingBang?: () => void }).strictLoadingBang?.();
       }
     }
 
     return records;
+  }
+
+  // Other SQL-executing entry points — gate on the same strict-loading
+  // check. Rails enforces strict loading uniformly across `CollectionProxy`
+  // reads; with CP now extending Relation, chained AR methods need the
+  // same gate.
+
+  // @ts-expect-error — Relation defines `count` as a property; override
+  //   as a method so we can gate strict-loading before dispatching.
+  async count(column?: string): Promise<number | Record<string, number>> {
+    this._checkStrictLoading();
+    return (
+      Relation.prototype as unknown as {
+        count: (col?: string) => Promise<number | Record<string, number>>;
+      }
+    ).count.call(this, column);
+  }
+
+  // @ts-expect-error — sum/average/minimum/maximum are also property-
+  //   assigned on Relation (from the Calculations mixin); override as
+  //   methods to gate strict-loading before each SQL entry point.
+  async sum(column?: string): Promise<number | Record<string, number>> {
+    this._checkStrictLoading();
+    return (
+      Relation.prototype as unknown as {
+        sum: (col?: string) => Promise<number | Record<string, number>>;
+      }
+    ).sum.call(this, column);
+  }
+
+  // @ts-expect-error — see `sum`.
+  async average(column: string): Promise<number | null | Record<string, number>> {
+    this._checkStrictLoading();
+    return (
+      Relation.prototype as unknown as {
+        average: (col: string) => Promise<number | null | Record<string, number>>;
+      }
+    ).average.call(this, column);
+  }
+
+  // @ts-expect-error — see `sum`.
+  async minimum(column: string): Promise<unknown | null | Record<string, unknown>> {
+    this._checkStrictLoading();
+    return (
+      Relation.prototype as unknown as {
+        minimum: (col: string) => Promise<unknown | null | Record<string, unknown>>;
+      }
+    ).minimum.call(this, column);
+  }
+
+  // @ts-expect-error — see `sum`.
+  async maximum(column: string): Promise<unknown | null | Record<string, unknown>> {
+    this._checkStrictLoading();
+    return (
+      Relation.prototype as unknown as {
+        maximum: (col: string) => Promise<unknown | null | Record<string, unknown>>;
+      }
+    ).maximum.call(this, column);
+  }
+
+  override pluck(...columns: Parameters<Relation<T>["pluck"]>): Promise<unknown[]> {
+    this._checkStrictLoading();
+    return super.pluck(...columns);
+  }
+
+  override pick(...columns: Parameters<Relation<T>["pick"]>): Promise<unknown> {
+    this._checkStrictLoading();
+    return super.pick(...columns);
+  }
+
+  override async calculate(
+    operation: "count" | "sum" | "average" | "minimum" | "maximum",
+    column?: string,
+  ): Promise<number | Record<string, number>> {
+    this._checkStrictLoading();
+    return (
+      super.calculate as unknown as (
+        op: string,
+        col?: string,
+      ) => Promise<number | Record<string, number>>
+    ).call(this, operation, column);
+  }
+
+  override updateAll(updates: Record<string, unknown>): Promise<number> {
+    this._checkStrictLoading();
+    return super.updateAll(updates);
+  }
+
+  override deleteAll(): Promise<number> {
+    this._checkStrictLoading();
+    return super.deleteAll();
   }
 }
 

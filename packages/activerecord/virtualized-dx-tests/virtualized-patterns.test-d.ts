@@ -98,7 +98,7 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     const author = new Author({ name: "dean" });
     expectTypeOf(author.comments).toEqualTypeOf<AssociationProxy<Comment>>();
     expectTypeOf(await author.comments).toEqualTypeOf<Comment[]>();
-    expectTypeOf(author.comments.length).toBeNumber();
+    expectTypeOf(author.comments.target.length).toBeNumber();
     expectTypeOf(author.comments[0]).toEqualTypeOf<Comment | undefined>();
   });
 

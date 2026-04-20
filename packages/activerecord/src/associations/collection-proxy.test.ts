@@ -59,17 +59,19 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("exposes `length` against the loaded target", async () => {
     const blog = await blogWithPosts();
     const proxy = association<ApPost>(blog, "apPosts");
-    expect(proxy.length).toBe(3);
+    // With CP extending Relation, `proxy.length` is now the inherited
+    // async `Relation#length()`. For a sync count over the loaded target
+    // reach for `Array.from(proxy).length` or `proxy.target.length`.
+    expect(Array.from(proxy).length).toBe(3);
+    expect(proxy.target.length).toBe(3);
   });
 
   it("shadows Relation#length() — use proxy.count() for async count", async () => {
     const blog = await blogWithPosts();
     const proxy = association<ApPost>(blog, "apPosts") as any;
-    // `proxy.length` is now a sync number (mirrors Array / Rails).
-    expect(typeof proxy.length).toBe("number");
-    // For Relation's async count semantics, reach for .count() which still
-    // routes through to Relation via AssociationProxy delegation.
-    expect(typeof proxy.count).toBe("function");
+    expect(typeof proxy.length).toBe("function");
+    expect(await proxy.length()).toBe(3);
+    // `proxy.count()` still works too (association-specific path).
     expect(await proxy.count()).toBe(3);
   });
 
@@ -197,7 +199,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("await proxy hydrates `_target` so subsequent sync ops work", async () => {
     // Build a blog/post pair WITHOUT pre-loading via blogWithPosts (which
     // calls .load()). `await proxy` alone should be enough to make
-    // `proxy.length`, `proxy[0]`, iteration all work afterwards.
+    // `proxy.target`, `proxy[0]`, iteration all work afterwards.
     const blog = new ApBlog({ name: "Fresh" });
     await blog.save();
     for (const title of ["x", "y"]) {
@@ -206,7 +208,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     }
     const proxy = association<ApPost>(blog, "apPosts") as any;
     await proxy;
-    expect(proxy.length).toBe(2);
+    expect(proxy.target.length).toBe(2);
     expect(proxy[0]?.title).toBe("x");
     expect([...proxy].map((p: ApPost) => p.title)).toEqual(["x", "y"]);
   });
@@ -262,6 +264,20 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(found?.title).toBe("a");
   });
 
+  it("toArray honors direct bang-mutation of inherited Relation state", async () => {
+    // In-place bang mutations on CP (cp.whereBang/orderBang/limitBang)
+    // change the inherited Relation state. `toArray()` detects the
+    // divergence from the seed and delegates to super.toArray() so
+    // results reflect the mutations, instead of silently returning the
+    // association-cached full load. Chaining (cp.where(...).toArray())
+    // is the normal path and already goes through AR → Relation.
+    const blog = await blogWithPosts();
+    const proxy = association<ApPost>(blog, "apPosts") as any;
+    proxy.whereBang({ title: "b" });
+    const results = await proxy.toArray();
+    expect(results.map((p: ApPost) => p.title)).toEqual(["b"]);
+  });
+
   // ── Phase R.2 — collection reader returns the AssociationProxy ─────
 
   it("blog.apPosts is the AssociationProxy itself (Phase R.2 reader swap)", async () => {
@@ -286,7 +302,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("blog.apPosts is array-like via R.1 surface", async () => {
     const blog = await blogWithPosts();
     const reader = (blog as any).apPosts;
-    expect(reader.length).toBe(3);
+    expect(reader.target.length).toBe(3);
     expect(reader[0]?.title).toBe("a");
     expect(reader.map((p: ApPost) => p.title)).toEqual(["a", "b", "c"]);
     const titles: string[] = [];
@@ -303,7 +319,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     (blog as any).apPosts = [replacement];
     // The proxy returned by the reader reflects the new target.
     const reader = (blog as any).apPosts;
-    expect(reader.length).toBe(1);
+    expect(reader.target.length).toBe(1);
     expect(reader[0]?.title).toBe("z");
   });
 });

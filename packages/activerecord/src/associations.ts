@@ -1,6 +1,35 @@
 import type { Base } from "./base.js";
 import { Table as ArelTable } from "@blazetrails/arel";
-import { CollectionProxy, type AssociationProxy } from "./associations/collection-proxy.js";
+import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
+import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
+// Re-export the slot's setter so the package entry and other internal
+// callers don't need to import the slot module directly.
+export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
+
+/**
+ * Explicit initialization hook for subpath consumers.
+ *
+ * The package entry (`@blazetrails/activerecord`) loads
+ * CollectionProxy eagerly so `association()` works out of the box.
+ * Consumers who deep-import `@blazetrails/activerecord/associations`
+ * without touching the entry won't trigger that registration; calling
+ * `await initializeAssociations()` once before `association()` is the
+ * supported alternative.
+ *
+ * Uses a dynamic `import()` so it doesn't participate in the static
+ * dependency cycle (associations → CP → Relation → Base →
+ * associations) that forced the late-binding in the first place.
+ */
+export async function initializeAssociations(): Promise<void> {
+  // Load both ctor slots. `association-relation.js` imports
+  // `collection-proxy.js` for the late-bind ctor setter, so importing
+  // AR first also registers CP transitively; we still import CP
+  // explicitly as a belt-and-suspenders guarantee.
+  await Promise.all([
+    import("./associations/collection-proxy.js"),
+    import("./association-relation.js"),
+  ]);
+}
 import { StrictLoadingViolationError, ConfigurationError } from "./errors.js";
 import {
   AssociationNotFoundError,
@@ -939,32 +968,31 @@ export async function loadHasMany(
 }
 
 /**
- * Build the relation for a hasMany association without executing it.
- * Skips caching, strict loading, and inverse_of — used by countHasMany
- * so resetCounters works under strict loading.
- * Returns null if primary key values are missing.
+ * Compute the WHERE condition hash that scopes a hasMany relation to its
+ * owner. Returns null if primary key values are missing (Rails'
+ * NullRelation fallback). Pure — no Relation construction.
+ *
+ * Shared by `buildHasManyRelation` (which wraps it in `all().where(...)`)
+ * and CollectionProxy's constructor (which seeds its own where-clause
+ * via the same condition).
  */
-export function buildHasManyRelation(
+export function computeHasManyWhere(
   record: Base,
   assocName: string,
   options: AssociationOptions,
-): any | null {
+): Record<string, unknown> | null {
   const ctor = record.constructor as typeof Base;
-  const className = options.className ?? camelize(singularize(assocName));
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const targetModel = resolveModel(className);
 
   if (options.as) {
     const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
+    if (Array.isArray(foreignKey) || Array.isArray(primaryKey)) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+    }
     const pkValue = record.readAttribute(primaryKey as string);
     if (pkValue === null || pkValue === undefined) return null;
     const typeCol = `${underscore(options.as)}_type`;
-    let rel = (targetModel as any).all().where({
-      [foreignKey as string]: pkValue,
-      [typeCol]: ctor.name,
-    });
-    if (options.scope) rel = options.scope(rel);
-    return rel;
+    return { [foreignKey as string]: pkValue, [typeCol]: ctor.name };
   }
 
   const foreignKey =
@@ -976,21 +1004,47 @@ export function buildHasManyRelation(
         : `${underscore(ctor.name)}_id`);
 
   if (Array.isArray(foreignKey)) {
-    const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+    // Composite FK requires a composite PK of matching length — otherwise
+    // we'd silently readAttribute(undefined) and produce a bogus/empty
+    // scope. Existing loaders throw CompositePrimaryKeyMismatchError; do
+    // the same here so CollectionProxy construction fails loudly.
+    if (!Array.isArray(primaryKey) || primaryKey.length !== foreignKey.length) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+    }
     const conditions: Record<string, unknown> = {};
     for (let i = 0; i < foreignKey.length; i++) {
-      const pkVal = record.readAttribute(pkCols[i]);
+      const pkVal = record.readAttribute(primaryKey[i]);
       if (pkVal === null || pkVal === undefined) return null;
       conditions[foreignKey[i]] = pkVal;
     }
-    let rel = (targetModel as any).all().where(conditions);
-    if (options.scope) rel = options.scope(rel);
-    return rel;
+    return conditions;
   }
 
+  // Scalar FK: a composite PK here is a mismatch too.
+  if (Array.isArray(primaryKey)) {
+    throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
+  }
   const pkValue = record.readAttribute(primaryKey as string);
   if (pkValue === null || pkValue === undefined) return null;
-  let rel = (targetModel as any).all().where({ [foreignKey]: pkValue });
+  return { [foreignKey]: pkValue };
+}
+
+/**
+ * Build the relation for a hasMany association without executing it.
+ * Skips caching, strict loading, and inverse_of — used by countHasMany
+ * so resetCounters works under strict loading.
+ * Returns null if primary key values are missing.
+ */
+export function buildHasManyRelation(
+  record: Base,
+  assocName: string,
+  options: AssociationOptions,
+): any | null {
+  const conditions = computeHasManyWhere(record, assocName, options);
+  if (conditions === null) return null;
+  const className = options.className ?? camelize(singularize(assocName));
+  const targetModel = resolveModel(className);
+  let rel = (targetModel as any).all().where(conditions);
   if (options.scope) rel = options.scope(rel);
   return rel;
 }
@@ -1674,7 +1728,28 @@ export function association<T extends Base = Base>(
   if (!assocDef) {
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
   }
-  const proxy = new CollectionProxy<T>(record, assocName, assocDef);
+  if (!_CollectionProxyCtor) {
+    // Deliberate constraint: `associations.ts`, `relation.ts`,
+    // `collection-proxy.ts`, and `base.ts` form a mandatory mutual
+    // dependency — CP `extends Relation`, Relation/Base call back
+    // into the association wiring, and attempting to value-import CP
+    // at this module's top would observe a partial module during
+    // init. The package entry (`@blazetrails/activerecord`) loads CP
+    // explicitly and triggers self-registration; deep-importing
+    // `associations.js` bypasses that. See the collection-proxy-slot
+    // module for the load-order details.
+    throw new Error(
+      "CollectionProxy not registered. Either import '@blazetrails/activerecord' " +
+        "once (the package entry loads CollectionProxy eagerly), or, if you are " +
+        "using subpath imports such as '@blazetrails/activerecord/associations' or " +
+        "'@blazetrails/activerecord/base', call `await initializeAssociations()` " +
+        "(exported from '@blazetrails/activerecord/associations') before the first " +
+        "`association()` call.",
+    );
+  }
+  const proxy = new _CollectionProxyCtor(record, assocName, assocDef) as CollectionProxy<T> & {
+    _hydrateFromPreload: (records: T[]) => void;
+  };
 
   // Hydrate from preloaded data if available
   const preloaded = record._preloadedAssociations?.get(assocName);

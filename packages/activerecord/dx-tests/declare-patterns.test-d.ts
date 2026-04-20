@@ -190,8 +190,11 @@ describe("declare patterns — typing runtime-attached members", () => {
     expectTypeOf(author.comments).toEqualTypeOf<AssociationProxy<Comment>>();
     // Awaitable → Comment[]
     expectTypeOf(await author.comments).toEqualTypeOf<Comment[]>();
-    // Array-shaped — sync against loaded target.
-    expectTypeOf(author.comments.length).toBeNumber();
+    // Array-shaped — sync against loaded target. `proxy.length` is now
+    // Relation's async `length()` under CP-extends-Relation; reach for
+    // `proxy.target.length` or `Array.from(proxy).length` for a sync
+    // count.
+    expectTypeOf(author.comments.target.length).toBeNumber();
     expectTypeOf(author.comments[0]).toEqualTypeOf<Comment | undefined>();
   });
 
