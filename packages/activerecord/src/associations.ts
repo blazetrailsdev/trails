@@ -352,16 +352,13 @@ function _canRouteThroughViaAssociationScope(
  * + IN list) rather than the legacy `loadHasManyThrough` 2-step.
  *
  * Currently routes: single-column and composite-key through
- * associations (from PR #645) and polymorphic-source + `sourceType`
- * through-associations (from PR #661 — Rails' DJAS has no such gate
- * and evaluates the per-reflection `constraints()` chain. When the
- * source is polymorphic, the through chain includes a
- * `PolymorphicReflection` wrapper whose `constraints()` contributes
- * `_sourceTypeScope()` (reflection.ts) — the `where(source_type:
- * ...)` closure that lands on the through step).
- *
- * Remaining bail-out: nested-through (`isNested()`). Follow-up
- * widening covers that case.
+ * associations (PR #645), polymorphic-source + `sourceType`
+ * through-associations (PR #661), and nested-through
+ * (`has_many :through → has_many :through`) associations (this PR).
+ * Rails' DJAS has no routing gate at all and handles each shape via
+ * the generic chain walk — `reflection.chain` flattens nested-through
+ * into a straight list of reflection steps, and `_getChain` / the
+ * reverseChain walk iterate that list uniformly.
  */
 function _canRouteThroughViaDisableJoinsAssociationScope(
   reflection: unknown,
@@ -371,10 +368,8 @@ function _canRouteThroughViaDisableJoinsAssociationScope(
   if (!options.disableJoins) return false;
   const refl = reflection as {
     isThroughReflection?: () => boolean;
-    isNested?: () => boolean;
   };
   if (typeof refl.isThroughReflection !== "function" || !refl.isThroughReflection()) return false;
-  if (typeof refl.isNested === "function" && refl.isNested()) return false;
   const src = (reflection as { sourceReflection?: unknown }).sourceReflection as
     | { isPolymorphic?: () => boolean }
     | undefined;
