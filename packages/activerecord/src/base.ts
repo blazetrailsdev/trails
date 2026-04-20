@@ -2257,39 +2257,7 @@ export class Base extends Model {
     });
   }
 
-  /**
-   * Update attributes and save.
-   *
-   * Mirrors: ActiveRecord::Base#update
-   */
-  async update(attrs: Record<string, unknown>): Promise<boolean> {
-    const ctor = this.constructor as typeof Base;
-    const lockCol = ctor.lockingColumn;
-    if (Object.hasOwn(attrs, lockCol) && ctor.lockingEnabled) {
-      throw new Error(`${lockCol} cannot be updated explicitly`);
-    }
-    for (const [key, value] of Object.entries(attrs)) {
-      this.writeAttribute(key, value);
-    }
-    return this.save();
-  }
-
-  /**
-   * Update attributes and save, or throw on validation failure.
-   *
-   * Mirrors: ActiveRecord::Base#update!
-   */
-  async updateBang(attrs: Record<string, unknown>): Promise<true> {
-    const ctor = this.constructor as typeof Base;
-    const lockCol = ctor.lockingColumn;
-    if (Object.hasOwn(attrs, lockCol) && ctor.lockingEnabled) {
-      throw new Error(`${lockCol} cannot be updated explicitly`);
-    }
-    for (const [key, value] of Object.entries(attrs)) {
-      this.writeAttribute(key, value);
-    }
-    return this.saveBang();
-  }
+  // update / updateBang extracted to persistence.ts; wired via include() below.
 
   /**
    * Destroy the record. Returns `false` if a beforeDestroy callback
@@ -2377,27 +2345,7 @@ export class Base extends Model {
     return result;
   }
 
-  /**
-   * Delete the record from the database without running callbacks.
-   *
-   * Mirrors: ActiveRecord::Base#delete
-   */
-  async delete(): Promise<this> {
-    const ctor = this.constructor as typeof Base;
-    const table = ctor.arelTable;
-
-    // Rails' `delete` issues a DELETE only when `persisted?`, then
-    // unconditionally marks the record destroyed + frozen.
-    if (this.isPersisted()) {
-      const dm = new DeleteManager().from(table).where(ctor._buildPkWhereNode(this.id));
-      await ctor.adapter.execDelete(dm.toSql(), "Delete");
-    }
-
-    this._destroyed = true;
-    this._previouslyNewRecord = false;
-    this.freeze();
-    return this;
-  }
+  // delete extracted to persistence.ts; wired via include() below.
 
   /**
    * Delete a record by primary key without callbacks.
@@ -2905,6 +2853,9 @@ export interface Base extends Included<typeof AutosaveAssociation> {
     options?: { touch?: boolean | string | string[] },
   ): Promise<this>;
   toggleBang(attribute: string): Promise<boolean>;
+  update(attrs: Record<string, unknown>): Promise<boolean>;
+  updateBang(attrs: Record<string, unknown>): Promise<true>;
+  delete(): Promise<this>;
 }
 
 // ---------------------------------------------------------------------------
@@ -2959,6 +2910,9 @@ include(Base, {
   incrementBang: _Persistence.incrementBang,
   decrementBang: _Persistence.decrementBang,
   toggleBang: _Persistence.toggleBang,
+  update: _Persistence.update,
+  updateBang: _Persistence.updateBang,
+  delete: _Persistence.deleteRow,
   // Core
   inspect: _inspect,
   attributeForInspect: _attributeForInspect,
