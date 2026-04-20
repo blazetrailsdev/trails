@@ -49,6 +49,26 @@ function readTuple(owner: Base, cols: string[]): unknown[] {
 }
 
 /**
+ * Resolve a reflection's `joinPrimaryKey` using the runtime-klass
+ * form when the reflection exposes it. `BelongsToReflection#joinPrimaryKey`
+ * hard-codes `"id"` for polymorphic sources since the target class
+ * isn't known at definition time, but the resolved sourceType class
+ * may use a custom PK (`uuid`, a composite, ...). Routing through
+ * `joinPrimaryKeyFor(klass)` mirrors the AssociationScope walk
+ * (association-scope.ts:_nextChainScope) and Rails'
+ * `join_primary_key_for(klass)` (reflection.rb:968). Falls back to
+ * the static `joinPrimaryKey` when the method isn't exposed (e.g.
+ * chain entries that aren't Through / BelongsTo shapes).
+ */
+function resolveJoinPrimaryKey(reflection: unknown, klass?: typeof Base): string | string[] {
+  const r = reflection as {
+    joinPrimaryKey: string | string[];
+    joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
+  };
+  return typeof r.joinPrimaryKeyFor === "function" ? r.joinPrimaryKeyFor(klass) : r.joinPrimaryKey;
+}
+
+/**
  * Builds scopes for `:through` associations that disable joins, querying
  * each step's table separately and stitching results in memory via IN(...)
  * rather than emitting a multi-table JOIN. Used when the source and
@@ -101,8 +121,15 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         reverseChain,
         owner,
       );
-      const key = (lastReflection as { joinPrimaryKey: string | string[] }).joinPrimaryKey;
-      const keyCols = keyColumns(key, "joinPrimaryKey");
+      // Prefer the runtime-klass form — `BelongsToReflection#joinPrimaryKey`
+      // hard-codes `"id"` for polymorphic sources, but a sourceType
+      // target may use a different PK (e.g. `uuid`). Mirrors the
+      // AssociationScope chain walk which also routes through
+      // joinPrimaryKeyFor (reflection.rb:968).
+      const keyCols = keyColumns(
+        resolveJoinPrimaryKey(lastReflection, (lastReflection as { klass?: typeof Base }).klass),
+        "joinPrimaryKey",
+      );
       const relation = this._addConstraintsDj(
         lastReflection,
         keyCols,
@@ -143,8 +170,10 @@ export class DisableJoinsAssociationScope extends AssociationScope {
 
     for (const nextReflection of work) {
       const [reflection, ordered, joinIds] = acc;
-      const key = (reflection as { joinPrimaryKey: string | string[] }).joinPrimaryKey;
-      const keyCols = keyColumns(key, "joinPrimaryKey");
+      const keyCols = keyColumns(
+        resolveJoinPrimaryKey(reflection, (reflection as { klass?: typeof Base }).klass),
+        "joinPrimaryKey",
+      );
       const records = this._addConstraintsDj(reflection, keyCols, joinIds, owner, ordered);
       const foreignKey = (nextReflection as { joinForeignKey: string | string[] }).joinForeignKey;
       const foreignKeyCols = keyColumns(foreignKey, "joinForeignKey");
