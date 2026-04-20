@@ -18,10 +18,6 @@
       "types": "./dist/connection-adapters/postgresql-adapter.d.ts",
       "default": "./dist/connection-adapters/postgresql-adapter.js"
     },
-    "./adapters/mysql2-adapter.js": {
-      "types": "./dist/adapters/mysql2-adapter.d.ts",
-      "default": "./dist/adapters/mysql2-adapter.js"
-    },
     "./connection-adapters/mysql2-adapter.js": {
       "types": "./dist/connection-adapters/mysql2-adapter.d.ts",
       "default": "./dist/connection-adapters/mysql2-adapter.js"

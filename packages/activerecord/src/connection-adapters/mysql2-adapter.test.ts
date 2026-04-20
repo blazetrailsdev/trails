@@ -644,7 +644,7 @@ describeIfMysql("Mysql2Adapter", () => {
       // Integration with Phase 5's dumpSchemaCache — MySQL now exposes
       // the full surface (dataSources/columns/primaryKey/indexes) the
       // capability guard requires.
-      const { SchemaCache } = await import("../connection-adapters/schema-cache.js");
+      const { SchemaCache } = await import("./schema-cache.js");
       const cache = new SchemaCache();
       await cache.addAll(adapter);
       const cols = await cache.columns(adapter, "widgets");

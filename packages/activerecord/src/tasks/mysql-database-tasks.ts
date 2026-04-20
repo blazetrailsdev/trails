@@ -137,7 +137,7 @@ export class MySQLDatabaseTasks {
    * Mysql2Adapter#truncate_tables behavior).
    */
   async truncateAll(): Promise<void> {
-    const { Mysql2Adapter } = await import("../adapters/mysql2-adapter.js");
+    const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
     const dbName = this.requireDatabaseName();
     // Build the adapter config the same way withAdmin does: prefer a
     // unix socket when the config provides one, coerce port safely so
@@ -273,7 +273,7 @@ export class MySQLDatabaseTasks {
   }
 
   private async withAdmin<T>(fn: (admin: DatabaseAdapter) => Promise<T>): Promise<T> {
-    const { Mysql2Adapter } = await import("../adapters/mysql2-adapter.js");
+    const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
     const socket = this.resolvedField("socket");
     const adminConfig: {
       host?: string;

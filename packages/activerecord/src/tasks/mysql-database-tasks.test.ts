@@ -63,7 +63,9 @@ describe("MySQLDatabaseTasks", () => {
     }
 
     vi.resetModules();
-    vi.doMock("../adapters/mysql2-adapter.js", () => ({ Mysql2Adapter: FakeMysql2Adapter }));
+    vi.doMock("../connection-adapters/mysql2-adapter.js", () => ({
+      Mysql2Adapter: FakeMysql2Adapter,
+    }));
 
     try {
       const mod =
@@ -75,7 +77,7 @@ describe("MySQLDatabaseTasks", () => {
         }),
       ).truncateAll();
     } finally {
-      vi.doUnmock("../adapters/mysql2-adapter.js");
+      vi.doUnmock("../connection-adapters/mysql2-adapter.js");
       vi.resetModules();
     }
 

@@ -669,7 +669,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("throws ConcurrentMigrationError when lock cannot be acquired", async () => {
-    const { ConcurrentMigrationError } = await import("./migration-errors.js");
+    const { ConcurrentMigrationError } = await import("./migration.js");
     const adapter = createTestAdapter();
     adapter.supportsAdvisoryLocks = () => true;
     adapter.getAdvisoryLock = async () => false;

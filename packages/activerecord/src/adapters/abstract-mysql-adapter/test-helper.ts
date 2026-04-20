@@ -1,6 +1,6 @@
 import { describe } from "vitest";
 import mysql from "mysql2/promise";
-import { Mysql2Adapter } from "../mysql2-adapter.js";
+import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
 
 export const MYSQL_TEST_URL =
   process.env.MYSQL_TEST_URL ?? "mysql://root@localhost:3306/rails_js_test";

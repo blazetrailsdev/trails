@@ -306,7 +306,7 @@ if (PG_TEST_URL) {
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else if (MYSQL_TEST_URL) {
-  const { Mysql2Adapter } = await import("./adapters/mysql2-adapter.js");
+  const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
   _sharedAdapter = new Mysql2Adapter(MYSQL_TEST_URL);
   const rows = await _sharedAdapter.execute(`SHOW TABLES`);
   for (const r of rows) {

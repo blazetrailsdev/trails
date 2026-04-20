@@ -42,9 +42,17 @@ function main() {
   console.log(`\nWritten to ${outputPath}`);
 }
 
+interface PendingReExport {
+  fromFile: string; // relative path of the file that re-exports
+  localName: string; // name exposed by `fromFile`
+  sourceName: string; // original name in the source module
+  moduleSpecifier: string; // e.g. "./migration-errors.js"
+}
+
 function extractPackage(pkgName: string, srcDir: string): PackageInfo {
   const files = getAllTsFiles(srcDir);
   const info: PackageInfo = { classes: {}, modules: {}, fileFunctions: {} };
+  const pendingReExports: PendingReExport[] = [];
 
   // Create a TypeScript program
   const dirName = PACKAGE_DIR_OVERRIDES[pkgName] ?? pkgName;
@@ -81,9 +89,15 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
     if (filePath.endsWith(".test.ts")) continue;
     if (filePath.endsWith(".d.ts")) continue;
 
-    const relPath = path.relative(srcDir, filePath);
+    // POSIX-normalize relPath so manifest keys are platform-stable.
+    // Windows path.relative() yields backslashes; api-compare keys —
+    // and resolveRelModule below — assume forward slashes.
+    const relPath = path.relative(srcDir, filePath).replace(/\\/g, "/");
     let fileHasClassOrModule = false;
     const fileFunctions: MethodInfo[] = [];
+    // Local-name → source-module map for this file, used to resolve the
+    // two-step re-export pattern (`import { X } ...; export { X };`).
+    const localImports = new Map<string, { sourceName: string; moduleSpecifier: string }>();
 
     ts.forEachChild(sourceFile, (node) => {
       if (ts.isClassDeclaration(node) && node.name) {
@@ -135,6 +149,66 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
             classMethods: [],
           };
           fileHasClassOrModule = true;
+        } else if (
+          node.exportClause &&
+          ts.isNamedExports(node.exportClause) &&
+          node.moduleSpecifier &&
+          ts.isStringLiteral(node.moduleSpecifier)
+        ) {
+          // Handle `export { X, Y } from "./z.js"` — single-step named
+          // re-exports. Record each re-exported name as "pending" keyed
+          // under this file's relPath; resolved in a post-pass once
+          // every file has been walked (the source file may come later
+          // in the list).
+          for (const spec of node.exportClause.elements) {
+            const localName = spec.name.text;
+            const sourceName = spec.propertyName?.text ?? localName;
+            pendingReExports.push({
+              fromFile: relPath,
+              localName,
+              sourceName,
+              moduleSpecifier: node.moduleSpecifier.text,
+            });
+          }
+        } else if (
+          node.exportClause &&
+          ts.isNamedExports(node.exportClause) &&
+          !node.moduleSpecifier
+        ) {
+          // Handle the two-step pattern:
+          //   import { X } from "./y.js";
+          //   export { X };
+          // Look up each exported name in localImports (built during
+          // the same forEachChild pass) to recover the source module.
+          for (const spec of node.exportClause.elements) {
+            const localName = spec.name.text;
+            const sourceName = spec.propertyName?.text ?? localName;
+            const imported = localImports.get(sourceName);
+            if (!imported) continue;
+            pendingReExports.push({
+              fromFile: relPath,
+              localName,
+              sourceName: imported.sourceName,
+              moduleSpecifier: imported.moduleSpecifier,
+            });
+          }
+        }
+      } else if (ts.isImportDeclaration(node)) {
+        // Track local imports so the two-step re-export branch above
+        // can resolve `export { X };` back to its source module.
+        if (
+          node.importClause?.namedBindings &&
+          ts.isNamedImports(node.importClause.namedBindings) &&
+          ts.isStringLiteral(node.moduleSpecifier)
+        ) {
+          const spec = node.moduleSpecifier.text;
+          if (spec.startsWith("./") || spec.startsWith("../")) {
+            for (const el of node.importClause.namedBindings.elements) {
+              const localName = el.name.text;
+              const sourceName = el.propertyName?.text ?? localName;
+              localImports.set(localName, { sourceName, moduleSpecifier: spec });
+            }
+          }
         }
       } else if (ts.isFunctionDeclaration(node) && node.name && isExported(node)) {
         const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
@@ -288,7 +362,44 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
     }
   }
 
+  // Post-pass: resolve named re-exports. For each `export { X } from
+  // "./y.js"`, if ./y.js defined `X` (and we haven't already registered
+  // `fromFile:X` via a local declaration), clone the class entry under
+  // the re-exporting file's path so api-compare sees the class where
+  // Rails expects it.
+  for (const re of pendingReExports) {
+    const key = `${re.fromFile}:${re.localName}`;
+    if (info.classes[key] || info.modules[key]) continue;
+    const targetRel = resolveRelModule(re.fromFile, re.moduleSpecifier);
+    if (!targetRel) continue;
+    const sourceKey = `${targetRel}:${re.sourceName}`;
+    const sourceClass = info.classes[sourceKey];
+    if (sourceClass) {
+      info.classes[key] = { ...sourceClass, name: re.localName, file: re.fromFile };
+      continue;
+    }
+    const sourceModule = info.modules[sourceKey];
+    if (sourceModule) {
+      info.modules[key] = { ...sourceModule, name: re.localName, file: re.fromFile };
+    }
+  }
+
   return info;
+}
+
+/**
+ * Resolve a relative module specifier (e.g. "./migration-errors.js")
+ * against a file's relative path. Returns the resolved file's path
+ * in the same POSIX-normalized form used as PackageInfo keys, or
+ * null if the specifier doesn't target a local file. Caller must
+ * already have POSIX-normalized `fromRel`.
+ */
+export function resolveRelModule(fromRel: string, spec: string): string | null {
+  if (!spec.startsWith("./") && !spec.startsWith("../")) return null;
+  const fromDir = path.posix.dirname(fromRel);
+  // Strip .js / .ts extension; api-compare keys use .ts paths.
+  const withoutExt = spec.replace(/\.(js|ts)$/, "");
+  return path.posix.normalize(path.posix.join(fromDir, withoutExt)) + ".ts";
 }
 
 function extractClass(
@@ -618,4 +729,13 @@ function getAllTsFiles(dir: string): string[] {
   return results;
 }
 
-main();
+// Only run when invoked as a script (not when imported for its
+// exports by the test file). fileURLToPath + argv[1] is the common
+// ESM "if __main__" pattern; resolve argv[1] first so the guard
+// works regardless of whether the caller passed a relative path or
+// went through a wrapper (matches the pattern in
+// scripts/guides-typecheck/check.ts).
+import { fileURLToPath as _fileURLToPath } from "node:url";
+if (process.argv[1] && path.resolve(process.argv[1]) === _fileURLToPath(import.meta.url)) {
+  main();
+}

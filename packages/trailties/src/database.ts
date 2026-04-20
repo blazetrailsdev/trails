@@ -444,7 +444,7 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
     case "mysql2":
     case "mysql": {
       const { Mysql2Adapter } =
-        await import("@blazetrails/activerecord/adapters/mysql2-adapter.js");
+        await import("@blazetrails/activerecord/connection-adapters/mysql2-adapter.js");
       if (config.url) {
         return new Mysql2Adapter(config.url);
       }

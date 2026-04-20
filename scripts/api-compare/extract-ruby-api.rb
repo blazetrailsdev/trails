@@ -14,6 +14,20 @@ SCRIPT_DIR = File.dirname(__FILE__)
 RAILS_DIR = File.join(SCRIPT_DIR, ".rails-source")
 OUTPUT_DIR = File.join(SCRIPT_DIR, "output")
 
+# Cache gate: Rails source is pinned to a tag by fetch-rails.sh and
+# doesn't change between runs. Skip the ~8s Ripper pass when the
+# output already exists and the Rails source hasn't moved since it
+# was last written. Honours `API_COMPARE_FORCE=1` for the rare case
+# where the extractor itself was modified and you want a fresh
+# manifest.
+output_path = File.join(OUTPUT_DIR, "rails-api.json")
+rails_head = File.join(RAILS_DIR, ".git", "HEAD")
+if ENV["API_COMPARE_FORCE"] != "1" && File.exist?(output_path) &&
+   File.exist?(rails_head) && File.mtime(output_path) >= File.mtime(rails_head)
+  puts "Rails manifest #{output_path} is up to date (set API_COMPARE_FORCE=1 to regenerate)"
+  exit 0
+end
+
 # Map of source directories to package names
 PACKAGE_DIRS = {
   "arel" => File.join(RAILS_DIR, "activerecord", "lib", "arel"),

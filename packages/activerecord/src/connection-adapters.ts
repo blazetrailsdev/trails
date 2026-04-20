@@ -63,7 +63,7 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
 const sqlite3Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/sqlite3-adapter.js")).SQLite3Adapter as any;
 const mysql2Loader: AdapterLoader = async () =>
-  (await import("./adapters/mysql2-adapter.js")).Mysql2Adapter as any;
+  (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
 const trilogyLoader: AdapterLoader = async () =>
