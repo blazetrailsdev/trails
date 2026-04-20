@@ -150,8 +150,8 @@ interface StrictLoadingFields {
 
 export type StrictLoadingMode = "all" | "n_plus_one_only";
 
-interface FrozenFields {
-  _frozen: boolean;
+interface FrozenRecord {
+  _attributes: import("@blazetrails/activemodel").AttributeSet;
 }
 
 /** Mirrors: ActiveRecord::Core#readonly? */
@@ -195,14 +195,26 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
   return this;
 }
 
-/** Mirrors: ActiveRecord::Core#frozen? */
-export function isFrozen(this: FrozenFields): boolean {
-  return this._frozen;
+/**
+ * Returns true if this record's attribute set has been frozen.
+ *
+ * Mirrors: ActiveRecord::Core#frozen? — `@attributes.frozen?` in Rails.
+ */
+export function isFrozen(this: FrozenRecord): boolean {
+  return this._attributes.isFrozen();
 }
 
-/** Mirrors: ActiveRecord::Core#freeze */
-export function freeze<T extends FrozenFields>(this: T): T {
-  this._frozen = true;
+/**
+ * Clone and freeze the attribute set. Subsequent writes to `_attributes`
+ * (e.g. `writeAttribute`, `writeFromUser`) raise. Associations remain
+ * accessible since they aren't stored in the attribute set. The clone
+ * step ensures records sharing an attribute reference (e.g. via
+ * `clone()` / `becomes`) aren't accidentally frozen together.
+ *
+ * Mirrors: ActiveRecord::Core#freeze — `@attributes = @attributes.clone.freeze; self` in Rails.
+ */
+export function freeze<T extends FrozenRecord>(this: T): T {
+  this._attributes = this._attributes.deepDup().freeze();
   return this;
 }
 

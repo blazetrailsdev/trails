@@ -2022,7 +2022,6 @@ export class Base extends Model {
   _newRecord = true;
   _destroyed = false;
   _readonly = false;
-  _frozen = false;
   private _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
@@ -2107,7 +2106,7 @@ export class Base extends Model {
   declare cacheVersion: () => string | null;
 
   writeAttribute(name: string, value: unknown): void {
-    if (this._frozen) {
+    if (this._attributes.isFrozen()) {
       throw new Error(`Cannot modify a frozen ${(this.constructor as typeof Base).name}`);
     }
     super.writeAttribute(name, value);
@@ -2625,7 +2624,9 @@ export class Base extends Model {
       }
 
       this._destroyed = true;
-      this._frozen = true;
+      // Rails' destroy ends with a `freeze` call. Delegate to it so we
+      // pick up the clone-and-freeze semantics on `_attributes`.
+      this.freeze();
       this._collectionProxies.clear();
       this._preloadedAssociations.clear();
       this._associationInstances.clear();
@@ -2666,19 +2667,17 @@ export class Base extends Model {
   async delete(): Promise<this> {
     const ctor = this.constructor as typeof Base;
     const table = ctor.arelTable;
-    const pk = this.id;
 
-    if (Array.isArray(pk) ? pk.every((v) => v == null) : pk == null) {
-      // New (unpersisted) record — nothing to delete
-      this._destroyed = true;
-      return this;
+    // Rails' `delete` issues a DELETE only when `persisted?`, then
+    // unconditionally marks the record destroyed + frozen.
+    if (this.isPersisted()) {
+      const dm = new DeleteManager().from(table).where(ctor._buildPkWhereNode(this.id));
+      await ctor.adapter.execDelete(dm.toSql(), "Delete");
     }
 
-    const dm = new DeleteManager().from(table).where(ctor._buildPkWhereNode(pk));
-    await ctor.adapter.execDelete(dm.toSql(), "Delete");
-
     this._destroyed = true;
-    this._frozen = true;
+    this._previouslyNewRecord = false;
+    this.freeze();
     return this;
   }
 

@@ -384,7 +384,7 @@ function rememberTransactionRecordState(record: Base): TransactionRecordSnapshot
   return {
     newRecord: r._newRecord,
     destroyed: r._destroyed,
-    frozen: r._frozen,
+    frozen: r._attributes.isFrozen(),
     id: record.id,
     previouslyNewRecord: r._previouslyNewRecord,
   };
@@ -401,13 +401,25 @@ function restoreTransactionRecordState(record: Base, snapshot: TransactionRecord
   const r = record as any;
   r._newRecord = snapshot.newRecord;
   r._destroyed = snapshot.destroyed;
-  r._frozen = snapshot.frozen;
   r._previouslyNewRecord = snapshot.previouslyNewRecord;
+
+  // Unfreeze the attribute set while internal fields are restored so the
+  // PK write below always succeeds — even when the snapshot itself was
+  // frozen. Mirrors Rails' `restore_transaction_record_state`, which
+  // unconditionally reassigns `@attributes` to a fresh mapped set.
+  if (r._attributes.isFrozen()) {
+    r._attributes = r._attributes.deepDup();
+  }
 
   // Restore the primary key if it was auto-assigned during insert
   if (snapshot.newRecord && !Array.isArray(record.id)) {
     const ctor = record.constructor as typeof Base;
     r._attributes.set(ctor.primaryKey as string, snapshot.id);
+  }
+
+  // Re-apply the snapshot's frozen state *after* any internal restores.
+  if (snapshot.frozen && !r._attributes.isFrozen()) {
+    r._attributes.freeze();
   }
 }
 

@@ -10,9 +10,32 @@ const LAZY_ATTR = Symbol("lazyAttr");
  */
 export class AttributeSet {
   private attributes: Map<string, Attribute>;
+  private _frozen = false;
 
   constructor(attributes: Map<string, Attribute> = new Map()) {
     this.attributes = attributes;
+  }
+
+  /**
+   * Freeze this set in place so subsequent mutations throw.
+   * Matches Ruby's `Hash#freeze` semantic used by `ActiveRecord::Core#freeze`.
+   */
+  freeze(): this {
+    this._frozen = true;
+    return this;
+  }
+
+  /** Whether this set has been frozen via {@link freeze}. */
+  isFrozen(): boolean {
+    return this._frozen;
+  }
+
+  private assertNotFrozen(): void {
+    if (this._frozen) {
+      const err = new Error("can't modify frozen AttributeSet");
+      err.name = "FrozenError";
+      throw err;
+    }
   }
 
   /**
@@ -32,6 +55,7 @@ export class AttributeSet {
   }
 
   set(name: string, attrOrValue: Attribute | unknown): void {
+    this.assertNotFrozen();
     if (attrOrValue instanceof Attribute) {
       this.attributes.set(name, attrOrValue);
     } else {
@@ -59,6 +83,7 @@ export class AttributeSet {
   }
 
   writeFromUser(name: string, value: unknown): unknown {
+    this.assertNotFrozen();
     const existing = this.attributes.get(name);
     if (existing) {
       this.attributes.set(name, existing.withValueFromUser(value));
@@ -70,6 +95,7 @@ export class AttributeSet {
   }
 
   writeFromDatabase(name: string, value: unknown): void {
+    this.assertNotFrozen();
     const existing = this.attributes.get(name);
     if (existing) {
       this.attributes.set(name, existing.withValueFromDatabase(value));
@@ -79,6 +105,7 @@ export class AttributeSet {
   }
 
   writeCastValue(name: string, value: unknown): void {
+    this.assertNotFrozen();
     const attr = this.attributes.get(name);
     if (attr) {
       attr.overrideCastValue(value);
@@ -149,6 +176,7 @@ export class AttributeSet {
   }
 
   delete(name: string): boolean {
+    this.assertNotFrozen();
     return this.attributes.delete(name);
   }
 
@@ -241,6 +269,7 @@ export class AttributeSet {
   }
 
   reverseMergeBang(target: AttributeSet): this {
+    this.assertNotFrozen();
     const cache = new Map<Attribute, Attribute>();
     target.forEach((attr, name) => {
       if (!this.isKey(name)) {
