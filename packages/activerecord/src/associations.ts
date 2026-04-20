@@ -460,24 +460,31 @@ async function _loadThroughViaDisableJoinsScope(
   reflection: unknown,
   options?: AssociationOptions,
 ): Promise<Base[]> {
-  // Null-PK short-circuit: an unsaved owner has no through-table FK to
-  // chain off, so DJAS would build `WHERE through.<fk> IN ([null])` and
-  // either return 0 rows or (worse) match rows with null FKs. Read the
-  // owner-side column the chain seeds from — `joinForeignKey` on the
-  // through_reflection is the owner's PK column on the through table,
-  // and on the owner record itself it's the owner's PK attribute. For
-  // chain length 1 (non-through), this code isn't reached. For through,
-  // the chain reverse walk seeds with `owner.readAttribute(throughRefl
-  // .joinForeignKey)`, so checking that here matches what DJAS reads.
-  const throughRefl = (reflection as { throughReflection?: unknown }).throughReflection as
-    | { joinForeignKey?: string | string[] }
-    | undefined;
-  const fk = throughRefl?.joinForeignKey;
-  const fkCols = Array.isArray(fk) ? fk : fk ? [fk] : [];
-  for (const col of fkCols) {
+  // Unsaved-owner / null-PK short-circuit — correctness, not just
+  // perf. With the guard absent DJAS seeds `joinIds = [null]`, and
+  // the ArrayHandler in PredicateBuilder folds `[null]` into
+  // `key IS NULL`. That would match orphan through rows whose FK
+  // is null and leak them into the chain as phantom associations.
+  //
+  // Previously the guard read `throughReflection.joinForeignKey`
+  // off the owner, but for nested-through + composite-FK shapes
+  // that delegation surfaces deeper-target columns that don't
+  // exist on the outer owner (e.g. `ck_order_shop_id` on `Shop`),
+  // producing a false null and early-returning even for saved
+  // owners. Read from the OUTER reflection's `activeRecordPrimaryKey`
+  // instead — that's the owner's own PK column(s), never a
+  // delegated downstream target. `isNewRecord()` covers unsaved
+  // records; the explicit PK-null check covers the defensive edge
+  // where a saved record somehow has a null composite-PK component.
+  const activeRecordPk = (reflection as { activeRecordPrimaryKey?: string | string[] })
+    .activeRecordPrimaryKey;
+  const ownerPkCols =
+    activeRecordPk == null ? [] : Array.isArray(activeRecordPk) ? activeRecordPk : [activeRecordPk];
+  const ownerHasNullPk = ownerPkCols.some((col) => {
     const v = record.readAttribute(col);
-    if (v === null || v === undefined) return [];
-  }
+    return v === null || v === undefined;
+  });
+  if (record.isNewRecord() || ownerHasNullPk) return [];
   // Lazy-import to avoid an eager cycle: DJAS imports
   // DisableJoinsAssociationRelation → relation.ts → associations.ts.
   const { DisableJoinsAssociationScope } =
