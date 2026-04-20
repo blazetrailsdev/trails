@@ -349,9 +349,19 @@ function _canRouteThroughViaAssociationScope(
  * Disable-joins routing gate. Mirrors `_canRouteThroughViaAssociationScope`
  * but for `disable_joins: true` through associations — runs the chain
  * via the Rails-faithful `DisableJoinsAssociationScope` (per-step pluck
- * + IN list) rather than the legacy `loadHasManyThrough` 2-step. PR 4
- * routes the simple non-polymorphic shape only; polymorphic / sourceType
- * stays on the existing loader.
+ * + IN list) rather than the legacy `loadHasManyThrough` 2-step.
+ *
+ * Currently routes: single-column and composite-key through
+ * associations (from PR #645) and polymorphic-source + `sourceType`
+ * through-associations (from PR #661 — Rails' DJAS has no such gate
+ * and evaluates the per-reflection `constraints()` chain. When the
+ * source is polymorphic, the through chain includes a
+ * `PolymorphicReflection` wrapper whose `constraints()` contributes
+ * `_sourceTypeScope()` (reflection.ts) — the `where(source_type:
+ * ...)` closure that lands on the through step).
+ *
+ * Remaining bail-out: nested-through (`isNested()`). Follow-up
+ * widening covers that case.
  */
 function _canRouteThroughViaDisableJoinsAssociationScope(
   reflection: unknown,
@@ -369,8 +379,20 @@ function _canRouteThroughViaDisableJoinsAssociationScope(
     | { isPolymorphic?: () => boolean }
     | undefined;
   if (!src) return false;
-  if (typeof src.isPolymorphic === "function" && src.isPolymorphic()) return false;
-  if (options.sourceType) return false;
+  // `sourceType` must pair with a polymorphic source. Rails' own
+  // reflection validation rejects `has_many :through` with a
+  // polymorphic source and no `source_type`
+  // (`HasManyThroughAssociationPolymorphicSourceError`), and `source_type`
+  // with a non-polymorphic source injects a useless
+  // `PolymorphicReflection` whose `foreignType` is null
+  // (reflection.ts:544) — `_sourceTypeScope()` would emit
+  // `where({[null]: sourceType})` (invalid SQL). Reject both
+  // mismatches so the fallback loader handles them predictably:
+  // - polymorphic source without sourceType → missing type filter,
+  //   through-step pluck could mix ids across polymorphic targets.
+  // - sourceType without polymorphic source → no valid type column.
+  const srcIsPolymorphic = typeof src.isPolymorphic === "function" && src.isPolymorphic();
+  if (srcIsPolymorphic !== (options.sourceType != null)) return false;
   // Composite-key through associations are now supported by DJAS'
   // `_addConstraintsDj`, which builds an Arel `OR`-of-`AND` predicate
   // (`(c1=v1a AND c2=v1b) OR ...`) for the chain walk — same shape
