@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
-import { QueryCache, QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
+import { QueryCache, QueryCacheAdapter, QueryCacheStore as Store } from "./query-cache.js";
+import { QueryCacheStore as RootQueryCacheStore } from "./index.js";
+import { Store as AbstractStore } from "./connection-adapters/abstract/query-cache.js";
 
 function setup() {
   const inner = createTestAdapter();
@@ -362,6 +364,17 @@ describe("QueryCacheTest", () => {
   });
 });
 
+describe("QueryCacheStore public re-export", () => {
+  it("is the same class via both the package root and the query-cache deep import", () => {
+    // Guards the re-export + alias surface against regressions: consumers
+    // reaching for `QueryCacheStore` from either `@blazetrails/activerecord`
+    // or `@blazetrails/activerecord/query-cache.js` should hit the
+    // canonical `Store` class in abstract/query-cache.ts.
+    expect(Store).toBe(AbstractStore);
+    expect(RootQueryCacheStore).toBe(AbstractStore);
+  });
+});
+
 describe("QueryCacheMutableParamTest", () => {
   it.skip("query cache handles mutated binds", () => {
     /* needs bind parameter mutation detection */
@@ -383,7 +396,7 @@ describe("QueryCacheExpiryTest", () => {
   });
 
   it("enable disable", async () => {
-    const store = new QueryCacheStore();
+    const store = new Store();
     expect(store.enabled).toBe(false);
     store.enabled = true;
     expect(store.enabled).toBe(true);
@@ -405,7 +418,7 @@ describe("QueryCacheExpiryTest", () => {
   });
 
   it("query cache lru eviction", async () => {
-    const store = new QueryCacheStore(3);
+    const store = new Store(3);
     store.enabled = true;
     for (let i = 0; i < 5; i++) {
       await store.computeIfAbsent(`query_${i}`, async () => [{ val: i }]);

@@ -145,7 +145,10 @@ export {
   IndifferentHashAccessor,
   StringKeyedHashAccessor,
 } from "./store.js";
-export { QueryCache, QueryCacheAdapter, QueryCacheStore } from "./query-cache.js";
+export { QueryCache, QueryCacheAdapter } from "./query-cache.js";
+// `QueryCache::Store` in Rails; exported under a qualified TS name
+// so the package-level surface isn't shadowed by the generic `Store`.
+export { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
 export { QueryLogs, escapeComment, LegacyFormatter, SQLCommenter } from "./query-logs.js";
 export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
 export {
