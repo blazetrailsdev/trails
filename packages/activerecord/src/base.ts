@@ -109,6 +109,7 @@ import * as _Core from "./core.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
 import * as _Reflection from "./reflection.js";
+import * as _AssocInstance from "./associations/instance-methods.js";
 import { argumentError } from "./relation/query-methods.js";
 import { ScopeRegistry } from "./scoping.js";
 
@@ -118,14 +119,7 @@ import {
   unscoped as _unscoped,
 } from "./scoping/default.js";
 import * as NamedScoping from "./scoping/named.js";
-import { AssociationNotFoundError } from "./associations/errors.js";
-import { Associations as _Associations, loadBelongsTo, loadHasOne } from "./associations.js";
-import { BelongsToAssociation } from "./associations/belongs-to-association.js";
-import { BelongsToPolymorphicAssociation } from "./associations/belongs-to-polymorphic-association.js";
-import { HasOneAssociation } from "./associations/has-one-association.js";
-import { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
-import { HasManyAssociation } from "./associations/has-many-association.js";
-import { HasManyThroughAssociation } from "./associations/has-many-through-association.js";
+import { Associations as _Associations } from "./associations.js";
 
 /** @internal */
 export function quoteSqlValue(v: unknown, asArray = false): string {
@@ -3033,168 +3027,10 @@ export class Base extends Model {
     return this.isEqual(other);
   }
 
-  /**
-   * Return the association object for the given name.
-   *
-   * Mirrors: ActiveRecord::Base#association
-   */
-  association(name: string): AssociationInstance {
-    const existing = this._associationInstances.get(name);
-    if (existing) {
-      this._syncAssociationInstance(name, existing);
-      return existing;
-    }
-
-    const ctor = this.constructor as any;
-    const associations: any[] = ctor._associations ?? [];
-    const assocDef = associations.find((a: any) => a.name === name);
-    if (!assocDef) {
-      throw new AssociationNotFoundError(this, name);
-    }
-
-    const instance = this._buildAssociationInstance(assocDef);
-    this._syncAssociationInstance(name, instance);
-    this._associationInstances.set(name, instance);
-    return instance;
-  }
-
-  /**
-   * Explicit async load for a belongsTo association. Same shape as
-   * the standalone `loadBelongsTo(record, name, opts)` helper, but
-   * takes just the association name.
-   *
-   * Returns the cached/preloaded value if present; otherwise runs a
-   * query. Not a forced reload — use `record.reload()` for that.
-   *
-   * The virtualizer emits typed overloads so `post.loadBelongsTo("author")`
-   * narrows to `Promise<Author | null>` without a hand-written declare.
-   *
-   * Mirrors Rails' `ActiveRecord::Associations::Preloader::Branch` /
-   * `BelongsToAssociation` which are the belongs_to-specific preload
-   * paths.
-   */
-  async loadBelongsTo(name: string): Promise<Base | null> {
-    const assocDef = this._assertSingularAssociation(name, "belongsTo");
-    const result = await this._bypassStrictLoading(() =>
-      loadBelongsTo(this, name, assocDef.options ?? {}),
-    );
-    this._hydrateSingularAssoc(name, result);
-    return result;
-  }
-
-  /**
-   * Explicit async load for a hasOne association. Same shape as the
-   * standalone `loadHasOne(record, name, opts)` helper, but takes just
-   * the association name.
-   *
-   * Returns the cached/preloaded value if present; otherwise runs a
-   * query. Not a forced reload — use `record.reload()` for that.
-   *
-   * The virtualizer emits typed overloads so `user.loadHasOne("profile")`
-   * narrows to `Promise<Profile | null>` without a hand-written declare.
-   *
-   * Mirrors Rails' `HasOneAssociation` preload path.
-   */
-  async loadHasOne(name: string): Promise<Base | null> {
-    const assocDef = this._assertSingularAssociation(name, "hasOne");
-    const result = await this._bypassStrictLoading(() =>
-      loadHasOne(this, name, assocDef.options ?? {}),
-    );
-    this._hydrateSingularAssoc(name, result);
-    return result;
-  }
-
-  /**
-   * Populate the association instance's target and mark it loaded so
-   * subsequent sync reader access (`post.author`) returns the record
-   * without tripping strict loading. `setTarget()` internally calls
-   * `loadedBang()`, so no separate call is needed here.
-   */
-  private _hydrateSingularAssoc(name: string, result: Base | null): void {
-    this.association(name).setTarget(result);
-  }
-
-  /**
-   * Temporarily bumps the strict-loading bypass count across the
-   * execution of `fn`. Explicit `loadBelongsTo` / `loadHasOne` calls
-   * are legitimate lazy loads — the caller asked for them — so they
-   * skip the strict-loading throw.
-   */
-  private async _bypassStrictLoading<T>(fn: () => Promise<T>): Promise<T> {
-    this._strictLoadingBypassCount += 1;
-    try {
-      return await fn();
-    } finally {
-      this._strictLoadingBypassCount = Math.max(0, this._strictLoadingBypassCount - 1);
-    }
-  }
-
-  private _assertSingularAssociation(
-    name: string,
-    expected: "belongsTo" | "hasOne",
-  ): { type: string; options: any } {
-    const ctor = this.constructor as any;
-    const associations: any[] = ctor._associations ?? [];
-    const assocDef = associations.find((a: any) => a.name === name);
-    if (!assocDef) {
-      throw new AssociationNotFoundError(this, name);
-    }
-    if (assocDef.type !== expected) {
-      if (assocDef.type === "hasMany" || assocDef.type === "hasAndBelongsToMany") {
-        throw new Error(
-          `load${expected === "belongsTo" ? "BelongsTo" : "HasOne"} is for singular associations. ` +
-            `\`${ctor.name}.${name}\` is a ${assocDef.type} — await the reader: \`await record.${name}\`.`,
-        );
-      }
-      const right = assocDef.type === "belongsTo" ? "loadBelongsTo" : "loadHasOne";
-      throw new Error(
-        `\`${ctor.name}.${name}\` is a ${assocDef.type}, not ${expected}. Use \`record.${right}("${name}")\` instead.`,
-      );
-    }
-    return assocDef;
-  }
-
-  private _buildAssociationInstance(assocDef: any): AssociationInstance {
-    const opts = assocDef.options ?? {};
-    switch (assocDef.type) {
-      case "belongsTo":
-        if (opts.polymorphic) {
-          return new BelongsToPolymorphicAssociation(this, assocDef);
-        }
-        return new BelongsToAssociation(this, assocDef);
-      case "hasOne":
-        if (opts.through) {
-          return new HasOneThroughAssociation(this, assocDef);
-        }
-        return new HasOneAssociation(this, assocDef);
-      case "hasMany":
-        if (opts.through) {
-          return new HasManyThroughAssociation(this, assocDef);
-        }
-        return new HasManyAssociation(this, assocDef);
-      case "hasAndBelongsToMany":
-        return new HasManyThroughAssociation(this, assocDef);
-      default:
-        return new AssociationInstance(this, assocDef);
-    }
-  }
-
-  private _syncAssociationInstance(name: string, instance: AssociationInstance): void {
-    const proxy = this._collectionProxies.get(name) as any;
-    if (proxy && proxy.loaded) {
-      instance.setTarget(proxy.target);
-    } else {
-      const cachedAssociation = (this as any)._cachedAssociations?.get(name);
-      if (cachedAssociation !== undefined) {
-        instance.setTarget(cachedAssociation as any);
-      } else {
-        const preloaded = this._preloadedAssociations?.get(name) ?? null;
-        if (preloaded !== null) {
-          instance.setTarget(preloaded as any);
-        }
-      }
-    }
-  }
+  // Associations instance methods wired via include() below;
+  // signatures declared on the merged `interface Base` at the bottom
+  // of this file so subclass-variance rules treat them as methods
+  // (bivariant) rather than properties (invariant).
 
   // Underscore aliases for bang methods (Rails uses ! suffix, TS uses _ suffix)
   static async first_<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
@@ -3230,8 +3066,12 @@ export class Base extends Model {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Base extends Included<typeof AutosaveAssociation> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Base extends Included<typeof AutosaveAssociation> {
+  association(name: string): AssociationInstance;
+  loadBelongsTo(name: string): Promise<Base | null>;
+  loadHasOne(name: string): Promise<Base | null>;
+}
 
 // ---------------------------------------------------------------------------
 // Ruby-style mixin wiring — one `extend` per module, mirroring Rails:
@@ -3319,6 +3159,7 @@ include(Base, {
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
 include(Base, AutosaveAssociation);
+include(Base, _AssocInstance.InstanceMethods);
 
 // Register Model.isValid as the super for the Validations module's isValid.
 // Breaks the recursion: Base.isValid → validations.isValid → Model.isValid.
