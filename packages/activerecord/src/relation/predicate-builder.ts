@@ -7,6 +7,7 @@ import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js"
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
+import { argumentError } from "./query-methods.js";
 
 /**
  * Converts hash conditions ({ name: "dean", age: 30 }) into
@@ -204,6 +205,104 @@ export class PredicateBuilder {
 
   buildRangePredicate(attribute: Nodes.Attribute, range: Range): Nodes.Node {
     return this.rangeHandler.call(attribute, range);
+  }
+
+  /**
+   * Build a composite-key predicate. For `cols.length > 1`:
+   *
+   *   (c1 = v11 AND c2 = v12) OR (c1 = v21 AND c2 = v22) OR ...
+   *
+   * For `cols.length === 1` (degenerate composite): a single
+   * `c IN (v1, v2, ...)` predicate via `Attribute#in` — more compact
+   * and often planner-friendlier than an OR chain.
+   *
+   * The Rails analog is `where({[col1, col2] => [[v1, v2], ...]})`,
+   * which Rails routes through `Arel::Nodes::HomogeneousIn` and the
+   * predicate builder. JS object keys can't be arrays, so we expose
+   * the composite shape as a separate method (and a matching
+   * `Relation#where(cols, tuples)` overload).
+   *
+   * Tuples containing `null` / `undefined` are filtered out: SQL
+   * tuple-equality semantics treat any null component as a non-match
+   * (Arel's `Attribute#eq(null)` would emit `IS NULL`, which is
+   * different). After filtering, an empty tuple list returns `null`
+   * — caller short-circuits via `Relation#none()`.
+   *
+   * Throws on caller bugs: empty `cols`, non-array tuple, or tuple
+   * arity mismatch (silent filtering would mask real issues by
+   * collapsing them into `null` → `none()`).
+   *
+   * Mirrors: ActiveRecord predicate-builder composite-key handling
+   * (relation/predicate_builder/array_handler.rb's homogeneous-in
+   * path for tuple values).
+   */
+  buildComposite(cols: string[], tuples: unknown[][]): Nodes.Node | null {
+    if (cols.length === 0) {
+      throw argumentError("PredicateBuilder.buildComposite: empty column list");
+    }
+    if (!Array.isArray(tuples)) {
+      // Surface as ArgumentError instead of letting the for-of /
+      // .filter() below throw a bare TypeError on null / object /
+      // non-iterable inputs.
+      throw argumentError(
+        `PredicateBuilder.buildComposite: tuples must be an array, got ${tuples === null ? "null" : typeof tuples}`,
+      );
+    }
+    // Validate shape/arity loudly — silently dropping malformed
+    // tuples would turn caller bugs into `null` (→ `none()`), which
+    // is hard to debug. Tagged as ArgumentError so callers can catch
+    // consistently with other query-method validation throws.
+    for (const t of tuples) {
+      if (!Array.isArray(t)) {
+        throw argumentError(
+          `PredicateBuilder.buildComposite: tuple must be an array, got ${typeof t}`,
+        );
+      }
+      if (t.length !== cols.length) {
+        throw argumentError(
+          `PredicateBuilder.buildComposite: tuple arity ${t.length} does not match column count ${cols.length} (cols=[${cols.join(", ")}])`,
+        );
+      }
+    }
+    // Filter null/undefined-bearing tuples (SQL tuple-equality
+    // semantics — see method docstring).
+    const validTuples = tuples.filter((t) => t.every((v) => v !== null && v !== undefined));
+    if (validTuples.length === 0) return null;
+    // Single-column degenerate case: a single `IN (...)` predicate is
+    // more compact than `c=v1 OR c=v2 OR ...` and typically optimizes
+    // identically (or better) on indexed columns.
+    if (cols.length === 1) {
+      const values = validTuples.map((t) => t[0]);
+      return this.resolveColumn(cols[0]).in(values);
+    }
+    // Build equalities through `buildBindAttribute` so each value
+    // becomes a `QueryAttribute` (= bind param) rather than an
+    // `Arel::Nodes::Casted` (= inlined SQL literal). Inlined values
+    // bypass `compileWithBinds` / prepared-statement caching and
+    // mishandle `StatementCache::Substitute` placeholders.
+    //
+    // Use the resolved attribute's `.name` (not the raw `c`) when
+    // constructing the bind so qualified column keys
+    // (e.g. `"orders.shop_id"`) resolve to the same column-name
+    // PredicateBuilder.BasicObjectHandler uses for type lookup —
+    // otherwise `typeForAttribute("orders.shop_id")` returns
+    // undefined and the cast falls back to identity.
+    //
+    // Pre-resolve `Attribute[]` once outside the per-tuple loop —
+    // each `resolveColumn` allocates a fresh `Arel::Attribute` (and
+    // sometimes a `Table`). Reusing the resolved attrs keeps large
+    // tuple lists allocation-light.
+    const attrs = cols.map((c) => this.resolveColumn(c));
+    const groupings: Nodes.Node[] = validTuples.map((tuple) => {
+      const eqs = attrs.map((attr, i) => attr.eq(this.buildBindAttribute(attr.name, tuple[i])));
+      return new Nodes.Grouping(new Nodes.And(eqs));
+    });
+    if (groupings.length === 1) return groupings[0];
+    // Use n-ary `Or(children[])` (Arel `Nodes::Or` extends `Nary`)
+    // for a flat AST instead of the deeply-nested binary chain
+    // `reduce` would produce. Keeps depth O(1) instead of O(n) for
+    // large tuple lists.
+    return new Nodes.Grouping(new Nodes.Or(groupings));
   }
 
   resolveColumn(key: string): Nodes.Attribute {

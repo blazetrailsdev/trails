@@ -101,6 +101,7 @@ import {
   isPresent as _isPresent,
   isBlank as _isBlank,
 } from "./core.js";
+import { argumentError } from "./relation/query-methods.js";
 import { ScopeRegistry } from "./scoping.js";
 
 import { Default as DefaultScoping } from "./scoping/default.js";
@@ -1165,12 +1166,10 @@ export class Base extends Model {
       // neither of which matches the CPK tuple contract). Require an
       // explicit array form so intent is unambiguous.
       if (this.compositePrimaryKey && ids.every((i) => !Array.isArray(i))) {
-        const err = new Error(
+        throw argumentError(
           `${this.name} has a composite primary key (${String(this.primaryKey)}); ` +
             `call find([...tuple]) or find([[...], [...]]) rather than variadic scalars.`,
         );
-        err.name = "ArgumentError";
-        throw err;
       }
       return this.find(ids);
     }
@@ -1396,23 +1395,64 @@ export class Base extends Model {
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
-    conditionsOrSql: Record<string, unknown> | string,
-    ...binds: unknown[]
+    cols: string[],
+    tuples: unknown[][],
+  ): Relation<InstanceType<T>>;
+  static where<T extends typeof Base>(
+    this: T,
+    conditionsOrSql: Record<string, unknown> | string | string[],
+    ...rest: unknown[]
   ): Relation<InstanceType<T>> {
     if (this.abstractClass) {
       throw new Error(`Cannot call where on abstract class ${this.name}`);
     }
     if (typeof conditionsOrSql === "string") {
-      return this.all().where(conditionsOrSql, ...binds);
+      return this.all().where(conditionsOrSql, ...rest);
     }
-    return this.all().where(conditionsOrSql);
+    if (Array.isArray(conditionsOrSql) && conditionsOrSql.every((c) => typeof c === "string")) {
+      // Fast-fail: composite-key form requires exactly one extra
+      // argument that is an array of tuples. Without this, a stray
+      // `Model.where(['a','b'])` would fall through to the hash path
+      // and treat the array as a record (numeric keys), producing
+      // nonsense.
+      if (rest.length !== 1 || !Array.isArray(rest[0])) {
+        throw argumentError(
+          `${(this as { name?: string }).name ?? "Model"}.where(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
+        );
+      }
+      return this.all().where(conditionsOrSql, rest[0] as unknown[][]);
+    }
+    return this.all().where(conditionsOrSql as Record<string, unknown>);
   }
 
   static whereNot<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
+  ): Relation<InstanceType<T>>;
+  static whereNot<T extends typeof Base>(
+    this: T,
+    cols: string[],
+    tuples: unknown[][],
+  ): Relation<InstanceType<T>>;
+  static whereNot<T extends typeof Base>(
+    this: T,
+    conditions: Record<string, unknown> | string[],
+    tuples?: unknown[][],
   ): Relation<InstanceType<T>> {
-    return this.all().whereNot(conditions);
+    if (Array.isArray(conditions) && conditions.every((c) => typeof c === "string")) {
+      // Same fast-fail as Base.where: composite-key form requires
+      // a tuples argument as an array of arrays. Without this guard
+      // a stray `Model.whereNot(['c'])` would forward only the cols
+      // and Relation#whereNot's matching guard would throw — same
+      // outcome but the error message would mention Relation, not Model.
+      if (!Array.isArray(tuples)) {
+        throw argumentError(
+          `${(this as { name?: string }).name ?? "Model"}.whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
+        );
+      }
+      return this.all().whereNot(conditions, tuples);
+    }
+    return this.all().whereNot(conditions as Record<string, unknown>);
   }
 
   /**
