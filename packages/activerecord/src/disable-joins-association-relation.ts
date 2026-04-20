@@ -299,15 +299,13 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * `.select(...)` chains conventionally APPEND elsewhere — so a
    * blanket merge would drop the walker's existing orders/projection
    * when the user chains `.order(...)`. Recompose those fields
-   * additively here. `_isNone` (used by `.none()`) is copied
-   * explicitly since `Relation#merge` doesn't propagate it today.
+   * additively here.
    */
   private _composeChainedState(walkerResult: Relation<T>): Relation<T> {
     type ComposeFields = {
       _orderClauses?: unknown[];
       _rawOrderClauses?: unknown[];
       _selectColumns?: unknown[];
-      _isNone?: boolean;
     };
     // Snapshot walker's pre-merge order/select state — the merge
     // would otherwise replace these.
@@ -345,7 +343,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       target._selectColumns = Array.from(new Set([...sourceSelects, ...overlaySelects]));
     }
 
-    if (overlay._isNone) target._isNone = true;
     return merged;
   }
 

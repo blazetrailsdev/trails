@@ -52,6 +52,8 @@ export function mergeBang(this: any, other: any): any {
     if (other._lockValue) this._lockValue = other._lockValue;
     if (other._isReadonly) this._isReadonly = true;
     if (other._isStrictLoading) this._isStrictLoading = true;
+    // Sticky `.none()` — kept in sync with `Merger#merge`.
+    if (other._isNone) this._isNone = true;
     this._joinClauses.push(...(other._joinClauses ?? []));
     this._rawJoins.push(...(other._rawJoins ?? []));
     this._annotations.push(...(other._annotations ?? []));

@@ -327,6 +327,45 @@ describe("merge()", () => {
     expect(items[0].name).toBe("A");
   });
 
+  it("propagates the none() short-circuit across merge in either direction", async () => {
+    // Rails: a null-relation stays empty through merge so callers
+    // don't broaden an already-empty scope by composing state. We
+    // mirror the sticky behavior on `_isNone` and it has to hold
+    // whichever side the `.none()` is on.
+    class Item extends Base {
+      static _tableName = "items";
+    }
+    Item.attribute("id", "integer");
+    Item.attribute("name", "string");
+    Item.adapter = adapter;
+
+    await Item.create({ name: "A" });
+    await Item.create({ name: "B" });
+
+    // populated.merge(none) — the propagation case the merger fix
+    // was written for.
+    const noneOther = Item.all().none();
+    const fromPopulated = Item.all().merge(noneOther);
+    expect(fromPopulated.isNone()).toBe(true);
+    expect(await fromPopulated.toArray()).toEqual([]);
+
+    // none.merge(populated) — already emptied by the left side; the
+    // merge must not accidentally un-empty it. Exercised here so a
+    // future refactor that rebuilds state from `other` on top of a
+    // fresh base can't regress this.
+    const populatedOther = Item.all().where({ name: "A" });
+    const fromNone = Item.all().none().merge(populatedOther);
+    expect(fromNone.isNone()).toBe(true);
+    expect(await fromNone.toArray()).toEqual([]);
+
+    // Same sticky behavior through the in-place `merge!` variant —
+    // the merger and spawn-methods paths stay in sync.
+    const bangTarget = Item.all();
+    (bangTarget as unknown as { mergeBang: (o: unknown) => unknown }).mergeBang(Item.all().none());
+    expect(bangTarget.isNone()).toBe(true);
+    expect(await bangTarget.toArray()).toEqual([]);
+  });
+
   it("merges order from other relation", async () => {
     class Item extends Base {
       static _tableName = "items";

@@ -40,6 +40,13 @@ export class Merger {
     if (this.other._lockValue) rel._lockValue = this.other._lockValue;
     if (this.other._isReadonly) rel._isReadonly = true;
     if (this.other._isStrictLoading) rel._isStrictLoading = true;
+    // `.none()` is sticky — a merged-in relation that was already
+    // empty stays empty so callers don't accidentally broaden the
+    // result by composing additional state on top. Mirrors Rails'
+    // `Relation::Merger#merge` implicitly propagating the null
+    // relation's short-circuit; we have to copy it explicitly
+    // because our none-check lives on a boolean field.
+    if (this.other._isNone) rel._isNone = true;
     rel._joinClauses.push(...this.other._joinClauses);
     rel._rawJoins.push(...this.other._rawJoins);
     rel._annotations.push(...this.other._annotations);
