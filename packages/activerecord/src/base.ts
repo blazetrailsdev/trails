@@ -1934,71 +1934,8 @@ export class Base extends Model {
     }
   }
 
-  /**
-   * Increment an attribute in memory.
-   *
-   * Mirrors: ActiveRecord::Base#increment
-   */
-  increment(attribute: string, by: number = 1): this {
-    const current = Number(this.readAttribute(attribute)) || 0;
-    this.writeAttribute(attribute, current + by);
-    return this;
-  }
-
-  /**
-   * Decrement an attribute in memory.
-   *
-   * Mirrors: ActiveRecord::Base#decrement
-   */
-  decrement(attribute: string, by: number = 1): this {
-    const current = Number(this.readAttribute(attribute)) || 0;
-    this.writeAttribute(attribute, current - by);
-    return this;
-  }
-
-  /**
-   * Toggle a boolean attribute in memory.
-   *
-   * Mirrors: ActiveRecord::Base#toggle
-   */
-  toggle(attribute: string): this {
-    const current = this.readAttribute(attribute);
-    this.writeAttribute(attribute, !current);
-    return this;
-  }
-
-  /**
-   * Increment and persist using updateColumn (skip validations).
-   *
-   * Mirrors: ActiveRecord::Base#increment!
-   */
-  async incrementBang(attribute: string, by: number = 1): Promise<this> {
-    this.increment(attribute, by);
-    await this.updateColumn(attribute, this.readAttribute(attribute));
-    return this;
-  }
-
-  /**
-   * Decrement and persist using updateColumn (skip validations).
-   *
-   * Mirrors: ActiveRecord::Base#decrement!
-   */
-  async decrementBang(attribute: string, by: number = 1): Promise<this> {
-    this.decrement(attribute, by);
-    await this.updateColumn(attribute, this.readAttribute(attribute));
-    return this;
-  }
-
-  /**
-   * Toggle and persist using updateColumn (skip validations).
-   *
-   * Mirrors: ActiveRecord::Base#toggle!
-   */
-  async toggleBang(attribute: string): Promise<this> {
-    this.toggle(attribute);
-    await this.updateColumn(attribute, this.readAttribute(attribute));
-    return this;
-  }
+  // increment/decrement/toggle + bang variants wired via include() below;
+  // signatures live on the merged `interface Base` at the bottom of this file.
 
   /**
    * Run async validations (like uniqueness).
@@ -2954,6 +2891,20 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   readAttributeForValidation(attribute: string): unknown;
   validate(context?: string): this;
   customValidationContext(): boolean;
+  increment(attribute: string, by?: number): this;
+  decrement(attribute: string, by?: number): this;
+  toggle(attribute: string): this;
+  incrementBang(
+    attribute: string,
+    by?: number,
+    options?: { touch?: boolean | string | string[] },
+  ): Promise<this>;
+  decrementBang(
+    attribute: string,
+    by?: number,
+    options?: { touch?: boolean | string | string[] },
+  ): Promise<this>;
+  toggleBang(attribute: string): Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -3002,6 +2953,12 @@ include(Base, {
   isDestroyed: _Persistence.isDestroyed,
   isPreviouslyNewRecord: _Persistence.isPreviouslyNewRecord,
   isPreviouslyPersisted: _Persistence.isPreviouslyPersisted,
+  increment: _Persistence.increment,
+  decrement: _Persistence.decrement,
+  toggle: _Persistence.toggle,
+  incrementBang: _Persistence.incrementBang,
+  decrementBang: _Persistence.decrementBang,
+  toggleBang: _Persistence.toggleBang,
   // Core
   inspect: _inspect,
   attributeForInspect: _attributeForInspect,

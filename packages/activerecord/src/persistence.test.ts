@@ -1458,6 +1458,62 @@ describe("PersistenceTest", () => {
     expect(reloaded.count).toBe(6);
   });
 
+  // Rails' increment! emits an atomic UPDATE via update_counters, so
+  // two concurrent calls both land instead of racing on a read-then-write.
+  it("increment! applies concurrent increments atomically", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ count: 0 });
+    const a = await Topic.find(t.id);
+    const b = await Topic.find(t.id);
+    await Promise.all([a.incrementBang("count"), b.incrementBang("count")]);
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.count).toBe(2);
+  });
+
+  // Rails: `clear_#{attribute}_change` — after increment! the attribute
+  // must no longer look dirty, otherwise a later save() would re-persist
+  // the already-applied delta.
+  it("increment! clears dirty tracking for the incremented attribute", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ count: 10 });
+    await t.incrementBang("count");
+    // Attribute is applied but should no longer appear dirty.
+    expect(t.count).toBe(11);
+    expect(t.changedAttributes).not.toContain("count");
+  });
+
+  // Rails: increment!(attribute, by, touch: :updated_at) updates the
+  // timestamp in the same atomic statement.
+  it("increment! with touch option updates the named timestamp column", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ count: 1, updated_at: new Date(2020, 0, 1) });
+    await t.incrementBang("count", 1, { touch: "updated_at" });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.count).toBe(2);
+    expect(new Date(reloaded.updated_at as any).getTime()).toBeGreaterThan(
+      new Date(2020, 0, 1).getTime(),
+    );
+  });
+
   it("populates non primary key autoincremented column for a cpk model", async () => {
     const adapter = freshAdapter();
     class Topic extends Base {

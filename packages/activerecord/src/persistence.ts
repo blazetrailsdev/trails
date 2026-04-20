@@ -250,3 +250,121 @@ export function isPreviouslyNewRecord(this: PersistenceRecordFields): boolean {
 export function isPreviouslyPersisted(this: PersistenceRecordDispatch): boolean {
   return !this.isNewRecord() && this.isDestroyed();
 }
+
+// ---------------------------------------------------------------------------
+// Increment / decrement / toggle — ActiveRecord::Persistence#increment /
+// #decrement / #toggle and their bang counterparts. The plain forms mutate
+// in memory; the bang forms dispatch through `this`. `increment!` and
+// `decrement!` persist via `constructor.updateCounters(...)` (atomic UPDATE,
+// skipping validations and model callbacks); `toggle!` persists via
+// `save({ validate: false })` (skipping validations but still running
+// callbacks), matching Rails' `toggle.update_attribute(...)` chain.
+// ---------------------------------------------------------------------------
+
+/** Read/write contract used by every increment/decrement/toggle function. */
+interface AttributeIO {
+  readAttribute(name: string): unknown;
+  writeAttribute(name: string, value: unknown): void;
+}
+
+type TouchOption = boolean | string | string[];
+
+/** Class-level updateCounters + dirty-tracking needed by incrementBang. */
+interface CounterBangRecord extends AttributeIO {
+  id: unknown;
+  clearAttributeChanges(attributes: string[]): void;
+  constructor: {
+    updateCounters(
+      id: unknown,
+      counters: Record<string, number>,
+      options?: { touch?: TouchOption },
+    ): Promise<number>;
+  };
+}
+
+/** Save path used by toggleBang. */
+interface ToggleBangRecord extends AttributeIO {
+  save(options?: { validate?: boolean }): Promise<boolean>;
+}
+
+/** Mirrors: ActiveRecord::Persistence#increment */
+export function increment<T extends AttributeIO>(this: T, attribute: string, by: number = 1): T {
+  const current = Number(this.readAttribute(attribute)) || 0;
+  this.writeAttribute(attribute, current + by);
+  return this;
+}
+
+/**
+ * Mirrors: ActiveRecord::Persistence#decrement — `increment(attribute, -by)`.
+ * Dispatched through `this` so subclass overrides of `increment` flow into
+ * `decrement`.
+ */
+export function decrement<T extends AttributeIO & { increment(a: string, b?: number): T }>(
+  this: T,
+  attribute: string,
+  by: number = 1,
+): T {
+  return this.increment(attribute, -by);
+}
+
+/** Mirrors: ActiveRecord::Persistence#toggle */
+export function toggle<T extends AttributeIO>(this: T, attribute: string): T {
+  this.writeAttribute(attribute, !this.readAttribute(attribute));
+  return this;
+}
+
+/**
+ * Mirrors: ActiveRecord::Persistence#increment! — dispatches `increment`
+ * through `this`, then emits an atomic `UPDATE ... SET attr = attr + by`
+ * via Class.updateCounters so concurrent increments don't stomp each
+ * other. Validations and callbacks are skipped. Accepts Rails' `touch`
+ * option (updates the named timestamp(s) in the same statement).
+ */
+export async function incrementBang<T extends CounterBangRecord>(
+  this: T & { increment(attribute: string, by?: number): T },
+  attribute: string,
+  by: number = 1,
+  options: { touch?: TouchOption } = {},
+) {
+  this.increment(attribute, by);
+  await this.constructor.updateCounters(this.id, { [attribute]: by }, { touch: options.touch });
+  // Rails: `public_send(:"clear_#{attribute}_change")` — the in-memory
+  // increment is now durably persisted, so the attribute should no longer
+  // appear dirty (otherwise a later save() would re-persist it).
+  this.clearAttributeChanges([attribute]);
+  return this;
+}
+
+/**
+ * Mirrors: ActiveRecord::Persistence#decrement! —
+ * `increment!(attribute, -by, touch: touch)`. Dispatched through `this` so
+ * subclass overrides of `incrementBang` flow into `decrementBang`.
+ */
+export async function decrementBang<
+  T extends CounterBangRecord & {
+    incrementBang(a: string, b?: number, o?: { touch?: TouchOption }): Promise<T>;
+  },
+>(this: T, attribute: string, by: number = 1, options: { touch?: TouchOption } = {}): Promise<T> {
+  return this.incrementBang(attribute, -by, options);
+}
+
+/**
+ * Mirrors: ActiveRecord::Persistence#toggle! —
+ * `toggle(attribute).update_attribute(attribute, self[attribute])`.
+ * Unlike `increment!` / `decrement!`, Rails' `toggle!` goes through
+ * `update_attribute` which runs callbacks (but still skips validations).
+ */
+export async function toggleBang<T extends ToggleBangRecord>(
+  this: T & { toggle(attribute: string): T },
+  attribute: string,
+): Promise<boolean> {
+  this.toggle(attribute);
+  // Rails' `update_attribute(name, value)` is effectively `self[name] = value;
+  // save(validate: false)`. Our toggle() already wrote the toggled value;
+  // calling updateAttribute would re-write the same value (potentially
+  // clearing dirty tracking). Save directly to preserve the dirty change and
+  // still run callbacks. Returns the same boolean Rails' toggle! exposes
+  // through update_attribute — `false` when a before/around save callback
+  // aborted, `true` otherwise.
+  return this.save({ validate: false });
+}
