@@ -30,20 +30,16 @@ import {
   ConnectionNotDefined,
   AttributeAssignmentError,
 } from "./errors.js";
-import { AssociatedValidator } from "./validations/associated.js";
-import { AbsenceValidator as ARAbsenceValidator } from "./validations/absence.js";
-import { PresenceValidator as ARPresenceValidator } from "./validations/presence.js";
-import { LengthValidator as ARLengthValidator } from "./validations/length.js";
-import { NumericalityValidator as ARNumericalityValidator } from "./validations/numericality.js";
 import { AutosaveAssociation, clearAutosaveState } from "./autosave-association.js";
 import {
   RecordInvalid,
   isValid as validationsIsValid,
-  customValidationContext,
   defaultValidationContext,
   performValidations,
   _setSuperIsValid,
+  _setSuperValidates,
 } from "./validations.js";
+import * as _Validations from "./validations.js";
 import {
   encrypts as _encrypts,
   applyPendingEncryptions,
@@ -822,75 +818,9 @@ export class Base extends Model {
   declare static reflectOnAggregation: typeof _Reflection.ClassMethods.reflectOnAggregation;
   declare static reflectOnAllAutosaveAssociations: typeof _Reflection.ClassMethods.reflectOnAllAutosaveAssociations;
 
-  /**
-   * Mirrors: ActiveRecord::Validations.validates
-   *
-   * Overrides Model.validates to use AR-specific validator classes for
-   * presence/absence/length/numericality. These AR validators add
-   * association awareness (filtering destroyed records, column precision).
-   */
-  static override validates(attribute: string, rules: Record<string, unknown>): void {
-    const arRules = { ...rules };
-    const shared = extractShared(arRules);
-    const { allowNil: sharedAllowNil, allowBlank: sharedAllowBlank, ...sharedRest } = shared;
-
-    // Build options for an AR validator, respecting per-validator allowNil/allowBlank
-    // precedence (only apply shared value when per-validator option is undefined).
-    const buildOpts = (opts: Record<string, unknown>) => ({
-      ...opts,
-      attributes: [attribute],
-      ...sharedRest,
-      ...(opts.allowNil === undefined && sharedAllowNil !== undefined
-        ? { allowNil: sharedAllowNil }
-        : {}),
-      ...(opts.allowBlank === undefined && sharedAllowBlank !== undefined
-        ? { allowBlank: sharedAllowBlank }
-        : {}),
-    });
-
-    if (arRules.presence) {
-      const opts = arRules.presence === true ? {} : (arRules.presence as Record<string, unknown>);
-      delete arRules.presence;
-      this.validatesWith(ARPresenceValidator, buildOpts(opts));
-    }
-    if (arRules.absence) {
-      const opts = arRules.absence === true ? {} : (arRules.absence as Record<string, unknown>);
-      delete arRules.absence;
-      this.validatesWith(ARAbsenceValidator, buildOpts(opts));
-    }
-    if (arRules.length) {
-      const opts = arRules.length as Record<string, unknown>;
-      delete arRules.length;
-      this.validatesWith(ARLengthValidator, buildOpts(opts));
-    }
-    if (arRules.numericality) {
-      const opts =
-        arRules.numericality === true ? {} : (arRules.numericality as Record<string, unknown>);
-      delete arRules.numericality;
-      this.validatesWith(ARNumericalityValidator, buildOpts(opts));
-    }
-    // Delegate remaining rules (inclusion, exclusion, format, etc.) to Model
-    const hasRemaining = Object.keys(arRules).some(
-      (k) => !["on", "if", "unless", "strict", "allowNil", "allowBlank"].includes(k),
-    );
-    if (hasRemaining) {
-      super.validates(attribute, arRules);
-    }
-  }
-
-  /**
-   * Validates that all named associations are themselves valid.
-   *
-   * Mirrors: ActiveRecord::Validations::ClassMethods#validates_associated
-   */
-  static validatesAssociated(...args: (string | Record<string, unknown>)[]): void {
-    const last = args[args.length - 1];
-    const opts =
-      typeof last === "object" && last !== null ? (args.pop() as Record<string, unknown>) : {};
-    for (const name of args as string[]) {
-      this.validatesWith(AssociatedValidator, { ...opts, attributes: [name] });
-    }
-  }
+  // --- Validations::ClassMethods (wired via extend() after class body) ---
+  declare static validates: typeof _Validations.validates;
+  declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
   // -- Enums --
   static _enums: Map<string, Record<string, number>> = new Map();
@@ -2130,15 +2060,7 @@ export class Base extends Model {
    *
    * Mirrors: validates uniqueness: true
    */
-  static validatesUniqueness(
-    attribute: string,
-    options: { scope?: string | string[]; message?: string; conditions?: (this: any) => any } = {},
-  ): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_asyncValidations")) {
-      (this as any)._asyncValidations = [...((this as any)._asyncValidations ?? [])];
-    }
-    (this as any)._asyncValidations.push({ attribute, options });
-  }
+  declare static validatesUniqueness: typeof _Validations.validatesUniqueness;
 
   /**
    * Save the record. Returns true if successful, false if validation fails.
@@ -2957,36 +2879,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Validations#validate
    */
-  /**
-   * Mirrors: ActiveModel::Validations#read_attribute_for_validation
-   *
-   * Rails aliases this to `send`, so calling it with an association name
-   * returns the association target (loaded records). We resolve from
-   * association caches first,
-   * falling back to readAttribute for regular columns.
-   */
-  readAttributeForValidation(attribute: string): unknown {
-    const cached = (this as any)._cachedAssociations?.get?.(attribute);
-    if (cached !== undefined) return cached;
-    const preloaded = (this as any)._preloadedAssociations?.get?.(attribute);
-    if (preloaded !== undefined) return preloaded;
-    const proxy = (this as any)._collectionProxies?.get?.(attribute);
-    if (
-      proxy &&
-      (proxy.loaded === true || (Array.isArray(proxy.target) && proxy.target.length > 0))
-    ) {
-      return proxy.target;
-    }
-    if (typeof this.association === "function") {
-      try {
-        const assoc = this.association(attribute);
-        if (assoc?.loaded === true && assoc.target !== undefined) return assoc.target;
-      } catch {
-        // Not an association — fall through
-      }
-    }
-    return this.readAttribute(attribute);
-  }
+  // readAttributeForValidation: wired via include() below.
 
   /**
    * Mirrors: ActiveRecord::Validations#valid?
@@ -3005,20 +2898,7 @@ export class Base extends Model {
     return result && !this.errors.any;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Validations#validate (alias of valid?)
-   */
-  validate(context?: string): this {
-    this.isValid(context);
-    return this;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Validations#custom_validation_context?
-   */
-  customValidationContext(): boolean {
-    return customValidationContext.call(this);
-  }
+  // validate / customValidationContext: wired via include() below.
 
   declare isPresent: () => boolean;
   declare isBlank: () => boolean;
@@ -3071,6 +2951,9 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   association(name: string): AssociationInstance;
   loadBelongsTo(name: string): Promise<Base | null>;
   loadHasOne(name: string): Promise<Base | null>;
+  readAttributeForValidation(attribute: string): unknown;
+  validate(context?: string): this;
+  customValidationContext(): boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -3087,17 +2970,6 @@ export interface Base extends Included<typeof AutosaveAssociation> {
 // exact generics, `this` parameter, and return type of their implementations.
 // ---------------------------------------------------------------------------
 
-function extractShared(rules: Record<string, unknown>): Record<string, unknown> {
-  const shared: Record<string, unknown> = {};
-  if (rules.on !== undefined) shared.on = rules.on;
-  if (rules.if !== undefined) shared.if = rules.if;
-  if (rules.unless !== undefined) shared.unless = rules.unless;
-  if (rules.strict) shared.strict = rules.strict;
-  if (rules.allowNil !== undefined) shared.allowNil = rules.allowNil;
-  if (rules.allowBlank !== undefined) shared.allowBlank = rules.allowBlank;
-  return shared;
-}
-
 extend(Base, ConnectionHandling.ClassMethods);
 extend(Base, Querying);
 extend(Base, {
@@ -3112,6 +2984,7 @@ extend(Base, ReadonlyAttributes.ClassMethods);
 extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
+extend(Base, _Validations.ClassMethods);
 extend(Base, { enum: _EnumModule.enumMethod });
 extend(Base, _Reflection.ClassMethods);
 extend(Base, {
@@ -3160,7 +3033,14 @@ include(Base, LockingPessimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
 include(Base, AutosaveAssociation);
 include(Base, _AssocInstance.InstanceMethods);
+include(Base, {
+  readAttributeForValidation: _Validations.readAttributeForValidation,
+  validate: _Validations.validate,
+  customValidationContext: _Validations.customValidationContext,
+});
 
-// Register Model.isValid as the super for the Validations module's isValid.
-// Breaks the recursion: Base.isValid → validations.isValid → Model.isValid.
+// Register Model's super methods for the Validations module.
+// Breaks the recursion on isValid (Base.isValid → validations.isValid → Model.isValid)
+// and on validates (AR's validates routes remaining rules through Model.validates).
 _setSuperIsValid(Model.prototype.isValid);
+_setSuperValidates(Model.validates);

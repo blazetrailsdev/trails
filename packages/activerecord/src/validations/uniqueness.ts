@@ -7,6 +7,24 @@
  */
 import { EachValidator } from "@blazetrails/activemodel";
 
+/**
+ * Register a deferred uniqueness validation to run on save (since uniqueness
+ * requires a DB round-trip, it's kept off the synchronous validator chain).
+ *
+ * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
+ */
+export function validatesUniqueness(
+  this: unknown,
+  attribute: string,
+  options: { scope?: string | string[]; message?: string; conditions?: (this: any) => any } = {},
+): void {
+  const klass = this as { _asyncValidations?: Array<unknown> };
+  if (!Object.prototype.hasOwnProperty.call(klass, "_asyncValidations")) {
+    klass._asyncValidations = [...(klass._asyncValidations ?? [])];
+  }
+  (klass._asyncValidations as Array<unknown>).push({ attribute, options });
+}
+
 export class UniquenessValidator extends EachValidator {
   private _klass: any;
 

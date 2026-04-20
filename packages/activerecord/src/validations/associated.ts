@@ -10,6 +10,23 @@
  */
 import { EachValidator } from "@blazetrails/activemodel";
 
+/**
+ * Registers AssociatedValidator(s) for the named associations.
+ *
+ * Mirrors: ActiveRecord::Validations::ClassMethods#validates_associated
+ */
+export function validatesAssociated(
+  this: { validatesWith(vc: unknown, opts: Record<string, unknown>): void },
+  ...args: (string | Record<string, unknown>)[]
+): void {
+  const last = args[args.length - 1];
+  const opts =
+    typeof last === "object" && last !== null ? (args.pop() as Record<string, unknown>) : {};
+  for (const name of args as string[]) {
+    this.validatesWith(AssociatedValidator, { ...opts, attributes: [name] });
+  }
+}
+
 export class AssociatedValidator extends EachValidator {
   validateEach(record: any, attribute: string, value: unknown): void {
     const context = this._recordValidationContextForAssociation(record);
