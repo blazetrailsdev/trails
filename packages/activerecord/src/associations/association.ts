@@ -2,6 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { resolveModel, buildHasManyRelation } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
+import { validateThroughSourceType } from "./validate-source-type.js";
 import { camelize, singularize } from "@blazetrails/activesupport";
 
 /**
@@ -39,6 +40,14 @@ export class Association {
     this.disableJoins = reflection.options.disableJoins || false;
     this.loaded = false;
     this.target = null;
+
+    // Rails' `Association#initialize` calls `reflection.check_validity!`
+    // so misconfigurations surface at first use. We run a narrow
+    // subset of that check (the two sourceType-shape cases) via
+    // the shared helper; the full `checkValidityBang` wire-up is
+    // deferred because several test fixtures trip the stricter
+    // checks (tracked separately).
+    validateThroughSourceType(owner.constructor as typeof Base, reflection.name);
   }
 
   get name(): string {
