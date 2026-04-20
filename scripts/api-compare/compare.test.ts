@@ -113,10 +113,17 @@ describe("superclassesMatch", () => {
     expect(superclassesMatch(null, ["Type"], "ValueType")).toBe(true);
   });
 
+  it("accepts AR Base extending Model when Ruby Base has no super", () => {
+    // `ActiveRecord::Base` has no Ruby super; TS `Base extends Model`
+    // to expose the ActiveModel host class on subclasses.
+    expect(superclassesMatch(null, ["Model"], "Base")).toBe(true);
+  });
+
   it("does not auto-accept other classes extending the intermediates with null Ruby super", () => {
-    // Only Table/Attribute/ValueType are on the intermediate whitelist.
+    // Only the whitelisted (tsName, intermediate) pairs above are accepted.
     expect(superclassesMatch(null, ["Node"], "Something")).toBe(false);
     expect(superclassesMatch(null, ["Type"], "Something")).toBe(false);
+    expect(superclassesMatch(null, ["Model"], "Something")).toBe(false);
   });
 });
 

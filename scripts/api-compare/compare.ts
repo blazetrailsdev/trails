@@ -189,6 +189,9 @@ const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   ["ValueType", "Type"],
   ["LockingType", "ValueType"],
   ["Serialized", "ValueType"],
+  // `ActiveRecord::Base` has no Ruby super; TS `Base` extends `Model`
+  // so the ActiveModel mixin surface is type-visible on subclasses.
+  ["Base", "Model"],
 ]);
 
 // Per-class TS renames that don't fit the systematic alias patterns
