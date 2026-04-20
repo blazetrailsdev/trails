@@ -78,7 +78,7 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
     );
     // Clean exit — no output expected on success.
     expect(result).toBe("");
-  });
+  }, 30_000);
 });
 
 describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
@@ -291,6 +291,10 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
     });
   });
 
+  // Subprocess spawn + full tsc solution build + composite fixture setup
+  // routinely takes ~3–5s on warm machines and longer under load; the
+  // Vitest default 5000ms timeout makes this flaky. Bump the per-test
+  // timeout rather than leaving false-negatives in CI.
   it("CLI binary --build exits 0 on the composite fixture", async () => {
     const binPath = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
     // Same pattern as the Phase 1b.1 binary test: skip when dist
@@ -306,7 +310,7 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
       expect(result).toBe("");
       expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
     });
-  });
+  }, 30_000);
 
   it("re-build after editing a model reflects the new declares in dependents", () => {
     withTempComposite((dir) => {
@@ -340,7 +344,7 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
       const authorDts = fs.readFileSync(path.join(dir, "models", "dist", "author.d.ts"), "utf8");
       expect(authorDts).toContain("bio");
     });
-  });
+  }, 30_000);
 });
 
 describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {

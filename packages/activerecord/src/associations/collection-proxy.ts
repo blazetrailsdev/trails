@@ -15,15 +15,15 @@ export function _setAssociationRelationCtor(
   _AssociationRelationCtor = ctor;
 }
 import { applyThenable, stripThenable } from "../relation/thenable.js";
+import {
+  normalizeFindArgs,
+  raiseNotFoundAll,
+  raiseNotFoundSingle,
+} from "../relation/find-normalization.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
-import {
-  StrictLoadingViolationError,
-  RecordNotSaved,
-  RecordNotFound,
-  ConfigurationError,
-} from "../errors.js";
+import { StrictLoadingViolationError, RecordNotSaved, ConfigurationError } from "../errors.js";
 import { RecordInvalid } from "../validations.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
@@ -1367,106 +1367,37 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override find(id: unknown): Promise<T>;
   override find(...ids: unknown[]): Promise<T | T[]>;
   override async find(...args: unknown[]): Promise<T | T[]> {
+    // Rails-faithful cache gate: CollectionAssociation#find in Rails
+    // only uses the in-memory loaded target when BOTH `inverse_of` is
+    // declared AND the association is `loaded?`. Otherwise it
+    // delegates to `scope.find(...)` (i.e. Relation.find via SQL).
+    // Gate runs FIRST so the non-cache path doesn't do duplicate
+    // arg-normalization — super.find runs its own normalize.
+    const inverseOf = this._assocDef.options.inverseOf;
+    const useCache = !!inverseOf && this._targetLoaded;
+    if (!useCache) {
+      // Non-cache path hits the DB — enforce strict-loading the same
+      // way the other query-executing proxy methods do. super.find
+      // goes through Relation.where(...).toArray(), which wraps CP
+      // as the `this` of its intermediate relations; the strict-
+      // loading guard lives on AssociationRelation.toArray(), not
+      // here. For the direct-on-CP call we check explicitly so
+      // owner.strictLoadingBang() can't be bypassed via proxy.find.
+      this._checkStrictLoading();
+      return (await super.find(...args)) as T | T[];
+    }
+
     const targetModel = this.model as typeof Base;
     const pk = targetModel.primaryKey ?? "id";
     const composite = Array.isArray(pk);
 
-    // No-args / empty-list contract matches Relation.find (same
-    // message shape, same `id: []` on the exception) so callers
-    // writing `catch (e) { e.id; e.primaryKey }` see consistent
-    // fields across both finders.
-    if (args.length === 0) {
-      throw new RecordNotFound(
-        `Couldn't find ${targetModel.name} with an empty list of ids`,
-        targetModel.name,
-        String(pk),
-        [],
-      );
-    }
+    // Shared arg normalization + deterministic-error raising (empty
+    // list / composite arity). Same message + id shape as
+    // Relation.performFind.
+    const normalized = normalizeFindArgs(targetModel.name, pk, args);
+    const { ids, wantArray, tuples } = normalized;
 
-    // Normalize the overload set into (ids, wantArray). Rules:
-    //
-    // - Variadic (`find(a, b, c)`) → each arg is a full id (scalar for
-    //   simple PKs, tuple for composite). Returns T[].
-    // - Single array arg + composite PK: ambiguous. Follow Rails:
-    //     * flat array of scalars whose length matches PK arity →
-    //       ONE composite-tuple id (find([k1, k2]) on [id1, id2]).
-    //     * array of arrays → each inner array is a composite-tuple id.
-    // - Single array arg + scalar PK → list of ids.
-    // - Single scalar / single tuple → that's the only id.
-    const [first, ...rest] = args;
-    let ids: unknown[];
-    let wantArray: boolean;
-    if (rest.length > 0) {
-      // Composite PK variadic: treat the whole arg list as ONE
-      // composite-tuple id when every arg is a scalar. If the arity
-      // doesn't match, the downstream validator reports the whole
-      // tuple (e.g. "got 1,2,3"), matching Relation.performFind. An
-      // array arg signals tuples-of-tuples — list-of-ids form.
-      if (composite && args.every((x) => !Array.isArray(x))) {
-        ids = [args];
-        wantArray = false;
-      } else {
-        ids = args;
-        wantArray = true;
-      }
-    } else if (Array.isArray(first)) {
-      if (composite) {
-        const pkArity = (pk as string[]).length;
-        const looksLikeSingleTuple =
-          first.length === pkArity && first.every((x) => !Array.isArray(x));
-        if (looksLikeSingleTuple) {
-          ids = [first];
-          wantArray = false;
-        } else {
-          // Array of tuples (or mixed / wrong arity — fall through so
-          // each element is treated as an id and keyForId normalizes).
-          ids = first;
-          wantArray = true;
-        }
-      } else {
-        // Simple PK: Relation.performFind flattens nested arrays
-        // (finder-methods.ts:78 `ids.flat()`), so `find([[1, 2]])`
-        // behaves like `find([1, 2])`. Mirror that here.
-        ids = (first as unknown[]).flat(Infinity);
-        wantArray = true;
-      }
-    } else {
-      ids = [first];
-      wantArray = false;
-    }
-
-    // Empty-id-list contract: Relation.find / performFind raises for
-    // an empty list so callers can distinguish "no ids" from "found
-    // nothing". Mirror that here — `find([])` and the composite
-    // fallthrough that produces zero ids both raise.
-    if (ids.length === 0) {
-      throw new RecordNotFound(
-        `Couldn't find ${targetModel.name} with an empty list of ids`,
-        targetModel.name,
-        String(pk),
-        [],
-      );
-    }
-
-    // Composite PKs require a tuple id of matching arity. Fail fast
-    // with a clear message instead of computing a lookup key that
-    // can never match (scalar id → [scalar] → no match).
-    if (composite) {
-      const pkArity = (pk as string[]).length;
-      for (const id of ids) {
-        if (!Array.isArray(id) || id.length !== pkArity) {
-          throw new RecordNotFound(
-            `${targetModel.name}: composite primary key requires a ${pkArity}-element array, got ${String(id)}`,
-            targetModel.name,
-            String(pk),
-            id,
-          );
-        }
-      }
-    }
-
-    const records = await this.toArray();
+    const records = this._target;
 
     // Cast incoming ids through the target model's attribute types so
     // in-memory find matches Relation.find's WHERE-condition casting
@@ -1506,61 +1437,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const byPk = new Map<string, T>();
     for (const r of records) byPk.set(keyForRecord(r), r);
 
-    // For composite PKs, collapse the caller-provided ids into the
-    // `tuples` shape performFind uses, so error messages and the
-    // `id` payload match exactly: tuples is always `unknown[][]`;
-    // `String(tuples)` yields "1,2,3,4" for [[1,2],[3,4]]. For
-    // simple PKs, stay with the scalar form.
-    const tuples: unknown[][] | null = composite ? (ids as unknown[][]) : null;
-
-    // Aggregate "couldn't find all" error when looking up multiple
-    // ids or composite-tuple lookups — matches Relation.performFind:
-    //   * ALWAYS uses the "Couldn't find all X with 'pk': (ids)" shape
-    //     when at least one requested id is missing, even for a
-    //     single-tuple lookup under composite PKs (relation/
-    //     finder-methods.ts:129-137).
-    //   * Simple-PK single-id lookup uses the "with 'pk'=id" shape.
-    if (composite || wantArray || ids.length > 1) {
-      // Duplicate-id handling matches Relation.performFind: the SQL
-      // path compares result count to requested count; duplicates
-      // collapse to one row and raise. Mirror by comparing distinct
-      // found-key count to ids.length.
+    // Composite + any-multi: always use the "Couldn't find all" shape
+    // (matches performFind). Simple-PK single-id uses "with 'pk'=id".
+    if (tuples || wantArray || ids.length > 1) {
+      // Duplicate-id handling matches performFind: compare distinct
+      // found keys to requested count. `find([1, 1])` raises.
       const castedIds = ids.map(castId);
       const uniqueFoundKeys = new Set(castedIds.map(keyForCastedId).filter((k) => byPk.has(k)));
       if (uniqueFoundKeys.size !== ids.length) {
-        // Simple PK: performFind uses `flatIds.join(", ")` and stores
-        // flatIds on the exception (finder-methods.ts:78-95).
-        // Composite: performFind uses `String(tuples)` (comma-join,
-        // no space) and stores tuples (finder-methods.ts:129-137).
-        const idPayload = tuples ?? ids;
-        const messageIds = tuples ? String(tuples) : (ids as unknown[]).join(", ");
-        throw new RecordNotFound(
-          `Couldn't find all ${targetModel.name} with '${String(pk)}': (${messageIds})`,
-          targetModel.name,
-          String(pk),
-          idPayload,
-        );
+        raiseNotFoundAll(targetModel.name, pk, normalized);
       }
-      // Return in DB/load order, matching Relation.performFind.
+      // Return in DB/load order, matching performFind.
       const wantedKeys = new Set(castedIds.map(keyForCastedId));
       const found = records.filter((r) => wantedKeys.has(keyForRecord(r)));
-      // Composite single-tuple lookup (`find([k1, k2])`) returns one
-      // record, matching performFind's `isArrayOfTuples ? records :
-      // records[0]` branch.
       return wantArray ? found : found[0];
     }
 
     // Simple PK, single scalar id.
     const id = ids[0];
     const match = byPk.get(keyForCastedId(castId(id)));
-    if (!match) {
-      throw new RecordNotFound(
-        `Couldn't find ${targetModel.name} with '${String(pk)}'=${String(id)}`,
-        targetModel.name,
-        String(pk),
-        id,
-      );
-    }
+    if (!match) raiseNotFoundSingle(targetModel.name, pk as string, id);
     return match;
   }
 

@@ -10,6 +10,7 @@
 
 import { RecordNotFound, SoleRecordExceeded } from "../errors.js";
 import { RecordInvalid } from "../validations.js";
+import { normalizeFindArgs, raiseNotFoundAll, raiseNotFoundSingle } from "./find-normalization.js";
 
 interface FinderRelation {
   _modelClass: {
@@ -33,108 +34,57 @@ interface FinderRelation {
   toArray(): Promise<any[]>;
 }
 
-function buildPkWhere(rel: FinderRelation, id: unknown): Record<string, unknown> {
-  const pk = rel._modelClass.primaryKey;
-  if (Array.isArray(pk)) {
-    if (!Array.isArray(id) || id.length !== pk.length) {
-      throw new RecordNotFound(
-        `${rel._modelClass.name}: composite primary key requires a ${pk.length}-element array, got ${String(id)}`,
-        rel._modelClass.name,
-        String(pk),
-        id,
-      );
-    }
-    const conditions: Record<string, unknown> = {};
-    pk.forEach((col, i) => {
-      conditions[col] = id[i];
-    });
-    return conditions;
-  }
-  return { [pk]: id };
+function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
+  const conditions: Record<string, unknown> = {};
+  pk.forEach((col, i) => {
+    conditions[col] = tuple[i];
+  });
+  return conditions;
 }
 
-export async function performFind(this: FinderRelation, ...ids: unknown[]): Promise<any> {
+export async function performFind(this: FinderRelation, ...args: unknown[]): Promise<any> {
   const pk = this._modelClass.primaryKey;
-  const isCpk = this._modelClass.compositePrimaryKey;
+  const modelName = this._modelClass.name;
+  const normalized = normalizeFindArgs(modelName, pk, args);
+  const { ids, wantArray, tuples } = normalized;
+
+  // Composite PK: OR over per-tuple WHERE conditions. The
+  // `Array.isArray(pk)` guard narrows `pk` to `string[]` via
+  // control flow instead of a cast. `tuples !== null` is a
+  // stronger invariant (the normalizer only returns tuples when pk
+  // is composite) but TS can't correlate them, so we check both.
+  if (tuples && Array.isArray(pk)) {
+    const orConditions = tuples.map((tuple) => buildPkWhere(pk, tuple));
+    let rel: any = this.where(orConditions[0]);
+    for (let i = 1; i < orConditions.length; i++) {
+      rel = rel.or(this.where(orConditions[i]));
+    }
+    const records = await rel.toArray();
+    if (records.length !== tuples.length) raiseNotFoundAll(modelName, pk, normalized);
+    return wantArray ? records : records[0];
+  }
+
+  // Simple PK from here on — pk is narrowed to `string`.
+  if (Array.isArray(pk)) {
+    // Unreachable: tuples-null + pk-array would mean the normalizer
+    // violated its contract.
+    throw new Error("performFind: composite PK without tuples (normalizer invariant violation)");
+  }
 
   // Simple PK, single scalar: find(1)
-  if (!isCpk && ids.length === 1 && !Array.isArray(ids[0])) {
-    const records = await this.where({ [pk as string]: ids[0] })
+  if (!wantArray) {
+    const id = ids[0];
+    const records = await this.where({ [pk]: id })
       .limit(1)
       .toArray();
-    if (records.length === 0) {
-      throw new RecordNotFound(
-        `Couldn't find ${this._modelClass.name} with '${pk}'=${ids[0]}`,
-        this._modelClass.name,
-        pk as string,
-        ids[0],
-      );
-    }
+    if (records.length === 0) raiseNotFoundSingle(modelName, pk, id);
     return records[0];
   }
 
-  // Simple PK, multiple: find(1, 2, 3) or find([1, 2, 3])
-  if (!isCpk) {
-    const flatIds = (ids as unknown[]).flat();
-    if (flatIds.length === 0) {
-      throw new RecordNotFound(
-        `Couldn't find ${this._modelClass.name} with an empty list of ids`,
-        this._modelClass.name,
-        pk as string,
-        [],
-      );
-    }
-    const records = await this.where({ [pk as string]: flatIds }).toArray();
-    if (records.length !== flatIds.length) {
-      throw new RecordNotFound(
-        `Couldn't find all ${this._modelClass.name} with '${pk}': (${flatIds.join(", ")})`,
-        this._modelClass.name,
-        pk as string,
-        flatIds,
-      );
-    }
-    return records;
-  }
-
-  // CPK: find([shop_id, id]) — single tuple
-  // CPK: find([[shop_id, id], [shop_id2, id2]]) — array of tuples
-  // Distinguish by checking if first element is an array
-  if (ids.length === 0) {
-    throw new RecordNotFound(
-      `Couldn't find ${this._modelClass.name} with an empty list of ids`,
-      this._modelClass.name,
-      String(pk),
-      [],
-    );
-  }
-  const input = ids.length === 1 && Array.isArray(ids[0]) ? ids[0] : ids;
-  if (Array.isArray(input) && input.length === 0) {
-    throw new RecordNotFound(
-      `Couldn't find ${this._modelClass.name} with an empty list of ids`,
-      this._modelClass.name,
-      String(pk),
-      [],
-    );
-  }
-  const isArrayOfTuples = Array.isArray(input[0]);
-  const tuples: unknown[][] = isArrayOfTuples ? (input as unknown[][]) : [input as unknown[]];
-
-  // Build OR conditions for all tuples in a single query
-  const orConditions = tuples.map((tuple) => buildPkWhere(this, tuple));
-  let rel: any = this.where(orConditions[0]);
-  for (let i = 1; i < orConditions.length; i++) {
-    rel = rel.or(this.where(orConditions[i]));
-  }
-  const records = await rel.toArray();
-  if (records.length !== tuples.length) {
-    throw new RecordNotFound(
-      `Couldn't find all ${this._modelClass.name} with '${pk}': (${String(tuples)})`,
-      this._modelClass.name,
-      String(pk),
-      tuples,
-    );
-  }
-  return isArrayOfTuples ? records : records[0];
+  // Simple PK, multiple: find(1, 2, 3) or find([1, 2, 3]).
+  const records = await this.where({ [pk]: ids }).toArray();
+  if (records.length !== ids.length) raiseNotFoundAll(modelName, pk, normalized);
+  return records;
 }
 
 export async function performFindBy(
