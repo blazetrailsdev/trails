@@ -2,7 +2,7 @@
  * SQL statement classification — shared utilities for determining
  * whether a SQL statement is a read or write query.
  *
- * Used by both AbstractAdapter and DatabaseStatementsMixin to avoid
+ * Used by both AbstractAdapter and DatabaseStatements module to avoid
  * duplicating the logic.
  */
 

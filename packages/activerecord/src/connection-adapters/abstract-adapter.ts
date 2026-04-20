@@ -25,8 +25,10 @@ import {
   clearQueryCache as clearQueryCacheMixin,
   type QueryCacheHost,
 } from "./abstract/query-cache.js";
-import { DatabaseStatementsMixin } from "./database-statements-mixin.js";
+import { DatabaseStatements } from "./abstract/database-statements.js";
 import { quote as abstractQuote, typeCast as abstractTypeCast } from "./abstract/quoting.js";
+import { include } from "@blazetrails/activesupport";
+import type { Result } from "../result.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
@@ -72,14 +74,45 @@ export class Version {
   }
 }
 
-// Rails: `class AbstractAdapter ... include DatabaseStatements`. We achieve
-// the same shape by mixing DatabaseStatements into the base chain here.
-const AbstractAdapterBase = DatabaseStatementsMixin(class {});
-
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter
+ *
+ * Rails: `class AbstractAdapter ... include DatabaseStatements`.
+ * We do the same with `include(AbstractAdapter, DatabaseStatements)`
+ * after the class body (see bottom of file) — no synthetic base.
  */
-export class AbstractAdapter extends AbstractAdapterBase {
+// Method-signature interface mirrors `DatabaseStatements` (declared via
+// include() below). Using method signatures (not property-typed
+// functions from `Included<>`) lets concrete adapter subclasses
+// override with method syntax without tripping TS2425.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface AbstractAdapter {
+  selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  selectOne(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+  ): Promise<Record<string, unknown> | undefined>;
+  selectValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
+  selectValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
+  selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  execInsert(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  isWriteQuery(sql: string): boolean;
+  emptyInsertStatementValue(pk?: string | null): string;
+  cacheableQuery(
+    klass: {
+      query?(sql: string): unknown;
+      partialQuery?(parts: unknown): unknown;
+      partialQueryCollector?(): unknown;
+    },
+    arel: unknown,
+  ): [unknown, unknown[]];
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class AbstractAdapter {
   static readonly Version = Version;
 
   private _connection: DatabaseAdapter | null = null;
@@ -888,3 +921,6 @@ export class AbstractAdapter extends AbstractAdapterBase {
     return new Map();
   }
 }
+
+// Rails: `include DatabaseStatements` inside the class body.
+include(AbstractAdapter, DatabaseStatements);

@@ -11,6 +11,7 @@ import { TransactionIsolationError } from "../../errors.js";
 import { quote, quoteTableName, quoteColumnName } from "./quoting.js";
 import { TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
+import { isWriteQuerySql } from "../sql-classification.js";
 
 /**
  * Host interface for DatabaseStatements mixin methods that need adapter context.
@@ -1113,3 +1114,148 @@ export { insert as create };
  * Alias: remove = delete (backwards compat with prior TS API)
  */
 export { deleteStatement as remove };
+
+// ---------------------------------------------------------------------------
+// Module object
+//
+// Rails' `include DatabaseStatements` — applied to AbstractAdapter (and
+// the test SchemaAdapter) via activesupport's `include()` helper. The
+// bodies delegate to the adapter's `execute` / `executeMutation`
+// primitives, matching Rails' pattern where module methods call down
+// into the adapter's `internal_exec_query` / `exec_query` layer.
+//
+// The file-level `export function` surface above models the Rails
+// DatabaseStatements module for standalone / utility use by adapters.
+// Most of those functions already provide default behavior by
+// delegating through the host adapter (e.g. `selectOne`, `selectRows`,
+// `execQuery`, `execInsertAll`); only the adapter-specific primitives
+// (`selectAll`, `execute`, `isWriteQuery`, `explain`) remain subclass
+// responsibilities and throw if called unbound. The module object
+// below is the concrete default set mixed onto AbstractAdapter's
+// prototype via `include()`.
+// ---------------------------------------------------------------------------
+
+interface DatabaseStatementsDefaultsHost {
+  execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
+  executeMutation(sql: string, binds?: unknown[]): Promise<number>;
+  execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+}
+
+export const DatabaseStatements = {
+  async selectAll(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+  ): Promise<Result> {
+    // Rails: select_all → internal_exec_query → exec_query. Delegating
+    // here lets adapters that override execQuery (e.g. PostgreSQLAdapter,
+    // which populates columnTypes via its type_map) have their override
+    // picked up automatically.
+    return this.execQuery(sql, name, binds);
+  },
+
+  async selectOne(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    _name?: string | null,
+    binds?: unknown[],
+  ): Promise<Record<string, unknown> | undefined> {
+    const rows = await this.execute(sql, binds);
+    return rows[0];
+  },
+
+  async selectValue(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    _name?: string | null,
+    binds?: unknown[],
+  ): Promise<unknown> {
+    const rows = await this.execute(sql, binds);
+    if (rows.length === 0) return undefined;
+    const keys = Object.keys(rows[0]);
+    return keys.length > 0 ? rows[0][keys[0]] : undefined;
+  },
+
+  async selectValues(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    _name?: string | null,
+    binds?: unknown[],
+  ): Promise<unknown[]> {
+    const rows = await this.execute(sql, binds);
+    if (rows.length === 0) return [];
+    const firstKey = Object.keys(rows[0])[0];
+    if (firstKey === undefined) return rows.map(() => undefined);
+    return rows.map((row) => row[firstKey]);
+  },
+
+  async selectRows(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    _name?: string | null,
+    binds?: unknown[],
+  ): Promise<unknown[][]> {
+    const rows = await this.execute(sql, binds);
+    if (rows.length === 0) return [];
+    const keys = Object.keys(rows[0]);
+    return rows.map((row) => keys.map((key) => row[key]));
+  },
+
+  async execQuery(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    _name?: string | null,
+    binds?: unknown[],
+  ): Promise<Result> {
+    const rows = await this.execute(sql, binds);
+    return Result.fromRowHashes(rows);
+  },
+
+  async execInsert(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    _name?: string | null,
+    binds?: unknown[],
+  ): Promise<number> {
+    return this.executeMutation(sql, binds);
+  },
+
+  async execDelete(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    _name?: string | null,
+    binds?: unknown[],
+  ): Promise<number> {
+    return this.executeMutation(sql, binds);
+  },
+
+  async execUpdate(
+    this: DatabaseStatementsDefaultsHost,
+    sql: string,
+    _name?: string | null,
+    binds?: unknown[],
+  ): Promise<number> {
+    return this.executeMutation(sql, binds);
+  },
+
+  isWriteQuery(sql: string): boolean {
+    return isWriteQuerySql(sql);
+  },
+
+  emptyInsertStatementValue(_pk?: string | null): string {
+    return "DEFAULT VALUES";
+  },
+
+  cacheableQuery(
+    this: unknown,
+    klass: {
+      query?(sql: string): unknown;
+      partialQuery?(parts: unknown): unknown;
+      partialQueryCollector?(): unknown;
+    },
+    arel: unknown,
+  ): [unknown, unknown[]] {
+    return cacheableQuery.call(this as never, klass, arel);
+  },
+};

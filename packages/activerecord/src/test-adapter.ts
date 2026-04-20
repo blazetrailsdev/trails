@@ -18,7 +18,10 @@
 
 import { inspectExplainOption } from "./adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
-import { DatabaseStatementsMixin } from "./connection-adapters/database-statements-mixin.js";
+import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
+import { include } from "@blazetrails/activesupport";
+import { isWriteQuerySql } from "./connection-adapters/sql-classification.js";
+import type { Result } from "./result.js";
 import { _setOnAdapterSetHook } from "./base.js";
 
 const PG_TEST_URL = process.env.PG_TEST_URL;
@@ -348,7 +351,32 @@ export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void
  *   2. Creates tables from registered model attribute definitions
  *   3. Handles missing table/column errors as a fallback
  */
-class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements DatabaseAdapter {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface SchemaAdapter {
+  selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  selectOne(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+  ): Promise<Record<string, unknown> | undefined>;
+  selectValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
+  selectValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
+  selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  execInsert(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  cacheableQuery(
+    klass: {
+      query?(sql: string): unknown;
+      partialQuery?(parts: unknown): unknown;
+      partialQueryCollector?(): unknown;
+    },
+    arel: unknown,
+  ): [unknown, unknown[]];
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class SchemaAdapter implements DatabaseAdapter {
   get adapterName(): string {
     return this.inner?.adapterName ?? "SchemaAdapter";
   }
@@ -356,7 +384,6 @@ class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements Databas
   private inner: any;
 
   constructor(inner: any) {
-    super();
     this.inner = inner;
   }
 
@@ -656,12 +683,12 @@ class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements Databas
     return this.inner.inTransaction;
   }
 
-  override emptyInsertStatementValue(pk?: string | null): string {
-    return this.inner.emptyInsertStatementValue?.(pk) ?? super.emptyInsertStatementValue(pk);
+  emptyInsertStatementValue(pk?: string | null): string {
+    return this.inner.emptyInsertStatementValue?.(pk) ?? "DEFAULT VALUES";
   }
 
-  override isWriteQuery(sql: string): boolean {
-    return this.inner.isWriteQuery?.(sql) ?? super.isWriteQuery(sql);
+  isWriteQuery(sql: string): boolean {
+    return this.inner.isWriteQuery?.(sql) ?? isWriteQuerySql(sql);
   }
 
   async exec(sql: string): Promise<void> {
@@ -731,3 +758,4 @@ class SchemaAdapter extends DatabaseStatementsMixin(class {}) implements Databas
     await dropAllTables(this.inner);
   }
 }
+include(SchemaAdapter, DatabaseStatements);
