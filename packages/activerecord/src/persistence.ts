@@ -22,6 +22,7 @@ import {
 } from "./errors.js";
 import { clearAutosaveState } from "./autosave-association.js";
 import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
+import { withTransactionReturningStatus } from "./transactions.js";
 import { RecordInvalid, performValidations } from "./validations.js";
 
 interface PersistenceHost {
@@ -550,7 +551,6 @@ export async function save<T extends SaveRecord>(
   }
 
   // Mirrors: ActiveRecord::Transactions#save
-  const { withTransactionReturningStatus } = await import("./transactions.js");
   try {
     return await withTransactionReturningStatus(self, () => self._createOrUpdate());
   } finally {
@@ -581,7 +581,6 @@ export async function destroy<T extends DestroyRecord>(this: T): Promise<T | fal
   }
 
   // Mirrors: ActiveRecord::Transactions#destroy
-  const { withTransactionReturningStatus } = await import("./transactions.js");
   const self = this as any;
   const result = await withTransactionReturningStatus(self, () => self._destroyRow());
   return result ? this : false;

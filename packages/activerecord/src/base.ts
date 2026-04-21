@@ -97,6 +97,7 @@ import * as _Reflection from "./reflection.js";
 import * as _AssocInstance from "./associations/instance-methods.js";
 import { argumentError } from "./relation/query-methods.js";
 import { ScopeRegistry } from "./scoping.js";
+import { transaction as _transaction } from "./transactions.js";
 
 import {
   Default as DefaultScoping,
@@ -2454,13 +2455,32 @@ export class Base extends Model {
   // becomesBang / updateAttributeBang extracted to persistence.ts.
 
   /**
-   * Instance-level transaction wrapper.
+   * Instance-level transaction wrapper — delegates to the class method
+   * so `record.transaction(...)` and `Model.transaction(...)` share one
+   * implementation path.
    *
    * Mirrors: ActiveRecord::Base#transaction
    */
-  async transaction<R>(fn: (tx: any) => Promise<R>): Promise<R | undefined> {
-    const { transaction: txn } = await import("./transactions.js");
-    return txn(this.constructor as typeof Base, fn);
+  async transaction<R>(
+    fn: (tx: any) => Promise<R>,
+    options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
+  ): Promise<R | undefined> {
+    return (this.constructor as typeof Base).transaction(fn, options);
+  }
+
+  /**
+   * Class-level transaction wrapper.
+   *
+   * Mirrors: ActiveRecord::Base.transaction — Rails exposes this as a
+   * class method (`Model.transaction do ... end`). In TS the block is
+   * async, so callers must `await` the result.
+   */
+  static transaction<R>(
+    this: typeof Base,
+    fn: (tx: any) => Promise<R>,
+    options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
+  ): Promise<R | undefined> {
+    return _transaction(this, fn, options);
   }
 
   /**

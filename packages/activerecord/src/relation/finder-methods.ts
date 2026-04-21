@@ -8,7 +8,7 @@
  * Mirrors: ActiveRecord::FinderMethods
  */
 
-import { RecordNotFound, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
+import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
 
 // ---------------------------------------------------------------------------
 // Shared id-normalization + not-found helpers.
@@ -193,6 +193,10 @@ interface FinderRelation {
     primaryKey: string | string[];
     compositePrimaryKey: boolean;
     createBang(attrs: any): Promise<any>;
+    transaction<R>(
+      fn: (tx: any) => Promise<R>,
+      options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
+    ): Promise<R | undefined>;
   };
   _isNone: boolean;
   _limitValue: number | null;
@@ -473,19 +477,33 @@ export async function performCreateOrFindByBang(
   conditions: Record<string, unknown>,
   extra?: Record<string, unknown>,
 ): Promise<any> {
+  // Rails:
+  //   transaction(requires_new: true) { create!(attributes, &block) }
+  //   rescue ActiveRecord::RecordNotUnique
+  //     where(attributes).lock.find_by!(attributes)
   try {
-    return await this._modelClass.createBang({
-      ...this.scopeForCreate(),
-      ...conditions,
-      ...extra,
-    });
+    const result = await this._modelClass.transaction(
+      () =>
+        this._modelClass.createBang({
+          ...this.scopeForCreate(),
+          ...conditions,
+          ...extra,
+        }),
+      { requiresNew: true },
+    );
+    // transaction() returns undefined when the block raises Rollback.
+    // Treat that as a persist failure rather than leaking undefined to
+    // the bang caller.
+    if (result === undefined) {
+      throw new RecordNotSaved(
+        `${this._modelClass.name}.createOrFindByBang rolled back before persist`,
+        undefined,
+      );
+    }
+    return result;
   } catch (error) {
-    // Rails' create_or_find_by! only retries on RecordNotUnique; validation
-    // failures and other adapter errors must propagate unchanged.
     if (!(error instanceof RecordNotUnique)) throw error;
-    const records = await this.where(conditions).limit(1).toArray();
-    if (records.length > 0) return records[0];
-    throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+    return this.where(conditions).lock().findByBang(conditions);
   }
 }
 

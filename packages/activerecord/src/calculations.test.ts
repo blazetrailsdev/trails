@@ -16,7 +16,7 @@ import {
 import { Associations, loadBelongsTo } from "./associations.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -5197,6 +5197,36 @@ describe("CalculationsTest", () => {
     expect(user.name).toBe("Alice");
     expect(user.isPersisted()).toBe(true);
   });
+
+  // Rails: rescue ActiveRecord::RecordNotUnique → where(attributes).lock.find_by!(attributes)
+  // Synthesize the concurrent-winner scenario by throwing RecordNotUnique
+  // from the inner create() call: the retry path must consume the error,
+  // hit findByBang inside the scope, and return the existing record.
+  // Gated to sqlite: the real end-to-end path requires the adapter to
+  // translate the driver's duplicate-key error into RecordNotUnique.
+  // Our sqlite3-adapter does (see _translateException). PG and MySQL
+  // adapters don't yet — tracked as a separate follow-up — so on those
+  // the raw driver Error would propagate instead of hitting the rescue.
+  it.skipIf(adapterType !== "sqlite")(
+    "createOrFindBy retries via findByBang on RecordNotUnique",
+    async () => {
+      class User extends Base {
+        static {
+          this._tableName = "users";
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.adapter = adapter;
+        }
+      }
+
+      const existing = await User.create({ name: "Claim" });
+      await adapter.executeMutation(`CREATE UNIQUE INDEX users_name_idx ON users (name)`);
+
+      const retried = await User.createOrFindBy({ name: "Claim" });
+      expect(retried.id).toBe(existing.id);
+      expect(await User.all().count()).toBe(1);
+    },
+  );
 
   // Rails: test "lock! reloads with FOR UPDATE"
   it("lockBang reloads the record", async () => {

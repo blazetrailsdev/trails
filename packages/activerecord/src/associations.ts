@@ -30,7 +30,7 @@ export async function initializeAssociations(): Promise<void> {
     import("./association-relation.js"),
   ]);
 }
-import { StrictLoadingViolationError, ConfigurationError } from "./errors.js";
+import { StrictLoadingViolationError, ConfigurationError, Rollback } from "./errors.js";
 import {
   AssociationNotFoundError,
   DeleteRestrictionError,
@@ -1647,8 +1647,6 @@ export async function createThroughAssociation(
   const sourceType = sourceAssocDef?.type ?? "belongsTo";
 
   let success = false;
-
-  const { Rollback } = await import("./transactions.js");
 
   await record.transaction(async () => {
     if (sourceType === "belongsTo") {

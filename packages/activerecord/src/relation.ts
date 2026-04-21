@@ -10,7 +10,7 @@ import {
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
-import { RecordNotFound, RecordNotUnique } from "./errors.js";
+import { RecordNotSaved, RecordNotUnique } from "./errors.js";
 import { modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
@@ -2284,20 +2284,38 @@ export class Relation<T extends Base> {
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T> {
+    // Rails:
+    //   transaction(requires_new: true) { create(attributes, &block) }
+    //   rescue ActiveRecord::RecordNotUnique
+    //     where(attributes).lock.find_by!(attributes)
+    // Nested transaction so the failed INSERT rolls back cleanly
+    // before the retry; `.lock` + `find_by!` so the concurrent winner
+    // is materialized + row-locked inside the caller's txn.
     try {
-      return (await this._modelClass.create({
-        ...this.scopeForCreate(),
-        ...conditions,
-        ...extra,
-      })) as T;
+      const result = await this._modelClass.transaction(
+        () =>
+          this._modelClass.create({
+            ...this.scopeForCreate(),
+            ...conditions,
+            ...extra,
+          }) as Promise<T>,
+        { requiresNew: true },
+      );
+      // transaction() returns undefined when the block raises Rollback.
+      // Don't silently yield undefined — raise so callers see the abort.
+      if (result === undefined) {
+        // `RecordNotSaved.record` is conventionally the model instance that
+        // failed to persist — which doesn't exist here, since the inner
+        // create rolled back. Leave record undefined rather than passing
+        // the Relation.
+        throw new RecordNotSaved(
+          `${this._modelClass.name}.createOrFindBy rolled back before persist`,
+        );
+      }
+      return result;
     } catch (e) {
-      // Rails' create_or_find_by only retries on ActiveRecord::RecordNotUnique;
-      // any other error (validation failure, connection error, etc.) must
-      // propagate unchanged.
       if (!(e instanceof RecordNotUnique)) throw e;
-      const records = await this.where(conditions).limit(1).toArray();
-      if (records.length > 0) return records[0];
-      throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
+      return this.where(conditions).lock().findByBang(conditions) as Promise<T>;
     }
   }
 

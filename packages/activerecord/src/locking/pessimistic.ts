@@ -83,8 +83,7 @@ export async function withLock<T extends Base>(
 
   const cb = callback;
   const instance = this;
-  const { transaction } = await import("../transactions.js");
-  await transaction(instance.constructor as typeof Base, async () => {
+  await instance.transaction(async () => {
     await lockBang.call(instance, lockClause);
     await cb(instance);
   });
