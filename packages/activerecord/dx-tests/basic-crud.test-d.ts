@@ -72,13 +72,13 @@ describe("basic CRUD DX — defining and using a model", () => {
     expectTypeOf(await User.secondToLast()).toEqualTypeOf<User | null>();
   });
 
-  it("findSigned / findSignedBang and underscore aliases carry User through", async () => {
+  it("findSigned / findSignedBang and bang methods carry User through", async () => {
     expectTypeOf(await User.findSigned("tok")).toEqualTypeOf<User | null>();
     expectTypeOf(await User.findSignedBang("tok")).toEqualTypeOf<User>();
-    expectTypeOf(await User.first_()).toEqualTypeOf<User>();
-    expectTypeOf(await User.last_()).toEqualTypeOf<User>();
-    expectTypeOf(await User.take_()).toEqualTypeOf<User>();
-    expectTypeOf(await User.findBy_({ name: "dean" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.firstBang()).toEqualTypeOf<User>();
+    expectTypeOf(await User.lastBang()).toEqualTypeOf<User>();
+    expectTypeOf(await User.takeBang()).toEqualTypeOf<User>();
+    expectTypeOf(await User.findByBang({ name: "dean" })).toEqualTypeOf<User>();
   });
 
   it("find_or / destroyBy / destroyAll / update / destroy all preserve User", async () => {

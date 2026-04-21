@@ -1539,7 +1539,7 @@ describe("UniquenessBindParamsTest", () => {
     const b = await Item.create({ name: "beta" });
     // Change b's PK in memory to a's PK, then change b's name to conflict with a.
     // The uniqueness validator must exclude b using b's database id, not the mutated in-memory id.
-    (b as any).id = a.id;
+    b.writeAttribute("id", a.id);
     b.name = "alpha";
     expect(b._dirty.attributeChanged("id")).toBe(true);
     // If self-exclusion incorrectly used the in-memory PK, it would exclude a and allow this save.

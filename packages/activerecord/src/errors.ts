@@ -117,6 +117,13 @@ export class DatabaseConnectionError extends ConnectionNotEstablished {
   }
 }
 
+export class NotImplementedError extends ActiveRecordError {
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "NotImplementedError";
+  }
+}
+
 export class ReadOnlyError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);

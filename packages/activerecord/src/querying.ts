@@ -269,9 +269,19 @@ export function second<T extends typeof Base>(this: T): Promise<InstanceType<T> 
   return this.all().second();
 }
 
+/** Mirrors: ActiveRecord::FinderMethods#second! */
+export function secondBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().secondBang();
+}
+
 /** Mirrors: ActiveRecord::Querying#third */
 export function third<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().third();
+}
+
+/** Mirrors: ActiveRecord::FinderMethods#third! */
+export function thirdBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().thirdBang();
 }
 
 /** Mirrors: ActiveRecord::Querying#fourth */
@@ -279,9 +289,19 @@ export function fourth<T extends typeof Base>(this: T): Promise<InstanceType<T> 
   return this.all().fourth();
 }
 
+/** Mirrors: ActiveRecord::FinderMethods#fourth! */
+export function fourthBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().fourthBang();
+}
+
 /** Mirrors: ActiveRecord::Querying#fifth */
 export function fifth<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().fifth();
+}
+
+/** Mirrors: ActiveRecord::FinderMethods#fifth! */
+export function fifthBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().fifthBang();
 }
 
 /** Mirrors: ActiveRecord::Querying#forty_two */
@@ -289,14 +309,29 @@ export function fortyTwo<T extends typeof Base>(this: T): Promise<InstanceType<T
   return this.all().fortyTwo();
 }
 
+/** Mirrors: ActiveRecord::FinderMethods#forty_two! */
+export function fortyTwoBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().fortyTwoBang();
+}
+
 /** Mirrors: ActiveRecord::Querying#second_to_last */
 export function secondToLast<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().secondToLast();
 }
 
+/** Mirrors: ActiveRecord::FinderMethods#second_to_last! */
+export function secondToLastBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().secondToLastBang();
+}
+
 /** Mirrors: ActiveRecord::Querying#third_to_last */
 export function thirdToLast<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
   return this.all().thirdToLast();
+}
+
+/** Mirrors: ActiveRecord::FinderMethods#third_to_last! */
+export function thirdToLastBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().thirdToLastBang();
 }
 
 /**
@@ -414,6 +449,11 @@ export function take<T extends typeof Base>(
   n?: number,
 ): Promise<InstanceType<T> | InstanceType<T>[] | null> {
   return n === undefined ? this.all().take() : this.all().take(n);
+}
+
+/** Mirrors: ActiveRecord::FinderMethods#take! */
+export function takeBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().takeBang();
 }
 
 /** Mirrors: ActiveRecord::Querying#sole — single result or throw */

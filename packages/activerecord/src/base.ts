@@ -20,7 +20,12 @@ import {
   subclasses as inheritanceSubclasses,
   descendants as inheritanceDescendants,
 } from "./inheritance.js";
-import { RecordNotFound, StaleObjectError, ConnectionNotDefined } from "./errors.js";
+import {
+  NotImplementedError,
+  RecordNotFound,
+  StaleObjectError,
+  ConnectionNotDefined,
+} from "./errors.js";
 import { AutosaveAssociation } from "./autosave-association.js";
 import {
   isValid as validationsIsValid,
@@ -385,6 +390,14 @@ export class Base extends Model {
 
   static set abstractClass(value: boolean) {
     this._abstractClass = value;
+  }
+
+  static _requireConcreteClass(): void {
+    if (this.abstractClass && !this._suppressAbstractCheck) {
+      throw new NotImplementedError(
+        `${this.name} is an abstract class and cannot be instantiated.`,
+      );
+    }
   }
 
   /**
@@ -897,6 +910,10 @@ export class Base extends Model {
   // after_initialize — matching Rails' init_with_attributes call order.
   static _suppressInitializeCallback = false;
 
+  // Suppresses the abstract-class guard during _instantiate, mirroring Rails'
+  // use of allocate (which bypasses initialize) for DB-loaded records.
+  static _suppressAbstractCheck = false;
+
   // --- ReadonlyAttributes mixin (wired via extend() after class) ---
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static readonlyAttributeQ: typeof ReadonlyAttributes.readonlyAttributeQ;
@@ -1141,7 +1158,7 @@ export class Base extends Model {
       // (`Model.find(1, 42)` could mean "tuple [1,42]" or "two scalar ids",
       // neither of which matches the CPK tuple contract). Require an
       // explicit array form so intent is unambiguous.
-      if (this.compositePrimaryKey && ids.every((i) => !Array.isArray(i))) {
+      if (this.compositePrimaryKey && ids.some((i) => !Array.isArray(i))) {
         throw argumentError(
           `${this.name} has a composite primary key (${String(this.primaryKey)}); ` +
             `call find([...tuple]) or find([[...], [...]]) rather than variadic scalars.`,
@@ -1350,9 +1367,6 @@ export class Base extends Model {
     conditionsOrSql: Record<string, unknown> | string | string[],
     ...rest: unknown[]
   ): Relation<InstanceType<T>> {
-    if (this.abstractClass) {
-      throw new Error(`Cannot call where on abstract class ${this.name}`);
-    }
     if (typeof conditionsOrSql === "string") {
       return this.all().where(conditionsOrSql, ...rest);
     }
@@ -1716,12 +1730,20 @@ export class Base extends Model {
   declare static destroyBy: typeof Querying.destroyBy;
   declare static deleteBy: typeof Querying.deleteBy;
   declare static second: typeof Querying.second;
+  declare static secondBang: typeof Querying.secondBang;
   declare static third: typeof Querying.third;
+  declare static thirdBang: typeof Querying.thirdBang;
   declare static fourth: typeof Querying.fourth;
+  declare static fourthBang: typeof Querying.fourthBang;
   declare static fifth: typeof Querying.fifth;
+  declare static fifthBang: typeof Querying.fifthBang;
   declare static fortyTwo: typeof Querying.fortyTwo;
+  declare static fortyTwoBang: typeof Querying.fortyTwoBang;
   declare static secondToLast: typeof Querying.secondToLast;
+  declare static secondToLastBang: typeof Querying.secondToLastBang;
   declare static thirdToLast: typeof Querying.thirdToLast;
+  declare static thirdToLastBang: typeof Querying.thirdToLastBang;
+
   declare static count: typeof Querying.count;
   declare static minimum: typeof Querying.minimum;
   declare static maximum: typeof Querying.maximum;
@@ -1735,6 +1757,7 @@ export class Base extends Model {
   declare static last: typeof Querying.last;
   declare static lastBang: typeof Querying.lastBang;
   declare static take: typeof Querying.take;
+  declare static takeBang: typeof Querying.takeBang;
   declare static sole: typeof Querying.sole;
   declare static exists: typeof Querying.exists;
   declare static findOrCreateBy: typeof Querying.findOrCreateBy;
@@ -1791,6 +1814,12 @@ export class Base extends Model {
     );
     const prevSuppress = this._suppressInitializeCallback;
     this._suppressInitializeCallback = true;
+    const hadOwnAbstractSuppress = Object.prototype.hasOwnProperty.call(
+      this,
+      "_suppressAbstractCheck",
+    );
+    const prevAbstractSuppress = this._suppressAbstractCheck;
+    this._suppressAbstractCheck = true;
     let record: InstanceType<T>;
     try {
       record = new this() as InstanceType<T>;
@@ -1799,6 +1828,11 @@ export class Base extends Model {
         this._suppressInitializeCallback = prevSuppress;
       } else {
         delete (this as any)._suppressInitializeCallback;
+      }
+      if (hadOwnAbstractSuppress) {
+        this._suppressAbstractCheck = prevAbstractSuppress;
+      } else {
+        delete (this as any)._suppressAbstractCheck;
       }
     }
     // Load DB values through deserialize (not cast) so encrypted types decrypt
@@ -1812,7 +1846,6 @@ export class Base extends Model {
     if (this._strictLoadingByDefault) {
       record._strictLoading = true;
     }
-    // Rails' init_with_attributes fires after_find then after_initialize
     this._callbackChain.runAfter("find", record);
     this._callbackChain.runAfter("initialize", record);
     return record;
@@ -1834,6 +1867,7 @@ export class Base extends Model {
   _associationInstances: Map<string, AssociationInstance> = new Map();
 
   constructor(attrs: Record<string, unknown> = {}) {
+    (new.target as typeof Base | undefined)?._requireConcreteClass();
     super(attrs);
   }
 
@@ -1944,8 +1978,8 @@ export class Base extends Model {
 
       // Exclude self if persisted — mirrors uniqueness.rb:26-30:
       // `relation.where.not(primary_key => [record.id_in_database])`
-      // Array form generates NOT IN, matching Rails. attributeWas() provides
-      // the DB value when the PK has been changed in memory (id_in_database).
+      // attributeWas() provides the DB value when the PK changed in memory
+      // (id_in_database semantics). CPK uses a tuple NOT-IN predicate.
       if (this.isPersisted()) {
         const pk = ctor.primaryKey;
         if (Array.isArray(pk)) {
@@ -2556,33 +2590,13 @@ export class Base extends Model {
   // of this file so subclass-variance rules treat them as methods
   // (bivariant) rather than properties (invariant).
 
-  // Underscore aliases for bang methods (Rails uses ! suffix, TS uses _ suffix)
-  static async first_<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
-    return this.firstBang();
-  }
-  static async last_<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
-    return this.lastBang();
-  }
-  static async take_<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
-    const r = await this.all().take();
-    if (!r)
-      throw new RecordNotFound(
-        `${this.name} record not found`,
-        this.name,
-        String(this.primaryKey),
-        null,
-      );
-    return r;
-  }
-  static async findBy_<T extends typeof Base>(
-    this: T,
-    conditions: Record<string, unknown>,
-  ): Promise<InstanceType<T>> {
-    return this.findByBang(conditions);
-  }
-
   static async tableExists(): Promise<boolean> {
-    return true; // TODO: query adapter for table existence
+    const adapter = this.adapter;
+    const cache = adapter.schemaCache;
+    if (!cache || typeof cache.dataSourceExists !== "function") return true;
+    const pool = adapter.pool ?? adapter;
+    const exists = await cache.dataSourceExists(pool, this.tableName);
+    return exists !== false;
   }
 
   static hasAttribute(name: string): boolean {

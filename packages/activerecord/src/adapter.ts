@@ -1,4 +1,5 @@
 import type { Result } from "./result.js";
+import type { SchemaCache } from "./connection-adapters/schema-cache.js";
 
 /**
  * A single entry in `Relation#explain`'s options list. Either a bare
@@ -143,6 +144,22 @@ export interface DatabaseAdapter {
    * Whether the adapter is currently inside a transaction.
    */
   readonly inTransaction: boolean;
+
+  /**
+   * Schema cache for this adapter's connection pool. Holds table/column
+   * metadata so repeated introspection queries are avoided.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#schema_cache
+   */
+  readonly schemaCache?: SchemaCache;
+
+  /**
+   * The underlying connection pool that owns this adapter checkout.
+   * Passed to SchemaCache methods that need a pool handle for lazy loading.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#pool
+   */
+  readonly pool?: unknown;
 
   /**
    * Return the query execution plan for `sql`. `binds` carries the

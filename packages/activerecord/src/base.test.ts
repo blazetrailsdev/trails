@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, RecordNotFound, AttributeAssignmentError } from "./index.js";
+import { Base, RecordNotFound, AttributeAssignmentError, NotImplementedError } from "./index.js";
 import { SubclassNotFound, NameError } from "./errors.js";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -963,9 +963,12 @@ describe("BasicsTest", () => {
         this.adapter = adapter;
       }
     }
-    // Abstract classes shouldn't have their own table, but the adapter allows it
-    // The key behavior is that abstractClass is true
-    expect(AbstractModel.abstractClass).toBe(true);
+    // create() calls new() immediately → NotImplementedError (matches Rails test_new_with_abstract_class).
+    // find() does NOT raise here — _instantiate suppresses the guard (mirrors Rails' allocate).
+    await expect(AbstractModel.create({ name: "x" })).rejects.toThrow(NotImplementedError);
+    await expect(AbstractModel.create({ name: "x" })).rejects.toThrow(
+      "AbstractModel is an abstract class and cannot be instantiated.",
+    );
   });
   it("update all on abstract class raises", async () => {
     class AbstractModel extends Base {
@@ -997,7 +1000,56 @@ describe("BasicsTest", () => {
         this.adapter = adapter;
       }
     }
-    expect(() => AbstractModel.where({ name: "x" })).toThrow(/abstract class/i);
+    // where() itself returns a lazy Relation without error (matching Rails).
+    expect(() => AbstractModel.where({ name: "x" })).not.toThrow();
+    // The error fires when records are materialized — new() is the direct trigger.
+    expect(() => new AbstractModel()).toThrow(NotImplementedError);
+  });
+
+  it("abstract class raises from find / findBy / create / update", async () => {
+    class AbstractBase extends Base {
+      static {
+        this.abstractClass = true;
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    // create() and new() raise NotImplementedError (Rails inheritance.rb:56-58).
+    await expect(AbstractBase.create({ name: "x" })).rejects.toThrow(NotImplementedError);
+    expect(() => new AbstractBase()).toThrow(NotImplementedError);
+    // find/findBy/update go through _instantiate which suppresses the guard (mirrors Rails' allocate).
+    // They fail for other reasons (no table/RecordNotFound) but NOT with NotImplementedError.
+    await expect(AbstractBase.find(1)).rejects.not.toThrow(NotImplementedError);
+    await expect(AbstractBase.findBy({ name: "x" })).rejects.not.toThrow(NotImplementedError);
+    await expect(AbstractBase.update(1, { name: "y" })).rejects.not.toThrow(NotImplementedError);
+  });
+
+  it("find accepts multiple tuples on composite primary key", async () => {
+    class Order extends Base {
+      static {
+        this.primaryKey = ["shop_id", "id"];
+        this.attribute("shop_id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    // Variadic tuple form: find([1,2], [3,4]) — all args are arrays, so it should
+    // NOT raise the "use array form" ambiguity error. It will raise RecordNotFound
+    // (expected — no records exist), not an ArgumentError.
+    await expect(Order.find([1, 2], [3, 4])).rejects.toThrow(/couldn't find/i);
+  });
+
+  it("tableExists returns true when adapter has no schemaCache", async () => {
+    class Ghost extends Base {
+      static tableName = "ghosts_that_do_not_exist";
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    // The in-memory test adapter has no schemaCache, so tableExists falls back to true.
+    const exists = await Ghost.tableExists();
+    expect(exists).toBe(true);
   });
 
   it("create works with optimistic locking", async () => {

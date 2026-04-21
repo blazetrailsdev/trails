@@ -172,6 +172,7 @@ export {
   SubclassNotFound,
   AdapterNotSpecified,
   AdapterNotFound,
+  NotImplementedError,
   AdapterError,
   ConnectionNotEstablished,
   ConnectionTimeoutError,
