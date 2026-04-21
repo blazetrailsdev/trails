@@ -354,6 +354,50 @@ describe("InheritanceTest", () => {
     expect(types).toContain("Client");
   });
 
+  // Rails: `delegate :find_by, to: :all` means Base.find_by picks up
+  // the STI type filter that `all()` installs on subclasses.
+  it("findBy on an STI subclass filters by type column", async () => {
+    class Company extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "companies";
+        this.adapter = adapter;
+        enableSti(Company);
+      }
+    }
+    class Firm extends Company {
+      static {
+        this.adapter = adapter;
+        registerModel(Firm);
+        registerSubclass(Firm);
+      }
+    }
+    class Client extends Company {
+      static {
+        this.adapter = adapter;
+        registerModel(Client);
+        registerSubclass(Client);
+      }
+    }
+
+    const createdFirm = await Firm.create({ name: "37signals" });
+    const createdClient = await Client.create({ name: "37signals" }); // same name, different type
+
+    // Firm.findBy must only match Firm rows, even when another subtype exists.
+    // Looking up by the OTHER subtype's PK must return null under the STI filter.
+    const firm = await Firm.findBy({ id: createdFirm.id });
+    expect(firm).not.toBeNull();
+    expect(firm!.constructor.name).toBe("Firm");
+    expect(await Firm.findBy({ id: createdClient.id })).toBeNull();
+
+    const client = await Client.findBy({ id: createdClient.id });
+    expect(client).not.toBeNull();
+    expect(client!.constructor.name).toBe("Client");
+    expect(await Client.findBy({ id: createdFirm.id })).toBeNull();
+  });
+
   it("alt inheritance find all", async () => {
     class Vegetable extends Base {
       static {

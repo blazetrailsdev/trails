@@ -3444,6 +3444,40 @@ describe("CalculationsTest", () => {
     expect(topic.title).toBe("Via class-level entry");
   });
 
+  // Rails' `delegate :find_by, to: :all` means Base.findBy picks up the
+  // current scope inside a scoping block. Before this PR, Base.findBy
+  // built a raw SELECT on arelTable and bypassed currentScope entirely.
+  // Deterministic check: a title that only exists OUTSIDE the scope must
+  // return null while the scope is active — the unscoped path would still
+  // return the row.
+  it("Base.findBy honors currentScope under scoping()", async () => {
+    class Topic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    await Topic.create({ title: "draft-only", status: "draft" });
+    await Topic.create({ title: "published-only", status: "published" });
+
+    let insideScope: Topic | null = null;
+    let insideScopeOther: Topic | null = null;
+    await Topic.all()
+      .where({ status: "published" })
+      .scoping(async () => {
+        insideScope = await Topic.findBy({ title: "published-only" });
+        insideScopeOther = await Topic.findBy({ title: "draft-only" });
+      });
+    if (insideScope === null) throw new Error("Expected insideScope to be present");
+    expect((insideScope as Topic).status).toBe("published");
+    // draft-only is excluded by the active where(status: 'published') scope.
+    expect(insideScopeOther).toBeNull();
+  });
+
   // Rails' findOrInitializeBy merges create_with attrs into the new
   // unsaved record (same scope_for_create path as findOrCreateBy's
   // create branch).

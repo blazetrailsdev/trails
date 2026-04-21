@@ -1103,45 +1103,29 @@ export class Base extends Model {
   /**
    * Find the first record matching conditions.
    *
-   * Mirrors: ActiveRecord::Base.find_by
+   * Mirrors: ActiveRecord::Base.find_by — `delegate :find_by, to: :all`
+   * (querying.rb QUERYING_METHODS). Routing through `all()` picks up
+   * the default scope, current scope (from `scoping()`), and STI type
+   * filter. `createWith` doesn't affect lookups — it's applied only
+   * on downstream create paths like `findOrCreateBy`.
    */
-  static async findBy<T extends typeof Base>(
+  static findBy<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
   ): Promise<InstanceType<T> | null> {
-    const table = this.arelTable;
-    const manager = table.project("*");
-
-    for (const [key, value] of Object.entries(conditions)) {
-      if (value === null) {
-        manager.where(table.get(key).isNull());
-      } else {
-        manager.where(table.get(key).eq(value));
-      }
-    }
-
-    manager.take(1);
-    const sql = manager.toSql();
-    const row = await this.adapter.selectOne(sql, "Find");
-    if (!row) return null;
-
-    return this._instantiate(row);
+    return this.all().findBy(conditions);
   }
 
   /**
    * Find the first record matching conditions, or throw.
    *
-   * Mirrors: ActiveRecord::Base.find_by!
+   * Mirrors: ActiveRecord::Base.find_by! — `delegate :find_by!, to: :all`.
    */
-  static async findByBang<T extends typeof Base>(
+  static findByBang<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
   ): Promise<InstanceType<T>> {
-    const record = await this.findBy(conditions);
-    if (!record) {
-      throw new RecordNotFound(`${this.name} not found`, this.name);
-    }
-    return record;
+    return this.all().findByBang(conditions);
   }
 
   /**
