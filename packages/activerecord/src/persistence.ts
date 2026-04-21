@@ -15,12 +15,14 @@ import {
 import {
   AttributeAssignmentError,
   ReadOnlyRecord,
+  RecordNotDestroyed,
   RecordNotFound,
   RecordNotSaved,
   UnknownAttributeError,
 } from "./errors.js";
 import { clearAutosaveState } from "./autosave-association.js";
 import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
+import { RecordInvalid, performValidations } from "./validations.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
@@ -486,6 +488,114 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
   this._previouslyNewRecord = false;
   this.freeze();
   return this;
+}
+
+// ---------------------------------------------------------------------------
+// save / save! / destroy / destroy! — the callback- and transaction-wrapped
+// entry points. They rely on Base-provided internal helpers/state
+// (_createOrUpdate, _destroyRow, _performInsert, _performUpdate,
+// _skipTouch, _pendingOperation) which remain `private` on Base; the
+// extracted functions reach them through `(this as any)` since those
+// members intentionally aren't part of the public Persistence API.
+// Mirrors ActiveRecord::Persistence#save, #save!, #destroy, #destroy!
+// (merged with Transactions#save / #destroy and Validations#save which, in
+// Rails, override the same method through module layering).
+// ---------------------------------------------------------------------------
+
+interface SaveRecord {
+  _destroyed: boolean;
+  _readonly: boolean;
+  _newRecord: boolean;
+  _attributes: { set(key: string, val: unknown): void };
+  readAttribute(name: string): unknown;
+  constructor: {
+    name: string;
+    _attributeDefinitions: Map<string, unknown>;
+  };
+}
+
+/**
+ * Mirrors: ActiveRecord::Base#save — runs validations, opens a
+ * transaction-returning-status, and delegates the insert/update to
+ * `_createOrUpdate` (Rails' Persistence#save super).
+ */
+export async function save<T extends SaveRecord>(
+  this: T,
+  options?: { validate?: boolean; touch?: boolean },
+): Promise<boolean> {
+  if (this._destroyed) {
+    throw new RecordNotSaved(
+      `Cannot save a destroyed ${this.constructor.name}`,
+      this as unknown as object,
+    );
+  }
+  if (this._readonly) {
+    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
+  }
+  if (!performValidations.call(this, options)) return false;
+  const self = this as any;
+  if (options?.validate !== false) {
+    if (!(await self._runAsyncValidations())) return false;
+  }
+
+  self._skipTouch = options?.touch === false;
+  const ctor = this.constructor as unknown as Parameters<typeof isStiSubclass>[0];
+
+  // Auto-set STI type column on new records
+  if (this._newRecord && isStiSubclass(ctor)) {
+    const col = getInheritanceColumn(getStiBase(ctor));
+    if (col && !this.readAttribute(col)) {
+      this._attributes.set(col, this.constructor.name);
+    }
+  }
+
+  // Mirrors: ActiveRecord::Transactions#save
+  const { withTransactionReturningStatus } = await import("./transactions.js");
+  try {
+    return await withTransactionReturningStatus(self, () => self._createOrUpdate());
+  } finally {
+    self._skipTouch = false;
+  }
+}
+
+/** Mirrors: ActiveRecord::Base#save! */
+export async function saveBang<
+  T extends SaveRecord & { save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean> },
+>(this: T): Promise<true> {
+  const result = await this.save();
+  if (!result) {
+    throw new RecordInvalid(this as unknown as object);
+  }
+  return true;
+}
+
+interface DestroyRecord {
+  _readonly: boolean;
+  constructor: { name: string };
+}
+
+/** Mirrors: ActiveRecord::Base#destroy */
+export async function destroy<T extends DestroyRecord>(this: T): Promise<T | false> {
+  if (this._readonly) {
+    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
+  }
+
+  // Mirrors: ActiveRecord::Transactions#destroy
+  const { withTransactionReturningStatus } = await import("./transactions.js");
+  const self = this as any;
+  const result = await withTransactionReturningStatus(self, () => self._destroyRow());
+  return result ? this : false;
+}
+
+/** Mirrors: ActiveRecord::Base#destroy! */
+export async function destroyBang<T extends DestroyRecord & { destroy(): Promise<T | false> }>(
+  this: T,
+): Promise<T> {
+  const result = await this.destroy();
+  if (result === false) {
+    throw new RecordNotDestroyed("Failed to destroy the record", this as unknown as object);
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------

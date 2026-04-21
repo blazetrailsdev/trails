@@ -20,20 +20,12 @@ import {
   subclasses as inheritanceSubclasses,
   descendants as inheritanceDescendants,
 } from "./inheritance.js";
-import {
-  RecordNotFound,
-  RecordNotSaved,
-  RecordNotDestroyed,
-  StaleObjectError,
-  ReadOnlyRecord,
-  ConnectionNotDefined,
-} from "./errors.js";
+import { RecordNotFound, StaleObjectError, ConnectionNotDefined } from "./errors.js";
 import { AutosaveAssociation } from "./autosave-association.js";
 import {
   RecordInvalid,
   isValid as validationsIsValid,
   defaultValidationContext,
-  performValidations,
   _setSuperIsValid,
   _setSuperValidates,
 } from "./validations.js";
@@ -1702,46 +1694,7 @@ export class Base extends Model {
    */
   declare static validatesUniqueness: typeof _Validations.validatesUniqueness;
 
-  /**
-   * Save the record. Returns true if successful, false if validation fails.
-   * Raises if the record has been destroyed.
-   *
-   * Mirrors: ActiveRecord::Base#save
-   */
-  async save(options?: { validate?: boolean; touch?: boolean }): Promise<boolean> {
-    if (this._destroyed) {
-      throw new RecordNotSaved(
-        `Cannot save a destroyed ${(this.constructor as typeof Base).name}`,
-        this,
-      );
-    }
-    if (this._readonly) {
-      throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-    }
-    if (!performValidations.call(this, options)) return false;
-    if (options?.validate !== false) {
-      if (!(await this._runAsyncValidations())) return false;
-    }
-
-    this._skipTouch = options?.touch === false;
-    const ctor = this.constructor as typeof Base;
-
-    // Auto-set STI type column on new records
-    if (this._newRecord && isStiSubclass(ctor)) {
-      const col = getInheritanceColumn(getStiBase(ctor));
-      if (col && !this.readAttribute(col)) {
-        this._attributes.set(col, ctor.name);
-      }
-    }
-
-    // Mirrors: ActiveRecord::Transactions#save
-    const { withTransactionReturningStatus } = await import("./transactions.js");
-    try {
-      return await withTransactionReturningStatus(this, () => this._createOrUpdate());
-    } finally {
-      this._skipTouch = false;
-    }
-  }
+  // save / saveBang extracted to persistence.ts; wired via include() below.
 
   /**
    * The persistence half of save — runs callbacks, performs INSERT or UPDATE,
@@ -1809,19 +1762,6 @@ export class Base extends Model {
     }
 
     return saved;
-  }
-
-  /**
-   * Save the record or throw if validation fails.
-   *
-   * Mirrors: ActiveRecord::Base#save!
-   */
-  async saveBang(): Promise<true> {
-    const result = await this.save();
-    if (!result) {
-      throw new RecordInvalid(this);
-    }
-    return true;
   }
 
   private _pendingOperation: Promise<void> | null = null;
@@ -1962,22 +1902,7 @@ export class Base extends Model {
 
   // update / updateBang extracted to persistence.ts; wired via include() below.
 
-  /**
-   * Destroy the record. Returns `false` if a beforeDestroy callback
-   * halts the chain, otherwise returns the destroyed record.
-   *
-   * Mirrors: ActiveRecord::Base#destroy
-   */
-  async destroy(): Promise<this | false> {
-    if (this._readonly) {
-      throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-    }
-
-    // Mirrors: ActiveRecord::Transactions#destroy
-    const { withTransactionReturningStatus } = await import("./transactions.js");
-    const result = await withTransactionReturningStatus(this, () => this._destroyRow());
-    return result ? this : false;
-  }
+  // destroy / destroyBang extracted to persistence.ts; wired via include() below.
 
   /**
    * The persistence half of destroy — runs callbacks, performs DELETE,
@@ -2033,19 +1958,6 @@ export class Base extends Model {
     }
 
     return true;
-  }
-
-  /**
-   * Destroy the record or throw.
-   *
-   * Mirrors: ActiveRecord::Base#destroy!
-   */
-  async destroyBang(): Promise<this> {
-    const result = await this.destroy();
-    if (result === false) {
-      throw new RecordNotDestroyed("Failed to destroy the record", this);
-    }
-    return result;
   }
 
   // delete extracted to persistence.ts; wired via include() below.
@@ -2350,6 +2262,10 @@ export interface Base extends Included<typeof AutosaveAssociation> {
     options?: { touch?: boolean | string | string[] },
   ): Promise<this>;
   toggleBang(attribute: string): Promise<boolean>;
+  save(options?: { validate?: boolean; touch?: boolean }): Promise<boolean>;
+  saveBang(): Promise<true>;
+  destroy(): Promise<this | false>;
+  destroyBang(): Promise<this>;
   update(attrs: Record<string, unknown>): Promise<boolean>;
   updateBang(attrs: Record<string, unknown>): Promise<true>;
   delete(): Promise<this>;
@@ -2419,6 +2335,10 @@ include(Base, {
   incrementBang: _Persistence.incrementBang,
   decrementBang: _Persistence.decrementBang,
   toggleBang: _Persistence.toggleBang,
+  save: _Persistence.save,
+  saveBang: _Persistence.saveBang,
+  destroy: _Persistence.destroy,
+  destroyBang: _Persistence.destroyBang,
   update: _Persistence.update,
   updateBang: _Persistence.updateBang,
   delete: _Persistence.deleteRow,
