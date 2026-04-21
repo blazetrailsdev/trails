@@ -23,7 +23,6 @@ import {
 import { RecordNotFound, StaleObjectError, ConnectionNotDefined } from "./errors.js";
 import { AutosaveAssociation } from "./autosave-association.js";
 import {
-  RecordInvalid,
   isValid as validationsIsValid,
   defaultValidationContext,
   _setSuperIsValid,
@@ -1355,18 +1354,16 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.create_or_find_by
    */
-  static async createOrFindBy<T extends typeof Base>(
+  static createOrFindBy<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<InstanceType<T>> {
-    try {
-      return await this.create({ ...conditions, ...extra });
-    } catch {
-      const record = await this.findBy(conditions);
-      if (record) return record;
-      throw new RecordNotFound(`${this.name} not found`, this.name);
-    }
+    // Rails: `delegate :create_or_find_by, to: :all`. Routing through all()
+    // picks up the current scope + uses the narrow RecordNotUnique retry
+    // Relation#createOrFindBy implements, so validation failures and
+    // other adapter errors propagate unchanged.
+    return this.all().createOrFindBy(conditions, extra) as Promise<InstanceType<T>>;
   }
 
   /**
@@ -1375,19 +1372,12 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.create_or_find_by!
    */
-  static async createOrFindByBang<T extends typeof Base>(
+  static createOrFindByBang<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<InstanceType<T>> {
-    try {
-      return await this.createBang({ ...conditions, ...extra });
-    } catch (e) {
-      if (e instanceof RecordInvalid) throw e;
-      const record = await this.findBy(conditions);
-      if (record) return record;
-      throw new RecordNotFound(`${this.name} not found`, this.name);
-    }
+    return this.all().createOrFindByBang(conditions, extra) as Promise<InstanceType<T>>;
   }
 
   /**

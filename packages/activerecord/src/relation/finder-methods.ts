@@ -8,8 +8,7 @@
  * Mirrors: ActiveRecord::FinderMethods
  */
 
-import { RecordNotFound, SoleRecordExceeded } from "../errors.js";
-import { RecordInvalid } from "../validations.js";
+import { RecordNotFound, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
 
 // ---------------------------------------------------------------------------
 // Shared id-normalization + not-found helpers.
@@ -202,6 +201,7 @@ interface FinderRelation {
   _rawOrderClauses: string[];
   _createWithAttrs: Record<string, unknown>;
   _scopeAttributes(): Record<string, unknown>;
+  scopeForCreate(): Record<string, unknown>;
   _clone(): any;
   where(conditions: Record<string, unknown>): any;
   limit(n: number): any;
@@ -462,8 +462,7 @@ export async function performFindOrCreateByBang(
   const records = await this.where(conditions).limit(1).toArray();
   if (records.length > 0) return records[0];
   return this._modelClass.createBang({
-    ...this._createWithAttrs,
-    ...this._scopeAttributes(),
+    ...this.scopeForCreate(),
     ...conditions,
     ...extra,
   });
@@ -476,13 +475,14 @@ export async function performCreateOrFindByBang(
 ): Promise<any> {
   try {
     return await this._modelClass.createBang({
-      ...this._createWithAttrs,
-      ...this._scopeAttributes(),
+      ...this.scopeForCreate(),
       ...conditions,
       ...extra,
     });
   } catch (error) {
-    if (error instanceof RecordInvalid) throw error;
+    // Rails' create_or_find_by! only retries on RecordNotUnique; validation
+    // failures and other adapter errors must propagate unchanged.
+    if (!(error instanceof RecordNotUnique)) throw error;
     const records = await this.where(conditions).limit(1).toArray();
     if (records.length > 0) return records[0];
     throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);

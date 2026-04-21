@@ -10,7 +10,7 @@ import {
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
-import { RecordNotFound } from "./errors.js";
+import { RecordNotFound, RecordNotUnique } from "./errors.js";
 import { modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
@@ -1296,8 +1296,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#build
    */
   build(attrs: Record<string, unknown> = {}): T {
-    const scopeAttrs = this._scopeAttributes();
-    return new this._modelClass({ ...scopeAttrs, ...attrs }) as T;
+    return new this._modelClass({ ...this.scopeForCreate(), ...attrs }) as T;
   }
 
   /**
@@ -1306,8 +1305,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#create
    */
   async create(attrs: Record<string, unknown> = {}): Promise<T> {
-    const scopeAttrs = this._scopeAttributes();
-    return this._modelClass.create({ ...scopeAttrs, ...attrs }) as Promise<T>;
+    return this._modelClass.create({ ...this.scopeForCreate(), ...attrs }) as Promise<T>;
   }
 
   /**
@@ -1316,8 +1314,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#create!
    */
   async createBang(attrs: Record<string, unknown> = {}): Promise<T> {
-    const scopeAttrs = this._scopeAttributes();
-    return this._modelClass.createBang({ ...scopeAttrs, ...attrs }) as Promise<T>;
+    return this._modelClass.createBang({ ...this.scopeForCreate(), ...attrs }) as Promise<T>;
   }
 
   /**
@@ -2252,8 +2249,7 @@ export class Relation<T extends Base> {
     // scope attrs first, createWith overrides, then the caller's conditions
     // and the optional extra hash win over both.
     return this._modelClass.create({
-      ...this._scopeAttributes(),
-      ...this._createWithAttrs,
+      ...this.scopeForCreate(),
       ...conditions,
       ...extra,
     }) as Promise<T>;
@@ -2273,8 +2269,7 @@ export class Relation<T extends Base> {
     // Same scope_for_create precedence as findOrCreateBy: scope attrs
     // first, createWith overrides, caller's conditions + extra win.
     return new (this._modelClass as any)({
-      ...this._scopeAttributes(),
-      ...this._createWithAttrs,
+      ...this.scopeForCreate(),
       ...conditions,
       ...extra,
     }) as T;
@@ -2291,12 +2286,15 @@ export class Relation<T extends Base> {
   ): Promise<T> {
     try {
       return (await this._modelClass.create({
-        ...this._createWithAttrs,
-        ...this._scopeAttributes(),
+        ...this.scopeForCreate(),
         ...conditions,
         ...extra,
       })) as T;
-    } catch {
+    } catch (e) {
+      // Rails' create_or_find_by only retries on ActiveRecord::RecordNotUnique;
+      // any other error (validation failure, connection error, etc.) must
+      // propagate unchanged.
+      if (!(e instanceof RecordNotUnique)) throw e;
       const records = await this.where(conditions).limit(1).toArray();
       if (records.length > 0) return records[0];
       throw new RecordNotFound(`${this._modelClass.name} not found`, this._modelClass.name);
@@ -2334,7 +2332,7 @@ export class Relation<T extends Base> {
   async firstOrInitialize(extra?: Record<string, unknown>): Promise<T> {
     const records = await this.limit(1).toArray();
     if (records.length > 0) return records[0];
-    return new (this._modelClass as any)({ ...this._scopeAttributes(), ...extra }) as T;
+    return new (this._modelClass as any)({ ...this.scopeForCreate(), ...extra }) as T;
   }
 
   /**

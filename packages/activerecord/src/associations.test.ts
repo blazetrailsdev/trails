@@ -656,6 +656,35 @@ describe("CollectionProxy", () => {
     expect(player.team_id).toBe(team.id);
   });
 
+  // AssociationRelation#build/create must honor createWith via
+  // scope_for_create (blog.posts.createWith(...).build/create).
+  it("AssociationRelation#build honors createWith defaults", async () => {
+    const team = await Team.create({ name: "Bulls" });
+    const proxy = association(team, "players");
+    const player = proxy.createWith({ name: "rookie" }).build({});
+    expect(player.isNewRecord()).toBe(true);
+    expect(player.name).toBe("rookie");
+    expect(player.team_id).toBe(team.id);
+  });
+
+  it("AssociationRelation#create honors createWith defaults", async () => {
+    const team = await Team.create({ name: "Bulls" });
+    const proxy = association(team, "players");
+    const player = await proxy.createWith({ name: "rookie" }).create({});
+    expect(player.isPersisted()).toBe(true);
+    expect(player.name).toBe("rookie");
+    expect(player.team_id).toBe(team.id);
+  });
+
+  it("AssociationRelation#createBang honors createWith defaults", async () => {
+    const team = await Team.create({ name: "Bulls" });
+    const proxy = association(team, "players");
+    const player = await proxy.createWith({ name: "rookie!" }).createBang({});
+    expect(player.isPersisted()).toBe(true);
+    expect(player.name).toBe("rookie!");
+    expect(player.team_id).toBe(team.id);
+  });
+
   // Rails: test_count
   it("test_count", async () => {
     const team = await Team.create({ name: "Bulls" });

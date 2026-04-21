@@ -51,7 +51,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * Mirrors: ActiveRecord::AssociationRelation#_new / #build
    */
   build(attrs: Record<string, unknown> = {}): T {
-    const merged = { ...this._scopeAttributes(), ...attrs };
+    const merged = { ...this.scopeForCreate(), ...attrs };
     return this._association.build(merged) as T;
   }
 
@@ -61,7 +61,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * Mirrors: ActiveRecord::AssociationRelation#_create / #create
    */
   async create(attrs: Record<string, unknown> = {}): Promise<T> {
-    const merged = { ...this._scopeAttributes(), ...attrs };
+    const merged = { ...this.scopeForCreate(), ...attrs };
     return this._association.create(merged) as Promise<T>;
   }
 
@@ -74,7 +74,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * Mirrors: ActiveRecord::AssociationRelation#_create! / #create!
    */
   async createBang(attrs: Record<string, unknown> = {}): Promise<T> {
-    const merged = { ...this._scopeAttributes(), ...attrs };
+    const merged = { ...this.scopeForCreate(), ...attrs };
     return this._association.createBang(merged) as Promise<T>;
   }
 
