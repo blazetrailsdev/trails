@@ -1487,6 +1487,12 @@ export class Base extends Model {
   declare static isMany: typeof Querying.isMany;
   declare static isOne: typeof Querying.isOne;
   declare static isEmpty: typeof Querying.isEmpty;
+  declare static firstOrCreate: typeof Querying.firstOrCreate;
+  declare static firstOrCreateBang: typeof Querying.firstOrCreateBang;
+  declare static firstOrInitialize: typeof Querying.firstOrInitialize;
+  declare static findEach: typeof Querying.findEach;
+  declare static findInBatches: typeof Querying.findInBatches;
+  declare static inBatches: typeof Querying.inBatches;
 
   /**
    * Increment counter columns for a record by primary key.

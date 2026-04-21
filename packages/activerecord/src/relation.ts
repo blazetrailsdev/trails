@@ -1954,13 +1954,41 @@ export class Relation<T extends Base> {
    */
   async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
     if (this._isNone) return false;
+    // Rails FinderMethods#exists?: `return false if !conditions` — treats an
+    // explicit `false` / `null` argument as "no match possible".
+    if (conditions === false || conditions === null) return false;
     let rel: Relation<T> = this;
     if (conditions !== undefined) {
-      if (typeof conditions === "object" && conditions !== null && !Array.isArray(conditions)) {
+      // Mirrors Rails' FinderMethods#exists? argument handling
+      // (construct_relation_for_exists):
+      //   case conditions
+      //   when Array, Hash → where!(conditions)
+      //   else             → where!(primary_key => conditions)
+      // So strings, numbers, and UUID-shaped PK values all route through
+      // the PK-lookup branch; only Array / Hash become condition specs.
+      if (Array.isArray(conditions)) {
+        // Array form: [sql, ...binds] — delegate to where's string+binds overload.
+        // Reject malformed arrays (empty / non-string head) up front so we
+        // don't fall into where(undefined) which returns a WhereChain and
+        // crashes downstream when we read rel._modelClass.
+        if (conditions.length === 0 || typeof conditions[0] !== "string") {
+          throw new Error(
+            "Relation#exists array conditions must be [sql, ...binds] with a SQL string as the first element",
+          );
+        }
+        rel = this.where(conditions[0], ...(conditions.slice(1) as unknown[]));
+      } else if (typeof conditions === "object" && conditions !== null) {
         rel = this.where(conditions as Record<string, unknown>);
       } else {
-        // Primary key lookup
-        rel = this.where({ [this._modelClass.primaryKey as string]: conditions });
+        // Primary-key lookup. Honor composite primary keys by routing
+        // through _buildPkWhereNode; Rails' construct_relation_for_exists
+        // reaches the same branch via where(primary_key => conditions).
+        const pk = this._modelClass.primaryKey;
+        if (Array.isArray(pk)) {
+          rel = this.where(this._modelClass._buildPkWhereNode(conditions));
+        } else {
+          rel = this.where({ [pk]: conditions });
+        }
       }
     }
     // Mirrors Rails' `SELECT 1 AS one FROM ... LIMIT 1`: a dedicated
