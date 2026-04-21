@@ -2627,9 +2627,30 @@ export class Relation<T extends Base> {
       if (typeof pk === "string" && !cols.includes(pk)) {
         cols = [pk, ...cols];
       }
-      return cols.length > 0 ? cols.map((c) => table.get(c)) : ["*"];
+      return cols.length > 0 ? cols.map((c) => table.get(c)) : [this._defaultProjection(table)];
     }
-    return ["*"];
+    return [this._defaultProjection(table)];
+  }
+
+  /**
+   * Default projection node when no explicit `select` and no
+   * `ignoredColumns`. Always the target table's qualified star —
+   * mirrors Rails' `Relation#build_select` which projects
+   * `table[Arel.star]` unconditionally
+   * (activerecord/lib/active_record/relation/query_methods.rb:1909).
+   *
+   * Plain `*` collapses same-named columns from joined tables in
+   * the row hash (drivers return one key per name, last write
+   * wins): e.g. `users.id` gets overwritten by a JOIN's
+   * `friendships.id`. Qualifying the projection avoids the trap.
+   *
+   * `from()` note: Rails DOES emit `SELECT "users".* FROM (subq)`
+   * when the user supplies a custom `from()` source — it's the
+   * caller's responsibility to ensure the target table is in
+   * scope, or to override with `.select("*")`. We match.
+   */
+  private _defaultProjection(table: Table): Nodes.SqlLiteral {
+    return table.star;
   }
 
   toArel(): SelectManager {
