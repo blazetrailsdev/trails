@@ -377,6 +377,47 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   }
 
   /**
+   * Count via the deferred chain walk without materializing the
+   * target rows. Runs the intermediate plucks (cheap; they happen
+   * anyway for this shape) then emits a single `SELECT COUNT(*)`
+   * (or `COUNT(<column>)` when a column is provided) on the final-
+   * step Relation. Loaded-chain mode delegates to
+   * `Relation.prototype.count` against the current relation state
+   * so any composed limit/offset/where on the loaded-chain DJAR
+   * counts correctly — `_storedIds.length` would over-count if
+   * additional WHEREs narrowed the load below the seed-id list.
+   *
+   * Mirrors Rails' `CollectionAssociation#count` on disable_joins
+   * (which goes through `scope.count` → `records.size` after
+   * loading) — except we skip the materialization since count
+   * doesn't need it. Net: same result, fewer rows hydrated.
+   */
+  // @ts-expect-error Relation defines `count` as a property (from
+  //   the calculations mixin); DJAR overrides as an async method
+  //   that runs the deferred chain walk before counting.
+  async count(column?: string): Promise<number | Record<string, number>> {
+    if (this._chainWalker) {
+      const { relation } = await this._walkOnce();
+      const merged = this._composeChainedState(relation);
+      return (
+        merged as unknown as {
+          count: (col?: string) => Promise<number | Record<string, number>>;
+        }
+      ).count(column);
+    }
+    // Loaded-chain mode: route through Relation.prototype.count so
+    // any composed limit/offset/where applies. Direct `.count.call`
+    // — not `this.count(column)` — to avoid re-entering this
+    // override.
+    const baseCount = (
+      Relation.prototype as unknown as {
+        count: (this: unknown, col?: string) => Promise<number | Record<string, number>>;
+      }
+    ).count;
+    return baseCount.call(this, column);
+  }
+
+  /**
    * Memoize the walker invocation so the async chain walk runs at
    * most once per DJAR instance. Shared by `toArray()` and `ids()`.
    */

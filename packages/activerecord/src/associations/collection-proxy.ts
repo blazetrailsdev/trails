@@ -39,6 +39,7 @@ import {
   buildHasManyRelation,
   loadHasMany,
   _canRouteThroughViaAssociationScope,
+  ownerHasUnresolvedThroughKey,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 
@@ -697,6 +698,32 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * Build a DJAR for the disable-joins-through count fast path —
+   * mirrors `_loadThroughViaDisableJoinsScope`'s setup but stops
+   * after constructing the DJAR. Returns `null` when
+   * `ownerHasUnresolvedThroughKey` fires (unsaved owner / null
+   * PK) so the caller short-circuits to 0 — same correctness
+   * guard the loader uses.
+   */
+  private async _djarForCount(): Promise<{ djar: unknown } | null> {
+    const ctor = this._record.constructor as typeof Base;
+    const reflection = (ctor as any)._reflectOnAssociation?.(this._assocName);
+    if (!reflection) return null;
+    if (ownerHasUnresolvedThroughKey(this._record, reflection)) return null;
+    const { DisableJoinsAssociationScope } = await import("./disable-joins-association-scope.js");
+    const klass = (reflection as { klass: typeof Base }).klass;
+    // Box the DJAR so awaiting this helper doesn't unwrap it via
+    // `Relation.then` (which resolves to the records array). Callers
+    // read `.djar` off the resolved value.
+    const djar = DisableJoinsAssociationScope.INSTANCE.scope({
+      owner: this._record,
+      reflection: reflection as any,
+      klass,
+    });
+    return { djar };
+  }
+
+  /**
    * Count associated records.
    */
   // @ts-expect-error Relation defines `count` as a property (from the
@@ -714,29 +741,52 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // a loaded target above returns without querying, matching
     // `size()`'s loaded-target fast path.
     this._checkStrictLoading();
-    // `disable_joins: true` through-associations don't have a single
-    // JOIN-based relation to count against — DJAS walks the chain in
-    // separate queries and `this.scope()` returns the final-step's
-    // relation without the prior chain's IN filters (nested-through
-    // shapes surface as `no such column` errors when running a
-    // direct COUNT). Fall back to the loader on that path.
-    // Non-disable-joins through associations are handled by
-    // `_buildThroughScope()` which builds a JOIN-based Relation that
-    // counts correctly.
-    // Through-associations: only take the scope().count() fast path
-    // when the shape is one AssociationScope can route. The shared
-    // predicate already excludes nested-through, disable-joins,
-    // polymorphic-has_many sources, and polymorphic-belongsTo
-    // sources without sourceType — all shapes where
-    // _buildThroughScope produces SQL that either references the
-    // wrong table's columns or can't disambiguate the target table.
-    // For those, fall back to the loader (which has its own
-    // per-shape handling). Matches the gate used by
-    // loadHasMany / loadHasOne in associations.ts:659.
+    // Through-associations:
+    //   * disable_joins: route through DJAS' chain walker and emit a
+    //     single COUNT(*) on the final-step relation
+    //     (DisableJoinsAssociationRelation#count). The intermediate
+    //     plucks happen either way; this just avoids hydrating rows.
+    //   * non-disable-joins shapes AssociationScope can route (the
+    //     shared predicate already excludes nested-through and the
+    //     polymorphic-without-sourceType cases): fall through to the
+    //     scope().count() fast path below — `_buildThroughScope()`
+    //     produces a COUNT-able JOIN/subquery relation.
+    //   * Other through shapes (nested-through non-DJAS,
+    //     polymorphic-has_many sources): scope() / _buildThroughScope
+    //     produces SQL that references columns the target FROM
+    //     doesn't have. Fall back to the loader for those (task #25
+    //     covers the underlying scope-build issue).
     if (this._assocDef.options.through) {
       const ctor = this._record.constructor as typeof Base;
       const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
-      if (!_canRouteThroughViaAssociationScope(refl, this._assocDef.options)) {
+      // Disable-joins through: fast path goes through DJAR's
+      // deferred walker + final-step COUNT. The divergence-aware
+      // Relation.prototype.count fallthrough below handles any
+      // in-place proxy mutations (whereBang / groupBang / etc.) —
+      // DJAR construction here ignores those, so route diverged
+      // proxies through the generic path instead.
+      if (this._assocDef.options.disableJoins && !this._relationStateDiverged()) {
+        const box = await this._djarForCount();
+        if (!box) return 0;
+        const djar = (box as { djar: unknown }).djar as {
+          count: () => Promise<number | Record<string, number>>;
+        };
+        const c = await djar.count();
+        if (typeof c !== "number") {
+          throw new Error("Grouped counts are not supported for association collection counts");
+        }
+        return c;
+      }
+      // Non-disable-joins through shapes AssociationScope can't
+      // route (nested / polymorphic-has_many / polymorphic-
+      // belongsTo-without-sourceType): fall back to the loader.
+      // Disable-joins diverged case also falls through here — the
+      // generic Relation.prototype.count path below honors the
+      // proxy's in-place mutations.
+      if (
+        !this._assocDef.options.disableJoins &&
+        !_canRouteThroughViaAssociationScope(refl, this._assocDef.options)
+      ) {
         const results = await loadHasMany(this._record, this._assocName, this._assocDef.options);
         return results.length;
       }
