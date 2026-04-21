@@ -892,6 +892,11 @@ export class Base extends Model {
   // -- Readonly attributes --
   static _readonlyAttributes: Set<string> = new Set();
 
+  // Suppresses after_initialize in the constructor when set by _instantiate /
+  // directInstantiate (inheritance.ts) so we can fire after_find first, then
+  // after_initialize — matching Rails' init_with_attributes call order.
+  static _suppressInitializeCallback = false;
+
   // --- ReadonlyAttributes mixin (wired via extend() after class) ---
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static readonlyAttributeQ: typeof ReadonlyAttributes.readonlyAttributeQ;
@@ -1780,7 +1785,22 @@ export class Base extends Model {
 
     (ModelSchema.loadSchema as any).call(this);
 
-    const record = new this() as InstanceType<T>;
+    const hadOwnSuppress = Object.prototype.hasOwnProperty.call(
+      this,
+      "_suppressInitializeCallback",
+    );
+    const prevSuppress = this._suppressInitializeCallback;
+    this._suppressInitializeCallback = true;
+    let record: InstanceType<T>;
+    try {
+      record = new this() as InstanceType<T>;
+    } finally {
+      if (hadOwnSuppress) {
+        this._suppressInitializeCallback = prevSuppress;
+      } else {
+        delete (this as any)._suppressInitializeCallback;
+      }
+    }
     // Load DB values through deserialize (not cast) so encrypted types decrypt
     for (const [key, value] of Object.entries(row)) {
       record._attributes.writeFromDatabase(key, value);
@@ -1792,8 +1812,9 @@ export class Base extends Model {
     if (this._strictLoadingByDefault) {
       record._strictLoading = true;
     }
-    // Fire after_find callbacks
+    // Rails' init_with_attributes fires after_find then after_initialize
     this._callbackChain.runAfter("find", record);
+    this._callbackChain.runAfter("initialize", record);
     return record;
   }
 

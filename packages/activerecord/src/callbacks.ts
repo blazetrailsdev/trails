@@ -152,6 +152,36 @@ export function afterDestroy<T extends ModelCtor>(
   registerCallback(modelClass, "after", "destroy", fn, options);
 }
 
+/**
+ * Register an after_find callback. Fires on every record loaded from the DB.
+ *
+ * Rails defines :find with only: :after, so there is no before_find or around_find.
+ *
+ * Mirrors: ActiveRecord::Callbacks.after_find
+ */
+export function afterFind<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void>,
+  options?: CallbackOptions<InstanceType<T>>,
+): void {
+  registerCallback(modelClass, "after", "find", fn, options);
+}
+
+/**
+ * Register an after_initialize callback. Fires on every new or loaded record.
+ *
+ * Rails defines :initialize with only: :after, so there is no before_initialize or around_initialize.
+ *
+ * Mirrors: ActiveRecord::Callbacks.after_initialize
+ */
+export function afterInitialize<T extends ModelCtor>(
+  modelClass: T,
+  fn: (record: InstanceType<T>) => void | Promise<void>,
+  options?: CallbackOptions<InstanceType<T>>,
+): void {
+  registerCallback(modelClass, "after", "initialize", fn, options);
+}
+
 type AnyCallbackOptions = CallbackOptions<never> | ValidationCallbackOptions<never>;
 
 function registerCallback(

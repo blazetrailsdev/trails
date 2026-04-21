@@ -3,7 +3,14 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, transaction, RecordNotDestroyed } from "./index.js";
+import {
+  Base,
+  transaction,
+  RecordNotDestroyed,
+  enableSti,
+  registerSubclass,
+  registerModel,
+} from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -50,11 +57,14 @@ describe("CallbacksTest", () => {
       }
     }
     const log: string[] = [];
+    Topic.afterFind(function (this: any) {
+      log.push("after_find");
+    });
     Topic.afterInitialize(function (this: any) {
       log.push("after_initialize");
     });
     new Topic({ title: "a" });
-    expect(log).toContain("after_initialize");
+    expect(log).toEqual(["after_initialize"]);
   });
 
   it("find", async () => {
@@ -69,8 +79,11 @@ describe("CallbacksTest", () => {
     Topic.afterFind(function (this: any) {
       log.push("after_find");
     });
+    Topic.afterInitialize(function (this: any) {
+      log.push("after_initialize");
+    });
     await Topic.find(created.id);
-    expect(log).toContain("after_find");
+    expect(log).toEqual(["after_find", "after_initialize"]);
   });
 });
 
@@ -1491,6 +1504,57 @@ describe("CallbacksTest", () => {
 
     await Developer.all().toArray();
     expect(found).toEqual(["Alice", "Bob"]);
+  });
+
+  // after_initialize fires with DB-loaded values available
+  it("after_initialize on loaded record sees DB values", async () => {
+    const seen: string[] = [];
+    class Developer extends Base {
+      static {
+        this._tableName = "developers";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.afterInitialize((r: any) => seen.push(r.name));
+      }
+    }
+
+    await Developer.create({ name: "Carol" });
+    seen.length = 0;
+
+    await Developer.find(1);
+    expect(seen).toEqual(["Carol"]);
+  });
+
+  // STI subclass loaded from DB fires after_find then after_initialize in order
+  it("after_find and after_initialize fire in Rails order for STI subclasses", async () => {
+    const order: string[] = [];
+    class Animal extends Base {
+      static {
+        this._tableName = "animals";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+        enableSti(this);
+      }
+    }
+    class Dog extends Animal {
+      static {
+        registerSubclass(this);
+        registerModel(this);
+        this.afterFind(() => order.push("after_find"));
+        this.afterInitialize(() => order.push("after_initialize"));
+      }
+    }
+    void Dog;
+
+    await Animal.create({ name: "Rex", type: "Dog" });
+    order.length = 0;
+
+    const loaded = await Animal.find(1);
+    expect(loaded).toBeInstanceOf(Dog);
+    expect(order).toEqual(["after_find", "after_initialize"]);
   });
 });
 
