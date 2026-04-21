@@ -1554,16 +1554,61 @@ export class Base extends Model {
   /**
    * Instantiate a new record (not yet saved).
    *
-   * Mirrors: ActiveRecord::Base.new (Ruby convention)
+   * Rails: `Base.new(attributes = nil, &block)` — recurses on arrays and
+   * yields each record to the block before returning.
    */
-  static new<T extends typeof Base>(this: T, attrs: Record<string, unknown> = {}): InstanceType<T> {
-    return new this(attrs) as InstanceType<T>;
+  static new<T extends typeof Base>(
+    this: T,
+    attrs: Record<string, unknown>[],
+    block?: (record: InstanceType<T>) => void,
+  ): InstanceType<T>[];
+  static new<T extends typeof Base>(
+    this: T,
+    attrs?: Record<string, unknown>,
+    block?: (record: InstanceType<T>) => void,
+  ): InstanceType<T>;
+  static new<T extends typeof Base>(
+    this: T,
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (record: InstanceType<T>) => void,
+  ): InstanceType<T> | InstanceType<T>[] {
+    if (Array.isArray(attrs)) {
+      return attrs.map((a) => (this as T).new(a, block));
+    }
+    const record = new this(this._mergeCurrentScopeAttrs(attrs)) as InstanceType<T>;
+    if (block) block(record);
+    return record;
+  }
+
+  /**
+   * Alias for `new` (Rails 7.2+). Handy when `new` reads awkwardly in
+   * fluent chains or template literals.
+   *
+   * Mirrors: ActiveRecord::Persistence::ClassMethods#build
+   */
+  static build<T extends typeof Base>(
+    this: T,
+    attrs: Record<string, unknown>[],
+    block?: (record: InstanceType<T>) => void,
+  ): InstanceType<T>[];
+  static build<T extends typeof Base>(
+    this: T,
+    attrs?: Record<string, unknown>,
+    block?: (record: InstanceType<T>) => void,
+  ): InstanceType<T>;
+  static build<T extends typeof Base>(
+    this: T,
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (record: InstanceType<T>) => void,
+  ): InstanceType<T> | InstanceType<T>[] {
+    return Array.isArray(attrs) ? (this as T).new(attrs, block) : (this as T).new(attrs, block);
   }
 
   /**
    * Create a record and save it to the database.
    *
-   * Mirrors: ActiveRecord::Base.create
+   * Rails: `Base.create(attributes = nil, &block)` — recurses on arrays
+   * and yields each record to the block before save.
    */
   private static _mergeCurrentScopeAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
     const scope = this.currentScope;
@@ -1576,9 +1621,30 @@ export class Base extends Model {
 
   static async create<T extends typeof Base>(
     this: T,
-    attrs: Record<string, unknown> = {},
-  ): Promise<InstanceType<T>> {
+    attrs: Record<string, unknown>[],
+    block?: (record: InstanceType<T>) => void,
+  ): Promise<InstanceType<T>[]>;
+  static async create<T extends typeof Base>(
+    this: T,
+    attrs?: Record<string, unknown>,
+    block?: (record: InstanceType<T>) => void,
+  ): Promise<InstanceType<T>>;
+  static async create<T extends typeof Base>(
+    this: T,
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (record: InstanceType<T>) => void,
+  ): Promise<InstanceType<T> | InstanceType<T>[]> {
+    if (Array.isArray(attrs)) {
+      // Sequential, matching Rails' `attributes.collect { create(attr, &block) }`.
+      // Promise.all would interleave saves and fire callbacks out of order.
+      const records: InstanceType<T>[] = [];
+      for (const a of attrs) {
+        records.push((await (this as T).create(a, block)) as InstanceType<T>);
+      }
+      return records;
+    }
     const record = new this(this._mergeCurrentScopeAttrs(attrs)) as InstanceType<T>;
+    if (block) block(record);
     await record.save();
     return record;
   }
@@ -1586,13 +1652,36 @@ export class Base extends Model {
   /**
    * Create a record or throw if validation fails.
    *
-   * Mirrors: ActiveRecord::Base.create!
+   * Rails: `Base.create!(attributes = nil, &block)` — recurses on arrays
+   * and yields each record to the block before `saveBang()`.
    */
   static async createBang<T extends typeof Base>(
     this: T,
-    attrs: Record<string, unknown> = {},
-  ): Promise<InstanceType<T>> {
+    attrs: Record<string, unknown>[],
+    block?: (record: InstanceType<T>) => void,
+  ): Promise<InstanceType<T>[]>;
+  static async createBang<T extends typeof Base>(
+    this: T,
+    attrs?: Record<string, unknown>,
+    block?: (record: InstanceType<T>) => void,
+  ): Promise<InstanceType<T>>;
+  static async createBang<T extends typeof Base>(
+    this: T,
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (record: InstanceType<T>) => void,
+  ): Promise<InstanceType<T> | InstanceType<T>[]> {
+    if (Array.isArray(attrs)) {
+      // Sequential + short-circuit on failure: Rails' create! stops at the
+      // first exception, so later elements are never attempted. Promise.all
+      // would fire every save concurrently and partial-write.
+      const records: InstanceType<T>[] = [];
+      for (const a of attrs) {
+        records.push((await (this as T).createBang(a, block)) as InstanceType<T>);
+      }
+      return records;
+    }
     const record = new this(this._mergeCurrentScopeAttrs(attrs)) as InstanceType<T>;
+    if (block) block(record);
     await record.saveBang();
     return record;
   }
