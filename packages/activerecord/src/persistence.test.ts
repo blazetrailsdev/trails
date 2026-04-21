@@ -273,6 +273,52 @@ describe("PersistenceTest", () => {
     expect(r1.title).toBe("x");
     expect(r2.title).toBe("y");
   });
+
+  // Rails: Model.update([ids], [attrs]) — parallel arrays, index-aligned.
+  it("update with parallel ids + attrs arrays updates each record", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    const result = await Topic.update([t1.id, t2.id], [{ title: "x" }, { title: "y" }]);
+    expect(result).toHaveLength(2);
+    expect((await Topic.find(t1.id)).title).toBe("x");
+    expect((await Topic.find(t2.id)).title).toBe("y");
+  });
+
+  // Rails: Model.update(attrs) — :all-sentinel default applies attrs to every record.
+  it("update with just attrs applies to every record in scope (:all default)", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ title: "a" });
+    await Topic.create({ title: "b" });
+    const result = await Topic.update({ title: "same" });
+    expect(result).toHaveLength(2);
+    const titles = (await Topic.all().toArray()).map((t) => t.title);
+    expect(titles).toEqual(["same", "same"]);
+  });
+
+  // Rails: passing an AR instance raises ArgumentError.
+  it("update rejects a Base instance", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ title: "a" });
+    // Invoke through `any` to bypass the overloads — we're verifying the
+    // runtime guard rejects a Base instance, not testing a supported form.
+    await expect((Topic as any).update(t, { title: "x" })).rejects.toThrow(/ActiveRecord::Base/);
+  });
 });
 
 // ==========================================================================
@@ -1656,6 +1702,112 @@ describe("PersistenceTest", () => {
       }
     }
     await expect(Topic.destroy([99999])).rejects.toThrow();
+  });
+
+  // Rails: Base.delete(ids[]) should delete every matching row — single-column
+  // PK case routes through `where(pk: ids).delete_all` (delete_by semantics).
+  it("delete with array of ids removes all matching rows", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = await Topic.create({ title: "a" });
+    const t2 = await Topic.create({ title: "b" });
+    await Topic.create({ title: "c" });
+    expect(await Topic.delete([t1.id, t2.id])).toBe(2);
+    expect(await Topic.count()).toBe(1);
+  });
+
+  it("delete with nil / [] is a no-op returning 0", async () => {
+    const adapter = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ title: "a" });
+    expect(await Topic.delete(null)).toBe(0);
+    expect(await Topic.delete(undefined)).toBe(0);
+    expect(await Topic.delete([])).toBe(0);
+    expect(await Topic.count()).toBe(1);
+  });
+
+  // Rails: Base.delete accepts an array of composite-PK tuples and deletes
+  // each matching row. Predicate builder emits an OR-of-AND — e.g.
+  // `(shop_id = 1 AND order_id = 10) OR (shop_id = 1 AND order_id = 11)`
+  // — NOT a per-column IN cross-product (which would also match
+  // [shop_id=2, order_id=10]).
+  it("delete accepts an array of composite-PK tuples", async () => {
+    const adapter = freshAdapter();
+    class OrderItem extends Base {
+      static {
+        this._tableName = "order_items";
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("item_name", "string");
+        this.primaryKey = ["shop_id", "order_id"];
+        this.adapter = adapter;
+      }
+    }
+    await OrderItem.create({ shop_id: 1, order_id: 10, item_name: "A" });
+    await OrderItem.create({ shop_id: 1, order_id: 11, item_name: "B" });
+    await OrderItem.create({ shop_id: 2, order_id: 10, item_name: "C" }); // NOT in delete set — cross-product would remove this
+    expect(
+      await OrderItem.delete([
+        [1, 10],
+        [1, 11],
+      ]),
+    ).toBe(2);
+    expect(await OrderItem.count()).toBe(1);
+    const remaining = await OrderItem.first();
+    expect(remaining!.shop_id).toBe(2);
+  });
+
+  // Rails: update(id, attrs) on a composite-PK model must treat a flat
+  // tuple as ONE id (not parallel ids). Mirrors destroy's detection.
+  it("update on composite PK treats a tuple as a single id", async () => {
+    const adapter = freshAdapter();
+    class OrderItem extends Base {
+      static {
+        this._tableName = "order_items";
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("item_name", "string");
+        this.primaryKey = ["shop_id", "order_id"];
+        this.adapter = adapter;
+      }
+    }
+    await OrderItem.create({ shop_id: 1, order_id: 10, item_name: "A" });
+    const updated = await OrderItem.update([1, 10], { item_name: "A-updated" });
+    expect(Array.isArray(updated)).toBe(false);
+    const reloaded = await OrderItem.all().where({ shop_id: 1, order_id: 10 }).first();
+    expect(reloaded!.item_name).toBe("A-updated");
+  });
+
+  // Rails: destroy(id) on a composite-PK model with a single tuple must
+  // destroy ONE record, not iterate the tuple as N ids.
+  it("destroy on composite PK treats a tuple as a single id", async () => {
+    const adapter = freshAdapter();
+    class OrderItem extends Base {
+      static {
+        this._tableName = "order_items";
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("item_name", "string");
+        this.primaryKey = ["shop_id", "order_id"];
+        this.adapter = adapter;
+      }
+    }
+    await OrderItem.create({ shop_id: 1, order_id: 10, item_name: "A" });
+    await OrderItem.create({ shop_id: 1, order_id: 11, item_name: "B" });
+    const destroyed = await OrderItem.destroy([1, 10]);
+    // Should be one record (not iterated as two ids).
+    expect(Array.isArray(destroyed)).toBe(false);
+    expect(await OrderItem.count()).toBe(1);
   });
 
   it("create prefetched pk", async () => {

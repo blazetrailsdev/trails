@@ -282,14 +282,48 @@ related records, etc.), they are almost always async. Always `await`
 them when composing manually; `save()` / `destroy()` / etc. do it for
 you.
 
-## 12. Naming, bang methods, keyword args, symbols
+## 12. `Base.update(:all, ...)` sentinel is `":all"`
+
+Rails' `Model.update(id = :all, attributes)` uses Ruby's `:all` symbol
+as the first-arg default. TypeScript has no symbols as natural literals,
+so the equivalent is a string with a leading colon:
+
+Rails:
+
+```ruby
+Model.update(:all, title: "x")
+Model.update([1, 2], [{ title: "a" }, { title: "b" }])
+```
+
+Trails:
+
+```ts
+import { Base } from "@blazetrails/activerecord";
+
+class Model extends Base {}
+
+await Model.update(":all", { title: "x" }); // explicit sentinel
+await Model.update({ title: "x" }); // also `:all` (no id arg)
+await Model.update([1, 2], [{ title: "a" }, { title: "b" }]);
+```
+
+The leading colon matters: a bare `"all"` would collide with a legitimate
+string / slug primary-key value (e.g. a record whose `id` is `"all"`),
+and `update("all", attrs)` would silently update every row instead of
+finding the record with that id.
+
+Everywhere a TS API needs to accept a Rails symbol sentinel (`:all`,
+`:default`, etc.), we use the same `":name"` convention to keep it
+unambiguous from string PK values.
+
+## 13. Naming, bang methods, keyword args, symbols
 
 All cross-package — see the index for
 [method casing](./index.md#method-casing), [bang methods](./index.md#bang-methods),
 and [symbols/kwargs](./index.md#symbols-kwargs). Every ActiveRecord API
 follows them.
 
-## 13. Typing runtime-attached members with `declare`
+## 14. Typing runtime-attached members with `declare`
 
 Rails defines attributes/associations/scopes/enums dynamically, so a
 Ruby author just writes `post.title`, `post.author`, `Post.published`
