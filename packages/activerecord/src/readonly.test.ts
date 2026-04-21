@@ -35,7 +35,7 @@ describe("ReadonlyTest", () => {
     const p = await Post.create({ title: "hello" });
     p.readonlyBang();
     expect(p.isReadonly()).toBe(true);
-    await expect(p.save()).rejects.toThrow(ReadOnlyRecord);
+    await expect(p.updateColumns({ title: "changed" })).rejects.toThrow(ReadOnlyRecord);
   });
 
   it("find with readonly option", async () => {
@@ -89,6 +89,13 @@ describe("ReadonlyTest", () => {
     const { Post } = makeModel();
     const p = new Post({ title: "new" });
     expect(p.isReadonly()).toBe(false);
+  });
+
+  it("readonly new record cannot be saved", async () => {
+    const { Post } = makeModel();
+    const p = new Post({ title: "new" });
+    p.readonlyBang();
+    await expect(p.save()).rejects.toThrow(ReadOnlyRecord);
   });
 
   it("readonly record cannot be updated via updateAttribute", async () => {
