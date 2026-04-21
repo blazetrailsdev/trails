@@ -199,3 +199,267 @@ export function leftOuterJoins<T extends typeof Base>(
 export function none<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
   return this.all().none();
 }
+
+// ---------------------------------------------------------------------------
+// Bulk / positional / calculation / predicate delegators — further entries
+// on Rails' QUERYING_METHODS list. Each forwards to the default relation,
+// matching `delegate(*QUERYING_METHODS, to: :all)`.
+// ---------------------------------------------------------------------------
+
+/** Mirrors: ActiveRecord::Querying#insert_all */
+export function insertAll<T extends typeof Base>(
+  this: T,
+  records: Record<string, unknown>[],
+  options?: Parameters<Relation<InstanceType<T>>["insertAll"]>[1],
+): Promise<number> {
+  return this.all().insertAll(records, options);
+}
+
+/** Mirrors: ActiveRecord::Querying#upsert_all */
+export function upsertAll<T extends typeof Base>(
+  this: T,
+  records: Record<string, unknown>[],
+  options?: Parameters<Relation<InstanceType<T>>["upsertAll"]>[1],
+): Promise<number> {
+  return this.all().upsertAll(records, options);
+}
+
+/** Mirrors: ActiveRecord::Querying#update_all */
+export async function updateAll<T extends typeof Base>(
+  this: T,
+  updates: Record<string, unknown>,
+): Promise<number> {
+  if (this.abstractClass) {
+    throw new Error(`Cannot call updateAll on abstract class ${this.name}`);
+  }
+  return this.all().updateAll(updates);
+}
+
+/** Mirrors: ActiveRecord::Querying#delete_all */
+export async function deleteAll<T extends typeof Base>(this: T): Promise<number> {
+  if (this.abstractClass) {
+    throw new Error(`Cannot call deleteAll on abstract class ${this.name}`);
+  }
+  return this.all().deleteAll();
+}
+
+/** Mirrors: ActiveRecord::Querying#destroy_all */
+export function destroyAll<T extends typeof Base>(this: T): Promise<InstanceType<T>[]> {
+  return this.all().destroyAll();
+}
+
+/** Mirrors: ActiveRecord::Querying#destroy_by */
+export function destroyBy<T extends typeof Base>(
+  this: T,
+  conditions: Record<string, unknown>,
+): Promise<InstanceType<T>[]> {
+  return this.all().where(conditions).destroyAll();
+}
+
+/** Mirrors: ActiveRecord::Querying#delete_by */
+export function deleteBy<T extends typeof Base>(
+  this: T,
+  conditions: Record<string, unknown>,
+): Promise<number> {
+  return this.all().where(conditions).deleteAll();
+}
+
+/** Mirrors: ActiveRecord::Querying#second */
+export function second<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
+  return this.all().second();
+}
+
+/** Mirrors: ActiveRecord::Querying#third */
+export function third<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
+  return this.all().third();
+}
+
+/** Mirrors: ActiveRecord::Querying#fourth */
+export function fourth<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
+  return this.all().fourth();
+}
+
+/** Mirrors: ActiveRecord::Querying#fifth */
+export function fifth<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
+  return this.all().fifth();
+}
+
+/** Mirrors: ActiveRecord::Querying#forty_two */
+export function fortyTwo<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
+  return this.all().fortyTwo();
+}
+
+/** Mirrors: ActiveRecord::Querying#second_to_last */
+export function secondToLast<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
+  return this.all().secondToLast();
+}
+
+/** Mirrors: ActiveRecord::Querying#third_to_last */
+export function thirdToLast<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
+  return this.all().thirdToLast();
+}
+
+/**
+ * Mirrors: ActiveRecord::Querying#count — accepts an optional column name
+ * and returns either a number or a grouped `Record<string, number>` when
+ * the active scope has a GROUP BY. Parameters/return are derived from
+ * `Relation#count` so the signatures stay in sync.
+ */
+export function count<T extends typeof Base>(
+  this: T,
+  ...args: Parameters<ReturnType<T["all"]>["count"]>
+): ReturnType<ReturnType<T["all"]>["count"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.count(...args) as ReturnType<ReturnType<T["all"]>["count"]>;
+}
+
+/** Mirrors: ActiveRecord::Querying#minimum — params/return derived from Relation#minimum. */
+export function minimum<T extends typeof Base>(
+  this: T,
+  column: Parameters<ReturnType<T["all"]>["minimum"]>[0],
+): ReturnType<ReturnType<T["all"]>["minimum"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.minimum(column) as ReturnType<ReturnType<T["all"]>["minimum"]>;
+}
+
+/** Mirrors: ActiveRecord::Querying#maximum — params/return derived from Relation#maximum. */
+export function maximum<T extends typeof Base>(
+  this: T,
+  column: Parameters<ReturnType<T["all"]>["maximum"]>[0],
+): ReturnType<ReturnType<T["all"]>["maximum"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.maximum(column) as ReturnType<ReturnType<T["all"]>["maximum"]>;
+}
+
+/** Mirrors: ActiveRecord::Querying#average — params/return derived from Relation#average. */
+export function average<T extends typeof Base>(
+  this: T,
+  column: Parameters<ReturnType<T["all"]>["average"]>[0],
+): ReturnType<ReturnType<T["all"]>["average"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.average(column) as ReturnType<ReturnType<T["all"]>["average"]>;
+}
+
+/** Mirrors: ActiveRecord::Querying#sum — params/return derived from Relation#sum. */
+export function sum<T extends typeof Base>(
+  this: T,
+  column?: Parameters<ReturnType<T["all"]>["sum"]>[0],
+): ReturnType<ReturnType<T["all"]>["sum"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.sum(column) as ReturnType<ReturnType<T["all"]>["sum"]>;
+}
+
+/**
+ * Mirrors: ActiveRecord::Querying#pluck — column args accept anything
+ * `Relation#pluck` accepts (strings, Arel nodes, etc.). Types derived
+ * from the Relation method.
+ */
+export function pluck<T extends typeof Base>(
+  this: T,
+  ...columns: Parameters<ReturnType<T["all"]>["pluck"]>
+): ReturnType<ReturnType<T["all"]>["pluck"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.pluck(...columns) as ReturnType<ReturnType<T["all"]>["pluck"]>;
+}
+
+/** Mirrors: ActiveRecord::Querying#ids */
+export function ids<T extends typeof Base>(this: T): Promise<unknown[]> {
+  return this.all().ids();
+}
+
+/** Mirrors: ActiveRecord::Querying#pick — same widened params as `pluck`. */
+export function pick<T extends typeof Base>(
+  this: T,
+  ...columns: Parameters<ReturnType<T["all"]>["pick"]>
+): ReturnType<ReturnType<T["all"]>["pick"]> {
+  const rel = this.all() as ReturnType<T["all"]>;
+  return rel.pick(...columns) as ReturnType<ReturnType<T["all"]>["pick"]>;
+}
+
+export function first<T extends typeof Base>(this: T): Promise<InstanceType<T> | null>;
+export function first<T extends typeof Base>(this: T, n: number): Promise<InstanceType<T>[]>;
+/** Mirrors: ActiveRecord::Querying#first */
+export function first<T extends typeof Base>(
+  this: T,
+  n?: number,
+): Promise<InstanceType<T> | InstanceType<T>[] | null> {
+  return n === undefined ? this.all().first() : this.all().first(n);
+}
+
+/** Mirrors: ActiveRecord::Querying#first! */
+export function firstBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().firstBang();
+}
+
+export function last<T extends typeof Base>(this: T): Promise<InstanceType<T> | null>;
+export function last<T extends typeof Base>(this: T, n: number): Promise<InstanceType<T>[]>;
+/** Mirrors: ActiveRecord::Querying#last */
+export function last<T extends typeof Base>(
+  this: T,
+  n?: number,
+): Promise<InstanceType<T> | InstanceType<T>[] | null> {
+  return n === undefined ? this.all().last() : this.all().last(n);
+}
+
+/** Mirrors: ActiveRecord::Querying#last! */
+export function lastBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().lastBang();
+}
+
+export function take<T extends typeof Base>(this: T): Promise<InstanceType<T> | null>;
+export function take<T extends typeof Base>(this: T, n: number): Promise<InstanceType<T>[]>;
+/** Mirrors: ActiveRecord::Querying#take */
+export function take<T extends typeof Base>(
+  this: T,
+  n?: number,
+): Promise<InstanceType<T> | InstanceType<T>[] | null> {
+  return n === undefined ? this.all().take() : this.all().take(n);
+}
+
+/** Mirrors: ActiveRecord::Querying#sole — single result or throw */
+export function sole<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
+  return this.all().sole();
+}
+
+/**
+ * Mirrors: ActiveRecord::Querying#exists? — delegates to
+ * `Relation#exists?` so the active scope (default scopes, STI type
+ * filter, currentScope) applies. Preserves the `false` / `null`
+ * short-circuit — Rails returns false for those regardless of data.
+ */
+export async function exists<T extends typeof Base>(
+  this: T,
+  idOrConditions?: unknown,
+): Promise<boolean> {
+  if (idOrConditions === false || idOrConditions === null) {
+    return false;
+  }
+  return this.all().exists(idOrConditions);
+}
+
+/**
+ * Mirrors: ActiveRecord::Querying#find_or_create_by — routes through
+ * Relation so default scopes, STI filter, and any scope attributes
+ * (from currentScope's `where` / `createWith`) apply to both the find
+ * and the create paths.
+ */
+export function findOrCreateBy<T extends typeof Base>(
+  this: T,
+  conditions: Record<string, unknown>,
+  extra?: Record<string, unknown>,
+): Promise<InstanceType<T>> {
+  return this.all().findOrCreateBy(conditions, extra);
+}
+
+/**
+ * Mirrors: ActiveRecord::Querying#find_or_initialize_by — same
+ * scope-aware dispatch as findOrCreateBy; the new record inherits
+ * the active scope's create-with attributes.
+ */
+export function findOrInitializeBy<T extends typeof Base>(
+  this: T,
+  conditions: Record<string, unknown>,
+  extra?: Record<string, unknown>,
+): Promise<InstanceType<T>> {
+  return this.all().findOrInitializeBy(conditions, extra);
+}

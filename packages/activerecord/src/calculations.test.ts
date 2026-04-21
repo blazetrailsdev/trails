@@ -3417,6 +3417,76 @@ describe("CalculationsTest", () => {
     expect(topic.title).toBe("New Topic");
   });
 
+  // Rails' Querying.find_or_create_by is `delegate ... to: :all`, so
+  // Model.findOrCreateBy picks up any active scope's create-with attrs /
+  // default scope. Exercises the class-level entry point (not Relation)
+  // under a scoping block to lock in the scope-aware semantics.
+  it("Base.findOrCreateBy inherits createWith attrs from currentScope", async () => {
+    class Topic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    let captured: Topic | null = null;
+    await Topic.all()
+      .createWith({ status: "scoped-default" })
+      .scoping(async () => {
+        captured = await Topic.findOrCreateBy({ title: "Via class-level entry" });
+      });
+    if (captured === null) throw new Error("Expected topic to be present");
+    const topic = captured as Topic;
+    expect(topic.status).toBe("scoped-default");
+    expect(topic.title).toBe("Via class-level entry");
+  });
+
+  // Rails' findOrInitializeBy merges create_with attrs into the new
+  // unsaved record (same scope_for_create path as findOrCreateBy's
+  // create branch).
+  it("createWith() applies default attrs to findOrInitializeBy when initializing", async () => {
+    class Topic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    const topic = await Topic.all()
+      .createWith({ status: "draft" })
+      .findOrInitializeBy({ title: "Unsaved Topic" });
+    expect(topic.isNewRecord()).toBe(true);
+    expect(topic.status).toBe("draft");
+    expect(topic.title).toBe("Unsaved Topic");
+  });
+
+  // Rails' scope_for_create: where_values_hash.merge(create_with_value).
+  // createWith attrs override same-named equality-scope attrs during
+  // create/initialize.
+  it("createWith() overrides same-named where-scope attrs in findOrCreateBy", async () => {
+    class Topic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    const topic = await Topic.where({ status: "draft" })
+      .createWith({ status: "published" })
+      .findOrCreateBy({ title: "Override Winner" });
+    expect(topic.status).toBe("published");
+    expect(topic.title).toBe("Override Winner");
+  });
+
   // Rails: test "create_with does not affect existing record lookup"
   it("createWith() does not affect existing record lookup", async () => {
     class Topic extends Base {
@@ -3637,6 +3707,29 @@ describe("CalculationsTest", () => {
     const topic = await Topic.create({ title: "Found" });
     expect(await Topic.all().exists(topic.id)).toBe(true);
     expect(await Topic.all().exists(999)).toBe(false);
+  });
+
+  // Regression: exists() used to route through count(), which returns a
+  // Record<string, number> under a GROUP BY scope — the numeric cast then
+  // always evaluated truthy and `exists` always returned true. Now issues
+  // a dedicated `SELECT 1 ... LIMIT 1` probe (mirroring Rails), which
+  // handles grouped scopes correctly without instantiating records.
+  it("exists() works under a grouped scope", async () => {
+    class Topic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    // Empty grouped relation → exists is false.
+    expect(await Topic.group("status").exists()).toBe(false);
+
+    await Topic.create({ title: "a", status: "draft" });
+    expect(await Topic.group("status").exists()).toBe(true);
   });
 
   // =====================================================================

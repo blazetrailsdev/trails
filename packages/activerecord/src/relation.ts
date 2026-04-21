@@ -1963,8 +1963,19 @@ export class Relation<T extends Base> {
         rel = this.where({ [this._modelClass.primaryKey as string]: conditions });
       }
     }
-    const c = await rel.count();
-    return (c as number) > 0;
+    // Mirrors Rails' `SELECT 1 AS one FROM ... LIMIT 1`: a dedicated
+    // existence probe that never instantiates records (no after_find /
+    // association loading) and doesn't go through count()'s limit
+    // fast-path, which would otherwise hydrate models.
+    const table = rel._modelClass.arelTable;
+    const manager = table.project(new Nodes.SqlLiteral("1 AS one"));
+    rel._applyJoinsToManager(manager);
+    rel._applyWheresToManager(manager, table);
+    for (const col of rel._groupColumns) manager.group(col);
+    if (!rel._havingClause.isEmpty()) manager.having(rel._havingClause.ast);
+    manager.take(1);
+    const rows = await rel._modelClass.adapter.execute(manager.toSql());
+    return rows.length > 0;
   }
 
   // -- Async query interface (Rails 7.0+) --
@@ -2209,9 +2220,12 @@ export class Relation<T extends Base> {
   ): Promise<T> {
     const records = await this.where(conditions).limit(1).toArray();
     if (records.length > 0) return records[0];
+    // Rails' scope_for_create: `where_values_hash.merge(create_with_value)` —
+    // scope attrs first, createWith overrides, then the caller's conditions
+    // and the optional extra hash win over both.
     return this._modelClass.create({
-      ...this._createWithAttrs,
       ...this._scopeAttributes(),
+      ...this._createWithAttrs,
       ...conditions,
       ...extra,
     }) as Promise<T>;
@@ -2228,8 +2242,11 @@ export class Relation<T extends Base> {
   ): Promise<T> {
     const existing = await this.findBy(conditions);
     if (existing) return existing;
+    // Same scope_for_create precedence as findOrCreateBy: scope attrs
+    // first, createWith overrides, caller's conditions + extra win.
     return new (this._modelClass as any)({
       ...this._scopeAttributes(),
+      ...this._createWithAttrs,
       ...conditions,
       ...extra,
     }) as T;

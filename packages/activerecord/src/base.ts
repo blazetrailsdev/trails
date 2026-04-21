@@ -1285,78 +1285,8 @@ export class Base extends Model {
     return this.all().whereNot(conditions as Record<string, unknown>);
   }
 
-  /**
-   * Insert multiple records in a single INSERT statement (skip callbacks/validations).
-   *
-   * Mirrors: ActiveRecord::Base.insert_all
-   */
-  static async insertAll(
-    records: Record<string, unknown>[],
-    options?: { uniqueBy?: string | string[] },
-  ): Promise<number> {
-    return this.all().insertAll(records, options);
-  }
-
-  /**
-   * Upsert multiple records in a single statement (skip callbacks/validations).
-   *
-   * Mirrors: ActiveRecord::Base.upsert_all
-   */
-  static async upsertAll(
-    records: Record<string, unknown>[],
-    options?: {
-      uniqueBy?: string | string[];
-      updateOnly?: string | string[];
-      onDuplicate?: "update" | "skip" | Nodes.SqlLiteral;
-    },
-  ): Promise<number> {
-    return this.all().upsertAll(records, options);
-  }
-
-  /**
-   * Update all records matching the default scope.
-   *
-   * Mirrors: ActiveRecord::Base.update_all
-   */
-  static async updateAll(updates: Record<string, unknown>): Promise<number> {
-    if (this.abstractClass) {
-      throw new Error(`Cannot call updateAll on abstract class ${this.name}`);
-    }
-    return this.all().updateAll(updates);
-  }
-
-  /**
-   * Delete all records (no callbacks).
-   *
-   * Mirrors: ActiveRecord::Base.delete_all
-   */
-  static async deleteAll(): Promise<number> {
-    if (this.abstractClass) {
-      throw new Error(`Cannot call deleteAll on abstract class ${this.name}`);
-    }
-    return this.all().deleteAll();
-  }
-
-  /**
-   * Destroy records matching conditions (runs callbacks).
-   *
-   * Mirrors: ActiveRecord::Base.destroy_by
-   */
-  static async destroyBy<T extends typeof Base>(
-    this: T,
-    conditions: Record<string, unknown>,
-  ): Promise<InstanceType<T>[]> {
-    return this.all().where(conditions).destroyAll();
-  }
-
-  /**
-   * Delete records matching conditions (no callbacks).
-   *
-   * Mirrors: ActiveRecord::Base.delete_by
-   */
-  static async deleteBy(conditions: Record<string, unknown>): Promise<number> {
-    return this.all().where(conditions).deleteAll();
-  }
+  // insertAll / upsertAll / updateAll / deleteAll / destroyBy / deleteBy
+  // extracted to querying.ts; declared in the Querying mixin section below.
 
   /**
    * Find and update a record by primary key.
@@ -1395,14 +1325,7 @@ export class Base extends Model {
     return record;
   }
 
-  /**
-   * Destroy all records (with callbacks).
-   *
-   * Mirrors: ActiveRecord::Base.destroy_all
-   */
-  static async destroyAll<T extends typeof Base>(this: T): Promise<InstanceType<T>[]> {
-    return this.all().destroyAll();
-  }
+  // destroyAll extracted to querying.ts; declared in the Querying mixin section.
 
   /**
    * Update a record and raise on validation failure.
@@ -1429,259 +1352,10 @@ export class Base extends Model {
    */
   declare static touchAll: typeof Timestamp.touchAll;
 
-  /**
-   * Return the second record.
-   * Mirrors: ActiveRecord::Base.second
-   */
-  static async second<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
-    return this.all().second();
-  }
-
-  /**
-   * Return the third record.
-   * Mirrors: ActiveRecord::Base.third
-   */
-  static async third<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
-    return this.all().third();
-  }
-
-  /**
-   * Return the fourth record.
-   * Mirrors: ActiveRecord::Base.fourth
-   */
-  static async fourth<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
-    return this.all().fourth();
-  }
-
-  /**
-   * Return the fifth record.
-   * Mirrors: ActiveRecord::Base.fifth
-   */
-  static async fifth<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
-    return this.all().fifth();
-  }
-
-  /**
-   * Return the forty-second record.
-   * Mirrors: ActiveRecord::Base.forty_two
-   */
-  static async fortyTwo<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
-    return this.all().fortyTwo();
-  }
-
-  /**
-   * Return the second-to-last record.
-   * Mirrors: ActiveRecord::Base.second_to_last
-   */
-  static async secondToLast<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
-    return this.all().secondToLast();
-  }
-
-  /**
-   * Return the third-to-last record.
-   * Mirrors: ActiveRecord::Base.third_to_last
-   */
-  static async thirdToLast<T extends typeof Base>(this: T): Promise<InstanceType<T> | null> {
-    return this.all().thirdToLast();
-  }
-
-  /**
-   * Check if a record exists. Accepts a primary key, conditions hash, or no arguments.
-   *
-   * Mirrors: ActiveRecord::Base.exists?
-   */
-  static async exists(idOrConditions?: unknown): Promise<boolean> {
-    if (idOrConditions === undefined) {
-      return this.all().isAny();
-    }
-    // Rails: exists(false) and exists(nil) always return false
-    if (idOrConditions === false || idOrConditions === null) {
-      return false;
-    }
-    if (
-      typeof idOrConditions === "object" &&
-      idOrConditions !== null &&
-      !Array.isArray(idOrConditions)
-    ) {
-      return this.all()
-        .where(idOrConditions as Record<string, unknown>)
-        .isAny();
-    }
-    // Treat as primary key
-    const record = await this.findBy({ [this.primaryKey as string]: idOrConditions });
-    return record !== null;
-  }
-
-  /**
-   * Return the count of all records.
-   *
-   * Mirrors: ActiveRecord::Base.count
-   */
-  static async count(): Promise<number> {
-    return this.all().count() as Promise<number>;
-  }
-
-  /**
-   * Return the minimum value of a column.
-   *
-   * Mirrors: ActiveRecord::Base.minimum
-   */
-  static async minimum(column: string): Promise<unknown> {
-    return this.all().minimum(column);
-  }
-
-  /**
-   * Return the maximum value of a column.
-   *
-   * Mirrors: ActiveRecord::Base.maximum
-   */
-  static async maximum(column: string): Promise<unknown> {
-    return this.all().maximum(column);
-  }
-
-  /**
-   * Return the average value of a column.
-   *
-   * Mirrors: ActiveRecord::Base.average
-   */
-  static async average(column: string): Promise<unknown> {
-    return this.all().average(column);
-  }
-
-  /**
-   * Return the sum of a column.
-   *
-   * Mirrors: ActiveRecord::Base.sum
-   */
-  static async sum(column: string): Promise<unknown> {
-    return this.all().sum(column);
-  }
-
-  /**
-   * Pluck column values.
-   *
-   * Mirrors: ActiveRecord::Base.pluck
-   */
-  static async pluck(...columns: string[]): Promise<unknown[]> {
-    return this.all().pluck(...columns);
-  }
-
-  /**
-   * Return primary key values.
-   *
-   * Mirrors: ActiveRecord::Base.ids
-   */
-  static async ids(): Promise<unknown[]> {
-    return this.all().ids();
-  }
-
-  /**
-   * Pick column values from the first matching record.
-   *
-   * Mirrors: ActiveRecord::Base.pick
-   */
-  static async pick(...columns: string[]): Promise<unknown> {
-    return this.all().pick(...columns);
-  }
-
-  /**
-   * Return the first record.
-   *
-   * Mirrors: ActiveRecord::Base.first
-   */
-  static async first<T extends typeof Base>(this: T): Promise<InstanceType<T> | null>;
-  static async first<T extends typeof Base>(this: T, n: number): Promise<InstanceType<T>[]>;
-  static async first<T extends typeof Base>(
-    this: T,
-    n?: number,
-  ): Promise<InstanceType<T> | InstanceType<T>[] | null> {
-    return n === undefined ? this.all().first() : this.all().first(n);
-  }
-
-  /**
-   * Return the first record, or throw if none found.
-   *
-   * Mirrors: ActiveRecord::Base.first!
-   */
-  static async firstBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
-    return this.all().firstBang();
-  }
-
-  /**
-   * Return the last record.
-   *
-   * Mirrors: ActiveRecord::Base.last
-   */
-  static async last<T extends typeof Base>(this: T): Promise<InstanceType<T> | null>;
-  static async last<T extends typeof Base>(this: T, n: number): Promise<InstanceType<T>[]>;
-  static async last<T extends typeof Base>(
-    this: T,
-    n?: number,
-  ): Promise<InstanceType<T> | InstanceType<T>[] | null> {
-    return n === undefined ? this.all().last() : this.all().last(n);
-  }
-
-  /**
-   * Return the last record, or throw if none found.
-   *
-   * Mirrors: ActiveRecord::Base.last!
-   */
-  static async lastBang<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
-    return this.all().lastBang();
-  }
-
-  /**
-   * Return a record without any implied ordering.
-   *
-   * Mirrors: ActiveRecord::Base.take
-   */
-  static async take<T extends typeof Base>(this: T): Promise<InstanceType<T> | null>;
-  static async take<T extends typeof Base>(this: T, n: number): Promise<InstanceType<T>[]>;
-  static async take<T extends typeof Base>(
-    this: T,
-    n?: number,
-  ): Promise<InstanceType<T> | InstanceType<T>[] | null> {
-    return n === undefined ? this.all().take() : this.all().take(n);
-  }
-
-  /**
-   * Return the sole matching record, or throw.
-   *
-   * Mirrors: ActiveRecord::Base.sole
-   */
-  static async sole<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
-    return this.all().sole();
-  }
-
-  /**
-   * Find the first record matching conditions, or create one.
-   *
-   * Mirrors: ActiveRecord::Base.find_or_create_by
-   */
-  static async findOrCreateBy<T extends typeof Base>(
-    this: T,
-    conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>,
-  ): Promise<InstanceType<T>> {
-    const record = await this.findBy(conditions);
-    if (record) return record;
-    return this.create({ ...conditions, ...extra });
-  }
-
-  /**
-   * Find the first record matching conditions, or instantiate one (unsaved).
-   *
-   * Mirrors: ActiveRecord::Base.find_or_initialize_by
-   */
-  static async findOrInitializeBy<T extends typeof Base>(
-    this: T,
-    conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>,
-  ): Promise<InstanceType<T>> {
-    const record = await this.findBy(conditions);
-    if (record) return record;
-    return new this({ ...conditions, ...extra }) as InstanceType<T>;
-  }
+  // Positional / calculation / predicate delegators (second..thirdToLast,
+  // exists, count/minimum/maximum/average/sum/pluck/ids/pick,
+  // first[!] / last[!] / take / sole, findOrCreateBy, findOrInitializeBy)
+  // extracted to querying.ts; declared in the Querying mixin section below.
 
   /**
    * Try to create a record first; if it already exists (uniqueness violation),
@@ -1786,6 +1460,37 @@ export class Base extends Model {
   declare static leftJoins: typeof Querying.leftJoins;
   declare static leftOuterJoins: typeof Querying.leftOuterJoins;
   declare static none: typeof Querying.none;
+  declare static insertAll: typeof Querying.insertAll;
+  declare static upsertAll: typeof Querying.upsertAll;
+  declare static updateAll: typeof Querying.updateAll;
+  declare static deleteAll: typeof Querying.deleteAll;
+  declare static destroyAll: typeof Querying.destroyAll;
+  declare static destroyBy: typeof Querying.destroyBy;
+  declare static deleteBy: typeof Querying.deleteBy;
+  declare static second: typeof Querying.second;
+  declare static third: typeof Querying.third;
+  declare static fourth: typeof Querying.fourth;
+  declare static fifth: typeof Querying.fifth;
+  declare static fortyTwo: typeof Querying.fortyTwo;
+  declare static secondToLast: typeof Querying.secondToLast;
+  declare static thirdToLast: typeof Querying.thirdToLast;
+  declare static count: typeof Querying.count;
+  declare static minimum: typeof Querying.minimum;
+  declare static maximum: typeof Querying.maximum;
+  declare static average: typeof Querying.average;
+  declare static sum: typeof Querying.sum;
+  declare static pluck: typeof Querying.pluck;
+  declare static ids: typeof Querying.ids;
+  declare static pick: typeof Querying.pick;
+  declare static first: typeof Querying.first;
+  declare static firstBang: typeof Querying.firstBang;
+  declare static last: typeof Querying.last;
+  declare static lastBang: typeof Querying.lastBang;
+  declare static take: typeof Querying.take;
+  declare static sole: typeof Querying.sole;
+  declare static exists: typeof Querying.exists;
+  declare static findOrCreateBy: typeof Querying.findOrCreateBy;
+  declare static findOrInitializeBy: typeof Querying.findOrInitializeBy;
 
   /**
    * Increment counter columns for a record by primary key.
