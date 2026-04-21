@@ -463,3 +463,33 @@ export function findOrInitializeBy<T extends typeof Base>(
 ): Promise<InstanceType<T>> {
   return this.all().findOrInitializeBy(conditions, extra);
 }
+
+/**
+ * Mirrors: ActiveRecord::Querying#any? — delegates to all().any?
+ */
+export function isAny<T extends typeof Base>(this: T): Promise<boolean> {
+  return this.all().isAny();
+}
+
+/**
+ * Mirrors: ActiveRecord::Querying#many? — delegates to all().many?
+ */
+export function isMany<T extends typeof Base>(this: T): Promise<boolean> {
+  return this.all().isMany();
+}
+
+/**
+ * Mirrors: ActiveRecord::Querying#one? — delegates to all().one?
+ */
+export function isOne<T extends typeof Base>(this: T): Promise<boolean> {
+  return this.all().isOne();
+}
+
+/**
+ * Mirrors: ActiveRecord::Querying#empty? — delegates to `all().empty?`.
+ * Rails' `none?` (no block/args) falls through to `empty?`, so this
+ * predicate also covers that semantic.
+ */
+export function isEmpty<T extends typeof Base>(this: T): Promise<boolean> {
+  return this.all().isEmpty();
+}

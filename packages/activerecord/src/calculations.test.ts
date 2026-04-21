@@ -4523,6 +4523,46 @@ describe("CalculationsTest", () => {
     expect(await Topic.all().isMany()).toBe(true);
   });
 
+  // Rails: test "one?"
+  it("isOne returns true for exactly one record", async () => {
+    class Topic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    expect(await Topic.isOne()).toBe(false);
+    await Topic.create({ title: "A" });
+    expect(await Topic.isOne()).toBe(true);
+    await Topic.create({ title: "B" });
+    expect(await Topic.isOne()).toBe(false);
+  });
+
+  // Rails: test Base.any? / .many? / .empty? delegate to all
+  it("Base.isAny / isMany / isEmpty delegate through all()", async () => {
+    class Topic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+
+    expect(await Topic.isEmpty()).toBe(true);
+    expect(await Topic.isAny()).toBe(false);
+    expect(await Topic.isMany()).toBe(false);
+    await Topic.create({ title: "A" });
+    expect(await Topic.isEmpty()).toBe(false);
+    expect(await Topic.isAny()).toBe(true);
+    expect(await Topic.isMany()).toBe(false);
+    await Topic.create({ title: "B" });
+    expect(await Topic.isMany()).toBe(true);
+  });
+
   // =====================================================================
   // inspect — activerecord/test/cases/base_test.rb
   // =====================================================================
