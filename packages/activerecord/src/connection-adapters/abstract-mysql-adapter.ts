@@ -11,6 +11,13 @@
 import { inspectExplainOption } from "../adapter.js";
 import type { ExplainOption } from "../adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
+import {
+  InvalidForeignKey,
+  NotNullViolation,
+  RecordNotUnique,
+  StatementInvalid,
+  ValueTooLong,
+} from "../errors.js";
 import type { Nodes } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import {
@@ -40,6 +47,9 @@ const NATIVE_DATABASE_TYPES: Record<string, { name: string; limit?: number }> = 
 const ER_DUP_ENTRY = 1062;
 const ER_NOT_NULL_VIOLATION = 1048;
 const ER_DO_NOT_HAVE_DEFAULT = 1364;
+const ER_NO_REFERENCED_ROW = 1216;
+const ER_ROW_IS_REFERENCED = 1217;
+const ER_ROW_IS_REFERENCED_2 = 1451;
 const ER_NO_REFERENCED_ROW_2 = 1452;
 const ER_DATA_TOO_LONG = 1406;
 const ER_OUT_OF_RANGE = 1264;
@@ -598,6 +608,41 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   protected _explainStatementClause(options: ExplainOption[]): string {
     if (options.length === 0) return "EXPLAIN";
     return `EXPLAIN ${this._validateExplainOptions(options).join(" ")}`;
+  }
+
+  /**
+   * Map MySQL/MariaDB driver errors to ActiveRecord exception classes by
+   * errno. Matches Rails'
+   * `ConnectionAdapters::AbstractMysqlAdapter#translate_exception`.
+   */
+  protected _translateException(e: unknown, sql: string, binds: unknown[]): Error {
+    if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
+    const errno = (e as { errno?: number }).errno;
+    const msg = e.message;
+    const cause = e;
+    switch (errno) {
+      case ER_DUP_ENTRY:
+        return new RecordNotUnique(msg, { sql, binds, cause });
+      case ER_NO_REFERENCED_ROW:
+      case ER_ROW_IS_REFERENCED:
+      case ER_ROW_IS_REFERENCED_2:
+      case ER_NO_REFERENCED_ROW_2:
+        return new InvalidForeignKey(msg, { sql, binds, cause });
+      case ER_NOT_NULL_VIOLATION:
+      case ER_DO_NOT_HAVE_DEFAULT:
+        return new NotNullViolation(msg, { sql, binds, cause });
+      case ER_DATA_TOO_LONG:
+        return new ValueTooLong(msg, { sql, binds, cause });
+      default:
+        // Driver errors expose a positive MySQL errno and usually a
+        // sqlState. Node/system errors (ECONNREFUSED etc.) also carry
+        // an `errno`, often negative, so gate on a positive numeric
+        // errno to avoid re-tagging network failures as
+        // StatementInvalid (which would attach misleading sql/binds).
+        return typeof errno === "number" && errno > 0 && e instanceof StatementInvalid === false
+          ? new StatementInvalid(msg, { sql, binds, cause })
+          : e;
+    }
   }
 }
 

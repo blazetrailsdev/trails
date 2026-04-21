@@ -22,7 +22,14 @@ import {
 } from "./postgresql/type-map-init.js";
 import { inspectExplainOption } from "../adapter.js";
 import type { DatabaseAdapter, ExplainOption, TrailsAdapterOptions } from "../adapter.js";
-import { PreparedStatementCacheExpired } from "../errors.js";
+import {
+  InvalidForeignKey,
+  NotNullViolation,
+  PreparedStatementCacheExpired,
+  RecordNotUnique,
+  StatementInvalid,
+  ValueTooLong,
+} from "../errors.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import { typeCastedBinds } from "./abstract/database-statements.js";
@@ -301,9 +308,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           payload.row_count = r.rows?.length ?? 0;
           return r;
         } catch (e: any) {
-          payload.exception = e;
-          payload.exception_object = e;
-          throw e;
+          const translated = this._translateException(e, rewritten, bindArray);
+          payload.exception = translated;
+          payload.exception_object = translated;
+          throw translated;
         }
       },
     );
@@ -685,9 +693,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           return result.rows;
         });
       } catch (e: any) {
-        payload.exception = e;
-        payload.exception_object = e;
-        throw e;
+        const translated = this._translateException(e, rewritten, binds);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
       }
     });
   }
@@ -781,9 +790,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           return result.rowCount ?? 0;
         });
       } catch (e: any) {
-        payload.exception = e;
-        payload.exception_object = e;
-        throw e;
+        const translated = this._translateException(e, pgSql, binds);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
       }
     });
   }
@@ -2350,6 +2360,39 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
     return pgQuoteString(String(value));
+  }
+
+  /**
+   * Map PostgreSQL driver errors to ActiveRecord exception classes by
+   * SQLSTATE code, matching Rails'
+   * `ConnectionAdapters::PostgreSQL::DatabaseStatements#translate_exception`.
+   */
+  private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
+    if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
+    const code = (e as { code?: string }).code;
+    const msg = e.message;
+    const cause = e;
+    switch (code) {
+      case "23505": // unique_violation
+        return new RecordNotUnique(msg, { sql, binds, cause });
+      case "23503": // foreign_key_violation
+        return new InvalidForeignKey(msg, { sql, binds, cause });
+      case "23502": // not_null_violation
+        return new NotNullViolation(msg, { sql, binds, cause });
+      case "22001": // string_data_right_truncation
+        return new ValueTooLong(msg, { sql, binds, cause });
+      default:
+        // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
+        // 5-char shape alone isn't enough — Node system errors like
+        // `EPIPE` / `EBADF` also match it, so gating on
+        // instanceof pg.DatabaseError avoids re-tagging socket /
+        // network failures as StatementInvalid with misleading
+        // sql/binds attached.
+        if (e instanceof pg.DatabaseError && e instanceof StatementInvalid === false) {
+          return new StatementInvalid(msg, { sql, binds, cause });
+        }
+        return e;
+    }
   }
 }
 

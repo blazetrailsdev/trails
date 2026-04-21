@@ -280,10 +280,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       } catch (e: any) {
         // getConn() itself can throw (pool exhausted / connection
         // refused / closed pool); catching here lets subscribers see
-        // acquisition failures as `payload.exception` too.
-        payload.exception = e;
-        payload.exception_object = e;
-        throw e;
+        // acquisition failures as `payload.exception` too. Query-level
+        // driver errors (ER_DUP_ENTRY etc.) are translated to Rails'
+        // typed exception classes via _translateException.
+        const translated = this._translateException(e, driverSql, driverBinds);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
       } finally {
         if (conn) this.releaseConn(conn);
       }
@@ -331,10 +334,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         return info.affectedRows;
       } catch (e: any) {
         // Guard acquisition failures (pool exhausted / refused /
-        // closed) so subscribers still see `payload.exception`.
-        payload.exception = e;
-        payload.exception_object = e;
-        throw e;
+        // closed) so subscribers still see `payload.exception`. Driver
+        // errors (ER_DUP_ENTRY etc.) are translated to Rails' typed
+        // exception classes via _translateException.
+        const translated = this._translateException(e, driverSql, driverBinds);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
       } finally {
         if (conn) this.releaseConn(conn);
       }

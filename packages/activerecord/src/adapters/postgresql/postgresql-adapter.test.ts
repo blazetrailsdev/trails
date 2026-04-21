@@ -3,6 +3,12 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import {
+  InvalidForeignKey,
+  NotNullViolation,
+  RecordNotUnique,
+  ValueTooLong,
+} from "../../errors.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -147,7 +153,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE TABLE "ex_class" ("id" SERIAL PRIMARY KEY, "name" TEXT NOT NULL)`);
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_class" ("name") VALUES (NULL)`),
-      ).rejects.toThrow();
+      ).rejects.toBeInstanceOf(NotNullViolation);
     });
 
     it("translate exception unique violation", async () => {
@@ -155,7 +161,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.executeMutation(`INSERT INTO "ex_uniq" ("name") VALUES ('Alice')`);
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_uniq" ("name") VALUES ('Alice')`),
-      ).rejects.toThrow(/duplicate key|unique/i);
+      ).rejects.toBeInstanceOf(RecordNotUnique);
     });
 
     it("translate exception not null violation", async () => {
@@ -164,7 +170,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_notnull" ("name") VALUES (NULL)`),
-      ).rejects.toThrow(/not-null|null value/i);
+      ).rejects.toBeInstanceOf(NotNullViolation);
     });
 
     it("translate exception foreign key violation", async () => {
@@ -174,14 +180,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_child" ("parent_id") VALUES (999)`),
-      ).rejects.toThrow(/foreign key|violates/i);
+      ).rejects.toBeInstanceOf(InvalidForeignKey);
     });
 
     it("translate exception value too long", async () => {
       await adapter.exec(`CREATE TABLE "ex_long" ("id" SERIAL PRIMARY KEY, "name" VARCHAR(5))`);
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_long" ("name") VALUES ('toolongvalue')`),
-      ).rejects.toThrow(/too long|value too long/i);
+      ).rejects.toBeInstanceOf(ValueTooLong);
     });
 
     it.skip("translate exception lock wait timeout", async () => {
