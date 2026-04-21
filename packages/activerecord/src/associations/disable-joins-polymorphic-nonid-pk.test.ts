@@ -96,9 +96,17 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
       sourceType: "DpNonIdPhoto",
       disableJoins: true,
     });
+    // `has_one :through` must go through a singular association
+    // (has_one / belongs_to) — Rails rejects has_one-through-
+    // collection at reflection time. Use a dedicated has_one
+    // gallery so the chain is singular end-to-end.
+    Associations.hasOne.call(DpAuthor, "dpGallery", {
+      className: "DpGallery",
+      foreignKey: "dp_author_id",
+    });
     Associations.hasOne.call(DpAuthor, "noJoinsDpOnePhoto", {
       className: "DpNonIdPhoto",
-      through: "dpGalleries",
+      through: "dpGallery",
       source: "imageable",
       sourceType: "DpNonIdPhoto",
       disableJoins: true,

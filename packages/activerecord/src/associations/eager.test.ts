@@ -3938,7 +3938,7 @@ describe("EagerAssociationTest", () => {
     Associations.hasMany.call(PhmtAuthor, "phmtPosts", { foreignKey: "phmt_author_id" });
     Associations.hasMany.call(PhmtAuthor, "phmtComments", {
       through: "phmtPosts",
-      source: "phmtComment",
+      source: "phmtComments",
       className: "PhmtComment",
     });
     Associations.hasMany.call(PhmtPost, "phmtComments", { foreignKey: "phmt_post_id" });

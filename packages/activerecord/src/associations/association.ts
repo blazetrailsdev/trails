@@ -2,7 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { resolveModel, buildHasManyRelation } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
-import { validateThroughSourceType } from "./validate-source-type.js";
+import { validateThroughReflection } from "./validate-through-reflection.js";
 import { camelize, singularize } from "@blazetrails/activesupport";
 
 /**
@@ -41,13 +41,13 @@ export class Association {
     this.loaded = false;
     this.target = null;
 
-    // Rails' `Association#initialize` calls `reflection.check_validity!`
-    // so misconfigurations surface at first use. We run a narrow
-    // subset of that check (the two sourceType-shape cases) via
-    // the shared helper; the full `checkValidityBang` wire-up is
-    // deferred because several test fixtures trip the stricter
-    // checks (tracked separately).
-    validateThroughSourceType(owner.constructor as typeof Base, reflection.name);
+    // Rails' `Association#initialize` runs `reflection.check_validity!`
+    // so every Rails-named misconfiguration surfaces at first use
+    // (polymorphic-through, missing source, source-type shape,
+    // has-one-through-collection, out-of-order declaration, and
+    // inverse-of misses). Delegates to
+    // `ThroughReflection#checkValidityBang` via a memoized helper.
+    validateThroughReflection(owner.constructor as typeof Base, reflection.name);
   }
 
   get name(): string {

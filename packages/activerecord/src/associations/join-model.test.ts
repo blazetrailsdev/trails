@@ -893,9 +893,12 @@ describe("AssociationsJoinModelTest", () => {
     registerModel(UtrAuthor);
     Associations.hasMany.call(UtrAuthor, "tags", { through: "nonexistent", className: "Tag" });
     const author = await UtrAuthor.create({ name: "Bad" });
+    // Error comes from ThroughReflection#checkValidityBang first-
+    // use check (Rails-faithful) — matches Rails'
+    // HasManyThroughAssociationNotFoundError wording.
     await expect(
       loadHasMany(author, "tags", { through: "nonexistent", className: "Tag" }),
-    ).rejects.toThrow(/Through association "nonexistent" not found/);
+    ).rejects.toThrow(/Could not find the association :nonexistent/);
   });
 
   it.skip("exceptions have suggestions for fix", () => {
@@ -1330,7 +1333,7 @@ describe("AssociationsJoinModelTest", () => {
     Associations.hasMany.call(TphmAuthor, "taggings", {
       through: "posts",
       className: "TphmTagging",
-      source: "tagging",
+      source: "taggings",
     });
     const author = await TphmAuthor.create({ name: "David" });
     const post1 = await TphmPost.create({ author_id: author.id, title: "P1" });
@@ -1340,7 +1343,7 @@ describe("AssociationsJoinModelTest", () => {
     const taggings = await loadHasMany(author, "taggings", {
       through: "posts",
       className: "TphmTagging",
-      source: "tagging",
+      source: "taggings",
     });
     expect(taggings).toHaveLength(2);
   });
@@ -1379,7 +1382,7 @@ describe("AssociationsJoinModelTest", () => {
     Associations.hasMany.call(IphmtAuthor, "taggings", {
       through: "posts",
       className: "IphmtTagging",
-      source: "tagging",
+      source: "taggings",
     });
     const author = await IphmtAuthor.create({ name: "David" });
     const post = await IphmtPost.create({ author_id: author.id, title: "P1" });
@@ -1612,6 +1615,10 @@ describe("AssociationsJoinModelTest", () => {
       className: "CaTagging",
       foreignKey: "taggable_id",
     });
+    Associations.belongsTo.call(CaTagging, "tag", {
+      className: "CaTag",
+      foreignKey: "tag_id",
+    });
     Associations.hasMany.call(CaPost, "tags", {
       through: "taggings",
       className: "CaTag",
@@ -1686,6 +1693,10 @@ describe("AssociationsJoinModelTest", () => {
       className: "DtTagging",
       foreignKey: "taggable_id",
     });
+    Associations.belongsTo.call(DtTagging, "tag", {
+      className: "DtTag",
+      foreignKey: "tag_id",
+    });
     Associations.hasMany.call(DtPost, "tags", {
       through: "taggings",
       className: "DtTag",
@@ -1736,6 +1747,10 @@ describe("AssociationsJoinModelTest", () => {
     Associations.hasMany.call(MdPost, "taggings", {
       className: "MdTagging",
       foreignKey: "taggable_id",
+    });
+    Associations.belongsTo.call(MdTagging, "tag", {
+      className: "MdTag",
+      foreignKey: "tag_id",
     });
     Associations.hasMany.call(MdPost, "tags", {
       through: "taggings",

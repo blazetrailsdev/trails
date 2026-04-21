@@ -88,9 +88,16 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
       sourceType: "RwMember",
       disableJoins: true,
     });
+    // `has_one :through` must go through a singular step — Rails
+    // rejects has_one-through-collection. Use a dedicated has_one
+    // comment so the chain is singular all the way to the source.
+    Associations.hasOne.call(RwAuthor, "rwComment", {
+      className: "RwComment",
+      foreignKey: "rw_author_id",
+    });
     Associations.hasOne.call(RwAuthor, "noJoinsOneRwMember", {
       className: "RwMember",
-      through: "rwComments",
+      through: "rwComment",
       source: "origin",
       sourceType: "RwMember",
       disableJoins: true,

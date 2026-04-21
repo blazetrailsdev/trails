@@ -40,7 +40,7 @@ import {
 } from "./associations/errors.js";
 import { ForeignAssociation } from "./associations/foreign-association.js";
 import { AssociationScope } from "./associations/association-scope.js";
-import { validateThroughSourceType } from "./associations/validate-source-type.js";
+import { validateThroughReflection } from "./associations/validate-through-reflection.js";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { getInheritanceColumn, findStiClass } from "./inheritance.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -646,7 +646,7 @@ export async function loadHasOne(
   options: AssociationOptions,
 ): Promise<Base | null> {
   if (options.through) {
-    validateThroughSourceType(record.constructor as typeof Base, assocName);
+    validateThroughReflection(record.constructor as typeof Base, assocName);
   }
   // Check cached (inverse_of) first, then preloaded
   if ((record as any)._cachedAssociations?.has(assocName)) {
@@ -850,7 +850,7 @@ export async function loadHasMany(
   options: AssociationOptions,
 ): Promise<Base[]> {
   if (options.through) {
-    validateThroughSourceType(record.constructor as typeof Base, assocName);
+    validateThroughReflection(record.constructor as typeof Base, assocName);
   }
   // Check cached (inverse_of) first, then preloaded
   if ((record as any)._cachedAssociations?.has(assocName)) {
@@ -1758,7 +1758,7 @@ export function association<T extends Base = Base>(
   if (!assocDef) {
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
   }
-  validateThroughSourceType(ctor, assocName);
+  validateThroughReflection(ctor, assocName);
   if (!_CollectionProxyCtor) {
     // Deliberate constraint: `associations.ts`, `relation.ts`,
     // `collection-proxy.ts`, and `base.ts` form a mandatory mutual
