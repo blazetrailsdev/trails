@@ -1,431 +1,127 @@
-# trails
+# trails — Claude guide
 
-A set of TypeScript packages that mirror the Rails API as closely as possible.
-Someone reading the Rails API docs should be able to use these packages with
-near-identical intent and naming.
+See [README.md](README.md) for the project overview, package list, design
+principles, zero-declare `trails-tsc` workflow, and the Rails-to-TypeScript
+idiom table.
 
-## Project Structure
+## Working principles
 
-This is a TypeScript monorepo. Packages live under `packages/`:
+- **Implementation-first.** The goal is to implement Rails features, not to
+  flip skipped tests. Build the feature, then unskip the tests that prove it.
+  Read the Rails source first to understand the expected behavior. A pinned
+  sparse checkout lives at `scripts/api-compare/.rails-source/` in the main
+  repo — no need to clone or go hunting. Populate it with
+  `bash scripts/api-compare/fetch-rails.sh` if missing.
+- **Read existing code before writing new code.** Trace how the codebase
+  already handles the concern. Use the real persistence API (`isNewRecord()`,
+  `isPersisted()`, `readAttribute()`, `writeAttribute()`) — not ad-hoc state.
+  Handle composite primary keys (`primaryKey` can be `string | string[]`).
+  Delegate to existing infrastructure; don't reimplement it.
+- **Ship behavior, not signatures.** Never commit a method that matches a
+  Rails API surface but returns null/undefined or only mutates in-memory
+  state when Rails hits the DB. A missing method is better than a misleading
+  one. `api:compare` coverage is a side effect of correct implementation.
+- **Use the package ecosystem like Rails does.** In `activerecord`, build
+  queries with `@blazetrails/arel` (Table, SelectManager, Nodes, Attribute) —
+  never raw SQL strings. Use `@blazetrails/activemodel` for
+  validations/callbacks and `@blazetrails/activesupport` for inflection.
+  `pnpm run lint:deps` scores cross-package usage against Rails (e.g.
+  ActiveRecord methods that should delegate to Arel) and flags gaps.
 
-- `packages/arel` — Query building and AST (Arel)
-- `packages/activemodel` — Validations, callbacks, dirty tracking, serialization (ActiveModel)
-- `packages/activerecord` — ORM layer tying Arel and ActiveModel together (ActiveRecord)
-- `packages/activesupport` — Core utilities, inflection, caching, notifications, encryption (ActiveSupport)
-- `packages/rack` — Web server interface, middleware, request/response (Rack)
-- `packages/actionpack` — ActionDispatch (routing, cookies, sessions) and ActionController
+## Module mixins (Ruby `include` → TypeScript)
 
-## Design Principles
+Rails uses `include`/`extend` to mix module methods into a class. We
+reimplement both in `@blazetrails/activesupport`:
 
-- **Rails API fidelity**: Class names, method names, and call signatures should
-  match Rails as closely as TypeScript allows. When the Rails docs say
-  `User.where(name: "dean").order(:created_at)`, the TS equivalent should feel
-  the same.
-- **Idiomatic TypeScript**: Use TypeScript's type system to provide safety that
-  Ruby can't. Generics, literal types, and discriminated unions are encouraged
-  where they improve the developer experience without breaking Rails parity.
-- **No magic strings where types work**: Prefer typed column references over
-  raw strings when possible, but always support the string form for parity.
-- **Use the package ecosystem like Rails does**: ActiveRecord's power comes
-  from Arel. When building queries, subqueries, or SQL conditions in
-  `activerecord`, use `@blazetrails/arel` (Table, SelectManager, Nodes, Attribute)
-  to build AST nodes — never construct raw SQL strings. Similarly, use
-  `@blazetrails/activemodel` for validations/callbacks and `@blazetrails/activesupport`
-  for inflection/utilities rather than reimplementing them.
-- **Implementation-first**: The goal is to implement Rails features in
-  TypeScript. Tests being unskipped is a side effect of implementation, not
-  the goal. Don't scan for easy tests to flip — build the feature, then
-  unskip the tests that prove it works. Read the Rails source to understand
-  the feature before implementing.
-- **Read existing code before writing new code**: Before implementing a new
-  class or module, trace how the existing codebase already handles the same
-  concern. Check Base for the actual persistence API (`isNewRecord()`,
-  `isPersisted()`, `readAttribute()`, `writeAttribute()` — not `_persisted`
-  or direct property access). Check existing load/build functions before
-  duplicating logic. Check how existing code handles composite primary keys
-  (`primaryKey` can be `string | string[]`). Methods should delegate to
-  existing infrastructure, not reimplement it.
-- **Ship behavior, not signatures**: Never commit methods that match an API
-  surface but return null/undefined or only manipulate in-memory state when
-  the Rails equivalent hits the database. If a method can't be fully
-  implemented yet, don't add it — a missing method is better than a
-  misleading one. `api:compare` coverage is a side effect of correct
-  implementation, not a goal to optimize for.
-- **Test-driven against Rails**: Progress is measured by `api:compare`,
-  which matches our test files and test names against the actual Rails test suite.
+- `include()` / `Included<>` — bulk-mix instance methods, Rails-style. Mirrors
+  Ruby's `include Mod`. See `packages/activesupport/src/include.ts`, and
+  `packages/activerecord/src/relation.ts` +
+  `packages/activerecord/src/relation/query-methods.ts` for real usage.
+- `extend()` / `Extended<>` — same, but onto the class (static side).
+- `concern()` / `includeConcern()` — our port of `ActiveSupport::Concern`
+  (with `included`/`prepended` blocks and dependency resolution, matching
+  `activesupport/lib/active_support/concern.rb` in the Rails source). See
+  `packages/activesupport/src/concern.ts`.
 
-## Module Mixins (Ruby `include` → TypeScript)
-
-Rails uses `include`/`extend` to mix module methods into a class. TypeScript
-has no equivalent, so we use **`this`-typed functions assigned directly to the
-class**. This is the closest TS equivalent of Ruby's module inclusion.
-
-### Pattern
-
-Define the function in the module file with a `this` parameter:
+For **one-off static methods** where a full Concern is overkill, prefer
+**`this`-typed functions assigned directly to the class**:
 
 ```ts
 // attribute-methods.ts
 export function aliasAttribute(this: AttributeMethodHost, newName: string, oldName: string): void {
-  // `this` is the class (e.g., Model) — use it like Ruby's `self`
   this._attributeAliases[newName] = oldName;
-  // ...
 }
-```
 
-Assign it directly on the class — no wrapper:
-
-```ts
 // model.ts
 import { aliasAttribute } from "./attribute-methods.js";
-
 export class Model {
   static aliasAttribute = aliasAttribute;
 }
 ```
 
-### Why this pattern
+Why: code lives in the file that matches Rails' layout (so `api:compare`
+finds it), no delegation wrappers, type-checked via the host interface,
+and `this` resolves to the actual subclass at runtime.
 
-- **Code lives in the right file.** `aliasAttribute` lives in
-  `attribute-methods.ts`, matching Rails where it's in
-  `attribute_methods.rb`. The `api:compare` script can find it.
-- **No delegation wrappers.** `static aliasAttribute = aliasAttribute` is
-  a direct assignment — no `static aliasAttribute(...args) { fn(this, ...args) }`.
-- **Type-safe.** TypeScript checks that Model satisfies `AttributeMethodHost`
-  at compile time. The `this` parameter is erased at runtime.
-- **Subclass-safe.** `this` resolves to the actual calling class at runtime
-  (e.g., `User` not `Model`), just like Ruby's `self`.
+When NOT to use this:
 
-For **instance methods** mixed in bulk (like Rails' `include QueryMethods`),
-use `include()` and `Included<>` from `@blazetrails/activesupport`.
-See `activesupport/src/include.ts` for the API and
-`relation.ts` + `relation/query-methods.ts` for usage.
-
-### When NOT to use this
-
-- **Ruby lifecycle hooks** (`extended`, `included`, `inherited`) have no TS
-  equivalent. Don't add empty functions just for `api:compare` — add them
-  to the skip list in `scripts/api-compare/compare.ts` instead.
-- **If the method needs Model-specific state** beyond what the host interface
-  declares, keep it in model.ts directly.
+- Ruby lifecycle hooks (`extended`, `included`, `inherited`) — no TS
+  equivalent. Don't stub them; add them to the skip list in
+  `scripts/api-compare/compare.ts`.
+- If the method needs Model-specific state beyond the host interface,
+  keep it in `model.ts` directly.
 
 ## Conventions
 
-- Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
-- Do NOT add "Co-Authored-By" lines to commit messages.
-- Do NOT add "Generated with Claude Code" lines to PR descriptions.
+- [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+- Do NOT add "Co-Authored-By" lines to commits or "Generated with Claude
+  Code" lines to PR descriptions.
 - Tests live next to source files as `*.test.ts`.
-- Prefer small, focused modules over large files.
-- Do NOT use subagents unless explicitly requested. Do the work directly.
-- Do use worktrees for any changes. Leave the default worktree for the user.
-- Copilot automatically reviews every PR and every push, so no need to request review.
-  Copilot reviews can be found at `~/.btwhooks/data/github/blazetrailsdev/trails/$PR`.
-- Do open new PRs in draft status.
+- Prefer small, focused modules.
+- Do NOT use subagents unless explicitly requested.
+- Do use worktrees for any changes; leave the default worktree for the user.
+  Always create them with the `EnterWorktree` skill so they land under
+  `.claude/worktrees/` (gitignored) instead of scattered under `/tmp` or
+  beside the repo. Do NOT run `git worktree add` directly.
+- Open new PRs in **draft** status.
 - After opening a PR, run the `/link` skill with the PR number so webhook
   notifications (Copilot reviews, CI failures) are delivered to this pane.
-- Do NOT add code comments that just describe what the line does. Only add
-  comments when they provide additional value — a potential bug hidden, or
-  explanation about the larger context.
-- Do NOT add empty stubs or placeholder interfaces. Only add real
-  implementations with meaningful logic. If a feature isn't implemented yet,
-  don't create an empty file for it.
-- **NEVER rename or reword test names.** Test names are derived from the Rails
-  test suite and are how `api:compare` matches our tests to Rails tests.
-  If a test is failing or the behavior doesn't match the name, fix the test body
-  (the implementation under test), not the test name. Always look at the
-  corresponding Rails test to understand the expected behavior before changing
-  anything.
+  Copilot auto-reviews every PR and push; reviews land at
+  `~/.btwhooks/data/github/blazetrailsdev/trails/$PR` — no need to request.
+- Do NOT add code comments that just describe what a line does. Only add
+  comments for non-obvious context (hidden bug, broader invariant, etc.).
+- Do NOT add empty stubs or placeholder interfaces. If a feature isn't
+  implemented yet, don't create an empty file for it.
+- **NEVER rename or reword test names.** Test names are how `test:compare`
+  matches our tests to Rails tests. If a test fails or the behavior doesn't
+  match the name, fix the implementation — not the name. Read the
+  corresponding Rails test first.
 
-## Measuring Progress
+## Measuring progress
 
-The primary measure of progress is the `api:compare` script output.
-It compares our test files and test names against the Rails test suite:
+Two complementary scripts (both run in CI on every push; both take
+`--package <name>`):
 
-```bash
-pnpm run api:compare
-```
+- `pnpm run api:compare` — matches our public methods against the Rails
+  source, method by method. This is the coverage number that drives
+  "implementation-first" — an unimplemented method shows up here.
+- `pnpm run test:compare` — matches our test file names and `it()` /
+  `it.skip()` descriptions against the Rails test suite. "Misplaced" means
+  a test exists but is in the wrong file per Rails layout — move it, don't
+  rewrite it. `pnpm run test:stubs` generates stub tests for unmatched
+  Rails tests.
+- `pnpm run lint:deps` — already mentioned above; scores cross-package
+  delegation (e.g. ActiveRecord → Arel) against Rails.
 
-Run it to see current stats per package. Use `--package <name>` for a single package.
+Secondary signal: `pnpm test:types` — Vitest typecheck suites in
+`packages/*/dx-tests/` that pin the public type contract and encode DX gaps
+as assertions. When a gap closes, the assertion flips. A dedicated
+`DX Type Tests` CI job runs on every push, as does a
+`Virtualized DX Type Tests` job covering
+`packages/activerecord/virtualized-dx-tests/` (compiled by `trails-tsc`).
 
-"Misplaced" means tests that exist but are in the wrong file according to
-Rails conventions. These need to be moved, not rewritten.
-
-CI runs `api:compare` on every push to track regressions.
-
-## Measuring DX
-
-A secondary signal is `pnpm test:types` — a Vitest typecheck-mode suite in
-`packages/*/dx-tests/` that exercises the public API the way a Rails
-developer would. It pins the current type contract and encodes DX gaps
-(e.g. `Model.where` returning `any`) as assertions. When a gap is closed,
-the assertion flips and signals the test should be tightened.
-
-A dedicated `DX Type Tests` CI job runs on every push.
-
-### The `declare` pattern for typed runtime-attached members
-
-Several things in ActiveRecord are attached to a class/instance at
-runtime (via `this.attribute`, `this.hasMany`, `this.scope`, `this.enum`,
-...) and aren't visible to the TypeScript type system by default.
-
-- **Instance members** (`record.name`, `post.comments`): `Model`'s
-  `[key: string]: unknown` index signature means the access type-checks
-  but resolves to `unknown`. Opt in with `declare name: string` etc.
-- **Static members** (`Post.published`, enum class scopes): there's no
-  static index signature, so without `declare static`, the access is a
-  `Property 'published' does not exist on type 'typeof Post'` error.
-  Always pair `this.scope(...)`, `this.enum(...)`, and
-  `defineEnum(...)` with a matching `declare static`.
-
-Every snippet below assumes:
-
-```ts
-import {
-  Base,
-  CollectionProxy,
-  AssociationProxy,
-  Relation,
-  association,
-  defineEnum,
-  readEnumValue,
-} from "@blazetrails/activerecord";
-```
-
-**Attributes** — two flavors:
-
-1. **Schema reflection** (Rails-default): columns come from the migration.
-   ActiveRecord's `load_schema!` pulls `columnsHash` from the adapter's
-   schema cache and registers each column as an attribute whose cast
-   type comes from `adapter.lookupCastTypeFromColumn(column)` — including
-   PG OID types (uuid, jsonb, hstore, inet, range, ...). No
-   `this.attribute(...)` call needed for columns that exist in the table.
-
-2. **User override** (`this.attribute(name, type)`): use when you want to
-   pin a type or add a virtual attribute. `attribute()` is now an
-   _override_ — it defaults to `userProvidedDefault: true` (Rails' keyword)
-   and wins over the schema-reflected type. Schema reflection instead
-   registers attributes as schema-sourced and non-user-provided
-   (`source: "schema"`, `userProvided: false`).
-
-```ts
-class User extends Base {
-  // `name` and `admin` come from the schema cache when present; the
-  // `declare` still adds the TypeScript field. The `static` block is
-  // only needed for overrides or virtual attributes.
-  declare name: string;
-  declare admin: boolean;
-  static {
-    // Override: pin `admin` to boolean even if the column is tinyint.
-    this.attribute("admin", "boolean", { default: false });
-  }
-}
-```
-
-**has_many / HABTM** (`this.hasMany(name)` — reader returns an
-`AssociationProxy<Target>`, mirroring Rails' `CollectionProxy`. The proxy
-is **chainable** like Relation, **awaitable** to the loaded array, and
-**array-shaped** for sync ops over the loaded target):
-
-```ts
-class Blog extends Base {
-  declare posts: AssociationProxy<Post>;
-  static {
-    this.hasMany("posts");
-  }
-}
-
-const blog = await Blog.find(1);
-
-// Chainable like Relation — `blog.posts.where(...).order(...)` —
-// matches Rails' `blog.posts.where(published: true).order(:created_at)`.
-const recent = await blog.posts.where({ published: true }).order("created_at").limit(10);
-
-// Awaitable — single `await` hydrates and yields the array. This IS
-// the explicit-load path for collections; no separate `loadPosts()`
-// method exists (the proxy's thenable is the loader).
-const all = await blog.posts;
-
-// Array-shaped sync ops — read the loaded target. (Iteration / .length /
-// .map / [0] don't trigger a fresh load; await first if you need one.)
-for (const post of blog.posts) console.log(post.title);
-const titles = blog.posts.map((p) => p.title);
-const first = blog.posts[0];
-
-// `association(record, name)` still returns the same proxy if you want
-// to bind it to a local for clarity.
-const proxy = association<Post>(blog, "posts"); // AssociationProxy<Post>
-```
-
-**belongs_to / has_one** (sync reader returns the currently loaded
-record or `null`; `loadBelongsTo(name)` / `loadHasOne(name)` perform
-an explicit async load, returning the cached/preloaded value if
-present or running a query otherwise):
-
-```ts
-class Post extends Base {
-  declare author: Author | null;
-  static {
-    this.belongsTo("author");
-  }
-}
-class Author extends Base {
-  declare profile: Profile | null;
-  static {
-    this.hasOne("profile");
-  }
-}
-
-// Sync reads return whatever's currently cached (may be null if
-// nothing loaded). Use `loadBelongsTo(name)` / `loadHasOne(name)` to
-// explicitly load — method name matches the macro, so calling the
-// wrong one is a TS error. Returns the cached/preloaded value if
-// present, otherwise runs a query.
-//
-// Under strict loading (`record.strictLoadingBang()` or
-// `Class.strictLoadingByDefault = true`, both off by default matching
-// Rails), sync access on a singular association that WOULD require a
-// DB load throws `StrictLoadingViolationError` instead of silently
-// returning null. The check honors preloaded / cached associations
-// (including keys mapped to null), null FKs on belongsTo, and new
-// owners on hasOne — none of those would run a query, so none throw.
-// The explicit async loaders (`loadBelongsTo` / `loadHasOne`) bypass
-// the check — the caller asked for the load. Per-instance opt-out:
-// `record.strictLoadingBang(false)`.
-const post = await Post.find(1);
-const author = await post.loadBelongsTo("author"); // Promise<Author | null>
-const author2 = await Author.find(1);
-const profile = await author2.loadHasOne("profile"); // Promise<Profile | null>
-
-// Virtualizer emits typed overloads so the return type narrows
-// automatically. Without the virtualizer, declare by hand:
-//   declare loadBelongsTo: (name: "author") => Promise<Author | null>;
-//   declare loadHasOne: (name: "profile") => Promise<Profile | null>;
-//
-// Collections (hasMany / hasAndBelongsToMany) have no explicit
-// loader — the AssociationProxy is awaitable (`await blog.posts`).
-// Calling `loadBelongsTo("posts")` throws with a pointer to the
-// proxy-await form. Calling the wrong macro for a singular
-// (`loadHasOne("author")` on a belongsTo) also throws with a
-// pointer to the right method.
-```
-
-**Named scopes** (`this.scope(name, fn)` — class-level):
-
-```ts
-class Post extends Base {
-  declare static published: () => Relation<Post>;
-  static {
-    this.scope("published", (rel) => rel.where({ published: true }));
-  }
-}
-```
-
-**Enums** — two forms with different surfaces:
-
-- `this.enum(name, mapping)` (`Base.enum`) generates a predicate +
-  in-memory bang setter (returns `this`, no persistence) + class scope
-  per value.
-- `defineEnum(modelClass, name, mapping)` (`@blazetrails/activerecord`'s
-  `defineEnum`) generates the same + a plain in-memory setter + an async
-  persisting `*Bang` + `not*` class scopes per value. Use this when
-  you want bang methods to persist, matching Rails' `enum` semantics
-  (see section 7 of the ActiveRecord deviations guide).
-
-```ts
-// Base.enum — simpler
-class Task extends Base {
-  declare status: string;
-  declare isLow: () => boolean;
-  declare lowBang: () => this; // in-memory; does not persist
-  declare static low: () => Relation<Task>;
-  static {
-    this.attribute("status", "integer");
-    this.enum("status", { low: 0, high: 1 });
-  }
-}
-
-// defineEnum — full surface
-class Article extends Base {
-  // defineEnum does NOT override the attribute accessor: `status` stays
-  // the integer column. Use `readEnumValue(record, "status")` when you
-  // want the string label.
-  declare status: number;
-  declare isDraft: () => boolean;
-  declare draft: () => void; // plain in-memory setter
-  declare draftBang: () => Promise<void>; // async; in-memory on new records,
-  //                                         otherwise persists via updateColumn
-  //                                         (bypasses validations/callbacks)
-  declare static draft: () => Relation<Article>;
-  declare static notDraft: () => Relation<Article>;
-  static {
-    this.attribute("status", "integer");
-    defineEnum(this, "status", { draft: 0, published: 1 });
-  }
-}
-```
-
-**Do not** redeclare `id` on subclasses — `Base#id` is an accessor
-(`PrimaryKeyValue`) and TS forbids overriding accessors with differently
-typed instance properties. Narrow at the use site instead:
-`record.id as number`.
-
-See `packages/activerecord/dx-tests/declare-patterns.test-d.ts` for the
-canonical manual-`declare` reference (the escape hatch — use when the
-virtualizer doesn't yet produce the declare you need, or when you want
-the shape documented locally).
-
-`packages/activerecord/virtualized-dx-tests/virtualized-patterns.test-d.ts`
-is the parallel **zero-declare** reference compiled by `trails-tsc`. It
-shows the Rails-fidelity authoring form (pure `static { this.attribute(...) }`
-blocks) and is the default you should prefer. CI runs it as the
-`Virtualized DX Type Tests` job.
-
-`CollectionProxy<T>` and `AssociationProxy<T>` are both generic in the
-element type. Without the `declare` (manual) or without `trails-tsc`
-compiling the file (virtualized), these runtime-attached members still
-resolve to `unknown`.
-
-### Schema-column declares via `--schema`
-
-For schema-only columns (columns that exist in the migration but aren't
-declared via `this.attribute(...)`), pass a schema-columns JSON to
-`trails-tsc` so the virtualizer can inject matching `declare` lines:
-
-```sh
-trails-tsc --schema db/schema-columns.json
-```
-
-JSON shape accepts either:
-
-- Legacy string: `{ "<table>": { "<column>": "<rails_type>", ... } }`
-- Rich: `{ "<table>": { "<column>": { "type": "<rails_type>", "null"?: boolean, "arrayElementType"?: "<rails_type>" }, ... } }`
-
-The rich shape (emitted by `trails-schema-dump`) drives:
-
-- Nullability: `null: true` renders `Type | null`, `null: false` renders the bare type. `null` is optional — omitting it is treated as `true` (Rails' conservative default: columns without a NOT NULL constraint are nullable).
-- Array element type: when `type: "array"` and `arrayElementType` is set, trails-tsc renders `ElementTsType[]` instead of the default `unknown[]`.
-
-Table resolution is `static tableName = "..."` when present, otherwise
-`pluralize(underscore(className))`. User `declare`s and
-`this.attribute(...)` calls always win over schema-sourced declares.
-`id` is skipped (Base's `PrimaryKeyValue` accessor handles it).
-Non-identifier / reserved-word column names (e.g. `strange-col`,
-`class`) are emitted as quoted class fields (`declare "strange-col":
-string;`). Emit order is sorted alphabetically for stability.
-
-Emit the JSON from a live adapter with `trails-schema-dump`:
-
-```sh
-# Explicit URL — print to stdout
-trails-schema-dump --database-url postgres://localhost/mydb
-
-# DATABASE_URL is read from the environment if --database-url is absent
-DATABASE_URL=postgres://localhost/mydb trails-schema-dump --out db/schema-columns.json
-
-# Feed into the type-checker
-trails-tsc --schema db/schema-columns.json
-```
-
-Rails-bookkeeping tables (`schema_migrations`, `ar_internal_metadata`)
-are skipped by default. Pass `--ignore t1,t2` to drop additional tables.
-Both tables and columns are emitted in sorted order for stable diffs.
+The canonical manual-`declare` reference is
+`packages/activerecord/dx-tests/declare-patterns.test-d.ts`; the zero-declare
+virtualized reference is
+`packages/activerecord/virtualized-dx-tests/virtualized-patterns.test-d.ts`.
+Prefer the virtualized form for new model code (see README).
