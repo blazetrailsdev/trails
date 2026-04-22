@@ -26,7 +26,11 @@ import {
   StaleObjectError,
   ConnectionNotDefined,
 } from "./errors.js";
-import { AutosaveAssociation } from "./autosave-association.js";
+import {
+  AutosaveAssociation,
+  autosaveBelongsTo,
+  autosaveChildren,
+} from "./autosave-association.js";
 import {
   isValid as validationsIsValid,
   defaultValidationContext,
@@ -110,7 +114,7 @@ import {
   unscoped as _unscoped,
 } from "./scoping/default.js";
 import * as NamedScoping from "./scoping/named.js";
-import { Associations as _Associations } from "./associations.js";
+import { Associations as _Associations, updateCounterCaches } from "./associations.js";
 
 /** @internal */
 export function quoteSqlValue(v: unknown, asArray = false): string {
@@ -2035,8 +2039,6 @@ export class Base extends Model {
    */
   private async _createOrUpdate(): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
-    const { autosaveBelongsTo, autosaveChildren } = await import("./autosave-association.js");
-
     let saved = false;
     if (!(await ctor._callbackChain.runBeforeAsync("save", this))) return false;
 
@@ -2083,7 +2085,6 @@ export class Base extends Model {
       await ctor._callbackChain.runAfterAsync("save", this);
 
       if (wasNewRecord) {
-        const { updateCounterCaches } = await import("./associations.js");
         await updateCounterCaches(this, "increment");
       }
 
@@ -2283,7 +2284,6 @@ export class Base extends Model {
       (this as any)._triggerDestroyCallback = true;
       (this as any)._newRecordBeforeLastCommit = false;
       (this as any)._triggerUpdateCallback = false;
-      const { updateCounterCaches } = await import("./associations.js");
       await updateCounterCaches(this, "decrement");
     }
 
