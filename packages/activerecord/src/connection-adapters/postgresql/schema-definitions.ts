@@ -19,6 +19,7 @@ import type {
   ColumnType,
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
+import { quoteIdentifier } from "../abstract/quoting.js";
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PostgreSQL {
@@ -59,9 +60,293 @@ export interface ColumnMethods {
   enumType(name: string, enumName: string, options?: ColumnOptions): unknown;
 }
 
+export interface ExclusionConstraintOptions {
+  name?: string;
+  using?: string;
+  where?: string;
+  deferrable?: boolean | "immediate" | "deferred";
+  [key: string]: unknown;
+}
+
+export class ExclusionConstraintDefinition {
+  constructor(
+    readonly tableName: string,
+    readonly expression: string,
+    readonly options: ExclusionConstraintOptions = {},
+  ) {}
+
+  get name(): string | undefined {
+    return this.options.name;
+  }
+
+  get using(): string | undefined {
+    return this.options.using;
+  }
+
+  get where(): string | undefined {
+    return this.options.where;
+  }
+
+  get deferrable(): boolean | "immediate" | "deferred" | undefined {
+    return this.options.deferrable;
+  }
+
+  exportNameOnSchemaDump(): boolean {
+    return this.name != null;
+  }
+}
+
+export interface UniqueConstraintOptions {
+  name?: string;
+  deferrable?: boolean | "immediate" | "deferred";
+  usingIndex?: string;
+  nullsNotDistinct?: boolean;
+  [key: string]: unknown;
+}
+
+export class UniqueConstraintDefinition {
+  constructor(
+    readonly tableName: string,
+    readonly column: string | string[],
+    readonly options: UniqueConstraintOptions = {},
+  ) {}
+
+  get name(): string | undefined {
+    return this.options.name;
+  }
+
+  get deferrable(): boolean | "immediate" | "deferred" | undefined {
+    return this.options.deferrable;
+  }
+
+  get usingIndex(): string | undefined {
+    return this.options.usingIndex;
+  }
+
+  get nullsNotDistinct(): boolean | undefined {
+    return this.options.nullsNotDistinct;
+  }
+
+  exportNameOnSchemaDump(): boolean {
+    return this.name != null;
+  }
+
+  definedFor(
+    opts: { name?: string; column?: string | string[]; [key: string]: unknown } = {},
+  ): boolean {
+    const { name, column, ...rest } = opts;
+    if (name != null && this.name !== String(name)) return false;
+    if (column != null) {
+      const thisCol = Array.isArray(this.column) ? this.column : [this.column];
+      const thatCol = (Array.isArray(column) ? column : [column]).map(String);
+      if (thisCol.join(",") !== thatCol.join(",")) return false;
+    }
+    // Mirrors Rails: options.slice(*self.options.keys).all? { |k, v| self.options[k].to_s == v.to_s }
+    // slice drops keys not present in self.options, so unknown keys are ignored.
+    // nil.to_s == "" in Ruby, so coerce null/undefined to "" like Rails does.
+    const toS = (x: unknown): string => (x == null ? "" : String(x));
+    const storedOpts = this.options as Record<string, unknown>;
+    for (const [k, v] of Object.entries(rest)) {
+      if (!(k in storedOpts)) continue;
+      if (toS(storedOpts[k]) !== toS(v)) return false;
+    }
+    return true;
+  }
+}
+
+function deferrableSql(deferrable: boolean | "immediate" | "deferred" | undefined): string[] {
+  if (!deferrable) return [];
+  if (deferrable === true) return ["DEFERRABLE"];
+  return [`DEFERRABLE INITIALLY ${deferrable.toUpperCase()}`];
+}
+
 export class TableDefinition extends AbstractTableDefinition {
-  constructor(tableName: string, options: { id?: boolean | "uuid" } = {}) {
+  readonly exclusionConstraints: ExclusionConstraintDefinition[] = [];
+  readonly uniqueConstraints: UniqueConstraintDefinition[] = [];
+  readonly unlogged: boolean;
+
+  constructor(
+    tableName: string,
+    options: {
+      id?: boolean | "uuid";
+      unlogged?: boolean;
+      options?: string;
+      comment?: string;
+      temporary?: boolean;
+      ifNotExists?: boolean;
+      as?: string;
+    } = {},
+  ) {
     super(tableName, { ...options, adapterName: "postgres" });
+    this.unlogged = options.unlogged ?? false;
+  }
+
+  exclusionConstraint(expression: string, options: ExclusionConstraintOptions = {}): this {
+    this.exclusionConstraints.push(this.newExclusionConstraintDefinition(expression, options));
+    return this;
+  }
+
+  uniqueConstraint(columnName: string | string[], options: UniqueConstraintOptions = {}): this {
+    this.uniqueConstraints.push(this.newUniqueConstraintDefinition(columnName, options));
+    return this;
+  }
+
+  newExclusionConstraintDefinition(
+    expression: string,
+    options: ExclusionConstraintOptions = {},
+  ): ExclusionConstraintDefinition {
+    return new ExclusionConstraintDefinition(this.tableName, expression, options);
+  }
+
+  newUniqueConstraintDefinition(
+    columnName: string | string[],
+    options: UniqueConstraintOptions = {},
+  ): UniqueConstraintDefinition {
+    return new UniqueConstraintDefinition(this.tableName, columnName, options);
+  }
+
+  override toSql(): string {
+    let sql = super.toSql();
+
+    if (this.unlogged) {
+      sql = sql.replace(/^CREATE TABLE/, "CREATE UNLOGGED TABLE");
+    }
+
+    if (!this.as && (this.exclusionConstraints.length > 0 || this.uniqueConstraints.length > 0)) {
+      const constraintSql = [
+        ...this.exclusionConstraints.map((ec) => this.exclusionConstraintSql(ec)),
+        ...this.uniqueConstraints.map((uc) => this.uniqueConstraintSql(uc)),
+      ].join(", ");
+      sql = this.appendConstraintsToSql(sql, constraintSql);
+    }
+
+    return sql;
+  }
+
+  private appendConstraintsToSql(sql: string, constraintSql: string): string {
+    const range = this.tableElementListRange(sql);
+    if (range === null)
+      throw new Error(
+        `Unable to append constraints to CREATE TABLE statement for ${this.tableName}: ${sql}`,
+      );
+    const { openingParenIndex, closingParenIndex } = range;
+    const inner = sql.slice(openingParenIndex + 1, closingParenIndex).trim();
+    const separator = inner.length === 0 ? "" : ", ";
+    return (
+      sql.slice(0, closingParenIndex) + separator + constraintSql + sql.slice(closingParenIndex)
+    );
+  }
+
+  private tableElementListRange(
+    sql: string,
+  ): { openingParenIndex: number; closingParenIndex: number } | null {
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+    let openingParenIndex = -1;
+
+    for (let i = 0; i < sql.length; i++) {
+      const ch = sql[i];
+
+      if (inSingleQuote) {
+        if (ch === "'" && sql[i + 1] === "'") {
+          i++;
+          continue;
+        }
+        if (ch === "'") inSingleQuote = false;
+        continue;
+      }
+      if (inDoubleQuote) {
+        if (ch === '"' && sql[i + 1] === '"') {
+          i++;
+          continue;
+        }
+        if (ch === '"') inDoubleQuote = false;
+        continue;
+      }
+      if (ch === "'") {
+        inSingleQuote = true;
+        continue;
+      }
+      if (ch === '"') {
+        inDoubleQuote = true;
+        continue;
+      }
+      if (ch === "(") {
+        openingParenIndex = i;
+        break;
+      }
+    }
+
+    if (openingParenIndex === -1) return null;
+
+    let depth = 0;
+    inSingleQuote = false;
+    inDoubleQuote = false;
+
+    for (let i = openingParenIndex; i < sql.length; i++) {
+      const ch = sql[i];
+
+      if (inSingleQuote) {
+        if (ch === "'" && sql[i + 1] === "'") {
+          i++;
+          continue;
+        }
+        if (ch === "'") inSingleQuote = false;
+        continue;
+      }
+      if (inDoubleQuote) {
+        if (ch === '"' && sql[i + 1] === '"') {
+          i++;
+          continue;
+        }
+        if (ch === '"') inDoubleQuote = false;
+        continue;
+      }
+      if (ch === "'") {
+        inSingleQuote = true;
+        continue;
+      }
+      if (ch === '"') {
+        inDoubleQuote = true;
+        continue;
+      }
+      if (ch === "(") {
+        depth++;
+        continue;
+      }
+      if (ch === ")") {
+        depth--;
+        if (depth === 0) return { openingParenIndex, closingParenIndex: i };
+      }
+    }
+
+    return null;
+  }
+
+  private exclusionConstraintSql(ec: ExclusionConstraintDefinition): string {
+    const parts: string[] = [];
+    if (ec.name) parts.push("CONSTRAINT", quoteIdentifier(ec.name, "postgres"));
+    parts.push("EXCLUDE");
+    if (ec.using) parts.push(`USING ${ec.using}`);
+    parts.push(`(${ec.expression})`);
+    if (ec.where) parts.push(`WHERE (${ec.where})`);
+    parts.push(...deferrableSql(ec.deferrable));
+    return parts.join(" ");
+  }
+
+  private uniqueConstraintSql(uc: UniqueConstraintDefinition): string {
+    const columns = Array.isArray(uc.column) ? uc.column : [uc.column];
+    const parts: string[] = [];
+    if (uc.name) parts.push("CONSTRAINT", quoteIdentifier(uc.name, "postgres"));
+    parts.push("UNIQUE");
+    if (uc.nullsNotDistinct) parts.push("NULLS NOT DISTINCT");
+    if (uc.usingIndex) {
+      parts.push(`USING INDEX ${quoteIdentifier(uc.usingIndex, "postgres")}`);
+    } else {
+      parts.push(`(${columns.map((c) => quoteIdentifier(c, "postgres")).join(", ")})`);
+    }
+    parts.push(...deferrableSql(uc.deferrable));
+    return parts.join(" ");
   }
 
   bigserial(name: string, options: ColumnOptions = {}): this {
@@ -198,14 +483,93 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 }
 
+export interface SchemaStatementsConstraintLike extends SchemaStatementsLike {
+  addExclusionConstraint?(
+    tableName: string,
+    expression: string,
+    options?: ExclusionConstraintOptions,
+  ): Promise<void>;
+  removeExclusionConstraint?(tableName: string, options?: { name?: string }): Promise<void>;
+  addUniqueConstraint?(
+    tableName: string,
+    column: string | string[],
+    options?: UniqueConstraintOptions,
+  ): Promise<void>;
+  removeUniqueConstraint?(tableName: string, options?: { name?: string }): Promise<void>;
+  validateConstraint?(tableName: string, constraintName: string): Promise<void>;
+  validateCheckConstraint?(tableName: string, constraintName: string): Promise<void>;
+}
+
 export class Table extends AbstractTable {
-  constructor(tableName: string, schema: SchemaStatementsLike) {
+  private _pgSchema: SchemaStatementsConstraintLike;
+  private _pgTableName: string;
+
+  constructor(tableName: string, schema: SchemaStatementsConstraintLike) {
     super(tableName, schema);
+    this._pgTableName = tableName;
+    this._pgSchema = schema;
+  }
+
+  exclusionConstraint(expression: string, options?: ExclusionConstraintOptions): Promise<void> {
+    this._requireConstraint("addExclusionConstraint");
+    return this._pgSchema.addExclusionConstraint!(this._pgTableName, expression, options);
+  }
+
+  removeExclusionConstraint(options?: { name?: string }): Promise<void> {
+    this._requireConstraint("removeExclusionConstraint");
+    return this._pgSchema.removeExclusionConstraint!(this._pgTableName, options);
+  }
+
+  uniqueConstraint(column: string | string[], options?: UniqueConstraintOptions): Promise<void> {
+    this._requireConstraint("addUniqueConstraint");
+    return this._pgSchema.addUniqueConstraint!(this._pgTableName, column, options);
+  }
+
+  removeUniqueConstraint(options?: { name?: string }): Promise<void> {
+    this._requireConstraint("removeUniqueConstraint");
+    return this._pgSchema.removeUniqueConstraint!(this._pgTableName, options);
+  }
+
+  validateConstraint(constraintName: string): Promise<void> {
+    this._requireConstraint("validateConstraint");
+    return this._pgSchema.validateConstraint!(this._pgTableName, constraintName);
+  }
+
+  validateCheckConstraint(constraintName: string): Promise<void> {
+    this._requireConstraint("validateCheckConstraint");
+    return this._pgSchema.validateCheckConstraint!(this._pgTableName, constraintName);
+  }
+
+  private _requireConstraint(method: keyof SchemaStatementsConstraintLike): void {
+    if (!this._pgSchema[method]) {
+      throw new Error(`${method} is not supported by the current schema backend`);
+    }
   }
 }
 
 export class AlterTable extends AbstractAlterTable {
-  constructor(name: string) {
-    super(name);
+  readonly constraintValidations: string[] = [];
+  readonly exclusionConstraintAdds: ExclusionConstraintDefinition[] = [];
+  readonly uniqueConstraintAdds: UniqueConstraintDefinition[] = [];
+
+  private _td: TableDefinition;
+
+  constructor(td: TableDefinition) {
+    super(td.tableName);
+    this._td = td;
+  }
+
+  validateConstraint(name: string): void {
+    this.constraintValidations.push(name);
+  }
+
+  addExclusionConstraint(expression: string, options: ExclusionConstraintOptions = {}): void {
+    this.exclusionConstraintAdds.push(
+      this._td.newExclusionConstraintDefinition(expression, options),
+    );
+  }
+
+  addUniqueConstraint(columnName: string | string[], options: UniqueConstraintOptions = {}): void {
+    this.uniqueConstraintAdds.push(this._td.newUniqueConstraintDefinition(columnName, options));
   }
 }
