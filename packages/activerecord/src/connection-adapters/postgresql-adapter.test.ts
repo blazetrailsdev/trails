@@ -631,6 +631,216 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   // ── Rails-matching test stubs ──
+
+  describe("checkConstraints", () => {
+    beforeEach(async () => {
+      await adapter.exec(`CREATE TABLE "check_test" ("id" SERIAL PRIMARY KEY, "age" INTEGER)`);
+    });
+
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "check_test" CASCADE`);
+    });
+
+    it("returns check constraints with expression and valid flag", async () => {
+      await adapter.exec(`ALTER TABLE "check_test" ADD CONSTRAINT "chk_age" CHECK (age > 0)`);
+      const constraints = await adapter.checkConstraints("check_test");
+      expect(constraints).toHaveLength(1);
+      expect(constraints[0].name).toBe("chk_age");
+      expect(constraints[0].expression).toBe("age > 0");
+      expect(constraints[0].validate).toBe(true);
+    });
+
+    it("returns valid: false for NOT VALID check constraints", async () => {
+      await adapter.exec(
+        `ALTER TABLE "check_test" ADD CONSTRAINT "chk_age_nv" CHECK (age > 0) NOT VALID`,
+      );
+      const constraints = await adapter.checkConstraints("check_test");
+      expect(constraints).toHaveLength(1);
+      expect(constraints[0].name).toBe("chk_age_nv");
+      expect(constraints[0].validate).toBe(false);
+    });
+
+    it("returns empty array when no check constraints exist", async () => {
+      const constraints = await adapter.checkConstraints("check_test");
+      expect(constraints).toHaveLength(0);
+    });
+  });
+
+  describe("addForeignKey options", () => {
+    beforeEach(async () => {
+      await adapter.exec(`CREATE TABLE "fk_parents" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec(
+        `CREATE TABLE "fk_children" ("id" SERIAL PRIMARY KEY, "parent_id" INTEGER)`,
+      );
+    });
+
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "fk_children" CASCADE`);
+      await adapter.exec(`DROP TABLE IF EXISTS "fk_parents" CASCADE`);
+    });
+
+    it("adds FK with ON DELETE CASCADE", async () => {
+      await adapter.addForeignKey("fk_children", "fk_parents", {
+        column: "parent_id",
+        name: "fk_cascade",
+        onDelete: "cascade",
+      });
+      const rows = await adapter.execute(
+        `SELECT confdeltype FROM pg_constraint WHERE conname = 'fk_cascade'`,
+      );
+      // 'a'=no action 'r'=restrict 'c'=cascade 'n'=set null 'd'=set default
+      expect((rows as any[])[0].confdeltype).toBe("c");
+    });
+
+    it("adds FK with ON UPDATE RESTRICT", async () => {
+      await adapter.addForeignKey("fk_children", "fk_parents", {
+        column: "parent_id",
+        name: "fk_restrict",
+        onUpdate: "restrict",
+      });
+      const rows = await adapter.execute(
+        `SELECT confupdtype FROM pg_constraint WHERE conname = 'fk_restrict'`,
+      );
+      expect((rows as any[])[0].confupdtype).toBe("r");
+    });
+
+    it("adds FK with ON DELETE SET NULL (nullify)", async () => {
+      await adapter.addForeignKey("fk_children", "fk_parents", {
+        column: "parent_id",
+        name: "fk_nullify",
+        onDelete: "nullify",
+      });
+      const rows = await adapter.execute(
+        `SELECT confdeltype FROM pg_constraint WHERE conname = 'fk_nullify'`,
+      );
+      expect((rows as any[])[0].confdeltype).toBe("n");
+    });
+
+    it("adds FK with DEFERRABLE INITIALLY DEFERRED", async () => {
+      await adapter.addForeignKey("fk_children", "fk_parents", {
+        column: "parent_id",
+        name: "fk_deferred",
+        deferrable: "deferred",
+      });
+      const row = await adapter.execute(
+        `SELECT condeferrable, condeferred FROM pg_constraint WHERE conname = 'fk_deferred'`,
+      );
+      expect((row as any[])[0].condeferrable).toBe(true);
+      expect((row as any[])[0].condeferred).toBe(true);
+    });
+
+    it("adds FK with validate: false (NOT VALID)", async () => {
+      await adapter.addForeignKey("fk_children", "fk_parents", {
+        column: "parent_id",
+        name: "fk_not_valid",
+        validate: false,
+      });
+      const row = await adapter.execute(
+        `SELECT convalidated FROM pg_constraint WHERE conname = 'fk_not_valid'`,
+      );
+      expect((row as any[])[0].convalidated).toBe(false);
+    });
+  });
+
+  describe("addExclusionConstraint / removeExclusionConstraint", () => {
+    beforeEach(async () => {
+      await adapter.exec(`CREATE TABLE "excl_test" ("id" SERIAL PRIMARY KEY, "during" tsrange)`);
+    });
+
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "excl_test" CASCADE`);
+    });
+
+    it("adds and introspects an exclusion constraint", async () => {
+      await adapter.addExclusionConstraint("excl_test", `"during" WITH &&`, {
+        name: "excl_during",
+        using: "gist",
+      });
+      const rows = await adapter.execute(
+        `SELECT conname FROM pg_constraint WHERE conname = 'excl_during' AND contype = 'x'`,
+      );
+      expect(rows as any[]).toHaveLength(1);
+    });
+
+    it("removes an exclusion constraint by name via options object", async () => {
+      await adapter.addExclusionConstraint("excl_test", `"during" WITH &&`, {
+        name: "excl_to_remove",
+        using: "gist",
+      });
+      await adapter.removeExclusionConstraint("excl_test", { name: "excl_to_remove" });
+      const rows = await adapter.execute(
+        `SELECT conname FROM pg_constraint WHERE conname = 'excl_to_remove'`,
+      );
+      expect(rows as any[]).toHaveLength(0);
+    });
+
+    it("removes an exclusion constraint by expression string", async () => {
+      await adapter.addExclusionConstraint("excl_test", `"during" WITH &&`, {
+        name: "excl_by_expr",
+        using: "gist",
+      });
+      await adapter.removeExclusionConstraint("excl_test", `"during" WITH &&`, {
+        name: "excl_by_expr",
+      });
+      const rows = await adapter.execute(
+        `SELECT conname FROM pg_constraint WHERE conname = 'excl_by_expr'`,
+      );
+      expect(rows as any[]).toHaveLength(0);
+    });
+
+    it("throws when neither expression nor name provided", async () => {
+      await expect(adapter.removeExclusionConstraint("excl_test")).rejects.toThrow(
+        /expression.*name/,
+      );
+    });
+  });
+
+  describe("addUniqueConstraint / removeUniqueConstraint", () => {
+    beforeEach(async () => {
+      await adapter.exec(
+        `CREATE TABLE "uniq_test" ("id" SERIAL PRIMARY KEY, "email" TEXT, "username" TEXT)`,
+      );
+    });
+
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "uniq_test" CASCADE`);
+    });
+
+    it("adds a unique constraint on a single column", async () => {
+      await adapter.addUniqueConstraint("uniq_test", "email", { name: "uniq_email" });
+      const rows = await adapter.execute(
+        `SELECT conname FROM pg_constraint WHERE conname = 'uniq_email' AND contype = 'u'`,
+      );
+      expect(rows as any[]).toHaveLength(1);
+    });
+
+    it("adds a DEFERRABLE unique constraint", async () => {
+      await adapter.addUniqueConstraint("uniq_test", "username", {
+        name: "uniq_username_deferred",
+        deferrable: "deferred",
+      });
+      const row = await adapter.execute(
+        `SELECT condeferrable, condeferred FROM pg_constraint WHERE conname = 'uniq_username_deferred'`,
+      );
+      expect((row as any[])[0].condeferrable).toBe(true);
+      expect((row as any[])[0].condeferred).toBe(true);
+    });
+
+    it("removes a unique constraint by name", async () => {
+      await adapter.addUniqueConstraint("uniq_test", "email", { name: "uniq_to_remove" });
+      await adapter.removeUniqueConstraint("uniq_test", { name: "uniq_to_remove" });
+      const rows = await adapter.execute(
+        `SELECT conname FROM pg_constraint WHERE conname = 'uniq_to_remove'`,
+      );
+      expect(rows as any[]).toHaveLength(0);
+    });
+
+    it("throws if neither columnName nor usingIndex provided to addUniqueConstraint", async () => {
+      await expect(adapter.addUniqueConstraint("uniq_test", null)).rejects.toThrow(
+        /columnName.*usingIndex/,
+      );
+    });
+  });
 });
 
 describe("PostgreSQLAdapter supports_* predicates (unit)", () => {

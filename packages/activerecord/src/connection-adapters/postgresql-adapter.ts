@@ -1,6 +1,6 @@
 import pg from "pg";
 import { type Type, ValueType } from "@blazetrails/activemodel";
-import { singularize, underscore, Notifications } from "@blazetrails/activesupport";
+import { singularize, underscore, Notifications, getCrypto } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -40,6 +40,20 @@ import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import { transactionIsolationLevels, typeCastedBinds } from "./abstract/database-statements.js";
 import { READ_QUERY } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
+import {
+  ExclusionConstraintDefinition,
+  UniqueConstraintDefinition,
+  Table as PgTable,
+  type ExclusionConstraintOptions,
+  type UniqueConstraintOptions,
+  type SchemaStatementsConstraintLike,
+} from "./postgresql/schema-definitions.js";
+import {
+  CheckConstraintDefinition,
+  type ReferentialAction,
+} from "./abstract/schema-definitions.js";
+import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
+import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 
 /**
  * PostgreSQL adapter — connects ActiveRecord to a real PostgreSQL database.
@@ -2771,8 +2785,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async addForeignKey(
     fromTable: string,
     toTable: string,
-    options: { column?: string; primaryKey?: string; name?: string } = {},
+    options: {
+      column?: string;
+      primaryKey?: string;
+      name?: string;
+      onDelete?: ReferentialAction;
+      onUpdate?: ReferentialAction;
+      deferrable?: "immediate" | "deferred";
+      validate?: boolean;
+    } = {},
   ): Promise<void> {
+    this.assertValidDeferrable(options.deferrable);
     const { schema: fromSchema, table: fromTbl } = this.parseSchemaQualifiedName(fromTable);
     const { schema: toSchema, table: toTbl } = this.parseSchemaQualifiedName(toTable);
 
@@ -2783,10 +2806,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const qi = (s: string) => this.quoteIdentifier(s);
     const qualifiedFrom = fromSchema ? `${qi(fromSchema)}.${qi(fromTbl)}` : qi(fromTbl);
     const qualifiedTo = toSchema ? `${qi(toSchema)}.${qi(toTbl)}` : qi(toTbl);
+    const sc = this.schemaCreation();
 
-    await this.exec(
-      `ALTER TABLE ${qualifiedFrom} ADD CONSTRAINT ${qi(name)} FOREIGN KEY (${qi(column)}) REFERENCES ${qualifiedTo} (${qi(pk)})`,
-    );
+    let sql = `ALTER TABLE ${qualifiedFrom} ADD CONSTRAINT ${qi(name)} FOREIGN KEY (${qi(column)}) REFERENCES ${qualifiedTo} (${qi(pk)})`;
+    if (options.onDelete) sql += ` ${sc.actionSql("DELETE", options.onDelete)}`;
+    if (options.onUpdate) sql += ` ${sc.actionSql("UPDATE", options.onUpdate)}`;
+    sql += this.deferrable(options.deferrable);
+    if (options.validate === false) sql += " NOT VALID";
+
+    await this.exec(sql);
   }
 
   async foreignKeyExists(fromTable: string, toTable: string): Promise<boolean> {
@@ -3286,6 +3314,229 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
        ORDER BY i.idx`,
     );
     return rows.map((r) => r.name as string);
+  }
+
+  async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
+    const scope = this.quotedScope(tableName);
+    const rows = await this.schemaQuery(
+      `SELECT conname, pg_get_constraintdef(c.oid, true) AS constraintdef, c.convalidated AS valid
+       FROM pg_constraint c
+       JOIN pg_class t ON c.conrelid = t.oid
+       JOIN pg_namespace n ON n.oid = c.connamespace
+       WHERE c.contype = 'c'
+         AND t.relname = ${scope.name!}
+         AND n.nspname = ${scope.schema}`,
+    );
+    return rows.map((row) => {
+      const expression = (row.constraintdef as string).match(/CHECK \((.+)\)/s)?.[1] ?? "";
+      return new CheckConstraintDefinition(
+        tableName,
+        expression,
+        row.conname as string,
+        row.valid as boolean,
+      );
+    });
+  }
+
+  exclusionConstraintOptions(
+    tableName: string,
+    expression: string,
+    options: Record<string, unknown>,
+  ): Record<string, unknown> {
+    this.assertValidDeferrable(options.deferrable);
+    const opts = { ...options };
+    if (!opts.name) {
+      opts.name = this.exclusionConstraintName(tableName, expression, opts);
+    }
+    return opts;
+  }
+
+  async addExclusionConstraint(
+    tableName: string,
+    expression: string,
+    options: ExclusionConstraintOptions = {},
+  ): Promise<void> {
+    const opts = this.exclusionConstraintOptions(tableName, expression, options);
+    const name = this.quoteIdentifier(opts.name as string);
+    const using = opts.using ? ` USING ${opts.using}` : "";
+    const where = opts.where ? ` WHERE (${opts.where})` : "";
+    const deferParts = this.deferrable(opts.deferrable as "immediate" | "deferred" | undefined);
+    await this.exec(
+      `ALTER TABLE ${this.quoteTableName(tableName)} ADD CONSTRAINT ${name} EXCLUDE${using} (${expression})${where}${deferParts}`,
+    );
+  }
+
+  async removeExclusionConstraint(
+    tableName: string,
+    expressionOrOptions?: string | Record<string, unknown> | null,
+    options: Record<string, unknown> = {},
+  ): Promise<void> {
+    const expression =
+      typeof expressionOrOptions === "string" || expressionOrOptions == null
+        ? expressionOrOptions
+        : null;
+    const opts =
+      typeof expressionOrOptions === "object" && expressionOrOptions !== null
+        ? expressionOrOptions
+        : options;
+    if (!expression && !opts.name) {
+      throw new Error(
+        "Either expression or `name` option must be provided for removeExclusionConstraint.",
+      );
+    }
+    const excl = this.exclusionConstraintForBang(tableName, expression ?? null, opts);
+    await this.exec(
+      `ALTER TABLE ${this.quoteTableName(tableName)} DROP CONSTRAINT ${this.quoteIdentifier(excl.name!)}`,
+    );
+  }
+
+  uniqueConstraintOptions(
+    tableName: string,
+    columnName: string | string[] | null | undefined,
+    options: Record<string, unknown>,
+  ): Record<string, unknown> {
+    this.assertValidDeferrable(options.deferrable);
+    if (columnName && options.usingIndex) {
+      throw new Error("Cannot specify both `columnName` and `usingIndex` options.");
+    }
+    const opts = { ...options };
+    if (!opts.name) {
+      opts.name = this.uniqueConstraintName(tableName, columnName, opts);
+    }
+    return opts;
+  }
+
+  async addUniqueConstraint(
+    tableName: string,
+    columnName?: string | string[] | null,
+    options: UniqueConstraintOptions = {},
+  ): Promise<void> {
+    if (!columnName && !options.usingIndex) {
+      throw new Error("Either columnName or usingIndex must be provided for addUniqueConstraint.");
+    }
+    const opts = this.uniqueConstraintOptions(tableName, columnName, options);
+    const name = this.quoteIdentifier(opts.name as string);
+    const deferParts = this.deferrable(opts.deferrable as "immediate" | "deferred" | undefined);
+    let constraintSql: string;
+    if (opts.usingIndex) {
+      constraintSql = `UNIQUE USING INDEX ${this.quoteIdentifier(opts.usingIndex as string)}`;
+    } else {
+      const cols = Array.isArray(columnName) ? columnName : [columnName!];
+      const nullsNotDistinct = opts.nullsNotDistinct ? " NULLS NOT DISTINCT" : "";
+      constraintSql = `UNIQUE${nullsNotDistinct} (${cols.map((c) => this.quoteIdentifier(c)).join(", ")})`;
+    }
+    await this.exec(
+      `ALTER TABLE ${this.quoteTableName(tableName)} ADD CONSTRAINT ${name} ${constraintSql}${deferParts}`,
+    );
+  }
+
+  async removeUniqueConstraint(
+    tableName: string,
+    columnNameOrOptions?: string | string[] | Record<string, unknown> | null,
+    options: Record<string, unknown> = {},
+  ): Promise<void> {
+    const columnName =
+      columnNameOrOptions === null ||
+      typeof columnNameOrOptions === "string" ||
+      Array.isArray(columnNameOrOptions) ||
+      columnNameOrOptions === undefined
+        ? columnNameOrOptions
+        : undefined;
+    const opts =
+      typeof columnNameOrOptions === "object" &&
+      columnNameOrOptions !== null &&
+      !Array.isArray(columnNameOrOptions)
+        ? columnNameOrOptions
+        : options;
+    if (!columnName && !opts.name && !opts.usingIndex) {
+      throw new Error(
+        "Either `columnName`, `name`, or `usingIndex` option must be provided for removeUniqueConstraint.",
+      );
+    }
+    const uniq = this.uniqueConstraintForBang(tableName, columnName, opts);
+    await this.exec(
+      `ALTER TABLE ${this.quoteTableName(tableName)} DROP CONSTRAINT ${this.quoteIdentifier(uniq.name!)}`,
+    );
+  }
+
+  indexName(tableName: string, options: { column?: string | string[] }): string {
+    const normalizedTableName = tableName.replace(/[."]/g, "_");
+    const cols = Array.isArray(options.column) ? options.column : [options.column ?? ""];
+    return `index_${normalizedTableName}_on_${cols.join("_and_")}`;
+  }
+
+  addIndexOptions(
+    _tableName: string,
+    _columnName: string | string[],
+    options: Record<string, unknown> = {},
+  ): Record<string, unknown> {
+    return { ...options };
+  }
+
+  schemaCreation(): PgSchemaCreation {
+    return new PgSchemaCreation();
+  }
+
+  updateTableDefinition(tableName: string, base: unknown): PgTable {
+    return new PgTable(tableName, base as SchemaStatementsConstraintLike);
+  }
+
+  createSchemaDumper(_options: unknown): PgSchemaDumper {
+    return new PgSchemaDumper(this);
+  }
+
+  private exclusionConstraintName(
+    tableName: string,
+    expression: string,
+    _options: Record<string, unknown>,
+  ): string {
+    const identifier = `${tableName}_${expression}_excl`;
+    const hashed = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    return `excl_rails_${hashed}`;
+  }
+
+  private exclusionConstraintForBang(
+    tableName: string,
+    expression: string | null,
+    options: Record<string, unknown>,
+  ): ExclusionConstraintDefinition {
+    const name =
+      (options.name as string | undefined) ??
+      this.exclusionConstraintName(tableName, expression ?? "", options);
+    return new ExclusionConstraintDefinition(tableName, expression ?? "", { ...options, name });
+  }
+
+  private uniqueConstraintName(
+    tableName: string,
+    columnName: string | string[] | null | undefined,
+    options: Record<string, unknown>,
+  ): string {
+    const cols = Array.isArray(columnName)
+      ? columnName
+      : columnName
+        ? [columnName as string]
+        : options.usingIndex
+          ? [options.usingIndex as string]
+          : [];
+    const identifier = `${tableName}_${cols.join("_and_")}_unique`;
+    const hashed = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    return `uniq_rails_${hashed}`;
+  }
+
+  private uniqueConstraintForBang(
+    tableName: string,
+    columnName: string | string[] | null | undefined,
+    options: Record<string, unknown>,
+  ): UniqueConstraintDefinition {
+    const name =
+      (options.name as string | undefined) ??
+      this.uniqueConstraintName(tableName, columnName, options);
+    return new UniqueConstraintDefinition(tableName, columnName ?? [], { ...options, name });
+  }
+
+  private deferrable(deferrable: "immediate" | "deferred" | undefined): string {
+    if (!deferrable) return "";
+    return ` DEFERRABLE INITIALLY ${deferrable.toUpperCase()}`;
   }
 
   private pgQuotedScope(

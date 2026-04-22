@@ -4,6 +4,8 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements
  */
 
+import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
+
 export interface PgIndexDefinition {
   table: string;
   name: string;
@@ -110,6 +112,97 @@ export interface SchemaStatements {
   ): Promise<void>;
   changeColumnComment(tableName: string, columnName: string, comment: string | null): Promise<void>;
   changeTableComment(tableName: string, comment: string | null): Promise<void>;
+  renameTable(tableName: string, newName: string): Promise<void>;
+  changeColumn(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options?: {
+      using?: string;
+      castAs?: string;
+      default?: unknown;
+      null?: boolean;
+      array?: boolean;
+    },
+  ): Promise<void>;
+  addIndex(
+    tableName: string,
+    columnName: string | string[],
+    options?: {
+      name?: string;
+      unique?: boolean;
+      using?: string;
+      where?: string;
+      algorithm?: string;
+      order?: Record<string, string> | string;
+      opclass?: Record<string, string>;
+      ifNotExists?: boolean;
+      nullsNotDistinct?: boolean;
+      include?: string[];
+    },
+  ): Promise<string>;
+  buildCreateIndexDefinition(
+    tableName: string,
+    columnName: string | string[],
+    options?: Record<string, unknown>,
+  ): unknown;
+  removeIndex(tableName: string, options: { name: string; algorithm?: string }): Promise<void>;
+  renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
+  indexName(tableName: string, options: { column?: string | string[] }): string;
+  addForeignKey(
+    fromTable: string,
+    toTable: string,
+    options?: {
+      column?: string;
+      primaryKey?: string;
+      name?: string;
+      onDelete?: "cascade" | "nullify" | "restrict" | "no_action" | "set_default";
+      onUpdate?: "cascade" | "nullify" | "restrict" | "no_action" | "set_default";
+      deferrable?: "immediate" | "deferred";
+      validate?: boolean;
+    },
+  ): Promise<void>;
+  checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
+  addExclusionConstraint(
+    tableName: string,
+    expression: string,
+    options?: {
+      name?: string;
+      using?: string;
+      where?: string;
+      deferrable?: "immediate" | "deferred";
+    },
+  ): Promise<void>;
+  exclusionConstraintOptions(
+    tableName: string,
+    expression: string,
+    options: Record<string, unknown>,
+  ): Record<string, unknown>;
+  removeExclusionConstraint(
+    tableName: string,
+    expressionOrOptions?: string | Record<string, unknown> | null,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
+  addUniqueConstraint(
+    tableName: string,
+    columnName?: string | string[] | null,
+    options?: {
+      name?: string;
+      deferrable?: "immediate" | "deferred";
+      usingIndex?: string;
+      nullsNotDistinct?: boolean;
+    },
+  ): Promise<void>;
+  uniqueConstraintOptions(
+    tableName: string,
+    columnName: string | string[] | null | undefined,
+    options: Record<string, unknown>,
+  ): Record<string, unknown>;
+  removeUniqueConstraint(
+    tableName: string,
+    columnNameOrOptions?: string | string[] | Record<string, unknown> | null,
+    options?: Record<string, unknown>,
+  ): Promise<void>;
   typeToSql(
     type: string,
     options?: {
@@ -120,7 +213,15 @@ export interface SchemaStatements {
       enumType?: string;
     },
   ): string;
+  columnsForDistinct(columns: string, orders: string[]): string;
+  updateTableDefinition(tableName: string, base: unknown): unknown;
+  createSchemaDumper(options: unknown): unknown;
   foreignKeyColumnFor(tableName: string, columnName?: string): string;
+  addIndexOptions(
+    tableName: string,
+    columnName: string | string[],
+    options?: Record<string, unknown>,
+  ): unknown;
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string;
   assertValidDeferrable(deferrable: unknown): void;
   extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
@@ -138,4 +239,5 @@ export interface SchemaStatements {
   foreignTables(): Promise<string[]>;
   foreignTableExists(tableName: string): Promise<boolean>;
   quotedIncludeColumnsForIndex(columnNames: string | string[]): string;
+  schemaCreation(): unknown;
 }
