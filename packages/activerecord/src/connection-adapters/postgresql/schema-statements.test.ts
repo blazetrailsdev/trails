@@ -4,7 +4,12 @@
  * currentDatabase, encoding, collation, ctype, schemaSearchPath,
  * clientMinMessages, tableOptions, tableComment, tablePartitionDefinition,
  * inheritedTableNames, defaultSequenceName, serialSequence, setPkSequenceBang,
- * resetPkSequenceBang, pkAndSequenceFor, primaryKeys)
+ * resetPkSequenceBang, pkAndSequenceFor, primaryKeys,
+ * addColumn, renameColumn, changeColumnDefault, changeColumnNull,
+ * changeColumnComment, changeTableComment, typeToSql, foreignKeyColumnFor,
+ * sequenceNameFromParts, assertValidDeferrable, extractForeignKeyAction,
+ * extractConstraintDeferrable, dataSourceSql, quotedScope,
+ * referenceNameForTable, columnNamesFromColumnNumbers)
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
@@ -300,6 +305,215 @@ describeIfPg("PostgreSQLAdapter", () => {
         await rootAdapter.exec(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.close();
       }
+    });
+  });
+
+  describe("ColumnDDLTest", () => {
+    it("add column", async () => {
+      await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "score", "integer");
+      const cols = await adapter.schemaQuery(
+        `SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2`,
+        [SCHEMA_NAME, TABLE_NAME],
+      );
+      expect(cols.map((r) => r.column_name)).toContain("score");
+      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS score`);
+    });
+
+    it("add column with comment", async () => {
+      await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "bio", "text", {
+        comment: "user bio",
+      });
+      const rows = await adapter.schemaQuery(
+        `SELECT col_description(c.oid, a.attnum) AS comment
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'bio'
+         WHERE c.relname = $1 AND n.nspname = $2`,
+        [TABLE_NAME, SCHEMA_NAME],
+      );
+      expect(rows[0].comment).toBe("user bio");
+      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS bio`);
+    });
+
+    it("rename column", async () => {
+      await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "old_col", "integer");
+      await adapter.renameColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "old_col", "new_col");
+      const cols = await adapter.schemaQuery(
+        `SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2`,
+        [SCHEMA_NAME, TABLE_NAME],
+      );
+      const names = cols.map((r) => r.column_name);
+      expect(names).toContain("new_col");
+      expect(names).not.toContain("old_col");
+      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS new_col`);
+    });
+
+    it("change column default", async () => {
+      await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "rating", "integer");
+      await adapter.changeColumnDefault(`${SCHEMA_NAME}.${TABLE_NAME}`, "rating", 5);
+      const rows = await adapter.schemaQuery(
+        `SELECT column_default FROM information_schema.columns
+         WHERE table_schema = $1 AND table_name = $2 AND column_name = 'rating'`,
+        [SCHEMA_NAME, TABLE_NAME],
+      );
+      expect(rows[0].column_default).toMatch(/5/);
+      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS rating`);
+    });
+
+    it("change column default with from/to object", async () => {
+      await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "rating", "integer", {
+        default: 3,
+      });
+      await adapter.changeColumnDefault(`${SCHEMA_NAME}.${TABLE_NAME}`, "rating", {
+        from: 3,
+        to: 7,
+      });
+      const rows = await adapter.schemaQuery(
+        `SELECT column_default FROM information_schema.columns
+         WHERE table_schema = $1 AND table_name = $2 AND column_name = 'rating'`,
+        [SCHEMA_NAME, TABLE_NAME],
+      );
+      expect(rows[0].column_default).toMatch(/7/);
+      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS rating`);
+    });
+
+    it("change column null", async () => {
+      await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "flag", "integer");
+      await adapter.changeColumnNull(`${SCHEMA_NAME}.${TABLE_NAME}`, "flag", false);
+      const rows = await adapter.schemaQuery(
+        `SELECT is_nullable FROM information_schema.columns
+         WHERE table_schema = $1 AND table_name = $2 AND column_name = 'flag'`,
+        [SCHEMA_NAME, TABLE_NAME],
+      );
+      expect(rows[0].is_nullable).toBe("NO");
+      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS flag`);
+    });
+
+    it("change column comment", async () => {
+      await adapter.changeColumnComment(`${SCHEMA_NAME}.${TABLE_NAME}`, "name", "full name");
+      const rows = await adapter.schemaQuery(
+        `SELECT col_description(c.oid, a.attnum) AS comment
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'name'
+         WHERE c.relname = $1 AND n.nspname = $2`,
+        [TABLE_NAME, SCHEMA_NAME],
+      );
+      expect(rows[0].comment).toBe("full name");
+      await adapter.changeColumnComment(`${SCHEMA_NAME}.${TABLE_NAME}`, "name", null);
+    });
+
+    it("change table comment", async () => {
+      await adapter.changeTableComment(`${SCHEMA_NAME}.${TABLE_NAME}`, "things table");
+      const comment = await adapter.tableComment(`${SCHEMA_NAME}.${TABLE_NAME}`);
+      expect(comment).toBe("things table");
+      await adapter.changeTableComment(`${SCHEMA_NAME}.${TABLE_NAME}`, null);
+    });
+  });
+
+  describe("TypeSqlTest", () => {
+    it("typeToSql integer with limit", () => {
+      expect(adapter.typeToSql("integer", { limit: 2 })).toBe("smallint");
+      expect(adapter.typeToSql("integer", { limit: 4 })).toBe("integer");
+      expect(adapter.typeToSql("integer", { limit: 8 })).toBe("bigint");
+    });
+
+    it("typeToSql binary", () => {
+      expect(adapter.typeToSql("binary")).toBe("bytea");
+    });
+
+    it("typeToSql text", () => {
+      expect(adapter.typeToSql("text")).toBe("text");
+    });
+
+    it("typeToSql array suffix", () => {
+      expect(adapter.typeToSql("integer", { array: true })).toBe("integer[]");
+    });
+
+    it("typeToSql enum requires enumType", () => {
+      expect(() => adapter.typeToSql("enum")).toThrow();
+      expect(adapter.typeToSql("enum", { enumType: "my_status" })).toBe("my_status");
+    });
+
+    it("typeToSql binary limit too large throws", () => {
+      expect(() => adapter.typeToSql("binary", { limit: 0x40000000 })).toThrow();
+    });
+  });
+
+  describe("HelperMethodsTest", () => {
+    it("foreignKeyColumnFor strips schema and singularizes", () => {
+      expect(adapter.foreignKeyColumnFor("public.accounts")).toBe("account_id");
+      expect(adapter.foreignKeyColumnFor("users")).toBe("user_id");
+    });
+
+    it("sequenceNameFromParts basic", () => {
+      const name = adapter.sequenceNameFromParts("things", "id", "seq");
+      expect(name).toBe("things_id_seq");
+    });
+
+    it("sequenceNameFromParts truncates long names", () => {
+      const longTable = "a".repeat(40);
+      const longCol = "b".repeat(30);
+      const name = adapter.sequenceNameFromParts(longTable, longCol, "seq");
+      expect(name.length).toBeLessThanOrEqual(63);
+    });
+
+    it("assertValidDeferrable accepts valid values", () => {
+      expect(() => adapter.assertValidDeferrable(false)).not.toThrow();
+      expect(() => adapter.assertValidDeferrable("immediate")).not.toThrow();
+      expect(() => adapter.assertValidDeferrable("deferred")).not.toThrow();
+    });
+
+    it("assertValidDeferrable rejects invalid values", () => {
+      expect(() => adapter.assertValidDeferrable("invalid")).toThrow();
+      expect(() => adapter.assertValidDeferrable(true)).toThrow();
+    });
+
+    it("extractForeignKeyAction", () => {
+      expect(adapter.extractForeignKeyAction("c")).toBe("cascade");
+      expect(adapter.extractForeignKeyAction("n")).toBe("nullify");
+      expect(adapter.extractForeignKeyAction("r")).toBe("restrict");
+      expect(adapter.extractForeignKeyAction("a")).toBeUndefined();
+    });
+
+    it("extractConstraintDeferrable", () => {
+      expect(adapter.extractConstraintDeferrable(true, true)).toBe("deferred");
+      expect(adapter.extractConstraintDeferrable(true, false)).toBe("immediate");
+      expect(adapter.extractConstraintDeferrable(false, true)).toBe(false);
+    });
+
+    it("referenceNameForTable strips schema and singularizes", () => {
+      expect(adapter.referenceNameForTable("public.accounts")).toBe("account");
+      expect(adapter.referenceNameForTable("users")).toBe("user");
+    });
+
+    it("quotedScope for schema-qualified name", () => {
+      const scope = adapter.quotedScope(`${SCHEMA_NAME}.${TABLE_NAME}`);
+      expect(scope.schema).toContain(SCHEMA_NAME);
+      expect(scope.name).toContain(TABLE_NAME);
+    });
+
+    it("quotedScope with type BASE TABLE", () => {
+      const scope = adapter.quotedScope(null, { type: "BASE TABLE" });
+      expect(scope.type).toBe("'r','p'");
+    });
+
+    it("dataSourceSql returns SQL string", () => {
+      const sql = adapter.dataSourceSql(`${SCHEMA_NAME}.${TABLE_NAME}`);
+      expect(sql).toMatch(/pg_class/);
+      expect(sql).toMatch(/relname/);
+    });
+
+    it("columnNamesFromColumnNumbers", async () => {
+      const rows = await adapter.schemaQuery(
+        `SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE c.relname = $1 AND n.nspname = $2`,
+        [TABLE_NAME, SCHEMA_NAME],
+      );
+      const oid = Number(rows[0].oid);
+      const names = await adapter.columnNamesFromColumnNumbers(oid, [1, 2]);
+      expect(Array.isArray(names)).toBe(true);
+      expect(names.length).toBe(2);
     });
   });
 });
