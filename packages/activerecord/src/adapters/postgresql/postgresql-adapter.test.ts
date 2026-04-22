@@ -920,4 +920,43 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(mood.isEnum).toBe(true);
     });
   });
+
+  // ── DatabaseStatements ────────────────────────────────────────────
+  describe("DatabaseStatements", () => {
+    it("isWriteQuery returns false for read-like statements", () => {
+      expect(adapter.isWriteQuery("SELECT 1")).toBe(true);
+      expect(adapter.isWriteQuery("SET search_path TO public")).toBe(false);
+      expect(adapter.isWriteQuery("SHOW server_version")).toBe(false);
+    });
+
+    it("highPrecisionCurrentTimestamp returns CURRENT_TIMESTAMP literal", () => {
+      const ts = adapter.highPrecisionCurrentTimestamp();
+      expect(ts.toSql()).toBe("CURRENT_TIMESTAMP");
+    });
+
+    it("setConstraints ALL DEFERRED executes without error", async () => {
+      await adapter.beginTransaction();
+      try {
+        await expect(adapter.setConstraints("deferred")).resolves.toBeUndefined();
+      } finally {
+        await adapter.commit();
+      }
+    });
+
+    it("setConstraints rejects invalid deferred value", async () => {
+      await expect(adapter.setConstraints("invalid" as "deferred" | "immediate")).rejects.toThrow();
+    });
+
+    it("beginIsolatedDbTransaction starts a transaction with isolation level", async () => {
+      await adapter.beginIsolatedDbTransaction("serializable");
+      try {
+        const rows = await adapter.execute(
+          `SELECT current_setting('transaction_isolation') AS iso`,
+        );
+        expect((rows[0] as { iso: string }).iso.toLowerCase()).toBe("serializable");
+      } finally {
+        await adapter.commit();
+      }
+    });
+  });
 });
