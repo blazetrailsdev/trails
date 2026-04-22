@@ -36,6 +36,20 @@ describe("basic CRUD DX — defining and using a model", () => {
     expectTypeOf(User.new({ name: "y" })).toEqualTypeOf<User>();
   });
 
+  it("Relation build / create / createBang array overloads return T[]", async () => {
+    const rel = User.where({ admin: false });
+    // single-attrs form
+    expectTypeOf(rel.build()).toEqualTypeOf<User>();
+    expectTypeOf(rel.build({})).toEqualTypeOf<User>();
+    expectTypeOf(await rel.create({})).toEqualTypeOf<User>();
+    expectTypeOf(await rel.createBang({})).toEqualTypeOf<User>();
+    // array form
+    expectTypeOf(rel.build([{}, {}])).toEqualTypeOf<User[]>();
+    expectTypeOf(await rel.create([{}, {}])).toEqualTypeOf<User[]>();
+    expectTypeOf(await rel.createBang([{}, {}])).toEqualTypeOf<User[]>();
+    expectTypeOf(rel.new([{}, {}])).toEqualTypeOf<User[]>();
+  });
+
   it("User.find(id) resolves to a single User", async () => {
     const u = await User.find(1);
     expectTypeOf(u).toEqualTypeOf<User>();

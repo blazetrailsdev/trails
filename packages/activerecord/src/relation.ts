@@ -1295,8 +1295,18 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#build
    */
-  build(attrs: Record<string, unknown> = {}): T {
-    return new this._modelClass({ ...this.scopeForCreate(), ...attrs }) as T;
+  build(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
+  build(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  build(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): T | T[] {
+    if (Array.isArray(attrs)) {
+      return attrs.map((a) => this.build(a, block));
+    }
+    const record = new this._modelClass({ ...this.scopeForCreate(), ...attrs }) as T;
+    if (block) block(record);
+    return record;
   }
 
   /**
@@ -1304,8 +1314,22 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#create
    */
-  async create(attrs: Record<string, unknown> = {}): Promise<T> {
-    return this._modelClass.create({ ...this.scopeForCreate(), ...attrs }) as Promise<T>;
+  async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async create(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): Promise<T | T[]> {
+    if (Array.isArray(attrs)) {
+      const records: T[] = [];
+      for (const a of attrs) {
+        records.push((await this.create(a, block)) as T);
+      }
+      return records;
+    }
+    const record = this.build(attrs, block);
+    await record.save();
+    return record;
   }
 
   /**
@@ -1313,8 +1337,22 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#create!
    */
-  async createBang(attrs: Record<string, unknown> = {}): Promise<T> {
-    return this._modelClass.createBang({ ...this.scopeForCreate(), ...attrs }) as Promise<T>;
+  async createBang(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async createBang(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async createBang(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): Promise<T | T[]> {
+    if (Array.isArray(attrs)) {
+      const records: T[] = [];
+      for (const a of attrs) {
+        records.push((await this.createBang(a, block)) as T);
+      }
+      return records;
+    }
+    const record = this.build(attrs, block);
+    await record.saveBang();
+    return record;
   }
 
   /**
@@ -2955,8 +2993,14 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#new
    */
-  new(attrs: Record<string, unknown> = {}): T {
-    return this.build(attrs);
+  new(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
+  new(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  new(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): T | T[] {
+    if (Array.isArray(attrs)) return this.build(attrs, block);
+    return this.build(attrs, block);
   }
 
   // -- Mutation methods --

@@ -597,10 +597,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * For through associations, builds the target without FK — the join
    * record is created later via create() or push().
    */
-  build(attrs: Record<string, unknown> = {}): T {
+  build(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
+  build(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  build(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): T | T[] {
+    if (Array.isArray(attrs)) {
+      return attrs.map((a) => this.build(a, block));
+    }
     // Through association: build the target record (no FK on target)
     if (this._isThrough) {
       const record = this._buildThrough(attrs) as T;
+      if (block) block(record);
       const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
       if (allowed) {
         this._target.push(record);
@@ -610,6 +619,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     const record = this._buildRaw(attrs) as T;
+    if (block) block(record);
     const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
     if (allowed) {
       this._target.push(record);
@@ -665,12 +675,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Build and save a new associated record.
    */
-  async create(attrs: Record<string, unknown> = {}): Promise<T> {
+  async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async create(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): Promise<T | T[]> {
+    if (Array.isArray(attrs)) {
+      const records: T[] = [];
+      for (const a of attrs) {
+        records.push((await this.create(a, block)) as T);
+      }
+      return records;
+    }
     this._ensureThroughWritable();
     if (this._isThrough) {
-      return (await this._createThrough(attrs)) as T;
+      return (await this._createThrough(attrs, block)) as T;
     }
     const record = this._buildRaw(attrs) as T;
+    if (block) block(record);
     if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
       return record;
     }
@@ -685,12 +708,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // NOTE: If _pushThrough fails after the target is saved, the target record
   // will be orphaned (no join row). Rails wraps this in a transaction. We don't
   // have transaction support yet — tracked in the roadmap under "Transactions".
-  private async _createThrough(attrs: Record<string, unknown> = {}): Promise<Base> {
+  private async _createThrough(
+    attrs: Record<string, unknown> = {},
+    block?: (r: T) => void,
+  ): Promise<Base> {
     const ctor = this._record.constructor as typeof Base;
     if (this._record.isNewRecord()) {
       throw new Error(`Cannot create through association on an unpersisted ${ctor.name}`);
     }
     const record = this._buildThrough(attrs) as T;
+    if (block) block(record);
     const saved = await record.save();
     if (!saved) return record;
     await this._pushThrough([record]);
@@ -1797,7 +1824,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#create!
    */
-  async createBang(attrs: Record<string, unknown> = {}): Promise<T> {
+  async createBang(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async createBang(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async createBang(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): Promise<T | T[]> {
+    if (Array.isArray(attrs)) {
+      const records: T[] = [];
+      for (const a of attrs) records.push((await this.createBang(a, block)) as T);
+      return records;
+    }
     this._ensureThroughWritable();
     if (this._isThrough) {
       const ctor = this._record.constructor as typeof Base;
@@ -1807,6 +1844,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         );
       }
       const record = this._buildThrough(attrs) as T;
+      if (block) block(record);
       if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
         throw new RecordNotSaved("Callback prevented record creation", record);
       }
@@ -1821,6 +1859,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return record;
     }
     const record = this._buildRaw(attrs) as T;
+    if (block) block(record);
     if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record)) {
       throw new RecordNotSaved("Callback prevented record creation", record);
     }

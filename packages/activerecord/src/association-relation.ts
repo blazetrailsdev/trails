@@ -50,9 +50,17 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::AssociationRelation#_new / #build
    */
-  build(attrs: Record<string, unknown> = {}): T {
+  build(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
+  build(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  build(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): T | T[] {
+    if (Array.isArray(attrs)) {
+      return attrs.map((a) => this.build(a, block));
+    }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return this._association.build(merged) as T;
+    return this._association.build(merged, block) as T;
   }
 
   /**
@@ -60,9 +68,19 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::AssociationRelation#_create / #create
    */
-  async create(attrs: Record<string, unknown> = {}): Promise<T> {
+  async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async create(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): Promise<T | T[]> {
+    if (Array.isArray(attrs)) {
+      const records: T[] = [];
+      for (const a of attrs) records.push((await this.create(a, block)) as T);
+      return records;
+    }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return this._association.create(merged) as Promise<T>;
+    return this._association.create(merged, block) as Promise<T>;
   }
 
   /**
@@ -73,9 +91,19 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::AssociationRelation#_create! / #create!
    */
-  async createBang(attrs: Record<string, unknown> = {}): Promise<T> {
+  async createBang(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
+  async createBang(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
+  async createBang(
+    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    block?: (r: T) => void,
+  ): Promise<T | T[]> {
+    if (Array.isArray(attrs)) {
+      const records: T[] = [];
+      for (const a of attrs) records.push((await this.createBang(a, block)) as T);
+      return records;
+    }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    return this._association.createBang(merged) as Promise<T>;
+    return this._association.createBang(merged, block) as Promise<T>;
   }
 
   /**

@@ -685,6 +685,26 @@ describe("CollectionProxy", () => {
     expect(player.team_id).toBe(team.id);
   });
 
+  it("Relation#build with array yields each record", async () => {
+    const rel = Team.all();
+    const yieldedTeams: Team[] = [];
+    const teams = rel.build([{ name: "A" }, { name: "B" }], (r) => yieldedTeams.push(r));
+    expect(teams).toHaveLength(2);
+    expect((teams[0] as any).name).toBe("A");
+    expect((teams[1] as any).name).toBe("B");
+    expect(yieldedTeams).toHaveLength(2);
+    expect(teams[0].isNewRecord()).toBe(true);
+  });
+
+  it("Relation#create with array returns array of saved records", async () => {
+    const team = await Team.create({ name: "Celtics" });
+    const proxy = association(team, "players");
+    const players = await proxy.create([{ name: "X" }, { name: "Y" }]);
+    expect(players).toHaveLength(2);
+    expect(players.every((p) => p.isPersisted())).toBe(true);
+    expect(players.every((p) => (p as any).team_id === team.id)).toBe(true);
+  });
+
   // Rails: test_count
   it("test_count", async () => {
     const team = await Team.create({ name: "Bulls" });
@@ -1856,6 +1876,64 @@ describe("Rails-guided: association features", () => {
     const entry = await proxy.create({ content: "Day 1" });
     expect(entry.isPersisted()).toBe(true);
     expect(await proxy.count()).toBe(1);
+  });
+
+  it("CollectionProxy#build with array fires beforeAdd per element", async () => {
+    class Widget extends Base {
+      static {
+        this.attribute("label", "string");
+        this.attribute("box_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Box extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const beforeAdds: Base[] = [];
+    Associations.hasMany.call(Box, "widgets", {
+      className: "Widget",
+      foreignKey: "box_id",
+      beforeAdd: (_owner: Base, record: Base) => void beforeAdds.push(record),
+    });
+    registerModel(Box);
+    registerModel(Widget);
+
+    const box = await Box.create({ name: "Toolbox" });
+    const proxy = association(box, "widgets");
+    const widgets = proxy.build([{ label: "Wrench" }, { label: "Hammer" }]);
+    expect(widgets).toHaveLength(2);
+    expect(beforeAdds).toHaveLength(2);
+    expect(widgets[0].isNewRecord()).toBe(true);
+    expect(widgets[0].box_id).toBe(box.id);
+  });
+
+  it("CollectionProxy#create with array sets FK on every element", async () => {
+    class Ticket extends Base {
+      static {
+        this.attribute("subject", "string");
+        this.attribute("event_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Event extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Event, "tickets", { className: "Ticket", foreignKey: "event_id" });
+    registerModel(Event);
+    registerModel(Ticket);
+
+    const event = await Event.create({ name: "Concert" });
+    const proxy = association(event, "tickets");
+    const tickets = await proxy.create([{ subject: "GA" }, { subject: "VIP" }]);
+    expect(tickets).toHaveLength(2);
+    expect(tickets.every((t) => t.isPersisted())).toBe(true);
+    expect(tickets.every((t) => t.event_id === event.id)).toBe(true);
   });
 
   it("includes preloads hasMany and uses cache", async () => {
