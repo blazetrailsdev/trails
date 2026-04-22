@@ -20,7 +20,7 @@ Live counts via `pnpm test:compare` (real matches only — stubs don't count).
 | trailties        | —            | —     | —        | Early            |
 
 API-surface coverage is a separate metric (`pnpm api:compare`) — arel +
-rack are at 100%, activerecord is at 87%, activemodel at 99.7%,
+rack are at 100%, activerecord is at 91.5%, activemodel at 99.7%,
 activesupport at 24.8%, actioncontroller at 66.4%, actiondispatch at
 6.1%, actionview at 3.6%.
 

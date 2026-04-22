@@ -12,6 +12,12 @@ idiom table.
   sparse checkout lives at `scripts/api-compare/.rails-source/` in the main
   repo — no need to clone or go hunting. Populate it with
   `bash scripts/api-compare/fetch-rails.sh` if missing.
+  **Before accepting any Copilot review suggestion on a Rails-port PR**, verify
+  it against the Rails source — Copilot frequently suggests "safer" behavior
+  that silently deviates from Rails semantics (e.g. adding fallbacks Rails
+  doesn't have, using equality that differs from Rails' `Object#==` identity,
+  extra index-keyed lookups Rails doesn't do). Reject suggestions that diverge;
+  only accept perf improvements with no semantic change or genuine bugs.
 - **Read existing code before writing new code.** Trace how the codebase
   already handles the concern. Use the real persistence API (`isNewRecord()`,
   `isPersisted()`, `readAttribute()`, `writeAttribute()`) — not ad-hoc state.
@@ -78,6 +84,14 @@ When NOT to use this:
   Code" lines to PR descriptions.
 - Tests live next to source files as `*.test.ts`.
 - Prefer small, focused modules.
+- **PRs: max 20 methods each** unless they are very simple one-liners/getters,
+  which can be grouped more liberally.
+- **camelCase everywhere** — no snake_case identifiers, property names, or
+  payload keys, even when the Rails equivalent uses snake_case. Never add
+  `payload.lock_wait ?? payload.lockWait`-style fallbacks.
+- **Never pipe long test runs to grep.** The full AR test suite takes ~8
+  minutes. Redirect to a temp file (`>/tmp/x.log 2>&1`), then grep the file
+  as many times as needed without re-running.
 - Do NOT use subagents unless explicitly requested.
 - Do use worktrees for any changes; leave the default worktree for the user.
   Always create them with the `EnterWorktree` skill so they land under

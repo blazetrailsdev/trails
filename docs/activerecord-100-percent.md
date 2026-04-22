@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100%
 
-Current: **87% API** (2,453 / 2,819 methods). **78% inheritance** (163 / 209).
+Current: **91.5% API** (2,578 / 2,819 methods). **97.1% inheritance** (204 / 210).
 
 ```bash
 pnpm run api:compare -- --package activerecord

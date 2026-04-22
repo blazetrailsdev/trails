@@ -179,13 +179,13 @@ Ruby-to-TypeScript translation table.
 
 | Package                      | Rails Equivalent                                                        | API       | Tests     | Description                                                |
 | ---------------------------- | ----------------------------------------------------------------------- | --------- | --------- | ---------------------------------------------------------- |
-| `@blazetrails/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **87%**   | **65.3%** | ORM — persistence, querying, associations, migrations      |
+| `@blazetrails/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **91.5%** | **65.3%** | ORM — persistence, querying, associations, migrations      |
 | `@blazetrails/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **24.8%** | **29.3%** | Core utilities, inflection, caching, notifications         |
 | `@blazetrails/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **100%**  | **91.2%** | SQL AST builder and query generation                       |
 | `@blazetrails/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.7%** | **93.4%** | Attributes, validations, callbacks, dirty tracking, i18n   |
 | `@blazetrails/rack`          | [Rack](https://rack.github.io/)                                         | —         | **98.7%** | Modular web server interface, request/response, middleware |
 
-**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **90.7% API** | **70.6% Tests**
+**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **93.1% API** | **70.6% Tests**
 
 Per-package deviation guides catalog the places where Trails diverges
 from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/activerecord-rails-deviations.md)
@@ -203,7 +203,7 @@ from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/act
 
 **Tests** = `test:compare` — matches our test names against the Rails test suite. **API** = `api:compare` — matches individual public methods against Rails source (method-level, not class/module wrappers). Rack doesn't have API comparison yet (it's not a Rails gem).
 
-**51.2%** overall API coverage (3,794 / 7,415 methods). CI runs both comparisons on every push.
+**52.3%** overall API coverage (3,877 / 7,415 methods). CI runs both comparisons on every push.
 
 ## Design Principles
 
