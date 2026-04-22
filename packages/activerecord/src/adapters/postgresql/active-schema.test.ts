@@ -1,12 +1,14 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/active_schema_test.rb
  *
- * The Rails version stubs `execute` to return SQL strings, making these
- * pure SQL-generation tests. We test `createDatabase` (which only returns SQL)
- * directly, and for index operations we test against a real table.
+ * The Rails version stubs `execute` to return SQL strings. We test against a
+ * real database instead — createDatabase, dropDatabase, and index operations.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+
+const tmpDb1 = "trails_test_active_schema_matt";
+const tmpDb2 = "trails_test_active_schema_aimonetti";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -19,23 +21,38 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLActiveSchemaTest", () => {
-    it("create database with encoding", async () => {
-      expect(adapter.createDatabase("matt")).toBe(`CREATE DATABASE "matt" ENCODING = 'utf8'`);
-      expect(adapter.createDatabase("aimonetti", { encoding: "latin1" })).toBe(
-        `CREATE DATABASE "aimonetti" ENCODING = 'latin1'`,
-      );
+    it("create database with encoding", { timeout: 30000 }, async () => {
+      await adapter.exec(`DROP DATABASE IF EXISTS ${tmpDb1}`);
+      try {
+        await adapter.createDatabase(tmpDb1, { encoding: "utf8" });
+        const rows = await adapter.schemaQuery(
+          `SELECT pg_encoding_to_char(encoding) AS enc FROM pg_database WHERE datname = $1`,
+          [tmpDb1],
+        );
+        expect(rows[0].enc).toMatch(/utf8|UTF8/i);
+      } finally {
+        await adapter.dropDatabase(tmpDb1).catch(() => {});
+      }
     });
 
-    it("create database with collation and ctype", async () => {
-      expect(
-        adapter.createDatabase("aimonetti", {
+    it("create database with collation and ctype", { timeout: 30000 }, async () => {
+      await adapter.exec(`DROP DATABASE IF EXISTS ${tmpDb2}`);
+      try {
+        await adapter.createDatabase(tmpDb2, {
           encoding: "UTF8",
-          collation: "ja_JP.UTF8",
-          ctype: "ja_JP.UTF8",
-        }),
-      ).toBe(
-        `CREATE DATABASE "aimonetti" ENCODING = 'UTF8' LC_COLLATE = 'ja_JP.UTF8' LC_CTYPE = 'ja_JP.UTF8'`,
-      );
+          collation: "C",
+          ctype: "C",
+          template: "template0",
+        });
+        const rows = await adapter.schemaQuery(
+          `SELECT datcollate AS col, datctype AS ct FROM pg_database WHERE datname = $1`,
+          [tmpDb2],
+        );
+        expect(rows[0].col).toBe("C");
+        expect(rows[0].ct).toBe("C");
+      } finally {
+        await adapter.dropDatabase(tmpDb2).catch(() => {});
+      }
     });
 
     it("add index", async () => {

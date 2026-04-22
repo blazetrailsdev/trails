@@ -276,7 +276,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("ignore nil schema search path", async () => {
       await adapter.setSchemaSearchPath(null);
-      const path = await adapter.schemaSearchPath;
+      const path = await adapter.schemaSearchPath();
       expect(path).toBeDefined();
     });
 
