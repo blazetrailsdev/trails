@@ -6,6 +6,7 @@ import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { splitQuotedIdentifier, Utils } from "./postgresql/utils.js";
+import { CHECK_ALL_FOREIGN_KEYS_SQL } from "./postgresql/referential-integrity.js";
 import { Column } from "./postgresql/column.js";
 import { ExplainPrettyPrinter } from "./postgresql/explain-pretty-printer.js";
 import {
@@ -1818,7 +1819,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
               a.attnotnull AS notnull,
               (i.indisprimary IS TRUE) AS is_primary,
               a.atttypid AS oid,
-              a.atttypmod AS fmod
+              a.atttypmod AS fmod,
+              a.attidentity AS identity,
+              a.attgenerated AS attgenerated
        FROM pg_attribute a
        JOIN pg_class t ON t.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = t.relnamespace
@@ -1836,14 +1839,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
     return rows.map((r) => {
       const sqlType = r.type as string;
+      const oid = r.oid as number;
+      const fmod = r.fmod as number;
+      // Mirrors Rails' fetch_type_metadata: look up the cast type so that
+      // SqlTypeMetadata.type reflects the OID type's semantic name (e.g.
+      // "enum" for user-defined enums, "integer" for int4, etc.) rather
+      // than defaulting to the raw sqlType string.
+      const castType = this.lookupCastTypeFromColumn({ oid, fmod, sqlType });
       const rawDefault = (r.default as string | null) ?? null;
-      // Mirrors Rails' PG `extract_value_from_default` / `extract_default_function`
-      // split — SQL-expression defaults (nextval, CURRENT_TIMESTAMP,
-      // gen_random_uuid(), etc.) become `defaultFunction`; only literals
-      // become `default`. Without this split, schema reflection would
-      // apply expressions as literal bind values and PG would reject
-      // `nextval(...)` as a bound integer.
-      const { literal, fn } = splitPgDefault(rawDefault);
+      const identity = (r.identity as string | null) || null;
+      const attgenerated = (r.attgenerated as string | null) || null;
+      // Mirrors Rails new_column_from_field: generated columns store the
+      // generation expression as defaultFunction; regular columns split into
+      // literal default vs. default function (nextval, CURRENT_TIMESTAMP, etc.).
+      const splitDefault = attgenerated ? null : splitPgDefault(rawDefault);
+      const defaultFunction = attgenerated ? rawDefault : (splitDefault?.fn ?? null);
+      const literal = attgenerated ? null : (splitDefault?.literal ?? null);
       const isSerial = typeof rawDefault === "string" && rawDefault.startsWith("nextval(");
 
       return new Column(
@@ -1851,15 +1862,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         literal,
         {
           sqlType,
-          oid: r.oid as number,
-          fmod: r.fmod as number,
+          type: castType.type(),
+          oid,
+          fmod,
         },
         !(r.notnull as boolean),
         {
-          defaultFunction: fn,
+          defaultFunction: defaultFunction ?? undefined,
           primaryKey: r.is_primary as boolean,
           serial: isSerial,
           array: sqlType.endsWith("[]"),
+          identity,
+          generated: attgenerated,
         },
       );
     });
@@ -2199,6 +2213,38 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       binds,
     );
     return Number(rows[0].count) > 0;
+  }
+
+  // Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
+  // Rails uses `transaction(requires_new: true)` — a savepoint when already
+  // inside a transaction, or a fresh BEGIN otherwise.
+  async checkAllForeignKeysValidBang(): Promise<void> {
+    if (this.inTransaction || this.isTransactionOpen()) {
+      // Materialize any lazy transaction so the savepoint lands inside the
+      // real PG transaction (mirrors Rails' transaction(requires_new: true)).
+      await this.materializeTransactions();
+      // Mirror Rails' savepoint naming: "active_record_#{stack.size}" (transaction.rb:528).
+      // Using openTransactions+1 makes repeated calls in the same transaction safe.
+      const sp = `active_record_${this.openTransactions + 1}`;
+      await this.createSavepoint(sp);
+      try {
+        await this.execute(CHECK_ALL_FOREIGN_KEYS_SQL);
+        await this.releaseSavepoint(sp);
+      } catch (e) {
+        await this.rollbackToSavepoint(sp);
+        await this.releaseSavepoint(sp).catch(() => {});
+        throw e;
+      }
+    } else {
+      await this.beginTransaction();
+      try {
+        await this.execute(CHECK_ALL_FOREIGN_KEYS_SQL);
+        await this.commit();
+      } catch (e) {
+        await this.rollback();
+        throw e;
+      }
+    }
   }
 
   createDatabase(

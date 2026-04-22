@@ -855,4 +855,69 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].val).toBeNull();
     });
   });
+
+  // ── Column reflection ──────────────────────────────────────────────
+  describe("Column reflection", () => {
+    afterEach(async () => {
+      await adapter.execute(`DROP TABLE IF EXISTS col_reflection_test CASCADE`);
+      await adapter.execute(`DROP TYPE IF EXISTS col_reflection_mood CASCADE`);
+    });
+
+    it("reflects identity column", async () => {
+      await adapter.execute(`
+        CREATE TABLE col_reflection_test (
+          id   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+          name TEXT
+        )
+      `);
+      const cols = await adapter.columns("col_reflection_test");
+      const id = cols.find((c) => c.name === "id")!;
+      expect(id.isIdentity).toBe(true);
+      expect(id.isAutoIncrementedByDb()).toBe(true);
+    });
+
+    it("reflects generated (virtual stored) column", async () => {
+      await adapter.execute(`
+        CREATE TABLE col_reflection_test (
+          id  SERIAL PRIMARY KEY,
+          a   INT NOT NULL,
+          b   INT NOT NULL,
+          sum INT GENERATED ALWAYS AS (a + b) STORED
+        )
+      `);
+      const cols = await adapter.columns("col_reflection_test");
+      const sum = cols.find((c) => c.name === "sum")!;
+      expect(sum.isVirtual()).toBe(true);
+      expect(sum.hasDefault).toBe(false);
+      expect(sum.defaultFunction).toBeTruthy();
+    });
+
+    it("reflects array column — sqlType strips [] and array flag is true", async () => {
+      await adapter.execute(`
+        CREATE TABLE col_reflection_test (
+          id   SERIAL PRIMARY KEY,
+          tags TEXT[]
+        )
+      `);
+      const cols = await adapter.columns("col_reflection_test");
+      const tags = cols.find((c) => c.name === "tags")!;
+      expect(tags.array).toBe(true);
+      expect(tags.sqlType).toBe("text");
+    });
+
+    it("reflects enum column — isEnum is true", async () => {
+      await adapter.execute(`CREATE TYPE col_reflection_mood AS ENUM ('happy', 'sad')`);
+      await adapter.execute(`
+        CREATE TABLE col_reflection_test (
+          id   SERIAL PRIMARY KEY,
+          mood col_reflection_mood
+        )
+      `);
+      // Reload the OID type map so the newly created enum type is registered.
+      await adapter.loadAdditionalTypes();
+      const cols = await adapter.columns("col_reflection_test");
+      const mood = cols.find((c) => c.name === "mood")!;
+      expect(mood.isEnum).toBe(true);
+    });
+  });
 });

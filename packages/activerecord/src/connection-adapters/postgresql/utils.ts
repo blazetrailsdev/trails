@@ -52,7 +52,8 @@ export namespace Utils {
   }
 }
 
-function unquoteIdentifier(name: string): string {
+// Mirrors: Utils#unquote_identifier
+export function unquoteIdentifier(name: string): string {
   if (name.startsWith('"') && name.endsWith('"')) {
     return name.slice(1, -1).replace(/""/g, '"');
   }
