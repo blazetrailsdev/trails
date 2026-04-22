@@ -1,9 +1,11 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/postgresql_adapter_test.rb
  */
+import pg from "pg";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import {
+  ConnectionNotEstablished,
   InvalidForeignKey,
   NotNullViolation,
   RecordNotUnique,
@@ -957,6 +959,122 @@ describeIfPg("PostgreSQLAdapter", () => {
       } finally {
         await adapter.commit();
       }
+    });
+  });
+
+  // ── Top-level adapter methods (PR C) ──────────────────────────────
+  describe("PostgreSQLAdapter top-level methods", () => {
+    it("nativeDatabaseTypes includes expected pg types", () => {
+      const types = PostgreSQLAdapter.nativeDatabaseTypes();
+      expect(types.string).toEqual({ name: "character varying" });
+      expect(types.binary).toEqual({ name: "bytea" });
+      expect(types.primaryKey).toBe("bigserial primary key");
+      expect(types.datetime).toBeDefined();
+    });
+
+    it("nativeDatabaseTypes datetime resolves from datetimeType", () => {
+      const original = PostgreSQLAdapter.datetimeType;
+      try {
+        PostgreSQLAdapter.datetimeType = "timestamptz";
+        const types = PostgreSQLAdapter.nativeDatabaseTypes();
+        expect(types.datetime).toEqual({ name: "timestamptz" });
+      } finally {
+        PostgreSQLAdapter.datetimeType = original;
+      }
+    });
+
+    it("isUseInsertReturning defaults to true", () => {
+      expect(adapter.isUseInsertReturning()).toBe(true);
+    });
+
+    it("isUseInsertReturning reflects insertReturning config", async () => {
+      const a = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        insertReturning: false,
+      });
+      try {
+        expect(a.isUseInsertReturning()).toBe(false);
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("insert with insertReturning disabled returns rowCount not id", async () => {
+      const a = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        insertReturning: false,
+      });
+      try {
+        await a.execute(
+          `CREATE TEMP TABLE test_no_returning (id bigserial primary key, title text)`,
+        );
+        const result = await a.executeMutation(
+          `INSERT INTO test_no_returning (title) VALUES ('hello')`,
+        );
+        expect(result).toBe(1);
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("maxIdentifierLength returns a positive integer", async () => {
+      const len = await adapter.maxIdentifierLength();
+      expect(len).toBeGreaterThan(0);
+      expect(Number.isInteger(len)).toBe(true);
+    });
+
+    it("maxIdentifierLength is cached after first call", async () => {
+      const first = await adapter.maxIdentifierLength();
+      const second = await adapter.maxIdentifierLength();
+      expect(first).toBe(second);
+    });
+
+    it("enumTypes returns enum types from the database", async () => {
+      await adapter.execute(`DROP TYPE IF EXISTS pr_c_mood`);
+      await adapter.execute(`CREATE TYPE pr_c_mood AS ENUM ('happy', 'sad')`);
+      try {
+        await adapter.loadAdditionalTypes();
+        const types = await adapter.enumTypes();
+        const entry = types.find(([name]) => name === "pr_c_mood");
+        expect(entry).toBeDefined();
+        expect(entry![1]).toContain("happy");
+        expect(entry![1]).toContain("sad");
+      } finally {
+        await adapter.execute(`DROP TYPE IF EXISTS pr_c_mood`);
+      }
+    });
+
+    it("setStandardConformingStrings executes without error", async () => {
+      await expect(adapter.setStandardConformingStrings()).resolves.toBeUndefined();
+    });
+
+    it("sessionAuth changes the session authorization", async () => {
+      const rows = await adapter.execute("SELECT current_user");
+      const currentUser = (rows[0] as { current_user: string }).current_user;
+      try {
+        await expect(adapter.sessionAuth(currentUser)).resolves.toBeUndefined();
+      } finally {
+        await adapter.sessionAuth("DEFAULT");
+      }
+    });
+
+    it("newClient connects and returns a pg.Client instance", async () => {
+      const client = await PostgreSQLAdapter.newClient({
+        connectionString: PG_TEST_URL,
+      });
+      expect(client).toBeInstanceOf(pg.Client);
+      await client.end();
+    });
+
+    it("newClient translates unknown host errors to ConnectionNotEstablished", async () => {
+      await expect(
+        PostgreSQLAdapter.newClient({
+          host: "nonexistent.invalid",
+          database: "testdb",
+          port: 5432,
+          connectionTimeoutMillis: 1000,
+        }),
+      ).rejects.toBeInstanceOf(ConnectionNotEstablished);
     });
   });
 });

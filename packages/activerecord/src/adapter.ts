@@ -26,6 +26,8 @@ export type ExplainOption = string | { format: string };
 export interface TrailsAdapterOptions {
   statementLimit?: number;
   preparedStatements?: boolean;
+  // Mirrors: database.yml `insert_returning` — set false to disable RETURNING
+  insertReturning?: boolean;
 }
 
 /**
