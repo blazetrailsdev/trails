@@ -60,11 +60,71 @@ describe("AttributeAssignmentTest", () => {
       static {
         this.attribute("name", "string");
       }
+      set name(_v: string) {
+        throw new globalThis.Error("boom");
+      }
     }
     const p = new Person({});
-    // Normal assignment should work
-    p.assignAttributes({ name: "test" });
-    expect(p.readAttribute("name")).toBe("test");
+    expect(() => p.assignAttributes({ name: "test" })).toThrow("boom");
+  });
+
+  it("finds inherited setter even when subclass defines a getter-only accessor", () => {
+    class Base extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+      set name(v: string) {
+        (this as Base).writeAttribute("name", (v as string).toUpperCase());
+      }
+      // getter mirrors the default attribute read
+      get name(): string {
+        return this.readAttribute("name") as string;
+      }
+    }
+    class Child extends Base {
+      // shadow with getter-only — Rails' `public_send("name=", v)` would still
+      // dispatch to Base#name=; our walk must too.
+      override get name(): string {
+        return (super.name as string) + "!";
+      }
+    }
+    const c = new Child({});
+    c.assignAttributes({ name: "bob" });
+    expect(c.readAttribute("name")).toBe("BOB");
+  });
+
+  it("routes through instance-own setter (JS singleton method)", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const p = new Person({});
+    const seen: string[] = [];
+    Object.defineProperty(p, "name", {
+      set(v: string) {
+        seen.push(v);
+        (this as Person).writeAttribute("name", v.toUpperCase());
+      },
+      configurable: true,
+    });
+    p.assignAttributes({ name: "bob" });
+    expect(seen).toEqual(["bob"]);
+    expect(p.readAttribute("name")).toBe("BOB");
+  });
+
+  it("routes through user-defined setter if present", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+      set name(v: string) {
+        super.writeAttribute("name", v.trim().toUpperCase());
+      }
+    }
+    const p = new Person({});
+    p.assignAttributes({ name: "  bob  " });
+    expect(p.readAttribute("name")).toBe("BOB");
   });
 
   it("an ArgumentError is raised if a non-hash-like object is passed", () => {
