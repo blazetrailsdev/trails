@@ -1,23 +1,14 @@
 # trails — Claude guide
 
-See [README.md](README.md) for the project overview, package list, design
-principles, zero-declare `trails-tsc` workflow, and the Rails-to-TypeScript
-idiom table.
+See [README.md](README.md) for project overview, package list, design principles,
+and the full `declare` / associations / enums / schema reference. This file
+contains only guidance specific to how Claude should work in this repo.
 
 ## Working principles
 
 - **Implementation-first.** The goal is to implement Rails features, not to
   flip skipped tests. Build the feature, then unskip the tests that prove it.
-  Read the Rails source first to understand the expected behavior. A pinned
-  sparse checkout lives at `scripts/api-compare/.rails-source/` in the main
-  repo — no need to clone or go hunting. Populate it with
-  `bash scripts/api-compare/fetch-rails.sh` if missing.
-  **Before accepting any Copilot review suggestion on a Rails-port PR**, verify
-  it against the Rails source — Copilot frequently suggests "safer" behavior
-  that silently deviates from Rails semantics (e.g. adding fallbacks Rails
-  doesn't have, using equality that differs from Rails' `Object#==` identity,
-  extra index-keyed lookups Rails doesn't do). Reject suggestions that diverge;
-  only accept perf improvements with no semantic change or genuine bugs.
+  Read the Rails source first to understand the expected behavior.
 - **Read existing code before writing new code.** Trace how the codebase
   already handles the concern. Use the real persistence API (`isNewRecord()`,
   `isPersisted()`, `readAttribute()`, `writeAttribute()`) — not ad-hoc state.
@@ -31,26 +22,11 @@ idiom table.
   queries with `@blazetrails/arel` (Table, SelectManager, Nodes, Attribute) —
   never raw SQL strings. Use `@blazetrails/activemodel` for
   validations/callbacks and `@blazetrails/activesupport` for inflection.
-  `pnpm run lint:deps` scores cross-package usage against Rails (e.g.
-  ActiveRecord methods that should delegate to Arel) and flags gaps.
 
 ## Module mixins (Ruby `include` → TypeScript)
 
-Rails uses `include`/`extend` to mix module methods into a class. We
-reimplement both in `@blazetrails/activesupport`:
-
-- `include()` / `Included<>` — bulk-mix instance methods, Rails-style. Mirrors
-  Ruby's `include Mod`. See `packages/activesupport/src/include.ts`, and
-  `packages/activerecord/src/relation.ts` +
-  `packages/activerecord/src/relation/query-methods.ts` for real usage.
-- `extend()` / `Extended<>` — same, but onto the class (static side).
-- `concern()` / `includeConcern()` — our port of `ActiveSupport::Concern`
-  (with `included`/`prepended` blocks and dependency resolution, matching
-  `activesupport/lib/active_support/concern.rb` in the Rails source). See
-  `packages/activesupport/src/concern.ts`.
-
-For **one-off static methods** where a full Concern is overkill, prefer
-**`this`-typed functions assigned directly to the class**:
+Rails uses `include`/`extend` to mix module methods into a class. TS has no
+equivalent, so we use **`this`-typed functions assigned directly to the class**.
 
 ```ts
 // attribute-methods.ts
@@ -69,6 +45,10 @@ Why: code lives in the file that matches Rails' layout (so `api:compare`
 finds it), no delegation wrappers, type-checked via the host interface,
 and `this` resolves to the actual subclass at runtime.
 
+For **instance methods mixed in bulk** (like Rails' `include QueryMethods`),
+use `include()` / `Included<>` from `@blazetrails/activesupport`. See
+`activesupport/src/include.ts` and `relation.ts` + `relation/query-methods.ts`.
+
 When NOT to use this:
 
 - Ruby lifecycle hooks (`extended`, `included`, `inherited`) — no TS
@@ -84,21 +64,8 @@ When NOT to use this:
   Code" lines to PR descriptions.
 - Tests live next to source files as `*.test.ts`.
 - Prefer small, focused modules.
-- **PRs: max 20 methods each** unless they are very simple one-liners/getters,
-  which can be grouped more liberally.
-- **camelCase everywhere** — no snake_case identifiers, property names, or
-  payload keys, even when the Rails equivalent uses snake_case. Never add
-  `payload.lock_wait ?? payload.lockWait`-style fallbacks.
-- **Never pipe long test runs to grep.** The full AR test suite takes ~8
-  minutes. Redirect to a temp file (`>/tmp/x.log 2>&1`), then grep the file
-  as many times as needed without re-running.
 - Do NOT use subagents unless explicitly requested.
 - Do use worktrees for any changes; leave the default worktree for the user.
-  Always create them with the `EnterWorktree` skill so they land under
-  `.claude/worktrees/` (gitignored) instead of scattered under `/tmp` or
-  beside the repo. Do NOT run `git worktree add` directly — the
-  `WorktreeCreate` hook in `.claude/settings.json` handles worktree creation,
-  runs `pnpm install`, and symlinks vendored Rails/Rack sources automatically.
 - Open new PRs in **draft** status.
 - After opening a PR, run the `/link` skill with the PR number so webhook
   notifications (Copilot reviews, CI failures) are delivered to this pane.
@@ -115,19 +82,9 @@ When NOT to use this:
 
 ## Measuring progress
 
-Two complementary scripts (both run in CI on every push; both take
-`--package <name>`):
-
-- `pnpm run api:compare` — matches our public methods against the Rails
-  source, method by method. This is the coverage number that drives
-  "implementation-first" — an unimplemented method shows up here.
-- `pnpm run test:compare` — matches our test file names and `it()` /
-  `it.skip()` descriptions against the Rails test suite. "Misplaced" means
-  a test exists but is in the wrong file per Rails layout — move it, don't
-  rewrite it. `pnpm run test:stubs` generates stub tests for unmatched
-  Rails tests.
-- `pnpm run lint:deps` — already mentioned above; scores cross-package
-  delegation (e.g. ActiveRecord → Arel) against Rails.
+Primary signal: `pnpm run api:compare` (use `--package <name>` for one
+package). "Misplaced" means tests exist but are in the wrong file per Rails
+layout — they need to be moved, not rewritten.
 
 Secondary signal: `pnpm test:types` — Vitest typecheck suites in
 `packages/*/dx-tests/` that pin the public type contract and encode DX gaps

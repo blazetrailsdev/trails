@@ -50,6 +50,7 @@ import {
   _defaultAttributes as _arDefaultAttributes,
 } from "./attributes.js";
 import * as Timestamp from "./timestamp.js";
+import * as TouchLater from "./touch-later.js";
 import { Association as AssociationInstance } from "./associations/association.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import * as ConnectionHandling from "./connection-handling.js";
@@ -2411,7 +2412,9 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#touch. Wired via include() after class.
    */
-  declare touch: typeof Timestamp.touch;
+  declare touch: typeof TouchLater.touch;
+  declare touchLater: typeof TouchLater.touchLater;
+  declare beforeCommittedBang: typeof TouchLater.beforeCommittedBang;
 
   // updateAttribute / updateColumn / updateColumns / dup / clone / becomes
   // extracted to persistence.ts; wired via include() below.
@@ -2774,6 +2777,7 @@ include(Base, {
 });
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
+include(Base, TouchLater.InstanceMethods);
 include(Base, AutosaveAssociation);
 include(Base, _AssocInstance.InstanceMethods);
 include(Base, {
