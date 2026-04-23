@@ -4,7 +4,11 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements
  */
 
-import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
+import type {
+  ChangeColumnDefinition,
+  ChangeColumnDefaultDefinition,
+  CheckConstraintDefinition,
+} from "../abstract/schema-definitions.js";
 
 export interface PgIndexDefinition {
   table: string;
@@ -125,6 +129,23 @@ export interface SchemaStatements {
       array?: boolean;
     },
   ): Promise<void>;
+  buildChangeColumnDefinition(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options?: {
+      using?: string;
+      castAs?: string;
+      default?: unknown;
+      null?: boolean;
+      array?: boolean;
+    },
+  ): ChangeColumnDefinition;
+  buildChangeColumnDefaultDefinition(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<ChangeColumnDefaultDefinition | undefined>;
   addIndex(
     tableName: string,
     columnName: string | string[],

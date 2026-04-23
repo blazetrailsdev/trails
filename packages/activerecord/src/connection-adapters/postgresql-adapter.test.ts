@@ -841,6 +841,80 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
     });
   });
+
+  describe("buildChangeColumnDefinition", () => {
+    it("returns a ChangeColumnDefinition with correct column name and sqlType", () => {
+      const def = adapter.buildChangeColumnDefinition("users", "age", "integer");
+      expect(def.name).toBe("age");
+      expect(def.column.name).toBe("age");
+      expect(def.column.sqlType).toBe("integer");
+    });
+
+    it("reflects using/castAs options on the column definition", () => {
+      const def = adapter.buildChangeColumnDefinition("users", "score", "decimal", {
+        using: "score::decimal",
+      });
+      expect(def.column.options).toMatchObject({ using: "score::decimal" });
+    });
+  });
+
+  describe("buildChangeColumnDefaultDefinition", () => {
+    beforeEach(async () => {
+      await adapter.exec(`
+        CREATE TABLE "bcd_test" (
+          "id" SERIAL PRIMARY KEY,
+          "score" INTEGER DEFAULT 0,
+          "created_at" TIMESTAMP WITHOUT TIME ZONE,
+          "tags" TEXT[]
+        )
+      `);
+    });
+
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "bcd_test" CASCADE`);
+    });
+
+    it("returns a ChangeColumnDefaultDefinition with the new default value and correct types", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", 42);
+      expect(def).toBeDefined();
+      expect(def!.column.name).toBe("score");
+      expect(def!.default).toBe(42);
+      expect(def!.column.type).toBe("integer");
+      expect(def!.column.sqlType).toBe("integer");
+    });
+
+    it("preserves semantic type and raw sqlType for timestamp column", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition(
+        "bcd_test",
+        "created_at",
+        "NOW()",
+      );
+      expect(def).toBeDefined();
+      expect(def!.column.name).toBe("created_at");
+      expect(def!.column.type).toMatch(/timestamp/i);
+      expect(def!.column.sqlType).toMatch(/timestamp/i);
+    });
+
+    it("preserves array column type", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "tags", "{}");
+      expect(def).toBeDefined();
+      expect(def!.column.name).toBe("tags");
+      expect(def!.column.options.array).toBe(true);
+      expect(def!.column.sqlType).toMatch(/text/i);
+    });
+
+    it("extracts :to from an object with a to key", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", {
+        to: 99,
+      });
+      expect(def!.default).toBe(99);
+    });
+
+    it("returns undefined when column does not exist", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "nonexistent", 42);
+      expect(def).toBeUndefined();
+    });
+  });
 });
 
 describe("PostgreSQLAdapter supports_* predicates (unit)", () => {

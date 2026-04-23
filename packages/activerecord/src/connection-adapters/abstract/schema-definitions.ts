@@ -96,6 +96,29 @@ export class CheckConstraintDefinition {
   ) {}
 }
 
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ChangeColumnDefinition
+ */
+export class ChangeColumnDefinition {
+  constructor(
+    readonly column: ColumnDefinition,
+    readonly name: string,
+  ) {}
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ChangeColumnDefaultDefinition
+ */
+export class ChangeColumnDefaultDefinition {
+  readonly default: unknown;
+  constructor(
+    readonly column: ColumnDefinition,
+    defaultValue: unknown,
+  ) {
+    this.default = defaultValue;
+  }
+}
+
 export interface ColumnOptions {
   null?: boolean;
   default?: unknown;
