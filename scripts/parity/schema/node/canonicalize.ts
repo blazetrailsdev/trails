@@ -94,21 +94,6 @@ function toCanonicalType(sqlType: string, table: string, column: string): Canoni
   return mapped;
 }
 
-/** Coerce a raw PRAGMA dflt_value string to a canonical scalar. */
-function coerceDefault(raw: string | null): string | number | boolean | null {
-  if (raw === null) return null;
-  // Strip surrounding single quotes: 'hello' → "hello"
-  if (raw.startsWith("'") && raw.endsWith("'")) {
-    return raw.slice(1, -1).replace(/''/g, "'");
-  }
-  if (raw === "true") return true;
-  if (raw === "false") return false;
-  if (raw === "NULL") return null;
-  const n = Number(raw);
-  if (!Number.isNaN(n) && raw.trim() !== "") return n;
-  return raw;
-}
-
 function canonicalizeTable(name: string, native: NativeTable): CanonicalTable {
   // Primary key — use primaryKeyColumns (pk-position order from adapter.primaryKey)
   // rather than filtering columns array, so composite PK ordering matches Rails.
@@ -125,7 +110,7 @@ function canonicalizeTable(name: string, native: NativeTable): CanonicalTable {
     name: col.name,
     type: toCanonicalType(col.sqlType, name, col.name),
     null: col.null,
-    default: coerceDefault(col.default),
+    default: col.default,
     limit: col.limit,
     precision: col.precision,
     scale: col.scale,

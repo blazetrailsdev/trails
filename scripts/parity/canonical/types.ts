@@ -17,8 +17,8 @@ export interface CanonicalColumn {
   type: CanonicalType;
   /** true when the column is nullable */
   null: boolean;
-  /** Literal default value; null when there is no default */
-  default: string | number | boolean | null;
+  /** Raw default string from the database, or null when there is no default */
+  default: string | null;
   limit: number | null;
   precision: number | null;
   scale: number | null;

@@ -57,6 +57,7 @@ Dir.mktmpdir("parity-ruby-") do |tmpdir|
         {
           name:      col.name,
           ar_type:   col.type,
+          sql_type:  col.sql_type,
           null:      col.null,
           default:   col.default,
           limit:     col.limit,

@@ -5,9 +5,9 @@ require_relative "canonicalize"
 
 class CanonicalizeTest < Minitest::Test
   # Build a minimal NativeTable hash for test fixtures
-  def col(name, ar_type, null: true, default: nil, limit: nil, precision: nil, scale: nil)
-    { name: name, ar_type: ar_type, null: null, default: default,
-      limit: limit, precision: precision, scale: scale }
+  def col(name, ar_type, null: true, default: nil, limit: nil, precision: nil, scale: nil, sql_type: nil)
+    { name: name, ar_type: ar_type, sql_type: sql_type || ar_type&.to_s&.upcase,
+      null: null, default: default, limit: limit, precision: precision, scale: scale }
   end
 
   def table(columns:, indexes: [], primary_key_columns: [])
@@ -23,10 +23,10 @@ class CanonicalizeTest < Minitest::Test
           col("id",         :integer,  null: true),
           col("email",      :text,     null: false),
           col("name",       :text,     null: true),
-          col("score",      :float,    null: true),
+          col("score",      nil,       null: true,  sql_type: "REAL"),  # AR returns nil for REAL
           col("avatar",     :binary,   null: true),
           col("created_at", :datetime, null: false),
-          col("active",     :integer,  null: false, default: 1),
+          col("active",     :integer,  null: false, default: "1"),
         ],
         primary_key_columns: ["id"],
       ),
@@ -44,7 +44,7 @@ class CanonicalizeTest < Minitest::Test
     assert_equal "float",    t["columns"][3]["type"]
     assert_equal "binary",   t["columns"][4]["type"]
     assert_equal "datetime", t["columns"][5]["type"]
-    assert_equal 1,          t["columns"][6]["default"]
+    assert_equal "1",        t["columns"][6]["default"]
     assert_equal [],         t["indexes"]
   end
 
@@ -132,14 +132,21 @@ class CanonicalizeTest < Minitest::Test
 
   # --- default coercion ---
 
-  def test_integer_default
-    native = { "t" => table(columns: [col("count", :integer, null: false, default: 0)]) }
-    assert_equal 0, Canonicalize.call(native)["tables"][0]["columns"][0]["default"]
+  def test_integer_default_string_passthrough
+    # AR returns col.default as the raw PRAGMA dflt_value string — pass it through unchanged.
+    native = { "t" => table(columns: [col("count", :integer, null: false, default: "0")]) }
+    assert_equal "0", Canonicalize.call(native)["tables"][0]["columns"][0]["default"]
   end
 
-  def test_string_default
-    native = { "t" => table(columns: [col("status", :string, null: false, default: "active")]) }
-    assert_equal "active", Canonicalize.call(native)["tables"][0]["columns"][0]["default"]
+  def test_float_default_string_passthrough
+    native = { "t" => table(columns: [col("rate", :float, null: false, default: "1.5")]) }
+    assert_equal "1.5", Canonicalize.call(native)["tables"][0]["columns"][0]["default"]
+  end
+
+  def test_quoted_string_default_passthrough
+    # SQLite dflt_value includes the surrounding quotes for string literals.
+    native = { "t" => table(columns: [col("status", :string, null: false, default: "'active'")]) }
+    assert_equal "'active'", Canonicalize.call(native)["tables"][0]["columns"][0]["default"]
   end
 
   def test_nil_default
@@ -153,6 +160,20 @@ class CanonicalizeTest < Minitest::Test
     native = { "t" => table(columns: [col("x", :unknowntype)]) }
     err = assert_raises(RuntimeError) { Canonicalize.call(native) }
     assert_match(/unknown AR type.*unknowntype/, err.message)
+  end
+
+  def test_falls_back_to_sql_type_when_ar_type_is_nil
+    # SQLite REAL: Rails' abstract type map registers %r(float)i but not %r(real)i,
+    # so col.type returns nil. Canonicalize falls back to SQL_TO_CANONICAL.
+    native = { "t" => table(columns: [col("score", nil, sql_type: "REAL")]) }
+    t = Canonicalize.call(native)["tables"][0]
+    assert_equal "float", t["columns"][0]["type"]
+  end
+
+  def test_raises_on_nil_ar_type_and_unknown_sql_type
+    native = { "t" => table(columns: [col("x", nil, sql_type: "UNKNOWNSQLTYPE")]) }
+    err = assert_raises(RuntimeError) { Canonicalize.call(native) }
+    assert_match(/unknown SQL type/, err.message)
   end
 
   def test_raises_on_index_with_no_columns

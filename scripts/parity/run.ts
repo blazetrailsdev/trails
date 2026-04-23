@@ -51,9 +51,12 @@ function fixtures(): string[] {
     .sort();
 }
 
-function run(cmd: string, args: string[]): Promise<void> {
+function run(cmd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { stdio: "inherit" });
+    const proc = spawn(cmd, args, {
+      stdio: "inherit",
+      env: env ? { ...process.env, ...env } : process.env,
+    });
     proc.on("close", (code, signal) => {
       if (code === 0) {
         resolve();
@@ -70,10 +73,17 @@ function run(cmd: string, args: string[]): Promise<void> {
 async function runRails(): Promise<void> {
   rmSync(OUT_RAILS, { recursive: true, force: true });
   mkdirSync(OUT_RAILS, { recursive: true });
+  // BUNDLE_GEMFILE tells bundler which Gemfile to use when invoked from repo root.
+  // BUNDLE_PATH is not forced here — bundler reads it from the .bundle/config
+  // written by `bundle install --path vendor/bundle` in the ruby dir (CI) or
+  // from the default gem path (local dev with a standard bundle install).
+  const bundleEnv = {
+    BUNDLE_GEMFILE: GEMFILE,
+  };
   for (const fixture of fixtures()) {
     const fixtureDir = join(FIXTURES_DIR, fixture);
     const outFile = join(OUT_RAILS, `${fixture}.json`);
-    await run("bundle", ["exec", `--gemfile=${GEMFILE}`, "ruby", RUBY_DUMP, fixtureDir, outFile]);
+    await run("bundle", ["exec", "ruby", RUBY_DUMP, fixtureDir, outFile], bundleEnv);
   }
 }
 

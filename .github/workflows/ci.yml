@@ -327,6 +327,105 @@ jobs:
       - name: Test comparison
         run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts
 
+  schema-parity-rails:
+    name: Schema Parity (Rails side)
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - name: Cache bundled gems
+        uses: actions/cache@v4
+        with:
+          path: scripts/parity/schema/ruby/vendor/bundle
+          key: ${{ runner.os }}-parity-gems-${{ hashFiles('scripts/parity/schema/ruby/Gemfile', 'scripts/parity/schema/ruby/Gemfile.lock') }}
+          restore-keys: ${{ runner.os }}-parity-gems-
+      - name: Bundle install
+        run: bundle install --jobs 4 --retry 3 --path vendor/bundle
+        working-directory: scripts/parity/schema/ruby
+      - name: Upload Gemfile.lock artifact (commit this to the repo for stable caching)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-ruby-gemfile-lock
+          path: scripts/parity/schema/ruby/Gemfile.lock
+          retention-days: 7
+      - run: pnpm install --frozen-lockfile
+      - name: Run Rails-side dump
+        run: pnpm tsx scripts/parity/run.ts --side=rails
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parity-rails-dumps
+          path: scripts/parity/.out/rails/
+          retention-days: 1
+
+  schema-parity-trails:
+    name: Schema Parity (trails side)
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build dependency packages for trails introspection
+        run: pnpm --filter @blazetrails/arel --filter @blazetrails/activesupport --filter @blazetrails/activemodel build
+      - name: Run trails-side dump
+        run: pnpm tsx scripts/parity/run.ts --side=trails
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parity-trails-dumps
+          path: scripts/parity/.out/trails/
+          retention-days: 1
+
+  schema-parity-diff:
+    name: Schema Parity (diff)
+    needs:
+      - changes
+      - schema-parity-rails
+      - schema-parity-trails
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.schema-parity-rails.result == 'success' &&
+      needs.schema-parity-trails.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: parity-rails-dumps
+          path: scripts/parity/.out/rails/
+      - uses: actions/download-artifact@v4
+        with:
+          name: parity-trails-dumps
+          path: scripts/parity/.out/trails/
+      - name: Diff canonical outputs
+        run: pnpm tsx scripts/parity/schema/diff.ts --rails-dir scripts/parity/.out/rails --trails-dir scripts/parity/.out/trails
+
   ci:
     name: CI
     if: ${{ always() }}
@@ -344,6 +443,9 @@ jobs:
       - mariadb-tests
       - website
       - rails-comparison
+      - schema-parity-rails
+      - schema-parity-trails
+      - schema-parity-diff
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any required job failed or was cancelled

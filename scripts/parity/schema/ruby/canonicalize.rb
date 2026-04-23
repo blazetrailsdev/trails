@@ -29,8 +29,17 @@ module Canonicalize
     json:     "json",
   }.freeze
 
+  # Fallback: maps raw SQL type strings (lowercased) when col.type is nil.
+  # Rails' abstract type map has %r(float)i but not %r(real)i, so SQLite
+  # REAL columns return nil from col.type (abstract_adapter.rb:894).
+  SQL_TO_CANONICAL = {
+    "real"   => "float",
+    "blob"   => "binary",
+    "bigint" => "bigint",
+  }.freeze
+
   # native_dump: Hash<table_name, { columns:, indexes:, primary_key_columns: }>
-  # where columns is Array<{ name:, ar_type:, null:, default:, limit:, precision:, scale: }>
+  # where columns is Array<{ name:, ar_type:, sql_type:, null:, default:, limit:, precision:, scale: }>
   # and indexes is Array<{ name:, columns:, unique:, where: }>
   # and primary_key_columns is Array<String> in PK-position order
   def self.call(native_dump)
@@ -62,14 +71,22 @@ module Canonicalize
 
   def self.canonicalize_column(table_name, col)
     ar_type = col[:ar_type]
-    canonical_type = AR_TO_CANONICAL[ar_type] or
-      raise "canonicalize: unknown AR type #{ar_type.inspect} on #{table_name}.#{col[:name]} — add it to AR_TO_CANONICAL"
+    canonical_type = if ar_type
+      AR_TO_CANONICAL[ar_type] or
+        raise "canonicalize: unknown AR type #{ar_type.inspect} on #{table_name}.#{col[:name]} — add it to AR_TO_CANONICAL"
+    else
+      # col.type is nil when Rails' type map has no entry for the SQL type
+      # (e.g. SQLite REAL — abstract_adapter.rb registers %r(float)i but not %r(real)i).
+      sql = col[:sql_type].to_s.downcase.gsub(/\s*\([^)]*\)/, "").strip
+      SQL_TO_CANONICAL[sql] or
+        raise "canonicalize: no AR type and unknown SQL type #{col[:sql_type].inspect} on #{table_name}.#{col[:name]} — add it to SQL_TO_CANONICAL"
+    end
 
     {
       "name"      => col[:name],
       "type"      => canonical_type,
       "null"      => col[:null],
-      "default"   => coerce_default(col[:default]),
+      "default"   => col[:default].nil? ? nil : col[:default].to_s,
       "limit"     => col[:limit],
       "precision" => col[:precision],
       "scale"     => col[:scale],
@@ -88,14 +105,4 @@ module Canonicalize
     }
   end
 
-  # Coerce an AR default value (already deserialized by AR's type system)
-  # into a canonical scalar: String | Integer | Float | true | false | nil.
-  def self.coerce_default(value)
-    return nil if value.nil?
-    return value if value == true || value == false
-    return value.to_i if value.is_a?(Integer)
-    # Float and BigDecimal (AR uses BigDecimal for :decimal columns) → JSON number.
-    return value.to_f if value.is_a?(Numeric)
-    value.to_s
-  end
 end

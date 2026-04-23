@@ -53,13 +53,8 @@
         "type": { "$ref": "#/$defs/CanonicalType" },
         "null": { "type": "boolean", "description": "true when the column is nullable." },
         "default": {
-          "description": "Literal default value, or null when there is no default. Expression defaults (e.g. CURRENT_TIMESTAMP) are deferred to v2.",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "number" },
-            { "type": "boolean" },
-            { "type": "null" }
-          ]
+          "description": "Raw default string from the database (PRAGMA dflt_value for SQLite), or null when there is no default. Kept as a raw string to preserve exact fidelity — no numeric coercion. Expression defaults (e.g. CURRENT_TIMESTAMP) are deferred to v2.",
+          "type": ["string", "null"]
         },
         "limit": { "type": ["integer", "null"] },
         "precision": { "type": ["integer", "null"] },

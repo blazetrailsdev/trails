@@ -103,7 +103,7 @@ describe("canonicalize", () => {
     expect(table!.columns.find((c) => c.name === "score")!.type).toBe("float");
     expect(table!.columns.find((c) => c.name === "avatar")!.type).toBe("binary");
     expect(table!.columns.find((c) => c.name === "created_at")!.type).toBe("datetime");
-    expect(table!.columns.find((c) => c.name === "active")!.default).toBe(1);
+    expect(table!.columns.find((c) => c.name === "active")!.default).toBe("1");
     expect(table!.indexes).toHaveLength(0);
   });
 
@@ -362,7 +362,7 @@ describe("canonicalize", () => {
     expect(table!.primaryKey).toBeNull();
   });
 
-  it("coerces numeric string defaults", () => {
+  it("passes numeric string defaults through unchanged", () => {
     const native: NativeDump = {
       t: {
         columns: [
@@ -392,11 +392,11 @@ describe("canonicalize", () => {
       },
     };
     const [table] = canonicalize(native).tables;
-    expect(table!.columns[0]!.default).toBe(0);
-    expect(table!.columns[1]!.default).toBe(1.5);
+    expect(table!.columns[0]!.default).toBe("0");
+    expect(table!.columns[1]!.default).toBe("1.5");
   });
 
-  it("coerces quoted string defaults", () => {
+  it("passes quoted string defaults through unchanged", () => {
     const native: NativeDump = {
       t: {
         columns: [
@@ -416,7 +416,7 @@ describe("canonicalize", () => {
       },
     };
     const [table] = canonicalize(native).tables;
-    expect(table!.columns[0]!.default).toBe("active");
+    expect(table!.columns[0]!.default).toBe("'active'");
   });
 
   it("throws on unknown SQL type", () => {
