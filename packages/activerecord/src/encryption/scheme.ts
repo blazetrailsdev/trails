@@ -9,6 +9,9 @@ import { ConfigError } from "./errors.js";
 import type { Compressor } from "./config.js";
 import { Configurable } from "./configurable.js";
 import { withEncryptionContext } from "./context.js";
+import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
+import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
+import { Key } from "./key.js";
 
 export interface SchemeOptions {
   keyProvider?: unknown;
@@ -24,7 +27,9 @@ export interface SchemeOptions {
 }
 
 export class Scheme {
-  keyProvider?: unknown;
+  private _keyProviderParam?: unknown;
+  private _cachedKeyProviderFromKey?: DerivedSecretKeyProvider;
+  private _cachedDeterministicKeyProvider?: DeterministicKeyProvider;
   key?: string;
   deterministic: boolean;
   downcase: boolean;
@@ -38,7 +43,7 @@ export class Scheme {
 
   constructor(options: SchemeOptions = {}) {
     this._opts = { ...options };
-    this.keyProvider = options.keyProvider;
+    this._keyProviderParam = options.keyProvider;
     this.key = options.key;
     this.deterministic = options.deterministic ?? false;
     this.downcase = options.downcase ?? false;
@@ -59,6 +64,18 @@ export class Scheme {
 
   get encryptor(): EncryptorLike {
     return this._encryptor;
+  }
+
+  get keyProvider(): unknown {
+    // When an explicit encryptor is provided, key providers are irrelevant —
+    // the encryptor handles encryption without needing key material from here.
+    if (this._opts.encryptor !== undefined) return this._keyProviderParam ?? undefined;
+    return (
+      this._keyProviderParam ??
+      this._keyProviderFromKey() ??
+      this._deterministicKeyProvider() ??
+      undefined
+    );
   }
 
   isSupportUnencryptedData(): boolean {
@@ -102,12 +119,40 @@ export class Scheme {
     return opts;
   }
 
+  private _keyProviderFromKey(): DerivedSecretKeyProvider | undefined {
+    if (this.key != null) {
+      this._cachedKeyProviderFromKey ??= new DerivedSecretKeyProvider(this.key);
+      return this._cachedKeyProviderFromKey;
+    }
+    return undefined;
+  }
+
+  private _deterministicKeyProvider(): DeterministicKeyProvider | undefined {
+    if (this.deterministic) {
+      const deterministicKey = Configurable.config.get("deterministicKey") as string;
+      this._cachedDeterministicKeyProvider ??= new DeterministicKeyProvider(
+        new Key(deterministicKey),
+      );
+      return this._cachedDeterministicKeyProvider;
+    }
+    return undefined;
+  }
+
   private _validate(): void {
     if (this.ignoreCase && !this.deterministic) {
       throw new ConfigError("ignoreCase requires deterministic encryption");
     }
     if (this.downcase && !this.deterministic) {
       throw new ConfigError("downcase requires deterministic encryption");
+    }
+    if (this._keyProviderParam != null && this.key != null) {
+      throw new ConfigError("key and keyProvider can't be used simultaneously");
+    }
+    if (this._opts.compress === false && this._opts.compressor !== undefined) {
+      throw new ConfigError("compressor can't be used with compress: false");
+    }
+    if (this._opts.compressor !== undefined && this._opts.encryptor !== undefined) {
+      throw new ConfigError("compressor can't be used with encryptor");
     }
   }
 }

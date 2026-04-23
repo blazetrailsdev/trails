@@ -128,15 +128,17 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     const opts: Record<string, unknown> = {
       deterministic: this.scheme.deterministic,
     };
-    if (this.scheme.keyProvider) opts.keyProvider = this.scheme.keyProvider;
-    if (this.scheme.key) opts.key = this.scheme.key;
+    // Mirror Rails: only pass key_provider, never the raw key.
+    // scheme.keyProvider auto-derives from key: or deterministic: if needed.
+    const kp = this.scheme.keyProvider;
+    if (kp != null) opts.keyProvider = kp;
     return opts;
   }
 
   private decryptionOptions(): Record<string, unknown> {
     const opts: Record<string, unknown> = {};
-    if (this.scheme.keyProvider) opts.keyProvider = this.scheme.keyProvider;
-    if (this.scheme.key) opts.key = this.scheme.key;
+    const kp = this.scheme.keyProvider;
+    if (kp != null) opts.keyProvider = kp;
     return opts;
   }
 

@@ -3,11 +3,91 @@ import { Scheme } from "./scheme.js";
 import { ConfigError } from "./errors.js";
 import { Configurable } from "./configurable.js";
 import { getEncryptionContext } from "./context.js";
+import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
+import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
 describe("ActiveRecord::Encryption::SchemeTest", () => {
   it("validates config options when using encrypted attributes", () => {
     expect(() => new Scheme({ ignoreCase: true, deterministic: false })).toThrow(ConfigError);
     expect(() => new Scheme({ downcase: true, deterministic: false })).toThrow(ConfigError);
+    expect(() => new Scheme({ key: "k", keyProvider: {} })).toThrow(ConfigError);
+    expect(
+      () =>
+        new Scheme({
+          compressor: { deflate: () => Buffer.alloc(0), inflate: () => "" },
+          encryptor: {
+            encrypt: (v) => v,
+            decrypt: (v) => v,
+            isEncrypted: () => false,
+            isBinary: () => false,
+          },
+        }),
+    ).toThrow(ConfigError);
+    expect(
+      () =>
+        new Scheme({
+          compress: false,
+          compressor: { deflate: () => Buffer.alloc(0), inflate: () => "" },
+        }),
+    ).toThrow(ConfigError);
+  });
+
+  it("keyProvider resolves from bare key: option via DerivedSecretKeyProvider, using config salt", () => {
+    const originalSalt = Configurable.config.keyDerivationSalt;
+    try {
+      Configurable.config.keyDerivationSalt = "salt-one";
+      const schemeA = new Scheme({ key: "mykey" });
+      expect(schemeA.keyProvider).toBeInstanceOf(DerivedSecretKeyProvider);
+      const secretA = (schemeA.keyProvider as DerivedSecretKeyProvider).encryptionKey().secret;
+
+      Configurable.config.keyDerivationSalt = "salt-two";
+      const schemeB = new Scheme({ key: "mykey" });
+      const secretB = (schemeB.keyProvider as DerivedSecretKeyProvider).encryptionKey().secret;
+
+      expect(secretA).toBeDefined();
+      expect(secretB).toBeDefined();
+      expect(secretA).not.toBe(secretB);
+    } finally {
+      Configurable.config.keyDerivationSalt = originalSalt;
+    }
+  });
+
+  it("keyProvider resolves from deterministic: true via DeterministicKeyProvider when config.deterministicKey is set", () => {
+    const originalKey = Configurable.config.deterministicKey;
+    Configurable.config.deterministicKey = "det-key";
+    try {
+      const scheme = new Scheme({ deterministic: true });
+      expect(scheme.keyProvider).toBeInstanceOf(DeterministicKeyProvider);
+    } finally {
+      Configurable.config.deterministicKey = originalKey;
+    }
+  });
+
+  it("keyProvider raises ConfigError when deterministic: true but config.deterministicKey is not set", () => {
+    const originalKey = Configurable.config.deterministicKey;
+    Configurable.config.deterministicKey = undefined;
+    try {
+      const scheme = new Scheme({ deterministic: true });
+      expect(() => scheme.keyProvider).toThrow(ConfigError);
+    } finally {
+      Configurable.config.deterministicKey = originalKey;
+    }
+  });
+
+  it("keyProvider memoizes — returns same instance on repeated calls", () => {
+    const originalSalt = Configurable.config.keyDerivationSalt;
+    Configurable.config.keyDerivationSalt = "memo-salt";
+    try {
+      const scheme = new Scheme({ key: "mykey" });
+      expect(scheme.keyProvider).toBe(scheme.keyProvider);
+    } finally {
+      Configurable.config.keyDerivationSalt = originalSalt;
+    }
+  });
+
+  it("keyProvider returns undefined when no key/keyProvider/deterministic configured", () => {
+    const scheme = new Scheme();
+    expect(scheme.keyProvider).toBeUndefined();
   });
 
   it("should create a encryptor well when compressor is given", () => {

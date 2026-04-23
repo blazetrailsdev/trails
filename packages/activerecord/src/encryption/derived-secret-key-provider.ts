@@ -6,11 +6,16 @@
 
 import { Key } from "./key.js";
 import { KeyProvider } from "./key-provider.js";
+import { KeyGenerator } from "./key-generator.js";
 
 export class DerivedSecretKeyProvider extends KeyProvider {
   constructor(passwords: string | string[]) {
     const passwordList = Array.isArray(passwords) ? passwords : [passwords];
-    const keys = passwordList.map((p) => Key.deriveFrom(p));
+    const generator = new KeyGenerator();
+    // Mirror Rails: uses key_generator.derive_key_from(password) which applies
+    // config.key_derivation_salt. deriveKeyFrom raises ConfigError if the salt
+    // is not configured, matching Rails' required-key semantics.
+    const keys = passwordList.map((p) => new Key(generator.deriveKeyFrom(p)));
     super(keys);
   }
 }
