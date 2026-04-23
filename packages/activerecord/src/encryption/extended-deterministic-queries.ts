@@ -71,15 +71,20 @@ export class EncryptedQuery {
   private static allCiphertextsFor(
     plaintext: unknown,
     type: EncryptedAttributeType,
-  ): Array<unknown | AdditionalValue> {
-    const results: Array<unknown | AdditionalValue> = [];
-    // Current scheme ciphertext (wrapped to prevent re-encryption)
-    results.push(new AdditionalValue(plaintext, type));
-    // Previous scheme ciphertexts (also wrapped)
+  ): Array<AdditionalValue | unknown> {
+    // Unlike Rails (which keeps plaintext at index 0 and relies on the
+    // PredicateBuilder type-casting scalars to encrypt them), our
+    // PredicateBuilder only type-casts objects via `build`/`QueryAttribute`.
+    // Plain scalars in an IN array bypass `EncryptedAttributeType.serialize`
+    // and land in the SQL unencrypted. Wrapping encrypted candidates in
+    // AdditionalValue ensures those elements go through `predicateBuilder.build`
+    // → `ExtendedEncryptableType.serialize` → pre-computed ciphertext, while
+    // still preserving the raw plaintext when unencrypted data remains queryable
+    // during migration (support_unencrypted_data).
+    const results: Array<AdditionalValue | unknown> = [new AdditionalValue(plaintext, type)];
     for (const prev of type.previousTypes) {
       results.push(new AdditionalValue(plaintext, prev));
     }
-    // Include plaintext only when support_unencrypted_data is enabled
     if (type.supportUnencryptedData) {
       results.push(plaintext);
     }
@@ -88,18 +93,52 @@ export class EncryptedQuery {
 }
 
 /**
- * Mixin that patches Relation#where and Relation#exists? to expand
- * encrypted query arguments via EncryptedQuery.processArguments.
+ * Mixin that patches Relation#where, #exists?, and #scope_for_create to
+ * expand encrypted query arguments via EncryptedQuery.processArguments.
  *
  * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQueries
  */
 export class RelationQueries {
-  static patchWhere(originalWhere: Function, relation: any, args: unknown[]): unknown {
-    return originalWhere.call(relation, ...EncryptedQuery.processArguments(relation, args, true));
+  static where(originalWhere: Function, relation: any, args: unknown[]): unknown {
+    const processed = EncryptedQuery.processArguments(relation, args, true);
+    const result = originalWhere.call(relation, ...processed) as any;
+    // Store the expanded conditions on the returned relation so scopeForCreate
+    // can access the AdditionalValue arrays directly, bypassing WhereClause.toH()
+    // which cannot extract OR chains produced by ArrayHandler for object values.
+    if (processed !== args && processed.length > 0 && typeof processed[0] === "object") {
+      result._encryptionExpansion = {
+        ...(relation._encryptionExpansion ?? {}),
+        ...(processed[0] as Record<string, unknown>),
+      };
+    }
+    return result;
   }
 
-  static patchExists(originalExists: Function, relation: any, args: unknown[]): unknown {
+  static isExists(originalExists: Function, relation: any, args: unknown[]): unknown {
     return originalExists.call(relation, ...EncryptedQuery.processArguments(relation, args, true));
+  }
+
+  static scopeForCreate(
+    originalScopeForCreate: () => Record<string, unknown>,
+    relation: any,
+  ): Record<string, unknown> {
+    const model = relation._modelClass ?? relation;
+    const encryptedAttrs = model._encryptedAttributes as Set<string> | undefined;
+    if (!encryptedAttrs?.size) return originalScopeForCreate.call(relation);
+
+    const scopeAttrs = originalScopeForCreate.call(relation);
+    const wheres: Record<string, unknown> = relation._encryptionExpansion ?? {};
+    for (const attrName of encryptedAttrs) {
+      const type = getAttributeType(model, attrName);
+      if (!(type instanceof EncryptedAttributeType) || !type.deterministic) continue;
+      const values = wheres[attrName];
+      if (Array.isArray(values) && values[0] instanceof AdditionalValue) {
+        // values[0] is AdditionalValue for the current scheme — unwrap to ciphertext
+        // so the created record stores the correct encrypted value directly.
+        scopeAttrs[attrName] = (values[0] as AdditionalValue).value;
+      }
+    }
+    return scopeAttrs;
   }
 }
 
@@ -109,7 +148,7 @@ export class RelationQueries {
  * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::CoreQueries
  */
 export class CoreQueries {
-  static patchFindBy(originalFindBy: Function, klass: any, args: unknown[]): unknown {
+  static findBy(originalFindBy: Function, klass: any, args: unknown[]): unknown {
     return originalFindBy.call(klass, ...EncryptedQuery.processArguments(klass, args, false));
   }
 }
