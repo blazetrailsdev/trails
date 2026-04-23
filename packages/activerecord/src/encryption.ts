@@ -25,17 +25,18 @@ import type { EncryptorLike } from "./encryption/encryptor.js";
 
 /**
  * The simple encryptor surface `Base.encrypts({ encryptor })` accepts.
- * If the encryptor implements `encrypted(text)` it will be consulted
+ * If the encryptor implements `isEncrypted(text)` it will be consulted
  * directly; otherwise the shim probes by calling `decrypt(text)` and
  * treats a non-throwing decrypt as encrypted (see
- * `LegacyEncryptorShim.encrypted`). Custom encryptors whose `decrypt`
+ * `LegacyEncryptorShim.isEncrypted`). Custom encryptors whose `decrypt`
  * accepts plaintext without throwing should also implement
- * `encrypted(text)` to avoid misclassification.
+ * `isEncrypted(text)` to avoid misclassification.
  */
 export interface Encryptor {
   encrypt(value: string): string;
   decrypt(ciphertext: string): string;
-  encrypted?(text: string): boolean;
+  isEncrypted?(text: string): boolean;
+  isBinary?(): boolean;
 }
 
 const ENCRYPTED_PREFIX = "AR_ENC:";
@@ -50,7 +51,7 @@ export const defaultEncryptor: Encryptor = {
     }
     return Buffer.from(ciphertext.slice(ENCRYPTED_PREFIX.length), "base64").toString("utf-8");
   },
-  encrypted(text: string): boolean {
+  isEncrypted(text: string): boolean {
     return typeof text === "string" && text.startsWith(ENCRYPTED_PREFIX);
   },
 };
@@ -61,13 +62,13 @@ export const defaultEncryptor: Encryptor = {
  * Options are intentionally ignored — the legacy path has no key provider
  * or deterministic mode.
  *
- * `encrypted()` is what `supportUnencryptedData` consults to distinguish
+ * `isEncrypted()` is what `supportUnencryptedData` consults to distinguish
  * ciphertext from plaintext on read. Returning the wrong answer is
  * critical in both directions: false positive and the shim decrypts
  * plaintext (may corrupt it); false negative and it skips decryption
  * for real ciphertext (returns garbage to the caller). Resolution order:
  *
- *   1. Delegate to `inner.encrypted(text)` if the user supplied one —
+ *   1. Delegate to `inner.isEncrypted(text)` if the user supplied one —
  *      this is the only reliable answer for custom encryptors.
  *   2. Otherwise, try `inner.decrypt(text)` and treat a throw as
  *      "not encrypted". Matches Rails' own
@@ -77,13 +78,13 @@ export const defaultEncryptor: Encryptor = {
  * Two caveats with the fallback path:
  *
  * - A custom encryptor whose `decrypt` is permissive (doesn't throw
- *   on plaintext) MUST supply `encrypted()` to avoid misclassification.
+ *   on plaintext) MUST supply `isEncrypted()` to avoid misclassification.
  * - When `supportUnencryptedData` is enabled, the scheme consults
- *   `encrypted()` before decrypting, so the fallback path runs
+ *   `isEncrypted()` before decrypting, so the fallback path runs
  *   `decrypt` once for the probe and once for real — roughly 2x the
  *   CPU. Rails avoids this by probing with `serializer.load` (cheap
  *   parse, no cipher), but the simple `{ encrypt, decrypt }` surface
- *   has no equivalent cheap probe. Supplying `encrypted()` eliminates
+ *   has no equivalent cheap probe. Supplying `isEncrypted()` eliminates
  *   the double work; consider doing so in perf-sensitive paths.
  */
 class LegacyEncryptorShim implements EncryptorLike {
@@ -97,14 +98,18 @@ class LegacyEncryptorShim implements EncryptorLike {
     return this.inner.decrypt(encryptedText);
   }
 
-  encrypted(text: string): boolean {
-    if (this.inner.encrypted) return this.inner.encrypted(text);
+  isEncrypted(text: string): boolean {
+    if (this.inner.isEncrypted) return this.inner.isEncrypted(text);
     try {
       this.inner.decrypt(text);
       return true;
     } catch {
       return false;
     }
+  }
+
+  isBinary(): boolean {
+    return this.inner.isBinary?.() ?? false;
   }
 }
 

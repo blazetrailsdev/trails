@@ -29,4 +29,13 @@ export class MessagePackMessageSerializer {
   load(serialized: string): Message {
     return this._fallback.load(serialized);
   }
+
+  // Rails returns true here because real MessagePack is binary.
+  // This implementation delegates to JSON, so false is correct for
+  // our current output format — the guard in EncryptedAttributeType
+  // that prevents binary data from being stored in text columns must
+  // not fire while we're producing JSON strings.
+  isBinary(): boolean {
+    return this._fallback.isBinary();
+  }
 }

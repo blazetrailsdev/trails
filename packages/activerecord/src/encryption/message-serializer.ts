@@ -86,4 +86,8 @@ export class MessageSerializer {
 
     return message;
   }
+
+  isBinary(): boolean {
+    return false;
+  }
 }

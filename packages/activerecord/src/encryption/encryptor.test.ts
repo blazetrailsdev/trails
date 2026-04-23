@@ -65,12 +65,16 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     /* needs key provider integration with metadata */
   });
 
+  it("binary? returns false (delegates to the JSON serializer)", () => {
+    expect(new Encryptor().isBinary()).toBe(false);
+  });
+
   it("encrypted? returns whether the passed text is encrypted", () => {
     const enc = new Encryptor();
     const key = generateKey();
     const encrypted = enc.encrypt("hello", { key });
-    expect(enc.encrypted(encrypted)).toBe(true);
-    expect(enc.encrypted("plain text")).toBe(false);
+    expect(enc.isEncrypted(encrypted)).toBe(true);
+    expect(enc.isEncrypted("plain text")).toBe(false);
   });
 
   it.skip("decrypt respects encoding even when compression is used", () => {

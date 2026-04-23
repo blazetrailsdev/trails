@@ -14,4 +14,12 @@ export class ReadOnlyNullEncryptor {
   decrypt(encryptedText: string, _options?: Record<string, unknown>): string {
     return encryptedText;
   }
+
+  isEncrypted(_text: string): boolean {
+    return false;
+  }
+
+  isBinary(): boolean {
+    return false;
+  }
 }

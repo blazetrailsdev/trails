@@ -26,7 +26,8 @@ export interface EncryptorOptions {
 export interface EncryptorLike {
   encrypt(clearText: string, options?: Record<string, unknown>): string;
   decrypt(encryptedText: string, options?: Record<string, unknown>): string;
-  encrypted(text: string): boolean;
+  isEncrypted(text: string): boolean;
+  isBinary(): boolean;
 }
 
 export interface KeyProviderLike {
@@ -126,12 +127,16 @@ export class Encryptor {
     return decrypted;
   }
 
-  encrypted(text: string): boolean {
+  isEncrypted(text: string): boolean {
     try {
       this._serializer.load(text);
       return true;
     } catch {
       return false;
     }
+  }
+
+  isBinary(): boolean {
+    return this._serializer.isBinary();
   }
 }

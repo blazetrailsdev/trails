@@ -66,6 +66,10 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     expect(() => serializer.dump("not a message" as any)).toThrow(ForbiddenClass);
   });
 
+  it("binary? returns false", () => {
+    expect(new MessageSerializer().isBinary()).toBe(false);
+  });
+
   it("raises Decryption when trying to parse message with more than one nested message", () => {
     const serializer = new MessageSerializer();
     const data = JSON.stringify({

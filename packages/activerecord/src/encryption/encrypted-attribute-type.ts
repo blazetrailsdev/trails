@@ -85,9 +85,9 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     return oldValue !== newValue;
   }
 
-  encrypted(value: unknown): boolean {
+  isEncrypted(value: unknown): boolean {
     if (typeof value !== "string") return false;
-    return this._encryptor.encrypted(value);
+    return this._encryptor.isEncrypted(value);
   }
 
   get deterministic(): boolean {
@@ -113,7 +113,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     if (value === null || value === undefined) return value;
     if (this._default !== undefined && this._default === value) return value;
 
-    if (this.supportUnencryptedData && !this.encrypted(value)) {
+    if (this.supportUnencryptedData && !this.isEncrypted(value)) {
       return value;
     }
 

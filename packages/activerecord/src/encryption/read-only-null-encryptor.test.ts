@@ -12,4 +12,12 @@ describe("ActiveRecord::Encryption::ReadOnlyNullEncryptorTest", () => {
     const enc = new ReadOnlyNullEncryptor();
     expect(() => enc.encrypt("hello")).toThrow(EncryptionError);
   });
+
+  it("encrypted? returns false", () => {
+    expect(new ReadOnlyNullEncryptor().isEncrypted("hello")).toBe(false);
+  });
+
+  it("binary? returns false", () => {
+    expect(new ReadOnlyNullEncryptor().isBinary()).toBe(false);
+  });
 });
