@@ -309,6 +309,7 @@ jobs:
         with:
           ruby-version: "3.3"
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - name: Fetch Rails source
         run: bash scripts/api-compare/fetch-rails.sh
       - name: Fetch Rails test source + Rack
