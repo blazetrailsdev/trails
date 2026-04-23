@@ -24,7 +24,8 @@
     "test:compare": "bash scripts/test-compare/fetch-rails-tests.sh && ruby scripts/test-compare/extract-ruby-tests.rb && pnpm tsx scripts/test-compare/extract-ts-tests.ts && pnpm tsx scripts/test-compare/test-compare.ts",
     "test:stubs": "pnpm test:compare -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
     "stats:sync": "pnpm tsx scripts/sync-stats/sync.ts",
-    "parity:validate": "ajv compile -s scripts/parity/canonical/schema.schema.json --spec=draft2020"
+    "parity:validate": "ajv compile -s scripts/parity/canonical/schema.schema.json --spec=draft2020",
+    "parity:schema": "pnpm tsx scripts/parity/run.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -33,6 +34,7 @@
     "@vitest/eslint-plugin": "^1.6.12",
     "ajv": "^8.18.0",
     "ajv-cli": "^5.0.0",
+    "diff": "^9.0.0",
     "eslint": "^10.0.3",
     "eslint-plugin-unused-imports": "^4.4.1",
     "husky": "^9.0.0",
