@@ -639,12 +639,113 @@ describe("ErrorsTest", () => {
     expect(e2.get("name")).toContain("can't be blank");
   });
 
+  it("copy! replaces existing errors rather than appending", () => {
+    // Rails errors.rb:138 — `@errors = other.errors.deep_dup`.
+    const e1 = new Errors(null);
+    const e2 = new Errors(null);
+    e2.add("name", "blank");
+    e1.add("age", "invalid");
+    e2.copyBang(e1);
+    expect(e2.count).toBe(1);
+    expect(e2.attributeNames).toEqual(["age"]);
+  });
+
+  it("copy! deep-dups nested option values (matches Rails deep_dup)", () => {
+    // Rails errors.rb:138 calls `other.errors.deep_dup`, which recurses into
+    // Hash/Array values. A shallow spread would leave nested values shared,
+    // so mutating the source after copy would leak into the target.
+    const source = new Errors({});
+    const nested = { range: { min: 1, max: 5 } };
+    source.add("age", "out_of_range", nested);
+    const target = new Errors({});
+    target.copyBang(source);
+    (source.objects[0].options.range as { min: number }).min = 999;
+    expect((target.objects[0].options.range as { min: number }).min).toBe(1);
+  });
+
+  it("copy! preserves NestedError class on duplicated errors", () => {
+    // Rails `deep_dup` preserves dynamic class; a NestedError dup is still
+    // a NestedError with its innerError reachable.
+    const source = new Errors({});
+    source.add("age", "invalid");
+    const wrapper = new Errors({});
+    wrapper.mergeBang(source); // imports as NestedError
+    const target = new Errors({});
+    target.copyBang(wrapper);
+    expect(target.objects[0].constructor.name).toBe("NestedError");
+  });
+
+  it("copy! deep-dups the inner error on NestedError (no shared mutable state)", () => {
+    // Rails `deep_dup` on a NestedError recurses into `@inner_error`, so the
+    // duplicated wrapper's inner error is independent of the source's.
+    const source = new Errors({});
+    source.add("age", "out_of_range", { range: { min: 1 } });
+    const wrapper = new Errors({});
+    wrapper.mergeBang(source);
+    const target = new Errors({});
+    target.copyBang(wrapper);
+    const srcInner = (
+      wrapper.objects[0] as unknown as { innerError: { options: Record<string, unknown> } }
+    ).innerError;
+    const tgtInner = (
+      target.objects[0] as unknown as { innerError: { options: Record<string, unknown> } }
+    ).innerError;
+    expect(tgtInner).not.toBe(srcInner);
+    expect((tgtInner.options.range as { min: number }).min).toBe(1);
+    (srcInner.options.range as { min: number }).min = 999;
+    expect((tgtInner.options.range as { min: number }).min).toBe(1);
+  });
+
+  it("copy! rebinds each error's base to the receiver", () => {
+    const base1 = { tag: "one" };
+    const base2 = { tag: "two" };
+    const e1 = new Errors(base1);
+    e1.add("name", "blank");
+    const e2 = new Errors(base2);
+    e2.copyBang(e1);
+    expect(e2.objects[0].base).toBe(base2);
+    // Original is untouched.
+    expect(e1.objects[0].base).toBe(base1);
+  });
+
   it("merge errors", () => {
     const e1 = new Errors(null);
     const e2 = new Errors(null);
     e1.add("name", "blank");
     e2.merge(e1);
     expect(e2.count).toBe(1);
+  });
+
+  it("merge! appends imported errors as NestedError", () => {
+    // Rails errors.rb:174-180 — `other.errors.each { import(error) }`;
+    // `import` wraps as NestedError (errors.rb:160).
+    const e1 = new Errors({});
+    e1.add("name", "blank");
+    const e2 = new Errors({});
+    e2.add("age", "invalid");
+    e2.mergeBang(e1);
+    expect(e2.count).toBe(2);
+    const imported = e2.objects.find((e) => e.attribute === "name")!;
+    expect(imported.constructor.name).toBe("NestedError");
+  });
+
+  it("objects returns the backing error array", () => {
+    const errors = new Errors(null);
+    errors.add("name", "blank");
+    expect(errors.objects).toHaveLength(1);
+    expect(errors.objects[0].attribute).toBe("name");
+  });
+
+  it("uniq! removes duplicates with identical attribute/type/options", () => {
+    const errors = new Errors({});
+    errors.add("name", "blank");
+    errors.add("name", "blank");
+    errors.add("age", "too_short", { count: 2 });
+    errors.add("age", "too_short", { count: 2 });
+    errors.add("age", "too_short", { count: 3 });
+    errors.uniqBang();
+    expect(errors.count).toBe(3);
+    expect(errors.objects.filter((e) => e.attribute === "age")).toHaveLength(2);
   });
 
   it("each when arity is negative", () => {

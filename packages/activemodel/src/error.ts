@@ -1,4 +1,4 @@
-import { humanize, underscore } from "@blazetrails/activesupport";
+import { humanize, underscore, deepDup } from "@blazetrails/activesupport";
 import { I18n } from "./i18n.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,6 +29,17 @@ export class Error {
     this.rawType = type;
     this.type = type || "invalid";
     this.options = options;
+  }
+
+  /**
+   * Return a deep-duped copy of this error, optionally rebinding `base` to a
+   * new model instance. Mirrors Rails' usage in
+   * `ActiveModel::Errors#copy!` where each error is `deep_dup`ed and then
+   * its `@base` is reset to the receiver
+   * (activemodel/lib/active_model/errors.rb:138-143).
+   */
+  dupWithBase(newBase: AnyRecord): Error {
+    return new Error(newBase, this.attribute, this.rawType, deepDup(this.options));
   }
 
   get message(): string {

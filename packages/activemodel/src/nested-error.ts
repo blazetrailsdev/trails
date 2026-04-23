@@ -1,3 +1,4 @@
+import { deepDup } from "@blazetrails/activesupport";
 import { Error as ActiveModelError } from "./error.js";
 
 interface ErrorLike {
@@ -29,5 +30,33 @@ export class NestedError extends ActiveModelError {
 
   override get message(): string {
     return this.innerError.message;
+  }
+
+  /**
+   * Preserve the NestedError wrapper + deep-dup the wrapped inner error.
+   *
+   * Rails' `deep_dup` keeps the dynamic class and recurses through ivars,
+   * so a duplicated NestedError gets an independent inner error too —
+   * without this, a copy would still share mutable `innerError` state
+   * (options, attribute, type) with the source and contradict the
+   * deep-dup semantics documented for `Errors#copy!`.
+   *
+   * Inner error's own `base` is preserved (the inner error belongs to the
+   * inner model, not the outer one) — only the NestedError's base changes.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  override dupWithBase(newBase: any): NestedError {
+    const inner = this.innerError;
+    const innerDup: ErrorLike =
+      inner instanceof ActiveModelError
+        ? inner.dupWithBase(inner.base)
+        : {
+            attribute: inner.attribute,
+            type: inner.type,
+            rawType: inner.rawType,
+            message: inner.message,
+            options: deepDup(inner.options ?? {}),
+          };
+    return new NestedError(newBase, innerDup, { attribute: this.attribute });
   }
 }
