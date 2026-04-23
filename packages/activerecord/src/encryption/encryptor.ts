@@ -139,4 +139,12 @@ export class Encryptor {
   isBinary(): boolean {
     return this._serializer.isBinary();
   }
+
+  get compressor(): Compressor {
+    return this._compressor;
+  }
+
+  isCompress(): boolean {
+    return this._compress;
+  }
 }

@@ -65,6 +65,11 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     /* needs key provider integration with metadata */
   });
 
+  it("compress? returns the compress setting", () => {
+    expect(new Encryptor({ compress: true }).isCompress()).toBe(true);
+    expect(new Encryptor({ compress: false }).isCompress()).toBe(false);
+  });
+
   it("binary? returns false (delegates to the JSON serializer)", () => {
     expect(new Encryptor().isBinary()).toBe(false);
   });
@@ -81,7 +86,28 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     /* needs encoding preservation in compression */
   });
 
-  it.skip("accept a custom compressor", () => {
-    /* needs compressor option wiring */
+  it("accept a custom compressor", () => {
+    const originalText = "x".repeat(1000);
+    const compressedMagic = "COMPRESSED";
+    let deflated = false;
+    let inflated = false;
+    const customCompressor = {
+      deflate(_data: string) {
+        deflated = true;
+        return Buffer.from(compressedMagic, "utf-8");
+      },
+      inflate(_data: Buffer) {
+        inflated = true;
+        return originalText;
+      },
+    };
+    const enc = new Encryptor({ compress: true, compressor: customCompressor });
+    expect(enc.compressor).toBe(customCompressor);
+    const key = generateKey();
+    const encrypted = enc.encrypt(originalText, { key });
+    const decrypted = enc.decrypt(encrypted, { key });
+    expect(decrypted).toBe(originalText);
+    expect(deflated).toBe(true);
+    expect(inflated).toBe(true);
   });
 });
