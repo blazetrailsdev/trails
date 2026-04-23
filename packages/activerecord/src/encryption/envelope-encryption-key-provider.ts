@@ -14,6 +14,7 @@ import type { Message } from "./message.js";
 export class EnvelopeEncryptionKeyProvider {
   private _primaryKeyProvider: KeyProvider;
   private _encryptor: Encryptor;
+  private _activePrimaryKey?: Key;
 
   constructor(primaryKeyProvider: KeyProvider) {
     this._primaryKeyProvider = primaryKeyProvider;
@@ -40,6 +41,11 @@ export class EnvelopeEncryptionKeyProvider {
       keyProvider: this._primaryKeyProvider,
     });
     return [new Key(secret)];
+  }
+
+  get activePrimaryKey(): Key {
+    this._activePrimaryKey ??= this._primaryKeyProvider.encryptionKey();
+    return this._activePrimaryKey;
   }
 
   generateRandomEncryptionKey(): string {

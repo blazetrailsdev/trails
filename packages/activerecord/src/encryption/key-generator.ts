@@ -15,6 +15,14 @@ export class KeyGenerator {
     this._hashDigestClass = hashDigestClass;
   }
 
+  get hashDigestClass(): string {
+    return this._hashDigestClass;
+  }
+
+  deriveKeyFrom(password: string, length: number = DEFAULT_KEY_LENGTH): string {
+    return this.deriveKey(password, length);
+  }
+
   generateRandomKey(length: number = DEFAULT_KEY_LENGTH): string {
     return getCrypto().randomBytes(length).toString("base64");
   }

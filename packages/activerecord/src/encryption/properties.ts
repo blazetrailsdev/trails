@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Properties
  */
 
-import { EncryptedContentIntegrity } from "./errors.js";
+import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
 const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
 
@@ -77,15 +77,29 @@ export class Properties {
     return this.get("at") as string | undefined;
   }
 
-  private _validateType(value: unknown): void {
+  validateValueType(value: unknown): void {
     if (value === null) return;
     if (typeof value === "object" && value !== null && "payload" in value && "headers" in value)
       return;
     const t = typeof value;
     if (!ALLOWED_TYPES.has(t)) {
-      throw new EncryptedContentIntegrity(
-        `Invalid property type: ${t}. Only string, number, boolean, nil are allowed.`,
+      const typeName = _typeNameFor(value);
+      throw new ForbiddenClass(
+        `Can't store a ${typeName}, only properties of type string, number, boolean, null are allowed`,
       );
     }
   }
+
+  private _validateType(value: unknown): void {
+    this.validateValueType(value);
+  }
+}
+
+function _typeNameFor(value: unknown): string {
+  const t = typeof value;
+  if ((t === "object" || t === "function") && value !== null) {
+    const name = (value as { constructor?: { name?: string } }).constructor?.name;
+    if (name) return name;
+  }
+  return t;
 }

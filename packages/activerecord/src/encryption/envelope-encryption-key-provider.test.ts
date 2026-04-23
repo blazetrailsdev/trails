@@ -51,6 +51,25 @@ describe("ActiveRecord::Encryption::EnvelopeEncryptionKeyProviderTest", () => {
     expect(decrypted).toBe("hello");
   });
 
+  it("active_primary_key returns and memoizes the primary key", () => {
+    let callCount = 0;
+    const primaryKey = makeKey();
+    const trackingProvider = {
+      encryptionKey() {
+        callCount++;
+        return primaryKey;
+      },
+      decryptionKeys: () => [primaryKey],
+    } as unknown as KeyProvider;
+
+    const provider = new EnvelopeEncryptionKeyProvider(trackingProvider);
+    const k1 = provider.activePrimaryKey;
+    const k2 = provider.activePrimaryKey;
+    expect(k1).toBe(primaryKey);
+    expect(k2).toBe(k1);
+    expect(callCount).toBe(1);
+  });
+
   it("work with multiple keys when config.store_key_references is true", () => {
     const primaryProvider = new KeyProvider([makeKey(), makeKey()]);
     const provider = new EnvelopeEncryptionKeyProvider(primaryProvider);

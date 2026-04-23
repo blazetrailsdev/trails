@@ -22,6 +22,7 @@ import { type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
+import { Cipher } from "./encryption/cipher/aes256-gcm.js";
 
 /**
  * The simple encryptor surface `Base.encrypts({ encryptor })` accepts.
@@ -245,4 +246,19 @@ export function isEncryptedAttribute(klass: any, attr: string): boolean {
     current = Object.getPrototypeOf(current);
   }
   return false;
+}
+
+/** Mirrors: ActiveRecord::Encryption.key_length */
+export function keyLength(): number {
+  return Cipher.keyLength;
+}
+
+/** Mirrors: ActiveRecord::Encryption.iv_length */
+export function ivLength(): number {
+  return Cipher.ivLength;
+}
+
+/** Mirrors: ActiveRecord::Encryption.eager_load! */
+export function eagerLoadBang(): void {
+  // No-op in TS — all encryption classes are statically imported.
 }

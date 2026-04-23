@@ -49,4 +49,15 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
     const key = gen.deriveKey("password", 16);
     expect(Buffer.from(key, "base64").length).toBe(16);
   });
+
+  it("hash_digest_class reflects the configured digest", () => {
+    expect(new KeyGenerator("SHA256").hashDigestClass).toBe("SHA256");
+    expect(new KeyGenerator("SHA1").hashDigestClass).toBe("SHA1");
+  });
+
+  it("derive_key_from produces the same output as deriveKey", () => {
+    const gen = new KeyGenerator();
+    expect(gen.deriveKeyFrom("password")).toBe(gen.deriveKey("password"));
+    expect(gen.deriveKeyFrom("password", 16)).toBe(gen.deriveKey("password", 16));
+  });
 });

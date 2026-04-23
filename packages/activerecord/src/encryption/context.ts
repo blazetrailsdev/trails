@@ -4,6 +4,32 @@
  * Mirrors: ActiveRecord::Encryption::Contexts
  */
 
+/**
+ * Holds the encryption configuration for a single context frame:
+ * key provider, key generator, cipher, message serializer, encryptor,
+ * and whether encryption is frozen (read-only mode).
+ *
+ * Mirrors: ActiveRecord::Encryption::Context
+ */
+export class Context {
+  private _keyProvider?: unknown;
+  keyGenerator?: unknown;
+  cipher?: unknown;
+  messageSerializer?: unknown;
+  encryptor?: unknown;
+  frozenEncryption: boolean = false;
+
+  constructor() {}
+
+  get keyProvider(): unknown {
+    return this._keyProvider;
+  }
+
+  set keyProvider(value: unknown) {
+    this._keyProvider = value;
+  }
+}
+
 export interface EncryptionContext {
   encryptionDisabled?: boolean;
   protectedMode?: boolean;

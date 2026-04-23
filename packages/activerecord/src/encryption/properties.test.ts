@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Properties } from "./properties.js";
-import { EncryptedContentIntegrity } from "./errors.js";
+import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
 describe("ActiveRecord::EncryptionPropertiesTest", () => {
   it("behaves like a hash", () => {
@@ -33,11 +33,11 @@ describe("ActiveRecord::EncryptionPropertiesTest", () => {
   });
 
   it("validate allowed types on creation", () => {
-    expect(() => new Properties({ a: {} as any })).toThrow(EncryptedContentIntegrity);
+    expect(() => new Properties({ a: {} as any })).toThrow(ForbiddenClass);
   });
 
   it("validate allowed_types setting headers", () => {
     const props = new Properties();
-    expect(() => props.set("a", {} as any)).toThrow(EncryptedContentIntegrity);
+    expect(() => props.set("a", {} as any)).toThrow(ForbiddenClass);
   });
 });

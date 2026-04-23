@@ -2,6 +2,8 @@ import { Scheme, type SchemeOptions } from "./scheme.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 
+const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
+
 /**
  * Provides the `encrypts` declaration for model classes, enabling
  * transparent attribute encryption/decryption. This is wired into
@@ -78,6 +80,12 @@ export class EncryptableRecord {
 
   static encryptedAttributes(modelClass: any): Set<string> {
     return modelClass._encryptedAttributes ?? new Set();
+  }
+
+  static sourceAttributeFromPreservedAttribute(attributeName: string): string | undefined {
+    return attributeName.startsWith(ORIGINAL_ATTRIBUTE_PREFIX)
+      ? attributeName.slice(ORIGINAL_ATTRIBUTE_PREFIX.length)
+      : undefined;
   }
 
   static deterministicEncryptedAttributes(modelClass: any): Set<string> {
