@@ -1702,16 +1702,28 @@ async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
         SELECT 1 FROM api_compare_stats acs
         WHERE acs.merge_commit_sha = rjl.merge_commit_sha
       )
-      OR NOT EXISTS (
-        SELECT 1 FROM api_compare_privates_stats acps
-        WHERE acps.merge_commit_sha = rjl.merge_commit_sha
+      OR (
+        -- Only gate on privates stats when the job actually ran the
+        -- --privates step. Historical logs from before the step was
+        -- added would otherwise loop forever on --refresh.
+        rjl.log_output LIKE '%compare.ts --privates%'
+        AND NOT EXISTS (
+          SELECT 1 FROM api_compare_privates_stats acps
+          WHERE acps.merge_commit_sha = rjl.merge_commit_sha
+        )
       )
       OR EXISTS (
-        WITH expected(step_name) AS (VALUES ('api_compare'), ('api_compare_privates'), ('test_compare'))
+        WITH expected(step_name, required) AS (
+          VALUES
+            ('api_compare', 1),
+            ('test_compare', 1),
+            ('api_compare_privates',
+              CASE WHEN rjl.log_output LIKE '%compare.ts --privates%' THEN 1 ELSE 0 END)
+        )
         SELECT 1 FROM expected e
         LEFT JOIN compare_logs cl
           ON cl.merge_commit_sha = rjl.merge_commit_sha AND cl.step_name = e.step_name
-        WHERE cl.step_name IS NULL
+        WHERE e.required = 1 AND cl.step_name IS NULL
       )
     )
     ORDER BY rjl.pr_number DESC

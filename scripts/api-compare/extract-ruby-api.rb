@@ -902,16 +902,16 @@ def run
       extractor.process_file(filepath, pkg_dir)
     end
 
-    # Preserve every method; non-public methods are tagged with
-    # `internal: true` so --privates mode can select them.
+    # Normalize into the JSON shape. Non-public methods are kept (tagged
+    # `internal: true`) so consumers can opt into private-API coverage.
     classes = {}
     extractor.classes.each do |fqn, info|
-      classes[fqn] = tag_visibility(info)
+      classes[fqn] = normalize_class_info(info)
     end
 
     modules = {}
     extractor.modules.each do |fqn, info|
-      modules[fqn] = tag_visibility(info)
+      modules[fqn] = normalize_class_info(info)
     end
 
     manifest[:packages][pkg_name] = {
@@ -924,9 +924,12 @@ def run
   manifest[:packages].each do |pkg, data|
     class_count = data[:classes].length
     module_count = data[:modules].length
-    method_count = data[:classes].values.sum { |c| c[:instanceMethods].length + c[:classMethods].length } +
-                   data[:modules].values.sum { |m| m[:instanceMethods].length + m[:classMethods].length }
-    puts "  #{pkg}: #{class_count} classes, #{module_count} modules, #{method_count} methods (public + internal)"
+    all_methods = data[:classes].values.flat_map { |c| c[:instanceMethods] + c[:classMethods] } +
+                  data[:modules].values.flat_map { |m| m[:instanceMethods] + m[:classMethods] }
+    internal_count = all_methods.count { |m| m[:internal] }
+    public_count = all_methods.length - internal_count
+    puts "  #{pkg}: #{class_count} classes, #{module_count} modules, " \
+         "#{public_count} public methods (#{internal_count} internal)"
   end
 
   output_path = File.join(OUTPUT_DIR, "rails-api.json")
@@ -944,7 +947,7 @@ def tag_internal(methods)
   end
 end
 
-def tag_visibility(info)
+def normalize_class_info(info)
   {
     name: info[:name],
     fqn: info[:fqn],

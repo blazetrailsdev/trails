@@ -411,7 +411,7 @@ export function resolveRelModule(fromRel: string, spec: string): string | null {
   return path.posix.normalize(path.posix.join(fromDir, withoutExt)) + ".ts";
 }
 
-function extractClass(
+export function extractClass(
   node: ts.ClassDeclaration,
   checker: ts.TypeChecker,
   file: string,
