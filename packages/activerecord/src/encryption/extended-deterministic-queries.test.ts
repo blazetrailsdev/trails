@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
 import {
   AdditionalValue,
   EncryptedQuery,
@@ -9,23 +9,233 @@ import {
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { NullEncryptor } from "./null-encryptor.js";
+import { Configurable } from "./configurable.js";
+import { installExtendedQueriesIfConfigured } from "./install.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { createTestAdapter } from "../test-adapter.js";
 
+// 32 bytes (base64-encoded) for AES-256-GCM. Cipher decodes the key from
+// base64, so we pad a known repeating byte to 32 bytes and encode. Shared
+// across the five Book model classes so they round-trip the same rows.
+const TEST_KEY = Buffer.alloc(32, "x").toString("base64");
+
+/**
+ * Shared fixture for the Rails port of ExtendedDeterministicQueriesTest.
+ * Mirrors Rails' `models/book_encrypted.rb`: one `books` table, five model
+ * classes pointing at it with different encryption configurations.
+ *
+ * Config mutation and prototype patching are handled in the describe
+ * block's beforeAll/afterAll; setupBooks() only builds fresh classes
+ * and an adapter per test.
+ */
+function setupBooks() {
+  const adapter = createTestAdapter();
+
+  class UnencryptedBook extends Base {
+    static {
+      this._tableName = "books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+    }
+  }
+  class EncryptedBook extends Base {
+    static {
+      this._tableName = "books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+      this.encrypts("name", { deterministic: true, key: TEST_KEY });
+    }
+  }
+  class EncryptedBookWithDowncaseName extends Base {
+    static {
+      this._tableName = "books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+      this.encrypts("name", { deterministic: true, downcase: true, key: TEST_KEY });
+    }
+  }
+  class EncryptedBookWithUnencryptedDataOptedOut extends Base {
+    static {
+      this._tableName = "books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+      this.encrypts("name", { deterministic: true, supportUnencryptedData: false, key: TEST_KEY });
+    }
+  }
+  class EncryptedBookWithUnencryptedDataOptedIn extends Base {
+    static {
+      this._tableName = "books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+      this.encrypts("name", { deterministic: true, supportUnencryptedData: true, key: TEST_KEY });
+    }
+  }
+
+  return {
+    adapter,
+    UnencryptedBook,
+    EncryptedBook,
+    EncryptedBookWithDowncaseName,
+    EncryptedBookWithUnencryptedDataOptedOut,
+    EncryptedBookWithUnencryptedDataOptedIn,
+  };
+}
+
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
-  it.skip("Finds records when data is unencrypted", () => {});
-  it.skip("Finds records when data is encrypted", () => {});
-  it.skip("Works well with downcased attributes", () => {});
-  it.skip("Works well with string attribute names", () => {});
-  it.skip("find_or_create_by works", () => {});
-  it.skip("does not mutate arguments", () => {});
-  it.skip("where(...).first_or_create works", () => {});
-  it.skip("exists?(...) works", () => {});
-  it.skip("If support_unencrypted_data is opted out at the attribute level, cannot find unencrypted data", () => {});
-  it.skip("If support_unencrypted_data is opted out at the attribute level, can find encrypted data", () => {});
-  it.skip("If support_unencrypted_data is opted in at the attribute level, can find unencrypted data", () => {});
-  it.skip("If support_unencrypted_data is opted in at the attribute level, can find encrypted data", () => {});
+  let books: ReturnType<typeof setupBooks>;
+
+  // Snapshot global state up front and restore it after the whole
+  // block. Configurable.config and Relation/Base/EncryptedAttributeType
+  // prototypes are shared across the Vitest worker; leaving them
+  // mutated would make sibling test files order-dependent.
+  const savedConfig = {
+    extendQueries: Configurable.config.extendQueries,
+    supportUnencryptedData: Configurable.config.supportUnencryptedData,
+    keyDerivationSalt: Configurable.config.keyDerivationSalt,
+    primaryKey: Configurable.config.primaryKey,
+    deterministicKey: Configurable.config.deterministicKey,
+  };
+  const savedMethods: {
+    where?: Function;
+    exists?: Function;
+    scopeForCreate?: Function;
+    findBy?: Function;
+    serialize?: Function;
+  } = {};
+
+  beforeAll(() => {
+    Configurable.config.extendQueries = true;
+    Configurable.config.supportUnencryptedData = true;
+    Configurable.config.keyDerivationSalt = "test-salt";
+    Configurable.config.primaryKey = "test-primary-key";
+    Configurable.config.deterministicKey = "test-deterministic-key";
+
+    savedMethods.where = Relation.prototype.where;
+    savedMethods.exists = (Relation.prototype as any).exists;
+    savedMethods.scopeForCreate = (Relation.prototype as any).scopeForCreate;
+    savedMethods.findBy = (Base as any).findBy;
+    savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
+
+    installExtendedQueriesIfConfigured();
+  });
+
+  afterAll(() => {
+    Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;
+    (Relation.prototype as any).exists = savedMethods.exists;
+    (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
+    (Base as any).findBy = savedMethods.findBy;
+    EncryptedAttributeType.prototype.serialize =
+      savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
+    (ExtendedDeterministicQueries as any)._installed = false;
+
+    Configurable.config.extendQueries = savedConfig.extendQueries;
+    Configurable.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
+    Configurable.config.keyDerivationSalt = savedConfig.keyDerivationSalt;
+    Configurable.config.primaryKey = savedConfig.primaryKey;
+    Configurable.config.deterministicKey = savedConfig.deterministicKey;
+  });
+
+  beforeEach(() => {
+    books = setupBooks();
+  });
+
+  it("Finds records when data is unencrypted", async () => {
+    const { UnencryptedBook, EncryptedBook } = books;
+    await UnencryptedBook.create({ name: "Dune" });
+    expect(await EncryptedBook.findBy({ name: "Dune" })).not.toBeNull();
+    expect(await EncryptedBook.where("id > 0").findBy({ name: "Dune" })).not.toBeNull();
+  });
+
+  it("Finds records when data is encrypted", async () => {
+    const { EncryptedBook } = books;
+    await EncryptedBook.create({ name: "Dune" });
+    expect(await EncryptedBook.findBy({ name: "Dune" })).not.toBeNull();
+    expect(await EncryptedBook.where("id > 0").findBy({ name: "Dune" })).not.toBeNull();
+  });
+
+  it("Works well with downcased attributes", async () => {
+    const { EncryptedBookWithDowncaseName } = books;
+    await EncryptedBookWithDowncaseName.create({ name: "Dune" });
+    expect(await EncryptedBookWithDowncaseName.findBy({ name: "DUNE" })).not.toBeNull();
+  });
+
+  it("Works well with string attribute names", async () => {
+    const { UnencryptedBook, EncryptedBook } = books;
+    await UnencryptedBook.create({ name: "Dune" });
+    expect(await EncryptedBook.findBy({ name: "Dune" })).not.toBeNull();
+  });
+
+  it("find_or_create_by works", async () => {
+    const { EncryptedBook } = books;
+    await EncryptedBook.findOrCreateBy({ name: "Dune" });
+    expect(await EncryptedBook.findBy({ name: "Dune" })).not.toBeNull();
+
+    await EncryptedBook.findOrCreateBy({ name: "Dune" });
+    expect(await EncryptedBook.findBy({ name: "Dune" })).not.toBeNull();
+    expect(await EncryptedBook.where({ name: "Dune" }).count()).toBe(1);
+  });
+
+  it("does not mutate arguments", async () => {
+    const { EncryptedBook } = books;
+    const props = { name: "Dune" };
+    const record = await EncryptedBook.findOrInitializeBy(props);
+    expect((record as any).name).toBe("Dune");
+    expect(props.name).toBe("Dune");
+  });
+
+  it("where(...).first_or_create works", async () => {
+    const { EncryptedBook } = books;
+    await EncryptedBook.where({ name: "Dune" }).firstOrCreate();
+    expect(await EncryptedBook.exists({ name: "Dune" })).toBe(true);
+  });
+
+  it("exists?(...) works", async () => {
+    const { EncryptedBook } = books;
+    await EncryptedBook.create({ name: "Dune" });
+    expect(await EncryptedBook.exists({ name: "Dune" })).toBe(true);
+  });
+
+  it("If support_unencrypted_data is opted out at the attribute level, cannot find unencrypted data", async () => {
+    const { UnencryptedBook, EncryptedBookWithUnencryptedDataOptedOut } = books;
+    await UnencryptedBook.create({ name: "Dune" });
+    expect(await EncryptedBookWithUnencryptedDataOptedOut.findBy({ name: "Dune" })).toBeNull();
+    expect(
+      await EncryptedBookWithUnencryptedDataOptedOut.where("id > 0").findBy({ name: "Dune" }),
+    ).toBeNull();
+  });
+
+  it("If support_unencrypted_data is opted out at the attribute level, can find encrypted data", async () => {
+    const { EncryptedBook, EncryptedBookWithUnencryptedDataOptedOut } = books;
+    await EncryptedBook.create({ name: "Dune" });
+    expect(await EncryptedBookWithUnencryptedDataOptedOut.findBy({ name: "Dune" })).not.toBeNull();
+    expect(
+      await EncryptedBookWithUnencryptedDataOptedOut.where("id > 0").findBy({ name: "Dune" }),
+    ).not.toBeNull();
+  });
+
+  it("If support_unencrypted_data is opted in at the attribute level, can find unencrypted data", async () => {
+    const { UnencryptedBook, EncryptedBookWithUnencryptedDataOptedIn } = books;
+    await UnencryptedBook.create({ name: "Dune" });
+    expect(await EncryptedBookWithUnencryptedDataOptedIn.findBy({ name: "Dune" })).not.toBeNull();
+    expect(
+      await EncryptedBookWithUnencryptedDataOptedIn.where("id > 0").findBy({ name: "Dune" }),
+    ).not.toBeNull();
+  });
+
+  it("If support_unencrypted_data is opted in at the attribute level, can find encrypted data", async () => {
+    const { EncryptedBook, EncryptedBookWithUnencryptedDataOptedIn } = books;
+    await EncryptedBook.create({ name: "Dune" });
+    expect(await EncryptedBookWithUnencryptedDataOptedIn.findBy({ name: "Dune" })).not.toBeNull();
+    expect(
+      await EncryptedBookWithUnencryptedDataOptedIn.where("id > 0").findBy({ name: "Dune" }),
+    ).not.toBeNull();
+  });
 });
 
 function makeType(deterministic = true): EncryptedAttributeType {
