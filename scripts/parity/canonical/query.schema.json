@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blazetrails.dev/schemas/parity/canonical-query/v1",
+  "title": "CanonicalQuery",
+  "description": "Version 1 canonical query output — SQL string and bind params for one Arel / AR expression.",
+  "type": "object",
+  "required": ["version", "fixture", "frozenAt", "sql", "binds"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Schema version. Bump in a single PR that also updates both runners and any checked-in baselines."
+    },
+    "fixture": {
+      "type": "string",
+      "description": "Fixture identifier, e.g. 'arel-01'."
+    },
+    "frozenAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+      "description": "ISO 8601 UTC timestamp (trailing Z required) that both sides froze time to for this run. Set by the orchestrator; included for auditability."
+    },
+    "sql": {
+      "type": "string",
+      "description": "SQL string produced by to_sql (Ruby) or .toSql() (TypeScript) on the expression returned by the query script. The expression may be an Arel node or a manager, each exposing .toSql() through its own API surface."
+    },
+    "binds": {
+      "type": "array",
+      "description": "Ordered bind parameter values, all stringified. Empty array when the expression has no bind parameters.",
+      "items": { "type": "string" }
+    }
+  }
+}
