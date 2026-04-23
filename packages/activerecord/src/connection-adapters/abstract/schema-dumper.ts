@@ -12,6 +12,15 @@
  * column-spec hooks.
  */
 
+import type { SchemaSource } from "../../schema-dumper.js";
 import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
 
-export class SchemaDumper extends BaseSchemaDumper {}
+export class SchemaDumper extends BaseSchemaDumper {
+  static override create<T extends typeof BaseSchemaDumper>(
+    this: T,
+    source: SchemaSource,
+    options: Record<string, unknown> = {},
+  ): InstanceType<T> {
+    return new this(source, options) as InstanceType<T>;
+  }
+}

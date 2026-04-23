@@ -70,30 +70,94 @@ export interface AddForeignKeyOptions {
   name?: string;
   onDelete?: ReferentialAction;
   onUpdate?: ReferentialAction;
+  deferrable?: "immediate" | "deferred" | false;
+  validate?: boolean;
 }
 
 export class ForeignKeyDefinition {
+  readonly fromTable: string;
+  readonly toTable: string;
+  readonly column: string;
+  readonly primaryKey: string;
+  readonly name: string;
+  readonly onDelete?: ReferentialAction;
+  readonly onUpdate?: ReferentialAction;
+  readonly deferrable?: "immediate" | "deferred" | false;
+  readonly validate: boolean;
+
   constructor(
-    readonly fromTable: string,
-    readonly toTable: string,
-    readonly column: string,
-    readonly primaryKey: string,
-    readonly name: string,
-    readonly onDelete?: ReferentialAction,
-    readonly onUpdate?: ReferentialAction,
-  ) {}
+    fromTable: string,
+    toTable: string,
+    column: string,
+    primaryKey: string,
+    name: string,
+    onDelete?: ReferentialAction,
+    onUpdate?: ReferentialAction,
+    deferrable?: "immediate" | "deferred" | false,
+    validate: boolean = true,
+  ) {
+    this.fromTable = fromTable;
+    this.toTable = toTable;
+    this.column = column;
+    this.primaryKey = primaryKey;
+    this.name = name;
+    this.onDelete = onDelete;
+    this.onUpdate = onUpdate;
+    this.deferrable = deferrable;
+    this.validate = validate;
+  }
+
+  get isCustomPrimaryKey(): boolean {
+    return this.primaryKey !== "id";
+  }
+
+  get isValidate(): boolean {
+    return this.validate;
+  }
+
+  get isExportNameOnSchemaDump(): boolean {
+    return true;
+  }
+
+  isDefinedFor(options: { toTable?: string; validate?: boolean } = {}): boolean {
+    return (
+      (options.toTable === undefined || options.toTable.toString() === this.toTable) &&
+      (options.validate === undefined || options.validate === this.validate)
+    );
+  }
 }
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::CheckConstraintDefinition
  */
 export class CheckConstraintDefinition {
-  constructor(
-    readonly tableName: string,
-    readonly expression: string,
-    readonly name: string,
-    readonly validate: boolean = true,
-  ) {}
+  readonly tableName: string;
+  readonly expression: string;
+  readonly name: string;
+  readonly validate: boolean;
+
+  constructor(tableName: string, expression: string, name: string, validate: boolean = true) {
+    this.tableName = tableName;
+    this.expression = expression;
+    this.name = name;
+    this.validate = validate;
+  }
+
+  get isValidate(): boolean {
+    return this.validate;
+  }
+
+  get isExportNameOnSchemaDump(): boolean {
+    return true;
+  }
+
+  isDefinedFor(options: { name: string; expression?: string; validate?: boolean }): boolean {
+    return (
+      this.name === options.name.toString() &&
+      (options.expression === undefined || this.expression === options.expression) &&
+      (options.validate === undefined || options.validate === this.validate)
+    );
+  }
 }
 
 /**
@@ -445,6 +509,10 @@ export class TableDefinition {
     return this.columns.filter((c) => c.options.primaryKey).map((c) => c.name);
   }
 
+  aliasedTypes(name: string, fallback: string): string {
+    return name === "bigint" ? "integer" : fallback;
+  }
+
   column(
     name: string,
     type: ColumnType,
@@ -498,6 +566,8 @@ export class TableDefinition {
       options.name ?? `fk_${this.tableName}_${col}`,
       options.onDelete,
       options.onUpdate,
+      options.deferrable,
+      options.validate,
     );
   }
 
@@ -781,6 +851,18 @@ export class TableDefinition {
           fkSql += ` ON DELETE ${fk.onDelete.toUpperCase().replace("NULLIFY", "SET NULL").replace("NO_ACTION", "NO ACTION")}`;
         if (fk.onUpdate)
           fkSql += ` ON UPDATE ${fk.onUpdate.toUpperCase().replace("NULLIFY", "SET NULL").replace("NO_ACTION", "NO ACTION")}`;
+        if (fk.deferrable) {
+          if (this._adapterName !== "postgres") {
+            throw new Error("Foreign key deferrable is only supported on PostgreSQL");
+          }
+          fkSql += ` DEFERRABLE INITIALLY ${fk.deferrable.toUpperCase()}`;
+        }
+        if (!fk.isValidate) {
+          if (this._adapterName !== "postgres") {
+            throw new Error("Foreign key validate: false is only supported on PostgreSQL");
+          }
+          fkSql += " NOT VALID";
+        }
         tableElements.push(fkSql);
       }
       sql += ` (${tableElements.join(", ")})`;
@@ -806,6 +888,10 @@ export class Table {
     private _tableName: string,
     private _schema: SchemaStatementsLike,
   ) {}
+
+  aliasedTypes(_name: string, fallback: string): string {
+    return fallback;
+  }
 
   async string(name: string, options: ColumnOptions = {}): Promise<void> {
     await this._schema.addColumn(this._tableName, name, "string", options);

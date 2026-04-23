@@ -384,6 +384,8 @@ export class SchemaStatements {
       name,
       options.onDelete,
       options.onUpdate,
+      options.deferrable,
+      options.validate,
     );
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(fromTable)} ADD ${this.schemaCreation.accept(fkDef)}`,

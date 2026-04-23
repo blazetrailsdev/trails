@@ -96,4 +96,9 @@ export {
 } from "./connection-adapters/schema-cache.js";
 export { SqlTypeMetadata } from "./connection-adapters/sql-type-metadata.js";
 export { StatementPool } from "./connection-adapters/statement-pool.js";
-export { deduplicate, type Deduplicable } from "./connection-adapters/deduplicable.js";
+export { deduplicate, registry, type Deduplicable } from "./connection-adapters/deduplicable.js";
+export {
+  ForeignKeyDefinition,
+  CheckConstraintDefinition,
+  TableDefinition,
+} from "./connection-adapters/abstract/schema-definitions.js";
