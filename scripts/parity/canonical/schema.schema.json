@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blazetrails.dev/schemas/parity/canonical-schema/v1",
+  "title": "CanonicalSchema",
+  "description": "Version 1 canonical schema dump — tables, columns, and indexes only.",
+  "type": "object",
+  "required": ["version", "tables"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Schema version. Bump in a single PR that also updates both canonicalizers and any checked-in baselines."
+    },
+    "tables": {
+      "type": "array",
+      "description": "User tables, sorted by name ASC. Does not include schema_migrations or ar_internal_metadata.",
+      "items": { "$ref": "#/$defs/CanonicalTable" }
+    }
+  },
+  "$defs": {
+    "CanonicalTable": {
+      "type": "object",
+      "required": ["name", "primaryKey", "columns", "indexes"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "primaryKey": {
+          "description": "Single-column PK: string. Composite PK: string[]. No PK: null.",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" }, "minItems": 2 },
+            { "type": "null" }
+          ]
+        },
+        "columns": {
+          "type": "array",
+          "description": "Columns in declaration order (not sorted).",
+          "items": { "$ref": "#/$defs/CanonicalColumn" }
+        },
+        "indexes": {
+          "type": "array",
+          "description": "Explicit indexes, sorted by name ASC. sqlite_autoindex_* entries are excluded.",
+          "items": { "$ref": "#/$defs/CanonicalIndex" }
+        }
+      }
+    },
+    "CanonicalColumn": {
+      "type": "object",
+      "required": ["name", "type", "null", "default", "limit", "precision", "scale"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "$ref": "#/$defs/CanonicalType" },
+        "null": { "type": "boolean", "description": "true when the column is nullable." },
+        "default": {
+          "description": "Literal default value, or null when there is no default. Expression defaults (e.g. CURRENT_TIMESTAMP) are deferred to v2.",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" }
+          ]
+        },
+        "limit": { "type": ["integer", "null"] },
+        "precision": { "type": ["integer", "null"] },
+        "scale": { "type": ["integer", "null"] }
+      }
+    },
+    "CanonicalIndex": {
+      "type": "object",
+      "required": ["name", "columns", "unique", "where"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "columns": {
+          "type": "array",
+          "description": "Column names in index declaration order.",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "unique": { "type": "boolean" },
+        "where": {
+          "type": ["string", "null"],
+          "description": "Partial-index predicate string, or null."
+        }
+      }
+    },
+    "CanonicalType": {
+      "type": "string",
+      "enum": [
+        "string",
+        "text",
+        "integer",
+        "bigint",
+        "float",
+        "decimal",
+        "datetime",
+        "date",
+        "time",
+        "boolean",
+        "binary",
+        "json"
+      ],
+      "description": "Rails abstract type name. Canonicalizers must throw on any type not in this enum."
+    }
+  }
+}
