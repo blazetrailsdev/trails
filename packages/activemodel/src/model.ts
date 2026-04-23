@@ -16,6 +16,14 @@ import {
 } from "./callbacks.js";
 import { serializableHash, SerializeOptions } from "./serialization.js";
 import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
+
+/**
+ * Anything `validates_with` accepts: a full `Validator`/`EachValidator`
+ * subclass, or any class that just implements `validate(record)`. Used by
+ * `_validators` / `validators()` / `validatorsOn()` so the stored value
+ * type matches what we actually accept at registration.
+ */
+type ValidatorLike = ValidatorBase | EachValidator | { validate(record: AnyRecord): void };
 import {
   AttributeMethodPattern,
   attributeMethodPrefix,
@@ -71,7 +79,22 @@ export class Model {
   static _attributeAliases: Record<string, string> = {};
   static _aliasesByAttributeName: Map<string, string[]> = new Map();
   static _generatedMethods: Set<string> = new Set();
-  static _validators: Array<ValidatorBase | EachValidator> = [];
+  // Rails: `class_attribute :_validators, … default: Hash.new { |h, k| h[k] = [] }`
+  // (activemodel/lib/active_model/validations.rb:50). Map keyed by attribute
+  // name (or `null` for validators registered without `attributes:`); O(1)
+  // `validatorsOn(attr)` via direct bucket lookup.
+  //
+  // Subclass isolation is copy-on-first-write rather than Rails'
+  // eager-on-`inherited`. JS has no `inherited` hook that fires when a
+  // subclass is defined, so we defer the dup until the subclass first
+  // writes (see `_ensureOwnValidators`). Behavioral consequence: if a
+  // subclass never registers its own validator, it keeps reading through
+  // the prototype chain and will see validators the parent adds *after*
+  // the subclass was defined. Identical in all cases where a subclass
+  // registers at least one validator (the standard pattern for
+  // `static { this.validates(...) }` blocks at class-definition time);
+  // only the "defined but never written to" window diverges from Rails.
+  static _validators: Map<string | null, Array<ValidatorLike>> = new Map();
   static _callbackChain: CallbackChain = new CallbackChain();
   private static _modelName: ModelName | null = null;
 
@@ -352,7 +375,8 @@ export class Model {
   }
 
   static clearValidatorsBang(): void {
-    this._validators = [];
+    // Rails: `_validators.clear` (activemodel/lib/active_model/validations.rb:248).
+    this._validators = new Map();
     this._ensureOwnCallbacks();
     this._callbackChain.clearEvent("validate");
   }
@@ -387,8 +411,7 @@ export class Model {
     options: ConditionalOptions = {},
   ): void {
     const validator = new BlockValidator({ attributes, ...options }, fn);
-    this._ensureOwnValidators();
-    this._validators.push(validator);
+    this._registerValidator(validator);
     this._ensureOwnCallbacks();
     this._callbackChain.register(
       "before",
@@ -423,6 +446,17 @@ export class Model {
     const { if: ifOpt, unless: unlessOpt, on: onOpt, strict: isStrict, ...rest } = options;
     const conditions = this._buildValidateConditions({ if: ifOpt, unless: unlessOpt, on: onOpt });
 
+    // Extract the explicit `attributes:` option so we can route the validator
+    // into the right bucket even when the validator class doesn't expose
+    // `attributes` on the instance or in `options` (e.g. plain classes that
+    // only implement `validate()`).
+    const rawExplicit = (rest as { attributes?: unknown }).attributes;
+    const explicitAttributes: string[] | null = Array.isArray(rawExplicit)
+      ? rawExplicit.map(String)
+      : typeof rawExplicit === "string"
+        ? [rawExplicit]
+        : null;
+
     for (const klass of args as Array<{
       new (options: Record<string, unknown>): ValidatorBase | { validate(record: AnyRecord): void };
     }>) {
@@ -434,8 +468,7 @@ export class Model {
           (validator as AnyRecord).checkValidityBang();
         }
       }
-      this._ensureOwnValidators();
-      this._validators.push(validator as ValidatorBase);
+      this._registerValidator(validator, explicitAttributes);
 
       let callbackFn: CallbackFn;
       if (isStrict) {
@@ -466,20 +499,39 @@ export class Model {
    *
    * Mirrors: ActiveModel::Validations.validators
    */
-  static validators(): Array<ValidatorBase | EachValidator> {
-    return [...this._validators];
+  static validators(): Array<ValidatorLike> {
+    // Rails: `_validators.values.flatten.uniq`
+    // (activemodel/lib/active_model/validations.rb:204-206).
+    const seen = new Set<ValidatorLike>();
+    const out: Array<ValidatorLike> = [];
+    for (const bucket of this._validators.values()) {
+      for (const v of bucket) {
+        if (seen.has(v)) continue;
+        seen.add(v);
+        out.push(v);
+      }
+    }
+    return out;
   }
 
   /**
-   * Return validators registered for a specific attribute.
+   * Return validators registered for a specific attribute. O(1) bucket
+   * lookup — Rails `_validators[attribute.to_sym]`
+   * (activemodel/lib/active_model/validations.rb:266-270).
    *
-   * Mirrors: ActiveModel::Validations.validators_on
+   * Returns a detached copy each call (same shape whether the bucket is
+   * populated or empty). Deliberately does NOT mirror Rails' default-proc
+   * auto-vivification (`Hash.new { |h,k| h[k] = [] }`) — that's a Ruby
+   * hash artifact that would turn reads into state mutations, and on a
+   * subclass it would also require eagerly invoking
+   * `_ensureOwnValidators()` just to avoid polluting the parent's map.
+   * The detached copy keeps both concerns away from the reader (caller
+   * mutation can't leak into internals; consecutive calls return
+   * independent arrays).
    */
-  static validatorsOn(attribute: string): Array<ValidatorBase | EachValidator> {
-    return this._validators.filter((v) => {
-      const attributes = (v as AnyRecord).attributes;
-      return Array.isArray(attributes) && attributes.includes(attribute);
-    });
+  static validatorsOn(attribute: string): Array<ValidatorLike> {
+    const bucket = this._validators.get(attribute);
+    return bucket ? [...bucket] : [];
   }
 
   // -- Individual validator helper methods --
@@ -852,8 +904,62 @@ export class Model {
   }
 
   private static _ensureOwnValidators(): void {
+    // Copy-on-first-write dup. Rails' `inherited(base)` hook
+    // (activemodel/lib/active_model/validations.rb:287-291) does this
+    // eagerly at class-definition time; JS has no such hook, so we defer
+    // the dup until the first write on the subclass. Produces an
+    // independent top-level Map whose per-attribute arrays are also fresh,
+    // matching Rails' `dup.each { |k, v| dup[k] = v.dup }` — downward
+    // writes from the subclass never leak up to the parent.
     if (!Object.prototype.hasOwnProperty.call(this, "_validators")) {
-      this._validators = [...this._validators];
+      const cloned = new Map<string | null, Array<ValidatorLike>>();
+      for (const [k, arr] of this._validators) cloned.set(k, [...arr]);
+      this._validators = cloned;
+    }
+  }
+
+  /**
+   * Register `validator` under each of its declared attributes (or under
+   * the `null` key when none are declared — Rails matches this in
+   * `validates_with` via `_validators[nil] << validator`).
+   *
+   * `explicitAttributes` wins when the caller already parsed attributes
+   * from options (e.g. `validates_with MyValidator, attributes: [...]`
+   * with a validator class that doesn't store them on the instance).
+   * Otherwise fall back to `validator.attributes` (set by `EachValidator`)
+   * or `validator.options.attributes` (set by plain `Validator`
+   * subclasses). This three-tier lookup covers all three validator
+   * shapes `validates_with` accepts:
+   *   - `EachValidator` subclass (attributes on instance),
+   *   - `Validator` subclass (attributes in `options`),
+   *   - arbitrary class that just implements `validate()` (neither —
+   *     caller must pass attributes explicitly).
+   */
+  private static _registerValidator(
+    validator: ValidatorLike,
+    explicitAttributes?: readonly string[] | null,
+  ): void {
+    this._ensureOwnValidators();
+    const fromInstance = (validator as AnyRecord).attributes;
+    const fromOptions = (validator as AnyRecord).options?.attributes;
+    const rawAttrs =
+      explicitAttributes && explicitAttributes.length > 0
+        ? explicitAttributes
+        : Array.isArray(fromInstance) && fromInstance.length > 0
+          ? fromInstance
+          : Array.isArray(fromOptions) && fromOptions.length > 0
+            ? fromOptions
+            : typeof fromOptions === "string"
+              ? [fromOptions]
+              : null;
+    const keys: Array<string | null> = rawAttrs ? rawAttrs.map(String) : [null];
+    for (const key of keys) {
+      let bucket = this._validators.get(key);
+      if (!bucket) {
+        bucket = [];
+        this._validators.set(key, bucket);
+      }
+      bucket.push(validator);
     }
   }
 

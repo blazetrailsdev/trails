@@ -1086,4 +1086,161 @@ describe("ValidationsTest", () => {
       expect(t.validationContext).toBe(null);
     });
   });
+
+  describe("_validators hash-of-arrays (Rails fidelity)", () => {
+    // Rails `_validators = Hash.new { |h, k| h[k] = [] }`
+    // (activemodel/lib/active_model/validations.rb:50) — per-attribute
+    // buckets, O(1) `validators_on`, dup-in-inherited.
+    it("validatorsOn is O(1) per-attribute lookup", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+          this.validates("name", { presence: true });
+          this.validates("age", { numericality: true });
+        }
+      }
+      expect(Person.validatorsOn("name")).toHaveLength(1);
+      expect(Person.validatorsOn("age")).toHaveLength(1);
+      expect(Person.validatorsOn("nonexistent")).toEqual([]);
+    });
+
+    it("validators() returns a uniq flat list across all attribute buckets", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("email", "string");
+          // validates_each binds one validator across two attributes —
+          // it lands in both buckets and must still appear once via
+          // `validators()` (Rails: `_validators.values.flatten.uniq`).
+          this.validatesEach(["name", "email"], () => {});
+        }
+      }
+      expect(Person.validators()).toHaveLength(1);
+      expect(Person.validatorsOn("name")).toHaveLength(1);
+      expect(Person.validatorsOn("email")).toHaveLength(1);
+      expect(Person.validatorsOn("name")[0]).toBe(Person.validatorsOn("email")[0]);
+    });
+
+    it("inheritance is copy-on-first-write (subclass sees parent writes made before its own first write)", () => {
+      // Documented divergence from Rails. Rails' `inherited(base)` hook runs
+      // eagerly at `class Child < Base; end` time and snapshots
+      // `_validators`, so subsequent `Base.validates` additions don't reach
+      // `Child`. JS has no `inherited` hook that fires at subclass
+      // definition, so we defer the dup until Child's first write. In this
+      // window, Child still reads Base's Map via the prototype chain.
+      class Base extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+        }
+      }
+      class Child extends Base {}
+      expect(Child.validatorsOn("name")).toHaveLength(1);
+      // Parent adds another validator AFTER Child is defined, and Child has
+      // not yet registered anything of its own. Copy-on-first-write
+      // semantics: Child still sees Base's map, so the new validator
+      // propagates.
+      Base.validates("name", { length: { minimum: 2 } });
+      expect(Child.validatorsOn("name")).toHaveLength(2);
+      // As soon as Child writes, it detaches. Further Base writes stay on
+      // Base.
+      Child.validates("name", { length: { maximum: 10 } });
+      Base.validates("name", { format: { with: /x/ } });
+      expect(Child.validatorsOn("name")).toHaveLength(3);
+      expect(Base.validatorsOn("name")).toHaveLength(3);
+      expect(Child.validatorsOn("name")).not.toContain(Base.validatorsOn("name")[2]);
+    });
+
+    it("subclass inherits validators but its changes don't leak up", () => {
+      class Base extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+        }
+      }
+      class Child extends Base {}
+      // Subclass sees parent's validators…
+      expect(Child.validatorsOn("name")).toHaveLength(1);
+      // …and adding one on the subclass must not affect the parent.
+      Child.validates("name", { length: { minimum: 2 } });
+      expect(Child.validatorsOn("name")).toHaveLength(2);
+      expect(Base.validatorsOn("name")).toHaveLength(1);
+    });
+
+    it("clearValidators! empties the map", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+        }
+      }
+      expect(Person.validators()).toHaveLength(1);
+      Person.clearValidatorsBang();
+      expect(Person.validators()).toEqual([]);
+      expect(Person.validatorsOn("name")).toEqual([]);
+    });
+
+    it("routes arbitrary { validate() } class into the right bucket via explicit attributes", () => {
+      // Rails `validates_with` also accepts any class that just implements
+      // `validate(record)`. Such a class won't expose `attributes` on the
+      // instance or in `options`, so `validatesWith` must route the explicit
+      // `attributes:` option through to the bucket lookup.
+      class PojoValidator {
+        validate(_record: unknown): void {
+          /* no-op */
+        }
+      }
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validatesWith(PojoValidator, { attributes: ["name"] });
+        }
+      }
+      expect(Person.validatorsOn("name")).toHaveLength(1);
+      expect(Person.validatorsOn("name")[0]).toBeInstanceOf(PojoValidator);
+    });
+
+    it("routes plain Validator with attributes: option into the right bucket", async () => {
+      // Rails `validates_with MyValidator, attributes: [:name]` — the
+      // validator is a plain `Validator` (not EachValidator); attributes
+      // live in `options` rather than directly on the instance.
+      // _registerValidator must check both.
+      const { Validator: ValidatorBase } = await import("./validator.js");
+      class StaticValidator extends ValidatorBase {
+        override validate(): void {
+          /* no-op */
+        }
+      }
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validatesWith(StaticValidator, { attributes: ["name"] });
+        }
+      }
+      expect(Person.validatorsOn("name")).toHaveLength(1);
+      expect(Person.validatorsOn("name")[0]).toBeInstanceOf(StaticValidator);
+    });
+
+    it("validatorsOn returns a fresh array (no state-mutating reads)", () => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true });
+        }
+      }
+      // Reading an unseen attribute must NOT create a bucket (unlike Rails'
+      // default-proc hash) — the TS API keeps reads side-effect-free.
+      Person.validatorsOn("never_registered");
+      expect(Array.from(Person._validators.keys())).not.toContain("never_registered");
+
+      // Mutating the returned array must NOT affect internal state.
+      const a = Person.validatorsOn("name");
+      a.length = 0;
+      expect(Person.validatorsOn("name")).toHaveLength(1);
+
+      // Consecutive calls return independent arrays.
+      expect(Person.validatorsOn("name")).not.toBe(Person.validatorsOn("name"));
+    });
+  });
 });
