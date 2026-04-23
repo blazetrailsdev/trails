@@ -807,3 +807,29 @@ describe("DefineAttributeSTITest", () => {
     expect(ownDesc).toBeUndefined();
   });
 });
+
+describe("ResetDefaultAttributesCascadeTest", () => {
+  it("adding an attribute to a superclass invalidates an AR subclass _defaultAttributes cache", () => {
+    const adp = createTestAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    class SpecialPost extends (Post as any) {}
+
+    // Prime the subclass cache via AR's _defaultAttributes path
+    const before = (SpecialPost as any)._defaultAttributes();
+    expect(before.keys()).toContain("title");
+    expect(before.keys()).not.toContain("score");
+
+    // Add attribute to superclass at runtime
+    Post.attribute("score", "integer", { default: 0 });
+
+    // Subclass cache must be invalidated and rebuilt with the new attribute
+    const after = (SpecialPost as any)._defaultAttributes();
+    expect(after.keys()).toContain("score");
+    expect(after.getAttribute("score").value).toBe(0);
+  });
+});

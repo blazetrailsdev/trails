@@ -13,6 +13,8 @@ import {
   AttributeSet,
   type Type,
   applyPendingAttributeModifications,
+  resetDefaultAttributes,
+  registerWithSuperclass,
 } from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
 import type { Base } from "./base.js";
@@ -86,8 +88,7 @@ export function defineAttribute(
     source: userProvidedDefault ? "user" : "schema",
   });
 
-  this._cachedDefaultAttributes = null;
-  this._attributesBuilder = undefined;
+  resetDefaultAttributes(this);
   applyPendingEncryptions(this);
 
   // Install prototype accessor so the attribute is readable/writable by name,
@@ -132,6 +133,10 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     : this;
 
   if (!cacheHost._cachedDefaultAttributes) {
+    // Register cacheHost with its superclass so resetDefaultAttributes()
+    // cascades here when the superclass gains new attribute declarations.
+    registerWithSuperclass(cacheHost);
+
     // Phase 1: seed from _attributeDefinitions (all entries — schema-reflected
     // columns and direct defineAttribute() calls). Schema entries use
     // Attribute.fromDatabase; user entries use withCastValue + withUserDefault.

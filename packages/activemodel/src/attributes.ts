@@ -2,7 +2,11 @@ import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
-import { pushPendingType, pushPendingDefault } from "./attribute-registration.js";
+import {
+  pushPendingType,
+  pushPendingDefault,
+  resetDefaultAttributes,
+} from "./attribute-registration.js";
 
 export interface AttributeDefinition {
   name: string;
@@ -99,8 +103,9 @@ export function attribute(
     pushPendingDefault(this, name, defaultValue);
   }
 
-  // Mirrors: Rails reset_default_attributes — clear cached AttributeSet
-  this._cachedDefaultAttributes = null;
+  // Mirrors: Rails reset_default_attributes — invalidate cache on this class
+  // and all known subclasses so they recompute on next _defaultAttributes() call.
+  resetDefaultAttributes(this);
 
   if (!Object.prototype.hasOwnProperty.call(this.prototype, name)) {
     Object.defineProperty(this.prototype, name, {

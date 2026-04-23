@@ -309,4 +309,45 @@ describe("AttributeRegistrationTest", () => {
     const defaults = (Child as any)._defaultAttributes();
     expect(defaults.getAttribute("role").value).toBe("admin");
   });
+
+  it("adding an attribute to a superclass after a subclass has cached _defaultAttributes invalidates the subclass cache", () => {
+    class Parent extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Child extends Parent {}
+
+    // Prime the subclass cache
+    const before = (Child as any)._defaultAttributes();
+    expect(before.keys()).toContain("name");
+    expect(before.keys()).not.toContain("age");
+
+    // Add a new attribute to the superclass at runtime
+    Parent.attribute("age", "integer", { default: 42 });
+
+    // Child's cache must be invalidated and rebuilt
+    const after = (Child as any)._defaultAttributes();
+    expect(after.getAttribute("age").value).toBe(42);
+  });
+
+  it("reset_default_attributes cascade propagates through multiple inheritance levels", () => {
+    class Base extends Model {
+      static {
+        this.attribute("base_attr", "string");
+      }
+    }
+    class Mid extends Base {}
+    class Leaf extends Mid {}
+
+    // Prime all caches
+    (Base as any)._defaultAttributes();
+    (Mid as any)._defaultAttributes();
+    (Leaf as any)._defaultAttributes();
+
+    // Add to root — all descendants must recompute
+    Base.attribute("new_attr", "integer", { default: 7 });
+
+    expect((Leaf as any)._defaultAttributes().getAttribute("new_attr").value).toBe(7);
+  });
 });

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Type } from "./type/value.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
@@ -76,6 +77,54 @@ class PendingDecorator implements PendingModification {
         attributeSet.set(name, existing.withType(newType));
       }
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Subclass registry
+// Mirrors: ActiveSupport::DescendantsTracker used by reset_default_attributes
+// ---------------------------------------------------------------------------
+
+/**
+ * Register cls as a direct subclass of its prototype-chain superclass so
+ * resetDefaultAttributes() can cascade to it.
+ *
+ * Delegates to DescendantsTracker (WeakRef-backed, dedup'd) — the same
+ * infrastructure Rails uses via ActiveSupport::DescendantsTracker. Rails
+ * registers via the `inherited` hook; we register lazily on the first
+ * _defaultAttributes() call instead (same effect: only classes that have
+ * a cache worth invalidating are tracked).
+ *
+ * Mirrors: ActiveSupport::DescendantsTracker registration triggered by
+ * Class.inherited in Rails.
+ */
+export function registerWithSuperclass(cls: AnyAttributeHost): void {
+  const superclass = Object.getPrototypeOf(cls);
+  if (!superclass || superclass === Function.prototype) return;
+  // Only register if the superclass participates in the attribute system.
+  if (!("_attributeDefinitions" in superclass)) return;
+  DescendantsTracker.registerSubclass(superclass, cls);
+}
+
+/**
+ * Clear the cached default AttributeSet on this class and all known
+ * subclasses, so the next call to _defaultAttributes() recomputes.
+ *
+ * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#reset_default_attributes
+ * which calls reset_default_attributes! then recurses via subclasses.each.
+ */
+export function resetDefaultAttributes(cls: AnyAttributeHost): void {
+  cls._cachedDefaultAttributes = null;
+  // _attributesBuilder is an AR-specific derived cache. Unconditionally
+  // shadow it with undefined so prototype-chain lookup never returns a stale
+  // superclass builder after this class's attributes change. For STI
+  // subclasses, attributesBuilder() removes the shadow after writing the
+  // fresh builder to cacheHost, restoring normal prototype-chain access.
+  // AM-only classes that never call attributesBuilder() carry the undefined
+  // own property harmlessly (a single extra slot per class).
+  cls._attributesBuilder = undefined;
+  for (const sub of DescendantsTracker.subclasses(cls)) {
+    resetDefaultAttributes(sub);
   }
 }
 
@@ -161,6 +210,11 @@ export function pushPendingDecorator(
  */
 export function _defaultAttributes(this: AnyAttributeHost): AttributeSet {
   if (!this._cachedDefaultAttributes) {
+    // Register with our superclass so resetDefaultAttributes() cascades to us
+    // when the superclass gains new attribute declarations. Mirrors the
+    // ActiveSupport::DescendantsTracker registration that Rails does via
+    // the `inherited` hook; we do it lazily here instead.
+    registerWithSuperclass(this);
     const attributeSet = new AttributeSet(new Map<string, Attribute>());
     applyPendingAttributeModifications(this, attributeSet);
     this._cachedDefaultAttributes = attributeSet;
@@ -201,7 +255,7 @@ export function decorateAttributes(
     }
   }
 
-  this._cachedDefaultAttributes = null;
+  resetDefaultAttributes(this);
 }
 
 /**

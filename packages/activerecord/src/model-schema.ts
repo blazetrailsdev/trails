@@ -452,6 +452,17 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
     ? (getStiBase(this as unknown as typeof Base) as unknown as SchemaHost)
     : this;
   cacheHost._attributesBuilder = new AttributeSetBuilder(types, defaults);
+  // If we are an STI subclass, resetDefaultAttributes() may have placed an
+  // own-property shadow of `undefined` on `this` to block stale inheritance.
+  // Now that cacheHost has a fresh builder, remove the shadow so subsequent
+  // calls on this STI subclass find cacheHost's builder via prototype chain
+  // instead of rebuilding on every access.
+  if (
+    cacheHost !== (this as unknown) &&
+    Object.prototype.hasOwnProperty.call(this, "_attributesBuilder")
+  ) {
+    delete (this as unknown as Record<string, unknown>)._attributesBuilder;
+  }
   return cacheHost._attributesBuilder;
 }
 
