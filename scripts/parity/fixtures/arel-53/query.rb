@@ -1,0 +1,7 @@
+users  = Arel::Table.new(:users)
+photos = Arel::Table.new(:photos)
+cte    = Arel::Table.new(:cte_photos)
+photos_query = photos.project(Arel.star)
+users.project(Arel.star)
+     .join(cte).on(cte[:user_id].eq(users[:id]))
+     .with(Arel::Nodes::As.new(cte, photos_query))

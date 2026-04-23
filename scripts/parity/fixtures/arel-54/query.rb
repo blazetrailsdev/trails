@@ -1,0 +1,7 @@
+users    = Arel::Table.new(:users)
+comments = Arel::Table.new(:comments)
+users_top = Arel::Table.new(:users_top)
+top_query = users.project(users[:id]).order(users[:karma].desc).take(10)
+comments.project(Arel.star)
+        .where(comments[:author_id].in(users_top.project(users_top[:id])))
+        .with(Arel::Nodes::As.new(users_top, top_query))

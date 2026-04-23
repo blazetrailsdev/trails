@@ -1,0 +1,5 @@
+posts    = Arel::Table.new(:posts)
+comments = Arel::Table.new(:comments)
+post_comments = comments.alias(:post_comments)
+posts.join(post_comments, Arel::Nodes::OuterJoin)
+     .on(posts[:id].eq(post_comments[:post_id]))

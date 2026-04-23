@@ -1,0 +1,6 @@
+products      = Arel::Table.new(:products)
+currency_rates = Arel::Table.new(:currency_rates)
+products.join(currency_rates)
+        .on(products[:currency_id].eq(currency_rates[:id]))
+        .project(Arel.star)
+        .order(products[:price].multiply(currency_rates[:rate]))
