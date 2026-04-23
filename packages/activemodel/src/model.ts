@@ -1142,6 +1142,30 @@ export class Model {
     return !this.isValid(context);
   }
 
+  /**
+   * Freeze this model instance. Mirrors Rails
+   * `ActiveModel::Validations#freeze` (activemodel/lib/active_model/validations.rb:372-377):
+   *
+   *   def freeze
+   *     errors
+   *     context_for_validation
+   *     super
+   *   end
+   *
+   * Rails pre-touches `@errors` and `@context_for_validation` so frozen
+   * models can still answer `#errors` and `#validation_context` without
+   * tripping their `||=` lazy-init. We mirror that by going through the
+   * public API (`.errors`, `.validationContext`) — that way, if either
+   * becomes lazy in the future, the pre-materialization still runs
+   * without this method coupling to private fields.
+   */
+  freeze(): this {
+    void this.errors;
+    void this.validationContext;
+    Object.freeze(this);
+    return this;
+  }
+
   // -- Dirty tracking --
 
   get changed(): boolean {

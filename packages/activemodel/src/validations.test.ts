@@ -1038,4 +1038,52 @@ describe("ValidationsTest", () => {
       expect(m.validationContext).toBe(before);
     });
   });
+
+  describe("ValidationError + freeze (Rails fidelity)", () => {
+    class Topic extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { presence: true });
+      }
+    }
+
+    it("ValidationError message comes from I18n :model_invalid", () => {
+      // Default en → "Validation failed: %{errors}"
+      // (activemodel locale/en.yml:9).
+      expect(() => new Topic({}).validateBang()).toThrow(
+        /^Validation failed: Title can't be blank$/,
+      );
+    });
+
+    it("ValidationError message picks up per-scope override", async () => {
+      const { I18n } = await import("./i18n.js");
+      I18n.storeTranslations("en", {
+        activemodel: {
+          errors: {
+            messages: { model_invalid: "Nope: %{errors}" },
+          },
+        },
+      });
+      try {
+        expect(() => new Topic({}).validateBang()).toThrow(/^Nope: /);
+      } finally {
+        I18n.reset();
+      }
+    });
+
+    it("freeze locks the object and returns self", () => {
+      const t = new Topic({ title: "ok" });
+      expect(t.freeze()).toBe(t);
+      expect(Object.isFrozen(t)).toBe(true);
+    });
+
+    it("freeze preserves errors/validationContext access (Rails pre-touch)", () => {
+      const t = new Topic({ title: "ok" });
+      t.freeze();
+      // Rails validations.rb:372-377 ensures these lazy ivars are
+      // materialized so frozen models can still answer.
+      expect(t.errors).toBeDefined();
+      expect(t.validationContext).toBe(null);
+    });
+  });
 });

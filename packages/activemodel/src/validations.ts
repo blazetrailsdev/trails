@@ -1,5 +1,6 @@
 import type { Errors } from "./errors.js";
 import type { ConditionalOptions } from "./validator.js";
+import { I18n } from "./i18n.js";
 
 /**
  * Validations mixin contract — provides the validation lifecycle.
@@ -61,9 +62,28 @@ export class ValidationError extends globalThis.Error {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly model: any;
 
+  // Mirrors Rails `ActiveModel::ValidationError#initialize`
+  // (activemodel/lib/active_model/validations.rb:496-500):
+  //
+  //   def initialize(model)
+  //     @model = model
+  //     errors = @model.errors.full_messages.join(", ")
+  //     super(I18n.t(:"#{@model.class.i18n_scope}.errors.messages.model_invalid",
+  //                  errors: errors, default: :"errors.messages.model_invalid"))
+  //   end
+  //
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(model: any) {
-    super(`Validation failed: ${model.errors.fullMessages.join(", ")}`);
+    const errors = model.errors.fullMessages.join(", ");
+    // Match the guard used by `error.ts`'s I18n lookups — only treat
+    // `i18nScope` as a scope when the class actually exposes a string.
+    const rawScope = model.constructor?.i18nScope;
+    const scope = typeof rawScope === "string" ? rawScope : "activemodel";
+    const message = I18n.t(`${scope}.errors.messages.model_invalid`, {
+      errors,
+      defaults: [{ key: "errors.messages.model_invalid" }],
+    });
+    super(message);
     this.name = "ValidationError";
     this.model = model;
   }
