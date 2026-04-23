@@ -25,6 +25,7 @@ import {
   quote as mysqlQuote,
   typeCast as mysqlTypeCast,
 } from "./mysql/quoting.js";
+import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 
 const NATIVE_DATABASE_TYPES: Record<string, { name: string; limit?: number }> = {
   primary_key: { name: "bigint auto_increment PRIMARY KEY" },
@@ -433,9 +434,24 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return sql;
   }
 
-  async foreignKeys(tableName: string): Promise<unknown[]> {
+  async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     void tableName;
     return [];
+  }
+
+  protected _mysqlFkAction(
+    rule: string | null | undefined,
+  ): "cascade" | "nullify" | "restrict" | undefined {
+    switch ((rule ?? "").toUpperCase()) {
+      case "CASCADE":
+        return "cascade";
+      case "SET NULL":
+        return "nullify";
+      case "RESTRICT":
+        return "restrict";
+      default:
+        return undefined;
+    }
   }
 
   async checkConstraints(tableName: string): Promise<unknown[]> {

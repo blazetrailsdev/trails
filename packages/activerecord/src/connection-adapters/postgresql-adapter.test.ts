@@ -666,6 +666,62 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
+  describe("foreignKeys", () => {
+    beforeEach(async () => {
+      await adapter.exec(`CREATE TABLE "fk_authors" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec(
+        `CREATE TABLE "fk_books" ("id" SERIAL PRIMARY KEY, "author_id" INTEGER, "editor_id" INTEGER)`,
+      );
+    });
+
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS "fk_books" CASCADE`);
+      await adapter.exec(`DROP TABLE IF EXISTS "fk_authors" CASCADE`);
+    });
+
+    it("returns ForeignKeyDefinition with name, column, and actions", async () => {
+      await adapter.exec(
+        `ALTER TABLE "fk_books" ADD CONSTRAINT "fk_books_author" FOREIGN KEY ("author_id") REFERENCES "fk_authors" ("id") ON DELETE CASCADE ON UPDATE RESTRICT`,
+      );
+      const fks = await adapter.foreignKeys("fk_books");
+      expect(fks).toHaveLength(1);
+      expect(fks[0].name).toBe("fk_books_author");
+      expect(fks[0].column).toBe("author_id");
+      expect(fks[0].toTable).toBe("fk_authors");
+      expect(fks[0].onDelete).toBe("cascade");
+      expect(fks[0].onUpdate).toBe("restrict");
+      expect(fks[0].validate).toBe(true);
+    });
+
+    it("returns deferrable: false for non-deferrable FK", async () => {
+      await adapter.exec(
+        `ALTER TABLE "fk_books" ADD CONSTRAINT "fk_books_editor" FOREIGN KEY ("editor_id") REFERENCES "fk_authors" ("id")`,
+      );
+      const fks = await adapter.foreignKeys("fk_books");
+      expect(fks[0].deferrable).toBe(false);
+    });
+
+    it("returns deferrable: deferred for DEFERRABLE INITIALLY DEFERRED FK", async () => {
+      await adapter.exec(
+        `ALTER TABLE "fk_books" ADD CONSTRAINT "fk_books_author_d" FOREIGN KEY ("author_id") REFERENCES "fk_authors" ("id") DEFERRABLE INITIALLY DEFERRED`,
+      );
+      const fks = await adapter.foreignKeys("fk_books");
+      expect(fks[0].deferrable).toBe("deferred");
+    });
+
+    it("returns validate: false for NOT VALID FK", async () => {
+      await adapter.exec(
+        `ALTER TABLE "fk_books" ADD CONSTRAINT "fk_books_author_nv" FOREIGN KEY ("author_id") REFERENCES "fk_authors" ("id") NOT VALID`,
+      );
+      const fks = await adapter.foreignKeys("fk_books");
+      expect(fks[0].validate).toBe(false);
+    });
+
+    it("returns empty array when no foreign keys exist", async () => {
+      expect(await adapter.foreignKeys("fk_books")).toHaveLength(0);
+    });
+  });
+
   describe("addForeignKey options", () => {
     beforeEach(async () => {
       await adapter.exec(`CREATE TABLE "fk_parents" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);

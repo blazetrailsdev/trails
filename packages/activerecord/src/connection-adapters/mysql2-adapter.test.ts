@@ -640,6 +640,41 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(functional!.columns[0]).not.toBe("null");
     });
 
+    describe("foreignKeys", () => {
+      beforeEach(async () => {
+        await adapter.exec("DROP TABLE IF EXISTS `fk_books`");
+        await adapter.exec("DROP TABLE IF EXISTS `fk_authors`");
+        await adapter.exec(
+          "CREATE TABLE `fk_authors` (`id` INT AUTO_INCREMENT PRIMARY KEY, `name` VARCHAR(255))",
+        );
+        await adapter.exec(
+          "CREATE TABLE `fk_books` (`id` INT AUTO_INCREMENT PRIMARY KEY, `author_id` INT)",
+        );
+      });
+
+      afterEach(async () => {
+        await adapter.exec("DROP TABLE IF EXISTS `fk_books`");
+        await adapter.exec("DROP TABLE IF EXISTS `fk_authors`");
+      });
+
+      it("returns ForeignKeyDefinition with name, column, toTable, and actions", async () => {
+        await adapter.exec(
+          "ALTER TABLE `fk_books` ADD CONSTRAINT `fk_books_author` FOREIGN KEY (`author_id`) REFERENCES `fk_authors` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT",
+        );
+        const fks = await adapter.foreignKeys("fk_books");
+        expect(fks).toHaveLength(1);
+        expect(fks[0].name).toBe("fk_books_author");
+        expect(fks[0].column).toBe("author_id");
+        expect(fks[0].toTable).toBe("fk_authors");
+        expect(fks[0].onDelete).toBe("cascade");
+        expect(fks[0].onUpdate).toBe("restrict");
+      });
+
+      it("returns empty array when no foreign keys exist", async () => {
+        expect(await adapter.foreignKeys("fk_books")).toHaveLength(0);
+      });
+    });
+
     it("SchemaCache.addAll populates from MySQL", async () => {
       // Integration with Phase 5's dumpSchemaCache — MySQL now exposes
       // the full surface (dataSources/columns/primaryKey/indexes) the

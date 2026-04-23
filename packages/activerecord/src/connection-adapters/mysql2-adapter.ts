@@ -6,6 +6,8 @@ import {
   StatementPool as MysqlStatementPool,
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
+import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
+import { quoteString as mysqlQuoteString } from "./mysql/quoting.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
@@ -899,5 +901,62 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   get raw(): mysql.Pool {
     if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
     return this._driverPool;
+  }
+
+  override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
+    const rows = (await this.schemaQuery(
+      `SELECT fk.referenced_table_name AS to_table,
+              fk.referenced_column_name AS primary_key,
+              fk.column_name AS \`column\`,
+              fk.constraint_name AS name,
+              fk.ordinal_position AS position,
+              rc.update_rule AS on_update,
+              rc.delete_rule AS on_delete
+       FROM information_schema.referential_constraints rc
+       JOIN information_schema.key_column_usage fk
+         USING (constraint_schema, constraint_name)
+       WHERE fk.referenced_column_name IS NOT NULL
+         AND fk.table_schema = DATABASE()
+         AND fk.table_name = ${mysqlQuoteString(tableName)}
+         AND rc.constraint_schema = DATABASE()
+         AND rc.table_name = ${mysqlQuoteString(tableName)}
+       ORDER BY fk.constraint_name, fk.ordinal_position`,
+    )) as Array<Record<string, unknown>>;
+
+    const grouped = new Map<string, Array<Record<string, unknown>>>();
+    for (const row of rows) {
+      const name = row.name as string;
+      if (!grouped.has(name)) grouped.set(name, []);
+      grouped.get(name)!.push(row);
+    }
+    const results: ForeignKeyDefinition[] = [];
+    for (const group of grouped.values()) {
+      group.sort((a, b) => (a.position as number) - (b.position as number));
+      const first = group[0];
+      const toTable = first.to_table as string;
+      const fkName = first.name as string;
+      const onDelete = this._mysqlFkAction(first.on_delete as string);
+      const onUpdate = this._mysqlFkAction(first.on_update as string);
+      const column =
+        group.length === 1
+          ? (first.column as string)
+          : group.map((r) => r.column as string).join(",");
+      const primaryKey =
+        group.length === 1
+          ? (first.primary_key as string)
+          : group.map((r) => r.primary_key as string).join(",");
+      results.push(
+        new ForeignKeyDefinition(
+          tableName,
+          toTable,
+          column,
+          primaryKey,
+          fkName,
+          onDelete,
+          onUpdate,
+        ),
+      );
+    }
+    return results;
   }
 }

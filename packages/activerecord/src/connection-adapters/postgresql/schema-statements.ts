@@ -8,6 +8,7 @@ import type {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
+  ForeignKeyDefinition,
 } from "../abstract/schema-definitions.js";
 
 export interface PgIndexDefinition {
@@ -64,7 +65,7 @@ export interface SchemaStatements {
   enumTypes(): Promise<Record<string, string[]>>;
   columns(tableName: string): Promise<unknown[]>;
   columnDefinitions(tableName: string): Promise<unknown[]>;
-  foreignKeys(tableName: string): Promise<unknown[]>;
+  foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
   defaultSequenceName(tableName: string, pk?: string | string[]): Promise<string | null>;
   serialSequence(tableName: string, column: string): Promise<string | null>;
   setPkSequenceBang(tableName: string, value: number): Promise<void>;

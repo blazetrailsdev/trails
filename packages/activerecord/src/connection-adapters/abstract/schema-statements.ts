@@ -724,48 +724,14 @@ export class SchemaStatements {
     }
   }
 
-  async foreignKeys(
-    tableName: string,
-  ): Promise<Array<{ from: string; to: string; column: string; primaryKey: string }>> {
-    switch (this.adapterName) {
-      case "sqlite": {
-        const rows = await this.adapter.execute(`PRAGMA foreign_key_list("${tableName}")`);
-        return (rows as any[]).map((row: any) => ({
-          from: tableName,
-          to: row.table,
-          column: row.from,
-          primaryKey: row.to,
-        }));
-      }
-      case "postgres": {
-        const rows = await this.adapter.execute(
-          `SELECT kcu.column_name, ccu.table_name AS foreign_table, ccu.column_name AS foreign_column
-           FROM information_schema.table_constraints tc
-           JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
-           JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
-           WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = '${tableName}' AND tc.table_schema = 'public'`,
-        );
-        return rows.map((row: any) => ({
-          from: tableName,
-          to: row.foreign_table,
-          column: row.column_name,
-          primaryKey: row.foreign_column,
-        }));
-      }
-      case "mysql": {
-        const rows = await this.adapter.execute(
-          `SELECT column_name, referenced_table_name, referenced_column_name
-           FROM information_schema.key_column_usage
-           WHERE table_schema = DATABASE() AND table_name = '${tableName}' AND referenced_table_name IS NOT NULL`,
-        );
-        return rows.map((row: any) => ({
-          from: tableName,
-          to: row.referenced_table_name ?? row.REFERENCED_TABLE_NAME,
-          column: row.column_name ?? row.COLUMN_NAME,
-          primaryKey: row.referenced_column_name ?? row.REFERENCED_COLUMN_NAME,
-        }));
-      }
+  async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
+    const adapter = this.adapter as {
+      foreignKeys?: (t: string) => Promise<ForeignKeyDefinition[]>;
+    };
+    if (typeof adapter.foreignKeys === "function") {
+      return adapter.foreignKeys(tableName);
     }
+    return [];
   }
 
   async tables(): Promise<string[]> {
@@ -855,7 +821,7 @@ export class SchemaStatements {
   ): Promise<boolean> {
     const fks = await this.foreignKeys(fromTable);
     if (typeof toTableOrOptions === "string") {
-      return fks.some((fk) => fk.to === toTableOrOptions);
+      return fks.some((fk) => fk.toTable === toTableOrOptions);
     }
     if (toTableOrOptions?.column) {
       return fks.some((fk) => fk.column === toTableOrOptions.column);

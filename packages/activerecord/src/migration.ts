@@ -3,6 +3,7 @@ import type { DatabaseAdapter } from "./adapter.js";
 import {
   TableDefinition,
   Table,
+  ForeignKeyDefinition,
   type ColumnType,
   type ColumnOptions,
   type AddForeignKeyOptions,
@@ -681,9 +682,7 @@ export abstract class Migration {
     return this.schema.primaryKey(tableName);
   }
 
-  async foreignKeys(
-    tableName: string,
-  ): Promise<Array<{ from: string; to: string; column: string; primaryKey: string }>> {
+  async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     return this.schema.foreignKeys(tableName);
   }
 
