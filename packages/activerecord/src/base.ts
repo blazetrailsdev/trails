@@ -81,6 +81,12 @@ import {
   accessedFields as _accessedFields,
 } from "./attribute-methods.js";
 import { toKey as _toKey } from "./attribute-methods/primary-key.js";
+import { _readAttribute as _readAttributeFn } from "./attribute-methods/read.js";
+import { _writeAttribute as _writeAttributeFn } from "./attribute-methods/write.js";
+import {
+  queryAttribute as _queryAttribute,
+  _queryAttribute as _queryAttributeFn,
+} from "./attribute-methods/query.js";
 import {
   toParam as _toParam,
   cacheKey as _cacheKey,
@@ -2401,6 +2407,10 @@ export class Base extends Model {
   declare attributePresent: (name: string) => boolean;
   declare toKey: () => unknown[] | null;
   declare accessedFields: () => string[];
+  declare queryAttribute: (name: string) => boolean;
+  declare _queryAttribute: (name: string) => boolean;
+  declare _readAttribute: (name: string) => unknown;
+  declare _writeAttribute: (name: string, value: unknown) => void;
 
   get attributeNamesList(): string[] {
     return _attributeNamesList.call(this as any);
@@ -2742,6 +2752,10 @@ include(Base, {
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,
   accessedFields: _accessedFields,
+  queryAttribute: _queryAttribute,
+  _queryAttribute: _queryAttributeFn,
+  _readAttribute: _readAttributeFn,
+  _writeAttribute: _writeAttributeFn,
   // PrimaryKey
   toKey: _toKey,
 });
