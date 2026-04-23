@@ -18,6 +18,7 @@
  * two flows share a single wrapper implementation.
  */
 
+import { type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
@@ -208,11 +209,17 @@ export function applyPendingEncryptions(klass: any): void {
   for (const { name, scheme } of pending) {
     const def = klass._attributeDefinitions.get(name);
     if (!def) continue;
+    // Guard prevents double-decoration both in _attributeDefinitions and
+    // in the pending queue (decorateAttributes is idempotent here because
+    // the encryptedType guard on _attributeDefinitions prevents re-entry).
     if (def.type instanceof EncryptedAttributeType) continue;
-    klass._attributeDefinitions.set(name, {
-      ...def,
-      type: new EncryptedAttributeType({ scheme, castType: def.type }),
-    });
+    // Route through decorateAttributes so the encryption PendingDecorator
+    // lands in the pending queue in declaration order (after any PendingType),
+    // ensuring _defaultAttributes replays correctly.
+    klass.decorateAttributes(
+      [name],
+      (_attrName: string, castType: Type) => new EncryptedAttributeType({ scheme, castType }),
+    );
   }
 }
 

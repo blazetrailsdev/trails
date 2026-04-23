@@ -8,7 +8,12 @@
  * Mirrors: ActiveRecord::Attributes
  */
 
-import { Attribute, AttributeSet, type Type } from "@blazetrails/activemodel";
+import {
+  Attribute,
+  AttributeSet,
+  type Type,
+  applyPendingAttributeModifications,
+} from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
 import type { Base } from "./base.js";
 import { applyPendingEncryptions } from "./encryption.js";
@@ -20,6 +25,7 @@ interface AttributeDefinition {
   type: Type;
   defaultValue?: unknown;
   userProvided?: boolean;
+  source?: "user" | "schema";
 }
 
 /**
@@ -109,14 +115,14 @@ export function defineAttribute(
 /**
  * Build the AttributeSet that seeds every new record's `_attributes`.
  *
- * Rails seeds from `columns_hash` (with `Attribute.from_database` for each
- * column default) then calls `apply_pending_attribute_modifications`. Our
- * architecture merges those two steps: schema reflection populates
- * `_attributeDefinitions` with column defaults and types, and this method
- * converts that map into an `AttributeSet` using the same Attribute factory
- * methods Rails uses. The result is semantically equivalent.
- *
  * Mirrors: ActiveRecord::Attributes::ClassMethods#_default_attributes
+ *
+ * Seeds from `_attributeDefinitions` (all entries — the equivalent of Rails'
+ * `columns_hash`) then replays user-declared `attribute()` calls from the
+ * pending-modification queue. Schema entries are built with
+ * `Attribute.fromDatabase`; direct `defineAttribute()` entries use
+ * `withCastValue`/`withUserDefault`. Matches Rails' two-phase approach:
+ * `columns_hash` seed → `apply_pending_attribute_modifications`.
  */
 export function _defaultAttributes(this: AnyClass): AttributeSet {
   // For STI subclasses, delegate to the STI base so cache invalidation
@@ -126,24 +132,36 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     : this;
 
   if (!cacheHost._cachedDefaultAttributes) {
+    // Phase 1: seed from _attributeDefinitions (all entries — schema-reflected
+    // columns and direct defineAttribute() calls). Schema entries use
+    // Attribute.fromDatabase; user entries use withCastValue + withUserDefault.
+    // Mirrors: columns_hash.transform_values { Attribute.from_database(...) }
+    // (our _attributeDefinitions is the equivalent of columns_hash since both
+    // schema and user-direct entries live there).
     const defs: Map<string, AttributeDefinition> = cacheHost._attributeDefinitions;
     const attrMap = new Map<string, Attribute>();
-
     for (const [name, def] of defs) {
-      const userProvided = def.userProvided ?? true;
+      const schemaColumn =
+        (def.source ?? (def.userProvided === false ? "schema" : "user")) === "schema";
       if (def.defaultValue != null) {
-        if (userProvided) {
+        if (schemaColumn) {
+          attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue, def.type));
+        } else {
           const base = Attribute.withCastValue(name, null, def.type);
           attrMap.set(name, base.withUserDefault(def.defaultValue));
-        } else {
-          attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue, def.type));
         }
       } else {
         attrMap.set(name, Attribute.withCastValue(name, null, def.type));
       }
     }
 
-    cacheHost._cachedDefaultAttributes = new AttributeSet(attrMap);
+    // Phase 2: replay user-declared attribute() calls from the pending queue.
+    // These always win over schema columns, matching Rails' ordering guarantee.
+    // Mirrors: apply_pending_attribute_modifications(attribute_set)
+    const attributeSet = new AttributeSet(attrMap);
+    applyPendingAttributeModifications(cacheHost, attributeSet);
+
+    cacheHost._cachedDefaultAttributes = attributeSet;
   }
   return cacheHost._cachedDefaultAttributes;
 }

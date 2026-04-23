@@ -2,6 +2,7 @@ import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
+import { pushPendingType, pushPendingDefault } from "./attribute-registration.js";
 
 export interface AttributeDefinition {
   name: string;
@@ -70,11 +71,16 @@ export function attribute(
   },
 ): void {
   const type = typeRegistry.lookup(typeName);
-  const defaultValue = options?.default ?? null;
   const userProvided = options?.userProvidedDefault !== false;
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     this._attributeDefinitions = new Map(this._attributeDefinitions);
   }
+  const existing = this._attributeDefinitions.get(name);
+  // Preserve the existing defaultValue when no default is explicitly provided,
+  // matching Rails' PendingType behavior: with_type only changes the type and
+  // leaves the current default/value untouched.
+  const defaultValue =
+    options?.default !== undefined ? options.default : (existing?.defaultValue ?? null);
   this._attributeDefinitions.set(name, {
     name,
     type,
@@ -83,6 +89,15 @@ export function attribute(
     userProvided,
     source: userProvided ? "user" : "schema",
   });
+
+  // Push to pending-modification queue so _defaultAttributes() replays in
+  // the correct order relative to schema-reflected columns (AR) or other
+  // pending modifications (AM inheritance).
+  // Mirrors: ActiveModel::AttributeRegistration#attribute
+  pushPendingType(this, name, type);
+  if (options?.default !== undefined) {
+    pushPendingDefault(this, name, defaultValue);
+  }
 
   // Mirrors: Rails reset_default_attributes — clear cached AttributeSet
   this._cachedDefaultAttributes = null;

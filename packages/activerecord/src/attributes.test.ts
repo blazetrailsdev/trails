@@ -706,6 +706,56 @@ describe("DefaultAttributesTest", () => {
     const p = new Post({});
     expect(p.status).toBe("draft");
   });
+
+  it("_defaultAttributes seeds schema columns via fromDatabase then replays user pending queue", () => {
+    const adp = createTestAdapter();
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.adapter = adp;
+      }
+    }
+    Post.defineAttribute("views", intType, { default: 0, userProvidedDefault: false });
+    Post.attribute("title", "string", { default: "untitled" });
+
+    const defaults = Post._defaultAttributes();
+    expect(defaults.getAttribute("views").value).toBe(0);
+    expect(defaults.getAttribute("title").value).toBe("untitled");
+  });
+
+  it("user attribute() declaration overrides schema column type via pending queue", () => {
+    const adp = createTestAdapter();
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.adapter = adp;
+      }
+    }
+    Post.defineAttribute("score", intType, { default: 0, userProvidedDefault: false });
+    Post.attribute("score", "string");
+
+    const defaults = Post._defaultAttributes();
+    expect(defaults.getAttribute("score").type.name).toBe("string");
+  });
+
+  it("attribute() overriding only type preserves the schema default", () => {
+    const adp = createTestAdapter();
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.adapter = adp;
+      }
+    }
+    // Schema reflection gives score a default of 5
+    Post.defineAttribute("score", intType, { default: 5, userProvidedDefault: false });
+    // User overrides type to string without specifying a default
+    Post.attribute("score", "string");
+
+    const defaults = Post._defaultAttributes();
+    // Type changed to string, but schema default (5) is preserved
+    expect(defaults.getAttribute("score").type.name).toBe("string");
+    expect(defaults.getAttribute("score").value).toBe("5");
+  });
 });
 
 describe("DefineAttributeSTITest", () => {
