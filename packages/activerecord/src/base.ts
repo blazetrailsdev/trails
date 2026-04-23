@@ -45,6 +45,10 @@ import {
 } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
+import {
+  defineAttribute as _defineAttribute,
+  _defaultAttributes as _arDefaultAttributes,
+} from "./attributes.js";
 import * as Timestamp from "./timestamp.js";
 import { Association as AssociationInstance } from "./associations/association.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
@@ -771,6 +775,10 @@ export class Base extends Model {
   declare static isSharded: typeof ConnectionHandling.isSharded;
 
   // --- ModelSchema mixin (wired via extend() after class) ---
+  // Mirrors: ActiveRecord::Attributes
+  declare static defineAttribute: typeof _defineAttribute;
+  declare static _defaultAttributes: typeof _arDefaultAttributes;
+
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
   declare static columnNames: typeof ModelSchema.columnNames;
   declare static hasAttributeDefinition: typeof ModelSchema.hasAttributeDefinition;
@@ -2432,12 +2440,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.column_defaults
    */
   static get columnDefaults(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [name, def] of this._attributeDefinitions) {
-      result[name] =
-        typeof def.defaultValue === "function" ? def.defaultValue() : (def.defaultValue ?? null);
-    }
-    return result;
+    return this._defaultAttributes().deepDup().toHash();
   }
 
   // -- Strict loading class-level default --
@@ -2694,6 +2697,10 @@ extend(Base, {
   unscoped: _unscoped,
 });
 extend(Base, ModelSchema.ClassMethods);
+extend(Base, {
+  defineAttribute: _defineAttribute,
+  _defaultAttributes: _arDefaultAttributes,
+});
 
 include(Base, {
   // ReadonlyAttributes

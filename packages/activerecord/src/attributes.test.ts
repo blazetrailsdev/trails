@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
+import { typeRegistry } from "@blazetrails/activemodel";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -568,5 +569,191 @@ describe("CustomPropertiesTest", () => {
     expect(p1.active).toBe(1);
     const p2 = new Post({ active: 0 });
     expect(p2.active).toBe(0);
+  });
+});
+
+describe("DefineAttributeTest", () => {
+  it("define_attribute registers a type object directly", () => {
+    const adp = createTestAdapter();
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.adapter = adp;
+        this.defineAttribute("score", intType);
+      }
+    }
+    const p = new Post({ score: "42" });
+    expect(p.score).toBe(42);
+  });
+
+  it("define_attribute with default value", () => {
+    const adp = createTestAdapter();
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.adapter = adp;
+        this.defineAttribute("rating", intType, { default: 5 });
+      }
+    }
+    const p = new Post({});
+    expect(p.rating).toBe(5);
+  });
+
+  it("define_attribute preserves existing default when no default given", () => {
+    const adp = createTestAdapter();
+    const strType = typeRegistry.lookup("string");
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.adapter = adp;
+        this.defineAttribute("score", strType, { default: "10" });
+        this.defineAttribute("score", intType);
+      }
+    }
+    const p = new Post({});
+    expect(p.score).toBe(10);
+  });
+
+  it("define_attribute with userProvidedDefault false uses database cast", () => {
+    const adp = createTestAdapter();
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.adapter = adp;
+        this.defineAttribute("views", intType, { default: "0", userProvidedDefault: false });
+      }
+    }
+    const p = new Post({});
+    expect(p.views).toBe(0);
+  });
+
+  it("define_attribute invalidates _defaultAttributes cache", () => {
+    const adp = createTestAdapter();
+    const strType = typeRegistry.lookup("string");
+    const intType = typeRegistry.lookup("integer");
+    class Post extends Base {
+      static {
+        this.adapter = adp;
+        this.defineAttribute("score", strType);
+      }
+    }
+    const before = Post._defaultAttributes();
+    Post.defineAttribute("score", intType);
+    const after = Post._defaultAttributes();
+    expect(before).not.toBe(after);
+  });
+});
+
+describe("DefaultAttributesTest", () => {
+  it("_default_attributes returns an AttributeSet", () => {
+    const adp = createTestAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const defaults = Post._defaultAttributes();
+    expect(typeof defaults.fetchValue).toBe("function");
+  });
+
+  it("_default_attributes includes declared attributes", () => {
+    const adp = createTestAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string", { default: "Untitled" });
+        this.adapter = adp;
+      }
+    }
+    const defaults = Post._defaultAttributes();
+    expect(defaults.fetchValue("title")).toBe("Untitled");
+  });
+
+  it("_default_attributes is cached", () => {
+    const adp = createTestAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    expect(Post._defaultAttributes()).toBe(Post._defaultAttributes());
+  });
+
+  it("_default_attributes cache is invalidated when attribute is defined", () => {
+    const adp = createTestAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const first = Post._defaultAttributes();
+    Post.attribute("body", "string");
+    const second = Post._defaultAttributes();
+    expect(first).not.toBe(second);
+    expect(second.fetchValue("body")).toBeNull();
+  });
+
+  it("new record attributes are seeded from _default_attributes", () => {
+    const adp = createTestAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("status", "string", { default: "draft" });
+        this.adapter = adp;
+      }
+    }
+    const p = new Post({});
+    expect(p.status).toBe("draft");
+  });
+});
+
+describe("DefineAttributeSTITest", () => {
+  it("defineAttribute on STI subclass routes to the STI base", () => {
+    const adp = createTestAdapter();
+    const intType = typeRegistry.lookup("integer");
+    class Animal extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        (this as any)._inheritanceColumn = "type";
+        this.adapter = adp;
+      }
+    }
+    class Dog extends (Animal as any) {}
+    // Defining on subclass should land on the base
+    (Dog as any).defineAttribute("legs", intType, { default: 4 });
+    expect((Animal as any)._attributeDefinitions.has("legs")).toBe(true);
+    const d = new (Dog as any)({});
+    expect(d.legs).toBe(4);
+  });
+
+  it("_defaultAttributes on STI subclass uses the base cache", () => {
+    const adp = createTestAdapter();
+    class Vehicle extends Base {
+      static {
+        this.attribute("speed", "integer", { default: 60 });
+        this.adapter = adp;
+      }
+    }
+    class Car extends (Vehicle as any) {}
+    const baseDefaults = (Vehicle as any)._defaultAttributes();
+    const subDefaults = (Car as any)._defaultAttributes();
+    expect(baseDefaults).toBe(subDefaults);
+  });
+
+  it("defineAttribute for id does not install an accessor", () => {
+    const adp = createTestAdapter();
+    const strType = typeRegistry.lookup("string");
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    Post.defineAttribute("id", strType);
+    // Base.prototype.id (the CPK-aware getter) must still be used, not a plain accessor
+    const ownDesc = Object.getOwnPropertyDescriptor(Post.prototype, "id");
+    expect(ownDesc).toBeUndefined();
   });
 });
