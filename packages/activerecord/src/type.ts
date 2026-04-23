@@ -19,6 +19,7 @@ import {
 } from "@blazetrails/activemodel";
 export { Type } from "@blazetrails/activemodel";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
+import { detectAdapterName } from "./adapter-name.js";
 import { Date } from "./type/date.js";
 import { DateTime } from "./type/date-time.js";
 import { Time } from "./type/time.js";
@@ -85,6 +86,21 @@ export function lookup(symbol: string, options?: { adapter?: string }): Type {
 
 export function defaultValue(): Type {
   return new ValueType();
+}
+
+/**
+ * Return the normalized adapter name for a given model's connection,
+ * matching the keys used for adapter-specific type registrations.
+ *
+ * Mirrors: ActiveRecord::Type.adapter_name_from
+ */
+export function adapterNameFrom(model: { adapter?: unknown }): string {
+  return detectAdapterName(model.adapter as Parameters<typeof detectAdapterName>[0]);
+}
+
+// currentAdapterName is private in Rails — exposed here for api:compare parity only.
+export function currentAdapterName(getBase?: () => { adapter?: unknown }): string {
+  return getBase ? adapterNameFrom(getBase()) : "sqlite";
 }
 
 // Override ActiveModel's type registry with AR-specific types so that

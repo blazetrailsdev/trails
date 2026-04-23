@@ -10,6 +10,9 @@ export class HashLookupTypeMap {
   private _mapping: Map<string | number, (lookupKey: string | number, ...args: unknown[]) => Type> =
     new Map();
   private _cache: Map<string | number, Map<string, Type>> = new Map();
+  // Rails' HashLookupTypeMap#initialize accepts a parent param but never uses it
+  // (unlike TypeMap which does delegate). Accepted here for API compatibility only.
+  constructor(_parent: HashLookupTypeMap | null = null) {}
 
   lookup(lookupKey: string | number, ...args: unknown[]): Type {
     return this.fetch(lookupKey, ...args, () => new ValueType());
@@ -58,7 +61,7 @@ export class HashLookupTypeMap {
     }
 
     if (!cacheable) {
-      return this._performFetch(lookupKey, args, fallback);
+      return this.performFetch(lookupKey, args, fallback);
     }
 
     const argsKey = parts.join("\x01");
@@ -72,7 +75,7 @@ export class HashLookupTypeMap {
     const cached = keyCache.get(argsKey);
     if (cached) return cached;
 
-    const result = this._performFetch(lookupKey, args, fallback);
+    const result = this.performFetch(lookupKey, args, fallback);
     keyCache.set(argsKey, result);
     return result;
   }
@@ -109,7 +112,7 @@ export class HashLookupTypeMap {
     return [...this._mapping.keys()];
   }
 
-  private _performFetch(
+  private performFetch(
     type: string | number,
     args: unknown[],
     fallback?: (lookupKey: string | number, ...args: unknown[]) => Type,

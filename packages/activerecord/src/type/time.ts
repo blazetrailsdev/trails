@@ -32,4 +32,12 @@ export class Time extends ActiveModelTime {
     }
     return null;
   }
+
+  /**
+   * Mirrors: ActiveRecord::Type::Time#serialize_cast_value
+   */
+  serializeCastValue(value: globalThis.Date | null): TimeValue | null {
+    if (value == null) return null;
+    return new TimeValue(value);
+  }
 }

@@ -3,9 +3,26 @@
  */
 import { ValueType } from "@blazetrails/activemodel";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
+import { StringKeyedHashAccessor } from "../store.js";
 
 export class Json extends ValueType<unknown> {
   readonly name = "json";
+
+  /**
+   * Mirrors: ActiveRecord::Type::Json#type
+   */
+  override type(): string {
+    return "json";
+  }
+
+  /**
+   * Returns the accessor class used by Store for JSON columns.
+   *
+   * Mirrors: ActiveRecord::Type::Json#accessor
+   */
+  accessor(): typeof StringKeyedHashAccessor {
+    return StringKeyedHashAccessor;
+  }
 
   cast(value: unknown): unknown {
     if (value === null || value === undefined) return null;
