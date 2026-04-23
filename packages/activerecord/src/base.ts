@@ -45,6 +45,7 @@ import {
 } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
+import { Map as TypeCasterMap } from "./type-caster/map.js";
 import {
   defineAttribute as _defineAttribute,
   _defaultAttributes as _arDefaultAttributes,
@@ -590,10 +591,18 @@ export class Base extends Model {
   /**
    * Get the Arel table for this model.
    *
-   * Mirrors: ActiveRecord::Base.arel_table
+   * Wires a TypeCasterMap so `arelTable.typeForAttribute(col)` resolves
+   * through the model's `_attributeDefinitions`. Predicate-builder bind
+   * values rely on this to serialize through the right Type (e.g.
+   * EncryptedAttributeType for deterministic encryption) — without a
+   * typeCaster, `.where({col: "x"})` would emit the raw `"x"` in SQL
+   * instead of the encrypted ciphertext.
+   *
+   * Mirrors: ActiveRecord::Base.arel_table (memoized; ours builds each
+   * call since Table is cheap).
    */
   static get arelTable(): Table {
-    return new Table(this.tableName);
+    return new Table(this.tableName, { typeCaster: new TypeCasterMap(this) });
   }
 
   /**

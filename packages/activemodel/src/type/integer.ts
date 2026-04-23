@@ -1,4 +1,5 @@
 import { ValueType } from "./value.js";
+import { ActiveModelRangeError } from "../errors.js";
 
 export class IntegerType extends ValueType<number> {
   readonly name: string = "integer";
@@ -24,7 +25,9 @@ export class IntegerType extends ValueType<number> {
   serialize(value: unknown): unknown {
     const result = this.cast(value);
     if (result !== null && (result < this._range[0] || result > this._range[1])) {
-      throw new RangeError(`${result} is out of range for integer with limit ${this.limit ?? 4}`);
+      throw new ActiveModelRangeError(
+        `${result} is out of range for integer with limit ${this.limit ?? 4}`,
+      );
     }
     return result;
   }

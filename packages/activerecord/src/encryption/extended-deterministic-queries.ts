@@ -1,4 +1,5 @@
-import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
+import { prepend } from "@blazetrails/activesupport";
+import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { getAttributeType } from "./encryptable-record.js";
 
 /**
@@ -10,7 +11,74 @@ import { getAttributeType } from "./encryptable-record.js";
 export class ExtendedDeterministicQueries {
   private static _installed = false;
 
-  static installSupport(): void {
+  /**
+   * Install the query-expansion patches. Rails does this via `prepend`:
+   *
+   *   ActiveRecord::Relation.prepend(RelationQueries)
+   *   ActiveRecord::Base.include(CoreQueries)
+   *   ActiveRecord::Encryption::EncryptedAttributeType.prepend(ExtendedEncryptableType)
+   *
+   * TS has no prepend, so we wrap prototype methods in place. Idempotent.
+   * Call this once during app boot when
+   * `Configurable.config.extendQueries` is true (Rails'
+   * `config.active_record.encryption.extend_queries`).
+   */
+  static installSupport(targets: {
+    Relation: { prototype: { where: Function; exists: Function; scopeForCreate: Function } };
+    Base: { findBy: Function };
+    EncryptedAttributeType: { prototype: { serialize: Function } };
+  }): void {
+    if (this._installed) return;
+
+    // Pre-validate every target method across all three prepend() calls
+    // so a missing method can't leave us with one class already patched
+    // and another un-patched — a non-atomic state that a retry would
+    // double-wrap. Rails' `prepend` at boot is effectively all-or-
+    // nothing; this matches that intent.
+    // `prepend()` needs an open object-with-Function-values shape, so
+    // cast at the call site rather than widening the public signature.
+    const relProto = targets.Relation.prototype as unknown as Record<string, Function>;
+    const baseTarget = targets.Base as unknown as Record<string, Function>;
+    const eatProto = targets.EncryptedAttributeType.prototype as unknown as Record<
+      string,
+      Function
+    >;
+    const missing: string[] = [];
+    if (typeof relProto.where !== "function") missing.push("Relation.prototype.where");
+    if (typeof relProto.exists !== "function") missing.push("Relation.prototype.exists");
+    if (typeof relProto.scopeForCreate !== "function")
+      missing.push("Relation.prototype.scopeForCreate");
+    if (typeof baseTarget.findBy !== "function") missing.push("Base.findBy");
+    if (typeof eatProto.serialize !== "function")
+      missing.push("EncryptedAttributeType.prototype.serialize");
+    if (missing.length > 0) {
+      throw new Error(
+        `ExtendedDeterministicQueries.installSupport: missing target method(s): ${missing.join(", ")}`,
+      );
+    }
+
+    prepend(relProto, {
+      where(super_, ...args) {
+        return RelationQueries.where(super_, this, args);
+      },
+      exists(super_, ...args) {
+        return RelationQueries.isExists(super_, this, args);
+      },
+      scopeForCreate(super_) {
+        return RelationQueries.scopeForCreate(super_, this);
+      },
+    });
+    prepend(baseTarget, {
+      findBy(super_, ...args) {
+        return CoreQueries.findBy(super_, this, args);
+      },
+    });
+    prepend(eatProto, {
+      serialize(super_, data) {
+        return ExtendedEncryptableType.serialize((v: unknown) => super_.call(this, v), data);
+      },
+    });
+
     this._installed = true;
   }
 
@@ -58,12 +126,34 @@ export class EncryptedQuery {
 
   private static processEncryptedQueryArgument(
     value: unknown,
-    _checkForAdditionalValues: boolean,
+    checkForAdditionalValues: boolean,
     type: EncryptedAttributeType,
   ): unknown {
     if (value === null) return value;
+
+    // Rails' process_encrypted_query_argument short-circuits when the
+    // caller is a Relation (`where`/`exists?`) and the value is already
+    // an expanded array whose last element is an AdditionalValue — that
+    // means a previous `where` on the same relation already ran
+    // processArguments, and re-expanding would produce AV-of-AV. Only
+    // checked for Relation paths (checkForAdditionalValues=true);
+    // `findBy` via CoreQueries uses false and always expands because
+    // its inputs come straight from the user.
+    if (
+      checkForAdditionalValues &&
+      Array.isArray(value) &&
+      value.length > 0 &&
+      value[value.length - 1] instanceof AdditionalValue
+    ) {
+      return value;
+    }
+
     if (Array.isArray(value)) {
-      return value.flatMap((v) => (v === null ? [v] : this.allCiphertextsFor(v, type)));
+      return value.flatMap((v) => {
+        if (v === null) return [v];
+        if (checkForAdditionalValues && v instanceof AdditionalValue) return [v];
+        return this.allCiphertextsFor(v, type);
+      });
     }
     return this.allCiphertextsFor(value, type);
   }
@@ -107,10 +197,7 @@ export class RelationQueries {
     return originalExists.call(relation, ...EncryptedQuery.processArguments(relation, args, true));
   }
 
-  static scopeForCreate(
-    originalScopeForCreate: () => Record<string, unknown>,
-    relation: any,
-  ): Record<string, unknown> {
+  static scopeForCreate(originalScopeForCreate: Function, relation: any): Record<string, unknown> {
     const model = relation.model ?? relation;
     const encryptedAttrs = model._encryptedAttributes as Set<string> | undefined;
     if (!encryptedAttrs?.size) return originalScopeForCreate.call(relation);
@@ -123,9 +210,12 @@ export class RelationQueries {
       const values = wheres[attrName];
       if (Array.isArray(values) && values[0] instanceof AdditionalValue) {
         // Our expansion stores AdditionalValue(current) at index 0 (see
-        // allCiphertextsFor). Unwrap to the ciphertext so the created
-        // record stores the current-scheme-encrypted value directly.
-        scopeAttrs[attrName] = (values[0] as AdditionalValue).value;
+        // allCiphertextsFor). Keep the AV reference — when the new record
+        // saves, EncryptedAttributeType.serialize (patched via
+        // ExtendedEncryptableType) unwraps it to the ciphertext without
+        // re-encrypting. Writing values[0].value directly would serialize
+        // the ciphertext as plaintext, producing a double-encrypted blob.
+        scopeAttrs[attrName] = values[0];
       }
     }
     return scopeAttrs;
@@ -152,6 +242,9 @@ export class CoreQueries {
 export class AdditionalValue {
   readonly value: unknown;
   readonly type: EncryptedAttributeType;
+  // Brand flag so EncryptedAttributeType.cast can identify AV instances
+  // without importing this module (which would be circular).
+  readonly [ADDITIONAL_VALUE_BRAND] = true;
 
   constructor(value: unknown, type: EncryptedAttributeType) {
     this.type = type;

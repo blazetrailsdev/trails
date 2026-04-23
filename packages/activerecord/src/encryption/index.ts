@@ -34,6 +34,12 @@ export {
   AdditionalValue,
   ExtendedEncryptableType,
 } from "./extended-deterministic-queries.js";
+// `installExtendedQueriesIfConfigured` is intentionally NOT re-exported
+// here — its top-level `Base`/`Relation` imports would expand the
+// dependency surface of `@blazetrails/activerecord/encryption` for
+// consumers that only need encryption primitives. It's re-exported
+// from the main package index (which already depends on Base/Relation)
+// and is also reachable via `@blazetrails/activerecord/encryption/install.js`.
 export {
   ExtendedDeterministicUniquenessValidator,
   EncryptedUniquenessValidator,

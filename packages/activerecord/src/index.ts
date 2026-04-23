@@ -267,6 +267,11 @@ export { serialize } from "./serialize.js";
 // Encryption is exposed via the subpath export. Use:
 // `import { ... } from "@blazetrails/activerecord/encryption"`.
 // `Base.encrypts(name, ...)` is still the idiomatic declaration site.
+// The boot-time installer lives here (not in the encryption subpath)
+// because it depends on Base/Relation — exposing it from the encryption
+// subpath would drag those imports into consumers that only want
+// encryption primitives.
+export { installExtendedQueriesIfConfigured } from "./encryption/install.js";
 // generatesTokenFor requires node:crypto — use subpath: @blazetrails/activerecord/generates-token-for
 export { delegatedType, getDelegatedTypeConfig } from "./delegated-type.js";
 export { DatabaseConfig } from "./database-configurations/database-config.js";
