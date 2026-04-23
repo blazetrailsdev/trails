@@ -14,15 +14,18 @@ describe("ConversionTest", () => {
 
   it("#to_param_delimiter allows redefining the delimiter used in #to_param", () => {
     class Person extends Model {
+      static paramDelimiter = "_";
       static {
         this.attribute("id", "integer");
       }
       isPersisted() {
         return true;
       }
+      toKey() {
+        return [1, 2];
+      }
     }
-    const p = new Person({ id: 123 });
-    expect(p.toParam()).toBe("123");
+    expect(new Person({ id: 1 }).toParam()).toBe("1_2");
   });
 
   it("to_key doesn't double-wrap composite `id`s", () => {
@@ -43,10 +46,14 @@ describe("ConversionTest", () => {
       static {
         this.attribute("id", "integer");
       }
+      isPersisted() {
+        return true;
+      }
+      toKey() {
+        return [1, null];
+      }
     }
-    const p = new Person({});
-    // Not persisted, so toParam returns null
-    expect(p.toParam()).toBeNull();
+    expect(new Person({}).toParam()).toBeNull();
   });
 
   it("to_partial_path handles non-standard model_name", () => {
@@ -61,15 +68,30 @@ describe("ConversionTest", () => {
 
   it("#to_param_delimiter is defined per class", () => {
     class Person extends Model {
+      static paramDelimiter = ";";
       static {
         this.attribute("id", "integer");
       }
       isPersisted() {
         return true;
       }
+      toKey() {
+        return [1, 2];
+      }
     }
-    const p = new Person({ id: 1 });
-    expect(p.toParam()).toBe("1");
+    class Other extends Model {
+      static {
+        this.attribute("id", "integer");
+      }
+      isPersisted() {
+        return true;
+      }
+      toKey() {
+        return [3, 4];
+      }
+    }
+    expect(new Person({ id: 1 }).toParam()).toBe("1;2");
+    expect(new Other({ id: 3 }).toParam()).toBe("3-4");
   });
 
   it("to_model default implementation returns self", () => {

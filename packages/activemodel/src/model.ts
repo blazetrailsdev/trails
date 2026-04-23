@@ -63,6 +63,9 @@ export class Model {
 
   // -- Class-level registries --
   static includeRootInJson: boolean | string = false;
+  // Rails: class_attribute :param_delimiter, instance_reader: false, default: "-"
+  // (activemodel/lib/active_model/conversion.rb:32)
+  static paramDelimiter: string = "-";
   static _attributeDefinitions: Map<string, AttributeDefinition> = new Map();
   static _attributeMethodPatterns: AttributeMethodPattern[] = [];
   static _attributeAliases: Record<string, string> = {};
@@ -1464,9 +1467,11 @@ export class Model {
   }
 
   toParam(): string | null {
+    if (!this.isPersisted()) return null;
     const key = this.toKey();
     if (!key) return null;
-    return key.map(String).join("-");
+    if (!key.every((part) => part !== null && part !== undefined && part !== false)) return null;
+    return key.map(String).join((this.constructor as typeof Model).paramDelimiter);
   }
 
   toPartialPath(): string {
