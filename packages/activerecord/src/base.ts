@@ -2629,7 +2629,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   loadBelongsTo(name: string): Promise<Base | null>;
   loadHasOne(name: string): Promise<Base | null>;
   readAttributeForValidation(attribute: string): unknown;
-  validate(context?: string): this;
+  validate(context?: string): boolean;
   customValidationContext(): boolean;
   increment(attribute: string, by?: number): this;
   decrement(attribute: string, by?: number): this;

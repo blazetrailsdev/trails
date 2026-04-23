@@ -12,9 +12,23 @@ import type { ConditionalOptions } from "./validator.js";
 export interface Validations {
   errors: Errors;
   isValid(context?: string | ValidationContext): boolean;
-  validate(context?: string | ValidationContext): this;
-  isInvalid(): boolean;
-  validateBang(context?: string | ValidationContext): boolean;
+  /**
+   * Run validations and return whether the record is valid.
+   * Mirrors Rails `alias_method :validate, :valid?`
+   * (activemodel/lib/active_model/validations.rb:370).
+   */
+  validate(context?: string | ValidationContext): boolean;
+  /**
+   * Opposite of `isValid`. Mirrors Rails `def invalid?(context = nil)`
+   * (activemodel/lib/active_model/validations.rb:408-410).
+   */
+  isInvalid(context?: string | ValidationContext): boolean;
+  /**
+   * Run validations; return `true` or raise `ValidationError`. Mirrors Rails
+   * `def validate!(context = nil); valid?(context) || raise_validation_error; end`
+   * (activemodel/lib/active_model/validations.rb:417-419) — never returns false.
+   */
+  validateBang(context?: string | ValidationContext): true;
   readonly validationContext: string | ValidationContext | null;
 }
 

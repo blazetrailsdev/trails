@@ -52,7 +52,12 @@ export class RecordInvalid extends ActiveRecordError {
  * Mirrors: ActiveRecord::Validations (module instance methods)
  */
 export interface Validations {
-  validate(context?: string): this;
+  /**
+   * Run validations and return whether the record is valid. AR inherits
+   * AM's alias `validate → valid?`
+   * (activemodel/lib/active_model/validations.rb:370).
+   */
+  validate(context?: string): boolean;
   isValid(context?: string): boolean;
 }
 
@@ -104,11 +109,11 @@ export function isValid(this: any, context?: string): boolean {
 }
 
 /**
- * Mirrors: ActiveRecord::Validations#validate (alias of valid?)
+ * Mirrors: ActiveRecord::Validations#validate — inherited alias of `valid?`
+ * (activemodel/lib/active_model/validations.rb:370).
  */
-export function validate(this: any, context?: string): any {
-  isValid.call(this, context);
-  return this;
+export function validate(this: any, context?: string): boolean {
+  return isValid.call(this, context);
 }
 
 /**

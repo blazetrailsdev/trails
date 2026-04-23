@@ -1123,17 +1123,23 @@ export class Model {
   }
 
   /**
-   * Run validations and return self.
+   * Run validations and return whether the record is valid.
    *
-   * Mirrors: ActiveModel::Validations#validate
+   * Mirrors Rails `alias_method :validate, :valid?`
+   * (activemodel/lib/active_model/validations.rb:370).
    */
-  validate(context?: string | ValidationContext): this {
-    this.isValid(context);
-    return this;
+  validate(context?: string | ValidationContext): boolean {
+    return this.isValid(context);
   }
 
-  isInvalid(): boolean {
-    return !this.isValid();
+  /**
+   * Opposite of `isValid`. Accepts an optional context.
+   *
+   * Mirrors Rails `def invalid?(context = nil); !valid?(context); end`
+   * (activemodel/lib/active_model/validations.rb:408-410).
+   */
+  isInvalid(context?: string | ValidationContext): boolean {
+    return !this.isValid(context);
   }
 
   // -- Dirty tracking --
@@ -1532,11 +1538,13 @@ export class Model {
   }
 
   /**
-   * Run validations, throw if invalid.
+   * Run validations. Returns `true` when valid; raises `ValidationError`
+   * otherwise — never returns `false`.
    *
-   * Mirrors: ActiveModel::Validations#validate!
+   * Mirrors Rails `def validate!(context = nil); valid?(context) || raise_validation_error; end`
+   * (activemodel/lib/active_model/validations.rb:417-419).
    */
-  validateBang(context?: string): boolean {
+  validateBang(context?: string | ValidationContext): true {
     if (!this.isValid(context)) {
       throw new ValidationError(this);
     }
