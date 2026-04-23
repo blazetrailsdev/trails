@@ -321,62 +321,65 @@ scripts/parity/fixtures/01-trivial /tmp/trails-01.json`
 1. `scripts/parity/schema/ruby/Gemfile` — pins:
    ```ruby
    source "https://rubygems.org"
-   gem "rails", "8.0.2"    # D10
-   gem "sqlite3", "~> 2.1" # matches AR 8.0.2 declared dependency range
-   gem "prism"             # AST parser for canonicalize.rb
+   gem "activerecord", "8.0.2"  # D10 — no full Rails stack needed
+   gem "sqlite3", "~> 2.1"      # matches AR 8.0.2 declared dependency range
+   gem "minitest", "~> 5.25"    # canonicalize_test.rb
    ```
-2. `scripts/parity/schema/ruby/Gemfile.lock` — committed, generated via
-   `bundle install` locally.
-3. `scripts/parity/schema/ruby/dump.rb` — CLI:
+   Note: uses `activerecord` directly (not `rails`) — we only need AR
+   introspection, not the full framework. Gemfile.lock is generated on
+   first `bundle install` (requires network) and should be committed.
+2. `scripts/parity/schema/ruby/dump.rb` — CLI:
    `bundle exec ruby dump.rb <fixture-dir> <out.json>`.
    Steps:
    1. Create temp sqlite via `Dir.mktmpdir`.
-   2. Apply `schema.sql` via the `sqlite3` gem directly (raw SQL, no
-      AR). Same applier as node side conceptually — isolate from SUT.
+   2. Apply `schema.sql` via `SQLite3::Database#execute_batch` (raw SQL,
+      isolates fixture application from AR under test).
    3. `ActiveRecord::Base.establish_connection(adapter: "sqlite3",
 database: tempfile)`.
-   4. Dump schema to a StringIO via
-      `ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection,
-io)`.
-   5. Parse that `schema.rb` string via `canonicalize.rb` →
-      canonical Hash.
+   4. Introspect via `conn.tables`, `conn.columns(table)`,
+      `conn.indexes(table)`, `conn.primary_key(table)` — same data
+      AR's type system provides, in declaration order. Direct
+      introspection is simpler and more reliable than parsing schema.rb.
+   5. Build native dump Hash and pass to `canonicalize.rb`.
    6. Validate against `expected.json` (D6) — same invariant as node
       side. Exit 2 on mismatch.
    7. `File.write(out_json, JSON.pretty_generate(canonical) + "\n")`.
-4. `scripts/parity/schema/ruby/canonicalize.rb` —
-   `Canonicalize.call(schema_rb_source) => Hash`.
-   - Parse with `Prism.parse`.
-   - Walk `create_table`, `t.column`, `t.string`, `t.integer`, …,
-     `add_index` invocations from the AST.
+3. `scripts/parity/schema/ruby/canonicalize.rb` —
+   `Canonicalize.call(native_dump) => Hash`.
+   - Input is a plain Ruby Hash from `dump.rb` (not schema.rb text).
    - Filter `schema_migrations`, `ar_internal_metadata` (D2).
    - Filter `sqlite_autoindex_*` (D3).
-   - Map Rails type method names (`t.string`, `t.integer`, etc.) and
-     generic `t.column` calls to the closed type set (D4). Raise on
-     unknown.
+   - Map `col.type` AR abstract type symbols (`:integer`, `:text`, etc.)
+     to the closed canonical set (D4). Raise on unknown.
    - Output Hash shape exactly matches `CanonicalSchema` (sorted/
      ordered per D1).
-5. `scripts/parity/schema/ruby/canonicalize_test.rb` — minitest, golden
-   fixtures (hand-written `schema.rb string → canonical Hash` pairs).
+4. `scripts/parity/schema/ruby/canonicalize_test.rb` — minitest, golden
+   fixtures (hand-written native-dump Hash → canonical Hash pairs).
    Same coverage as the node-side canonicalize tests.
 
 ### Acceptance
 
-- From `scripts/parity/schema/ruby/`:
-  `bundle install && bundle exec ruby dump.rb
-../../fixtures/01-trivial /tmp/rails-01.json`
+- From repo root:
+  `cd scripts/parity/schema/ruby && bundle install && cd - &&
+bundle exec --gemfile scripts/parity/schema/ruby/Gemfile ruby
+scripts/parity/schema/ruby/dump.rb
+scripts/parity/fixtures/01-trivial /tmp/rails-01.json`
   writes a file that validates against
   `scripts/parity/canonical/schema.schema.json`.
-- `bundle exec ruby canonicalize_test.rb` green.
+- `bundle exec --gemfile scripts/parity/schema/ruby/Gemfile ruby
+scripts/parity/schema/ruby/canonicalize_test.rb` green.
 
 ### Gotchas
 
-- Rails creates `ar_internal_metadata` on connect. Ensure `dump.rb`
-  filters it **and** the canonicalizer filters it (belt +
-  suspenders; the AR version in the schema.rb varies by migration
-  state).
-- `schema.rb` output includes a `ActiveRecord::Schema[8.0].define(…)`
-  header with `version: 0` or similar — canonicalize must strip this
-  metadata, not leak it into output.
+- Rails creates `ar_internal_metadata` on connect. `conn.tables`
+  includes it — filter in both `dump.rb` and `canonicalize.rb` (D2).
+- `conn.primary_key` returns `nil`, a `String`, or an `Array` of
+  strings — handle all three cases.
+- `conn.indexes` on SQLite filters any index whose name starts with
+  `"sqlite_"` (Rails source:
+  `sqlite3/schema_statements.rb:12` — `next if row["name"].start_with?("sqlite_")`).
+  The canonicalizer's `sqlite_autoindex_*` filter (D3) is
+  belt-and-suspenders and catches any that slip through.
 
 ---
 
