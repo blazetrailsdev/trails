@@ -10,6 +10,7 @@ interface Identifiable {
   id: unknown;
   isNewRecord(): boolean;
   readAttribute(name: string): unknown;
+  _readAttribute(name: string): unknown;
 }
 
 /**
@@ -54,7 +55,7 @@ export function cacheKeyWithVersion(this: Identifiable): string {
  */
 export function cacheVersion(this: Identifiable): string | null {
   if ((this as any).hasAttribute?.("updated_at")) {
-    const updatedAt = this.readAttribute("updated_at");
+    const updatedAt = this._readAttribute("updated_at");
     if (updatedAt instanceof Date) {
       return updatedAt.toISOString().replace(/[^0-9]/g, "");
     }

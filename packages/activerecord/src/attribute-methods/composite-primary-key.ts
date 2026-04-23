@@ -7,6 +7,7 @@
 interface CompositePKRecord {
   id: unknown;
   readAttribute(name: string): unknown;
+  _readAttribute(name: string): unknown;
   constructor: Function & { primaryKey: string | string[]; compositePrimaryKey: boolean };
 }
 
@@ -20,7 +21,7 @@ export function isPrimaryKeyValuesPresent(record: CompositePKRecord): boolean {
   if (!ctor.compositePrimaryKey) return record.id != null;
   const pk = ctor.primaryKey as string[];
   return pk.every((col: string) => {
-    const v = record.readAttribute(col);
+    const v = record._readAttribute(col);
     return v !== null && v !== undefined;
   });
 }
@@ -28,20 +29,20 @@ export function isPrimaryKeyValuesPresent(record: CompositePKRecord): boolean {
 export function id(this: CompositePKRecord): unknown {
   const ctor = this.constructor as any;
   if (ctor.compositePrimaryKey) {
-    return (ctor.primaryKey as string[]).map((col: string) => this.readAttribute(col));
+    return (ctor.primaryKey as string[]).map((col: string) => this._readAttribute(col));
   }
-  return this.readAttribute(ctor.primaryKey);
+  return this._readAttribute(ctor.primaryKey);
 }
 
 export function isId(this: CompositePKRecord): boolean {
   const ctor = this.constructor as any;
   if (ctor.compositePrimaryKey) {
     return (ctor.primaryKey as string[]).every((col: string) => {
-      const v = this.readAttribute(col);
+      const v = this._readAttribute(col);
       return v !== null && v !== undefined && v !== "" && v !== false;
     });
   }
-  const v = this.readAttribute(ctor.primaryKey);
+  const v = this._readAttribute(ctor.primaryKey);
   return v !== null && v !== undefined && v !== "" && v !== false;
 }
 
@@ -51,7 +52,7 @@ export function idBeforeTypeCast(this: CompositePKRecord): unknown {
   const reader =
     typeof fn === "function"
       ? (col: string) => fn.call(this, col)
-      : (col: string) => this.readAttribute(col);
+      : (col: string) => this._readAttribute(col);
   if (ctor.compositePrimaryKey) {
     return (ctor.primaryKey as string[]).map(reader);
   }
@@ -64,7 +65,7 @@ export function idWas(this: CompositePKRecord): unknown {
   const reader =
     typeof fn === "function"
       ? (col: string) => fn.call(this, col)
-      : (col: string) => this.readAttribute(col);
+      : (col: string) => this._readAttribute(col);
   if (ctor.compositePrimaryKey) {
     return (ctor.primaryKey as string[]).map(reader);
   }
@@ -77,7 +78,7 @@ export function idInDatabase(this: CompositePKRecord): unknown {
   const reader =
     typeof fn === "function"
       ? (col: string) => fn.call(this, col)
-      : (col: string) => this.readAttribute(col);
+      : (col: string) => this._readAttribute(col);
   if (ctor.compositePrimaryKey) {
     return (ctor.primaryKey as string[]).map(reader);
   }
@@ -92,7 +93,7 @@ export function idForDatabase(this: CompositePKRecord): unknown {
       const attr = attrs.getAttribute(col);
       if (attr != null && "valueForDatabase" in attr) return attr.valueForDatabase;
     }
-    return this.readAttribute(col);
+    return this._readAttribute(col);
   };
   if (ctor.compositePrimaryKey) {
     return (ctor.primaryKey as string[]).map(readForDb);

@@ -1935,9 +1935,9 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
     const pk = ctor.primaryKey;
     if (Array.isArray(pk)) {
-      return pk.map((col) => this.readAttribute(col)) as PrimaryKeyValue;
+      return pk.map((col) => this._readAttribute(col)) as PrimaryKeyValue;
     }
-    return this.readAttribute(pk) as PrimaryKeyValue;
+    return this._readAttribute(pk) as PrimaryKeyValue;
   }
 
   set id(value: PrimaryKeyValue) {
@@ -1949,9 +1949,9 @@ export class Base extends Model {
           `Expected an array for composite primary key [${pk.join(", ")}], got ${value === null ? "null" : typeof value}`,
         );
       }
-      pk.forEach((col, i) => this.writeAttribute(col, value[i]));
+      pk.forEach((col, i) => this._writeAttribute(col, value[i]));
     } else {
-      this.writeAttribute(pk, value);
+      this._writeAttribute(pk, value);
     }
   }
 
@@ -2122,13 +2122,13 @@ export class Base extends Model {
       const now = new Date();
       if (
         ctor._attributeDefinitions.has("created_at") &&
-        this.readAttribute("created_at") === null
+        this._readAttribute("created_at") === null
       ) {
         this._attributes.set("created_at", now);
       }
       if (
         ctor._attributeDefinitions.has("updated_at") &&
-        this.readAttribute("updated_at") === null
+        this._readAttribute("updated_at") === null
       ) {
         this._attributes.set("updated_at", now);
       }
@@ -2182,7 +2182,7 @@ export class Base extends Model {
 
     // Auto-populate updated_at timestamp (unless touch: false)
     if (!this._skipTouch && ctor._attributeDefinitions.has("updated_at")) {
-      this.writeAttribute("updated_at", new Date());
+      this._writeAttribute("updated_at", new Date());
     }
 
     // Rails raises ReadonlyAttributeError at write time (HasReadonlyAttributes),
@@ -2409,6 +2409,7 @@ export class Base extends Model {
   declare accessedFields: () => string[];
   declare queryAttribute: (name: string) => boolean;
   declare _queryAttribute: (name: string) => boolean;
+  declare readAttribute: (name: string) => unknown;
   declare _readAttribute: (name: string) => unknown;
   declare _writeAttribute: (name: string, value: unknown) => void;
 

@@ -243,9 +243,9 @@ export class Association {
 
   private _deriveKey(record: Base, key: string | string[]): unknown {
     if (Array.isArray(key)) {
-      return JSON.stringify(key.map((k) => this._convertKey((record as any).readAttribute(k))));
+      return JSON.stringify(key.map((k) => this._convertKey((record as any)._readAttribute(k))));
     }
-    return this._convertKey((record as any).readAttribute(key));
+    return this._convertKey((record as any)._readAttribute(key));
   }
 
   private _convertKey(key: unknown): unknown {

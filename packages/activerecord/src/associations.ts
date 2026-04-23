@@ -478,7 +478,7 @@ export function ownerHasUnresolvedThroughKey(record: Base, reflection: unknown):
   const ownerPkCols =
     activeRecordPk == null ? [] : Array.isArray(activeRecordPk) ? activeRecordPk : [activeRecordPk];
   return ownerPkCols.some((col) => {
-    const v = record.readAttribute(col);
+    const v = record._readAttribute(col);
     return v === null || v === undefined;
   });
 }
@@ -551,7 +551,7 @@ export async function loadBelongsTo(
   let className: string;
   if (options.polymorphic) {
     const typeCol = `${underscore(assocName)}_type`;
-    const typeName = record.readAttribute(typeCol) as string | null;
+    const typeName = record._readAttribute(typeCol) as string | null;
     if (!typeName) return null;
     className = typeName;
   } else {
@@ -595,7 +595,7 @@ export async function loadBelongsTo(
       ? foreignKey
       : [foreignKey as string];
   for (const fk of fkColsForCheck) {
-    const v = record.readAttribute(fk);
+    const v = record._readAttribute(fk);
     if (v === null || v === undefined) return null;
   }
 
@@ -617,12 +617,12 @@ export async function loadBelongsTo(
       }
       const conditions: Record<string, unknown> = {};
       for (let i = 0; i < foreignKey.length; i++) {
-        conditions[pkCols[i]] = record.readAttribute(foreignKey[i]);
+        conditions[pkCols[i]] = record._readAttribute(foreignKey[i]);
       }
       result = await targetModel.findBy(conditions);
     } else {
       result = await targetModel.findBy({
-        [primaryKey as string]: record.readAttribute(foreignKey as string),
+        [primaryKey as string]: record._readAttribute(foreignKey as string),
       });
     }
   }
@@ -728,7 +728,7 @@ export async function loadHasOne(
       ? primaryKey
       : [primaryKey as string];
   for (const pk of pkCheckCols) {
-    const v = record.readAttribute(pk);
+    const v = record._readAttribute(pk);
     if (v === null || v === undefined) return null;
   }
 
@@ -750,24 +750,24 @@ export async function loadHasOne(
       }
       const conditions: Record<string, unknown> = {};
       for (let i = 0; i < foreignKey.length; i++) {
-        conditions[foreignKey[i]] = record.readAttribute(pkCols[i]);
+        conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
       }
       result = await targetModel.findBy(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
       result = await targetModel.findBy({
-        [foreignKey as string]: record.readAttribute(primaryKey as string),
+        [foreignKey as string]: record._readAttribute(primaryKey as string),
         [typeCol]: ctor.name,
       });
     } else if (options.scope) {
       let rel = (targetModel as any)
         .all()
-        .where({ [foreignKey as string]: record.readAttribute(primaryKey as string) });
+        .where({ [foreignKey as string]: record._readAttribute(primaryKey as string) });
       rel = options.scope(rel);
       result = await rel.first();
     } else {
       result = await targetModel.findBy({
-        [foreignKey as string]: record.readAttribute(primaryKey as string),
+        [foreignKey as string]: record._readAttribute(primaryKey as string),
       });
     }
   }
@@ -802,7 +802,7 @@ export function buildHasOne(
 
   const buildAttrs: Record<string, unknown> = {
     ...attrs,
-    [foreignKey as string]: record.readAttribute(primaryKey as string),
+    [foreignKey as string]: record._readAttribute(primaryKey as string),
   };
   if (options.as) {
     buildAttrs[`${underscore(options.as)}_type`] = ctor.name;
@@ -936,7 +936,7 @@ export async function loadHasMany(
       ? primaryKey
       : [primaryKey as string];
   for (const pk of fkCheckPks) {
-    const v = record.readAttribute(pk);
+    const v = record._readAttribute(pk);
     if (v === null || v === undefined) return [];
   }
 
@@ -967,19 +967,19 @@ export async function loadHasMany(
       }
       const conditions: Record<string, unknown> = {};
       for (let i = 0; i < foreignKey.length; i++) {
-        conditions[foreignKey[i]] = record.readAttribute(pkCols[i]);
+        conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
       }
       rel = (targetModel as any).all().where(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
       rel = (targetModel as any).all().where({
-        [foreignKey as string]: record.readAttribute(primaryKey as string),
+        [foreignKey as string]: record._readAttribute(primaryKey as string),
         [typeCol]: ctor.name,
       });
     } else {
       rel = (targetModel as any)
         .all()
-        .where({ [foreignKey as string]: record.readAttribute(primaryKey as string) });
+        .where({ [foreignKey as string]: record._readAttribute(primaryKey as string) });
     }
     if (options.scope) rel = options.scope(rel);
   }
@@ -1019,7 +1019,7 @@ export function computeHasManyWhere(
     if (Array.isArray(foreignKey) || Array.isArray(primaryKey)) {
       throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
     }
-    const pkValue = record.readAttribute(primaryKey as string);
+    const pkValue = record._readAttribute(primaryKey as string);
     if (pkValue === null || pkValue === undefined) return null;
     const typeCol = `${underscore(options.as)}_type`;
     return { [foreignKey as string]: pkValue, [typeCol]: ctor.name };
@@ -1043,7 +1043,7 @@ export function computeHasManyWhere(
     }
     const conditions: Record<string, unknown> = {};
     for (let i = 0; i < foreignKey.length; i++) {
-      const pkVal = record.readAttribute(primaryKey[i]);
+      const pkVal = record._readAttribute(primaryKey[i]);
       if (pkVal === null || pkVal === undefined) return null;
       conditions[foreignKey[i]] = pkVal;
     }
@@ -1054,7 +1054,7 @@ export function computeHasManyWhere(
   if (Array.isArray(primaryKey)) {
     throw new CompositePrimaryKeyMismatchError(ctor.name, assocName);
   }
-  const pkValue = record.readAttribute(primaryKey as string);
+  const pkValue = record._readAttribute(primaryKey as string);
   if (pkValue === null || pkValue === undefined) return null;
   return { [foreignKey]: pkValue };
 }
@@ -1187,7 +1187,7 @@ export async function loadHasManyThrough(
     const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
 
     const targetIds = throughRecords
-      .map((r) => r.readAttribute(targetFk as string))
+      .map((r) => r._readAttribute(targetFk as string))
       .filter((v) => v !== null && v !== undefined);
     if (targetIds.length === 0) return [];
     let rel = (targetModel as any).all().where({ [targetModel.primaryKey as string]: targetIds });
@@ -1202,7 +1202,7 @@ export async function loadHasManyThrough(
       ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
       : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
     const throughIds = throughRecords
-      .map((r) => r.readAttribute((r.constructor as typeof Base).primaryKey as string))
+      .map((r) => r._readAttribute((r.constructor as typeof Base).primaryKey as string))
       .filter((v) => v !== null && v !== undefined);
     if (throughIds.length === 0) return [];
     const whereConditions: Record<string, unknown> = { [sourceFk as string]: throughIds };
@@ -1262,7 +1262,7 @@ export async function loadHasOneThrough(
   // Fallback: try as belongs_to by convention
   const className = options.className ?? camelize(sourceName);
   const targetFk = `${underscore(sourceName)}_id`;
-  const fkValue = throughRecord.readAttribute(targetFk);
+  const fkValue = throughRecord._readAttribute(targetFk);
   if (fkValue === null || fkValue === undefined) return null;
   const targetModel = resolveModel(className);
   return targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
@@ -1398,7 +1398,7 @@ export async function loadHabtm(
   const ownerFk = singleFk(options.foreignKey, `${underscore(ctor.name)}_id`);
   const targetFk = `${underscore(singularize(assocName))}_id`;
   const ownerPkCol = habtmOwnerPk(options, ctor);
-  const pkValue = record.readAttribute(ownerPkCol);
+  const pkValue = record._readAttribute(ownerPkCol);
   if (pkValue === null || pkValue === undefined) return [];
 
   // Reject composite target PKs
@@ -1450,7 +1450,7 @@ export async function processDependentAssociations(record: Base): Promise<void> 
         );
         const fk = (assoc.options.foreignKey as string) ?? `${underscore(ctor.name)}_id`;
         const pkCol = Array.isArray(ctor.primaryKey) ? ctor.primaryKey[0] : ctor.primaryKey;
-        await childModel.where({ [fk]: record.readAttribute(pkCol as string) }).deleteAll();
+        await childModel.where({ [fk]: record._readAttribute(pkCol as string) }).deleteAll();
       } else if (dep === "nullify") {
         const asName = assoc.options.as;
         const foreignKey = asName
@@ -1462,7 +1462,7 @@ export async function processDependentAssociations(record: Base): Promise<void> 
         );
         for (const child of children) {
           for (const [col, val] of nullifiedEntries) {
-            child.writeAttribute(col, val);
+            child._writeAttribute(col, val);
           }
           await child.save();
         }
@@ -1496,7 +1496,7 @@ export async function processDependentAssociations(record: Base): Promise<void> 
           type: typeCol,
         });
         for (const [col, val] of Object.entries(nullified)) {
-          child.writeAttribute(col, val);
+          child._writeAttribute(col, val);
         }
         await child.save();
       } else if (dep === "restrictWithException") {
@@ -1606,10 +1606,10 @@ export function buildThroughAssociation(
     const polyFk = throughAssoc.options.foreignKey
       ? (throughAssoc.options.foreignKey as string)
       : `${underscore(throughAssoc.options.as)}_id`;
-    throughAttrs[polyFk] = record.readAttribute(ownerPk);
+    throughAttrs[polyFk] = record._readAttribute(ownerPk);
     throughAttrs[`${underscore(throughAssoc.options.as)}_type`] = ctor.name;
   } else {
-    throughAttrs[ownerFk] = record.readAttribute(ownerPk);
+    throughAttrs[ownerFk] = record._readAttribute(ownerPk);
   }
   const through = new throughModel(throughAttrs);
 
@@ -1668,11 +1668,11 @@ export async function createThroughAssociation(
           "createThroughAssociation does not support composite primary keys",
         );
       }
-      through.writeAttribute(sourceFk as string, target.readAttribute(targetPk as string));
+      through._writeAttribute(sourceFk as string, target._readAttribute(targetPk as string));
       if (sourceAssocDef?.options?.polymorphic) {
         const typeCol = `${underscore(sourceName)}_type`;
         const typeValue = assocDef.options.sourceType ?? (target.constructor as typeof Base).name;
-        through.writeAttribute(typeCol, typeValue);
+        through._writeAttribute(typeCol, typeValue);
       }
 
       const throughSaved = await through.save();
@@ -1697,9 +1697,9 @@ export async function createThroughAssociation(
           "createThroughAssociation does not support composite primary keys",
         );
       }
-      target.writeAttribute(targetFk as string, through.readAttribute(throughPk as string));
+      target._writeAttribute(targetFk as string, through._readAttribute(throughPk as string));
       if (sourceAsName) {
-        target.writeAttribute(`${underscore(sourceAsName)}_type`, throughCtor.name);
+        target._writeAttribute(`${underscore(sourceAsName)}_type`, throughCtor.name);
       }
       const targetSaved = await target.save();
       if (!targetSaved) throw new Rollback();
@@ -1721,7 +1721,7 @@ export async function createThroughAssociation(
       rec._newRecord = true;
       const pk = (rec.constructor as typeof Base).primaryKey;
       if (!Array.isArray(pk)) {
-        rec.writeAttribute(pk as string, null);
+        rec._writeAttribute(pk as string, null);
       }
     }
   }
@@ -1852,14 +1852,14 @@ export async function updateCounterCaches(
     if (assoc.type !== "belongsTo" || !assoc.options.counterCache) continue;
 
     const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
-    const fkValue = record.readAttribute(foreignKey as string);
+    const fkValue = record._readAttribute(foreignKey as string);
     if (fkValue === null || fkValue === undefined) continue;
 
     // For polymorphic, resolve model from _type column
     let className: string;
     if (assoc.options.polymorphic) {
       const typeCol = `${underscore(assoc.name)}_type`;
-      const typeName = record.readAttribute(typeCol) as string | null;
+      const typeName = record._readAttribute(typeCol) as string | null;
       if (!typeName) continue;
       className = typeName;
     } else {
@@ -1942,7 +1942,7 @@ export function setBelongsTo(
     if (Array.isArray(foreignKey)) {
       const pkCols = primaryKey as string[];
       for (let i = 0; i < foreignKey.length; i++) {
-        record.writeAttribute(foreignKey[i], target.readAttribute(pkCols[i]));
+        record._writeAttribute(foreignKey[i], target._readAttribute(pkCols[i]));
       }
     } else {
       if (Array.isArray(primaryKey)) {
@@ -1950,23 +1950,23 @@ export function setBelongsTo(
           `belongs_to "${assocName}" has a single foreignKey but the target model has a composite primaryKey. Provide an explicit foreignKey array or primaryKey option.`,
         );
       }
-      record.writeAttribute(foreignKey as string, target.readAttribute(primaryKey as string));
+      record._writeAttribute(foreignKey as string, target._readAttribute(primaryKey as string));
     }
     if (options.polymorphic) {
       const typeCol = `${underscore(assocName)}_type`;
-      record.writeAttribute(typeCol, targetCtor!.name);
+      record._writeAttribute(typeCol, targetCtor!.name);
     }
   } else {
     if (Array.isArray(foreignKey)) {
       for (const fk of foreignKey) {
-        record.writeAttribute(fk, null);
+        record._writeAttribute(fk, null);
       }
     } else {
-      record.writeAttribute(foreignKey as string, null);
+      record._writeAttribute(foreignKey as string, null);
     }
     if (options.polymorphic) {
       const typeCol = `${underscore(assocName)}_type`;
-      record.writeAttribute(typeCol, null);
+      record._writeAttribute(typeCol, null);
     }
   }
 
@@ -1995,7 +1995,7 @@ export async function setHasOne(
 ): Promise<void> {
   const ctor = record.constructor as typeof Base;
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const pkValue = record.readAttribute(primaryKey as string);
+  const pkValue = record._readAttribute(primaryKey as string);
 
   // Polymorphic "as" option
   const asName = options.as;
@@ -2011,14 +2011,14 @@ export async function setHasOne(
   if (typeCol) findConditions[typeCol] = ctor.name;
   const existing = await targetModel.findBy(findConditions);
   if (existing && existing !== target) {
-    existing.writeAttribute(foreignKey as string, null);
-    if (typeCol) existing.writeAttribute(typeCol, null);
+    existing._writeAttribute(foreignKey as string, null);
+    if (typeCol) existing._writeAttribute(typeCol, null);
     await existing.save();
   }
 
   if (target) {
-    target.writeAttribute(foreignKey as string, pkValue);
-    if (typeCol) target.writeAttribute(typeCol, ctor.name);
+    target._writeAttribute(foreignKey as string, pkValue);
+    if (typeCol) target._writeAttribute(typeCol, ctor.name);
     if (target.isPersisted()) await target.save();
   }
 
@@ -2047,7 +2047,7 @@ export async function setHasMany(
 ): Promise<void> {
   const ctor = record.constructor as typeof Base;
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
-  const pkValue = record.readAttribute(primaryKey as string);
+  const pkValue = record._readAttribute(primaryKey as string);
 
   // Polymorphic "as" option
   const asName = options.as;
@@ -2064,16 +2064,16 @@ export async function setHasMany(
   const existing = await (targetModel as any).where(findConditions).toArray();
   for (const old of existing) {
     if (!targets.includes(old)) {
-      old.writeAttribute(foreignKey, null);
-      if (typeCol) old.writeAttribute(typeCol, null);
+      old._writeAttribute(foreignKey, null);
+      if (typeCol) old._writeAttribute(typeCol, null);
       await old.save();
     }
   }
 
   // Set FK on new targets
   for (const t of targets) {
-    t.writeAttribute(foreignKey as string, pkValue);
-    if (typeCol) t.writeAttribute(typeCol, ctor.name);
+    t._writeAttribute(foreignKey as string, pkValue);
+    if (typeCol) t._writeAttribute(typeCol, ctor.name);
     if (t.isPersisted()) await t.save();
 
     // Set inverse
@@ -2096,13 +2096,13 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
     if (assoc.type !== "belongsTo" || !assoc.options.touch) continue;
 
     const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
-    const fkValue = record.readAttribute(foreignKey as string);
+    const fkValue = record._readAttribute(foreignKey as string);
     if (fkValue === null || fkValue === undefined) continue;
 
     let className: string;
     if (assoc.options.polymorphic) {
       const typeCol = `${underscore(assoc.name)}_type`;
-      const typeName = record.readAttribute(typeCol) as string | null;
+      const typeName = record._readAttribute(typeCol) as string | null;
       if (!typeName) continue;
       className = typeName;
     } else {

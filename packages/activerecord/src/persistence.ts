@@ -509,6 +509,7 @@ interface SaveRecord {
   _newRecord: boolean;
   _attributes: { set(key: string, val: unknown): void };
   readAttribute(name: string): unknown;
+  _readAttribute(name: string): unknown;
   constructor: {
     name: string;
     _attributeDefinitions: Map<string, unknown>;
@@ -545,7 +546,7 @@ export async function save<T extends SaveRecord>(
   // Auto-set STI type column on new records
   if (this._newRecord && isStiSubclass(ctor)) {
     const col = getInheritanceColumn(getStiBase(ctor));
-    if (col && !this.readAttribute(col)) {
+    if (col && !this._readAttribute(col)) {
       this._attributes.set(col, this.constructor.name);
     }
   }

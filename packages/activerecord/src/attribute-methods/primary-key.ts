@@ -11,6 +11,7 @@ import { dangerousAttributeMethods } from "../attribute-methods.js";
 interface PrimaryKeyRecord {
   id: unknown;
   readAttribute(name: string): unknown;
+  _readAttribute(name: string): unknown;
 }
 
 /**
@@ -35,7 +36,7 @@ export function isPrimaryKeyValuesPresent(this: PrimaryKeyRecord): boolean {
   const pk = (this.constructor as any).primaryKey;
   if (Array.isArray(pk)) {
     return pk.every((col: string) => {
-      const v = this.readAttribute(col);
+      const v = this._readAttribute(col);
       return v !== null && v !== undefined;
     });
   }
@@ -49,8 +50,8 @@ function readPkWith(record: PrimaryKeyRecord, method: string): unknown {
     if (Array.isArray(pk)) return pk.map((k: string) => fn.call(record, k));
     return fn.call(record, pk);
   }
-  if (Array.isArray(pk)) return pk.map((k: string) => record.readAttribute(k));
-  return record.readAttribute(pk);
+  if (Array.isArray(pk)) return pk.map((k: string) => record._readAttribute(k));
+  return record._readAttribute(pk);
 }
 
 export function idBeforeTypeCast(this: PrimaryKeyRecord): unknown {
@@ -75,14 +76,14 @@ export function idForDatabase(this: PrimaryKeyRecord): unknown {
         // valueForDatabase is a getter property, not a method
         return attr != null && "valueForDatabase" in attr
           ? attr.valueForDatabase
-          : this.readAttribute(k);
+          : this._readAttribute(k);
       });
     }
     const attr = attrs.getAttribute(pk);
     if (attr != null && "valueForDatabase" in attr) return attr.valueForDatabase;
   }
-  if (Array.isArray(pk)) return pk.map((k: string) => this.readAttribute(k));
-  return this.readAttribute(pk);
+  if (Array.isArray(pk)) return pk.map((k: string) => this._readAttribute(k));
+  return this._readAttribute(pk);
 }
 
 // ---------------------------------------------------------------------------

@@ -783,7 +783,12 @@ export class AssociationReflection extends MacroReflection {
 
   joinIdFor(owner: any): any[] {
     const keys = Array.isArray(this.joinForeignKey) ? this.joinForeignKey : [this.joinForeignKey];
-    return keys.map((key) => (owner.readAttribute ? owner.readAttribute(key) : owner[key]));
+    return keys.map((key) => {
+      if (typeof (owner as any)._readAttribute === "function")
+        return (owner as any)._readAttribute(key);
+      if (typeof owner.readAttribute === "function") return owner.readAttribute(key);
+      return owner[key];
+    });
   }
 
   get throughReflection(): null {

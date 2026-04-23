@@ -134,12 +134,12 @@ export class HasOneAssociation extends SingularAssociation {
     for (let i = 0; i < fks.length; i++) {
       const pkCol = pks[i] ?? pks[0];
       const pkValue =
-        typeof this.owner.readAttribute === "function"
-          ? this.owner.readAttribute(pkCol)
+        typeof (this.owner as any)._readAttribute === "function"
+          ? (this.owner as any)._readAttribute(pkCol)
           : (this.owner as any)[pkCol];
 
-      if (typeof (record as any).writeAttribute === "function") {
-        (record as any).writeAttribute(fks[i], pkValue);
+      if (typeof (record as any)._writeAttribute === "function") {
+        (record as any)._writeAttribute(fks[i], pkValue);
       } else {
         (record as any)[fks[i]] = pkValue;
       }
@@ -147,8 +147,8 @@ export class HasOneAssociation extends SingularAssociation {
 
     if (this.reflection.options.as) {
       const typeCol = `${underscore(this.reflection.options.as)}_type`;
-      if (typeof (record as any).writeAttribute === "function") {
-        (record as any).writeAttribute(typeCol, ctor.name);
+      if (typeof (record as any)._writeAttribute === "function") {
+        (record as any)._writeAttribute(typeCol, ctor.name);
       } else {
         (record as any)[typeCol] = ctor.name;
       }
@@ -160,8 +160,8 @@ export class HasOneAssociation extends SingularAssociation {
       ? this.reflection.options.foreignKey
       : [this.foreignKeyColumn()];
     for (const fk of fks) {
-      if (typeof (record as any).writeAttribute === "function") {
-        (record as any).writeAttribute(fk, null);
+      if (typeof (record as any)._writeAttribute === "function") {
+        (record as any)._writeAttribute(fk, null);
       } else {
         (record as any)[fk] = null;
       }
@@ -169,8 +169,8 @@ export class HasOneAssociation extends SingularAssociation {
 
     if (this.reflection.options.as) {
       const typeCol = `${underscore(this.reflection.options.as)}_type`;
-      if (typeof (record as any).writeAttribute === "function") {
-        (record as any).writeAttribute(typeCol, null);
+      if (typeof (record as any)._writeAttribute === "function") {
+        (record as any)._writeAttribute(typeCol, null);
       } else {
         (record as any)[typeCol] = null;
       }

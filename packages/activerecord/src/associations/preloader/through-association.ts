@@ -61,7 +61,7 @@ export class ThroughAssociation extends Association {
             const foreignType = (this.reflection as any).foreignType;
             if (sourceType && foreignType) {
               throughRecords = throughRecords.filter(
-                (record) => (record as any).readAttribute(foreignType) === sourceType,
+                (record) => (record as any)._readAttribute(foreignType) === sourceType,
               );
             }
           }

@@ -516,7 +516,9 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     const keyCols = Array.isArray(this.key) ? this.key : [this.key];
     const composite = this._composite;
     for (const r of records) {
-      const raw = composite ? keyCols.map((c) => r.readAttribute(c)) : r.readAttribute(keyCols[0]);
+      const raw = composite
+        ? keyCols.map((c) => r._readAttribute(c))
+        : r._readAttribute(keyCols[0]);
       const k = serializeKey(raw, composite);
       const bucket = byKey.get(k);
       if (bucket) bucket.push(r);

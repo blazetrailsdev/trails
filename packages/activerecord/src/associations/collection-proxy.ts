@@ -531,11 +531,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _identityFor(r: Base): string | null {
     const pk = (r.constructor as typeof Base).primaryKey;
     if (Array.isArray(pk)) {
-      const vals = pk.map((col) => r.readAttribute(col));
+      const vals = pk.map((col) => r._readAttribute(col));
       if (vals.some((v) => v == null)) return null;
       return JSON.stringify(vals);
     }
-    const val = r.readAttribute(pk as string);
+    const val = r._readAttribute(pk as string);
     return val == null ? null : String(val);
   }
 
@@ -641,7 +641,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const buildAttrs: Record<string, unknown> = {
       ...attrs,
-      [foreignKey as string]: this._record.readAttribute(primaryKey as string),
+      [foreignKey as string]: this._record._readAttribute(primaryKey as string),
     };
     if (asName) {
       buildAttrs[`${underscore(asName)}_type`] = ctor.name;
@@ -963,7 +963,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           );
         }
         for (let i = 0; i < foreignKey.length; i++) {
-          record.writeAttribute(foreignKey[i], this._record.readAttribute(primaryKey[i] as string));
+          record._writeAttribute(
+            foreignKey[i],
+            this._record._readAttribute(primaryKey[i] as string),
+          );
         }
       } else {
         if (Array.isArray(primaryKey)) {
@@ -971,10 +974,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             `Association "${this._assocName}" with composite primaryKey requires a composite foreignKey array`,
           );
         }
-        const pkValue = this._record.readAttribute(primaryKey as string);
-        record.writeAttribute(foreignKey as string, pkValue);
+        const pkValue = this._record._readAttribute(primaryKey as string);
+        record._writeAttribute(foreignKey as string, pkValue);
       }
-      if (typeCol) record.writeAttribute(typeCol, ctor.name);
+      if (typeCol) record._writeAttribute(typeCol, ctor.name);
       const saved = await record.save();
       if (saved) {
         this._target.push(record);
@@ -1008,7 +1011,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         `Through associations do not support composite primary keys on "${this._assocName}".`,
       );
     }
-    const pkValue = this._record.readAttribute(primaryKey);
+    const pkValue = this._record._readAttribute(primaryKey);
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
 
@@ -1033,7 +1036,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
               `Through associations do not support composite primary keys on target model for "${this._assocName}".`,
             );
           }
-          return record.readAttribute(targetPk);
+          return record._readAttribute(targetPk);
         })(),
       };
       // Handle polymorphic through (as option on through association)
@@ -1092,12 +1095,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
       if (Array.isArray(foreignKey)) {
         for (const fk of foreignKey) {
-          record.writeAttribute(fk, null);
+          record._writeAttribute(fk, null);
         }
       } else {
-        record.writeAttribute(foreignKey as string, null);
+        record._writeAttribute(foreignKey as string, null);
       }
-      if (typeCol) record.writeAttribute(typeCol, null);
+      if (typeCol) record._writeAttribute(typeCol, null);
       const saved = await record.save();
       if (saved) {
         removed.push(record);
@@ -1137,14 +1140,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const throughModel = resolveModel(throughClassName);
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
-    const pkValue = this._record.readAttribute(primaryKey as string);
+    const pkValue = this._record._readAttribute(primaryKey as string);
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
 
     const removed: Base[] = [];
     for (const record of records) {
       if (!fireAssocCallbacks(this._assocDef.options.beforeRemove, this._record, record)) continue;
-      const targetPk = record.readAttribute(
+      const targetPk = record._readAttribute(
         (record.constructor as typeof Base).primaryKey as string,
       );
       const joinRecord = await throughModel.findBy({
@@ -1177,7 +1180,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         `deleteAll does not support composite primary keys for through associations on "${this._assocName}".`,
       );
     }
-    const pkValue = this._record.readAttribute(primaryKey);
+    const pkValue = this._record._readAttribute(primaryKey);
     if (pkValue == null) return;
     const throughAs = throughAssoc.options.as;
     const conditions: Record<string, unknown> = {};
@@ -1285,7 +1288,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         const condition: Record<string, unknown> = {};
         let allPresent = true;
         for (const key of primaryKey) {
-          const value = record.readAttribute(key);
+          const value = record._readAttribute(key);
           if (value == null) {
             allPresent = false;
             break;
@@ -1294,7 +1297,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         }
         if (allPresent) return s.exists(condition);
       } else {
-        const pkValue = record.readAttribute(primaryKey);
+        const pkValue = record._readAttribute(primaryKey);
         if (pkValue != null) return s.exists({ [primaryKey]: pkValue });
       }
     }
@@ -1538,9 +1541,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const keyForRecord = (r: Base): string => {
       if (composite) {
         const cols = pk as string[];
-        return keyForTuple(cols.map((c) => r.readAttribute(c)));
+        return keyForTuple(cols.map((c) => r._readAttribute(c)));
       }
-      return String(r.readAttribute(pk as string));
+      return String(r._readAttribute(pk as string));
     };
     const keyForCastedId = (castedId: unknown): string => {
       if (composite) return keyForTuple(castedId as unknown[]);
@@ -1598,9 +1601,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         (r) => !r.isNewRecord(),
       );
       if (stringCols.length === 1) {
-        return records.map((r) => r.readAttribute(stringCols[0]));
+        return records.map((r) => r._readAttribute(stringCols[0]));
       }
-      return records.map((r) => stringCols.map((c) => r.readAttribute(c)));
+      return records.map((r) => stringCols.map((c) => r._readAttribute(c)));
     }
     this._checkStrictLoading();
     // Scope bangs on the proxy itself: scope() rebuilds the unmutated
@@ -1622,8 +1625,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         (r) => !r.isNewRecord(),
       );
       if (records.length === 0) return null;
-      if (stringCols.length === 1) return records[0].readAttribute(stringCols[0]);
-      return stringCols.map((c) => records[0].readAttribute(c));
+      if (stringCols.length === 1) return records[0]._readAttribute(stringCols[0]);
+      return stringCols.map((c) => records[0]._readAttribute(c));
     }
     this._checkStrictLoading();
     // Same divergence gate as pluck().
@@ -1730,7 +1733,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       );
     }
 
-    const pkValue = this._record.readAttribute(ownerPk as string);
+    const pkValue = this._record._readAttribute(ownerPk as string);
     if (pkValue == null) return (targetModel as any).all().none();
 
     const throughTable = new ArelTable(throughModel.tableName);

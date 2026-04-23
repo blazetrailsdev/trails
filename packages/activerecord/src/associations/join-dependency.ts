@@ -398,7 +398,7 @@ export class JoinDependency {
       if (!seenRawPks.has(rawPk)) {
         seenRawPks.add(rawPk);
         const parent = (this._baseModel as any)._instantiate(parentAttrs);
-        parentKey = parent.readAttribute(basePk);
+        parentKey = parent._readAttribute(basePk);
         rawToKey.set(rawPk, parentKey);
         parentMap.set(parentKey, parent);
         assocMap.set(parentKey, new Map());

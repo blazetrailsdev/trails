@@ -184,8 +184,8 @@ export class BelongsToAssociation extends SingularAssociation {
 
     for (let i = 0; i < fks.length; i++) {
       const fkValue =
-        typeof this.owner.readAttribute === "function"
-          ? this.owner.readAttribute(fks[i])
+        typeof (this.owner as any)._readAttribute === "function"
+          ? (this.owner as any)._readAttribute(fks[i])
           : (this.owner as any)[fks[i]];
       if (fkValue == null) return null;
       conditions[pks[i] ?? pks[0]] = fkValue;
@@ -216,8 +216,8 @@ export class BelongsToAssociation extends SingularAssociation {
   protected override staleState(): unknown {
     const fks = this.foreignKeyNames();
     const values = fks.map((fk) =>
-      typeof this.owner.readAttribute === "function"
-        ? this.owner.readAttribute(fk)
+      typeof (this.owner as any)._readAttribute === "function"
+        ? (this.owner as any)._readAttribute(fk)
         : (this.owner as any)[fk],
     );
     return values.length === 1 ? values[0] : JSON.stringify(values);
@@ -230,8 +230,8 @@ export class BelongsToAssociation extends SingularAssociation {
   protected override foreignKeyPresent(): boolean {
     return this.foreignKeyNames().every((fk) => {
       const value =
-        typeof this.owner.readAttribute === "function"
-          ? this.owner.readAttribute(fk)
+        typeof (this.owner as any)._readAttribute === "function"
+          ? (this.owner as any)._readAttribute(fk)
           : (this.owner as any)[fk];
       return value != null;
     });
@@ -291,13 +291,13 @@ export class BelongsToAssociation extends SingularAssociation {
     for (let i = 0; i < fks.length; i++) {
       const pkCol = pks[i] ?? pks[0];
       const value = record
-        ? typeof record.readAttribute === "function"
-          ? record.readAttribute(pkCol)
+        ? typeof (record as any)._readAttribute === "function"
+          ? (record as any)._readAttribute(pkCol)
           : (record as any)[pkCol]
         : null;
 
-      if (typeof this.owner.writeAttribute === "function") {
-        (this.owner as any).writeAttribute(fks[i], value);
+      if (typeof (this.owner as any)._writeAttribute === "function") {
+        (this.owner as any)._writeAttribute(fks[i], value);
       } else {
         (this.owner as any)[fks[i]] = value;
       }
@@ -327,7 +327,7 @@ export class BelongsToAssociation extends SingularAssociation {
     const pks = this.associationPrimaryKeys(null);
     const conditions: Record<string, unknown> = {};
     for (let i = 0; i < fks.length; i++) {
-      const fkValue = this.owner.readAttribute?.(fks[i]);
+      const fkValue = (this.owner as any)._readAttribute?.(fks[i]);
       if (fkValue == null) return;
       conditions[pks[i] ?? pks[0]] = fkValue;
     }

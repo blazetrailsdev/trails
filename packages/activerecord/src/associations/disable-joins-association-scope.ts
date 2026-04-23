@@ -45,7 +45,7 @@ function keyColumns(key: string | string[], label: string): string[] {
  * column order. Used to seed the chain-walk's first join-IDs entry.
  */
 function readTuple(owner: Base, cols: string[]): unknown[] {
-  return cols.map((c) => owner.readAttribute(c));
+  return cols.map((c) => owner._readAttribute(c));
 }
 
 /**

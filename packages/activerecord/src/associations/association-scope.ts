@@ -207,7 +207,7 @@ export class AssociationScope {
     if (!last) return binds;
     const joinFk = (last as { joinForeignKey?: string | string[] }).joinForeignKey;
     const fks = Array.isArray(joinFk) ? joinFk : joinFk ? [joinFk] : [];
-    for (const fk of fks) binds.push(owner.readAttribute(fk));
+    for (const fk of fks) binds.push(owner._readAttribute(fk));
     if ((last as { type?: string | null }).type) {
       binds.push(polymorphicName(owner.constructor as typeof Base));
     }
@@ -362,7 +362,7 @@ export class AssociationScope {
       throw new CompositePrimaryKeyMismatchError(ownerName, name);
     }
     for (let i = 0; i < joinPks.length; i++) {
-      const rawValue = owner.readAttribute(joinFks[i]);
+      const rawValue = owner._readAttribute(joinFks[i]);
       const value = this._transformValue(rawValue);
       scope = this._applyScope(scope, table, joinPks[i], value);
     }

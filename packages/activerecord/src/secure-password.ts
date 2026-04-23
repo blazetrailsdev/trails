@@ -77,7 +77,7 @@ export function hasSecurePassword(
   // authenticate method
   Object.defineProperty(modelClass.prototype, "authenticate", {
     value: function (this: Base, password: string): Base | false {
-      const digest = this.readAttribute("password_digest");
+      const digest = this._readAttribute("password_digest");
       if (!digest) return false;
       return verifyPassword(password, digest as string) ? this : false;
     },

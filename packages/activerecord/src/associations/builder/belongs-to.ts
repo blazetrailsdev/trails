@@ -116,7 +116,9 @@ export class BelongsTo extends SingularAssociation {
     const oldFkValues = fkColumns.map((col) => {
       const change = changes[col];
       if (change) return change[0];
-      return typeof record.readAttribute === "function" ? record.readAttribute(col) : record[col];
+      return typeof (record as any)._readAttribute === "function"
+        ? (record as any)._readAttribute(col)
+        : record[col];
     });
     const foreignTypeCol = `${underscore(name)}_type`;
     const hasOldFk =
@@ -138,8 +140,8 @@ export class BelongsTo extends SingularAssociation {
             `${underscore(name)}_type`;
           const typeName =
             changes[foreignType]?.[0] ??
-            (typeof record.readAttribute === "function"
-              ? record.readAttribute(foreignType)
+            (typeof (record as any)._readAttribute === "function"
+              ? (record as any)._readAttribute(foreignType)
               : record[foreignType]);
           try {
             klass = typeName ? resolveModel(typeName) : null;
@@ -163,7 +165,9 @@ export class BelongsTo extends SingularAssociation {
 
     // Touch the current parent by looking it up via FK value.
     const currentFkValues = fkColumns.map((col) =>
-      typeof record.readAttribute === "function" ? record.readAttribute(col) : record[col],
+      typeof (record as any)._readAttribute === "function"
+        ? (record as any)._readAttribute(col)
+        : record[col],
     );
     if (currentFkValues.every((v) => v != null)) {
       const association =
@@ -282,7 +286,7 @@ export class BelongsTo extends SingularAssociation {
         const needsValidation = (record: any, attrs: string[]) =>
           attrs.some(
             (attr) =>
-              record.readAttribute(attr) == null ||
+              (record as any)._readAttribute(attr) == null ||
               (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
           );
 

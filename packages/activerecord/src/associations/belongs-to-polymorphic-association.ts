@@ -61,8 +61,8 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   protected override replace(record: Base | null): void {
     const typeCol = this.foreignTypeName();
     const typeName = record ? (record.constructor as any).name : null;
-    if (typeof this.owner.writeAttribute === "function") {
-      (this.owner as any).writeAttribute(typeCol, typeName);
+    if (typeof (this.owner as any)._writeAttribute === "function") {
+      (this.owner as any)._writeAttribute(typeCol, typeName);
     } else {
       (this.owner as any)[typeCol] = typeName;
     }
@@ -84,8 +84,8 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   private readForeignType(): string | null {
     const ft = this.foreignTypeName();
     const value =
-      typeof this.owner.readAttribute === "function"
-        ? this.owner.readAttribute(ft)
+      typeof (this.owner as any)._readAttribute === "function"
+        ? (this.owner as any)._readAttribute(ft)
         : (this.owner as any)[ft];
     return (value as string) ?? null;
   }

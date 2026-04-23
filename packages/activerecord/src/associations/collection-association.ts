@@ -377,8 +377,8 @@ export class CollectionAssociation extends Association {
     const keys = Array.isArray(pk) ? pk : [pk];
     return keys.every((key: string) => {
       const val =
-        typeof this.owner.readAttribute === "function"
-          ? this.owner.readAttribute(key)
+        typeof (this.owner as any)._readAttribute === "function"
+          ? (this.owner as any)._readAttribute(key)
           : (this.owner as any)[key];
       return val != null;
     });
@@ -452,12 +452,12 @@ export class CollectionAssociation extends Association {
     for (let i = 0; i < fks.length; i++) {
       const pkCol = pks[i] ?? pks[0];
       const pkValue =
-        typeof this.owner.readAttribute === "function"
-          ? this.owner.readAttribute(pkCol)
+        typeof (this.owner as any)._readAttribute === "function"
+          ? (this.owner as any)._readAttribute(pkCol)
           : (this.owner as any)[pkCol];
 
-      if (typeof (record as any).writeAttribute === "function") {
-        (record as any).writeAttribute(fks[i], pkValue);
+      if (typeof (record as any)._writeAttribute === "function") {
+        (record as any)._writeAttribute(fks[i], pkValue);
       } else {
         (record as any)[fks[i]] = pkValue;
       }
@@ -465,8 +465,8 @@ export class CollectionAssociation extends Association {
 
     if (this.reflection.options.as) {
       const typeCol = `${underscore(this.reflection.options.as)}_type`;
-      if (typeof (record as any).writeAttribute === "function") {
-        (record as any).writeAttribute(typeCol, ctor.name);
+      if (typeof (record as any)._writeAttribute === "function") {
+        (record as any)._writeAttribute(typeCol, ctor.name);
       } else {
         (record as any)[typeCol] = ctor.name;
       }
@@ -520,8 +520,8 @@ export class CollectionAssociation extends Association {
       }
       for (const record of persisted) {
         for (const attr of nullAttrs) {
-          if (typeof (record as any).writeAttribute === "function") {
-            (record as any).writeAttribute(attr, null);
+          if (typeof (record as any)._writeAttribute === "function") {
+            (record as any)._writeAttribute(attr, null);
           } else {
             (record as any)[attr] = null;
           }
@@ -566,8 +566,8 @@ export class CollectionAssociation extends Association {
     await this.loadTarget();
     for (const record of this.target) {
       for (const [attr, val] of Object.entries(nullAttrs)) {
-        if (typeof (record as any).writeAttribute === "function") {
-          (record as any).writeAttribute(attr, val);
+        if (typeof (record as any)._writeAttribute === "function") {
+          (record as any)._writeAttribute(attr, val);
         } else {
           (record as any)[attr] = val;
         }
@@ -587,7 +587,9 @@ export class CollectionAssociation extends Association {
     const pk = (this.klass as any).primaryKey ?? "id";
     const keys = Array.isArray(pk) ? pk : [pk];
     const values = keys.map((key: string) =>
-      typeof record.readAttribute === "function" ? record.readAttribute(key) : (record as any)[key],
+      typeof (record as any)._readAttribute === "function"
+        ? (record as any)._readAttribute(key)
+        : (record as any)[key],
     );
     if (values.some((v) => v == null)) return record;
     return JSON.stringify(values.length === 1 ? values[0] : values);
@@ -597,13 +599,13 @@ export class CollectionAssociation extends Association {
     const pk = (this.klass as any).primaryKey ?? "id";
     if (Array.isArray(pk)) {
       return pk.map((key: string) =>
-        typeof record.readAttribute === "function"
-          ? record.readAttribute(key)
+        typeof (record as any)._readAttribute === "function"
+          ? (record as any)._readAttribute(key)
           : (record as any)[key],
       );
     }
-    return typeof record.readAttribute === "function"
-      ? record.readAttribute(pk)
+    return typeof (record as any)._readAttribute === "function"
+      ? (record as any)._readAttribute(pk)
       : (record as any)[pk];
   }
 
