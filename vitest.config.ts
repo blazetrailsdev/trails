@@ -36,6 +36,7 @@ export default defineConfig({
       "packages/*/src/**/*.test.ts",
       "scripts/guides-typecheck/*.test.ts",
       "scripts/api-compare/*.test.ts",
+      "scripts/parity/**/*.test.ts",
     ],
     exclude: ["**/node_modules/**", "**/dist/**", "packages/website/**", "packages/*/dx-tests/**"],
     setupFiles: process.env.MYSQL_TEST_URL

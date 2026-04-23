@@ -19,12 +19,33 @@ import type { Column } from "./connection-adapters/column.js";
 
 type AdapterWithTables = { tables(): Promise<string[]> };
 type AdapterWithColumns = { columns(table: string): Promise<Column[]> };
+type AdapterWithIndexes = {
+  indexes(table: string): Promise<Array<{ name: string; columns: string[]; unique: boolean }>>;
+};
+type AdapterWithPrimaryKey = {
+  primaryKey(table: string): Promise<string | string[] | null>;
+};
+
+/** Minimal index descriptor shared by all adapters. */
+export interface IntrospectedIndex {
+  name: string;
+  columns: string[];
+  unique: boolean;
+  /** Partial-index predicate; undefined when adapter does not surface it. */
+  where?: string;
+}
 
 function hasTables(a: unknown): a is AdapterWithTables {
   return typeof (a as AdapterWithTables).tables === "function";
 }
 function hasColumns(a: unknown): a is AdapterWithColumns {
   return typeof (a as AdapterWithColumns).columns === "function";
+}
+function hasIndexes(a: unknown): a is AdapterWithIndexes {
+  return typeof (a as AdapterWithIndexes).indexes === "function";
+}
+function hasPrimaryKey(a: unknown): a is AdapterWithPrimaryKey {
+  return typeof (a as AdapterWithPrimaryKey).primaryKey === "function";
 }
 
 // Memoize `SchemaStatements` per-adapter so the fallback path doesn't
@@ -64,4 +85,40 @@ export async function introspectColumns(
 ): Promise<Column[]> {
   if (hasColumns(adapter)) return adapter.columns(table);
   return schemaStatementsFor(adapter).columns(table);
+}
+
+/**
+ * Return index descriptors for `table`. Uses `adapter.indexes()` when
+ * implemented (preferred — adapter-specific semantics like SQLite's
+ * `origin === "c"` filter that excludes constraint-generated autoindexes
+ * are applied), else falls back to `SchemaStatements.indexes()`.
+ */
+export async function introspectIndexes(
+  adapter: DatabaseAdapter,
+  table: string,
+): Promise<IntrospectedIndex[]> {
+  if (hasIndexes(adapter)) return adapter.indexes(table);
+  return schemaStatementsFor(adapter).indexes(table);
+}
+
+/**
+ * Return primary key column names for `table` in PK-position order (matching
+ * Rails' `PRAGMA table_info` pk-field sort). Uses `adapter.primaryKey()` when
+ * implemented, else derives from `columns()` filtered to primaryKey===true —
+ * which preserves declaration order but loses composite PK position.
+ *
+ * Returns an empty array when the table has no primary key.
+ */
+export async function introspectPrimaryKey(
+  adapter: DatabaseAdapter,
+  table: string,
+): Promise<string[]> {
+  if (hasPrimaryKey(adapter)) {
+    const pk = await adapter.primaryKey(table);
+    if (pk === null) return [];
+    return Array.isArray(pk) ? pk : [pk];
+  }
+  // Fallback: columns with primaryKey=true in declaration order.
+  const cols = await introspectColumns(adapter, table);
+  return cols.filter((c) => c.primaryKey).map((c) => c.name);
 }
