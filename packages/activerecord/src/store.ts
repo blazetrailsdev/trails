@@ -15,6 +15,30 @@ export function storedAttributes(modelClass: typeof Base): Record<string, string
 }
 
 /**
+ * Returns only the stored attributes defined directly on this class (not
+ * inherited ones). Mirrors Rails' `attr_accessor :local_stored_attributes`
+ * on `ActiveRecord::Store` — each class has its own hash of store→keys[].
+ *
+ * Mirrors: ActiveRecord::Store#local_stored_attributes
+ */
+export function localStoredAttributes(modelClass: typeof Base): Record<string, string[]> {
+  return _storedAttributes.get(modelClass) ?? {};
+}
+
+/**
+ * Sets the local stored attributes for a model class directly. Used internally
+ * during store/store_accessor setup.
+ *
+ * Mirrors: ActiveRecord::Store#local_stored_attributes= (the attr_accessor setter)
+ */
+export function setLocalStoredAttributes(
+  modelClass: typeof Base,
+  attrs: Record<string, string[]>,
+): void {
+  _storedAttributes.set(modelClass, attrs);
+}
+
+/**
  * Reads/writes hash keys on a store attribute.
  *
  * Mirrors: ActiveRecord::Store::HashAccessor

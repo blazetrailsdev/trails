@@ -3,6 +3,7 @@ import { modelRegistry } from "./associations.js";
 import { ActiveRecordError, UnknownAttributeError } from "./errors.js";
 import { singularize, camelize, underscore } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
+import { isMarkedForDestruction } from "./autosave-association.js";
 
 /**
  * Raised when more nested-attribute records are provided than the
@@ -15,6 +16,17 @@ export class TooManyRecords extends ActiveRecordError {
     super(message);
     this.name = "TooManyRecords";
   }
+}
+
+/**
+ * Returns whether the record is marked for destruction in the context of
+ * nested attributes. Mirrors Rails' NestedAttributes instance method `_destroy`,
+ * which delegates to `marked_for_destruction?`.
+ *
+ * Mirrors: ActiveRecord::NestedAttributes#_destroy
+ */
+export function _destroy(this: Base): boolean {
+  return isMarkedForDestruction(this);
 }
 
 interface NestedAttributeOptions {

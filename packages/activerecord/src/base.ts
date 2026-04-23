@@ -939,6 +939,7 @@ export class Base extends Model {
   // --- ReadonlyAttributes mixin (wired via extend() after class) ---
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static readonlyAttributeQ: typeof ReadonlyAttributes.readonlyAttributeQ;
+  declare static isReadonlyAttribute: typeof ReadonlyAttributes.readonlyAttributeQ;
 
   /**
    * Return the list of readonly attribute names.

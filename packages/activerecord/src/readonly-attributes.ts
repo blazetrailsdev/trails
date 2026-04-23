@@ -101,6 +101,19 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
 }
 
 /**
+ * Low-level write that checks readonly but bypasses the frozen-record guard.
+ *
+ * Mirrors: ActiveRecord::HasReadonlyAttributes#_write_attribute
+ */
+export function _writeAttribute(this: Base, name: string, value: unknown): void {
+  const ctor = this.constructor as typeof Base;
+  if (this._newRecord === false && ctor.readonlyAttributeQ(String(name))) {
+    throw new ReadonlyAttributeError(String(name));
+  }
+  Model.prototype.writeAttribute.call(this, name, value);
+}
+
+/**
  * Module methods wired onto Base as static methods via `extend()` in base.ts.
  * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention.
  *
@@ -112,4 +125,5 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
 export const ClassMethods = {
   attrReadonly,
   readonlyAttributeQ,
+  isReadonlyAttribute: readonlyAttributeQ,
 };

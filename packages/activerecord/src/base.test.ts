@@ -3,7 +3,13 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, RecordNotFound, AttributeAssignmentError, NotImplementedError } from "./index.js";
+import {
+  Base,
+  RecordNotFound,
+  AttributeAssignmentError,
+  NotImplementedError,
+  ReadonlyAttributeError,
+} from "./index.js";
 import { SubclassNotFound, NameError } from "./errors.js";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -1848,7 +1854,36 @@ describe("BasicsTest", () => {
      * We don't expose that knob yet — the default behavior (raise) is covered
      * by the `attrReadonly prevents updating readonly attributes` test. */
   });
-  it.skip("readonly attributes on belongs to association", () => {});
+  it("readonly attributes on belongs to association", async () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ReadonlyAuthorPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.attrReadonly("author_id");
+        this.adapter = adapter;
+      }
+    }
+    expect(ReadonlyAuthorPost.readonlyAttributes).toEqual(["author_id"]);
+
+    const author1 = await Author.create({ name: "Alex" });
+    const author2 = await Author.create({ name: "Not Alex" });
+
+    // Updating non-readonly attributes on a persisted record is fine
+    const post = await ReadonlyAuthorPost.create({ title: "Hi", author_id: author1.id });
+    await post.update({ title: "Hello" });
+    const reloaded = await ReadonlyAuthorPost.find(post.id);
+    expect(reloaded.readAttribute("author_id")).toBe(author1.id);
+
+    // Attempting to change the readonly FK throws ReadonlyAttributeError
+    const post2 = await ReadonlyAuthorPost.create({ title: "Hi", author_id: author1.id });
+    await expect(post2.update({ author_id: author2.id })).rejects.toThrow(ReadonlyAttributeError);
+  });
   it.skip("respect internal encoding", () => {
     /* Ruby-specific: tests Encoding.default_internal (EUC-JP) on column names — no JS equivalent */
   });
