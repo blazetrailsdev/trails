@@ -18,6 +18,7 @@ import {
   connectedToStack,
   currentRole as coreCurrentRole,
   currentShard as coreCurrentShard,
+  isApplicationRecordClass as coreIsApplicationRecordClass,
 } from "./core.js";
 import { getAsyncContext } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
@@ -248,6 +249,24 @@ export function isConnectedQ(this: typeof Base): boolean {
     role: coreCurrentRole.call(this as any),
     shard: coreCurrentShard.call(this as any),
   });
+}
+
+export const isConnected = isConnectedQ;
+
+export function connection(this: typeof Base): DatabaseAdapter {
+  const pool = connectionPool.call(this);
+  if (pool.isPermanentLease()) return pool.leaseConnection();
+  return pool.activeConnection ?? pool.leaseConnection();
+}
+
+export function isPrimaryClass(this: typeof Base): boolean {
+  return this.name === "Base" || coreIsApplicationRecordClass.call(this as any);
+}
+
+export function adapterClass(this: typeof Base): Promise<new (...args: any[]) => DatabaseAdapter> {
+  return connectionPool.call(this).dbConfig.adapterClass() as Promise<
+    new (...args: any[]) => DatabaseAdapter
+  >;
 }
 
 export function removeConnection(this: typeof Base): void {
@@ -644,6 +663,10 @@ export const ClassMethods = {
   connectionPool,
   retrieveConnection,
   isConnectedQ,
+  isConnected,
+  connection,
+  isPrimaryClass,
+  adapterClass,
   removeConnection,
   schemaCache,
   clearCacheBang,

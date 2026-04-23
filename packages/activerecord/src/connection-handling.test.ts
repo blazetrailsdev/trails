@@ -286,4 +286,39 @@ describe("ConnectionHandlingTest", () => {
     expect(currentRole.call(Base)).toBe("writing");
     expect(connectedToStack()).toHaveLength(0);
   });
+
+  it("#isConnected delegates to isConnectedQ", () => {
+    expect(Base.isConnected()).toBe(Base.isConnectedQ());
+  });
+
+  it("#connection leases a connection when none is active", () => {
+    const pool = Base.connectionPool();
+    expect(pool.activeConnection).toBeNull();
+    const conn = Base.connection();
+    expect(conn).toBeTruthy();
+    expect(pool.activeConnection).toBeTruthy();
+    Base.releaseConnection();
+  });
+
+  it("#connection returns the active connection inside withConnection", () => {
+    Base.withConnection((leased) => {
+      const conn = Base.connection();
+      expect(conn).toBe(leased);
+    });
+  });
+
+  it("#isPrimaryClass returns true for Base", () => {
+    expect(Base.isPrimaryClass()).toBe(true);
+  });
+
+  it("#isPrimaryClass returns false for a normal model subclass", () => {
+    class Post extends Base {}
+    expect(Post.isPrimaryClass()).toBe(false);
+  });
+
+  it("#adapterClass resolves to the SQLite3Adapter constructor", async () => {
+    const Klass = await Base.adapterClass();
+    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+    expect(Klass).toBe(SQLite3Adapter);
+  });
 });

@@ -51,4 +51,8 @@ export class Column extends BaseColumn {
   isVirtualStored(): boolean {
     return this.isVirtual() && this._generatedType === "stored";
   }
+
+  override get hasDefault(): boolean {
+    return super.hasDefault && !this.isVirtual();
+  }
 }

@@ -768,6 +768,10 @@ export class Base extends Model {
     (this as any)._connectionSpecificationName = name;
   }
   declare static isConnectedQ: typeof ConnectionHandling.isConnectedQ;
+  declare static isConnected: typeof ConnectionHandling.isConnected;
+  declare static connection: typeof ConnectionHandling.connection;
+  declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
+  declare static adapterClass: typeof ConnectionHandling.adapterClass;
   declare static removeConnection: typeof ConnectionHandling.removeConnection;
   declare static schemaCache: typeof ConnectionHandling.schemaCache;
   declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;
