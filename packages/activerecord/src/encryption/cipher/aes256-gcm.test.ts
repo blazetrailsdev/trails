@@ -40,6 +40,26 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     expect(r1.iv).toBe(r2.iv);
   });
 
+  it("deterministic IV matches Rails HMAC-SHA256 derivation (fixed vector)", () => {
+    // Fixed key and plaintext — verify the IV equals HMAC-SHA256(key_bytes, plaintext)[0..12].
+    // To verify with Ruby:
+    //   key_bytes = Base64.strict_decode64(key)[0,32]
+    //   iv = OpenSSL::HMAC.digest("SHA256", key_bytes, "hello world")[0, 12]
+    //   puts Base64.strict_encode64(iv)
+    const key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; // 32 zero bytes base64
+    const keyBuf = Buffer.from(key, "base64").subarray(0, 32);
+    const expectedIv = crypto
+      .createHmac("sha256", keyBuf)
+      .update("hello world")
+      .digest()
+      .subarray(0, 12)
+      .toString("base64");
+
+    const cipher = new Cipher();
+    const result = cipher.encrypt("hello world", key, { deterministic: true });
+    expect(result.iv).toBe(expectedIv);
+  });
+
   it("it generates different ivs for different ciphertexts", () => {
     const cipher = new Cipher();
     const key = generateKey();

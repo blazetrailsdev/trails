@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { KeyGenerator } from "./key-generator.js";
+import { Configurable } from "./configurable.js";
 
 describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
   it("generate_random_key generates random keys with the cipher key length by default", () => {
@@ -55,9 +56,34 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
     expect(new KeyGenerator("SHA1").hashDigestClass).toBe("SHA1");
   });
 
-  it("derive_key_from produces the same output as deriveKey", () => {
-    const gen = new KeyGenerator();
-    expect(gen.deriveKeyFrom("password")).toBe(gen.deriveKey("password"));
-    expect(gen.deriveKeyFrom("password", 16)).toBe(gen.deriveKey("password", 16));
+  it("default hash_digest_class reads from config", () => {
+    expect(new KeyGenerator().hashDigestClass).toBe(Configurable.config.hashDigestClass);
+  });
+
+  describe("derive_key_from", () => {
+    let originalSalt: string | undefined;
+    beforeEach(() => {
+      originalSalt = Configurable.config.keyDerivationSalt;
+      Configurable.config.keyDerivationSalt = "test-salt";
+    });
+    afterEach(() => {
+      Configurable.config.keyDerivationSalt = originalSalt;
+    });
+
+    it("uses config.keyDerivationSalt as the salt", () => {
+      const gen = new KeyGenerator("SHA256");
+      expect(gen.deriveKeyFrom("password")).toBe(gen.deriveKey("password", 32, "test-salt"));
+    });
+
+    it("raises when config.keyDerivationSalt is not set", () => {
+      Configurable.config.keyDerivationSalt = undefined;
+      const gen = new KeyGenerator("SHA256");
+      expect(() => gen.deriveKeyFrom("password")).toThrow();
+    });
+
+    it("produces a different key than empty-salt deriveKey", () => {
+      const gen = new KeyGenerator("SHA256");
+      expect(gen.deriveKeyFrom("password")).not.toBe(gen.deriveKey("password", 32, ""));
+    });
   });
 });

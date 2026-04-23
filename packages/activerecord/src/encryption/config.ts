@@ -18,7 +18,7 @@ export class Config {
   excludeFromFilterParameters: string[] = [];
   previousSchemes: unknown[] = [];
   extendQueries: boolean = false;
-  hashDigestClass: string = "SHA256";
+  hashDigestClass: string = "SHA1";
   keyProviderClass?: string;
   compressor: Compressor = defaultCompressor;
   forcedEncodingForDeterministicEncryption: string = "UTF-8";

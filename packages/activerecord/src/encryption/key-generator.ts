@@ -5,14 +5,15 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
+import { Configurable } from "./configurable.js";
 
 const DEFAULT_KEY_LENGTH = 32; // AES-256
 
 export class KeyGenerator {
   private _hashDigestClass: string;
 
-  constructor(hashDigestClass: string = "SHA256") {
-    this._hashDigestClass = hashDigestClass;
+  constructor(hashDigestClass?: string) {
+    this._hashDigestClass = hashDigestClass ?? Configurable.config.hashDigestClass;
   }
 
   get hashDigestClass(): string {
@@ -20,7 +21,8 @@ export class KeyGenerator {
   }
 
   deriveKeyFrom(password: string, length: number = DEFAULT_KEY_LENGTH): string {
-    return this.deriveKey(password, length);
+    const salt = Configurable.config.get("keyDerivationSalt") as string;
+    return this.deriveKey(password, length, salt);
   }
 
   generateRandomKey(length: number = DEFAULT_KEY_LENGTH): string {

@@ -33,7 +33,7 @@ export class Cipher {
     const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
     let iv: Buffer;
     if (options?.deterministic ?? this.deterministic) {
-      iv = crypto.createHash("sha256").update(data).update(key).digest().subarray(0, IV_LENGTH);
+      iv = crypto.createHmac("sha256", keyBuf).update(data).digest().subarray(0, IV_LENGTH);
     } else {
       iv = crypto.randomBytes(IV_LENGTH);
     }
