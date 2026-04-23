@@ -667,6 +667,32 @@ describe("scopeForCreate / whereValuesHash", () => {
     expect(hash.author).toBe("Alice");
     expect(hash.title).toBe("Test");
   });
+
+  it("whereValuesHash exposes IN-array values (Rails: equality_only=false)", () => {
+    class Post extends Base {
+      static {
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
+    }
+    const rel = Post.where({ author: ["Alice", "Bob"] });
+    const hash = rel.whereValuesHash();
+    expect(hash.author).toEqual(["Alice", "Bob"]);
+  });
+
+  it("scopeForCreate filters out IN-array values (Rails: equality_only=true)", () => {
+    class Post extends Base {
+      static {
+        this.attribute("author", "string");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const rel = Post.where({ author: ["Alice", "Bob"], title: "Fixed" });
+    const scope = rel.scopeForCreate();
+    expect(scope.title).toBe("Fixed");
+    expect(scope.author).toBeUndefined();
+  });
 });
 
 describe("Scoping block (Rails-guided)", () => {

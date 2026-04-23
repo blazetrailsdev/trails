@@ -100,18 +100,7 @@ export class EncryptedQuery {
  */
 export class RelationQueries {
   static where(originalWhere: Function, relation: any, args: unknown[]): unknown {
-    const processed = EncryptedQuery.processArguments(relation, args, true);
-    const result = originalWhere.call(relation, ...processed) as any;
-    // Store the expanded conditions on the returned relation so scopeForCreate
-    // can access the AdditionalValue arrays directly, bypassing WhereClause.toH()
-    // which cannot extract OR chains produced by ArrayHandler for object values.
-    if (processed !== args && processed.length > 0 && typeof processed[0] === "object") {
-      result._encryptionExpansion = {
-        ...(relation._encryptionExpansion ?? {}),
-        ...(processed[0] as Record<string, unknown>),
-      };
-    }
-    return result;
+    return originalWhere.call(relation, ...EncryptedQuery.processArguments(relation, args, true));
   }
 
   static isExists(originalExists: Function, relation: any, args: unknown[]): unknown {
@@ -122,19 +111,20 @@ export class RelationQueries {
     originalScopeForCreate: () => Record<string, unknown>,
     relation: any,
   ): Record<string, unknown> {
-    const model = relation._modelClass ?? relation;
+    const model = relation.model ?? relation;
     const encryptedAttrs = model._encryptedAttributes as Set<string> | undefined;
     if (!encryptedAttrs?.size) return originalScopeForCreate.call(relation);
 
     const scopeAttrs = originalScopeForCreate.call(relation);
-    const wheres: Record<string, unknown> = relation._encryptionExpansion ?? {};
+    const wheres = relation.whereValuesHash();
     for (const attrName of encryptedAttrs) {
       const type = getAttributeType(model, attrName);
       if (!(type instanceof EncryptedAttributeType) || !type.deterministic) continue;
       const values = wheres[attrName];
       if (Array.isArray(values) && values[0] instanceof AdditionalValue) {
-        // values[0] is AdditionalValue for the current scheme — unwrap to ciphertext
-        // so the created record stores the correct encrypted value directly.
+        // Our expansion stores AdditionalValue(current) at index 0 (see
+        // allCiphertextsFor). Unwrap to the ciphertext so the created
+        // record stores the current-scheme-encrypted value directly.
         scopeAttrs[attrName] = (values[0] as AdditionalValue).value;
       }
     }

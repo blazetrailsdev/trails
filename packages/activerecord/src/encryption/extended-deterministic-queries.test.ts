@@ -7,6 +7,9 @@ import {
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { NullEncryptor } from "./null-encryptor.js";
+import { Base } from "../base.js";
+import { createTestAdapter } from "../test-adapter.js";
+import "../relation.js";
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
   it.skip("Finds records when data is unencrypted", () => {});
@@ -65,10 +68,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::ExtendedEncryp
 });
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQueries#scopeForCreate", () => {
-  it("unwraps AdditionalValues from _encryptionExpansion to produce the current-scheme ciphertext", () => {
-    // _encryptionExpansion is set by RelationQueries.where when processArguments expands
-    // the condition. scopeForCreate reads it directly, bypassing WhereClause.toH() which
-    // cannot extract OR chains that ArrayHandler produces for object values.
+  it("unwraps AdditionalValues from whereValuesHash() to produce the current-scheme ciphertext", () => {
     const type = makeType(true);
     const prevType = makeType(true);
     const avCurrent = new AdditionalValue("plain@example.com", type);
@@ -79,25 +79,23 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
       _attributeDefinitions: new Map([["email", { type }]]),
     };
     const relation = {
-      _modelClass: model,
-      _encryptionExpansion: { email: [avCurrent, avPrev] },
+      model,
+      whereValuesHash: () => ({ email: [avCurrent, avPrev] }),
     };
 
-    const originalScopeForCreate = () => ({});
-    const result = RelationQueries.scopeForCreate(originalScopeForCreate, relation);
+    const result = RelationQueries.scopeForCreate(() => ({}), relation);
     expect(result.email).toBe(avCurrent.value);
   });
 
-  it("leaves attributes alone when no expansion context is present", () => {
+  it("leaves attributes alone when whereValuesHash has no matching entry", () => {
     const type = makeType(true);
     const model = {
       _encryptedAttributes: new Set(["email"]),
       _attributeDefinitions: new Map([["email", { type }]]),
     };
-    const relation = { _modelClass: model };
+    const relation = { model, whereValuesHash: () => ({}) };
 
-    const originalScopeForCreate = () => ({ email: "plain@example.com" });
-    const result = RelationQueries.scopeForCreate(originalScopeForCreate, relation);
+    const result = RelationQueries.scopeForCreate(() => ({ email: "plain@example.com" }), relation);
     expect(result.email).toBe("plain@example.com");
   });
 
@@ -108,37 +106,68 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
       _encryptedAttributes: new Set(["body"]),
       _attributeDefinitions: new Map([["body", { type }]]),
     };
-    const relation = {
-      _modelClass: model,
-      _encryptionExpansion: { body: [av] },
-    };
+    const relation = { model, whereValuesHash: () => ({ body: [av] }) };
 
-    const originalScopeForCreate = () => ({});
-    const result = RelationQueries.scopeForCreate(originalScopeForCreate, relation);
+    const result = RelationQueries.scopeForCreate(() => ({}), relation);
     expect(result.body).toBeUndefined();
   });
 
-  it("RelationQueries.where stores expansion context on the returned relation", () => {
-    // Need a type with previousTypes so processArguments actually expands the condition.
-    const prevScheme = new Scheme({ deterministic: true, encryptor: new NullEncryptor() });
-    const type = new EncryptedAttributeType({
-      scheme: new Scheme({
-        deterministic: true,
-        encryptor: new NullEncryptor(),
-        previousSchemes: [prevScheme],
-      }),
-    });
+  it("ignores scalar (non-array) where values", () => {
+    const type = makeType(true);
     const model = {
       _encryptedAttributes: new Set(["email"]),
       _attributeDefinitions: new Map([["email", { type }]]),
     };
-    const returnedRelation: any = { _modelClass: model };
-    const originalWhere = (_args: unknown) => returnedRelation;
-    const result = RelationQueries.where(originalWhere, { _modelClass: model }, [
-      { email: "x@example.com" },
-    ]) as any;
-    expect(result._encryptionExpansion).toBeDefined();
-    expect(Array.isArray(result._encryptionExpansion.email)).toBe(true);
-    expect(result._encryptionExpansion.email[0]).toBeInstanceOf(AdditionalValue);
+    const relation = {
+      model,
+      whereValuesHash: () => ({ email: "plain@example.com" }),
+    };
+    const result = RelationQueries.scopeForCreate(() => ({}), relation);
+    expect(result.email).toBeUndefined();
+  });
+
+  it("reads IN-array values from a real Relation via whereValuesHash() (integration)", () => {
+    const adapter = createTestAdapter();
+    class Contact extends Base {
+      static {
+        this._tableName = "contacts";
+        this.attribute("id", "integer");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
+    }
+    const rel = Contact.all().where({ email: ["a@x", "b@x"] });
+    expect(rel.whereValuesHash()).toEqual({ email: ["a@x", "b@x"] });
+    // scope_for_create filters the IN array out (Rails: equality_only=true).
+    expect(rel.scopeForCreate()).toEqual({});
+  });
+
+  it("unwraps AdditionalValue trailers end-to-end on a real Relation", () => {
+    const adapter = createTestAdapter();
+    const type = makeType(true);
+    const prevType = makeType(true);
+
+    class Contact extends Base {
+      static {
+        this._tableName = "contacts";
+        this.attribute("id", "integer");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+      }
+    }
+    (Contact as any)._encryptedAttributes = new Set(["email"]);
+    const defs = (Contact as any)._attributeDefinitions as Map<string, { type: unknown }>;
+    defs.set("email", { type });
+
+    const avCurrent = new AdditionalValue("plain@example.com", type);
+    const avPrev = new AdditionalValue("plain@example.com", prevType);
+    const rel = Contact.all().where({ email: [avCurrent, avPrev] });
+
+    const hash = rel.whereValuesHash();
+    expect(Array.isArray(hash.email)).toBe(true);
+    expect((hash.email as unknown[])[0]).toBe(avCurrent);
+
+    const scope = RelationQueries.scopeForCreate(() => ({}), rel);
+    expect(scope.email).toBe(avCurrent.value);
   });
 });

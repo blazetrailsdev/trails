@@ -252,13 +252,21 @@ describe("RelationTest", () => {
   it("empty where values hash", () => {
     class Post extends Base {
       static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    const rel = Post.all();
-    const hash = (rel as any)._scopeAttributes ? (rel as any)._scopeAttributes() : {};
-    expect(Object.keys(hash).length).toBe(0);
+    expect(Post.all().whereValuesHash()).toEqual({});
+
+    const notEq = Post.all().where(Post.arelTable.get("id").notEq(10)).whereValuesHash();
+    expect(notEq).toEqual({});
+
+    const distinctFrom = Post.all()
+      .where(Post.arelTable.get("id").isDistinctFrom(10))
+      .whereValuesHash();
+    expect(distinctFrom).toEqual({});
   });
 
   it("create with value", async () => {
@@ -416,21 +424,29 @@ describe("RelationTest", () => {
 
   it("has values", () => {
     const Post = makePost();
-    const rel = Post.where({ title: "test" }).limit(5);
-    expect(rel.toSql()).toContain("test");
-    expect(rel.toSql()).toContain("5");
+    const rel = Post.where({ title: "test" });
+    expect(rel.whereValuesHash()).toEqual({ title: "test" });
   });
 
   it("values wrong table", () => {
     const Post = makePost();
-    const sql = Post.where({ title: "test" }).toSql();
-    expect(sql).toContain("posts");
+    class Comment extends Base {
+      static {
+        this._tableName = "comments";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const rel = Post.all().where(Comment.arelTable.get("id").eq(10));
+    expect(rel.whereValuesHash()).toEqual({});
   });
 
   it("tree is not traversed", () => {
     const Post = makePost();
-    const rel = Post.all();
-    expect(rel.isLoaded).toBe(false);
+    const left = Post.arelTable.get("id").eq(10);
+    const right = Post.arelTable.get("id").eq(10);
+    const rel = Post.all().where(left.or(right));
+    expect(rel.whereValuesHash()).toEqual({});
   });
 
   it("create with value with wheres", async () => {
@@ -646,9 +662,8 @@ describe("RelationTest", () => {
 
   it("where values hash with in clause", () => {
     const Post = makePost();
-    const rel = Post.where({ title: "test" });
-    const hash = rel.whereValuesHash();
-    expect(hash.title).toBe("test");
+    const rel = Post.where({ title: ["foo", "bar", "hello"] });
+    expect(rel.whereValuesHash()).toEqual({ title: ["foo", "bar", "hello"] });
   });
 
   it("#values returns a dup of the values", () => {

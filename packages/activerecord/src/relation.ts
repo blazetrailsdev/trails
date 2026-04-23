@@ -2444,7 +2444,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#where_values_hash
    */
   whereValuesHash(): Record<string, unknown> {
-    return this._scopeAttributes();
+    return this._whereClause.toH(this._modelClass.tableName);
   }
 
   // -- Value accessors (for introspection) --
@@ -2554,14 +2554,7 @@ export class Relation<T extends Base> {
 
   /** @internal */
   protected _scopeAttributes(): Record<string, unknown> {
-    const h = this._whereClause.toH(this._modelClass.tableName);
-    const attrs: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(h)) {
-      if (value !== null && !Array.isArray(value) && !(value instanceof Range)) {
-        attrs[key] = value;
-      }
-    }
-    return attrs;
+    return this._whereClause.toH(this._modelClass.tableName, { equalityOnly: true });
   }
 
   // -- Batches --

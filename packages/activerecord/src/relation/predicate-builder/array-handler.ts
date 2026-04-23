@@ -33,10 +33,21 @@ export class ArrayHandler {
       return attribute.in([]);
     }
 
+    // Mirrors Rails' ArrayHandler#call:
+    //   values = value.map { |x| x.is_a?(Base) ? x.id : x }
+    //   nils = values.compact!
+    //   ranges = values.extract! { |v| v.is_a?(Range) }
+    // Everything that isn't a Base record, nil, or Range stays in `values`,
+    // including arbitrary objects like AdditionalValue (for encrypted
+    // deterministic queries). A single remaining value is routed through
+    // `predicateBuilder.build(...)` (typically producing an Equality);
+    // multiple values use the In/HomogeneousIn branch. Passing Relations
+    // inside the array is unsupported here — Rails would likewise fail
+    // to serialize them inside HomogeneousIn; use `where(col: relation)`
+    // for subqueries instead.
     const scalarValues: unknown[] = [];
     let hasNull = false;
     const ranges: Range[] = [];
-    const nonScalarValues: unknown[] = [];
 
     for (const item of value) {
       if (item === null || item === undefined) {
@@ -44,15 +55,14 @@ export class ArrayHandler {
       } else if (item instanceof Range) {
         ranges.push(item);
       } else if (typeof item === "object" && item !== null && "id" in item) {
-        scalarValues.push((item as any).id);
-      } else if (typeof item === "object" || typeof item === "function") {
-        nonScalarValues.push(item);
+        // Rails: `x.is_a?(Base) ? x.id : x` — flatten AR records to their PK.
+        // Duck-typed on `id` presence to avoid a circular import on Base.
+        scalarValues.push((item as { id: unknown }).id);
       } else {
         scalarValues.push(item);
       }
     }
 
-    // Build the scalar values predicate, using NullPredicate as sentinel
     let valuesPredicate: Nodes.Node | typeof NullPredicate;
     if (scalarValues.length === 0) {
       valuesPredicate = NullPredicate;
@@ -62,14 +72,6 @@ export class ArrayHandler {
       valuesPredicate = attribute.in(scalarValues);
     }
 
-    // Fold in non-scalar values (e.g. Relations → subqueries) via PredicateBuilder
-    for (const v of nonScalarValues) {
-      const pred = this.predicateBuilder.build(attribute, v);
-      valuesPredicate =
-        valuesPredicate === NullPredicate ? pred : groupedOr(valuesPredicate as Nodes.Node, pred);
-    }
-
-    // Fold in NULL with Grouping to preserve precedence
     if (hasNull) {
       valuesPredicate =
         valuesPredicate === NullPredicate
@@ -77,7 +79,6 @@ export class ArrayHandler {
           : groupedOr(valuesPredicate as Nodes.Node, attribute.isNull());
     }
 
-    // Fold in ranges with Grouping to preserve precedence
     if (ranges.length === 0) {
       return valuesPredicate === NullPredicate ? attribute.in([]) : (valuesPredicate as Nodes.Node);
     }

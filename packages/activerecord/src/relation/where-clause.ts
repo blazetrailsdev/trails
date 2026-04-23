@@ -119,9 +119,9 @@ export class WhereClause {
     return attrs;
   }
 
-  toH(tableName?: string): Record<string, unknown> {
+  toH(tableName?: string, opts: { equalityOnly?: boolean } = {}): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    for (const node of equalities(this.predicates)) {
+    for (const node of equalities(this.predicates, opts.equalityOnly ?? false)) {
       const attr = fetchAttributeNode(node);
       if (attr === null) continue;
       if (tableName !== undefined && attr.relation.name !== tableName) continue;
@@ -169,13 +169,16 @@ function fetchAttributeNode(node: Nodes.Node): Nodes.Attribute | null {
   return null;
 }
 
-function equalities(predicates: Nodes.Node[]): Nodes.Node[] {
+function equalities(predicates: Nodes.Node[], equalityOnly: boolean): Nodes.Node[] {
   const result: Nodes.Node[] = [];
   for (const node of predicates) {
-    if (typeof (node as any).isEquality === "function" && (node as any).isEquality()) {
+    const matches = equalityOnly
+      ? node instanceof Nodes.Equality
+      : typeof (node as any).isEquality === "function" && (node as any).isEquality();
+    if (matches) {
       result.push(node);
     } else if (node instanceof Nodes.And) {
-      result.push(...equalities((node as any).children));
+      result.push(...equalities((node as any).children, equalityOnly));
     }
   }
   return result;
