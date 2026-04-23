@@ -191,16 +191,22 @@ Hand-written, no tooling.
 ### Files to add
 
 1. `scripts/parity/fixtures/01-trivial/schema.sql` — one table `users`:
-   `id INTEGER PRIMARY KEY`, `email TEXT NOT NULL`,
-   `name TEXT`, `created_at DATETIME NOT NULL`,
-   `active INTEGER NOT NULL DEFAULT 1`.
+   `id INTEGER PRIMARY KEY`, `email TEXT NOT NULL`, `name TEXT`,
+   `score REAL`, `avatar BLOB`, `created_at DATETIME NOT NULL`,
+   `active INTEGER NOT NULL DEFAULT 1`. Covers all six SQLite storage
+   classes Rails maps to abstract types: integer, text, real, blob,
+   datetime, and boolean-as-integer.
 2. `scripts/parity/fixtures/01-trivial/expected.json` —
    `{ "tables": ["users"], "indexCount": 0 }`.
-3. `scripts/parity/fixtures/02-moderate/schema.sql` — two or three
-   tables: `authors` (PK, `name TEXT NOT NULL UNIQUE`), `posts` (PK,
+3. `scripts/parity/fixtures/02-moderate/schema.sql` — two tables:
+   `authors` (PK, `name TEXT NOT NULL UNIQUE`, `bio TEXT`,
+   `created_at DATETIME NOT NULL`), `posts` (PK,
    `author_id INTEGER NOT NULL REFERENCES authors(id)`,
-   `title TEXT NOT NULL`, `published_at DATETIME`), plus one explicit
+   `title TEXT NOT NULL`, `body TEXT`, `published_at DATETIME`,
+   `view_count INTEGER NOT NULL DEFAULT 0`), plus one explicit
    `CREATE INDEX idx_posts_published_at ON posts(published_at)`.
+   Extra columns beyond the bare minimum provide additional type and
+   nullability coverage without complicating the fixture structure.
    v1 canonical does **not** cover FKs (deferred); the FK in SQL is
    kept deliberately so the fixture doesn't need reshaping when v2 adds
    FK support. Both canonicalizers silently ignore FK info in v1.
