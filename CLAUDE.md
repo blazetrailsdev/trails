@@ -96,7 +96,9 @@ When NOT to use this:
 - Do use worktrees for any changes; leave the default worktree for the user.
   Always create them with the `EnterWorktree` skill so they land under
   `.claude/worktrees/` (gitignored) instead of scattered under `/tmp` or
-  beside the repo. Do NOT run `git worktree add` directly.
+  beside the repo. Do NOT run `git worktree add` directly — the
+  `WorktreeCreate` hook in `.claude/settings.json` handles worktree creation,
+  runs `pnpm install`, and symlinks vendored Rails/Rack sources automatically.
 - Open new PRs in **draft** status.
 - After opening a PR, run the `/link` skill with the PR number so webhook
   notifications (Copilot reviews, CI failures) are delivered to this pane.

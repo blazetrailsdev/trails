@@ -18,6 +18,13 @@ export interface MethodInfo {
   deps?: string[];
   depRefs?: Record<string, string[]>;
   calls?: string[];
+  /**
+   * True when the method is not part of the public API surface:
+   * Ruby `private`/`protected`, TS `private`/`protected`, or
+   * TS `#`-prefixed private fields. Consumers should filter these
+   * out of normal coverage and only include them behind an opt-in flag.
+   */
+  internal?: boolean;
 }
 
 export interface ClassInfo {

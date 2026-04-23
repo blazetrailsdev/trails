@@ -240,20 +240,29 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
       const mixinMethods: MethodInfo[] = [];
 
       for (const prop of instanceType.getProperties()) {
-        if (prop.name.startsWith("#")) continue;
         if (prop.flags & ts.SymbolFlags.Prototype) continue;
         const decl = prop.valueDeclaration ?? prop.declarations?.[0];
         if (!decl) continue;
-        if (hasModifier(decl, ts.SyntaxKind.PrivateKeyword)) continue;
-        if (hasModifier(decl, ts.SyntaxKind.ProtectedKeyword)) continue;
+        // `#private` fields surface in the symbol table with their
+        // mangled name, not a literal leading `#`, so derive the flag
+        // from the declaration's name node (same approach as `getVisibility`
+        // below and the top-level class walker at line 707/727).
+        const declNameNode = (decl as ts.NamedDeclaration).name;
+        const isPrivateField = !!declNameNode && ts.isPrivateIdentifier(declNameNode);
+        const hasPrivateMod = hasModifier(decl, ts.SyntaxKind.PrivateKeyword);
+        const hasProtectedMod = hasModifier(decl, ts.SyntaxKind.ProtectedKeyword);
+        const visibility: "public" | "private" | "protected" =
+          isPrivateField || hasPrivateMod ? "private" : hasProtectedMod ? "protected" : "public";
+        const internal = visibility !== "public";
         const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
         mixinMethods.push({
           name: prop.name,
-          visibility: "public",
+          visibility,
           params: [],
           isStatic: false,
           line,
           file: relPath,
+          ...(internal ? { internal: true } : {}),
         });
       }
 
@@ -435,9 +444,6 @@ function extractClass(
   }
 
   for (const member of node.members) {
-    // Skip private/protected members
-    if (hasModifier(member, ts.SyntaxKind.PrivateKeyword)) continue;
-    if (hasModifier(member, ts.SyntaxKind.ProtectedKeyword)) continue;
     const memberName = getMemberName(member);
     // Skip _-prefixed non-method members (backing fields), but keep _-prefixed methods
     // since Rails has public methods like _load_from, _reflect_on_association, etc.
@@ -449,6 +455,8 @@ function extractClass(
     )
       continue;
 
+    const visibility = memberVisibility(member);
+    const internal = visibility !== "public";
     const isStatic = hasModifier(member, ts.SyntaxKind.StaticKeyword);
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;
 
@@ -456,11 +464,12 @@ function extractClass(
       const params = extractParameters(member.parameters);
       const method: MethodInfo = {
         name: memberName,
-        visibility: "public",
+        visibility,
         params,
         line,
         file,
         isStatic,
+        ...(internal ? { internal: true } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -471,19 +480,21 @@ function extractClass(
       const params = extractParameters(member.parameters);
       instanceMethods.push({
         name: "constructor",
-        visibility: "public",
+        visibility,
         params,
         line,
         file,
+        ...(internal ? { internal: true } : {}),
       });
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
       const method: MethodInfo = {
         name: memberName,
-        visibility: "public",
+        visibility,
         params: [],
         line,
         file,
         isStatic,
+        ...(internal ? { internal: true } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -494,11 +505,12 @@ function extractClass(
       const params = extractParameters(member.parameters);
       const method: MethodInfo = {
         name: memberName,
-        visibility: "public",
+        visibility,
         params,
         line,
         file,
         isStatic,
+        ...(internal ? { internal: true } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -510,11 +522,12 @@ function extractClass(
       // Only record them if they're not readonly (readonly = getter only conceptually)
       const method: MethodInfo = {
         name: memberName,
-        visibility: "public",
+        visibility,
         params: [],
         line,
         file,
         isStatic,
+        ...(internal ? { internal: true } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -696,6 +709,9 @@ function getMemberName(member: ts.ClassElement): string | undefined {
     if (ts.isIdentifier(member.name)) {
       return member.name.text;
     }
+    if (ts.isPrivateIdentifier(member.name)) {
+      return member.name.text;
+    }
     if (ts.isStringLiteral(member.name)) {
       return member.name.text;
     }
@@ -704,6 +720,17 @@ function getMemberName(member: ts.ClassElement): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Returns the effective visibility of a class member, treating
+ * `#`-prefixed private fields as `private`.
+ */
+function memberVisibility(member: ts.ClassElement): "public" | "private" | "protected" {
+  if (hasModifier(member, ts.SyntaxKind.PrivateKeyword)) return "private";
+  if (hasModifier(member, ts.SyntaxKind.ProtectedKeyword)) return "protected";
+  if (member.name && ts.isPrivateIdentifier(member.name)) return "private";
+  return "public";
 }
 
 function isExported(node: ts.Node): boolean {

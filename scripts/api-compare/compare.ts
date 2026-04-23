@@ -258,6 +258,16 @@ export function superclassesMatch(
   return tsChain.some((ancestor) => nameMatches(rubySuper, ancestor));
 }
 
+/**
+ * Whether a given method belongs to the current comparison bucket.
+ * Default mode (showPrivates=false) keeps only public API methods; with
+ * `--privates` the comparison runs exclusively against internal methods.
+ * Exported so compare.test.ts can pin the filter semantics.
+ */
+export function methodInMode(m: MethodInfo, showPrivates: boolean): boolean {
+  return showPrivates ? m.internal === true : m.internal !== true;
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -278,6 +288,12 @@ function main() {
   const showFiles = args.includes("--files");
   const showIncomplete = args.includes("--incomplete");
   const showInheritance = args.includes("--inheritance");
+  // When --privates is passed, the comparison runs against internal-only
+  // methods (Ruby `private`/`protected`, TS `private`/`protected`,
+  // `#`-prefixed fields). Without it, internal methods are filtered out
+  // and the numbers match the historical public-API coverage.
+  const showPrivates = args.includes("--privates");
+  const methodMatchesMode = (m: MethodInfo): boolean => methodInMode(m, showPrivates);
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
   const tsPath = path.join(OUTPUT_DIR, "ts-api.json");
@@ -309,6 +325,7 @@ function main() {
         const file = cls.file || "";
         const methods = tsMethodsByFile.get(file) || new Set();
         for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
+          if (!methodMatchesMode(m)) continue;
           methods.add(m.name);
         }
         tsMethodsByFile.set(file, methods);
@@ -322,6 +339,7 @@ function main() {
         for (const [file, fns] of Object.entries(tsPkg.fileFunctions)) {
           const methods = tsMethodsByFile.get(file) || new Set();
           for (const fn of fns) {
+            if (!methodMatchesMode(fn)) continue;
             methods.add(fn.name);
           }
           tsMethodsByFile.set(file, methods);
@@ -378,6 +396,7 @@ function main() {
 
         const methods = new Set<string>();
         for (const m of [...entity.instanceMethods, ...entity.classMethods]) {
+          if (!methodMatchesMode(m)) continue;
           methods.add(m.name);
         }
 
@@ -592,6 +611,7 @@ function main() {
       for (const item of items) {
         const rubyMethods = [...item.info.instanceMethods, ...item.info.classMethods];
         for (const rm of rubyMethods) {
+          if (!methodMatchesMode(rm)) continue;
           const tsCandidates = rubyMethodToTs(rm.name);
           if (tsCandidates === null) continue;
           const key = tsCandidates[0];
@@ -794,14 +814,24 @@ function main() {
     });
   }
 
-  // Write JSON
-  const jsonPath = path.join(OUTPUT_DIR, "api-comparison.json");
+  // Write JSON. Separate file for the --privates run so the public artifact
+  // isn't clobbered when both run back-to-back in CI.
+  const jsonFilename = showPrivates ? "api-comparison-privates.json" : "api-comparison.json";
+  const jsonPath = path.join(OUTPUT_DIR, jsonFilename);
   fs.writeFileSync(
     jsonPath,
     JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
   );
 
-  printReport(results, showMissing, showFiles, filterPkg, showIncomplete, showInheritance);
+  printReport(
+    results,
+    showMissing,
+    showFiles,
+    filterPkg,
+    showIncomplete,
+    showInheritance,
+    showPrivates,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -815,7 +845,14 @@ function printReport(
   filterPkg: string | null,
   showIncomplete = false,
   showInheritance = false,
+  showPrivates = false,
 ) {
+  if (showPrivates) {
+    console.log(
+      `\n  (comparing internal/private API surface — ` +
+        `Ruby private/protected, TS private/protected, TS #-prefixed fields)`,
+    );
+  }
   let grandTotal = 0;
   let grandMatched = 0;
   let grandFiles = 0;

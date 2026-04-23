@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { nameMatches, superclassesMatch, resolveTsClassForRuby } from "./compare.js";
-import type { ClassInfo } from "./types.js";
+import { nameMatches, superclassesMatch, resolveTsClassForRuby, methodInMode } from "./compare.js";
+import type { ClassInfo, MethodInfo } from "./types.js";
 
 function cls(file: string, name: string, superclass?: string): ClassInfo {
   return {
@@ -172,5 +172,32 @@ describe("resolveTsClassForRuby", () => {
 
   it("returns undefined when nothing resolves", () => {
     expect(resolveTsClassForRuby("Nothing", "nowhere.ts", new Map())).toBeUndefined();
+  });
+});
+
+describe("methodInMode", () => {
+  const method = (internal?: boolean): MethodInfo => ({
+    name: "foo",
+    visibility: internal ? "private" : "public",
+    params: [],
+    ...(internal ? { internal: true } : {}),
+  });
+
+  it("keeps public methods when --privates is off", () => {
+    expect(methodInMode(method(false), false)).toBe(true);
+    expect(methodInMode(method(true), false)).toBe(false);
+  });
+
+  it("keeps only internal methods when --privates is on", () => {
+    expect(methodInMode(method(true), true)).toBe(true);
+    expect(methodInMode(method(false), true)).toBe(false);
+  });
+
+  it("treats missing internal flag as public", () => {
+    // Legacy fixture manifests may not set `internal` at all; those
+    // methods must count toward the public surface, not drop out.
+    const bare: MethodInfo = { name: "x", visibility: "public", params: [] };
+    expect(methodInMode(bare, false)).toBe(true);
+    expect(methodInMode(bare, true)).toBe(false);
   });
 });

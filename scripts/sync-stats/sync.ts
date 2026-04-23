@@ -235,6 +235,19 @@ class ApiCompareStat extends Base {
   }
 }
 
+class ApiComparePrivatesStat extends Base {
+  static {
+    this.tableName = "api_compare_privates_stats";
+    this.attribute("merge_commit_sha", "string");
+    this.attribute("pr_number", "integer");
+    this.attribute("package", "string");
+    this.attribute("matched", "integer");
+    this.attribute("total", "integer");
+    this.attribute("percent", "float");
+    this.attribute("missing", "integer", { default: 0 });
+  }
+}
+
 class CompareLog extends Base {
   static {
     this.tableName = "compare_logs";
@@ -462,6 +475,19 @@ async function migrateDb(adapter: SQLite3Adapter) {
       });
     }
 
+    if (!(await tableExists(adapter, "api_compare_privates_stats"))) {
+      await ctx.createTable("api_compare_privates_stats", {}, (t) => {
+        t.string("merge_commit_sha");
+        t.integer("pr_number");
+        t.string("package");
+        t.integer("matched");
+        t.integer("total");
+        t.float("percent");
+        t.integer("missing", { default: 0 });
+        t.index(["merge_commit_sha", "package"], { unique: true });
+      });
+    }
+
     return;
   }
 
@@ -649,6 +675,17 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.integer("total");
       t.float("percent");
       t.integer("misplaced", { default: 0 });
+      t.integer("missing", { default: 0 });
+      t.index(["merge_commit_sha", "package"], { unique: true });
+    });
+
+    await ctx.createTable("api_compare_privates_stats", {}, (t) => {
+      t.string("merge_commit_sha");
+      t.integer("pr_number");
+      t.string("package");
+      t.integer("matched");
+      t.integer("total");
+      t.float("percent");
       t.integer("missing", { default: 0 });
       t.index(["merge_commit_sha", "package"], { unique: true });
     });
@@ -1399,7 +1436,7 @@ function extractStepLogs(rawLog: string): Map<string, string> {
     let stepName: string | null = null;
 
     if (command.includes("api-compare/compare.ts")) {
-      stepName = "api_compare";
+      stepName = command.includes("--privates") ? "api_compare_privates" : "api_compare";
     } else if (
       command.includes("test-compare/test-compare.ts") ||
       command.includes("test-compare/convention-compare.ts")
@@ -1665,8 +1702,12 @@ async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
         SELECT 1 FROM api_compare_stats acs
         WHERE acs.merge_commit_sha = rjl.merge_commit_sha
       )
+      OR NOT EXISTS (
+        SELECT 1 FROM api_compare_privates_stats acps
+        WHERE acps.merge_commit_sha = rjl.merge_commit_sha
+      )
       OR EXISTS (
-        WITH expected(step_name) AS (VALUES ('api_compare'), ('test_compare'))
+        WITH expected(step_name) AS (VALUES ('api_compare'), ('api_compare_privates'), ('test_compare'))
         SELECT 1 FROM expected e
         LEFT JOIN compare_logs cl
           ON cl.merge_commit_sha = rjl.merge_commit_sha AND cl.step_name = e.step_name
@@ -1729,7 +1770,12 @@ async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
       );
     }
 
-    const apiStats = parseApiCompareFromLogs(logs);
+    // Parse the public-API step in isolation so the privates step (same log
+    // format, appended below it) doesn't overwrite entries.
+    const apiStepLog = stepLogs.get("api_compare") ?? "";
+    const apiStats = apiStepLog
+      ? parseApiCompareFromLogs(apiStepLog)
+      : parseApiCompareFromLogs(logs);
     if (apiStats.size > 0) {
       await ApiCompareStat.upsertAll(
         [...apiStats.entries()].map(([pkg, s]) => ({
@@ -1746,13 +1792,36 @@ async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
       );
     }
 
-    if (stepLogs.size > 0 || testStats.size > 0 || apiStats.size > 0) {
+    const apiPrivatesStepLog = stepLogs.get("api_compare_privates") ?? "";
+    const apiPrivatesStats = apiPrivatesStepLog
+      ? parseApiCompareFromLogs(apiPrivatesStepLog)
+      : parseApiCompareFromLogs("");
+    if (apiPrivatesStats.size > 0) {
+      await ApiComparePrivatesStat.upsertAll(
+        [...apiPrivatesStats.entries()].map(([pkg, s]) => ({
+          merge_commit_sha: headSha,
+          pr_number: prNumber,
+          package: pkg,
+          matched: s.matched,
+          total: s.total,
+          percent: s.percent,
+          missing: s.missing,
+        })),
+        { uniqueBy: ["merge_commit_sha", "package"] },
+      );
+    }
+
+    if (stepLogs.size > 0 || testStats.size > 0 || apiStats.size > 0 || apiPrivatesStats.size > 0) {
       parsed++;
       const totalTests = [...testStats.values()].reduce((sum, s) => sum + s.matched, 0);
       const totalApi = [...apiStats.values()].reduce((sum, s) => sum + s.matched, 0);
+      const totalApiPrivates = [...apiPrivatesStats.values()].reduce(
+        (sum, s) => sum + s.matched,
+        0,
+      );
       const logSteps = [...stepLogs.keys()].join(", ");
       console.log(
-        `  PR #${prNumber}: ${testStats.size} test packages (${totalTests} matched), ${apiStats.size} api packages (${totalApi} matched), logs: [${logSteps}]`,
+        `  PR #${prNumber}: ${testStats.size} test packages (${totalTests} matched), ${apiStats.size} api packages (${totalApi} matched), ${apiPrivatesStats.size} api-privates packages (${totalApiPrivates} matched), logs: [${logSteps}]`,
       );
     }
   }
@@ -1781,6 +1850,7 @@ async function printSummary() {
     stepCount,
     testStatCount,
     apiStatCount,
+    apiPrivatesStatCount,
     logCount,
     rawLogCount,
   ] = await Promise.all([
@@ -1790,6 +1860,7 @@ async function printSummary() {
     count("workflow_steps"),
     countDistinct("test_compare_stats", "merge_commit_sha"),
     countDistinct("api_compare_stats", "merge_commit_sha"),
+    countDistinct("api_compare_privates_stats", "merge_commit_sha"),
     countDistinct("compare_logs", "merge_commit_sha"),
     count("raw_job_logs"),
   ]);
@@ -1838,6 +1909,7 @@ async function printSummary() {
   console.log(`  Workflow steps: ${stepCount}`);
   console.log(`  Commits with test:compare stats: ${testStatCount}`);
   console.log(`  Commits with api:compare stats: ${apiStatCount}`);
+  console.log(`  Commits with api:compare --privates stats: ${apiPrivatesStatCount}`);
   console.log(`  Commits with compare logs: ${logCount}`);
   console.log(`  Database: ${DB_PATH}`);
 
@@ -1875,6 +1947,28 @@ async function printSummary() {
   if (latestApiStats.length > 0) {
     console.log("\n  Latest api:compare:");
     for (const row of latestApiStats) {
+      const pkg = row.readAttribute("package");
+      const matched = row.readAttribute("matched");
+      const total = row.readAttribute("total");
+      const percent = row.readAttribute("percent");
+      const missing = row.readAttribute("missing") as number;
+      const missStr = missing > 0 ? ` (${missing} missing)` : "";
+      console.log(`    ${pkg}: ${matched}/${total} (${percent}%)${missStr}`);
+    }
+  }
+
+  const latestApiPrivatesStats = await ApiComparePrivatesStat.findBySql(`
+    SELECT package, matched, total, percent, missing
+    FROM api_compare_privates_stats
+    WHERE merge_commit_sha = (
+      SELECT merge_commit_sha FROM api_compare_privates_stats ORDER BY pr_number DESC LIMIT 1
+    )
+    ORDER BY package
+  `);
+
+  if (latestApiPrivatesStats.length > 0) {
+    console.log("\n  Latest api:compare --privates:");
+    for (const row of latestApiPrivatesStats) {
       const pkg = row.readAttribute("package");
       const matched = row.readAttribute("matched");
       const total = row.readAttribute("total");

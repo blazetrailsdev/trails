@@ -396,13 +396,16 @@ class ApiExtractor
 
     case cmd_name
     when "private", "protected", "public"
-      # Check if it's a visibility modifier with no args (changes default)
-      # or with args (modifies specific methods)
+      # No-args form (`private`) flips the default visibility for the scope.
+      # Symbol-args form (`private :foo, :bar`) retroactively marks those
+      # named methods — without this, methods defined above as public would
+      # stay tagged public, causing them to be misclassified.
       if args.nil? || (args.is_a?(Array) && args[0] == :args_new)
         @visibility_stack[-1] = cmd_name.to_sym
+      else
+        names = extract_symbol_args(args)
+        apply_visibility_to_named(names, cmd_name.to_sym) unless names.empty?
       end
-      # If it has args, it modifies specific methods — we handle this by
-      # not changing default visibility
     when "include"
       process_include(args)
     when "extend"
@@ -444,12 +447,18 @@ class ApiExtractor
       cmd_name = ident_name(node[1][1])
       case cmd_name
       when "private", "protected", "public"
-        # This is the inline form: private def foo; end
-        # The method is already defined, we need to mark it
-        # For simplicity, handle the case where the arg is a def
+        # Either inline `private def foo; end` (recurse so the def is
+        # visited under the adjusted visibility) or the paren symbol form
+        # `private(:foo, :bar)` which retroactively marks named methods.
         args = node[2]
-        if args.is_a?(Array)
-          walk(args)
+        names = args.is_a?(Array) ? extract_symbol_args_from_paren(args) : []
+        if names.empty?
+          prev_vis = @visibility_stack[-1]
+          @visibility_stack[-1] = cmd_name.to_sym
+          walk(args) if args.is_a?(Array)
+          @visibility_stack[-1] = prev_vis
+        else
+          apply_visibility_to_named(names, cmd_name.to_sym)
         end
       when "attr_reader", "attr_writer", "attr_accessor"
         process_attr_from_arg_paren(node[2], cmd_name)
@@ -463,6 +472,17 @@ class ApiExtractor
     else
       walk(node[1]) if node[1].is_a?(Array)
       walk(node[2]) if node[2].is_a?(Array)
+    end
+  end
+
+  def apply_visibility_to_named(names, vis)
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+
+    bucket = @in_sclass ? :classMethods : :instanceMethods
+    target[bucket].each do |m|
+      m[:visibility] = vis.to_s if names.include?(m[:name])
     end
   end
 
@@ -882,15 +902,16 @@ def run
       extractor.process_file(filepath, pkg_dir)
     end
 
-    # Filter to only public methods
+    # Preserve every method; non-public methods are tagged with
+    # `internal: true` so --privates mode can select them.
     classes = {}
     extractor.classes.each do |fqn, info|
-      classes[fqn] = filter_public(info)
+      classes[fqn] = tag_visibility(info)
     end
 
     modules = {}
     extractor.modules.each do |fqn, info|
-      modules[fqn] = filter_public(info)
+      modules[fqn] = tag_visibility(info)
     end
 
     manifest[:packages][pkg_name] = {
@@ -905,7 +926,7 @@ def run
     module_count = data[:modules].length
     method_count = data[:classes].values.sum { |c| c[:instanceMethods].length + c[:classMethods].length } +
                    data[:modules].values.sum { |m| m[:instanceMethods].length + m[:classMethods].length }
-    puts "  #{pkg}: #{class_count} classes, #{module_count} modules, #{method_count} public methods"
+    puts "  #{pkg}: #{class_count} classes, #{module_count} modules, #{method_count} methods (public + internal)"
   end
 
   output_path = File.join(OUTPUT_DIR, "rails-api.json")
@@ -913,7 +934,17 @@ def run
   puts "\nWritten to #{output_path}"
 end
 
-def filter_public(info)
+def tag_internal(methods)
+  methods.map do |m|
+    if m[:visibility] == "public"
+      m
+    else
+      m.merge(internal: true)
+    end
+  end
+end
+
+def tag_visibility(info)
   {
     name: info[:name],
     fqn: info[:fqn],
@@ -921,8 +952,8 @@ def filter_public(info)
     file: info[:file],
     includes: info[:includes].uniq,
     extends: info[:extends].uniq,
-    instanceMethods: info[:instanceMethods].select { |m| m[:visibility] == "public" },
-    classMethods: info[:classMethods].select { |m| m[:visibility] == "public" },
+    instanceMethods: tag_internal(info[:instanceMethods]),
+    classMethods: tag_internal(info[:classMethods]),
   }
 end
 
