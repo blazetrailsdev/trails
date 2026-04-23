@@ -1,5 +1,6 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
+import { pendingCounterCacheColumns } from "./counter-cache-state.js";
 
 /**
  * Counter cache operations for ActiveRecord models.
@@ -157,49 +158,55 @@ export async function resetCounters(
 }
 
 /**
- * Check whether a column is a counter-cache column — i.e. any belongs_to
- * association on this class was declared with `counter_cache:` that
- * resolves to this column name.
+ * Check whether a column is a counter-cache column on this model — i.e. some
+ * other model's belongs_to targets this model with counter_cache: enabled,
+ * and the resolved counter column name matches.  Registration happens in the
+ * belongs_to builder (mirroring Rails' builder/belongs_to.rb), eagerly when
+ * the target class is already registered or via a pending map otherwise.
  *
  * Mirrors: ActiveRecord::CounterCache::ClassMethods#counter_cache_column?
- * (The `Q` suffix mirrors Ruby's `?` predicate convention.)
  */
-export function counterCacheColumnQ(this: typeof Base, columnName: string): boolean {
+export function isCounterCacheColumn(this: typeof Base, columnName: string): boolean {
   const counterCols = getCounterCacheColumns(this);
   return counterCols.has(columnName);
 }
 
 /**
- * Eagerly populate the cached set of counter-cache columns from
- * `belongs_to` reflections that have `counter_cache` enabled.
- *
- * Mirrors the column-set bookkeeping that Rails'
- * `ActiveRecord::CounterCache#load_schema!` performs (a private extension
- * point inside `ClassMethods`). Not currently part of `ClassMethods`
- * because, like in Rails, it's an internal hook into the schema loader
- * rather than a user-facing class method — `counterCacheColumnQ` lazily
- * primes the same cache via `getCounterCacheColumns` on first read.
+ * Flush any pending counter-cache column registrations for this class,
+ * mirroring the bookkeeping Rails' `ActiveRecord::CounterCache#load_schema!`
+ * triggers.  Called by `registerModel` so that pending entries accumulated
+ * before the target class was registered are applied deterministically.
  */
 export function loadSchemaBang(this: typeof Base): void {
   getCounterCacheColumns(this);
 }
 
+/**
+ * Merge any pending counter-cache column registrations for a newly registered
+ * model class.  Called by `registerModel` so entries accumulated before the
+ * target was in the registry are applied immediately rather than on first read.
+ */
+export function flushPendingCounterCacheColumns(modelClass: typeof Base): void {
+  getCounterCacheColumns(modelClass);
+}
+
 function getCounterCacheColumns(modelClass: typeof Base): Set<string> {
-  const cached = (modelClass as any)._counterCacheColumns;
-  if (cached) return cached;
-  const cols = new Set<string>();
-  const associations: any[] = (modelClass as any)._associations ?? [];
-  for (const assoc of associations) {
-    if (assoc.type === "belongsTo" && assoc.options?.counterCache) {
-      const col =
-        typeof assoc.options.counterCache === "string"
-          ? assoc.options.counterCache
-          : `${assoc.name}_count`;
-      cols.add(col);
-    }
+  const direct: Set<string> = (modelClass as any)._counterCacheColumns ?? new Set<string>();
+  // Collect matching pending keys: exact class name, registry aliases, or "::ClassName" suffix.
+  const registryKeys: string[] = (modelClass as any)._registryKeys ?? [];
+  const suffix = `::${modelClass.name}`;
+  const matchingKeys: string[] = [];
+  for (const key of pendingCounterCacheColumns.keys()) {
+    if (key === modelClass.name || registryKeys.includes(key) || key.endsWith(suffix))
+      matchingKeys.push(key);
   }
-  (modelClass as any)._counterCacheColumns = cols;
-  return cols;
+  if (matchingKeys.length === 0) return direct;
+  for (const key of matchingKeys) {
+    for (const col of pendingCounterCacheColumns.get(key)!) direct.add(col);
+    pendingCounterCacheColumns.delete(key);
+  }
+  (modelClass as any)._counterCacheColumns = direct;
+  return direct;
 }
 
 /**
@@ -211,5 +218,5 @@ export const ClassMethods = {
   decrementCounter,
   updateCounters,
   resetCounters,
-  counterCacheColumnQ,
+  isCounterCacheColumn,
 };

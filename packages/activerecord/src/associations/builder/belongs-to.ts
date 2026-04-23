@@ -1,7 +1,8 @@
-import { underscore } from "@blazetrails/activesupport";
+import { underscore, pluralize, camelize } from "@blazetrails/activesupport";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
-import { resolveModel } from "../../associations.js";
+import { resolveModel, modelRegistry } from "../../associations.js";
+import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 
 /**
  * Mirrors: ActiveRecord::Associations::Builder::BelongsTo
@@ -53,6 +54,27 @@ export class BelongsTo extends SingularAssociation {
 
   static addCounterCacheCallbacks(model: any, reflection: any): void {
     const name = reflection.name;
+
+    // Register the counter column on the target class so isCounterCacheColumn
+    // works on the has-many side — mirrors Rails' builder/belongs_to.rb line:
+    //   klass._counter_cache_columns |= [cache_column]
+    const cacheColumn: string =
+      typeof reflection.counterCacheColumn === "function"
+        ? (reflection.counterCacheColumn() ?? `${pluralize(underscore(model.name))}_count`)
+        : `${pluralize(underscore(model.name))}_count`;
+    const targetClassName = reflection.options?.className ?? camelize(name);
+    if (modelRegistry.has(targetClassName)) {
+      const targetClass = resolveModel(targetClassName);
+      const existing: Set<string> = (targetClass as any)._counterCacheColumns ?? new Set();
+      existing.add(cacheColumn);
+      (targetClass as any)._counterCacheColumns = existing;
+    } else {
+      // Target class not registered yet — store in pending map; registerModel
+      // flushes it when the target is registered, getCounterCacheColumns as fallback.
+      const pending = pendingCounterCacheColumns.get(targetClassName) ?? new Set<string>();
+      pending.add(cacheColumn);
+      pendingCounterCacheColumns.set(targetClassName, pending);
+    }
 
     // Rails only registers after_update in add_counter_cache_callbacks.
     // Create/destroy counter handling is done by updateCounterCaches()

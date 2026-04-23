@@ -1576,7 +1576,27 @@ describe("CounterCacheTest", () => {
     expect(reloaded.updated_at).not.toBeNull();
     expect(reloaded.written_on).not.toBeNull();
   });
-  it.skip("counter_cache_column?", () => {});
+  it("counter_cache_column?", () => {
+    class Car extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Person extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("cars_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    // Person has a hasMany :cars — the counter_cache column lives on Person
+    Associations.belongsTo.call(Car, "person", { counterCache: true });
+
+    expect(Person.isCounterCacheColumn("cars_count")).toBe(true);
+    expect(Car.isCounterCacheColumn("cars_count")).toBe(false);
+    expect(Person.isCounterCacheColumn("name")).toBe(false);
+  });
 });
 
 describe("counter_cache", () => {
