@@ -139,7 +139,8 @@ function buildScheme(options: EncryptsOptions): Scheme {
     schemeOptions.ignoreCase !== undefined ||
     schemeOptions.previousSchemes !== undefined ||
     schemeOptions.compress !== undefined ||
-    schemeOptions.compressor !== undefined;
+    schemeOptions.compressor !== undefined ||
+    schemeOptions.supportUnencryptedData !== undefined;
 
   if (hasSchemeOptions) {
     return new Scheme(schemeOptions);
