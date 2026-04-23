@@ -101,6 +101,55 @@ export function quotedBinaryString(value: Buffer): string {
   return `x'${value.toString("hex")}'`;
 }
 
+export function quotedBinary(value: Buffer | string): string {
+  const hex = Buffer.isBuffer(value)
+    ? value.toString("hex")
+    : Buffer.from(value, "binary").toString("hex");
+  return `x'${hex}'`;
+}
+
+export function unquoteIdentifier(identifier: string | null | undefined): string | null {
+  if (identifier && identifier.startsWith("`") && identifier.endsWith("`")) {
+    return identifier.slice(1, -1).replace(/``/g, "`");
+  }
+  return identifier ?? null;
+}
+
+export function castBoundValue(value: unknown): unknown {
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (value === true) return "1";
+  if (value === false) return "0";
+  return value;
+}
+
+// Mirrors Rails' MySQL::Quoting.column_name_matcher. JS can't replicate Ruby's
+// recursive \g<n> back-references, so we limit function arguments to plain
+// identifiers and column references (no nested expressions), which is stricter
+// than Rails but prevents injection via function call arguments.
+export function columnNameMatcher(): RegExp {
+  const id = String.raw`(?:\w+|` + "`" + String.raw`\w+` + "`" + String.raw`)`;
+  const col = String.raw`(?:${id}\.)?${id}`;
+  const fnArg = String.raw`(?:\*|${col})`;
+  const fnCall = String.raw`\w+\(\s*(?:${fnArg}(?:\s*,\s*${fnArg})*)?\s*\)`;
+  const expr = String.raw`(?:${col}|${fnCall})`;
+  const aliased = String.raw`${expr}(?:(?:\s+AS)?\s+${id})?`;
+  return new RegExp(`^${aliased}(?:\\s*,\\s*${aliased})*$`, "i");
+}
+
+// Mirrors Rails' MySQL::Quoting.column_name_with_order_matcher — like
+// columnNameMatcher but also allows COLLATE and ASC/DESC suffixes.
+export function columnNameWithOrderMatcher(): RegExp {
+  const id = String.raw`(?:\w+|` + "`" + String.raw`\w+` + "`" + String.raw`)`;
+  const col = String.raw`(?:${id}\.)?${id}`;
+  const fnArg = String.raw`(?:\*|${col})`;
+  const fnCall = String.raw`\w+\(\s*(?:${fnArg}(?:\s*,\s*${fnArg})*)?\s*\)`;
+  const expr = String.raw`(?:${col}|${fnCall})`;
+  const collate = String.raw`(?:\s+COLLATE\s+(?:\w+|"\w+"))?`;
+  const dir = String.raw`(?:\s+ASC|\s+DESC)?`;
+  const ordered = String.raw`${expr}${collate}${dir}`;
+  return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
+}
+
 /**
  * Quote a value for inclusion in a SQL literal.
  *
@@ -111,7 +160,7 @@ export function quote(value: unknown): string {
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   if (value instanceof Date) return `'${quotedDate(value)}'`;
-  if (value instanceof Buffer) return quotedBinaryString(value);
+  if (value instanceof Buffer) return quotedBinary(value);
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");

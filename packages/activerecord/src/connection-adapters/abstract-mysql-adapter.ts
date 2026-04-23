@@ -18,12 +18,17 @@ import {
   StatementInvalid,
   ValueTooLong,
 } from "../errors.js";
-import type { Nodes } from "@blazetrails/arel";
+import { sql as arelSql, type Nodes } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import {
   quoteString as mysqlQuoteString,
   quote as mysqlQuote,
   typeCast as mysqlTypeCast,
+  castBoundValue as mysqlCastBoundValue,
+  quotedBinary as mysqlQuotedBinary,
+  unquoteIdentifier as mysqlUnquoteIdentifier,
+  columnNameMatcher as mysqlColumnNameMatcher,
+  columnNameWithOrderMatcher as mysqlColumnNameWithOrderMatcher,
 } from "./mysql/quoting.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 
@@ -432,6 +437,30 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   addSqlCommentBang(sql: string, comment: string): string {
     if (comment) return `${sql} COMMENT ${mysqlQuoteString(comment)}`;
     return sql;
+  }
+
+  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
+    return arelSql("CURRENT_TIMESTAMP(6)");
+  }
+
+  castBoundValue(value: unknown): unknown {
+    return mysqlCastBoundValue(value);
+  }
+
+  quotedBinary(value: Buffer | string): string {
+    return mysqlQuotedBinary(value);
+  }
+
+  unquoteIdentifier(identifier: string | null | undefined): string | null {
+    return mysqlUnquoteIdentifier(identifier);
+  }
+
+  static columnNameMatcher(): RegExp {
+    return mysqlColumnNameMatcher();
+  }
+
+  static columnNameWithOrderMatcher(): RegExp {
+    return mysqlColumnNameWithOrderMatcher();
   }
 
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {

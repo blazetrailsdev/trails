@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements (module)
  */
 
+import type { Nodes } from "@blazetrails/arel";
 import type { Result } from "../../result.js";
 
 export interface DatabaseStatements {
@@ -13,4 +14,5 @@ export interface DatabaseStatements {
   execInsert(sql: string, name?: string | null, binds?: unknown[], pk?: string): Promise<unknown>;
   explain(sql: string, binds?: unknown[], options?: { extended?: boolean }): Promise<string>;
   lastInsertedId(result: unknown): number;
+  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
 }

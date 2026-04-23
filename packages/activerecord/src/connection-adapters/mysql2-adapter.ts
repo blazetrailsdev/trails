@@ -170,7 +170,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   constructor(config: string | (mysql.PoolOptions & TrailsAdapterOptions)) {
     super();
     if (typeof config === "string") {
-      this._driverPool = mysql.createPool({ uri: config });
+      this._driverPool = Mysql2Adapter.newClient({ uri: config });
       return;
     }
     // See PostgreSQLAdapter#constructor: Rails' database.yml merges
@@ -182,7 +182,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const { statementLimit, preparedStatements, ...mysqlConfig } = config;
     if (statementLimit !== undefined) this.statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
-    this._driverPool = mysql.createPool(mysqlConfig);
+    this._driverPool = Mysql2Adapter.newClient(mysqlConfig);
   }
 
   /**
@@ -958,5 +958,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       );
     }
     return results;
+  }
+
+  static newClient(config: mysql.PoolOptions): mysql.Pool {
+    return mysql.createPool(config);
   }
 }
