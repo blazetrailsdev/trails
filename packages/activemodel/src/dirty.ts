@@ -149,14 +149,33 @@ export class DirtyTracker {
     delete?(name: string): boolean;
   }): void {
     for (const [name] of this._changedAttributes) {
-      if (!this._originalHas.has(name)) {
-        // Attribute was absent — remove it rather than setting undefined
-        attributes.delete?.(name);
-      } else {
-        const original = resolveValue(this._originalAttributes.get(name));
-        attributes.set(name, original);
-      }
+      this._restoreOne(attributes, name);
     }
     this._changedAttributes.clear();
+  }
+
+  /**
+   * Restore a single attribute to its pre-change value, matching Rails
+   * `ActiveModel::Dirty#restore_attribute!(attr)` (activemodel/lib/active_model/dirty.rb).
+   */
+  restoreAttribute(
+    attributes: { set(name: string, value: unknown): void; delete?(name: string): boolean },
+    name: string,
+  ): void {
+    if (!this._changedAttributes.has(name)) return;
+    this._restoreOne(attributes, name);
+    this._changedAttributes.delete(name);
+  }
+
+  private _restoreOne(
+    attributes: { set(name: string, value: unknown): void; delete?(name: string): boolean },
+    name: string,
+  ): void {
+    if (!this._originalHas.has(name)) {
+      attributes.delete?.(name);
+    } else {
+      const original = resolveValue(this._originalAttributes.get(name));
+      attributes.set(name, original);
+    }
   }
 }

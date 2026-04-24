@@ -1618,6 +1618,26 @@ export class Model {
     this._dirty.restore(this._attributes);
   }
 
+  /**
+   * Restore a single attribute to its pre-change value.
+   *
+   * Mirrors: ActiveModel::Dirty#restore_attribute!
+   */
+  restoreAttribute(name: string): void {
+    this._dirty.restoreAttribute(this._attributes, name);
+  }
+
+  /**
+   * Before/after tuple of a saved change for `name`, or undefined if the
+   * attribute wasn't changed in the last save.
+   *
+   * Mirrors: ActiveModel::Dirty#attribute_previous_change (returned as
+   * the hash pair by `attribute_previously_was` / `saved_change_to_attribute`).
+   */
+  attributePreviousChange(name: string): [unknown, unknown] | undefined {
+    return this._dirty.previousChanges[name];
+  }
+
   changesApplied(): void {
     this._dirty.changesApplied(this._attributes);
   }
