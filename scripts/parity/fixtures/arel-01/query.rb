@@ -1,2 +1,2 @@
 users = Arel::Table.new(:users)
-users
+users.project(Arel.star)

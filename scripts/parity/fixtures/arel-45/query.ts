@@ -1,7 +1,7 @@
 import { Table } from "@blazetrails/arel";
 const users = new Table("users");
 const employees = users.alias("employees");
-users.join(employees).on(
+export default users.join(employees).on(
   employees
     .get("id")
     .notEq(users.get("id"))

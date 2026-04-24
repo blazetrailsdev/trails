@@ -1,3 +1,3 @@
 import { Table } from "@blazetrails/arel";
 const users = new Table("users");
-users.get("name").notInAny([["Mike"], ["Molly"]]);
+export default users.get("name").notInAny([["Mike"], ["Molly"]]);

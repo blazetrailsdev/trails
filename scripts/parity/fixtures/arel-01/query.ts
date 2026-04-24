@@ -1,3 +1,3 @@
-import { Table } from "@blazetrails/arel";
+import { Table, star } from "@blazetrails/arel";
 const users = new Table("users");
-users;
+export default users.project(star);

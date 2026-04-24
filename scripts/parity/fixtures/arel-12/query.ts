@@ -1,3 +1,3 @@
 import { Table } from "@blazetrails/arel";
 const users = new Table("users");
-users.get("age").gteq(10);
+export default users.get("age").gteq(10);

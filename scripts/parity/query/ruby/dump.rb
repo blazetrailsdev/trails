@@ -96,9 +96,9 @@ Dir.mktmpdir("parity-query-ruby-") do |tmpdir|
       db.execute_batch(File.read(File.join(fixture_dir, "schema.sql")))
     end
 
-    # 2. Connect via ActiveRecord
+    # 2. Connect via ActiveRecord so fixtures that reference AR::Base.connection
+    #    (via time helpers or implicit connection resolution) work.
     ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: db_path)
-    conn = ActiveRecord::Base.connection
 
     # 3. Always freeze time so query evaluation is deterministic
     time_helper.travel_to(frozen_time)
@@ -116,34 +116,18 @@ Dir.mktmpdir("parity-query-ruby-") do |tmpdir|
     result = eval(query_source, query_binding, query_path)
     # rubocop:enable Security/Eval
     raise "[#{fixture_name}] query.rb returned nil" if result.nil?
-    unless result.respond_to?(:to_sql) || result.respond_to?(:ast)
-      raise "[#{fixture_name}] query.rb returned #{result.class}: expected an Arel node or manager"
+    unless result.respond_to?(:to_sql)
+      raise "[#{fixture_name}] query.rb returned #{result.class}: expected an Arel node or manager responding to #to_sql"
     end
 
-    # 5. Get SQL and binds.
-    #    Managers expose .ast; pass it directly to to_sql_and_binds which compiles via
-    #    the visitor and returns Rails-style bind objects. Plain nodes (no .ast) are
-    #    rendered directly via to_sql — they carry no bind params.
-    raw_sql, raw_binds =
-      if result.respond_to?(:ast)
-        conn.to_sql_and_binds(result.ast)
-      else
-        # Plain node — Arel::Nodes::Node#to_sql (arel/nodes/node.rb:148)
-        [result.to_sql.strip, []]
-      end
-
-    binds = Array(raw_binds).map do |b|
-      raw = if b.respond_to?(:value_before_type_cast)
-        b.value_before_type_cast
-      elsif b.respond_to?(:value)
-        b.value
-      else
-        b
-      end
-      # nil bind = SQL NULL; keep as "NULL" so binds array stays string[] per schema
-      raw.nil? ? "NULL" : raw.to_s
-    end
-    sql_str = raw_sql.strip
+    # 5. Get SQL. For pure Arel fixtures (v1 scope) all values are inlined — both
+    #    Arel::Nodes::Node#to_sql and Arel::SelectManager#to_sql render literals
+    #    directly, so binds is always []. Note: ConnectionAdapters
+    #    DatabaseStatements#to_sql_and_binds is private in Rails 8.0
+    #    (activerecord-8.0.2/lib/.../abstract/database_statements.rb:52), so we
+    #    call to_sql directly. This mirrors the trails side which uses .toSql().
+    sql_str = result.to_sql.strip
+    binds = []
 
     # 6. Write CanonicalQuery JSON
     canonical = {

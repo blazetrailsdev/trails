@@ -1,3 +1,3 @@
 import { Table } from "@blazetrails/arel";
 const users = new Table("users");
-users.get("age").sum();
+export default users.get("age").sum();

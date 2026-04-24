@@ -1,3 +1,3 @@
 import { Table } from "@blazetrails/arel";
 const users = new Table("users");
-users.get("name").doesNotMatchRegexp("vic$");
+export default users.get("name").doesNotMatchRegexp("vic$");

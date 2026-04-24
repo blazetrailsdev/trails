@@ -1,5 +1,5 @@
 -- Fixture for statement: arel-01
--- Query: Arel::Table.new(:users)
+-- Query: Arel::Table.new(:users).project(Arel.star)
 
 CREATE TABLE users (
   id INTEGER PRIMARY KEY,

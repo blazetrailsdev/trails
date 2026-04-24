@@ -29,8 +29,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@sinonjs/fake-timers": "^15.3.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/pg": "^8.18.0",
+    "@types/sinonjs__fake-timers": "^15.0.1",
     "@vitest/eslint-plugin": "^1.6.12",
     "ajv": "^8.18.0",
     "ajv-cli": "^5.0.0",

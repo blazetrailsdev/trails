@@ -1,3 +1,3 @@
 import { Table } from "@blazetrails/arel";
 const posts = new Table("posts");
-posts.get("title").as("name");
+export default posts.get("title").as("name");

@@ -1,3 +1,3 @@
 import { Table } from "@blazetrails/arel";
 const posts = new Table("posts");
-posts.get("title").matches("hell%");
+export default posts.get("title").matches("hell%");
