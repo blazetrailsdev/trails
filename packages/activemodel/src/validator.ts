@@ -8,7 +8,14 @@ export type ConditionFn = ((record: AnyRecord) => boolean) | string;
 export interface ConditionalOptions {
   if?: ConditionFn | ConditionFn[];
   unless?: ConditionFn | ConditionFn[];
-  on?: string;
+  /**
+   * Validation context(s) under which this condition fires — a single
+   * context name or an array. Mirrors Rails `on:` which accepts
+   * `Symbol | Array<Symbol>` and intersects with the model's current
+   * `validation_context` via `predicate_for_validation_context`
+   * (activemodel/lib/active_model/validations.rb:294-306).
+   */
+  on?: string | string[];
 }
 
 export function evaluateCondition(record: AnyRecord, cond: ConditionFn): boolean {

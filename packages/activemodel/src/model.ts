@@ -969,11 +969,19 @@ export class Model {
     const parts: Array<(record: AnyRecord) => boolean> = [];
 
     if (options.on !== undefined) {
-      const onContext = options.on;
+      // Rails `predicate_for_validation_context` (validations.rb:294-306):
+      // both the registered `on:` and the model's current
+      // `validation_context` may be Symbols or Arrays of Symbols. A
+      // validator with `on: [:create, :publish]` fires when the model's
+      // context is `:create`, `[:create]`, `[:publish, :foo]`, etc. —
+      // intersection, not equality.
+      const registered = Array.isArray(options.on) ? options.on : [options.on];
+      const registeredSet = new Set(registered);
       parts.push((record: AnyRecord) => {
         const ctx = record._validationContext;
-        if (!ctx) return false;
-        return ctx === onContext;
+        if (ctx == null) return false;
+        const current = Array.isArray(ctx) ? ctx : [ctx];
+        return current.some((c: unknown) => registeredSet.has(c as string));
       });
     }
 
@@ -1203,14 +1211,34 @@ export class Model {
 
   // -- Validations --
 
-  _validationContext: string | null = null;
+  // Rails `validation_context` holds either a single Symbol or an
+  // Array<Symbol> (or nil). `valid?([:create, :publish])` round-trips
+  // the array so `on: :create` / `on: [:create]` / `on: [:create, :other]`
+  // validators all fire. See `validations.rb:361-368` and `:294-306`.
+  _validationContext: string | string[] | null = null;
 
-  isValid(context?: string | ValidationContext): boolean {
+  isValid(context?: string | string[] | ValidationContext | null): boolean {
     this.errors.clear();
     const ctor = this.constructor as typeof Model;
-    const contextStr = context instanceof ValidationContext ? context.name : context;
+    // Rails `valid?(context = nil)` (validations.rb:361-368) always
+    // assigns `context_for_validation.context = context` on entry,
+    // restoring in `ensure`. An omitted argument and an explicit
+    // `null` both map to Rails' `nil` — so we collapse both to
+    // `null` here. For `ValidationContext` / Array we deep-copy to
+    // prevent caller-side mutation from leaking into our frame.
+    let normalized: string | string[] | null;
+    if (context === undefined || context === null) {
+      normalized = null;
+    } else if (context instanceof ValidationContext) {
+      const inner = context.context;
+      normalized = Array.isArray(inner) ? [...inner] : inner;
+    } else if (Array.isArray(context)) {
+      normalized = [...context];
+    } else {
+      normalized = context;
+    }
     const prevContext = this._validationContext;
-    this._validationContext = contextStr ?? this._validationContext;
+    this._validationContext = normalized;
 
     try {
       const completed = ctor._callbackChain.runCallbacks("validation", this, () => {
@@ -1234,7 +1262,7 @@ export class Model {
    * Mirrors Rails `alias_method :validate, :valid?`
    * (activemodel/lib/active_model/validations.rb:370).
    */
-  validate(context?: string | ValidationContext): boolean {
+  validate(context?: string | string[] | ValidationContext | null): boolean {
     return this.isValid(context);
   }
 
@@ -1244,7 +1272,7 @@ export class Model {
    * Mirrors Rails `def invalid?(context = nil); !valid?(context); end`
    * (activemodel/lib/active_model/validations.rb:408-410).
    */
-  isInvalid(context?: string | ValidationContext): boolean {
+  isInvalid(context?: string | string[] | ValidationContext | null): boolean {
     return !this.isValid(context);
   }
 
@@ -1663,7 +1691,7 @@ export class Model {
    *
    * Mirrors: ActiveModel::Validations#validation_context
    */
-  get validationContext(): string | null {
+  get validationContext(): string | string[] | null {
     return this._validationContext;
   }
 
@@ -1674,7 +1702,7 @@ export class Model {
    * Mirrors Rails `def validate!(context = nil); valid?(context) || raise_validation_error; end`
    * (activemodel/lib/active_model/validations.rb:417-419).
    */
-  validateBang(context?: string | ValidationContext): true {
+  validateBang(context?: string | string[] | ValidationContext | null): true {
     if (!this.isValid(context)) {
       throw new ValidationError(this);
     }

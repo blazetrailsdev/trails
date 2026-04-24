@@ -5,7 +5,15 @@
  * database-aware validators (uniqueness, association validity, etc.)
  * and overrides save/valid? to run validations with context awareness.
  */
+import type { ValidationContext } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
+
+/**
+ * Anything Rails' `valid?(context = nil)` accepts — shared between
+ * AM's `Model.isValid` and AR's `valid?` override so the signatures
+ * stay substitutable.
+ */
+export type ValidationContextArg = string | string[] | ValidationContext | null;
 import { AbsenceValidator } from "./validations/absence.js";
 import { AssociatedValidator, validatesAssociated } from "./validations/associated.js";
 import { LengthValidator } from "./validations/length.js";
@@ -57,8 +65,8 @@ export interface Validations {
    * AM's alias `validate → valid?`
    * (activemodel/lib/active_model/validations.rb:370).
    */
-  validate(context?: string): boolean;
-  isValid(context?: string): boolean;
+  validate(context?: ValidationContextArg): boolean;
+  isValid(context?: ValidationContextArg): boolean;
 }
 
 /**
@@ -76,10 +84,10 @@ export interface ValidationsClassMethods {
 
 // Reference to the parent class's isValid (Model.prototype.isValid).
 // Set by Base at module load via _setSuperIsValid to avoid circular imports.
-let _superIsValid: ((context?: string) => boolean) | null = null;
+let _superIsValid: ((context?: ValidationContextArg) => boolean) | null = null;
 
 /** @internal Called by Base to register the super isValid for delegation. */
-export function _setSuperIsValid(fn: (context?: string) => boolean): void {
+export function _setSuperIsValid(fn: (context?: ValidationContextArg) => boolean): void {
   _superIsValid = fn;
 }
 
@@ -90,7 +98,7 @@ export function _setSuperIsValid(fn: (context?: string) => boolean): void {
  * :update for persisted). Sets _validationContext for the duration
  * matching Rails' with_validation_context.
  */
-export function isValid(this: any, context?: string): boolean {
+export function isValid(this: any, context?: ValidationContextArg): boolean {
   const effectiveContext =
     context ?? this._validationContext ?? defaultValidationContext.call(this);
   if (_superIsValid == null) {
@@ -112,7 +120,7 @@ export function isValid(this: any, context?: string): boolean {
  * Mirrors: ActiveRecord::Validations#validate — inherited alias of `valid?`
  * (activemodel/lib/active_model/validations.rb:370).
  */
-export function validate(this: any, context?: string): boolean {
+export function validate(this: any, context?: ValidationContextArg): boolean {
   return isValid.call(this, context);
 }
 

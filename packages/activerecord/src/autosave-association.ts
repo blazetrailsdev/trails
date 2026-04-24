@@ -6,6 +6,7 @@
  * The [included] hook registers validateAssociations onto the class.
  */
 import type { Base } from "./base.js";
+import type { ValidationContextArg } from "./validations.js";
 import { CompositePrimaryKeyMismatchError } from "./associations/errors.js";
 import type { AssociationDefinition } from "./associations.js";
 import { underscore } from "@blazetrails/activesupport";
@@ -173,7 +174,7 @@ export function clearAutosaveState(record: Base): void {
 const _validatingRecords = new WeakSet<object>();
 const _autosavingRecords = new WeakSet<object>();
 
-export function validateAssociations(record: Base, context?: string): void {
+export function validateAssociations(record: Base, context?: ValidationContextArg): void {
   if (_validatingRecords.has(record)) return;
   _validatingRecords.add(record);
 

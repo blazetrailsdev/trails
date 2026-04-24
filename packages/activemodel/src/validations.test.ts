@@ -1024,6 +1024,83 @@ describe("ValidationsTest", () => {
       expect(() => new Scoped({}).validateBang("create")).toThrow(/Validation failed/);
     });
 
+    it("valid? accepts an array context that matches :on-registered validators", () => {
+      // Rails `predicate_for_validation_context` (validations.rb:294-306)
+      // intersects the registered `on:` set with the model's current
+      // context — either side may be a single symbol or an array.
+      class Scoped extends Model {
+        static {
+          this.attribute("name", "string");
+          this.attribute("title", "string");
+          this.validates("name", { presence: true, on: "create" });
+          this.validates("title", { presence: true, on: ["publish"] });
+        }
+      }
+      // Single-symbol context → only the `on: :create` validator fires.
+      const a = new Scoped({});
+      expect(a.isValid("create")).toBe(false);
+      expect(a.errors.attributeNames).toEqual(["name"]);
+
+      // Array context → both validators fire (Rails: intersection).
+      const b = new Scoped({});
+      expect(b.isValid(["create", "publish"])).toBe(false);
+      expect(b.errors.attributeNames.sort()).toEqual(["name", "title"]);
+
+      // Array context matching only one registered value fires that one.
+      const c = new Scoped({});
+      expect(c.isValid(["publish"])).toBe(false);
+      expect(c.errors.attributeNames).toEqual(["title"]);
+    });
+
+    it("on: [array] validator fires when current context is a single symbol in the set", () => {
+      class Scoped extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { presence: true, on: ["create", "publish"] });
+        }
+      }
+      expect(new Scoped({}).isValid("create")).toBe(false);
+      expect(new Scoped({}).isValid("publish")).toBe(false);
+      expect(new Scoped({}).isValid("unrelated")).toBe(true);
+    });
+
+    it("validationContext round-trips array contexts while a validation is in flight", () => {
+      // Rails `validation_context` surfaces whatever context is currently
+      // set — when called inside a validator with an array context, it
+      // returns the array.
+      const captured: Array<string | string[] | null> = [];
+      class Scoped extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validate((record: InstanceType<typeof Scoped>) => {
+            captured.push(record.validationContext);
+          });
+        }
+      }
+      new Scoped({}).isValid(["create", "publish"]);
+      expect(captured).toEqual([["create", "publish"]]);
+    });
+
+    it("valid?(null) clears the context (Rails sets it to nil on entry)", () => {
+      // Rails `valid?(context = nil)` always assigns
+      // `context_for_validation.context = context` — passing nil clears.
+      const captured: Array<string | string[] | null> = [];
+      class Scoped extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validate((r: InstanceType<typeof Scoped>) => {
+            captured.push(r.validationContext);
+          });
+        }
+      }
+      const m = new Scoped({});
+      m.isValid("previous");
+      m.isValid(null);
+      // First call saw "previous"; second call saw null (explicit clear),
+      // not "previous" carried over.
+      expect(captured).toEqual(["previous", null]);
+    });
+
     it("valid? restores previous context in ensure/finally even on failure", () => {
       // Rails validations.rb:361-368 uses `ensure` to restore context.
       class Scoped extends Model {
