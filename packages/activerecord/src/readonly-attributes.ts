@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { Model } from "@blazetrails/activemodel";
+import { Model, resolveAliasName } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 
 /**
@@ -108,15 +108,19 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
     throw new Error(`Cannot modify a frozen ${(this.constructor as typeof Base).name}`);
   }
   const ctor = this.constructor as typeof Base;
-  if (this._newRecord === false && ctor.readonlyAttributeQ(String(name))) {
+  // Rails' `write_attribute` resolves `attribute_aliases[name]` before the
+  // chain runs, so HasReadonlyAttributes' check sees the canonical name and
+  // writing via an alias cannot bypass readonly enforcement.
+  const canonical = resolveAliasName(ctor, String(name));
+  if (this._newRecord === false && ctor.readonlyAttributeQ(canonical)) {
     if (_raiseOnAssignToAttrReadonly) {
-      throw new ReadonlyAttributeError(String(name));
+      throw new ReadonlyAttributeError(canonical);
     }
     return; // silently skip — mirrors Rails' non-raising mode
   }
-  // `super` — route through Model's writeAttribute (the next ancestor with
-  // a writeAttribute impl, matching Rails' `super` in HasReadonlyAttributes).
-  Model.prototype.writeAttribute.call(this, name, value);
+  // `super` — route through Model's _writeAttribute with the already-resolved
+  // canonical name, matching Rails' `super` into the underscore path.
+  Model.prototype._writeAttribute.call(this, canonical, value);
 }
 
 /**
@@ -132,7 +136,9 @@ export function _writeAttribute(this: Base, name: string, value: unknown): void 
     }
     return;
   }
-  Model.prototype.writeAttribute.call(this, name, value);
+  // Mirrors Rails `_write_attribute`: skip alias resolution, unlike the
+  // public `write_attribute` path above.
+  Model.prototype._writeAttribute.call(this, name, value);
 }
 
 /**

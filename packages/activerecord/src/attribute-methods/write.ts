@@ -34,5 +34,5 @@ export interface Write {
  * Mirrors: ActiveRecord::AttributeMethods::Write#_write_attribute
  */
 export function _writeAttribute(this: Model, name: string, value: unknown): void {
-  Model.prototype.writeAttribute.call(this, name, value);
+  Model.prototype._writeAttribute.call(this, name, value);
 }

@@ -279,3 +279,15 @@ export function isAttributeAlias(host: AttributeMethodHost, name: string): boole
 export function attributeAlias(host: AttributeMethodHost, name: string): string | undefined {
   return host._attributeAliases[name];
 }
+
+/**
+ * Resolve `name` to its canonical attribute name, following one alias
+ * hop. Mirrors Rails `ActiveModel::AttributeMethods#read_attribute`'s
+ * `attribute_aliases[name] || name` (activemodel/lib/active_model/attribute_methods.rb
+ * read_attribute / write_attribute paths) so every read/write path sees
+ * the same key whether the caller passed `nickname` or `name`.
+ */
+export function resolveAliasName(host: AttributeMethodHost, name: string): string {
+  const aliased = host._attributeAliases?.[name];
+  return aliased ?? name;
+}

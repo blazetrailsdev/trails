@@ -1774,6 +1774,22 @@ describe("AttributeMethodsTest", () => {
     it("returns false for undefined attributes", () => {
       expect(Person.hasAttributeDefinition("foo")).toBe(false);
     });
+
+    it("returns true for alias_attribute names on instances", () => {
+      // Rails `has_attribute?` resolves attribute_aliases
+      // (active_record/attribute_methods.rb).
+      class Topic extends Base {
+        static {
+          this.attribute("title", "string");
+          this.aliasAttribute("heading", "title");
+          this.adapter = adapter;
+        }
+      }
+      const t = new Topic({ title: "Hi" });
+      expect(t.hasAttribute("heading")).toBe(true);
+      expect(t.hasAttribute("title")).toBe(true);
+      expect(t.hasAttribute("missing")).toBe(false);
+    });
   });
 
   describe("readonly attributes", () => {

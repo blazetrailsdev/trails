@@ -362,6 +362,26 @@ describe("ReadonlyTest", () => {
     await expect(post.destroy()).rejects.toThrow("readonly");
   });
 
+  it("attr_readonly cannot be bypassed by writing via an alias_attribute", async () => {
+    // Rails' `write_attribute` resolves attribute_aliases before
+    // HasReadonlyAttributes runs, so the readonly check applies equally
+    // whether the caller passes the canonical or aliased name.
+    class Product extends Base {
+      static {
+        this._tableName = "products";
+        this.attribute("id", "integer");
+        this.attribute("sku", "string");
+        this.adapter = adapter;
+      }
+    }
+    Product.attrReadonly("sku");
+    Product.aliasAttribute("code", "sku");
+    const p = await Product.create({ sku: "A" });
+    expect(() => {
+      (p as any).writeAttribute("code", "B");
+    }).toThrow(ReadonlyAttributeError);
+  });
+
   // Rails: test "readonly? predicate"
   it("isReadonly reflects the readonly state", async () => {
     class Post extends Base {

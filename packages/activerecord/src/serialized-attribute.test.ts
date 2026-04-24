@@ -842,4 +842,20 @@ describe("SerializedAttributeTest", () => {
     c.count = "42";
     expect(c.count).toBe(42);
   });
+
+  it("serialized attribute is still deserialized when read via alias", () => {
+    // Rails registers serialize coders under the canonical column name;
+    // reading via an alias_attribute should still route through the coder.
+    class User extends Base {
+      static {
+        this.attribute("preferences", "string");
+        this.aliasAttribute("prefs", "preferences");
+        this.adapter = adapter;
+      }
+    }
+    serialize(User, "preferences", { coder: "json" });
+    const u = new User({ preferences: '{"theme":"dark"}' });
+    expect((u as any).prefs).toEqual({ theme: "dark" });
+    expect(u.readAttribute("prefs")).toEqual({ theme: "dark" });
+  });
 });

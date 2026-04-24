@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { Json } from "./type/json.js";
 import { SerializationTypeMismatch } from "./errors.js";
+import { resolveAliasName } from "@blazetrails/activemodel";
 
 interface Coder {
   dump(value: unknown): string;
@@ -105,12 +106,17 @@ export function serialize(
 
     modelClass.prototype.readAttribute = function (name: string): unknown {
       const raw = originalRead.call(this, name);
+      // Serialized coders are registered under the canonical attribute
+      // name, so resolve aliases before the map lookup — matches Rails
+      // `serialize` wrapping `_read_attribute(column_name)` through the
+      // attribute_aliases-aware read path.
+      const canonical = resolveAliasName(this.constructor as any, name);
       const serializedAttrs: Map<string, Coder> | undefined = (this.constructor as any)
         ._serializedAttributes;
-      if (serializedAttrs?.has(name)) {
+      if (serializedAttrs?.has(canonical)) {
         const expected: string | undefined = (
           this.constructor as any
-        )._serializedExpectedTypes?.get(name);
+        )._serializedExpectedTypes?.get(canonical);
         if (expected && raw !== null && raw !== undefined) {
           // Validate the raw parsed value BEFORE the coder coerces it.
           // The coders silently coerce (e.g. ARRAY_CODER returns [] for non-arrays),
@@ -141,7 +147,7 @@ export function serialize(
             }
           }
         }
-        return serializedAttrs.get(name)!.load(raw);
+        return serializedAttrs.get(canonical)!.load(raw);
       }
       return raw;
     };

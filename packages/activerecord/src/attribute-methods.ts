@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::AttributeMethods
  */
 import { isBlank } from "@blazetrails/activesupport";
+import { resolveAliasName } from "@blazetrails/activemodel";
 // ActiveModel provides aliasAttribute and undefineAttributeMethods on Model.
 // aliasAttribute delegates via the prototype chain. defineAttributeMethods
 // is implemented here since AM doesn't expose it as a static on Model.
@@ -31,7 +32,15 @@ interface AttributeRecord {
  * Mirrors: ActiveRecord::AttributeMethods#has_attribute?
  */
 export function hasAttribute(this: AttributeRecord, name: string): boolean {
-  return this._attributes.has(name);
+  // Rails `has_attribute?` resolves attribute_aliases before hitting the
+  // attribute set (active_record/attribute_methods.rb).
+  const resolved = resolveAliasName(
+    (this as unknown as { constructor: unknown }).constructor as Parameters<
+      typeof resolveAliasName
+    >[0],
+    name,
+  );
+  return this._attributes.has(resolved);
 }
 
 /**
