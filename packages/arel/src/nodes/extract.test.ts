@@ -11,6 +11,16 @@ describe("Arel::Nodes::ExtractTest", () => {
     expect(sql).toBe('EXTRACT(YEAR FROM "users"."created_at")');
   });
 
+  it("uppercases a lowercase field to match Rails", () => {
+    // Rails' visit_Arel_Nodes_Extract does `o.field.to_s.upcase`, so the
+    // field identifier in the emitted SQL is always uppercased regardless
+    // of how it was constructed.
+    const createdAt = users.get("created_at");
+    const node = new Nodes.Extract(createdAt, "month");
+    const sql = new Visitors.ToSql().compile(node);
+    expect(sql).toBe('EXTRACT(MONTH FROM "users"."created_at")');
+  });
+
   describe("as", () => {
     it("should alias the extract", () => {
       const createdAt = users.get("created_at");

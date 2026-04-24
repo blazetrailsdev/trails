@@ -31,10 +31,6 @@
     "side": "trails-missing",
     "reason": "(~users[:bitmap]).gt(0): trails Nodes.BitwiseNot does not implement predication methods (no .gt/.lt/.eq chain)."
   },
-  "arel-36": {
-    "side": "diff",
-    "reason": "EXTRACT(MONTH FROM ...) vs EXTRACT(month FROM ...): trails ToSql visitor emits the EXTRACT field in the casing it was constructed with (lowercase in fixture); Rails uppercases."
-  },
   "arel-44": {
     "side": "diff",
     "reason": "subquery alias quoting: Rails emits the alias bare (sub); trails emits the quoted identifier (\"sub\"). Real ToSql visitor divergence."

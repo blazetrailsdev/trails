@@ -991,7 +991,7 @@ export class ToSql implements NodeVisitor<SQLString> {
   // -- Extract --
 
   private visitExtract(node: Nodes.Extract): SQLString {
-    this.collector.append(`EXTRACT(${node.field} FROM `);
+    this.collector.append(`EXTRACT(${String(node.field).toUpperCase()} FROM `);
     if (node.expr instanceof Node) {
       this.visit(node.expr);
     } else if (node.expr !== null && node.expr !== undefined) {
