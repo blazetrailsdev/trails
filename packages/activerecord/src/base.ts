@@ -113,6 +113,7 @@ import {
 } from "./core.js";
 import * as _Core from "./core.js";
 import * as _Persistence from "./persistence.js";
+import * as _Aggregations from "./aggregations.js";
 import * as _EnumModule from "./enum.js";
 import * as _Reflection from "./reflection.js";
 import * as _AssocInstance from "./associations/instance-methods.js";
@@ -2665,6 +2666,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   updateBang(attrs: Record<string, unknown>): Promise<true>;
   delete(): Promise<this>;
   reload(): Promise<this>;
+  initializeDup(other: unknown): void;
   slice(...keys: string[]): Record<string, unknown>;
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): void;
@@ -2787,6 +2789,9 @@ include(Base, {
 include(Base, LockingPessimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
 include(Base, TouchLater.InstanceMethods);
+include(Base, _Aggregations.InstanceMethods);
+// Aggregations#reload must override Persistence#reload (include() won't replace).
+(Base.prototype as any).reload = _Aggregations.reload;
 include(Base, AutosaveAssociation);
 include(Base, _AssocInstance.InstanceMethods);
 include(Base, {

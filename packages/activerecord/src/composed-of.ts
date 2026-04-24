@@ -1,5 +1,6 @@
 import type { Base } from "./base.js";
 import { AggregateReflection } from "./reflection.js";
+import { getAggregationCache } from "./aggregations.js";
 
 interface ComposedOfOptions {
   className: new (...args: any[]) => any;
@@ -48,27 +49,43 @@ export function composedOf(
     ),
   );
 
-  // Getter: read mapped attributes and instantiate the value object
+  // Getter: read from aggregation cache or build and cache the value object.
+  // Mirrors: Rails' reader_method — caches in @aggregation_cache[name].freeze
   Object.defineProperty(modelClass.prototype, name, {
     get(this: Base): unknown {
+      const cache = getAggregationCache(this);
+      if (cache.has(name)) return cache.get(name);
+
       const args = options.mapping.map(([modelAttr]) => this.readAttribute(modelAttr));
-      // If all args are null, return null
       if (args.every((a) => a === null || a === undefined)) return null;
-      return new options.className(...args);
+
+      const obj = Object.freeze(new options.className(...args));
+      cache.set(name, obj);
+      return obj;
     },
     set(this: Base, value: unknown): void {
+      const cache = getAggregationCache(this);
+
       if (value === null || value === undefined) {
         for (const [modelAttr] of options.mapping) {
           this.writeAttribute(modelAttr, null);
         }
+        // Don't cache null — let the reader recompute (mirrors Rails where
+        // nil cache entry triggers a rebuild attempt on next read).
+        cache.delete(name);
         return;
       }
 
-      // If it's an instance of the class, decompose it
+      // If it's an instance of the class, decompose it and cache frozen copy.
+      // Rails does part.dup.freeze — we freeze a shallow copy via spread.
       if (value instanceof options.className) {
         for (const [modelAttr, valueAttr] of options.mapping) {
           this.writeAttribute(modelAttr, (value as any)[valueAttr]);
         }
+        cache.set(
+          name,
+          Object.freeze(Object.assign(Object.create(Object.getPrototypeOf(value)), value)),
+        );
         return;
       }
 
@@ -79,6 +96,12 @@ export function composedOf(
           for (const [modelAttr, valueAttr] of options.mapping) {
             this.writeAttribute(modelAttr, (converted as any)[valueAttr]);
           }
+          cache.set(
+            name,
+            Object.freeze(
+              Object.assign(Object.create(Object.getPrototypeOf(converted)), converted),
+            ),
+          );
         }
       }
     },

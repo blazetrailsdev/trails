@@ -427,7 +427,11 @@ describe("AggregationsTest", () => {
     const addr1 = (c as any).address;
     expect(addr1.city).toBe("BOS");
 
-    c.address_city = "CHI";
+    // Bypass the composed-of setter / aggregation cache invalidation path,
+    // then reload to flush it — mirrors the Rails test's update_all + reload
+    // sequence used to clear @aggregation_cache.
+    await c.updateColumn("address_city", "CHI");
+    await c.reload();
     const addr2 = (c as any).address;
     expect(addr2.city).toBe("CHI");
   });
