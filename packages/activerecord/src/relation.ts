@@ -2100,7 +2100,10 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#calculate
    */
   async calculate(operation: "count", column?: string): Promise<number | Record<string, number>>;
-  async calculate(operation: "sum", column: string): Promise<number | Record<string, number>>;
+  async calculate(
+    operation: "sum",
+    column: string,
+  ): Promise<number | bigint | Record<string, number | bigint>>;
   async calculate(
     operation: "average",
     column: string,

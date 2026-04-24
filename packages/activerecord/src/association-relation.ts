@@ -204,11 +204,11 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   // @ts-expect-error — sum/average/minimum/maximum are also property-
   //   assigned on Relation (from the Calculations mixin); override as
   //   methods to gate strict-loading before each SQL entry point.
-  async sum(column?: string): Promise<number | Record<string, number>> {
+  async sum(column?: string): Promise<number | bigint | Record<string, number | bigint>> {
     this._checkStrictLoading();
     return (
       Relation.prototype as unknown as {
-        sum: (col?: string) => Promise<number | Record<string, number>>;
+        sum: (col?: string) => Promise<number | bigint | Record<string, number | bigint>>;
       }
     ).sum.call(this, column);
   }
@@ -251,19 +251,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   override pick(...columns: Parameters<Relation<T>["pick"]>): Promise<unknown> {
     this._checkStrictLoading();
     return super.pick(...columns);
-  }
-
-  override async calculate(
-    operation: "count" | "sum" | "average" | "minimum" | "maximum",
-    column?: string,
-  ): Promise<number | Record<string, number>> {
-    this._checkStrictLoading();
-    return (
-      super.calculate as unknown as (
-        op: string,
-        col?: string,
-      ) => Promise<number | Record<string, number>>
-    ).call(this, operation, column);
   }
 
   override updateAll(updates: Record<string, unknown>): Promise<number> {

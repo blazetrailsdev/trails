@@ -848,17 +848,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // and drop in-place mutations.
   // @ts-expect-error sum is a property on Relation (Calculations mixin);
   //   method override is intentional to gate + honor divergence.
-  async sum(column?: string): Promise<number | Record<string, number>> {
+  async sum(column?: string): Promise<number | bigint | Record<string, number | bigint>> {
     this._checkStrictLoading();
     const fn = (
       Relation.prototype as unknown as {
-        sum: (col?: string) => Promise<number | Record<string, number>>;
+        sum: (col?: string) => Promise<number | bigint | Record<string, number | bigint>>;
       }
     ).sum;
     if (this._relationStateDiverged()) return fn.call(this, column);
     const s = this.scope();
     return (
-      s as unknown as { sum: (col?: string) => Promise<number | Record<string, number>> }
+      s as unknown as {
+        sum: (col?: string) => Promise<number | bigint | Record<string, number | bigint>>;
+      }
     ).sum(column);
   }
 
