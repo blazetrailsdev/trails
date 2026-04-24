@@ -15,7 +15,11 @@ import type { DatabaseConfigOptions } from "./database-config.js";
 // E.g., "postgres" → "postgresql".
 const PROTOCOL_ADAPTERS: Record<string, string> = {
   postgres: "postgresql",
+  postgresql: "postgresql",
+  mysql: "mysql2",
+  mysql2: "mysql2",
   sqlite: "sqlite3",
+  sqlite3: "sqlite3",
 };
 
 export class ConnectionUrlResolver {
@@ -105,8 +109,14 @@ export class ConnectionUrlResolver {
     if (!this._query) return {};
     const result: Record<string, string> = {};
     for (const pair of this._query.split("&")) {
-      const [k, v] = pair.split("=", 2);
-      if (k) result[k] = v ?? "";
+      const eqIdx = pair.indexOf("=");
+      if (eqIdx === -1) {
+        if (pair) result[pair] = "";
+      } else {
+        const k = pair.slice(0, eqIdx);
+        const v = pair.slice(eqIdx + 1);
+        if (k) result[k] = v;
+      }
     }
     return result;
   }
@@ -127,7 +137,8 @@ export class ConnectionUrlResolver {
       password: parsed.password || undefined,
       port: parsed.port ? Number(parsed.port) : undefined,
       database: this._databaseFromPath(parsed.pathname),
-      host: parsed.hostname || undefined,
+      // URL API wraps IPv6 addresses in brackets; strip them to match Rails behavior
+      host: parsed.hostname ? parsed.hostname.replace(/^\[(.+)\]$/, "$1") : undefined,
     };
   }
 

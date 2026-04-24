@@ -465,7 +465,11 @@ async function establishWithConfig(
   const dbConfig = new HashConfig(
     process.env.NODE_ENV || DatabaseConfigurations.defaultEnv,
     "primary",
-    { adapter: adapterName, url, ...config },
+    {
+      adapter: adapterName,
+      url,
+      ...config,
+    },
   );
 
   modelClass.connectionHandler.establishConnection(dbConfig, {
