@@ -9,6 +9,7 @@ import {
 } from "../abstract-mysql-adapter/test-helper.js";
 import {
   InvalidForeignKey,
+  MismatchedForeignKey,
   NotNullViolation,
   RecordNotUnique,
   ValueTooLong,
@@ -94,11 +95,170 @@ describeIfMysql("Mysql2Adapter", () => {
     it.skip("exec query with prepared statements", () => {});
     it.skip("exec query nothing raises with no result queries", () => {});
     it.skip("database exists returns false if database does not exist", () => {});
-    it.skip("errors for bigint fks on integer pk table in alter table", () => {});
-    it.skip("errors for multiple fks on mismatched types for pk table in alter table", () => {});
-    it.skip("errors for bigint fks on integer pk table in create table", () => {});
-    it.skip("errors for integer fks on bigint pk table in create table", () => {});
-    it.skip("errors for bigint fks on string pk table in create table", () => {});
+
+    // FK type-mismatch fixture tables — created/dropped around each test so
+    // the FK tests are self-contained. beforeEach/afterEach live directly in
+    // Mysql2AdapterTest so test paths match Rails (no extra describe level).
+    // Mirrors Rails: test/cases/adapters/mysql2/mysql2_adapter_test.rb:136–270
+    //
+    //   old_cars    — integer PK  (Rails' old_cars fixture)
+    //   cars        — bigint PK   (Rails' cars fixture)
+    //   subscribers — varchar PK  (Rails' subscribers fixture)
+    //   engines     — bigint PK, used as the referencing table
+    beforeEach(async () => {
+      await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `old_cars`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+      await adapter.executeMutation(
+        "CREATE TABLE `old_cars` (`id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
+      );
+      await adapter.executeMutation(
+        "CREATE TABLE `cars` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY) ENGINE=InnoDB",
+      );
+      await adapter.executeMutation(
+        "CREATE TABLE `subscribers` (`nick` VARCHAR(255) NOT NULL PRIMARY KEY) ENGINE=InnoDB",
+      );
+      await adapter.executeMutation(
+        "CREATE TABLE `engines` (`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, `old_car_id` BIGINT) ENGINE=InnoDB",
+      );
+    });
+
+    afterEach(async () => {
+      await adapter.executeMutation("DROP TABLE IF EXISTS `engines`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `foos`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `old_cars`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `cars`");
+      await adapter.executeMutation("DROP TABLE IF EXISTS `subscribers`");
+    });
+
+    it("errors for bigint fks on integer pk table in alter table", async () => {
+      // engines.old_car_id is BIGINT but old_cars.id is INT — type mismatch
+      const error = await adapter
+        .executeMutation(
+          "ALTER TABLE `engines` ADD CONSTRAINT `fk_test` FOREIGN KEY (`old_car_id`) REFERENCES `old_cars` (`id`)",
+        )
+        .then(() => null)
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(MismatchedForeignKey);
+      expect(error.message).toMatch(
+        /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
+      );
+      expect(error.message).toMatch(/which has type `int/i);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer/,
+      );
+      expect(error.cause).toBeInstanceOf(Error);
+    });
+
+    it("errors for multiple fks on mismatched types for pk table in alter table", async () => {
+      // MariaDB does not include mismatched FK details in error message
+      const isMariaDb = adapter.isMariadb();
+      if (isMariaDb) return;
+
+      // Add matching FK first (cars.id is BIGINT, engines.id is BIGINT — OK)
+      await adapter.executeMutation(
+        "ALTER TABLE `engines` ADD COLUMN `car_id` BIGINT, ADD CONSTRAINT `fk_car` FOREIGN KEY (`car_id`) REFERENCES `cars` (`id`)",
+      );
+
+      // Then add mismatched FK (old_cars.id is INT but old_car_id is BIGINT)
+      const error = await adapter
+        .executeMutation(
+          "ALTER TABLE `engines` ADD CONSTRAINT `fk_old_car` FOREIGN KEY (`old_car_id`) REFERENCES `old_cars` (`id`)",
+        )
+        .then(() => null)
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(MismatchedForeignKey);
+      expect(error.message).toMatch(
+        /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
+      );
+      expect(error.message).toMatch(/which has type `int/i);
+      expect(error.cause).toBeInstanceOf(Error);
+    });
+
+    it("errors for bigint fks on integer pk table in create table", async () => {
+      // foos.old_car_id is BIGINT but old_cars.id is INT
+      const error = await adapter
+        .executeMutation(
+          `
+            CREATE TABLE \`foos\` (
+              \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+              \`old_car_id\` BIGINT,
+              INDEX \`idx_old_car_id\` (\`old_car_id\`),
+              CONSTRAINT \`fk_foos_old_car\` FOREIGN KEY (\`old_car_id\`) REFERENCES \`old_cars\` (\`id\`)
+            ) ENGINE=InnoDB
+          `,
+        )
+        .then(() => null)
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(MismatchedForeignKey);
+      expect(error.message).toMatch(
+        /Column `old_car_id` on table `foos` does not match column `id` on `old_cars`/,
+      );
+      expect(error.message).toMatch(/which has type `int/i);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `old_car_id` column on `foos` to be :integer/,
+      );
+      expect(error.cause).toBeInstanceOf(Error);
+    });
+
+    it("errors for integer fks on bigint pk table in create table", async () => {
+      // foos.car_id is INT but cars.id is BIGINT
+      const error = await adapter
+        .executeMutation(
+          `
+            CREATE TABLE \`foos\` (
+              \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+              \`car_id\` INT,
+              INDEX \`idx_car_id\` (\`car_id\`),
+              CONSTRAINT \`fk_foos_car\` FOREIGN KEY (\`car_id\`) REFERENCES \`cars\` (\`id\`)
+            ) ENGINE=InnoDB
+          `,
+        )
+        .then(() => null)
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(MismatchedForeignKey);
+      expect(error.message).toMatch(
+        /Column `car_id` on table `foos` does not match column `id` on `cars`/,
+      );
+      expect(error.message).toMatch(/which has type `bigint/i);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `car_id` column on `foos` to be :bigint/,
+      );
+      expect(error.cause).toBeInstanceOf(Error);
+    });
+
+    it("errors for bigint fks on string pk table in create table", async () => {
+      // foos.subscriber_id is BIGINT but subscribers.nick is VARCHAR
+      const error = await adapter
+        .executeMutation(
+          `
+            CREATE TABLE \`foos\` (
+              \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+              \`subscriber_id\` BIGINT,
+              INDEX \`idx_subscriber_id\` (\`subscriber_id\`),
+              CONSTRAINT \`fk_foos_subscriber\` FOREIGN KEY (\`subscriber_id\`) REFERENCES \`subscribers\` (\`nick\`)
+            ) ENGINE=InnoDB
+          `,
+        )
+        .then(() => null)
+        .catch((e) => e);
+
+      expect(error).toBeInstanceOf(MismatchedForeignKey);
+      expect(error.message).toMatch(
+        /Column `subscriber_id` on table `foos` does not match column `nick` on `subscribers`/,
+      );
+      expect(error.message).toMatch(/which has type `varchar/i);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `subscriber_id` column on `foos` to be :string/,
+      );
+      expect(error.cause).toBeInstanceOf(Error);
+    });
+
     it.skip("read timeout exception", () => {});
     it.skip("statement timeout error codes", () => {});
     it.skip("database timezone changes synced to connection", () => {});

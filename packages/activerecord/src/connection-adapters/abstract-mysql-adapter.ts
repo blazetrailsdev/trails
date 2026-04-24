@@ -11,12 +11,15 @@
 import { inspectExplainOption } from "../adapter.js";
 import type { ExplainOption } from "../adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
+import type { Column } from "./column.js";
 import {
   InvalidForeignKey,
+  MismatchedForeignKey,
   NotNullViolation,
   RecordNotUnique,
   StatementInvalid,
   ValueTooLong,
+  sqlTypeToMigrationKeyword,
 } from "../errors.js";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
@@ -66,6 +69,9 @@ const NATIVE_DATABASE_TYPES: Record<string, { name: string; limit?: number }> = 
 };
 
 const ER_DUP_ENTRY = 1062;
+const ER_CANNOT_ADD_FOREIGN = 1215;
+const ER_CANNOT_CREATE_TABLE = 1005;
+const ER_FK_INCOMPATIBLE_COLUMNS = 3780;
 const ER_NOT_NULL_VIOLATION = 1048;
 const ER_DO_NOT_HAVE_DEFAULT = 1364;
 const ER_NO_REFERENCED_ROW = 1216;
@@ -82,6 +88,15 @@ const ER_TABLE_EXISTS = 1050;
 
 export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly Version = Version;
+
+  /**
+   * Return Column objects for a table. Concrete adapters (Mysql2Adapter,
+   * TrilogyAdapter) override this. The default throws so that unimplemented
+   * adapters fail loudly if FK enrichment is ever triggered.
+   */
+  async columns(_tableName: string): Promise<Column[]> {
+    throw new Error(`${this.constructor.name} must implement columns()`);
+  }
 
   protected _mariadb = false;
   protected _databaseVersion: Version | null = null;
@@ -748,6 +763,99 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
+   * Build a MismatchedForeignKey from a MySQL FK constraint error.
+   * Parses the FK SQL to identify the mismatched columns, then looks up
+   * the referenced column's type to produce a helpful suggestion.
+   *
+   * Mirrors: AbstractMysqlAdapter#mismatched_foreign_key (abstract_mysql_adapter.rb:1001)
+   */
+  protected _mismatchedForeignKey(
+    message: string,
+    sql: string,
+    binds: unknown[],
+    cause: unknown,
+  ): MismatchedForeignKey {
+    const details = this._mismatchedForeignKeyDetails(message, sql);
+    return new MismatchedForeignKey({ message, sql, binds, cause, ...details });
+  }
+
+  /**
+   * Parse a CREATE TABLE / ALTER TABLE SQL statement to extract the FK
+   * details needed for a helpful MismatchedForeignKey error message.
+   *
+   * Mirrors: AbstractMysqlAdapter#mismatched_foreign_key_details (abstract_mysql_adapter.rb:978)
+   */
+  private _mismatchedForeignKeyDetails(
+    message: string,
+    sql: string,
+  ): Partial<ConstructorParameters<typeof MismatchedForeignKey>[0]> {
+    // Extract the referencing column name from MySQL's error message when
+    // available (MySQL 8+ includes it: "Referencing column 'x' and referenced")
+    const fkFromMsg = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1];
+    const fkPat = fkFromMsg ?? "\\w+";
+
+    const match = new RegExp(
+      String.raw`(?:CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?|ALTER\s+TABLE\s+)(?:\`?\w+\`?\.)?` +
+        String.raw`\`?(?<table>\w+)\`?.+?` +
+        String.raw`FOREIGN\s+KEY\s*\(\`?(?<foreign_key>${fkPat})\`?\)\s*` +
+        String.raw`REFERENCES\s*\`?(?<target_table>\w+)\`?\s*\(\`?(?<primary_key>\w+)\`?\)`,
+      "ims",
+    ).exec(sql);
+
+    if (!match?.groups) return {};
+
+    const {
+      table,
+      foreign_key: foreignKey,
+      target_table: targetTable,
+      primary_key: primaryKey,
+    } = match.groups;
+
+    // Return the parsed names; _enrichMismatchedForeignKey does the async
+    // column type lookup so the full human-readable message can be built.
+    return { table, foreignKey, targetTable, primaryKey };
+  }
+
+  /**
+   * Async enrichment for MismatchedForeignKey errors — looks up the
+   * referenced column's SQL type and rebuilds the error with a full
+   * human-readable message including the column type suggestion.
+   *
+   * Called after `_translateException` when a MismatchedForeignKey without
+   * type info is returned. Returns the original error if enrichment fails.
+   */
+  protected async _enrichMismatchedForeignKey(
+    err: MismatchedForeignKey,
+  ): Promise<MismatchedForeignKey> {
+    const { table, foreignKey, targetTable, primaryKey } = err.fkDetails;
+    if (!targetTable || !primaryKey || err.fkDetails.primaryKeySqlType) return err;
+
+    try {
+      const cols = await this.columns(targetTable);
+      const col = cols.find((c) => c.name === primaryKey);
+      if (!col) return err;
+
+      const sqlType = col.sqlTypeMetadata?.sqlType ?? col.sqlTypeMetadata?.type ?? "";
+      const primaryKeyType = sqlTypeToMigrationKeyword(sqlType);
+
+      return new MismatchedForeignKey({
+        message: err.cause instanceof Error ? err.cause.message : undefined,
+        sql: err.sql ?? undefined,
+        binds: err.binds ?? undefined,
+        cause: err.cause,
+        table,
+        foreignKey,
+        targetTable,
+        primaryKey,
+        primaryKeySqlType: sqlType,
+        primaryKeyType,
+      });
+    } catch {
+      return err;
+    }
+  }
+
+  /**
    * Map MySQL/MariaDB driver errors to ActiveRecord exception classes by
    * errno. Matches Rails'
    * `ConnectionAdapters::AbstractMysqlAdapter#translate_exception`.
@@ -765,6 +873,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       case ER_ROW_IS_REFERENCED_2:
       case ER_NO_REFERENCED_ROW_2:
         return new InvalidForeignKey(msg, { sql, binds, cause });
+      case ER_CANNOT_ADD_FOREIGN:
+      case ER_FK_INCOMPATIBLE_COLUMNS:
+        return this._mismatchedForeignKey(msg, sql, binds, cause);
+      case ER_CANNOT_CREATE_TABLE:
+        if (msg.includes("errno: 150") || msg.includes("errno 150")) {
+          return this._mismatchedForeignKey(msg, sql, binds, cause);
+        }
+        return new StatementInvalid(msg, { sql, binds, cause });
       case ER_NOT_NULL_VIOLATION:
       case ER_DO_NOT_HAVE_DEFAULT:
         return new NotNullViolation(msg, { sql, binds, cause });

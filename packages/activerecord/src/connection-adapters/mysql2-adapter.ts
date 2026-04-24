@@ -6,6 +6,7 @@ import {
   StatementPool as MysqlStatementPool,
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
+import { MismatchedForeignKey } from "../errors.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { quoteString as mysqlQuoteString } from "./mysql/quoting.js";
 import { Column } from "./column.js";
@@ -232,6 +233,36 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
+   * Translate a driver exception and, if it's a MismatchedForeignKey,
+   * enrich it with the referenced column's type via an async columns() call.
+   *
+   * Returns the translated (and possibly enriched) error plus a flag
+   * indicating whether the caller's `conn` was released during enrichment
+   * (to prevent double-release in `finally`).
+   */
+  private async _translateAndEnrich(
+    e: unknown,
+    sql: string,
+    binds: unknown[],
+    conn: mysql.PoolConnection | undefined,
+  ): Promise<{ error: Error; connReleased: boolean }> {
+    let translated = this._translateException(e, sql, binds);
+    let connReleased = false;
+    if (translated instanceof MismatchedForeignKey) {
+      // Release connection before enrichment — _enrichMismatchedForeignKey
+      // calls columns() which needs its own pool connection. Holding the
+      // current connection while waiting for another would deadlock on
+      // small pools (e.g. connectionLimit: 1).
+      if (conn) {
+        this.releaseConn(conn);
+        connReleased = true;
+      }
+      translated = await this._enrichMismatchedForeignKey(translated);
+    }
+    return { error: translated, connReleased };
+  }
+
+  /**
    * Convert boolean values in binds to integers for MySQL compatibility.
    */
   private mysqlBinds(binds: unknown[]): unknown[] {
@@ -284,8 +315,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // refused / closed pool); catching here lets subscribers see
         // acquisition failures as `payload.exception` too. Query-level
         // driver errors (ER_DUP_ENTRY etc.) are translated to Rails'
-        // typed exception classes via _translateException.
-        const translated = this._translateException(e, driverSql, driverBinds);
+        // typed exception classes via _translateAndEnrich.
+        const { error: translated, connReleased } = await this._translateAndEnrich(
+          e,
+          driverSql,
+          driverBinds,
+          conn,
+        );
+        if (connReleased) conn = undefined;
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
@@ -338,8 +375,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // Guard acquisition failures (pool exhausted / refused /
         // closed) so subscribers still see `payload.exception`. Driver
         // errors (ER_DUP_ENTRY etc.) are translated to Rails' typed
-        // exception classes via _translateException.
-        const translated = this._translateException(e, driverSql, driverBinds);
+        // exception classes via _translateAndEnrich.
+        const { error: translated, connReleased } = await this._translateAndEnrich(
+          e,
+          driverSql,
+          driverBinds,
+          conn,
+        );
+        if (connReleased) conn = undefined;
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;

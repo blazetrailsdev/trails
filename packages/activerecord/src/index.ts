@@ -187,6 +187,7 @@ export {
   WrappedDatabaseException,
   RecordNotUnique,
   InvalidForeignKey,
+  MismatchedForeignKey,
   NotNullViolation,
   StaleObjectError,
   ConfigurationError,

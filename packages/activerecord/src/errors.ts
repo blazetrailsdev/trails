@@ -237,6 +237,107 @@ export class InvalidForeignKey extends WrappedDatabaseException {
   }
 }
 
+/**
+ * Normalize a MySQL SQL column type to its Rails migration type keyword.
+ * E.g. `int(11)` → `integer`, `bigint(20)` → `bigint`, `varchar(255)` → `string`,
+ * `text` → `text`, `tinyint(1)` → `boolean`.
+ *
+ * Used by both MismatchedForeignKey (error construction) and
+ * _enrichMismatchedForeignKey (adapter enrichment) to keep suggestion
+ * messages consistent.
+ */
+export function sqlTypeToMigrationKeyword(sqlType: string): string {
+  const normalized = sqlType.trim().toLowerCase();
+
+  if (/^tinyint\s*\(\s*1\s*\)$/.test(normalized)) return "boolean";
+
+  // Strip size/precision (e.g. `int(11)`, `varchar(255)`) and modifiers
+  // (e.g. `int unsigned`) to get the bare base type.
+  const base = normalized.split("(")[0].trim().split(/\s+/)[0];
+
+  if (base === "bigint") return "bigint";
+  if (base.endsWith("int")) return "integer"; // int, tinyint, smallint, mediumint
+  if (base === "varchar" || base === "char") return "string";
+  if (base === "text" || base === "tinytext" || base === "mediumtext" || base === "longtext") {
+    return "text";
+  }
+
+  return base;
+}
+
+export interface MismatchedForeignKeyOptions {
+  message?: string;
+  sql?: string;
+  binds?: unknown[];
+  connectionPool?: unknown;
+  cause?: unknown;
+  table?: string;
+  foreignKey?: string;
+  targetTable?: string;
+  primaryKey?: string;
+  primaryKeySqlType?: string;
+  primaryKeyType?: string;
+}
+
+/**
+ * Raised when a FK column type doesn't match the referenced PK column type.
+ *
+ * Mirrors: ActiveRecord::MismatchedForeignKey (errors.rb:238)
+ *
+ * Intentionally extends StatementInvalid (not InvalidForeignKey) — matches
+ * Rails where MismatchedForeignKey < StatementInvalid, not < InvalidForeignKey.
+ *
+ * Provides a human-readable message describing the mismatch and suggesting
+ * the correct column type to use.
+ */
+export class MismatchedForeignKey extends StatementInvalid {
+  /** Parsed FK details for async enrichment after construction. */
+  readonly fkDetails: Omit<
+    MismatchedForeignKeyOptions,
+    "message" | "sql" | "binds" | "connectionPool" | "cause"
+  >;
+
+  constructor(options: MismatchedForeignKeyOptions = {}) {
+    const {
+      message: originalMessage,
+      table,
+      foreignKey,
+      targetTable,
+      primaryKey,
+      primaryKeySqlType,
+      primaryKeyType,
+      ...rest
+    } = options;
+
+    let msg: string;
+    if (table && foreignKey && targetTable && primaryKey && primaryKeySqlType) {
+      const type = primaryKeyType ?? sqlTypeToMigrationKeyword(primaryKeySqlType);
+      msg = [
+        `Column \`${foreignKey}\` on table \`${table}\` does not match column \`${primaryKey}\` on \`${targetTable}\`,`,
+        `which has type \`${primaryKeySqlType}\`.`,
+        `To resolve this issue, change the type of the \`${foreignKey}\` column on \`${table}\` to be :${type}.`,
+        `(For example \`t.${type} :${foreignKey}\`).`,
+      ].join(" ");
+    } else {
+      const fallback =
+        "There is a mismatch between the foreign key and primary key column types. " +
+        "Verify that the foreign key column type and the primary key of the associated table match types.";
+      msg = originalMessage ? `${fallback} ${originalMessage}` : fallback;
+    }
+
+    super(msg, rest);
+    this.name = "MismatchedForeignKey";
+    this.fkDetails = {
+      table,
+      foreignKey,
+      targetTable,
+      primaryKey,
+      primaryKeySqlType,
+      primaryKeyType,
+    };
+  }
+}
+
 export class NotNullViolation extends StatementInvalid {
   constructor(
     message?: string,

@@ -12,6 +12,9 @@ class TestMysqlAdapter extends AbstractMysqlAdapter {
   override isWriteQuery(sql: string): boolean {
     return /^\s*(INSERT|UPDATE|DELETE|REPLACE|CREATE|ALTER|DROP|TRUNCATE)/i.test(sql);
   }
+  async columns(_tableName: string) {
+    return [];
+  }
 }
 
 let adapter: TestMysqlAdapter;
