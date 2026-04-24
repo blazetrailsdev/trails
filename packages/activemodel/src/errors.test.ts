@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Model, Errors, I18n } from "./index.js";
+import { Model, Errors, I18n, StrictValidationFailed } from "./index.js";
 import { Error as ActiveModelError } from "./error.js";
 
 describe("ErrorsTest", () => {
@@ -986,5 +986,52 @@ describe("ErrorsTest", () => {
     const errors = new Errors(base);
     errors.add("name", "invalid", { message: "bar" });
     expect(errors.fullMessages).toEqual(["foo bar"]);
+  });
+
+  describe("add strict + Enumerable (Rails fidelity)", () => {
+    // Rails errors.rb:342-354 — `add` returns the new Error and raises
+    // when `strict:` is passed. `include Enumerable` (errors.rb:62) makes
+    // the collection iterable.
+    it("add returns the new Error object", () => {
+      const errors = new Errors({});
+      const err = errors.add("name", "blank");
+      expect(err).toBeInstanceOf(ActiveModelError);
+      expect(err.attribute).toBe("name");
+      expect(err.type).toBe("blank");
+      expect(errors.objects[0]).toBe(err);
+    });
+
+    it("add with strict: true raises StrictValidationFailed", () => {
+      const errors = new Errors({});
+      expect(() => errors.add("name", "blank", { strict: true })).toThrow(StrictValidationFailed);
+      // Strict raise must NOT append the error to the collection.
+      expect(errors.count).toBe(0);
+    });
+
+    it("add with strict: CustomErrorClass raises that class", () => {
+      class NameIsInvalid extends globalThis.Error {}
+      const errors = new Errors({});
+      expect(() => errors.add("name", "blank", { strict: NameIsInvalid })).toThrow(NameIsInvalid);
+      expect(errors.count).toBe(0);
+    });
+
+    it("is iterable via for..of", () => {
+      const errors = new Errors({});
+      errors.add("name", "blank");
+      errors.add("age", "invalid");
+      const collected: string[] = [];
+      for (const e of errors) {
+        collected.push(e.attribute);
+      }
+      expect(collected).toEqual(["name", "age"]);
+    });
+
+    it("supports spread and Array.from", () => {
+      const errors = new Errors({});
+      errors.add("name", "blank");
+      errors.add("age", "invalid");
+      expect([...errors]).toHaveLength(2);
+      expect(Array.from(errors, (e) => e.attribute)).toEqual(["name", "age"]);
+    });
   });
 });
