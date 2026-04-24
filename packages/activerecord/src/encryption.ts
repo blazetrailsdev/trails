@@ -24,6 +24,7 @@ import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Cipher } from "./encryption/cipher/aes256-gcm.js";
 import { globalPreviousSchemesFor } from "./encryption/encryptable-record.js";
+import { Configurable } from "./encryption/configurable.js";
 
 /**
  * The simple encryptor surface `Base.encrypts({ encryptor })` accepts.
@@ -140,9 +141,18 @@ function buildScheme(options: EncryptsOptions): Scheme {
     schemeOptions.compressor !== undefined ||
     schemeOptions.supportUnencryptedData !== undefined;
 
+  // Switch to the real Scheme whenever any encryption key material is configured.
+  // If config is incomplete (e.g. only keyDerivationSalt set, no primaryKey),
+  // Scheme._defaultKeyProvider() returns undefined and Encryptor raises
+  // "No encryption key provided" at serialize/deserialize time — still more
+  // informative than silently storing AR_ENC:base64 data.
+  const { primaryKey, deterministicKey, keyDerivationSalt } = Configurable.config;
+  const hasConfiguredKeys =
+    primaryKey !== undefined || deterministicKey !== undefined || keyDerivationSalt !== undefined;
+
   const coreOpts: SchemeOptions = encryptor
     ? { ...schemeOptions, encryptor: new LegacyEncryptorShim(encryptor) }
-    : hasSchemeOptions
+    : hasSchemeOptions || hasConfiguredKeys
       ? schemeOptions
       : { encryptor: new LegacyEncryptorShim(defaultEncryptor) };
 

@@ -13,6 +13,50 @@ import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 import { Key } from "./key.js";
 
+// Module-level single-entry cache for the default key provider. Shared across
+// all Scheme instances so PBKDF2 runs once per (primaryKey, salt, digest) tuple.
+// Uses stable string serialisation for primaryKey so array instances compare by
+// value rather than reference, avoiding spurious re-derivations.
+let _defaultKeyProviderEntry: DerivedSecretKeyProvider | undefined;
+let _defaultKeyProviderSig: string | undefined;
+
+function stableKeySignature(
+  primaryKey: string | string[],
+  keyDerivationSalt: string | undefined,
+  hashDigestClass: string,
+): string {
+  // JSON.stringify preserves array order (key rotation order is semantically
+  // meaningful) and is unambiguous — no comma-collision risk from key strings.
+  // Use null for undefined so missing salt is distinct from empty-string salt,
+  // ensuring cache invalidation when keyDerivationSalt is cleared.
+  // Normalize digest the same way KeyGenerator does (lowercase, no hyphens)
+  // so "SHA-256" and "sha256" resolve to the same cache entry.
+  const digest = hashDigestClass.toLowerCase().replace(/-/g, "");
+  return JSON.stringify([primaryKey, keyDerivationSalt ?? null, digest]);
+}
+
+function getOrCreateDefaultKeyProvider(
+  primaryKey: string | string[],
+  keyDerivationSalt: string | undefined,
+  hashDigestClass: string,
+): DerivedSecretKeyProvider {
+  const sig = stableKeySignature(primaryKey, keyDerivationSalt, hashDigestClass);
+  if (!_defaultKeyProviderEntry || _defaultKeyProviderSig !== sig) {
+    _defaultKeyProviderEntry = new DerivedSecretKeyProvider(primaryKey);
+    _defaultKeyProviderSig = sig;
+  }
+  return _defaultKeyProviderEntry;
+}
+
+export function clearDefaultKeyProviderCache(): void {
+  _defaultKeyProviderEntry = undefined;
+  _defaultKeyProviderSig = undefined;
+}
+
+// Register eager cache invalidation so key material is released whenever
+// Configurable.configure() is called (key rotation, test teardown, etc.).
+Configurable.onConfigure(clearDefaultKeyProviderCache);
+
 export interface SchemeOptions {
   keyProvider?: unknown;
   key?: string;
@@ -74,7 +118,7 @@ export class Scheme {
       this._keyProviderParam ??
       this._keyProviderFromKey() ??
       this._deterministicKeyProvider() ??
-      undefined
+      this._defaultKeyProvider()
     );
   }
 
@@ -125,6 +169,23 @@ export class Scheme {
       return this._cachedKeyProviderFromKey;
     }
     return undefined;
+  }
+
+  // Mirrors Rails' Scheme#default_key_provider → ActiveRecord::Encryption.key_provider.
+  // Returns the context's keyProvider if set, otherwise derives one from config.primaryKey.
+  // Memoized on the primaryKey value to avoid repeated PBKDF2 calls.
+  private _defaultKeyProvider(): unknown {
+    const ctxKp = Configurable.keyProvider;
+    if (ctxKp != null) return ctxKp;
+    if (Configurable.config.primaryKey == null) {
+      // No primary key configured — clear any stale cached provider so old
+      // key material can be GC'd (e.g. after config reset in tests).
+      clearDefaultKeyProviderCache();
+      return undefined;
+    }
+    const primaryKey = Configurable.config.primaryKey;
+    const { keyDerivationSalt, hashDigestClass } = Configurable.config;
+    return getOrCreateDefaultKeyProvider(primaryKey, keyDerivationSalt, hashDigestClass);
   }
 
   private _deterministicKeyProvider(): DeterministicKeyProvider | undefined {

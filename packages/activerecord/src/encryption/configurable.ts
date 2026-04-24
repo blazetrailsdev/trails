@@ -3,6 +3,7 @@ import { Contexts } from "./contexts.js";
 
 let _sharedConfig: Config | null = null;
 const _listeners: Array<(klass: any, name: string) => void> = [];
+const _configureHooks: Array<() => void> = [];
 
 /**
  * Configuration API for ActiveRecord::Encryption. Manages the shared
@@ -49,6 +50,15 @@ export class Configurable {
     // Mirror Rails: reset_default_context after setting config so context
     // properties derived from config (e.g. key_provider) are re-evaluated.
     Contexts.resetDefaultContext();
+    for (const hook of _configureHooks) hook();
+  }
+
+  static onConfigure(hook: () => void): () => void {
+    _configureHooks.push(hook);
+    return () => {
+      const idx = _configureHooks.indexOf(hook);
+      if (idx !== -1) _configureHooks.splice(idx, 1);
+    };
   }
 
   static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
