@@ -19,6 +19,10 @@ import {
   computeType as inheritanceComputeType,
   subclasses as inheritanceSubclasses,
   descendants as inheritanceDescendants,
+  isFinderNeedsTypeCondition,
+  primaryAbstractClass,
+  stiClassFor,
+  polymorphicClassFor,
 } from "./inheritance.js";
 import {
   NotImplementedError,
@@ -838,6 +842,22 @@ export class Base extends Model {
 
   static computeType(typeName: string): typeof Base {
     return inheritanceComputeType(this, typeName);
+  }
+
+  static isFinderNeedsTypeCondition(): boolean {
+    return isFinderNeedsTypeCondition(this);
+  }
+
+  static primaryAbstractClass(): void {
+    primaryAbstractClass(this);
+  }
+
+  static stiClassFor(typeName: string): typeof Base {
+    return stiClassFor(this, typeName);
+  }
+
+  static polymorphicClassFor(name: string): typeof Base {
+    return polymorphicClassFor(this, name);
   }
 
   static get subclasses(): (typeof Base)[] {

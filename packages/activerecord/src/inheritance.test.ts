@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } from "./index.js";
 import { getStiBase, isStiSubclass } from "./inheritance.js";
 
@@ -1801,3 +1801,97 @@ describe("Base.inheritanceColumn", () => {
 // ==========================================================================
 // InheritanceTest — targets inheritance_test.rb (continued)
 // ==========================================================================
+
+import {
+  isFinderNeedsTypeCondition,
+  primaryAbstractClass,
+  stiClassFor,
+  polymorphicClassFor,
+  __resetPrimaryAbstractClass,
+} from "./inheritance.js";
+
+describe("InheritanceTest — new parity methods", () => {
+  afterEach(() => __resetPrimaryAbstractClass());
+
+  it("primary_abstract_class marks the class abstract", () => {
+    class AppRecord extends Base {}
+    primaryAbstractClass(AppRecord);
+    expect(AppRecord.abstractClass).toBe(true);
+  });
+
+  it("primary_abstract_class raises if a different class is already set", () => {
+    class AppRecord extends Base {}
+    class Other extends Base {}
+    primaryAbstractClass(AppRecord);
+    expect(() => primaryAbstractClass(Other)).toThrow(/primary_abstract_class.*already set/);
+  });
+
+  it("primary_abstract_class allows re-setting the same class by reference", () => {
+    class AppRecord extends Base {}
+    primaryAbstractClass(AppRecord);
+    expect(() => primaryAbstractClass(AppRecord)).not.toThrow();
+  });
+
+  it("finder_needs_type_condition? returns false for base class", () => {
+    class M extends Base {
+      static {
+        this.attribute("type", "string");
+      }
+    }
+    expect(isFinderNeedsTypeCondition(M)).toBe(false);
+  });
+
+  it("finder_needs_type_condition? returns true for STI subclass", () => {
+    class Animal extends Base {
+      static {
+        this.attribute("type", "string");
+      }
+    }
+    enableSti(Animal);
+    class Dog extends Animal {}
+    expect(isFinderNeedsTypeCondition(Dog)).toBe(true);
+  });
+
+  it("finder_needs_type_condition? memoizes per own class, not inherited", () => {
+    class Shape extends Base {
+      static {
+        this.attribute("type", "string");
+      }
+    }
+    enableSti(Shape);
+    class Circle extends Shape {}
+    isFinderNeedsTypeCondition(Shape); // cache false on Shape
+    // Circle is an STI subclass — must compute its own value (true)
+    expect(isFinderNeedsTypeCondition(Circle)).toBe(true);
+    expect(isFinderNeedsTypeCondition(Shape)).toBe(false);
+  });
+
+  it("sti_class_for raises SubclassNotFound for unknown type", () => {
+    class Animal extends Base {
+      static {
+        this.attribute("type", "string");
+      }
+    }
+    expect(() => stiClassFor(Animal, "NonExistent")).toThrow(SubclassNotFound);
+  });
+
+  it("sti_class_for returns registered subclass", () => {
+    class Vehicle extends Base {
+      static {
+        this.attribute("type", "string");
+      }
+    }
+    class Car extends Vehicle {}
+    registerModel(Car);
+    expect(stiClassFor(Vehicle, "Car")).toBe(Car);
+  });
+
+  it("polymorphic_class_for resolves any registered model", () => {
+    class Post extends Base {}
+    class Comment extends Base {}
+    registerModel(Post);
+    registerModel(Comment);
+    // polymorphicClassFor resolves without STI constraint
+    expect(polymorphicClassFor(Post, "Comment")).toBe(Comment);
+  });
+});

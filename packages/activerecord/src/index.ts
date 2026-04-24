@@ -71,6 +71,7 @@ export {
 } from "./log-subscriber.js";
 export { ExplainSubscriber } from "./explain-subscriber.js";
 export { ExplainRegistry } from "./explain-registry.js";
+export { collectingQueriesForExplain, execExplain } from "./explain.js";
 
 // Wire LogSubscriber's Base resolver so it can delegate logger/filter
 // to ActiveRecord::Base without circular imports.
@@ -262,7 +263,7 @@ export {
   TooManyRecords,
 } from "./nested-attributes.js";
 // hasSecureToken requires node:crypto — use subpath: @blazetrails/activerecord/secure-token
-export { composedOf } from "./composed-of.js";
+export { composedOf } from "./aggregations.js";
 export { serialize } from "./serialize.js";
 // Encryption is exposed via the subpath export. Use:
 // `import { ... } from "@blazetrails/activerecord/encryption"`.
