@@ -136,7 +136,7 @@ import { Associations as _Associations, updateCounterCaches } from "./associatio
 /** @internal */
 export function quoteSqlValue(v: unknown, asArray = false): string {
   if (v === null || v === undefined) return "NULL";
-  if (typeof v === "number") return String(v);
+  if (typeof v === "number" || typeof v === "bigint") return String(v);
   if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
   if (v instanceof Date) return `'${v.toISOString()}'`;
   if (asArray && Array.isArray(v)) {
@@ -151,10 +151,11 @@ export function quoteSqlValue(v: unknown, asArray = false): string {
  * A single column of a primary key.
  *
  * - `string` / `number` — the common scalar PK types (auto-increment ids, UUIDs).
+ * - `bigint` — large integer PKs (big_integer columns, e.g. PG int8 / MySQL BIGINT).
  * - `null` / `undefined` — column unset (e.g. a new record, or an unassigned
  *   CPK column).
  */
-export type PrimaryKeyScalar = string | number | null | undefined;
+export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
 /**
  * Value of a primary key on a persisted (or to-be-persisted) record.

@@ -86,12 +86,25 @@ class Article extends Base {
   }
 }
 
+class BigRecord extends Base {
+  static {
+    this.attribute("score", "big_integer");
+    this.attribute("smallId", "big_integer");
+  }
+}
+
 describe("virtualized patterns — trails-tsc injects declares + auto-imports", () => {
   it("attributes resolve to their declared type", () => {
     const u = new User({ name: "dean", email: "d@example.com", admin: false });
     expectTypeOf(u.name).toBeString();
     expectTypeOf(u.email).toBeString();
     expectTypeOf(u.admin).toBeBoolean();
+  });
+
+  it("big_integer attribute resolves to bigint", () => {
+    const r = new BigRecord({ score: 2n ** 62n });
+    expectTypeOf(r.score).toEqualTypeOf<bigint>();
+    expectTypeOf(r.smallId).toEqualTypeOf<bigint>();
   });
 
   it("hasMany resolves to AssociationProxy<Target>", async () => {

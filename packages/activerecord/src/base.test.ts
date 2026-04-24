@@ -13,6 +13,7 @@ import {
   setRaiseOnAssignToAttrReadonly,
 } from "./index.js";
 import { SubclassNotFound, NameError } from "./errors.js";
+import { quoteSqlValue } from "./base.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
@@ -2985,6 +2986,27 @@ describe("BasicsTest", () => {
       }
     }
     expect(User.tableName).toBe("app_users");
+  });
+});
+
+// ==========================================================================
+// quoteSqlValue — internal helper used by InsertAll and relation scoping
+// ==========================================================================
+describe("quoteSqlValue", () => {
+  it("emits bare decimal for bigint (not quoted string)", () => {
+    expect(quoteSqlValue(123n)).toBe("123");
+    expect(quoteSqlValue(2n ** 62n)).toBe("4611686018427387904");
+    expect(quoteSqlValue(-1n)).toBe("-1");
+  });
+
+  it("emits bare decimal for number (unchanged)", () => {
+    expect(quoteSqlValue(42)).toBe("42");
+    expect(quoteSqlValue(-7)).toBe("-7");
+  });
+
+  it("emits NULL for null/undefined", () => {
+    expect(quoteSqlValue(null)).toBe("NULL");
+    expect(quoteSqlValue(undefined)).toBe("NULL");
   });
 });
 

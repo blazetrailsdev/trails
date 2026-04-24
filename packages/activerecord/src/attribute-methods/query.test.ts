@@ -57,6 +57,26 @@ describe("QueryTest", () => {
     expect(p.queryAttribute("views")).toBe(true);
   });
 
+  it("query attribute returns false for zero bigint", () => {
+    class Post extends Base {
+      static {
+        this.attribute("score", "big_integer");
+      }
+    }
+    const p = new Post({ score: 0n });
+    expect(p.queryAttribute("score")).toBe(false);
+  });
+
+  it("query attribute returns true for non-zero bigint", () => {
+    class Post extends Base {
+      static {
+        this.attribute("score", "big_integer");
+      }
+    }
+    const p = new Post({ score: 2n ** 62n });
+    expect(p.queryAttribute("score")).toBe(true);
+  });
+
   it("query attribute respects overridden getter", () => {
     class Post extends Base {
       static {

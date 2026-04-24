@@ -188,6 +188,20 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/declare strict_tags: string\[\];/);
   });
 
+  test("schemaColumnsByTable emits bigint for big_integer schema columns", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          score: { type: "big_integer", null: false },
+          score_nullable: { type: "big_integer", null: true },
+        },
+      },
+    });
+    expect(text).toMatch(/declare score: bigint;/);
+    expect(text).toMatch(/declare score_nullable: bigint \| null;/);
+  });
+
   test("schemaColumnsByTable mixing legacy string and rich shape in same table", () => {
     const src = "export class Post extends Base {}\n";
     const { text } = virtualize(src, "post.ts", {

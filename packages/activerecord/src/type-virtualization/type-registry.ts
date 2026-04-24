@@ -29,7 +29,7 @@ export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   cidr: "string",
   citext: "string",
   integer: "number",
-  big_integer: "number",
+  big_integer: "bigint",
   float: "number",
   decimal: "number",
   boolean: "boolean",

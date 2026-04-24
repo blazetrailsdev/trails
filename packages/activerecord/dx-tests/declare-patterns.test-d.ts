@@ -177,12 +177,31 @@ class Article extends Base {
   }
 }
 
+// --- big_integer attribute typing ---
+class BigRecord extends Base {
+  declare score: bigint;
+  declare smallId: bigint;
+
+  static {
+    this.attribute("score", "big_integer");
+    this.attribute("smallId", "big_integer");
+  }
+}
+
 describe("declare patterns — typing runtime-attached members", () => {
   it("attributes: `declare name: string` exposes the typed field", () => {
     const u = new User({ name: "dean", email: "d@example.com", admin: false });
     expectTypeOf(u.name).toBeString();
     expectTypeOf(u.email).toBeString();
     expectTypeOf(u.admin).toBeBoolean();
+  });
+
+  it("big_integer attribute: `declare score: bigint` exposes bigint field", () => {
+    const r = new BigRecord({ score: 2n ** 62n });
+    expectTypeOf(r.score).toEqualTypeOf<bigint>();
+    expectTypeOf(r.smallId).toEqualTypeOf<bigint>();
+    // PrimaryKeyScalar includes bigint
+    expectTypeOf<bigint>().toMatchTypeOf<import("@blazetrails/activerecord").PrimaryKeyScalar>();
   });
 
   it("hasMany accessor: `declare comments: AssociationProxy<Comment>` (chainable + awaitable + array-shaped)", async () => {

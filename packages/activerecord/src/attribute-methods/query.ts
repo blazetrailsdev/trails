@@ -63,6 +63,7 @@ export function _queryAttribute(this: RawReadable, name: string): boolean {
 function castToBoolean(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   if (typeof value === "number") return value !== 0;
+  if (typeof value === "bigint") return value !== 0n;
   const cast = booleanType.cast(value);
   if (cast !== null) return cast;
   return !!value;
