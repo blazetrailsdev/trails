@@ -41,7 +41,8 @@
   },
   "bin": {
     "trails-tsc": "./bin/trails-tsc.js",
-    "trails-schema-dump": "./bin/trails-schema-dump.js"
+    "trails-schema-dump": "./bin/trails-schema-dump.js",
+    "trails-models-dump": "./bin/trails-models-dump.js"
   },
   "scripts": {
     "build": "tsc"
