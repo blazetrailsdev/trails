@@ -198,8 +198,8 @@ function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Ba
     (record as any)._strictLoading = true;
   }
   // Rails' init_with_attributes fires after_find then after_initialize
-  (klass as any)._callbackChain?.runAfter?.("find", record);
-  (klass as any)._callbackChain?.runAfter?.("initialize", record);
+  (klass as any)._callbackChain?.runAfter?.("find", record, { strict: "sync" });
+  (klass as any)._callbackChain?.runAfter?.("initialize", record, { strict: "sync" });
   return record;
 }
 

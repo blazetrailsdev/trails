@@ -1617,6 +1617,111 @@ describe("CallbacksTest", () => {
     expect(notifications).toEqual(["order:100"]); // Not called for silent
   });
 
+  it("awaits async before_save before persisting", async () => {
+    const order: string[] = [];
+    class Widget extends Base {
+      static {
+        this._tableName = "widgets";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.beforeSave(async (r: any) => {
+          await Promise.resolve();
+          order.push(`before:${r.name}`);
+        });
+        this.afterSave((r: any) => {
+          order.push(`after:${r.name}`);
+        });
+      }
+    }
+    const w = await Widget.create({ name: "gear" });
+    expect(w.isPersisted()).toBe(true);
+    expect(order).toEqual(["before:gear", "after:gear"]);
+  });
+
+  it("awaits async after_save after persisting", async () => {
+    const seen: number[] = [];
+    class Gadget extends Base {
+      static {
+        this._tableName = "gadgets";
+        this.attribute("id", "integer");
+        this.attribute("value", "integer");
+        this.adapter = adapter;
+        this.afterSave(async (r: any) => {
+          await Promise.resolve();
+          seen.push(r.id);
+        });
+      }
+    }
+    const g = await Gadget.create({ value: 1 });
+    expect(seen).toEqual([g.id]);
+  });
+
+  it("async before_save returning false halts save", async () => {
+    class Locked extends Base {
+      static {
+        this._tableName = "lockeds";
+        this.attribute("id", "integer");
+        this.attribute("allowed", "boolean");
+        this.adapter = adapter;
+        this.beforeSave(async (r: any) => {
+          await Promise.resolve();
+          return r.allowed === true;
+        });
+      }
+    }
+    const ok = new Locked();
+    ok.allowed = true;
+    expect(await ok.save()).toBe(true);
+
+    const blocked = new Locked();
+    blocked.allowed = false;
+    expect(await blocked.save()).toBe(false);
+    expect(blocked.isPersisted()).toBe(false);
+  });
+
+  it("async around_create wraps the insert block and awaits both sides", async () => {
+    const order: string[] = [];
+    class Envelope extends Base {
+      static {
+        this._tableName = "envelopes";
+        this.attribute("id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+        this.aroundCreate(async (_r: any, proceed: () => void | Promise<void>) => {
+          order.push("around:before");
+          await proceed();
+          await Promise.resolve();
+          order.push("around:after");
+        });
+        this.afterSave(() => {
+          order.push("after");
+        });
+      }
+    }
+    await Envelope.create({ label: "x" });
+    expect(order).toEqual(["around:before", "around:after", "after"]);
+  });
+
+  it("async before_destroy halts destroy", async () => {
+    class Protected extends Base {
+      static {
+        this._tableName = "protecteds";
+        this.attribute("id", "integer");
+        this.attribute("sealed", "boolean");
+        this.adapter = adapter;
+        this.beforeDestroy(async (r: any) => {
+          await Promise.resolve();
+          return r.sealed !== true;
+        });
+      }
+    }
+    const r = await Protected.create({ sealed: true });
+    const result = await r.destroy();
+    expect(result).toBe(false);
+    expect(await Protected.count()).toBe(1);
+  });
+
   // Rails: test "halt callback chain with false"
   it("before save throwing abort", async () => {
     class Immutable extends Base {

@@ -1938,8 +1938,8 @@ export class Base extends Model {
     if (this._strictLoadingByDefault) {
       record._strictLoading = true;
     }
-    this._callbackChain.runAfter("find", record);
-    this._callbackChain.runAfter("initialize", record);
+    this._callbackChain.runAfter("find", record, { strict: "sync" });
+    this._callbackChain.runAfter("initialize", record, { strict: "sync" });
     return record;
   }
 
@@ -2089,7 +2089,7 @@ export class Base extends Model {
   private async _createOrUpdate(): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
     let saved = false;
-    if (!(await ctor._callbackChain.runBeforeAsync("save", this))) return false;
+    if (!(await ctor._callbackChain.runBefore("save", this))) return false;
 
     const belongsToOk = await autosaveBelongsTo(this);
     if (!belongsToOk) {
@@ -2099,7 +2099,7 @@ export class Base extends Model {
 
     const wasNewRecord = this._newRecord;
     if (this._newRecord) {
-      const createResult = await ctor._callbackChain.runCallbacksAsync("create", this, async () => {
+      const createResult = await ctor._callbackChain.runCallbacks("create", this, async () => {
         this._performInsert();
         if (this._pendingOperation) {
           await this._pendingOperation;
@@ -2112,7 +2112,7 @@ export class Base extends Model {
       });
       if (!createResult) saved = false;
     } else {
-      const updateResult = await ctor._callbackChain.runCallbacksAsync("update", this, async () => {
+      const updateResult = await ctor._callbackChain.runCallbacks("update", this, async () => {
         this._performUpdate();
         if (this._pendingOperation) {
           await this._pendingOperation;
@@ -2131,7 +2131,7 @@ export class Base extends Model {
       (this as any)._newRecordBeforeLastCommit = wasNewRecord;
       (this as any)._triggerUpdateCallback = !wasNewRecord;
 
-      await ctor._callbackChain.runAfterAsync("save", this);
+      await ctor._callbackChain.runAfter("save", this);
 
       if (wasNewRecord) {
         await updateCounterCaches(this, "increment");
@@ -2295,7 +2295,7 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
 
     let didDelete = false;
-    const destroyResult = await ctor._callbackChain.runCallbacksAsync("destroy", this, async () => {
+    const destroyResult = await ctor._callbackChain.runCallbacks("destroy", this, async () => {
       const table = ctor.arelTable;
       const pk = this.id;
       if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {

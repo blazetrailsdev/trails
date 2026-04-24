@@ -170,7 +170,7 @@ async function touchDeferredAttributes(record: Base): Promise<void> {
   // Run after_touch callbacks — mirrors touch() going through Timestamp#touch
   // which fires the after_touch chain.
   const ctor = record.constructor as typeof Base;
-  await (ctor as any)._callbackChain?.runAfterAsync?.("touch", record);
+  await (ctor as any)._callbackChain?.runAfter?.("touch", record);
 }
 
 export const InstanceMethods = {

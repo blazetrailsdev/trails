@@ -12,6 +12,7 @@ import {
   AroundCallbackFn,
   type CallbackObject,
   CallbackConditions,
+  type RunCallbacksOptions,
   defineModelCallbacks,
 } from "./callbacks.js";
 import { serializableHash, SerializeOptions, coerceForJson } from "./serialization.js";
@@ -387,14 +388,17 @@ export class Model {
   }
 
   static validate(
-    methodOrFn: string | ((record: AnyRecord) => void),
+    methodOrFn: string | ((record: AnyRecord) => unknown),
     options: ConditionalOptions = {},
   ): void {
     const fn: CallbackFn = (record: AnyRecord) => {
+      // Return the underlying result so an `async` validator's Promise flows
+      // into the callback runner, where strict-sync mode (on the `validate`
+      // event) will throw instead of dropping it as an unhandled rejection.
       if (typeof methodOrFn === "function") {
-        methodOrFn(record);
+        return methodOrFn(record) as void;
       } else if (typeof record[methodOrFn] === "function") {
-        record[methodOrFn]();
+        return record[methodOrFn]() as void;
       }
     };
     this._ensureOwnCallbacks();
@@ -417,7 +421,7 @@ export class Model {
     this._callbackChain.register(
       "before",
       "validate",
-      (record: AnyRecord) => validator.validate(record),
+      (record: AnyRecord) => validator.validate(record) as unknown as void,
       this._buildValidateConditions(options),
     );
   }
@@ -477,17 +481,19 @@ export class Model {
           const origErrors = record.errors;
           const tempErrors = new Errors(record);
           record.errors = tempErrors;
+          let validateResult: unknown;
           try {
-            validator.validate(record);
+            validateResult = validator.validate(record);
           } finally {
             record.errors = origErrors;
           }
           if (tempErrors.any) {
             throw new StrictValidationFailed(tempErrors.fullMessages.join(", "));
           }
+          return validateResult as void;
         };
       } else {
-        callbackFn = (record: AnyRecord) => validator.validate(record);
+        callbackFn = (record: AnyRecord) => validator.validate(record) as unknown as void;
       }
 
       this._ensureOwnCallbacks();
@@ -1212,7 +1218,7 @@ export class Model {
     // then fire after_initialize in Rails-compatible order.
     const callbackSuppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     if (callbackSuppressor._suppressInitializeCallback !== true) {
-      ctor._callbackChain.runAfter("initialize", this);
+      ctor._callbackChain.runAfter("initialize", this, { strict: "sync" });
     }
   }
 
@@ -1373,9 +1379,14 @@ export class Model {
     this._validationContext = normalized;
 
     try {
-      const completed = ctor._callbackChain.runCallbacks("validation", this, () => {
-        this._runValidateCallbacks();
-      });
+      const completed = ctor._callbackChain.runCallbacks(
+        "validation",
+        this,
+        () => {
+          this._runValidateCallbacks();
+        },
+        { strict: "sync" },
+      );
       if (!completed) return false;
       return this.errors.empty;
     } finally {
@@ -1385,7 +1396,7 @@ export class Model {
 
   private _runValidateCallbacks(): void {
     const ctor = this.constructor as typeof Model;
-    ctor._callbackChain.runBefore("validate", this);
+    ctor._callbackChain.runBefore("validate", this, { strict: "sync" });
   }
 
   /**
@@ -1876,8 +1887,22 @@ export class Model {
 
   // -- Callbacks helper for subclasses --
 
-  runCallbacks(event: string, block: () => void): boolean {
-    return (this.constructor as typeof Model)._callbackChain.runCallbacks(event, this, block);
+  runCallbacks(
+    event: string,
+    block: () => unknown,
+    opts: RunCallbacksOptions & { strict: "sync" },
+  ): boolean;
+  runCallbacks(
+    event: string,
+    block: () => unknown,
+    opts?: RunCallbacksOptions,
+  ): boolean | Promise<boolean>;
+  runCallbacks(
+    event: string,
+    block: () => unknown,
+    opts?: RunCallbacksOptions,
+  ): boolean | Promise<boolean> {
+    return (this.constructor as typeof Model)._callbackChain.runCallbacks(event, this, block, opts);
   }
 }
 
