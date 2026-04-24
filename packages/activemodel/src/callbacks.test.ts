@@ -391,3 +391,160 @@ describe("CallbackChain.run", () => {
     expect(log).toEqual(["block", "after1", "after2"]);
   });
 });
+
+describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidelity)", () => {
+  // Rails `set_callback(name, type, filter, options)` /
+  // `skip_callback(...)` / `reset_callbacks(name)` from
+  // `ActiveSupport::Callbacks::ClassMethods`.
+  it("setCallback registers a function for arbitrary event + timing", () => {
+    const log: string[] = [];
+    class Thing extends Model {}
+    Thing.setCallback("save", "before", () => log.push("before"));
+    Thing.setCallback("save", "after", () => log.push("after"));
+    new Thing().runCallbacks("save", () => log.push("block"));
+    expect(log).toEqual(["before", "block", "after"]);
+  });
+
+  it("skipCallback removes a previously registered callback by reference", () => {
+    const log: string[] = [];
+    class Thing extends Model {}
+    const cb = () => log.push("skipped-callback");
+    Thing.setCallback("save", "before", cb);
+    Thing.setCallback("save", "before", () => log.push("kept"));
+
+    expect(Thing.skipCallback("save", "before", cb)).toBe(true);
+    new Thing().runCallbacks("save", () => log.push("block"));
+    expect(log).toEqual(["kept", "block"]);
+  });
+
+  it("skipCallback returns false on miss (Rails raises unless :raise => false)", () => {
+    class Thing extends Model {}
+    expect(Thing.skipCallback("save", "before", () => undefined)).toBe(false);
+  });
+
+  it("resetCallbacks clears all callbacks for an event", () => {
+    const log: string[] = [];
+    class Thing extends Model {}
+    Thing.setCallback("save", "before", () => log.push("before"));
+    Thing.setCallback("save", "after", () => log.push("after"));
+    Thing.setCallback("update", "before", () => log.push("update-before"));
+
+    Thing.resetCallbacks("save");
+    new Thing().runCallbacks("save", () => log.push("save-block"));
+    new Thing().runCallbacks("update", () => log.push("update-block"));
+    expect(log).toEqual(["save-block", "update-before", "update-block"]);
+  });
+
+  it("setCallback on subclass does not leak up to parent (copy-on-first-write)", () => {
+    const log: string[] = [];
+    class Parent extends Model {}
+    class Child extends Parent {}
+    Child.setCallback("save", "before", () => log.push("child"));
+    new Parent().runCallbacks("save", () => log.push("parent-block"));
+    expect(log).toEqual(["parent-block"]);
+    new Child().runCallbacks("save", () => log.push("child-block"));
+    expect(log).toEqual(["parent-block", "child", "child-block"]);
+  });
+
+  it("skipCallback miss does NOT isolate subclass from future parent callbacks", () => {
+    // A miss must preserve copy-on-first-write inheritance so a
+    // subclass that later has callbacks added to its parent still sees
+    // them via the prototype chain.
+    const log: string[] = [];
+    class Parent extends Model {}
+    class Child extends Parent {}
+    expect(Child.skipCallback("save", "before", () => undefined)).toBe(false);
+    // Now register on Parent — Child should still see it.
+    Parent.setCallback("save", "before", () => log.push("from-parent"));
+    new Child().runCallbacks("save", () => log.push("child-block"));
+    expect(log).toEqual(["from-parent", "child-block"]);
+  });
+
+  it("skipCallback removes a CallbackObject registered by reference", () => {
+    // Rails `set_callback(:save, :before, CallbackObject.new)` looks up
+    // `before_save` (or our camelCase `beforeSave`) on the object. The
+    // same reference must identify it for `skip_callback` — even though
+    // `register` internally resolves to a bound method, `skip` must
+    // match the original object reference.
+    const log: string[] = [];
+    class Thing extends Model {}
+    const obj = {
+      beforeSave() {
+        log.push("obj-before");
+      },
+    };
+    Thing.setCallback("save", "before", obj);
+    Thing.setCallback("save", "before", () => log.push("fn-kept"));
+
+    expect(Thing.skipCallback("save", "before", obj)).toBe(true);
+    new Thing().runCallbacks("save", () => log.push("block"));
+    expect(log).toEqual(["fn-kept", "block"]);
+  });
+
+  it("skipCallback removes a CallbackObject registered via beforeX/afterX helpers", () => {
+    // The generated `beforeX`/`afterX`/`aroundX` helpers from
+    // `defineModelCallbacks` pass the original filter straight to
+    // `register` so skipCallback(event, timing, originalObject) can
+    // find and remove it by reference.
+    const log: string[] = [];
+    class Thing extends Model {
+      static {
+        this.defineModelCallbacks("ship");
+      }
+    }
+    const obj = {
+      beforeShip() {
+        log.push("obj");
+      },
+    };
+    (Thing as unknown as { beforeShip: (o: object) => void }).beforeShip(obj);
+    (Thing as unknown as { beforeShip: (fn: () => void) => void }).beforeShip(() => log.push("fn"));
+
+    expect(Thing.skipCallback("ship", "before", obj)).toBe(true);
+    new Thing().runCallbacks("ship", () => log.push("block"));
+    expect(log).toEqual(["fn", "block"]);
+  });
+
+  it("CallbackChain.register rejects on: for non-commit/rollback events", () => {
+    // Register-level gate — every path (setCallback, generated
+    // beforeX/afterX, plugin-direct chain.register) funnels here, so
+    // rejecting once at the chain catches `defineModelCallbacks`
+    // helpers too, not just setCallback.
+    const chain = new CallbackChain();
+    expect(() => chain.register("before", "save", () => {}, { on: "create" })).toThrow(/:on/);
+  });
+
+  it("CallbackChain.register accepts on: for commit/rollback events", () => {
+    const chain = new CallbackChain();
+    expect(() => chain.register("after", "commit", () => {}, { on: "create" })).not.toThrow();
+    expect(() => chain.register("after", "rollback", () => {}, { on: "update" })).not.toThrow();
+  });
+
+  it("resetCallbacks clears CallbackObject-registered callbacks too", () => {
+    // Companion to the skipCallback-with-object case: resetCallbacks
+    // must sweep the event bucket regardless of whether its entries
+    // came from functions or CallbackObjects.
+    const log: string[] = [];
+    class Thing extends Model {}
+    const obj = {
+      beforeSave() {
+        log.push("obj-before");
+      },
+    };
+    Thing.setCallback("save", "before", obj);
+    Thing.setCallback("save", "before", () => log.push("fn"));
+
+    Thing.resetCallbacks("save");
+    new Thing().runCallbacks("save", () => log.push("block-after-reset"));
+    expect(log).toEqual(["block-after-reset"]);
+  });
+
+  it("setCallback respects prepend: true (runs before earlier-registered)", () => {
+    const log: string[] = [];
+    class Thing extends Model {}
+    Thing.setCallback("save", "before", () => log.push("registered-first"));
+    Thing.setCallback("save", "before", () => log.push("prepended"), { prepend: true });
+    new Thing().runCallbacks("save", () => log.push("block"));
+    expect(log).toEqual(["prepended", "registered-first", "block"]);
+  });
+});

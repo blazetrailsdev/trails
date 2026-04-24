@@ -86,6 +86,13 @@ export function defineModelCallbacks(this: any, ...args: unknown[]): void {
   for (const event of eventNames) {
     const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
 
+    // NB: pass `fnOrObject` directly to `register`; `register` already
+    // handles `resolveCallback` internally AND stores the original
+    // filter for identity-based removal via `skip()`. Pre-resolving here
+    // would make the stored filter the wrapper function, breaking
+    // `Model.skipCallback(event, timing, originalObject)` for entries
+    // registered through the generated `beforeX`/`afterX`/`aroundX`
+    // helpers.
     if (timings.includes("before")) {
       const methodName = `before${capitalizedEvent}`;
       Object.defineProperty(this, methodName, {
@@ -93,8 +100,7 @@ export function defineModelCallbacks(this: any, ...args: unknown[]): void {
           if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
             this._callbackChain = this._callbackChain.clone();
           }
-          const fn = resolveCallback(fnOrObject, "before", event);
-          this._callbackChain.register("before", event, fn, conditions);
+          this._callbackChain.register("before", event, fnOrObject, conditions);
         },
         writable: true,
         configurable: true,
@@ -108,8 +114,7 @@ export function defineModelCallbacks(this: any, ...args: unknown[]): void {
           if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
             this._callbackChain = this._callbackChain.clone();
           }
-          const fn = resolveCallback(fnOrObject, "after", event);
-          this._callbackChain.register("after", event, fn, conditions);
+          this._callbackChain.register("after", event, fnOrObject, conditions);
         },
         writable: true,
         configurable: true,
@@ -126,8 +131,7 @@ export function defineModelCallbacks(this: any, ...args: unknown[]): void {
           if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
             this._callbackChain = this._callbackChain.clone();
           }
-          const fn = resolveCallback(fnOrObject, "around", event);
-          this._callbackChain.register("around", event, fn as AroundCallbackFn, conditions);
+          this._callbackChain.register("around", event, fnOrObject, conditions);
         },
         writable: true,
         configurable: true,
@@ -194,7 +198,16 @@ export interface CallbackConditions<TRecord = AnyRecord> {
 interface CallbackEntry {
   timing: CallbackTiming;
   event: CallbackEvent;
+  /** Resolved callable used at run time. */
   fn: CallbackFn | AroundCallbackFn;
+  /**
+   * Original filter the caller passed — may be a function (same as `fn`
+   * after resolution) or a `CallbackObject` (before resolution via
+   * `resolveCallback`). `skip(event, timing, filter)` matches on this so
+   * removing a `CallbackObject` works with the same reference the caller
+   * registered.
+   */
+  filter: CallbackFn | AroundCallbackFn | CallbackObject;
   conditions?: CallbackConditions;
 }
 
@@ -218,11 +231,43 @@ export class CallbackChain {
     fn: CallbackFn | AroundCallbackFn | CallbackObject,
     conditions?: CallbackConditions,
   ): void {
+    // `on:` is a transactional-only option: Rails' `ActiveRecord::Transactions`
+    // uses it to scope `after_commit` / `after_rollback` callbacks to
+    // specific actions (`:create` / `:update` / `:destroy`). For every
+    // other event it's meaningless — silently accepting it would
+    // register a callback whose `on:` filter is never consulted (see
+    // `_shouldRun` below, which only applies `on` for commit/rollback).
+    // Reject at register-time so the error surfaces immediately rather
+    // than at run-time when the callback silently doesn't fire.
+    // Key-presence check (not value check) so `{ on: undefined }` also
+    // rejects — matches `_rejectOnOption`'s `"on" in conditions` and
+    // Rails' "unknown key" semantics. An explicit `on` (even undefined)
+    // signals caller intent that doesn't apply here.
+    if (conditions && "on" in conditions) {
+      if (event !== "commit" && event !== "rollback") {
+        throw new ArgumentError(
+          `Unknown key: :on. The :on option is only supported for :commit and :rollback callbacks (got :${event})`,
+        );
+      }
+      // Validate the value here too so `defineModelCallbacks` helpers
+      // and direct `chain.register` calls surface the same error
+      // Rails raises from `after_commit`/`after_rollback`:
+      // "on conditions … have to be one of [:create, :destroy, :update]".
+      const on = conditions.on;
+      const values = Array.isArray(on) ? on : [on];
+      for (const v of values) {
+        if (v !== "create" && v !== "update" && v !== "destroy") {
+          throw new ArgumentError(
+            `:on conditions for after_commit and after_rollback callbacks have to be one of [:create, :destroy, :update]`,
+          );
+        }
+      }
+    }
     const resolved: CallbackFn | AroundCallbackFn =
       typeof fn === "function"
         ? (fn as CallbackFn | AroundCallbackFn)
         : resolveCallback(fn, timing, event);
-    const entry = { timing, event, fn: resolved, conditions };
+    const entry: CallbackEntry = { timing, event, fn: resolved, filter: fn, conditions };
     if (conditions?.prepend) {
       this.callbacks.unshift(entry);
     } else {
@@ -248,6 +293,47 @@ export class CallbackChain {
 
   clearEvent(event: CallbackEvent): void {
     this.callbacks = this.callbacks.filter((c) => c.event !== event);
+  }
+
+  /**
+   * Remove the first registered entry matching `event + timing + filter`.
+   * Identity-matches on the caller's original filter (function OR
+   * `CallbackObject`), not on the resolved runtime `fn` — so an object
+   * registered via `register(..., obj)` can be removed with the same
+   * object reference even though the chain internally resolves it to
+   * a bound method.
+   *
+   * Mirrors Rails `CallbackChain#delete` used internally by
+   * `skip_callback` (activesupport/lib/active_support/callbacks.rb:786-808).
+   * Returns `true` if a matching entry was found and removed, `false`
+   * otherwise — callers decide whether a miss is an error (Rails'
+   * default raises unless `raise: false` is passed).
+   */
+  skip(
+    event: CallbackEvent,
+    timing: CallbackTiming,
+    filter: CallbackFn | AroundCallbackFn | CallbackObject,
+  ): boolean {
+    // Identity-match on the original filter the caller registered with
+    // (not the resolved `fn`), so `CallbackObject` removals work with
+    // the same reference that was passed to `register`.
+    const idx = this.callbacks.findIndex(
+      (c) => c.event === event && c.timing === timing && c.filter === filter,
+    );
+    if (idx === -1) return false;
+    this.callbacks.splice(idx, 1);
+    return true;
+  }
+
+  /** Does this chain contain a matching entry? Non-mutating. */
+  has(
+    event: CallbackEvent,
+    timing: CallbackTiming,
+    filter: CallbackFn | AroundCallbackFn | CallbackObject,
+  ): boolean {
+    return this.callbacks.some(
+      (c) => c.event === event && c.timing === timing && c.filter === filter,
+    );
   }
 
   clone(): CallbackChain {

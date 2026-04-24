@@ -903,6 +903,118 @@ export class Model {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Generic callback registration — Rails `set_callback` / `skip_callback` /
+  // `reset_callbacks` from `ActiveSupport::Callbacks::ClassMethods`
+  // (activesupport/lib/active_support/callbacks.rb:737-820). Exposes the
+  // canonical event-agnostic form so plugin authors can register callbacks
+  // for any event without needing a per-event convenience helper (beforeSave,
+  // afterCreate, etc.).
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Register a callback for `event` with `timing` (`"before" | "after" |
+   * "around"`). Mirrors Rails `set_callback(event, timing, filter, options)`
+   * (activesupport/lib/active_support/callbacks.rb:737-749). `filter` may be
+   * a function (most common in TS) or a method-object that our existing
+   * `CallbackChain.register` accepts; `options` covers the usual Rails
+   * conditionals (`if`, `unless`, `prepend`). `on` is only valid for
+   * transactional callbacks (`commit` / `rollback`) — any other event
+   * raises if `on` is set, matching the existing per-event helpers.
+   */
+  static setCallback<T extends typeof Model>(
+    this: T,
+    event: string,
+    timing: "before" | "after",
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+    options?: CallbackConditions<InstanceType<T>>,
+  ): void;
+  static setCallback<T extends typeof Model>(
+    this: T,
+    event: string,
+    timing: "around",
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+    options?: CallbackConditions<InstanceType<T>>,
+  ): void;
+  static setCallback<T extends typeof Model>(
+    this: T,
+    event: string,
+    timing: "before" | "after" | "around",
+    fn: CallbackFn | AroundCallbackFn | CallbackObject,
+    options?: CallbackConditions<InstanceType<T>>,
+  ): void {
+    // `CallbackChain.register` below enforces both `on:` applicability
+    // (only commit/rollback) and value validity
+    // (:create/:update/:destroy) using key-presence checks, so every
+    // entry point — setCallback, defineModelCallbacks helpers, direct
+    // chain.register — shares the same gate. No extra guard needed
+    // here.
+    this._ensureOwnCallbacks();
+    this._callbackChain.register(
+      timing,
+      event,
+      fn as CallbackFn | AroundCallbackFn | CallbackObject,
+      options as CallbackConditions | undefined,
+    );
+  }
+
+  /**
+   * Remove a previously-registered callback. Mirrors Rails
+   * `skip_callback(event, timing, filter)`
+   * (activesupport/lib/active_support/callbacks.rb:786-808). Identity
+   * comparison on `fn` — callers pass the same reference they registered.
+   * Returns `true` if a matching entry was removed; Rails raises when no
+   * match unless `raise: false`, we return boolean so the caller can
+   * decide.
+   *
+   * Note: Rails also lets `skip_callback(..., if: cond)` *conditionally*
+   * skip at run time (it rewrites the chain entry rather than deleting
+   * it). Ours only supports unconditional removal; for conditional
+   * skipping, re-`setCallback` the same filter wrapped in your own
+   * condition check.
+   */
+  static skipCallback<T extends typeof Model>(
+    this: T,
+    event: string,
+    timing: "before" | "after",
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
+  ): boolean;
+  static skipCallback<T extends typeof Model>(
+    this: T,
+    event: string,
+    timing: "around",
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject,
+  ): boolean;
+  static skipCallback<T extends typeof Model>(
+    this: T,
+    event: string,
+    timing: "before" | "after" | "around",
+    fn: CallbackFn | AroundCallbackFn | CallbackObject,
+  ): boolean {
+    // Don't force copy-on-first-write on a miss — if there's nothing
+    // matching, we shouldn't clone and trap the subclass in a snapshot
+    // that will never see future parent registrations. Check via the
+    // inherited chain first; only clone when we're actually going to
+    // mutate (match found).
+    if (!this._callbackChain.has(event, timing, fn)) return false;
+    this._ensureOwnCallbacks();
+    return this._callbackChain.skip(event, timing, fn);
+  }
+
+  /**
+   * Clear every callback registered for `event` on this class. Mirrors
+   * Rails `reset_callbacks(name)`
+   * (activesupport/lib/active_support/callbacks.rb:811-821).
+   */
+  static resetCallbacks<T extends typeof Model>(this: T, event: string): void {
+    this._ensureOwnCallbacks();
+    this._callbackChain.clearEvent(event);
+  }
+
   private static _ensureOwnValidators(): void {
     // Copy-on-first-write dup. Rails' `inherited(base)` hook
     // (activemodel/lib/active_model/validations.rb:287-291) does this
