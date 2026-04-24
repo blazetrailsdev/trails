@@ -15,12 +15,30 @@ export class Cipher {
   static keyLength = KEY_LENGTH;
   static ivLength = IV_LENGTH;
 
-  readonly secret?: string;
+  // Declared for TypeScript type-checking only; defined as non-enumerable
+  // in the constructor so it doesn't appear in JSON.stringify / object spreads.
+  declare readonly secret?: string;
   readonly deterministic: boolean;
 
   constructor(secret?: string, options?: { deterministic?: boolean }) {
-    this.secret = secret;
+    Object.defineProperty(this, "secret", {
+      value: secret,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
     this.deterministic = options?.deterministic ?? false;
+  }
+
+  // Mirrors Rails' inspect override — never expose the secret in debug output.
+  // Symbol.for("nodejs.util.inspect.custom") is the stable public symbol
+  // used by Node's util.inspect without importing "util" directly.
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return `Cipher {}`;
+  }
+
+  toJSON(): Record<string, unknown> {
+    return { deterministic: this.deterministic };
   }
 
   encrypt(

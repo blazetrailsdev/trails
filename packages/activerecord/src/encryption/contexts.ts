@@ -3,14 +3,15 @@ import {
   withoutEncryption as _withoutEnc,
   protectingEncryptedData as _protecting,
   getEncryptionContext,
+  getDefaultContext,
+  getCurrentCustomContext,
+  resetDefaultContext as _resetDefaultContext,
   type EncryptionContext,
 } from "./context.js";
 
-let _defaultContext: EncryptionContext = {};
-
 /**
  * Class-based API for managing encryption contexts. Delegates to the
- * existing AsyncLocalStorage-based context system in context.ts.
+ * manual-stack context system in context.ts (Promise-aware push/pop).
  *
  * Mirrors: ActiveRecord::Encryption::Contexts
  */
@@ -32,15 +33,14 @@ export class Contexts {
   }
 
   static get currentCustomContext(): EncryptionContext | null {
-    const ctx = getEncryptionContext();
-    return ctx ?? null;
+    return getCurrentCustomContext();
   }
 
   static get defaultContext(): EncryptionContext {
-    return _defaultContext;
+    return getDefaultContext();
   }
 
   static resetDefaultContext(): void {
-    _defaultContext = {};
+    _resetDefaultContext();
   }
 }

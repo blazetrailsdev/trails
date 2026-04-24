@@ -38,9 +38,18 @@ export interface EncryptionContext {
 }
 
 const contextStack: EncryptionContext[] = [];
+let _defaultContext: EncryptionContext = {};
+
+export function getDefaultContext(): EncryptionContext {
+  return _defaultContext;
+}
+
+export function resetDefaultContext(): void {
+  _defaultContext = {};
+}
 
 function currentContext(): EncryptionContext {
-  return contextStack.length > 0 ? contextStack[contextStack.length - 1] : {};
+  return contextStack.length > 0 ? contextStack[contextStack.length - 1] : _defaultContext;
 }
 
 export function withEncryptionContext<T>(overrides: EncryptionContext, fn: () => T): T {
@@ -80,6 +89,10 @@ export function protectingEncryptedData<T>(fn: () => T): T {
 
 export function getEncryptionContext(): EncryptionContext {
   return currentContext();
+}
+
+export function getCurrentCustomContext(): EncryptionContext | null {
+  return contextStack.length > 0 ? contextStack[contextStack.length - 1] : null;
 }
 
 export function isEncryptionDisabled(): boolean {

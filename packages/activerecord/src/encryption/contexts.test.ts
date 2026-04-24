@@ -1,14 +1,38 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   withEncryptionContext,
   withoutEncryption,
   protectingEncryptedData,
   getEncryptionContext,
+  getDefaultContext,
+  resetDefaultContext,
   isEncryptionDisabled,
   isProtectedMode,
 } from "./context.js";
 
 describe("ActiveRecord::Encryption::ContextsTest", () => {
+  afterEach(() => {
+    resetDefaultContext();
+  });
+
+  it("defaultContext is visible via getEncryptionContext when no custom context is active", () => {
+    expect(getEncryptionContext().keyProvider).toBeUndefined();
+
+    getDefaultContext().keyProvider = "default-provider";
+    expect(getEncryptionContext().keyProvider).toBe("default-provider");
+
+    // custom context overrides default
+    withEncryptionContext({ keyProvider: "custom" }, () => {
+      expect(getEncryptionContext().keyProvider).toBe("custom");
+    });
+
+    // default is restored after custom context exits
+    expect(getEncryptionContext().keyProvider).toBe("default-provider");
+
+    resetDefaultContext();
+    expect(getEncryptionContext().keyProvider).toBeUndefined();
+  });
+
   it(".with_encryption_context lets you override properties", () => {
     withEncryptionContext({ keyProvider: "custom" }, () => {
       expect(getEncryptionContext().keyProvider).toBe("custom");

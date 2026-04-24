@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Cipher } from "./aes256-gcm.js";
 import * as crypto from "crypto";
+import { inspect } from "util";
 
 function generateKey(): string {
   return crypto.randomBytes(32).toString("base64");
@@ -77,7 +78,11 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     expect(r1.iv).not.toBe(r2.iv);
   });
 
-  it.skip("inspect_does not show secrets", () => {
-    /* needs custom inspect/toString */
+  it("inspect_does not show secrets", () => {
+    const secret = generateKey();
+    const cipher = new Cipher(secret);
+    expect(inspect(cipher)).not.toContain(secret);
+    expect(JSON.stringify(cipher)).not.toContain(secret);
+    expect(Object.keys(cipher)).not.toContain("secret");
   });
 });
