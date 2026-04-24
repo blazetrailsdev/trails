@@ -250,8 +250,15 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("scale: 2");
   });
 
-  it.skip("schema dump includes bigint default", () => {
-    /* needs bigint column type in TableDefinition */
+  it("schema dump includes bigint default", async () => {
+    // Mirrors Rails: test_schema_dump_includes_bigint_default
+    // (activerecord/test/cases/schema_dumper_test.rb:366)
+    // assert_match %r{t\.bigint\s+"bigint_default",\s+default: 0}, output
+    await ctx.createTable("defaults", {}, (t) => {
+      t.bigint("bigint_default", { default: 0 });
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toMatch(/t\.bigint\("bigint_default",\s*\{[^}]*default:\s*0[^}]*\}/);
   });
 
   it.skip("schema dump includes limit on array type", () => {
