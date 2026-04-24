@@ -42,5 +42,17 @@
   "arel-47": {
     "side": "trails-missing",
     "reason": "photos[:id].count.gt(5): trails Attribute#count returns a node without predication methods — HAVING aggregate-comparison chain incomplete."
+  },
+  "ar-01": {
+    "side": "diff",
+    "reason": "Book.joins(:reviews): with models registered via registerModel() in the fixture's models.ts, trails Relation#joins(name) does resolve the association and emit an INNER JOIN on the FK. The remaining diff is table-name quoting — trails emits 'INNER JOIN reviews ON ...' where Rails emits 'INNER JOIN \"reviews\" ON ...'. Column references on both sides are quoted identically; only the table identifier after INNER JOIN is bare on trails."
+  },
+  "ar-09": {
+    "side": "diff",
+    "reason": "Boolean literal serialization: trails' ToSql renders JS booleans as the TRUE/FALSE keywords; Rails on SQLite writes 1/0 (SQLite's BOOLEAN maps to INTEGER, so Rails serialises to the integer form). Semantically equivalent but lexically differ."
+  },
+  "ar-11": {
+    "side": "diff",
+    "reason": "Boolean literal serialization in WHERE with array + nil: trails emits 'tall = FALSE OR tall IS NULL'; Rails emits 'tall = 0 OR tall IS NULL'. Same root cause as ar-09."
   }
 }
