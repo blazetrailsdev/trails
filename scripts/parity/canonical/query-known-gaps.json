@@ -54,5 +54,17 @@
   "ar-11": {
     "side": "diff",
     "reason": "Boolean literal serialization in WHERE with array + nil: trails emits 'tall = FALSE OR tall IS NULL'; Rails emits 'tall = 0 OR tall IS NULL'. Same root cause as ar-09."
+  },
+  "ar-16": {
+    "side": "diff",
+    "reason": "Book.all().eagerLoad(\"author\").limit(10): trails eagerLoad pushes the association into _eagerLoadAssociations but doesn't emit the LEFT OUTER JOIN + column-aliased SELECT that Rails produces. Rails emits 'SELECT \"books\".\"id\" AS t0_r0, ... FROM \"books\" LEFT OUTER JOIN \"authors\" ON ... LIMIT 10'; trails emits the bare 'SELECT \"books\".* FROM \"books\" LIMIT 10'. Real trails-missing feature: eagerLoad's JOIN + column-projection behaviour."
+  },
+  "ar-17": {
+    "side": "diff",
+    "reason": "GROUP BY column qualification: trails emits 'GROUP BY created_at' (bare); Rails qualifies to 'GROUP BY \"orders\".\"created_at\"'. Same SQL semantic, lexically differ."
+  },
+  "ar-19": {
+    "side": "diff",
+    "reason": "Boolean literal in WHERE: trails emits 'active = TRUE', Rails on SQLite emits 'active = 1'. Same root cause as ar-09 / ar-11."
   }
 }
