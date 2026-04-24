@@ -426,6 +426,139 @@ describe("ModelName namespace accepts Module-like {name}", () => {
   });
 });
 
+// Rails `ActiveModel::Name` includes Comparable and delegates ==/<=>/
+// =~/match?/to_s/to_str/as_json to @name (naming.rb:10, :151-152). JS
+// can't overload those operators, so we expose methods + Symbol.toPrimitive.
+describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
+  it("toString returns the class name", () => {
+    expect(new ModelName("Post").toString()).toBe("Post");
+    expect(String(new ModelName("Post"))).toBe("Post");
+    expect(`${new ModelName("Post")}`).toBe("Post");
+  });
+
+  it("Symbol.toPrimitive coerces to the class name in string concatenation", () => {
+    const mn = new ModelName("Post");
+    expect("Model: " + mn).toBe("Model: Post");
+  });
+
+  it("equals compares against strings and other ModelName instances", () => {
+    const mn = new ModelName("Post");
+    expect(mn.equals("Post")).toBe(true);
+    expect(mn.equals("Other")).toBe(false);
+    expect(mn.equals(new ModelName("Post"))).toBe(true);
+    expect(mn.equals(new ModelName("Other"))).toBe(false);
+    expect(mn.equals(42)).toBe(false);
+  });
+
+  it("compare returns -1/0/1 matching String#<=>", () => {
+    const mn = new ModelName("BlogPost");
+    expect(mn.compare("BlogPost")).toBe(0);
+    expect(mn.compare("Blog")).toBe(1);
+    expect(mn.compare("BlogPosts")).toBe(-1);
+    expect(mn.compare(new ModelName("BlogPost"))).toBe(0);
+  });
+
+  it("match tests a regexp against the class name", () => {
+    const mn = new ModelName("BlogPost");
+    expect(mn.match(/Post/)).toBe(true);
+    expect(mn.match(/\d/)).toBe(false);
+  });
+
+  it("match stays stable when reusing global and sticky regexps", () => {
+    // RegExp.prototype.test advances `lastIndex` on /g and /y flags, so a
+    // second call on the same regex can flip false without care. Our
+    // `match` saves/restores `lastIndex` so repeated calls are stable
+    // (Ruby `match?` is stateless).
+    const mn = new ModelName("BlogPost");
+    const globalRe = /Post/g;
+    const stickyRe = /Blog/y;
+    expect(mn.match(globalRe)).toBe(true);
+    expect(mn.match(globalRe)).toBe(true);
+    expect(mn.match(stickyRe)).toBe(true);
+    expect(mn.match(stickyRe)).toBe(true);
+    expect(globalRe.lastIndex).toBe(0);
+    expect(stickyRe.lastIndex).toBe(0);
+  });
+
+  it("compare throws ArgumentError on non-string/non-ModelName input", () => {
+    const mn = new ModelName("Post");
+    expect(() => mn.compare(42)).toThrow(ArgumentError);
+    expect(() => mn.compare(null)).toThrow(ArgumentError);
+    expect(() => mn.compare(undefined)).toThrow(ArgumentError);
+  });
+
+  it("match throws ArgumentError on non-RegExp input", () => {
+    const mn = new ModelName("Post");
+    expect(() => mn.match("Post")).toThrow(ArgumentError);
+    expect(() => mn.match(null)).toThrow(ArgumentError);
+    expect(() => mn.match(undefined)).toThrow(ArgumentError);
+  });
+
+  it("equals / compare distinguish namespaced models with the same bare name", () => {
+    // Two ModelName instances share the same `name: "Post"` but differ
+    // in namespace — must not compare equal, must sort deterministically.
+    const blogPost = new ModelName("Post", { namespace: "Blog" });
+    const adminPost = new ModelName("Post", { namespace: "Admin" });
+    const blogPost2 = new ModelName("Post", { namespace: "Blog" });
+    const barePost = new ModelName("Post");
+
+    expect(blogPost.equals(adminPost)).toBe(false);
+    expect(blogPost.equals(blogPost2)).toBe(true);
+    expect(blogPost.equals(barePost)).toBe(false);
+    // `compare` compares the full qualified path ("Admin/Post" vs
+    // "Blog/Post"), so Admin < Blog.
+    expect(blogPost.compare(adminPost)).toBe(1);
+    expect(adminPost.compare(blogPost)).toBe(-1);
+    expect(blogPost.compare(blogPost2)).toBe(0);
+
+    // String coercion still yields just the bare name (user-enforced:
+    // no Ruby "::" in TS output). Callers that need namespace-aware
+    // identity use `.equals` / `.namespace`.
+    expect(String(blogPost)).toBe("Post");
+    expect(String(adminPost)).toBe("Post");
+    expect(blogPost.equals("Post")).toBe(true);
+  });
+
+  it("compare sorts by full qualified path, not bare name first", () => {
+    // Covers the Rails `String#<=>` parity: ordering is determined by
+    // the full namespace+name path as a single string — so a model
+    // under an earlier-sorting namespace outranks a later-sorting
+    // namespace even when its bare name comes later alphabetically.
+    const adminOther = new ModelName("Other", { namespace: "Admin" });
+    const blogPost = new ModelName("Post", { namespace: "Blog" });
+    // "Admin/Other" < "Blog/Post"
+    expect(adminOther.compare(blogPost)).toBe(-1);
+    expect(blogPost.compare(adminOther)).toBe(1);
+    // Bare name ("Post") > a qualified name starting with earlier letters
+    // ("Admin/Other")? No — bare comparison uses the raw qualified path,
+    // so "Admin/Other" < "Post".
+    const barePost = new ModelName("Post");
+    expect(adminOther.compare(barePost)).toBe(-1);
+    expect(barePost.compare(adminOther)).toBe(1);
+  });
+
+  it("== operator coerces via Symbol.toPrimitive to the class name", () => {
+    // Rails `model_name == "Post"` is true because Name < String.
+    // JS `==` between object and string triggers primitive coercion,
+    // which Symbol.toPrimitive steers at the class name — so the
+    // Rails-shaped comparison works verbatim.
+    const mn: unknown = new ModelName("Post");
+
+    expect(mn == "Post").toBe(true);
+
+    expect(mn == "Other").toBe(false);
+  });
+
+  it("asJson / JSON.stringify emits the plain class name", () => {
+    // Rails `String#as_json` returns the string; `Name.new(BlogPost).to_json`
+    // emits '"BlogPost"', not a hash form.
+    const mn = new ModelName("BlogPost");
+    expect(mn.asJson()).toBe("BlogPost");
+    expect(JSON.stringify(mn)).toBe('"BlogPost"');
+    expect(JSON.stringify({ model: mn })).toBe('{"model":"BlogPost"}');
+  });
+});
+
 describe("OverridingAccessorsTest", () => {
   it("overriding accessors keys", () => {
     class Person extends Model {

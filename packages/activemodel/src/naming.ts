@@ -1,6 +1,14 @@
 import { underscore, pluralize, singularize, humanize } from "@blazetrails/activesupport";
 import { ArgumentError } from "./attribute-assignment.js";
 
+function sameSegments(a: readonly string[] | null, b: readonly string[] | null): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 /**
  * Naming mixin — provides model_name on classes and naming helpers.
  *
@@ -214,6 +222,124 @@ export class ModelName {
 
   get cacheKey(): string {
     return this.collection;
+  }
+
+  // ---------------------------------------------------------------------------
+  // String-ness — Rails `ActiveModel::Name < String` (naming.rb:10, :151-152):
+  //   include Comparable
+  //   delegate :==, :===, :<=>, :=~, :"!~", :eql?, :match?, :to_s,
+  //            :to_str, :as_json, to: :name
+  //
+  // JS can't overload operators, so we expose methods + the one coercion
+  // hook JS does have: `Symbol.toPrimitive`. That covers IMPLICIT string
+  // coercion only — `String(modelName)`, template literals, `modelName +
+  // ""`, and loose `==` against a string. It does NOT trigger on strict
+  // `===` / `Object.is` / matchers that use strict identity without
+  // coercion; for those, callers use `mn.name` or `mn.equals(other)`.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Mirrors Rails `to_s` / `to_str` delegated to `@name`
+   * (naming.rb:131-152). Rails' `@name` is the full constant path
+   * (`"Blog::Post"`). TS has no `::` constant syntax and we
+   * deliberately reject `::` at the input boundary (see constructor),
+   * so `toString` returns the bare identifier (`"Post"`). Two
+   * instances with the same bare name but different namespaces will
+   * coerce to the same string — callers that care about namespaced
+   * identity should use `.equals(other)` / `.compare(other)` (which
+   * compare the full name + namespace identity) or read `.namespace`
+   * directly.
+   */
+  toString(): string {
+    return this.name;
+  }
+
+  /** Implicit coercion hook so `String(mn)`, `"${mn}"`, `mn + ""` all work. */
+  [Symbol.toPrimitive](_hint: string): string {
+    return this.name;
+  }
+
+  /**
+   * Mirrors Rails `@name == other` (String#==). When comparing to
+   * another `ModelName`, both the bare name AND namespace segments
+   * must match — so `ModelName("Post")` and
+   * `ModelName("Post", { namespace: "Blog" })` are NOT equal. When
+   * comparing to a string, only `.name` is matched (a plain string
+   * can't express a namespace).
+   */
+  equals(other: unknown): boolean {
+    if (other instanceof ModelName) {
+      if (this.name !== other.name) return false;
+      return sameSegments(this.namespace, other.namespace);
+    }
+    return typeof other === "string" && this.name === other;
+  }
+
+  /**
+   * Mirrors Rails `@name <=> other` (String#<=>). Returns `-1`, `0`,
+   * or `1`. Throws `ArgumentError` for non-string / non-ModelName
+   * arguments. For ModelName-to-ModelName, compares the full
+   * identity (name + namespace) so namespace-differing models sort
+   * distinctly; for ModelName-to-string, compares `.name` only.
+   */
+  compare(other: unknown): -1 | 0 | 1 {
+    if (other instanceof ModelName) {
+      // Single string compare over the full constant path — matches
+      // Rails' `String#<=>` on `@name` (e.g. "Admin::Other" < "Blog::Post"
+      // by first segment, regardless of bare-name ordering). We join
+      // with `/` (not `::`) to keep Ruby syntax out of TS code.
+      const l = ModelName._qualified(this);
+      const r = ModelName._qualified(other);
+      if (l === r) return 0;
+      return l < r ? -1 : 1;
+    }
+    if (typeof other === "string") {
+      if (this.name === other) return 0;
+      return this.name < other ? -1 : 1;
+    }
+    throw new ArgumentError("comparison of ModelName with non-string failed");
+  }
+
+  private static _qualified(mn: ModelName): string {
+    return [...(mn.namespace ?? []), mn.name].join("/");
+  }
+
+  /**
+   * Mirrors Rails `@name.match?(regexp)`. Returns whether the class
+   * name matches the given regex (boolean — this is `match?` semantic,
+   * not the integer position that Ruby `=~` returns).
+   *
+   * Preserves `pattern.lastIndex` so repeated calls with `/g` or `/y`
+   * regexes stay stable — `RegExp.prototype.test` advances `lastIndex`
+   * on stateful flags, but Ruby `match?` is stateless.
+   */
+  match(pattern: unknown): boolean {
+    if (!(pattern instanceof RegExp)) {
+      throw new ArgumentError("ModelName#match requires a RegExp");
+    }
+    const savedLastIndex = pattern.lastIndex;
+    try {
+      return pattern.test(this.name);
+    } finally {
+      pattern.lastIndex = savedLastIndex;
+    }
+  }
+
+  /**
+   * Mirrors Rails `@name.as_json` — `String#as_json` just returns the
+   * string (and accepts an ignored `options` Hash). Returns `this.name`
+   * as-is; accepts (but ignores) an options argument so callers match
+   * Rails' signature and the rest of this codebase's `asJson(options?)`
+   * conventions. Lets `JSON.stringify(mn)` emit the plain class name
+   * rather than `{}` / the object form.
+   */
+  asJson(_options?: unknown): string {
+    return this.name;
+  }
+
+  /** JSON.stringify hook — delegates to `asJson`. */
+  toJSON(): string {
+    return this.asJson();
   }
 
   get human(): string {
