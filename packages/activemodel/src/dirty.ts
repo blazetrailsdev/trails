@@ -12,6 +12,8 @@ export interface Dirty {
   readonly changedAttributes: string[];
   readonly changes: Record<string, [unknown, unknown]>;
   readonly previousChanges: Record<string, [unknown, unknown]>;
+  readonly mutationsFromDatabase: Record<string, [unknown, unknown]>;
+  readonly mutationsBeforeLastSave: Record<string, [unknown, unknown]>;
   attributeChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean;
   attributeWas(name: string): unknown;
   attributePreviouslyChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean;
@@ -21,6 +23,8 @@ export interface Dirty {
   clearChangesInformation(): void;
   clearAttributeChanges(attributes: string[]): void;
   attributeChangedInPlace(name: string): boolean;
+  forgetAttributeAssignments(): void;
+  clearAttributeChange(name: string): void;
 }
 
 function resolveValue(value: unknown): unknown {
@@ -131,6 +135,90 @@ export class DirtyTracker {
   clearAttributeChanges(attributes: string[]): void {
     for (const attr of attributes) {
       this._changedAttributes.delete(attr);
+    }
+  }
+
+  /**
+   * Pending changes diff against the values loaded from the database —
+   * what will be written on the next save. Cleared by `changesApplied()`.
+   *
+   * Mirrors: ActiveModel::Dirty#mutations_from_database
+   * (activemodel/lib/active_model/dirty.rb + attribute_mutation_tracker.rb).
+   */
+  get mutationsFromDatabase(): Record<string, [unknown, unknown]> {
+    return this.changes;
+  }
+
+  /**
+   * Snapshot of `mutations_from_database` at the moment of the last save.
+   * Lives until the next save.
+   *
+   * Mirrors: ActiveModel::Dirty#mutations_before_last_save
+   */
+  get mutationsBeforeLastSave(): Record<string, [unknown, unknown]> {
+    return this.previousChanges;
+  }
+
+  /**
+   * Drop all pending assignment tracking and reset the baseline to the
+   * current in-memory values. Subsequent writes diff from the new baseline.
+   *
+   * Rails' `forget_attribute_assignments` replaces `@attributes` with
+   * `@attributes.map(&:forgotten_change)`, which rebinds each Attribute's
+   * `@original_attribute` to its current cast value. Mirror that by
+   * re-snapshotting (while preserving `_previousChanges` from the last save).
+   *
+   * Mirrors: ActiveModel::Dirty#forget_attribute_assignments
+   */
+  forgetAttributeAssignments(
+    attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
+  ): void {
+    // Same shape as snapshot(): reset baseline + clear pending changes.
+    // `snapshot` also clears `_changedAttributes`, so the single call
+    // covers both sides of Rails' `forget_attribute_assignments`.
+    this.snapshot(attributes);
+  }
+
+  /**
+   * Drop a single attribute's pending change and rebind its baseline to
+   * the current value, so a later write reports `[current, next]` instead
+   * of `[originalFromFirstSnapshot, next]`.
+   *
+   * Mirrors: ActiveModel::Dirty#clear_attribute_change
+   * -> `mutation_tracker.forget_change(name)`.
+   */
+  clearAttributeChange(
+    attributes:
+      | Map<string, unknown>
+      | { has(name: string): boolean; fetchValue(name: string): unknown }
+      | { snapshotValues(): Map<string, unknown> },
+    name: string,
+  ): void {
+    this._changedAttributes.delete(name);
+    // Fast path: avoid snapshotting every attribute when only one baseline
+    // needs rebinding. AttributeSet exposes has/fetchValue per-attribute;
+    // fall back to the full snapshot for plain Maps / other shapes.
+    let has: boolean;
+    let value: unknown;
+    const perAttr = attributes as { has?: unknown; fetchValue?: unknown };
+    if (typeof perAttr.has === "function" && typeof perAttr.fetchValue === "function") {
+      const src = attributes as { has(n: string): boolean; fetchValue(n: string): unknown };
+      has = src.has(name);
+      value = has ? src.fetchValue(name) : undefined;
+    } else {
+      const snap =
+        attributes instanceof Map
+          ? attributes
+          : (attributes as { snapshotValues(): Map<string, unknown> }).snapshotValues();
+      has = snap.has(name);
+      value = snap.get(name);
+    }
+    if (has) {
+      this._originalAttributes.set(name, value);
+      this._originalHas.add(name);
+    } else {
+      this._originalAttributes.delete(name);
+      this._originalHas.delete(name);
     }
   }
 

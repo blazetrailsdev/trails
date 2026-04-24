@@ -290,7 +290,7 @@ type TouchOption = boolean | string | string[];
 /** Class-level updateCounters + dirty-tracking needed by incrementBang. */
 interface CounterBangRecord extends AttributeIO {
   id: unknown;
-  clearAttributeChanges(attributes: string[]): void;
+  clearAttributeChange(name: string): void;
   constructor: {
     updateCounters(
       id: unknown,
@@ -348,8 +348,11 @@ export async function incrementBang<T extends CounterBangRecord>(
   await this.constructor.updateCounters(this.id, { [attribute]: by }, { touch: options.touch });
   // Rails: `public_send(:"clear_#{attribute}_change")` — the in-memory
   // increment is now durably persisted, so the attribute should no longer
-  // appear dirty (otherwise a later save() would re-persist it).
-  this.clearAttributeChanges([attribute]);
+  // appear dirty (otherwise a later save() would re-persist it). Use the
+  // per-attribute form so the baseline is rebound to the current value —
+  // otherwise a later write would still diff against the pre-increment
+  // original.
+  this.clearAttributeChange(attribute);
   return this;
 }
 

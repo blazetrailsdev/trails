@@ -144,7 +144,11 @@ export async function beforeCommittedBang(this: Base): Promise<void> {
 function surreptitiouslyTouch(record: Base, attrNames: string[], time: Date): void {
   for (const attr of attrNames) {
     (record as any).writeAttribute(attr, time);
-    if (typeof (record as any).clearAttributeChanges === "function") {
+    // Per-attribute clear so the baseline rebinds to the touched value;
+    // otherwise a later write would diff against the pre-touch original.
+    if (typeof (record as any).clearAttributeChange === "function") {
+      (record as any).clearAttributeChange(attr);
+    } else if (typeof (record as any).clearAttributeChanges === "function") {
       (record as any).clearAttributeChanges([attr]);
     }
   }

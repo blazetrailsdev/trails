@@ -1660,6 +1660,43 @@ export class Model {
     this._dirty.clearAttributeChanges(attributes);
   }
 
+  /**
+   * Pending changes diff against the values loaded from the database.
+   *
+   * Mirrors: ActiveModel::Dirty#mutations_from_database
+   */
+  get mutationsFromDatabase(): Record<string, [unknown, unknown]> {
+    return this._dirty.mutationsFromDatabase;
+  }
+
+  /**
+   * Snapshot of the pending changes at the moment of the last save.
+   *
+   * Mirrors: ActiveModel::Dirty#mutations_before_last_save
+   */
+  get mutationsBeforeLastSave(): Record<string, [unknown, unknown]> {
+    return this._dirty.mutationsBeforeLastSave;
+  }
+
+  /**
+   * Drop all pending assignment tracking without reverting values.
+   * Used by transactional rollback paths.
+   *
+   * Mirrors: ActiveModel::Dirty#forget_attribute_assignments
+   */
+  forgetAttributeAssignments(): void {
+    this._dirty.forgetAttributeAssignments(this._attributes);
+  }
+
+  /**
+   * Drop a single attribute's pending change without reverting its value.
+   *
+   * Mirrors: ActiveModel::Dirty#clear_attribute_change
+   */
+  clearAttributeChange(name: string): void {
+    this._dirty.clearAttributeChange(this._attributes, name);
+  }
+
   // -- Serialization --
 
   serializableHash(options?: SerializeOptions): Record<string, unknown> {
