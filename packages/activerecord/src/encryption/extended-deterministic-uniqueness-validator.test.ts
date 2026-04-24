@@ -52,9 +52,9 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     expect(calls[0].value).toBe("user@example.com");
     expect(calls[0].encryptionDisabled).toBe(false);
 
-    // Second call: previous scheme ciphertext (encryption disabled)
+    // Second call: all previous-scheme ciphertexts as an array (single IN query, encryption disabled)
     expect(calls[1]).toBeDefined();
-    expect(calls[1].value).toBe(type.previousTypes[0].serialize("user@example.com"));
+    expect(calls[1].value).toEqual([type.previousTypes[0].serialize("user@example.com")]);
     expect(calls[1].encryptionDisabled).toBe(true);
   });
 

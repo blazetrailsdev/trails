@@ -11,6 +11,8 @@ import { Scheme } from "./scheme.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { Configurable } from "./configurable.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
+import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
+import { UniquenessValidator } from "../validations.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { createTestAdapter } from "../test-adapter.js";
@@ -133,6 +135,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     EncryptedAttributeType.prototype.serialize =
       savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
     (ExtendedDeterministicQueries as any)._installed = false;
+    ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
 
     Configurable.config.extendQueries = savedConfig.extendQueries;
     Configurable.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
@@ -643,6 +646,7 @@ describe("installExtendedQueriesIfConfigured", () => {
       (Base as any).findBy = origFindBy;
       EncryptedAttributeType.prototype.serialize = origSerialize;
       (ExtendedDeterministicQueries as any)._installed = false;
+      ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
       Configurable.config.extendQueries = prev;
     }
   });

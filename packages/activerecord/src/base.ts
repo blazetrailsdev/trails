@@ -41,6 +41,7 @@ import {
   _setSuperIsValid,
   _setSuperValidates,
   type ValidationContextArg,
+  UniquenessValidator,
 } from "./validations.js";
 import * as _Validations from "./validations.js";
 import {
@@ -2050,47 +2051,8 @@ export class Base extends Model {
     for (const { attribute, options } of asyncValidators) {
       const value = this.readAttribute(attribute);
       if (value === null || value === undefined) continue;
-
-      const conditions: Record<string, unknown> = { [attribute]: value };
-
-      // Add scope columns
-      if (options.scope) {
-        const scopes = Array.isArray(options.scope) ? options.scope : [options.scope];
-        for (const scopeCol of scopes) {
-          conditions[scopeCol] = this.readAttribute(scopeCol);
-        }
-      }
-
-      // Apply conditions if provided
-      let relation = ctor.where(conditions);
-      if (options.conditions && typeof options.conditions === "function") {
-        relation = options.conditions.call(relation);
-      }
-
-      // Exclude self if persisted — mirrors uniqueness.rb:26-30:
-      // `relation.where.not(primary_key => [record.id_in_database])`
-      // attributeWas() provides the DB value when the PK changed in memory
-      // (id_in_database semantics). CPK uses a tuple NOT-IN predicate.
-      if (this.isPersisted()) {
-        const pk = ctor.primaryKey;
-        if (Array.isArray(pk)) {
-          const dbVals = pk.map((col) =>
-            this._dirty.attributeChanged(col)
-              ? this._dirty.attributeWas(col)
-              : this.readAttribute(col),
-          );
-          relation = relation.whereNot(pk, [dbVals]);
-        } else {
-          const dbVal = this._dirty.attributeChanged(pk)
-            ? this._dirty.attributeWas(pk)
-            : this.readAttribute(pk);
-          relation = relation.whereNot({ [pk]: [dbVal] });
-        }
-      }
-      const existing = await relation.first();
-      if (existing) {
-        this.errors.add(attribute, "taken", { message: options.message });
-      }
+      const validator = new UniquenessValidator({ ...options, attributes: attribute, class: ctor });
+      validator.validateEach(this, attribute, value);
     }
 
     // Await per-instance async validation promises (pushed by UniquenessValidator.validateEach)

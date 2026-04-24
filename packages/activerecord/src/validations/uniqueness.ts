@@ -65,8 +65,18 @@ export class UniquenessValidator extends EachValidator {
 
     if (record.isPersisted?.()) {
       const pk = modelClass.primaryKey ?? "id";
-      if (!Array.isArray(pk)) {
-        relation = relation.whereNot({ [pk]: record.readAttribute(pk) });
+      if (Array.isArray(pk)) {
+        const dbVals = pk.map((col: string) =>
+          record._dirty?.attributeChanged(col)
+            ? record._dirty.attributeWas(col)
+            : record.readAttribute(col),
+        );
+        relation = relation.whereNot(pk, [dbVals]);
+      } else {
+        const dbVal = record._dirty?.attributeChanged(pk)
+          ? record._dirty.attributeWas(pk)
+          : record.readAttribute(pk);
+        relation = relation.whereNot({ [pk]: [dbVal] });
       }
     }
 

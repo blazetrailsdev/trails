@@ -462,7 +462,6 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with non callable conditions is not supported", async () => {
-    // Non-callable conditions should be rejected or ignored
     const adp = freshAdapter();
     class Post extends Base {
       static {
@@ -472,8 +471,7 @@ describe("UniquenessValidationTest", () => {
       }
     }
     const p = new Post({ title: "test" });
-    // Should save since conditions is invalid and likely ignored
-    expect(await p.save()).toBe(true);
+    await expect(p.save()).rejects.toThrow("is not callable");
   });
 
   it("validate uniqueness with conditions with record arg", async () => {

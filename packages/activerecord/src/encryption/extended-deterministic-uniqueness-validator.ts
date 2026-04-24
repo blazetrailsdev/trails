@@ -1,6 +1,6 @@
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { EncryptableRecord, getAttributeType } from "./encryptable-record.js";
-import { AdditionalValue } from "./extended-deterministic-queries.js";
+import { AdditionalValue, ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
 import { withoutEncryption } from "./context.js";
 
 /**
@@ -12,9 +12,56 @@ import { withoutEncryption } from "./context.js";
  */
 export class ExtendedDeterministicUniquenessValidator {
   private static _installed = false;
+  private static _originalValidateEach: Function | undefined;
 
-  static installSupport(): void {
+  /**
+   * Wraps UniquenessValidator#validateEach so uniqueness checks also cover
+   * values encrypted with previous schemes. Validates the target is callable
+   * before patching and saves the original for restoration via resetSupport().
+   *
+   * Mirrors: Rails' ExtendedDeterministicUniquenessValidator.install_support which
+   * prepends EncryptedUniquenessValidator into ActiveRecord::Validations::UniquenessValidator.
+   */
+  static installSupport({
+    UniquenessValidator,
+    EncryptedUniquenessValidator: EUV,
+  }: {
+    UniquenessValidator: { prototype: { validateEach: Function } };
+    EncryptedUniquenessValidator: typeof EncryptedUniquenessValidator;
+  }): void {
+    if (this._installed) return;
+
+    const original = UniquenessValidator.prototype.validateEach;
+    if (typeof original !== "function") {
+      throw new Error(
+        "ExtendedDeterministicUniquenessValidator: UniquenessValidator.prototype.validateEach is not callable",
+      );
+    }
+
+    this._originalValidateEach = original;
     this._installed = true;
+
+    // When ExtendedDeterministicQueries is also installed it already expands
+    // WHERE clauses to cover all previous-scheme ciphertexts, so
+    // EncryptedUniquenessValidator skips the extra previous-scheme query in
+    // that case to avoid duplicate errors and redundant DB round-trips.
+    const validator = new EUV();
+    UniquenessValidator.prototype.validateEach = function (
+      this: unknown,
+      record: any,
+      attribute: string,
+      value: unknown,
+    ) {
+      validator.validateEach(original.bind(this), record, attribute, value);
+    };
+  }
+
+  /** Restores the original validateEach — for use in test teardown. */
+  static resetSupport(UniquenessValidator: { prototype: { validateEach: Function } }): void {
+    if (!this._installed || !this._originalValidateEach) return;
+    UniquenessValidator.prototype.validateEach = this._originalValidateEach;
+    this._installed = false;
+    this._originalValidateEach = undefined;
   }
 
   static get installed(): boolean {
@@ -45,11 +92,17 @@ export class EncryptedUniquenessValidator {
     const encryptedType = getAttributeType(klass, attribute);
     if (!(encryptedType instanceof EncryptedAttributeType)) return;
 
-    for (const prevType of encryptedType.previousTypes) {
-      const encryptedValue = prevType.serialize(value);
-      withoutEncryption(() => {
-        originalValidateEach(record, attribute, encryptedValue);
-      });
+    // When ExtendedDeterministicQueries is installed it already expands the
+    // WHERE clause to cover all previous-scheme ciphertexts, so the first
+    // originalValidateEach call above is sufficient. Only issue the extra
+    // query when the WHERE expansion is not active.
+    if (!ExtendedDeterministicQueries.installed) {
+      const prevCiphertexts = encryptedType.previousTypes.map((pt) => pt.serialize(value));
+      if (prevCiphertexts.length > 0) {
+        withoutEncryption(() => {
+          originalValidateEach(record, attribute, prevCiphertexts);
+        });
+      }
     }
   }
 
