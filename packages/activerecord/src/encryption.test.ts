@@ -1,8 +1,35 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
+import { Configurable } from "./encryption/configurable.js";
+import { Decryption as DecryptionError } from "./encryption/errors.js";
+import type { EncryptorLike } from "./encryption/encryptor.js";
+
+class TestEncryptor implements EncryptorLike {
+  constructor(private readonly map: Record<string, string>) {}
+  encrypt(clearText: string): string {
+    return this.map[clearText] ?? clearText;
+  }
+  decrypt(encryptedText: string): string {
+    for (const [clear, cipher] of Object.entries(this.map)) {
+      if (cipher === encryptedText) return clear;
+    }
+    throw new DecryptionError(`No match for ${encryptedText}`);
+  }
+  isEncrypted(text: string): boolean {
+    try {
+      this.decrypt(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  isBinary(): boolean {
+    return false;
+  }
+}
 
 // -- Helpers --
 
@@ -104,5 +131,60 @@ describe("encrypts()", () => {
     }
 
     expect((User as any)._encryptedAttributes.has("ssn")).toBe(true);
+  });
+});
+
+describe("Base.encrypts() — global previous schemes via config.previous", () => {
+  let savedPreviousSchemes: typeof Configurable.config.previousSchemes;
+
+  beforeEach(() => {
+    savedPreviousSchemes = [...Configurable.config.previousSchemes];
+    Configurable.config.previousSchemes = [];
+  });
+
+  afterEach(() => {
+    Configurable.config.previousSchemes = savedPreviousSchemes;
+  });
+
+  it("config.previous schemes are applied to Base.encrypts() attribute types", () => {
+    Configurable.config.previous = [
+      { encryptor: new TestEncryptor({ legacy: "legacy_cipher" }) } as any,
+    ];
+
+    const adapter = createTestAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+        this.encrypts("email", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
+      }
+    }
+    new User();
+    const type = (User as any)._attributeDefinitions.get("email")?.type as EncryptedAttributeType;
+    expect(type.previousTypes).toHaveLength(1);
+
+    // legacy ciphertext falls back to previous scheme
+    expect(type.deserialize("legacy_cipher")).toBe("legacy");
+  });
+
+  it("deterministic-incompatible global previous schemes are excluded", () => {
+    Configurable.config.previous = [
+      { encryptor: new TestEncryptor({ det: "det_cipher" }), deterministic: true } as any,
+    ];
+
+    const adapter = createTestAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("email", "string");
+        this.adapter = adapter;
+        this.encrypts("email", { encryptor: new TestEncryptor({ current: "current_cipher" }) });
+      }
+    }
+    new User();
+    const type = (User as any)._attributeDefinitions.get("email")?.type as EncryptedAttributeType;
+    // non-deterministic attribute: deterministic global scheme is incompatible
+    expect(type.previousTypes).toHaveLength(0);
   });
 });

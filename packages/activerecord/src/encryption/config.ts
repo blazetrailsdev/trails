@@ -5,6 +5,7 @@
  */
 
 import { ConfigError } from "./errors.js";
+import type { SchemeOptions } from "./scheme.js";
 
 export class Config {
   primaryKey?: string | string[];
@@ -16,7 +17,8 @@ export class Config {
   validateColumnSize: boolean = true;
   addToFilterParameters: boolean = true;
   excludeFromFilterParameters: string[] = [];
-  previousSchemes: unknown[] = [];
+  previousSchemes: SchemeOptions[] = [];
+  supportSha1ForNonDeterministicEncryption: boolean = false;
   extendQueries: boolean = false;
   hashDigestClass: string = "SHA1";
   keyProviderClass?: string;
@@ -35,15 +37,9 @@ export class Config {
     return this.excludeFromFilterParameters;
   }
 
-  set previous(schemes: Record<string, unknown>[]) {
+  set previous(schemes: SchemeOptions[]) {
     for (const props of schemes) {
       this.previousSchemes.push(props);
-    }
-  }
-
-  set supportSha1ForNonDeterministicEncryption(value: boolean) {
-    if (value && this.primaryKey) {
-      this.previousSchemes.push({ hashDigestClass: "SHA1" });
     }
   }
 

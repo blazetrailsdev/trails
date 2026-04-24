@@ -23,6 +23,7 @@ import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Cipher } from "./encryption/cipher/aes256-gcm.js";
+import { globalPreviousSchemesFor } from "./encryption/encryptable-record.js";
 
 /**
  * The simple encryptor surface `Base.encrypts({ encryptor })` accepts.
@@ -126,11 +127,7 @@ export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {
 }
 
 function buildScheme(options: EncryptsOptions): Scheme {
-  const { encryptor, ...schemeOptions } = options;
-
-  if (encryptor) {
-    return new Scheme({ ...schemeOptions, encryptor: new LegacyEncryptorShim(encryptor) });
-  }
+  const { encryptor, previousSchemes: localPrevious = [], ...schemeOptions } = options;
 
   const hasSchemeOptions =
     schemeOptions.key !== undefined ||
@@ -138,19 +135,21 @@ function buildScheme(options: EncryptsOptions): Scheme {
     schemeOptions.deterministic !== undefined ||
     schemeOptions.downcase !== undefined ||
     schemeOptions.ignoreCase !== undefined ||
-    schemeOptions.previousSchemes !== undefined ||
+    localPrevious.length > 0 ||
     schemeOptions.compress !== undefined ||
     schemeOptions.compressor !== undefined ||
     schemeOptions.supportUnencryptedData !== undefined;
 
-  if (hasSchemeOptions) {
-    return new Scheme(schemeOptions);
-  }
+  const coreOpts: SchemeOptions = encryptor
+    ? { ...schemeOptions, encryptor: new LegacyEncryptorShim(encryptor) }
+    : hasSchemeOptions
+      ? schemeOptions
+      : { encryptor: new LegacyEncryptorShim(defaultEncryptor) };
 
-  // No scheme configuration and no explicit encryptor — fall back to
-  // the repo's default AR_ENC:base64 encryptor so `this.encrypts("name")`
-  // works in contexts that haven't set up keys/config.
-  return new Scheme({ encryptor: new LegacyEncryptorShim(defaultEncryptor) });
+  const base = new Scheme(coreOpts);
+  const globalPrevious = globalPreviousSchemesFor(base);
+  const allPrevious = [...globalPrevious, ...localPrevious];
+  return allPrevious.length > 0 ? new Scheme({ ...coreOpts, previousSchemes: allPrevious }) : base;
 }
 
 interface PendingEncryption {

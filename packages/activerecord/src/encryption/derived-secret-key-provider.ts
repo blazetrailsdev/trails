@@ -9,9 +9,9 @@ import { KeyProvider } from "./key-provider.js";
 import { KeyGenerator } from "./key-generator.js";
 
 export class DerivedSecretKeyProvider extends KeyProvider {
-  constructor(passwords: string | string[]) {
+  constructor(passwords: string | string[], options?: { keyGenerator?: KeyGenerator }) {
     const passwordList = Array.isArray(passwords) ? passwords : [passwords];
-    const generator = new KeyGenerator();
+    const generator = options?.keyGenerator ?? new KeyGenerator();
     // Mirror Rails: uses key_generator.derive_key_from(password) which applies
     // config.key_derivation_salt. deriveKeyFrom raises ConfigError if the salt
     // is not configured, matching Rails' required-key semantics.
