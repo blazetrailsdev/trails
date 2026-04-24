@@ -194,6 +194,14 @@ export function quote(value: unknown): string {
   if (value instanceof Range) {
     return quoteString(encodeRange(value));
   }
+  // Mirrors: PostgreSQL::Quoting#quote raises IntegerOutOf64BitRange for
+  // integers exceeding the 64-bit signed range. Covers both bigint and
+  // integer number values — JS integers beyond MAX_SAFE_INTEGER lose
+  // precision silently, so they must be rejected the same way bigints are.
+  if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
+    checkIntegerRange(value);
+    return String(value);
+  }
   return abstractQuote(value);
 }
 

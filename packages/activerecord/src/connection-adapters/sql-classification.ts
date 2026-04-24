@@ -6,8 +6,12 @@
  * duplicating the logic.
  */
 
+// Shared read-only statement allowlist used for cross-adapter SQL
+// classification, including adapter-specific additions such as PostgreSQL
+// cursor operations. CLOSE/DECLARE/FETCH/MOVE read or manage cursors — not
+// data writes.
 const READ_ONLY_STATEMENTS =
-  /^(SELECT|EXPLAIN|PRAGMA|SHOW|SET|RESET|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|DESCRIBE|DESC|USE|KILL)$/;
+  /^(SELECT|EXPLAIN|PRAGMA|SHOW|SET|RESET|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|DESCRIBE|DESC|USE|KILL|CLOSE|DECLARE|FETCH|MOVE)$/;
 
 /**
  * Strip SQL block comments and line comments.

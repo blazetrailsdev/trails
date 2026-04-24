@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/bytea_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -28,7 +28,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it.skip("write with hex format", async () => {});
     it.skip("write with escape format", async () => {});
     it.skip("write via fixture", async () => {});
-    it.skip("binary columns are limitless the upper limit is one GB", () => {});
+    it("binary columns are limitless the upper limit is one GB", () => {
+      expect(adapter.typeToSql("binary", { limit: 100_000 })).toBe("bytea");
+      expect(() => adapter.typeToSql("binary", { limit: 4_294_967_295 })).toThrow();
+    });
     it.skip("type cast binary converts the encoding", () => {});
     it.skip("type cast binary value", () => {});
     it.skip("type case nil", () => {});

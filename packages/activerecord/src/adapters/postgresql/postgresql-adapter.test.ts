@@ -973,7 +973,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   // ── DatabaseStatements ────────────────────────────────────────────
   describe("DatabaseStatements", () => {
     it("isWriteQuery returns false for read-like statements", () => {
-      expect(adapter.isWriteQuery("SELECT 1")).toBe(true);
+      expect(adapter.isWriteQuery("SELECT 1")).toBe(false);
       expect(adapter.isWriteQuery("SET search_path TO public")).toBe(false);
       expect(adapter.isWriteQuery("SHOW server_version")).toBe(false);
     });

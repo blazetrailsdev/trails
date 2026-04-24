@@ -125,6 +125,11 @@ export function initializeTypeMap(m: HashLookupTypeMap): void {
   m.aliasType("char", "varchar");
   m.aliasType("name", "varchar");
   m.aliasType("bpchar", "varchar");
+  // Register fixed OIDs for internal PG string-like types so columns() can
+  // resolve their semantic type without a pg_type round-trip. OIDs are
+  // stable built-ins that don't vary across PG versions.
+  m.registerType(18, new StringType()); // "char" — single internal byte
+  m.registerType(19, new StringType()); // name   — 63-byte identifier type
   m.registerType("bool", new BooleanType());
   registerClassWithLimit(m, "bit", Bit);
   registerClassWithLimit(m, "varbit", BitVarying);

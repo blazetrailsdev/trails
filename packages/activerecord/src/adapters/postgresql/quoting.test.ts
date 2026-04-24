@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quoting.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -60,9 +61,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows).toHaveLength(0);
     });
 
-    it.skip("quote table name with schema", async () => {});
-    it.skip("quote unicode string", async () => {});
-    it.skip("quote binary", async () => {});
+    it("quote table name with schema", async () => {
+      expect(adapter.quoteTableName("foo.bar")).toBe('"foo"."bar"');
+    });
+
+    it.skip("quote unicode string", async () => {
+      // unicode string quoting verified via standard string quoting; no special PG behavior
+    });
+    it.skip("quote binary", async () => {
+      // binary quoting tested via write/read bytea round-trips; requires bytea column setup
+    });
     it("quote date", async () => {
       const rows = await adapter.execute("SELECT DATE '2023-01-15' AS val");
       const val = rows[0].val;
@@ -96,9 +104,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].val).toBe(42);
     });
 
-    it.skip("quote big decimal", async () => {});
-    it.skip("quote rational", async () => {});
-    it.skip("quote bit string", async () => {});
+    it("quote big decimal", async () => {
+      expect(adapter.quote(4.2)).toBe("4.2");
+    });
+
+    it.skip("quote rational", async () => {
+      // Ruby-only: Rational(3,4). No JS equivalent; numeric literals work without a Rational type.
+    });
+    it.skip("quote bit string", async () => {
+      // Requires OID::Bit type serialization; covered by bit_string tests.
+    });
 
     it("quote table name with spaces", async () => {
       await adapter.exec(`CREATE TABLE "table with spaces" ("id" SERIAL PRIMARY KEY)`);
@@ -107,11 +122,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows).toHaveLength(1);
     });
 
-    it.skip("raise when int is wider than 64bit", async () => {});
-    it("do not raise when int is not wider than 64bit", async () => {
-      const rows = await adapter.execute("SELECT 2147483647::integer AS val");
-      expect(rows[0].val).toBe(2147483647);
+    it("raise when int is wider than 64bit", async () => {
+      const tooBig = BigInt("9223372036854775808"); // MAX_INT64 + 1
+      expect(() => adapter.quote(tooBig)).toThrow(IntegerOutOf64BitRange);
+      const tooSmall = BigInt("-9223372036854775809"); // MIN_INT64 - 1
+      expect(() => adapter.quote(tooSmall)).toThrow(IntegerOutOf64BitRange);
     });
-    it.skip("do not raise when raise int wider than 64bit is false", async () => {});
+
+    it("do not raise when int is not wider than 64bit", async () => {
+      expect(adapter.quote(BigInt("9223372036854775807"))).toBe("9223372036854775807");
+      expect(adapter.quote(BigInt("-9223372036854775808"))).toBe("-9223372036854775808");
+    });
+
+    it.skip("do not raise when raise int wider than 64bit is false", async () => {
+      // Requires ActiveRecord.raise_int_wider_than_64bit class-level flag; not yet implemented.
+    });
   });
 });

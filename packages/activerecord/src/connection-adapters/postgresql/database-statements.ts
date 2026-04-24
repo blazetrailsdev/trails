@@ -9,8 +9,17 @@ import type { ExplainOption } from "../../adapter.js";
 import type { Result } from "../../result.js";
 
 // Mirrors: PostgreSQL::DatabaseStatements::READ_QUERY (database_statements.rb:19-21)
-// SQL statements that do not modify data — write_query? returns false for these.
-export const READ_QUERY = /^[\s]*(?:close|declare|fetch|move|set|show)\b/i;
+// Mirrors Rails' build_read_query_regexp which combines the default read list
+// (begin, commit, explain, release, rollback, savepoint, select) with
+// the PG-specific additions (close, declare, fetch, move, set, show).
+// Matches Rails exactly: `with` is included in the read list.
+// Rails does not perform deep CTE analysis — data-modifying CTEs starting
+// with WITH are treated as read-only, the same as pure-read CTEs. This
+// mirrors DEFAULT_READ_QUERY + PG additions from build_read_query_regexp.
+// Leading whitespace, block/line comments, and opening parentheses are
+// allowed before the keyword in any order.
+export const READ_QUERY =
+  /^(?:\s|\/\*.*?\*\/|--[^\n]*(?:\n|$)|\()*(?:begin|close|commit|declare|explain|fetch|move|release|rollback|savepoint|select|set|show|with)\b/is;
 
 export interface DatabaseStatements {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
