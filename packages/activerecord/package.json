@@ -40,8 +40,8 @@
     }
   },
   "bin": {
-    "trails-tsc": "./dist/tsc-wrapper/cli.js",
-    "trails-schema-dump": "./dist/bin/trails-schema-dump.js"
+    "trails-tsc": "./bin/trails-tsc.js",
+    "trails-schema-dump": "./bin/trails-schema-dump.js"
   },
   "scripts": {
     "build": "tsc"
@@ -55,7 +55,8 @@
     "typescript": ">=5.0.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "license": "MIT"
 }

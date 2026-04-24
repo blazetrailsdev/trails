@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "trails": "./dist/bin.js"
+    "trails": "./bin/trails.js"
   },
   "exports": {
     ".": "./dist/cli.js",
@@ -14,7 +14,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "dependencies": {
     "@blazetrails/activerecord": "workspace:*",
