@@ -44,6 +44,7 @@ import {
   type AddForeignKeyOptions,
 } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
+import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 
 /**
@@ -414,6 +415,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._nativeTypeMap.lookup(normalized);
   }
 
+  lookupCastTypeFromColumn(column: {
+    sqlType?: string | null;
+  }): import("@blazetrails/activemodel").Type {
+    return this.lookupCastType(column.sqlType ?? "");
+  }
+
   get nativeTypeMap(): TypeMap {
     return this._nativeTypeMap;
   }
@@ -733,6 +740,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   ): Promise<void> {
     const sqlType = this.typeToSql(type, options);
     let sql = `ALTER TABLE ${quoteTableName(tableName)} ADD COLUMN ${quoteColumnName(columnName)} ${sqlType}`;
+    if (options?.collation) sql += ` COLLATE ${quoteColumnName(String(options.collation))}`;
     if (options?.null === false) sql += " NOT NULL";
     if (options?.default !== undefined) {
       sql += ` DEFAULT ${this.quoteDefault(options.default)}`;
@@ -803,6 +811,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         if (options?.default !== undefined)
           columns[columnName].dflt_value =
             options.default === null ? null : this.quoteDefault(options.default);
+        if (options?.collation !== undefined) columns[columnName].collation = options.collation;
       }
     });
   }
@@ -1149,6 +1158,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       dflt_value: string | null;
       pk: number;
     }>;
+
+    const collationMap = this._parseCollationsFromTableSql(tableName);
+
     return rows.map((r) => {
       const sqlType = r.type || "";
       const meta = new SqlTypeMetadata({
@@ -1158,10 +1170,42 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         precision: null,
         scale: null,
       });
-      return new Column(r.name, r.dflt_value, meta, r.notnull === 0, {
+      const defaultValue = this._extractValueFromDefault(r.dflt_value);
+      return new Sqlite3Column(r.name, defaultValue, meta, r.notnull === 0, {
         primaryKey: r.pk > 0,
+        collation: collationMap.get(r.name) ?? null,
       });
     });
+  }
+
+  // Mirrors: SQLite3Adapter#extract_value_from_default
+  private _extractValueFromDefault(dfltValue: string | null): unknown {
+    if (dfltValue === null) return null;
+    if (/^null$/i.test(dfltValue)) return null;
+    const singleQuoted = /^'([\s\S]*)'$/.exec(dfltValue);
+    if (singleQuoted) return singleQuoted[1].replace(/''/g, "'");
+    const doubleQuoted = /^"([\s\S]*)"$/.exec(dfltValue);
+    if (doubleQuoted) return doubleQuoted[1].replace(/""/g, '"');
+    if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
+    const hexMatch = /^x'(.*)'$/i.exec(dfltValue);
+    if (hexMatch) return Buffer.from(hexMatch[1], "hex");
+    return null;
+  }
+
+  // Mirrors: SQLite3Adapter#table_structure_with_collation
+  private _parseCollationsFromTableSql(tableName: string): Map<string, string> {
+    const result = new Map<string, string>();
+    const createSql = this._getCreateTableSql(tableName);
+    if (!createSql) return result;
+
+    const COLLATE_REGEX = /.*"(\w+)".*\bCOLLATE\s+"(\w+)".*/i;
+    const body = createSql.replace(/\);*\s*$/, "").replace(/^[^(]*\(/, "");
+    const parts = body.split(/,(?=\s*(?:"|\bCONSTRAINT\b))/i);
+    for (const part of parts) {
+      const m = COLLATE_REGEX.exec(part);
+      if (m) result.set(m[1], m[2]);
+    }
+    return result;
   }
 
   async indexes(tableName: string): Promise<unknown[]> {
@@ -1404,9 +1448,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       .map((c) => c.name);
     const compositePk = pkColumns.length > 1;
 
+    const existingCollations = this._parseCollationsFromTableSql(tableName);
     const colDefs = colNames.map((name) => {
       const col = columns[name];
       let def = `${quoteColumnName(name)} ${col.type ?? "TEXT"}`;
+      const collation = col.collation === undefined ? existingCollations.get(name) : col.collation;
+      if (collation) def += ` COLLATE ${quoteColumnName(String(collation))}`;
       if (!compositePk && col.pk) def += " PRIMARY KEY";
       if (col.notnull) def += " NOT NULL";
       if (col.dflt_value !== null && col.dflt_value !== undefined) {

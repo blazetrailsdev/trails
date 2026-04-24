@@ -193,6 +193,7 @@ export interface ColumnOptions {
   unique?: boolean;
   primaryKey?: boolean;
   array?: boolean;
+  collation?: string;
 }
 
 export interface AddIndexOptions {
@@ -802,6 +803,10 @@ export class TableDefinition {
       // For types that don't handle PRIMARY KEY internally, append it if requested
       if (col.options.primaryKey && col.type !== "primary_key" && col.type !== "uuid") {
         parts.push("PRIMARY KEY");
+      }
+
+      if (col.options.collation && this._adapterName === "sqlite") {
+        parts.push(`COLLATE ${quoteIdentifier(col.options.collation, this._adapterName)}`);
       }
 
       if (col.options.array && col.type !== "primary_key") {
