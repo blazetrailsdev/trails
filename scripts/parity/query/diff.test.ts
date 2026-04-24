@@ -158,4 +158,71 @@ describe("diff.ts classification", () => {
     expect(stdout).toMatch(/expected diff, actual trails-missing/);
     expect(code).toBe(1);
   });
+
+  it("summary includes gap-by-side breakdown across multiple categories", () => {
+    // g: both sides differ AND listed as diff → KNOWN-GAP diff
+    writeFileSync(join(railsDir, "g.json"), fixtureJson({ fixture: "g", sql: "A" }));
+    writeFileSync(join(trailsDir, "g.json"), fixtureJson({ fixture: "g", sql: "B" }));
+    // h: trails missing AND listed as trails-missing → KNOWN-GAP trails-missing
+    writeFileSync(join(railsDir, "h.json"), fixtureJson({ fixture: "h" }));
+    // i: rails missing AND listed as rails-missing → KNOWN-GAP rails-missing
+    writeFileSync(join(trailsDir, "i.json"), fixtureJson({ fixture: "i" }));
+    writeGaps({
+      g: { side: "diff", reason: "g gap" },
+      h: { side: "trails-missing", reason: "h gap" },
+      i: { side: "rails-missing", reason: "i gap" },
+    });
+    const { code, stdout } = runDiff(railsDir, trailsDir, gapsPath, fixturesDir);
+    expect(code).toBe(0);
+    // All three categories appear in the breakdown line, each with count 1.
+    expect(stdout).toMatch(/known gaps by side: .*1 rails-missing/);
+    expect(stdout).toMatch(/known gaps by side: .*1 trails-missing/);
+    expect(stdout).toMatch(/known gaps by side: .*1 diff/);
+    expect(stdout).toMatch(/3 known gap\(s\)/);
+  });
+});
+
+describe("diff.ts known-gaps validation", () => {
+  let tmp: string;
+  let railsDir: string;
+  let trailsDir: string;
+  let gapsPath: string;
+  let fixturesDir: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "parity-query-diff-test-"));
+    railsDir = join(tmp, "rails");
+    trailsDir = join(tmp, "trails");
+    gapsPath = join(tmp, "gaps.json");
+    fixturesDir = join(tmp, "fixtures");
+    mkdirSync(railsDir);
+    mkdirSync(trailsDir);
+    mkdirSync(fixturesDir);
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("exits 1 with pointed error on invalid `side` value", () => {
+    writeFileSync(gapsPath, JSON.stringify({ a: { side: "typo", reason: "x" } }));
+    const { code, stderr } = runDiff(railsDir, trailsDir, gapsPath, fixturesDir);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/\[a\]\.side must be one of/);
+    expect(stderr).toMatch(/got "typo"/);
+  });
+
+  it("exits 1 with pointed error on empty `reason`", () => {
+    writeFileSync(gapsPath, JSON.stringify({ a: { side: "diff", reason: "" } }));
+    const { code, stderr } = runDiff(railsDir, trailsDir, gapsPath, fixturesDir);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/\[a\]\.reason must be a non-empty string/);
+  });
+
+  it("exits 1 on malformed JSON", () => {
+    writeFileSync(gapsPath, "{not json");
+    const { code, stderr } = runDiff(railsDir, trailsDir, gapsPath, fixturesDir);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/failed to parse/);
+  });
 });

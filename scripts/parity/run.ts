@@ -117,13 +117,44 @@ function fixtures(cfg: TypeConfig): string[] {
     .sort();
 }
 
-function run(cmd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<void> {
+interface RunOptions {
+  env?: NodeJS.ProcessEnv;
+  /**
+   * When true, buffer the child's stdout/stderr and flush them in one
+   * contiguous block on exit. Used when fixtures run in parallel so each
+   * fixture's log lines stay grouped instead of interleaving with others.
+   */
+  buffered?: boolean;
+}
+
+function run(cmd: string, args: string[], opts: RunOptions = {}): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = spawn(cmd, args, {
-      stdio: "inherit",
-      env: env ? { ...process.env, ...env } : process.env,
+      stdio: opts.buffered ? ["ignore", "pipe", "pipe"] : "inherit",
+      env: opts.env ? { ...process.env, ...opts.env } : process.env,
     });
+    // Tagged chunks preserve arrival order across stdout and stderr so an
+    // interleaved error message still lines up with the surrounding stdout
+    // context when flushed. Flushed per-stream at the end so parent's own
+    // stderr stream still gets stderr output (for log filters, tools that
+    // split streams, etc.).
+    const chunks: Array<{ stream: "out" | "err"; text: string }> = [];
+    if (opts.buffered) {
+      proc.stdout
+        ?.setEncoding("utf8")
+        .on("data", (c: string) => chunks.push({ stream: "out", text: c }));
+      proc.stderr
+        ?.setEncoding("utf8")
+        .on("data", (c: string) => chunks.push({ stream: "err", text: c }));
+    }
+    const flush = () => {
+      if (!opts.buffered) return;
+      for (const c of chunks) {
+        (c.stream === "out" ? process.stdout : process.stderr).write(c.text);
+      }
+    };
     proc.on("close", (code, signal) => {
+      flush();
       if (code === 0) {
         resolve();
         return;
@@ -132,33 +163,85 @@ function run(cmd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<void
       const status = code === null ? `signal ${signal}` : `${code}`;
       reject(new Error(`${command} exited ${status}`));
     });
-    proc.on("error", reject);
+    proc.on("error", (err) => {
+      flush();
+      reject(err);
+    });
+  });
+}
+
+// Bound concurrency so we don't fork 53 bundler or tsx processes at once.
+// Default 4 — safe for Ruby bundler memory and reasonable on 2-core CI runners.
+// Override with PARITY_CONCURRENCY for local tuning; must be a positive integer.
+function parseConcurrency(raw: string | undefined): number {
+  if (raw === undefined || raw === "") return 4;
+  const trimmed = raw.trim();
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed) || parsed < 1 || String(parsed) !== trimmed) {
+    process.stderr.write(
+      `parity run: PARITY_CONCURRENCY must be a positive integer (got ${JSON.stringify(raw)})\n`,
+    );
+    process.exit(1);
+  }
+  return parsed;
+}
+
+const CONCURRENCY = parseConcurrency(process.env.PARITY_CONCURRENCY);
+
+async function runPool<T>(items: T[], worker: (item: T) => Promise<void>): Promise<void> {
+  const queue = [...items];
+  // Fail-fast: as soon as any worker errors, stop pulling new items from the
+  // queue. In-flight work finishes (we can't kill spawned children here), but
+  // no further fixtures are scheduled, so a broken fixture doesn't spawn 50
+  // more Ruby/tsx processes before the error surfaces. Query mode wraps each
+  // dump in try/catch inside the worker so this branch never triggers there.
+  let firstError: unknown;
+  const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+    for (;;) {
+      if (firstError !== undefined) return;
+      const item = queue.shift();
+      if (item === undefined) return;
+      try {
+        await worker(item);
+      } catch (err) {
+        if (firstError === undefined) firstError = err;
+        return;
+      }
+    }
+  });
+  await Promise.all(workers);
+  if (firstError !== undefined) throw firstError;
+}
+
+function dumpOne(cfg: TypeConfig, label: "rails" | "trails", fixture: string): Promise<void> {
+  const fixtureDir = join(FIXTURES_DIR, fixture);
+  const outDir = label === "rails" ? cfg.outRails : cfg.outTrails;
+  const outFile = join(outDir, `${fixture}.json`);
+  // Buffered so each fixture's verbose dump output prints as one contiguous
+  // block — otherwise concurrent workers interleave lines and CI logs become
+  // unreadable.
+  if (label === "rails") {
+    return run(
+      "bundle",
+      ["exec", "ruby", cfg.rubyDump, fixtureDir, outFile, ...cfg.extraDumpArgs],
+      { env: { BUNDLE_GEMFILE: GEMFILE }, buffered: true },
+    );
+  }
+  return run("pnpm", ["exec", "tsx", cfg.nodeDump, fixtureDir, outFile, ...cfg.extraDumpArgs], {
+    buffered: true,
   });
 }
 
 async function runRails(cfg: TypeConfig): Promise<void> {
   rmSync(cfg.outRails, { recursive: true, force: true });
   mkdirSync(cfg.outRails, { recursive: true });
-  const bundleEnv = { BUNDLE_GEMFILE: GEMFILE };
-  for (const fixture of fixtures(cfg)) {
-    const fixtureDir = join(FIXTURES_DIR, fixture);
-    const outFile = join(cfg.outRails, `${fixture}.json`);
-    await run(
-      "bundle",
-      ["exec", "ruby", cfg.rubyDump, fixtureDir, outFile, ...cfg.extraDumpArgs],
-      bundleEnv,
-    );
-  }
+  await runPool(fixtures(cfg), (fixture) => dumpOne(cfg, "rails", fixture));
 }
 
 async function runTrails(cfg: TypeConfig): Promise<void> {
   rmSync(cfg.outTrails, { recursive: true, force: true });
   mkdirSync(cfg.outTrails, { recursive: true });
-  for (const fixture of fixtures(cfg)) {
-    const fixtureDir = join(FIXTURES_DIR, fixture);
-    const outFile = join(cfg.outTrails, `${fixture}.json`);
-    await run("pnpm", ["exec", "tsx", cfg.nodeDump, fixtureDir, outFile, ...cfg.extraDumpArgs]);
-  }
+  await runPool(fixtures(cfg), (fixture) => dumpOne(cfg, "trails", fixture));
 }
 
 async function runDiff(cfg: TypeConfig): Promise<void> {
@@ -188,27 +271,16 @@ async function runAllFixturesBestEffort(cfg: TypeConfig, label: "rails" | "trail
   const outDir = label === "rails" ? cfg.outRails : cfg.outTrails;
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
-  const bundleEnv = { BUNDLE_GEMFILE: GEMFILE };
-  for (const fixture of fixtures(cfg)) {
-    const fixtureDir = join(FIXTURES_DIR, fixture);
-    const outFile = join(outDir, `${fixture}.json`);
+  await runPool(fixtures(cfg), async (fixture) => {
     try {
-      if (label === "rails") {
-        await run(
-          "bundle",
-          ["exec", "ruby", cfg.rubyDump, fixtureDir, outFile, ...cfg.extraDumpArgs],
-          bundleEnv,
-        );
-      } else {
-        await run("pnpm", ["exec", "tsx", cfg.nodeDump, fixtureDir, outFile, ...cfg.extraDumpArgs]);
-      }
+      await dumpOne(cfg, label, fixture);
     } catch (err) {
       process.stdout.write(
         `parity run: [${label}/${fixture}] dump failed — diff step will classify as gap/fail\n`,
       );
       process.stdout.write(`  ${err instanceof Error ? err.message : String(err)}\n`);
     }
-  }
+  });
 }
 
 async function main(): Promise<void> {

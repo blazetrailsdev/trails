@@ -12,6 +12,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import Ajv from "ajv/dist/2020.js";
 import { createTwoFilesPatch } from "diff";
+import { stableJson } from "../canonical/diff-helpers.js";
 
 const SCHEMA_PATH = "scripts/parity/canonical/schema.schema.json";
 
@@ -39,22 +40,6 @@ function parseArgs(): { railsDir: string; trailsDir: string } {
   }
   if (!railsDir || !trailsDir) usage();
   return { railsDir, trailsDir };
-}
-
-function sortedKeys(obj: unknown): unknown {
-  if (Array.isArray(obj)) return obj.map(sortedKeys);
-  if (obj !== null && typeof obj === "object") {
-    return Object.fromEntries(
-      Object.keys(obj)
-        .sort()
-        .map((k) => [k, sortedKeys((obj as Record<string, unknown>)[k])]),
-    );
-  }
-  return obj;
-}
-
-function stableJson(obj: unknown): string {
-  return JSON.stringify(sortedKeys(obj), null, 2) + "\n";
 }
 
 function listJsonFiles(dir: string): string[] {

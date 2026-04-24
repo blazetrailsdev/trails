@@ -23,6 +23,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import Ajv from "ajv/dist/2020.js";
 import { createTwoFilesPatch } from "diff";
+import { stableJson } from "../canonical/diff-helpers.js";
 
 const SCHEMA_PATH = "scripts/parity/canonical/query.schema.json";
 // Tests override via PARITY_KNOWN_GAPS_PATH / PARITY_FIXTURES_DIR so they don't
@@ -49,6 +50,57 @@ interface KnownGap {
 }
 
 type KnownGaps = Record<string, KnownGap>;
+
+const VALID_SIDES: ReadonlySet<KnownGap["side"]> = new Set([
+  "rails-missing",
+  "trails-missing",
+  "both-missing",
+  "diff",
+]);
+
+/**
+ * Validate the shape of the known-gaps file so a typo in a `side` value or
+ * a missing `reason` fails loudly instead of silently mis-classifying fixtures.
+ * Returns a typed object on success; exits 1 with a useful error on failure.
+ */
+function loadKnownGaps(path: string): KnownGaps {
+  if (!existsSync(path)) return {};
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"));
+  } catch (err) {
+    process.stderr.write(
+      `parity query diff: failed to parse ${path}: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    process.exit(1);
+  }
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    process.stderr.write(`parity query diff: ${path} must be a JSON object\n`);
+    process.exit(1);
+  }
+  const gaps: KnownGaps = {};
+  for (const [name, entry] of Object.entries(raw as Record<string, unknown>)) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      process.stderr.write(`parity query diff: ${path}[${name}] must be an object\n`);
+      process.exit(1);
+    }
+    const e = entry as Record<string, unknown>;
+    if (typeof e.side !== "string" || !VALID_SIDES.has(e.side as KnownGap["side"])) {
+      process.stderr.write(
+        `parity query diff: ${path}[${name}].side must be one of ${[...VALID_SIDES].join(", ")} (got ${JSON.stringify(e.side)})\n`,
+      );
+      process.exit(1);
+    }
+    if (typeof e.reason !== "string" || e.reason.trim() === "") {
+      process.stderr.write(
+        `parity query diff: ${path}[${name}].reason must be a non-empty string\n`,
+      );
+      process.exit(1);
+    }
+    gaps[name] = { side: e.side as KnownGap["side"], reason: e.reason };
+  }
+  return gaps;
+}
 
 function assertRepoRoot(): void {
   if (!existsSync(SCHEMA_PATH)) {
@@ -78,22 +130,6 @@ function parseArgs(): { railsDir: string; trailsDir: string } {
   return { railsDir, trailsDir };
 }
 
-function sortedKeys(obj: unknown): unknown {
-  if (Array.isArray(obj)) return obj.map(sortedKeys);
-  if (obj !== null && typeof obj === "object") {
-    return Object.fromEntries(
-      Object.keys(obj)
-        .sort()
-        .map((k) => [k, sortedKeys((obj as Record<string, unknown>)[k])]),
-    );
-  }
-  return obj;
-}
-
-function stableJson(obj: unknown): string {
-  return JSON.stringify(sortedKeys(obj), null, 2) + "\n";
-}
-
 function listJsonFiles(dir: string): string[] {
   if (!existsSync(dir)) {
     process.stderr.write(`parity query diff: directory not found: ${dir}\n`);
@@ -112,9 +148,7 @@ async function main(): Promise<void> {
   const ajv = new Ajv();
   const validate = ajv.compile(schemaJson);
 
-  const knownGaps: KnownGaps = existsSync(KNOWN_GAPS_PATH)
-    ? JSON.parse(readFileSync(KNOWN_GAPS_PATH, "utf8"))
-    : {};
+  const knownGaps = loadKnownGaps(KNOWN_GAPS_PATH);
 
   const railsFiles = new Set(listJsonFiles(railsDir));
   const trailsFiles = new Set(listJsonFiles(trailsDir));
@@ -143,6 +177,12 @@ async function main(): Promise<void> {
   let failed = 0;
   let knownGap = 0;
   let unexpectedPass = 0;
+  const gapBySide: Record<KnownGap["side"], number> = {
+    "rails-missing": 0,
+    "trails-missing": 0,
+    "both-missing": 0,
+    diff: 0,
+  };
 
   for (const name of [...allFixtures].sort()) {
     const file = `${name}.json`;
@@ -157,6 +197,7 @@ async function main(): Promise<void> {
       if (gap && gap.side === actualSide) {
         process.stdout.write(`KNOWN-GAP  ${name}  (${actualSide}: ${gap.reason})\n`);
         knownGap++;
+        gapBySide[actualSide]++;
       } else if (gap) {
         failed++;
         process.stdout.write(
@@ -207,6 +248,7 @@ async function main(): Promise<void> {
       } else {
         if (gap && gap.side === "diff") {
           knownGap++;
+          gapBySide.diff++;
           process.stdout.write(`KNOWN-GAP  ${name}  (diff: ${gap.reason})\n`);
         } else {
           failed++;
@@ -244,6 +286,13 @@ async function main(): Promise<void> {
   if (unexpectedPass > 0) process.stdout.write(`, ${unexpectedPass} unexpected pass`);
   if (failed > 0) process.stdout.write(`, ${failed} failure(s)`);
   process.stdout.write("\n");
+
+  if (knownGap > 0) {
+    const parts = (Object.entries(gapBySide) as [KnownGap["side"], number][])
+      .filter(([, n]) => n > 0)
+      .map(([side, n]) => `${n} ${side}`);
+    process.stdout.write(`  known gaps by side: ${parts.join(", ")}\n`);
+  }
 
   if (failed > 0 || unexpectedPass > 0) process.exit(1);
 }
