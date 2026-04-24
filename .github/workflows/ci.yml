@@ -5,6 +5,15 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # `labeled` fires so parity jobs can be opted in via a PR label
+    # without pushing a new commit. `run-parity` is the label name
+    # matched in the `changes` job below.
+    types: [opened, synchronize, reopened, labeled]
+  schedule:
+    # Weekly post-merge sweep so slow regressions can't hide between
+    # parity-relevant PRs. Monday 06:00 UTC is off-peak on an Ubuntu runner.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
 
 jobs:
   # Preflight that sets `docs_only=true` when every changed path is under
@@ -20,11 +29,16 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
+      parity_relevant: ${{ steps.filter.outputs.parity_relevant }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - id: filter
+        env:
+          # Labels live on the PR even when the firing event is `labeled`,
+          # `synchronize`, etc., so we can scan them uniformly.
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels) }}
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -39,25 +53,50 @@ jobs:
           # reliably compute a diff — fall back to running the full matrix.
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! files=$(git diff --name-only "$base" "$head" 2>/dev/null); then
+          elif ! files=$(git diff --name-only "$base" "$head" 2>/dev/null); then
             echo "git diff failed (base may be unreachable after force-push) — running full matrix"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "Changed files:"
-          echo "$files"
-          if [ -z "$files" ]; then
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Any line that does NOT start with `docs/` flips the switch.
-          if echo "$files" | grep -qv '^docs/'; then
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
           else
-            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            echo "Changed files:"
+            echo "$files"
+            # docs_only: any line NOT starting with `docs/` flips the switch.
+            if [ -z "$files" ]; then
+              echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            elif echo "$files" | grep -qv '^docs/'; then
+              echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
+          # parity_relevant: the Rails↔trails parity sweep is expensive
+          # (~15-20 CI minutes of setup across 7 jobs), and almost every
+          # PR touches `packages/*/src/**`, so a path filter would still
+          # run it nearly every time. Instead run on:
+          #   - `push` to main (catches regressions immediately after merge)
+          #   - weekly `schedule` cron (catches slow drifts between pushes)
+          #   - manual `workflow_dispatch` (debugging)
+          #   - PRs carrying the `run-parity` label (opt-in per PR when
+          #     the author knows their change could shift SQL output)
+          # Plain PRs without the label skip all 7 parity jobs.
+          case "${{ github.event_name }}" in
+            push|schedule|workflow_dispatch)
+              echo "parity_relevant=true" >> "$GITHUB_OUTPUT"
+              ;;
+            pull_request)
+              # `any(.[]; ...)` rather than `.[].name == "..."` because the
+              # latter emits one boolean per label and `jq -e`'s exit status
+              # reflects only the last element — so a PR with labels
+              # ["run-parity", "bug"] would miss.
+              if echo "$PR_LABELS" | jq -e 'any(.[]; .name == "run-parity")' >/dev/null; then
+                echo "parity_relevant=true" >> "$GITHUB_OUTPUT"
+              else
+                echo "parity_relevant=false" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+            *)
+              echo "parity_relevant=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
 
   build-and-typecheck:
     name: Build & Type Check
@@ -330,7 +369,9 @@ jobs:
   schema-parity-rails:
     name: Schema Parity (Rails side)
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.parity_relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -372,7 +413,9 @@ jobs:
   schema-parity-trails:
     name: Schema Parity (trails side)
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.parity_relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -402,6 +445,7 @@ jobs:
       - schema-parity-trails
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.parity_relevant == 'true' &&
       needs.schema-parity-rails.result == 'success' &&
       needs.schema-parity-trails.result == 'success'
     runs-on: ubuntu-latest
@@ -429,7 +473,9 @@ jobs:
   query-parity-frozen-at:
     name: Query Parity (compute frozen-at)
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.parity_relevant == 'true'
     runs-on: ubuntu-latest
     outputs:
       # Minted once per workflow run and consumed by both dump jobs so they
@@ -448,7 +494,9 @@ jobs:
     needs:
       - changes
       - query-parity-frozen-at
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.parity_relevant == 'true'
     runs-on: ubuntu-latest
     env:
       PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
@@ -487,7 +535,9 @@ jobs:
     needs:
       - changes
       - query-parity-frozen-at
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.parity_relevant == 'true'
     runs-on: ubuntu-latest
     env:
       PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
@@ -528,6 +578,7 @@ jobs:
       - query-parity-trails
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.parity_relevant == 'true' &&
       needs.query-parity-rails.result == 'success' &&
       needs.query-parity-trails.result == 'success'
     runs-on: ubuntu-latest
