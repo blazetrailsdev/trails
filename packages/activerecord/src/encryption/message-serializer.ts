@@ -77,6 +77,13 @@ export class MessageSerializer {
             throw new DecryptionError("Messages can only have one nested message in their headers");
           }
           const nested = this.load(JSON.stringify(value));
+          for (const [, v] of nested.headers.entries()) {
+            if (v instanceof Message) {
+              throw new DecryptionError(
+                "Messages can only have one nested message in their headers",
+              );
+            }
+          }
           message.headers.set(key, nested);
         } else {
           message.headers.set(key, value);
