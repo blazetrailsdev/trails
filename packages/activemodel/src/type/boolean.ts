@@ -10,6 +10,7 @@ export class BooleanType extends ValueType<boolean> {
   private static readonly FALSE_VALUES: ReadonlySet<unknown> = new Set([
     false,
     0,
+    0n, // safeIntegers mode returns bigint 0n for SQLite boolean columns
     "0",
     "f",
     "F",

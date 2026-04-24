@@ -961,6 +961,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   static newClient(config: mysql.PoolOptions): mysql.Pool {
-    return mysql.createPool(config);
+    // With supportBigNumbers:true, mysql2 returns a decimal string for BIGINT
+    // values with ≥15 digits (i.e. ≥ 10^14) where parseInt would lose precision,
+    // and a JS number for smaller values. Both are handled by BigIntegerType.cast().
+    // Note: the threshold is mysql2's internal digit count (≥15), not
+    // Number.MAX_SAFE_INTEGER (2^53-1 ≈ 9×10^15, 16 digits). Callers may
+    // override via explicit false in config.
+    return mysql.createPool({ supportBigNumbers: true, ...config });
   }
 }

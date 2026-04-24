@@ -18,6 +18,7 @@ export class IntegerType extends ValueType<number> {
       if (isNaN(value)) return null;
       return Math.trunc(value);
     }
+    if (typeof value === "bigint") return Number(value);
     const parsed = parseInt(String(value), 10);
     return isNaN(parsed) ? null : parsed;
   }
