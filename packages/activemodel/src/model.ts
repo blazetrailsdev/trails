@@ -14,7 +14,7 @@ import {
   CallbackConditions,
   defineModelCallbacks,
 } from "./callbacks.js";
-import { serializableHash, SerializeOptions } from "./serialization.js";
+import { serializableHash, SerializeOptions, coerceForJson } from "./serialization.js";
 import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
 
 /**
@@ -1504,7 +1504,7 @@ export class Model {
   }
 
   asJson(options?: SerializeOptions): Record<string, unknown> {
-    const hash = this.serializableHash(options);
+    const hash = coerceForJson(this.serializableHash(options)) as Record<string, unknown>;
     const ctor = this.constructor as typeof Model;
     if (ctor.includeRootInJson) {
       const root =
@@ -1518,6 +1518,17 @@ export class Model {
 
   toJson(options?: SerializeOptions): string {
     return JSON.stringify(this.asJson(options));
+  }
+
+  /**
+   * JSON.stringify hook — delegates to `asJson()` so
+   * `JSON.stringify(model)` produces the same output as
+   * `model.toJson()`. Without this, the default walker would
+   * enumerate internal fields (`_attributes`, `_dirty`, `errors`, …)
+   * and potentially throw on BigInt attributes.
+   */
+  toJSON(): unknown {
+    return this.asJson();
   }
 
   /**
