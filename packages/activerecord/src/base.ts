@@ -46,6 +46,10 @@ import * as _Validations from "./validations.js";
 import {
   encrypts as _encrypts,
   applyPendingEncryptions,
+  encryptedAttributeQ as _encryptedAttributeQ,
+  ciphertextFor as _ciphertextFor,
+  encryptRecord as _encryptRecord,
+  decryptRecord as _decryptRecord,
   type EncryptsOptions,
 } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
@@ -1001,6 +1005,38 @@ export class Base extends Model {
     // is trying to eliminate.
     const target = isStiSubclass(this) ? (getStiBase(this) as typeof Base) : this;
     _encrypts(target, ...args);
+  }
+
+  /**
+   * Returns true if the attribute is currently stored as encrypted ciphertext.
+   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute?
+   */
+  encryptedAttribute(attributeName: string): boolean {
+    return _encryptedAttributeQ(this, attributeName);
+  }
+
+  /**
+   * Returns the raw ciphertext stored for the attribute.
+   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#ciphertext_for
+   */
+  ciphertextFor(attributeName: string): unknown {
+    return _ciphertextFor(this, attributeName);
+  }
+
+  /**
+   * Encrypts all encryptable attributes and persists via update_columns.
+   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypt
+   */
+  async encrypt(): Promise<void> {
+    return _encryptRecord(this);
+  }
+
+  /**
+   * Decrypts all encryptable attributes and persists via update_columns.
+   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#decrypt
+   */
+  async decrypt(): Promise<void> {
+    return _decryptRecord(this);
   }
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {

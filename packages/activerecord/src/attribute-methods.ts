@@ -147,6 +147,10 @@ export function dangerousAttributeMethods(): Set<string> {
     "readAttribute",
     "writeAttribute",
     "assignAttributes",
+    "encrypt",
+    "decrypt",
+    "encryptedAttribute",
+    "ciphertextFor",
   ]);
   return _dangerousMethodsCache;
 }

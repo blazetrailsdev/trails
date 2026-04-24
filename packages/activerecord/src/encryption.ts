@@ -25,6 +25,7 @@ import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Cipher } from "./encryption/cipher/aes256-gcm.js";
 import { globalPreviousSchemesFor } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
+import { withoutEncryption } from "./encryption/context.js";
 
 /**
  * The simple encryptor surface `Base.encrypts({ encryptor })` accepts.
@@ -255,6 +256,100 @@ export function isEncryptedAttribute(klass: any, attr: string): boolean {
     current = Object.getPrototypeOf(current);
   }
   return false;
+}
+
+// ─── Instance-level encryption API ──────────────────────────────────────────
+
+/**
+ * Returns true if the attribute's current stored value is encrypted ciphertext.
+ * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute?
+ */
+export function encryptedAttributeQ(record: any, attributeName: string): boolean {
+  const klass = record.constructor as any;
+  // Resolve attribute aliases (mirrors Rails' attribute_aliases lookup).
+  const resolved = klass._attributeAliases?.[attributeName] ?? attributeName;
+  if (!klass._encryptedAttributes?.has(resolved)) return false;
+  const type = klass._attributeDefinitions?.get(resolved)?.type;
+  if (!(type instanceof EncryptedAttributeType)) return false;
+  const rawValue = record.readAttributeBeforeTypeCast(resolved);
+  return type.isEncrypted(rawValue);
+}
+
+/**
+ * Returns the ciphertext for the given attribute.
+ * For encrypted attributes: returns the raw (before-type-cast) stored value.
+ * For unencrypted attributes: returns the serialized DB value.
+ *
+ * Mirrors: ActiveRecord::Encryption::EncryptableRecord#ciphertext_for
+ */
+export function ciphertextFor(record: any, attributeName: string): unknown {
+  const klass = record.constructor as any;
+  const resolved = klass._attributeAliases?.[attributeName] ?? attributeName;
+  if (encryptedAttributeQ(record, attributeName)) {
+    return record.readAttributeBeforeTypeCast(resolved);
+  }
+  return record._attributes.valuesForDatabase()[resolved];
+}
+
+/**
+ * Encrypts all encryptable attributes and persists them via update_columns.
+ * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypt
+ */
+export async function encryptRecord(record: any): Promise<void> {
+  const klass = record.constructor as any;
+  const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
+  if (encryptedAttrs.size === 0) return;
+
+  // Save plaintext values before calling updateColumns, which would overwrite
+  // in-memory attributes with the ciphertext (since updateColumns uses cast()).
+  const plaintextValues: Record<string, unknown> = {};
+  const assignments: Record<string, unknown> = {};
+  for (const attr of encryptedAttrs) {
+    const plaintext = record.readAttribute(attr);
+    plaintextValues[attr] = plaintext;
+    // Explicitly serialize via the type so updateColumns writes ciphertext —
+    // updateColumns uses cast() not serialize(), so we pre-serialize here.
+    const type = klass._attributeDefinitions?.get(attr)?.type;
+    assignments[attr] =
+      type instanceof EncryptedAttributeType ? type.serialize(plaintext) : plaintext;
+  }
+
+  await record.updateColumns(assignments);
+
+  // Restore plaintext as the in-memory cast value so record.attr still reads
+  // as plaintext, while preserving the ciphertext as valueBeforeTypeCast
+  // (used by encryptedAttribute? / ciphertextFor on this instance).
+  for (const [attr, plaintext] of Object.entries(plaintextValues)) {
+    record._attributes.writeCastValue(attr, plaintext);
+  }
+  // Re-snapshot the dirty tracker so it sees the restored plaintext as the
+  // clean state — updateColumns already called changesApplied() with the
+  // ciphertext values, which would make subsequent attribute writes appear
+  // to change "from" the ciphertext rather than the plaintext.
+  record.changesApplied();
+}
+
+/**
+ * Decrypts all encryptable attributes and persists them via update_columns
+ * (with encryption disabled, matching Rails' without_encryption block).
+ * Mirrors: ActiveRecord::Encryption::EncryptableRecord#decrypt
+ */
+export async function decryptRecord(record: any): Promise<void> {
+  const klass = record.constructor as any;
+  const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
+  if (encryptedAttrs.size === 0) return;
+
+  const assignments: Record<string, unknown> = {};
+  for (const attr of encryptedAttrs) {
+    const type = klass._attributeDefinitions?.get(attr)?.type;
+    const raw = record.readAttributeBeforeTypeCast(attr);
+    if (type instanceof EncryptedAttributeType && type.isEncrypted(raw)) {
+      assignments[attr] = type.deserialize(raw);
+    } else {
+      assignments[attr] = record.readAttribute(attr);
+    }
+  }
+  await withoutEncryption(() => record.updateColumns(assignments));
 }
 
 /** Mirrors: ActiveRecord::Encryption.key_length */

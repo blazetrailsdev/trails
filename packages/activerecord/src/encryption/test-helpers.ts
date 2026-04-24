@@ -8,6 +8,8 @@
 import { createTestAdapter } from "../test-adapter.js";
 import { Base } from "../index.js";
 import type { DatabaseAdapter } from "../adapter.js";
+
+export { Base };
 import { Configurable } from "./configurable.js";
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
