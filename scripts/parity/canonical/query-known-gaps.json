@@ -62,5 +62,9 @@
   "ar-19": {
     "side": "diff",
     "reason": "Boolean literal in WHERE: trails emits 'active = TRUE', Rails on SQLite emits 'active = 1'. Same root cause as ar-09 / ar-11."
+  },
+  "ar-23": {
+    "side": "diff",
+    "reason": "ORDER BY column qualification with .from(...) using a single raw SQL string that already includes the alias: trails qualifies the order column to '\"developers\".\"hotness\"'; Rails leaves it bare as '\"hotness\"'. Same SQL semantic, lexically differ. Inverse direction from ar-17's GROUP BY case."
   }
 }
