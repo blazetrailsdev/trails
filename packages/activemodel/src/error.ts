@@ -4,6 +4,59 @@ import { I18n } from "./i18n.js";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = any;
 
+// Rails `CALLBACKS_OPTIONS` / `MESSAGE_OPTIONS` — option keys that are
+// stripped from the identity of an error for strict-match / hash purposes
+// (activemodel/lib/active_model/error.rb:10-11). Both snake and camel
+// spellings are accepted since our codebase normalizes to camel while
+// Rails-ported code may leak snake-cased keys.
+const CALLBACKS_OPTIONS = new Set<string>([
+  "if",
+  "unless",
+  "on",
+  "allow_nil",
+  "allow_blank",
+  "strict",
+  "allowNil",
+  "allowBlank",
+]);
+const MESSAGE_OPTIONS = new Set<string>(["message"]);
+
+/**
+ * Value equality that matches Ruby `==` for the common option shapes:
+ * primitives (identity), arrays (elementwise), and plain objects (key-set +
+ * recursive value equality). Rails relies on `Array#==` / `Hash#==` here
+ * since option values like `in: [1,2,3]` / `count: 2..5` are frequently
+ * collections, and reference equality in JS would silently fail to match.
+ */
+function optionsEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!optionsEqual(a[i], b[i])) return false;
+    return true;
+  }
+  // Ruby `Regexp#==` compares source + options. JS RegExp's enumerable keys
+  // are empty, so the plain-object path below would always return true —
+  // handle explicitly before it.
+  if (a instanceof RegExp && b instanceof RegExp) {
+    return a.source === b.source && a.flags === b.flags;
+  }
+  if (a instanceof RegExp || b instanceof RegExp) return false;
+  if (typeof a === "object" && typeof b === "object") {
+    const ak = Object.keys(a as object);
+    const bk = Object.keys(b as object);
+    if (ak.length !== bk.length) return false;
+    for (const k of ak) {
+      if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+      if (!optionsEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
 /**
  * Represents one single error.
  *
@@ -23,10 +76,17 @@ export class Error {
     attribute: string,
     type: string = "invalid",
     options: Record<string, unknown> = {},
+    rawType?: string,
   ) {
     this.base = base;
     this.attribute = attribute;
-    this.rawType = type;
+    // Rails `NestedError#initialize` keeps `@raw_type = inner_error.raw_type`
+    // while allowing `@type` to be overridden via `override_options[:type]`
+    // (activemodel/lib/active_model/nested_error.rb:8-15). Message
+    // generation keys off `raw_type` so i18n lookups still resolve the
+    // original error's key even when the surface `type` has been renamed.
+    // `rawType` defaults to `type` for the common case where they match.
+    this.rawType = rawType ?? type;
     this.type = type || "invalid";
     this.options = options;
   }
@@ -36,10 +96,12 @@ export class Error {
    * new model instance. Mirrors Rails' usage in
    * `ActiveModel::Errors#copy!` where each error is `deep_dup`ed and then
    * its `@base` is reset to the receiver
-   * (activemodel/lib/active_model/errors.rb:138-143).
+   * (activemodel/lib/active_model/errors.rb:138-143). Preserves a split
+   * between `type` and `rawType` when a NestedError-style override was in
+   * play.
    */
   dupWithBase(newBase: AnyRecord): Error {
-    return new Error(newBase, this.attribute, this.rawType, deepDup(this.options));
+    return new Error(newBase, this.attribute, this.type, deepDup(this.options), this.rawType);
   }
 
   get message(): string {
@@ -82,17 +144,45 @@ export class Error {
     return Error.fullMessage(this.attribute, this.message, this.base);
   }
 
-  match(attribute: string, type?: string): boolean {
+  /**
+   * See if this error matches `attribute`, `type`, and `options`. Mirrors
+   * Rails `Error#match?` (activemodel/lib/active_model/error.rb:166-174):
+   * subset match — every key in `options` must equal (Ruby `==`, i.e.
+   * structural for Array/Hash, value-equal for primitives) the
+   * corresponding value in `this.options`; extra keys on the error are
+   * ignored. Not Ruby's case-equality (`===`), which would imply
+   * RegExp/Range-style matching — Rails' `match?` uses `!=`.
+   */
+  match(attribute: string, type?: string, options?: Record<string, unknown>): boolean {
     if (this.attribute !== attribute) return false;
     if (type !== undefined && this.type !== type) return false;
+    if (options) {
+      for (const [key, value] of Object.entries(options)) {
+        if (!optionsEqual(this.options[key], value)) return false;
+      }
+    }
     return true;
   }
 
+  /**
+   * Strict match — Rails `Error#strict_match?`
+   * (activemodel/lib/active_model/error.rb:184-188): attribute/type must
+   * match and `options` must equal the error's `@options` with
+   * `CALLBACKS_OPTIONS` and `MESSAGE_OPTIONS` stripped.
+   */
   strictMatch(attribute: string, type: string, options?: Record<string, unknown>): boolean {
     if (!this.match(attribute, type)) return false;
-    if (!options) return true;
-    for (const [key, value] of Object.entries(options)) {
-      if (this.options[key] !== value) return false;
+    const expected = options ?? {};
+    const own: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(this.options)) {
+      if (!CALLBACKS_OPTIONS.has(k) && !MESSAGE_OPTIONS.has(k)) own[k] = v;
+    }
+    const expectedKeys = Object.keys(expected);
+    const ownKeys = Object.keys(own);
+    if (expectedKeys.length !== ownKeys.length) return false;
+    for (const k of expectedKeys) {
+      if (!Object.prototype.hasOwnProperty.call(own, k) || !optionsEqual(own[k], expected[k]))
+        return false;
     }
     return true;
   }
