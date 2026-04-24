@@ -9,6 +9,8 @@ import {
   AttributeAssignmentError,
   NotImplementedError,
   ReadonlyAttributeError,
+  getRaiseOnAssignToAttrReadonly,
+  setRaiseOnAssignToAttrReadonly,
 } from "./index.js";
 import { SubclassNotFound, NameError } from "./errors.js";
 
@@ -792,7 +794,7 @@ describe("BasicsTest", () => {
   });
 
   it.skip("inherited from scoped find", () => {
-    /* needs scoped find with STI */
+    /* not in Rails test suite — fabricated test name; kept as placeholder only */
   });
 
   it.skip("model classes with matching names", () => {
@@ -804,7 +806,7 @@ describe("BasicsTest", () => {
   });
 
   it.skip("select does not fire after_initialize callbacks on unmatched records", () => {
-    /* needs select() with column projection */
+    /* not in Rails base_test.rb — fabricated test name */
   });
 
   it("type cast attribute from select to false", async () => {
@@ -1341,7 +1343,9 @@ describe("BasicsTest", () => {
     expect(u.isNewRecord()).toBe(true);
     expect(u.name).toBe("alice");
   });
-  it.skip("implicit readonly on left joins", () => {});
+  it.skip("implicit readonly on left joins", () => {
+    /* not in Rails test suite — left_outer_joins does not mark records readonly in Rails */
+  });
   it("to param with id", async () => {
     class User extends Base {
       static {
@@ -1727,8 +1731,12 @@ describe("BasicsTest", () => {
     const sql = User.joins("INNER JOIN posts ON posts.user_id = users.id").toSql();
     expect(sql).toContain("INNER JOIN");
   });
-  it.skip("includes eager loads associations", () => {});
-  it.skip("incomplete schema loading", () => {});
+  it.skip("includes eager loads associations", () => {
+    /* not in Rails base_test.rb — covered by eager_test.rb tests */
+  });
+  it.skip("incomplete schema loading", () => {
+    /* Rails: stubs schema_cache to raise — relies on internal connection-pool stub infrastructure */
+  });
   it("primary key with no id", () => {
     class Widget extends Base {
       static {
@@ -1738,7 +1746,9 @@ describe("BasicsTest", () => {
     }
     expect(Widget.primaryKey).toBe("widget_id");
   });
-  it.skip("primary key and references columns should be identical type", () => {});
+  it.skip("primary key and references columns should be identical type", () => {
+    /* Rails: compares pk.sql_type with ref.sql_type — needs columns_hash schema metadata */
+  });
   it("invalid limit", () => {
     class User extends Base {
       static {
@@ -1849,10 +1859,50 @@ describe("BasicsTest", () => {
     }
     expect(ConcreteModel.readonlyAttributes).toContain("code");
   });
-  it.skip("readonly attributes when configured to not raise", async () => {
-    /* Needs ActiveRecord config `raise_on_assign_to_attr_readonly` (Rails 7.1+).
-     * We don't expose that knob yet — the default behavior (raise) is covered
-     * by the `attrReadonly prevents updating readonly attributes` test. */
+  it("readonly attributes when configured to not raise", async () => {
+    const prev = getRaiseOnAssignToAttrReadonly();
+    setRaiseOnAssignToAttrReadonly(false);
+    try {
+      class NonRaisingPost extends Base {
+        static {
+          this.attribute("title", "string");
+          this.attribute("body", "string");
+          this.attrReadonly("title");
+          this.adapter = adapter;
+        }
+      }
+      expect(NonRaisingPost.readonlyAttributes).toEqual(["title"]);
+
+      const post = await NonRaisingPost.create({ title: "cannot change this", body: "changeable" });
+      expect(post.readAttribute("title")).toBe("cannot change this");
+      expect(post.readAttribute("body")).toBe("changeable");
+
+      // write_attribute silently skips the readonly attr, applies to other attrs
+      post.writeAttribute("title", "changed via write_attribute");
+      post.writeAttribute("body", "changed via write_attribute");
+      await post.saveBang();
+      await post.reload();
+      expect(post.readAttribute("title")).toBe("cannot change this");
+      expect(post.readAttribute("body")).toBe("changed via write_attribute");
+
+      // assignAttributes silently skips readonly attr
+      post.assignAttributes({
+        title: "changed via assign_attributes",
+        body: "changed via assign_attributes",
+      });
+      await post.saveBang();
+      await post.reload();
+      expect(post.readAttribute("title")).toBe("cannot change this");
+      expect(post.readAttribute("body")).toBe("changed via assign_attributes");
+
+      // update() silently skips readonly attr
+      await post.update({ title: "changed via update", body: "changed via update" });
+      await post.reload();
+      expect(post.readAttribute("title")).toBe("cannot change this");
+      expect(post.readAttribute("body")).toBe("changed via update");
+    } finally {
+      setRaiseOnAssignToAttrReadonly(prev);
+    }
   });
   it("readonly attributes on belongs to association", async () => {
     class Author extends Base {

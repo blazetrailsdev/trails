@@ -210,7 +210,11 @@ export {
   TransactionIsolationError,
   IrreversibleOrderError,
 } from "./errors.js";
-export { ReadonlyAttributeError } from "./readonly-attributes.js";
+export {
+  ReadonlyAttributeError,
+  getRaiseOnAssignToAttrReadonly,
+  setRaiseOnAssignToAttrReadonly,
+} from "./readonly-attributes.js";
 export { RecordInvalid } from "./validations.js";
 export {
   AssociationNotFoundError,

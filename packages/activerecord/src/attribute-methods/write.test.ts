@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Base } from "../index.js";
+import { Base, ReadonlyAttributeError } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 
 describe("WriteTest", () => {
@@ -42,7 +42,8 @@ describe("WriteTest", () => {
     }
     const item = new Item({ code: "A" });
     (item as any)._newRecord = false;
-    expect(() => item._writeAttribute("code", "B")).not.toThrow();
-    expect(item.readAttribute("code")).toBe("B");
+    // Rails HasReadonlyAttributes overrides _write_attribute to also enforce readonly —
+    // in our implementation _writeAttribute also raises, matching Rails behavior.
+    expect(() => item._writeAttribute("code", "B")).toThrow(ReadonlyAttributeError);
   });
 });

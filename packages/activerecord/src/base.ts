@@ -93,7 +93,6 @@ import {
 } from "./attribute-methods.js";
 import { toKey as _toKey } from "./attribute-methods/primary-key.js";
 import { _readAttribute as _readAttributeFn } from "./attribute-methods/read.js";
-import { _writeAttribute as _writeAttributeFn } from "./attribute-methods/write.js";
 import {
   queryAttribute as _queryAttribute,
   _queryAttribute as _queryAttributeFn,
@@ -2803,7 +2802,7 @@ include(Base, {
   queryAttribute: _queryAttribute,
   _queryAttribute: _queryAttributeFn,
   _readAttribute: _readAttributeFn,
-  _writeAttribute: _writeAttributeFn,
+  _writeAttribute: ReadonlyAttributes._writeAttribute,
   // PrimaryKey
   toKey: _toKey,
 });

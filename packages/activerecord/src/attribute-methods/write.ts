@@ -22,14 +22,14 @@ export interface Write {
 }
 
 /**
- * Bypasses Base/ReadonlyAttributes' readonly attribute checks. Used
- * internally where the attribute name is already canonical. A frozen
- * attribute store will still raise at the AttributeSet level.
+ * Low-level attribute write — skips alias resolution and `"id"` → primary-key
+ * remapping that `write_attribute` performs, but readonly enforcement is
+ * applied by `ReadonlyAttributes._writeAttribute` (wired in base.ts),
+ * matching Rails' `HasReadonlyAttributes#_write_attribute`.
  *
- * Rails' public `write_attribute` also resolves `"id"` to the primary-key
- * column name and resolves aliases. Those redirects will live in our
- * AR-level `writeAttribute` override once implemented; `_writeAttribute`
- * intentionally skips them.
+ * This function is the fallback used when `Base._writeAttribute` is not yet
+ * available (e.g. during very early bootstrap). At runtime it is shadowed
+ * by `ReadonlyAttributes._writeAttribute` on `Base.prototype`.
  *
  * Mirrors: ActiveRecord::AttributeMethods::Write#_write_attribute
  */
