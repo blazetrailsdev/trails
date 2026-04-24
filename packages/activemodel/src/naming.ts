@@ -1,4 +1,10 @@
-import { underscore, pluralize, singularize, humanize } from "@blazetrails/activesupport";
+import {
+  underscore,
+  pluralize,
+  singularize,
+  humanize,
+  Inflections,
+} from "@blazetrails/activesupport";
 import { ArgumentError } from "./attribute-assignment.js";
 
 function sameSegments(a: readonly string[] | null, b: readonly string[] | null): boolean {
@@ -94,17 +100,25 @@ export class ModelName {
   private _humanFallback: string;
   private _klass: ModelLike | null;
 
-  private static _uncountables: Set<string> = new Set([
-    "sheep",
-    "fish",
-    "series",
-    "species",
-    "money",
-    "rice",
-  ]);
+  // Uncountable lookup delegates to `@blazetrails/activesupport`'s
+  // `Inflections.instance("en")` — the same store Rails models go
+  // through via `ActiveSupport::Inflector.inflections { |i| i.uncountable ... }`
+  // (activesupport/lib/active_support/inflections.rb). Previously we
+  // maintained a local 6-word set that ignored user-added inflections
+  // and diverged from activesupport's own pluralize() which uses the
+  // shared store.
+  private static get _uncountables(): Set<string> {
+    return Inflections.instance("en").uncountables;
+  }
 
+  /**
+   * Register an uncountable word. Mirrors Rails
+   * `ActiveSupport::Inflector.inflections.uncountable(word)` — writes
+   * through to the shared inflector store so `pluralize("sheep")`,
+   * `ModelName`, and every other inflection consumer see it.
+   */
   static addUncountable(word: string): void {
-    this._uncountables.add(word.toLowerCase());
+    Inflections.instance("en").uncountable(word);
   }
 
   /**
