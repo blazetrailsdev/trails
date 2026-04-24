@@ -119,7 +119,12 @@ export function serializableHash(
  * - Symbol → string (Ruby symbols are interned strings)
  *
  * We cover the JS analog:
- * - `bigint` → string (JSON.stringify throws otherwise)
+ * - `bigint` → decimal string. Rails serializes large integers as JSON
+ *   numbers because Ruby's Integer is arbitrary-precision and the JSON
+ *   encoder handles them natively. JS `JSON.stringify` throws on bigint,
+ *   and JS numbers lose precision above 2^53-1, so we emit a decimal
+ *   string instead. Consumers that need the numeric value must parse
+ *   with `BigInt(str)`.
  * - `Date` → ISO 8601 string, or `null` for invalid dates (matches
  *   `Date.prototype.toJSON`)
  * - Plain arrays / objects → recurse

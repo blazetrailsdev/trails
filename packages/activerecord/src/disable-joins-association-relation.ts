@@ -54,15 +54,14 @@ export type DjarIds = unknown[] | unknown[][];
  * as-is (Map identity already works); tuples are serialized so
  * `[1, 100]` from two independent reads collides in the bucket.
  *
- * JSON covers the primitive shapes pluck returns (number/string/
- * null/bool), but `bigint` throws in `JSON.stringify` — the `big_integer`
- * cast type produces bigints, and composite PKs on large tables are
- * the exact case that hits them. Normalize bigints via a replacer
- * that emits `"\u0000B<decimal>"` (a NUL-prefixed string), so a
- * `123n` component serializes distinctly from the plain string
- * `"123"`. The outer tuple key also carries a leading `\u0000T`
- * marker so tuple keys are non-collidable with any plausible scalar
- * passed through this helper.
+ * `big_integer` columns (PG int8 / MySQL BIGINT) produce JS `bigint`
+ * values after driver normalization — composite PKs on large tables are
+ * the primary case. `bigint` cannot appear in `JSON.stringify` without a
+ * replacer, so we normalize via one that emits `"\u0000B<decimal>"`
+ * (a NUL-prefixed tag), keeping `123n` distinct from the plain string
+ * `"123"` in the same tuple position. The outer tuple key carries a
+ * leading `"\u0000T"` marker so tuple keys are non-collidable with any
+ * plausible scalar passed through this helper.
  */
 function serializeKey(v: unknown, composite: boolean): unknown {
   if (!composite) return v;

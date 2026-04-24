@@ -250,7 +250,7 @@ describe("SerializationTest", () => {
       }
       const r = new Row({ id: "99999999999999999999", name: "row-1" });
       const json = r.asJson();
-      // Before this PR: `id` was a BigInt → JSON.stringify would throw.
+      // bigint attributes are coerced to decimal strings by coerceForJson.
       expect(json["id"]).toBe("99999999999999999999");
       expect(json["name"]).toBe("row-1");
       // JSON.stringify now round-trips without throwing.
@@ -333,6 +333,25 @@ describe("SerializationTest", () => {
       expect(JSON.stringify(r)).toBe(r.toJson());
       const parsed = JSON.parse(JSON.stringify(r));
       expect(parsed).toEqual({ id: "42", name: "row-1" });
+    });
+
+    it("JSON.stringify(model) with large bigint id above Number.MAX_SAFE_INTEGER", () => {
+      class Row extends Model {
+        static {
+          this.attribute("id", "big_integer");
+          this.attribute("name", "string");
+        }
+      }
+      // 2^62 — cannot be represented as a JS number without precision loss.
+      const big = 2n ** 62n;
+      const r = new Row({ id: big, name: "row-2" });
+      expect(() => JSON.stringify(r)).not.toThrow();
+      const parsed = JSON.parse(JSON.stringify(r));
+      // bigint is coerced to decimal string (not number — JS number loses
+      // precision above 2^53-1). Consumers must parse with BigInt(str).
+      expect(typeof parsed.id).toBe("string");
+      expect(parsed.id).toBe("4611686018427387904");
+      expect(parsed.name).toBe("row-2");
     });
 
     it("coerceForJson maps invalid Date to null (matches Date.prototype.toJSON)", async () => {
