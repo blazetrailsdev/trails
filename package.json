@@ -25,7 +25,8 @@
     "test:stubs": "pnpm test:compare -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
     "stats:sync": "pnpm tsx scripts/sync-stats/sync.ts",
     "parity:validate": "ajv compile -s scripts/parity/canonical/schema.schema.json -s scripts/parity/canonical/query.schema.json --spec=draft2020",
-    "parity:schema": "pnpm tsx scripts/parity/run.ts"
+    "parity:schema": "pnpm tsx scripts/parity/run.ts --type=schema",
+    "parity:query": "pnpm tsx scripts/parity/run.ts --type=query"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

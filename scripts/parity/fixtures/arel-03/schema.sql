@@ -1,5 +1,5 @@
 -- Fixture for statement: arel-03
--- Query: posts[:id]
+-- Query: posts.project(posts[:id])
 
 CREATE TABLE users (
   id INTEGER PRIMARY KEY,

@@ -1,2 +1,2 @@
 posts = Arel::Table.new(:posts)
-posts[:id]
+posts.project(posts[:id])

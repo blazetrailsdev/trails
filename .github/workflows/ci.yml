@@ -426,6 +426,123 @@ jobs:
       - name: Diff canonical outputs
         run: pnpm tsx scripts/parity/schema/diff.ts --rails-dir scripts/parity/.out/rails --trails-dir scripts/parity/.out/trails
 
+  query-parity-frozen-at:
+    name: Query Parity (compute frozen-at)
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      # Minted once per workflow run and consumed by both dump jobs so they
+      # freeze time to the same instant. ISO-8601 UTC with ms precision and
+      # trailing Z — matches scripts/parity/canonical/query.schema.json.
+      value: ${{ steps.gen.outputs.value }}
+    steps:
+      - id: gen
+        run: |
+          ts=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
+          echo "value=$ts" >> "$GITHUB_OUTPUT"
+          echo "frozen-at: $ts"
+
+  query-parity-rails:
+    name: Query Parity (Rails side)
+    needs:
+      - changes
+      - query-parity-frozen-at
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    env:
+      PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - name: Cache bundled gems
+        uses: actions/cache@v4
+        with:
+          path: scripts/parity/schema/ruby/vendor/bundle
+          key: ${{ runner.os }}-parity-gems-${{ hashFiles('scripts/parity/schema/ruby/Gemfile', 'scripts/parity/schema/ruby/Gemfile.lock') }}
+          restore-keys: ${{ runner.os }}-parity-gems-
+      - name: Bundle install
+        run: bundle install --jobs 4 --retry 3 --path vendor/bundle
+        working-directory: scripts/parity/schema/ruby
+      - run: pnpm install --frozen-lockfile
+      - name: Run Rails-side query dump
+        run: pnpm tsx scripts/parity/run.ts --type=query --side=rails
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parity-query-rails-dumps
+          path: scripts/parity/.out/query/rails/
+          retention-days: 1
+
+  query-parity-trails:
+    name: Query Parity (trails side)
+    needs:
+      - changes
+      - query-parity-frozen-at
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    env:
+      PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build dependency packages for trails query runner
+        run: pnpm --filter @blazetrails/arel --filter @blazetrails/activesupport --filter @blazetrails/activemodel build
+      - name: Run trails-side query dump
+        run: pnpm tsx scripts/parity/run.ts --type=query --side=trails
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parity-query-trails-dumps
+          path: scripts/parity/.out/query/trails/
+          retention-days: 1
+
+  query-parity-diff:
+    name: Query Parity (diff)
+    needs:
+      - changes
+      - query-parity-rails
+      - query-parity-trails
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.query-parity-rails.result == 'success' &&
+      needs.query-parity-trails.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: parity-query-rails-dumps
+          path: scripts/parity/.out/query/rails/
+      - uses: actions/download-artifact@v4
+        with:
+          name: parity-query-trails-dumps
+          path: scripts/parity/.out/query/trails/
+      - name: Diff canonical query outputs
+        run: pnpm tsx scripts/parity/query/diff.ts --rails-dir scripts/parity/.out/query/rails --trails-dir scripts/parity/.out/query/trails
+
   ci:
     name: CI
     if: ${{ always() }}
@@ -446,6 +563,10 @@ jobs:
       - schema-parity-rails
       - schema-parity-trails
       - schema-parity-diff
+      - query-parity-frozen-at
+      - query-parity-rails
+      - query-parity-trails
+      - query-parity-diff
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any required job failed or was cancelled
