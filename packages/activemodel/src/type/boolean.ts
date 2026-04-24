@@ -3,19 +3,10 @@ import { ValueType } from "./value.js";
 export class BooleanType extends ValueType<boolean> {
   readonly name = "boolean";
 
-  private static readonly TRUE_VALUES: ReadonlySet<unknown> = new Set([
-    true,
-    1,
-    "1",
-    "t",
-    "T",
-    "true",
-    "TRUE",
-    "on",
-    "ON",
-    "yes",
-    "YES",
-  ]);
+  // Mirrors Rails `ActiveModel::Type::Boolean::FALSE_VALUES`
+  // (activemodel/lib/active_model/type/boolean.rb:15-24). Rails' Symbol
+  // variants (`:"0"`, `:false`, `:FALSE`, `:off`, `:OFF`, …) are omitted
+  // since JS has no symbols for those strings.
   private static readonly FALSE_VALUES: ReadonlySet<unknown> = new Set([
     false,
     0,
@@ -26,16 +17,27 @@ export class BooleanType extends ValueType<boolean> {
     "FALSE",
     "off",
     "OFF",
-    "no",
-    "NO",
   ]);
 
+  /**
+   * Mirrors Rails `cast_value` (type/boolean.rb:40-45):
+   *
+   *   def cast_value(value)
+   *     if value == ""
+   *       nil
+   *     else
+   *       !FALSE_VALUES.include?(value)
+   *     end
+   *   end
+   *
+   * Anything not in `FALSE_VALUES` is `true` — Rails' permissive
+   * policy. "yes", "no", "garbage" all coerce to `true`. Empty string
+   * and `null`/`undefined` map to `null`.
+   */
   cast(value: unknown): boolean | null {
     if (value === null || value === undefined) return null;
     if (value === "") return null;
-    if (BooleanType.TRUE_VALUES.has(value)) return true;
-    if (BooleanType.FALSE_VALUES.has(value)) return false;
-    return null;
+    return !BooleanType.FALSE_VALUES.has(value);
   }
 
   serialize(value: unknown): boolean | null {

@@ -1,4 +1,4 @@
-import { underscore, tableize } from "@blazetrails/activesupport";
+import { underscore, tableize, demodulize } from "@blazetrails/activesupport";
 
 /**
  * Conversion mixin — provides toModel, toKey, toParam, toPartialPath.
@@ -29,7 +29,14 @@ export function _toPartialPath(this: AnyConversionHost): string {
       const mn = this.modelName;
       this._cachedToPartialPath = `${mn.collection}/${mn.element}`;
     } else {
-      const element = underscore(this.name);
+      // Rails `_to_partial_path` fallback
+      // (activemodel/lib/active_model/conversion.rb:110-118):
+      //   element    = underscore(demodulize(name))
+      //   collection = tableize(name)
+      // Using `underscore(this.name)` without `demodulize` would produce
+      // a path-shape element like "blog/post" for a namespaced class name
+      // — keeping the fallback Rails-faithful: demodulize first.
+      const element = underscore(demodulize(this.name));
       const collection = tableize(this.name);
       this._cachedToPartialPath = `${collection}/${element}`;
     }

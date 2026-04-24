@@ -12,8 +12,11 @@ describe("BooleanTest", () => {
     expect(type.cast("0")).toBe(false);
     expect(type.cast(1)).toBe(true);
     expect(type.cast(0)).toBe(false);
+    // Rails: anything not in FALSE_VALUES is true. "yes" and "no" are
+    // BOTH truthy under that policy — the string "no" isn't a Rails
+    // FALSE_VALUE (type/boolean.rb:15-24).
     expect(type.cast("yes")).toBe(true);
-    expect(type.cast("no")).toBe(false);
+    expect(type.cast("no")).toBe(true);
     expect(type.cast(null)).toBe(null);
   });
 });

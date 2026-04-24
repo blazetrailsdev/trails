@@ -44,10 +44,11 @@ describe("ActiveModel", () => {
     });
 
     it("casts string to boolean", () => {
+      // Rails BooleanType: "yes"/"no" both truthy (neither in FALSE_VALUES).
       expect(new User({ active: "false" }).readAttribute("active")).toBe(false);
       expect(new User({ active: "true" }).readAttribute("active")).toBe(true);
       expect(new User({ active: "yes" }).readAttribute("active")).toBe(true);
-      expect(new User({ active: "no" }).readAttribute("active")).toBe(false);
+      expect(new User({ active: "no" }).readAttribute("active")).toBe(true);
       expect(new User({ active: "1" }).readAttribute("active")).toBe(true);
       expect(new User({ active: "0" }).readAttribute("active")).toBe(false);
       expect(new User({ active: 1 }).readAttribute("active")).toBe(true);
