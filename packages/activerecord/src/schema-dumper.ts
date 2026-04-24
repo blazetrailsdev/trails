@@ -268,6 +268,10 @@ function cleanDefault(raw: unknown): unknown {
  */
 class AdapterSchemaSource implements SchemaSource {
   private _adapter: DatabaseAdapter;
+
+  get adapter(): DatabaseAdapter {
+    return this._adapter;
+  }
   // Lazily constructed on first `indexes()` call so the static import
   // cycle (schema-dumper -> schema-statements -> abstract/schema-dumper
   // -> schema-dumper) doesn't fire at module init. Type-only import
@@ -409,13 +413,53 @@ export class SchemaDumper {
     this.header(lines);
     const result = this.dumpTables(lines);
     if (result instanceof Promise) {
-      return result.then(() => {
+      return result.then(async () => {
+        await this.dumpVirtualTables(lines);
+        this.trailer(lines);
+        return lines.join("\n");
+      });
+    }
+    const vtResult = this.dumpVirtualTables(lines);
+    if (vtResult instanceof Promise) {
+      return vtResult.then(() => {
         this.trailer(lines);
         return lines.join("\n");
       });
     }
     this.trailer(lines);
     return lines.join("\n");
+  }
+
+  // Mirrors: SQLite3::SchemaDumper#virtual_tables — emits createVirtualTable
+  // calls for any virtual tables found via the adapter.
+  protected dumpVirtualTables(lines: string[]): void | Promise<void> {
+    const adapter = this._source instanceof AdapterSchemaSource ? this._source.adapter : undefined;
+    if (!adapter || typeof (adapter as any).virtualTables !== "function") return;
+    return this._dumpVirtualTablesAsync(lines);
+  }
+
+  private async _dumpVirtualTablesAsync(lines: string[]): Promise<void> {
+    const adapter = this._source instanceof AdapterSchemaSource ? this._source.adapter : undefined;
+    if (!adapter) return;
+    const tables: Record<string, [string, string]> = await (adapter as any).virtualTables();
+    const names = Object.keys(tables).sort();
+    if (names.length === 0) return;
+    lines.push("");
+    // Split on commas that are NOT inside single quotes; filter empty segments
+    const splitArgs = (s: string): string[] => {
+      if (s.trim() === "") return [];
+      return s
+        .split(/,(?=(?:[^']*'[^']*')*[^']*$)/)
+        .map((a) => a.trim())
+        .filter((a) => a.length > 0);
+    };
+    for (const name of names) {
+      const [moduleName, argsStr] = tables[name];
+      const args = splitArgs(argsStr);
+      lines.push(
+        `  await ctx.createVirtualTable(${JSON.stringify(name)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(args)});`,
+      );
+    }
   }
 
   private header(lines: string[]): void {

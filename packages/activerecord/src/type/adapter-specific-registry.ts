@@ -16,7 +16,7 @@ export class Registration {
   readonly name: string;
   protected _block: (...args: unknown[]) => Type;
   readonly adapter?: string;
-  protected _override?: boolean;
+  protected _override: boolean | null;
 
   constructor(
     name: string,
@@ -26,11 +26,19 @@ export class Registration {
     this.name = name;
     this._block = block;
     this.adapter = options?.adapter;
-    this._override = options?.override ?? false;
+    this._override = options?.override ?? null;
   }
 
-  call(_registry: AdapterSpecificRegistry, ..._args: unknown[]): Type {
-    return this._block(..._args);
+  call(
+    _registry: AdapterSpecificRegistry,
+    symbol: string,
+    options?: Record<string, unknown>,
+  ): Type {
+    // Strip adapter: before calling the block — mirrors Rails' Registration#call which does
+    // `def call(_registry, *args, adapter: nil, **kwargs)` stripping adapter from kwargs.
+    if (!options) return this._block(symbol);
+    const { adapter: _adapter, ...rest } = options;
+    return Object.keys(rest).length > 0 ? this._block(symbol, rest) : this._block(symbol);
   }
 
   matches(typeName: string, _options?: { adapter?: string }): boolean {
@@ -40,7 +48,7 @@ export class Registration {
   get priority(): number {
     let result = 0;
     if (this.adapter) result |= 1;
-    if (this._override) result |= 2;
+    if (this._override === true) result |= 2;
     return result;
   }
 
@@ -49,7 +57,7 @@ export class Registration {
     const otherPriorityNoAdapter = other.priority & ~1;
     if (
       myPriorityNoAdapter === otherPriorityNoAdapter &&
-      ((!this._override && other.adapter) || (this.adapter && !other._override))
+      ((this._override === null && other.adapter) || (this.adapter && other._override === null))
     ) {
       throw new TypeConflictError(
         `Type ${this.name} was registered for all adapters, but shadows a native type with the same name for ${this.adapter ?? other.adapter}`,
@@ -77,16 +85,16 @@ export class DecorationRegistration extends Registration {
     this._klass = klass;
   }
 
-  call(registry: AdapterSpecificRegistry, ..._args: unknown[]): Type {
-    const kwargs = _args[1] as Record<string, unknown> | undefined;
-    const filteredKwargs: Record<string, unknown> = {};
-    if (kwargs) {
-      for (const [k, v] of Object.entries(kwargs)) {
-        if (!(k in this._options)) filteredKwargs[k] = v;
-      }
+  call(registry: AdapterSpecificRegistry, symbol: string, options?: Record<string, unknown>): Type {
+    // Pass through options minus the decorator's own keys and adapter:.
+    const filtered: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(options ?? {})) {
+      if (k !== "adapter" && !(k in this._options)) filtered[k] = v;
     }
-    const symbol = _args[0] as string;
-    const subtype = registry.lookup(symbol, filteredKwargs);
+    const subtype = registry.lookup(
+      symbol,
+      Object.keys(filtered).length > 0 ? filtered : undefined,
+    );
     return new this._klass(subtype);
   }
 
@@ -131,7 +139,7 @@ export class AdapterSpecificRegistry {
     if (registration) {
       return registration.call(this, symbol, options);
     }
-    throw new Error(`Unknown type: ${String(symbol)}`);
+    throw new Error(`Unknown type :${String(symbol)}`);
   }
 
   private _findRegistration(
@@ -142,7 +150,7 @@ export class AdapterSpecificRegistry {
     if (matching.length === 0) return undefined;
     return matching.reduce((best, current) => {
       const cmp = best.compareTo(current);
-      return cmp <= 0 ? current : best;
+      return cmp < 0 ? current : best;
     });
   }
 }

@@ -12,6 +12,7 @@ import {
   ValueTooLong,
   NoDatabaseError,
   DatabaseConnectionError,
+  TransactionIsolationError,
 } from "../errors.js";
 import { TypeMap } from "../type/type-map.js";
 import { Date as DateType } from "../type/date.js";
@@ -26,7 +27,6 @@ import {
   FloatType,
   BooleanType,
   BinaryType,
-  BigIntegerType,
   DecimalType,
 } from "@blazetrails/activemodel";
 import { getFs, Notifications } from "@blazetrails/activesupport";
@@ -110,6 +110,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     options: TrailsAdapterOptions & { readonly?: boolean } = {},
   ) {
     super();
+    this._config = { ...options };
     this._filename = filename;
     this._memoryDatabase = SQLite3Adapter._isMemoryFilename(filename);
     this._readonly = options.readonly ?? false;
@@ -260,8 +261,40 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /**
    * Begin a transaction.
    */
-  async beginDeferredTransaction(): Promise<void> {
+  private _previousReadUncommitted: unknown = null;
+
+  // Mirrors: SQLite3::DatabaseStatements#begin_deferred_transaction
+  async beginDeferredTransaction(isolation?: string | null): Promise<void> {
+    if (isolation) return this.beginIsolatedDbTransaction(isolation);
     return this.beginDbTransaction();
+  }
+
+  // Mirrors: SQLite3::DatabaseStatements#begin_isolated_db_transaction
+  async beginIsolatedDbTransaction(isolation: string): Promise<void> {
+    if (isolation !== "read_uncommitted") {
+      throw new TransactionIsolationError(
+        "SQLite3 only supports the `read_uncommitted` transaction isolation level",
+      );
+    }
+    if (!this.isSharedCache()) {
+      throw new TransactionIsolationError(
+        "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
+      );
+    }
+    const row = this.db.prepare("PRAGMA read_uncommitted").get() as
+      | { read_uncommitted: number }
+      | undefined;
+    this._previousReadUncommitted = row?.read_uncommitted ?? 0;
+    this.db.exec("PRAGMA read_uncommitted=ON");
+    await this.beginDbTransaction();
+  }
+
+  // Mirrors: SQLite3::DatabaseStatements#reset_isolation_level
+  resetIsolationLevel(): void {
+    if (this._previousReadUncommitted !== null) {
+      this.db.exec(`PRAGMA read_uncommitted=${this._previousReadUncommitted}`);
+      this._previousReadUncommitted = null;
+    }
   }
 
   async beginDbTransaction(): Promise<void> {
@@ -406,12 +439,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#lookup_cast_type
    */
   lookupCastType(sqlType: string): import("@blazetrails/activemodel").Type {
-    // Strip precision/scale metadata and normalize for lookup.
-    // e.g. "DECIMAL(10, 0)" → "decimal", "VARCHAR(255)" → "varchar"
-    const normalized = sqlType
-      .toLowerCase()
-      .replace(/\(.*\)/, "")
-      .trim();
+    // Pass the full sql type to the map so regex registrations (e.g. /decimal/i)
+    // can inspect precision/scale. Fall back to the bare normalized key when
+    // no full-string match is found.
+    const lower = sqlType.toLowerCase().trim();
+    const full = this._nativeTypeMap.fetch(lower);
+    if (full.type() !== "value") return full;
+    const normalized = lower.replace(/\(.*\)/, "").trim();
     return this._nativeTypeMap.lookup(normalized);
   }
 
@@ -425,28 +459,48 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._nativeTypeMap;
   }
 
+  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer
+  // INTEGER in SQLite can store up to 8 bytes; default _limit to 8 when none given.
   private static _buildTypeMap(): TypeMap {
+    const sqlite3Int = (limit?: number) => new IntegerType({ limit: limit ?? 8 });
     const map = new TypeMap();
     map.registerType("string", new StringType());
     map.registerType("text", new TextType());
-    map.registerType("integer", new IntegerType());
+    map.registerType("integer", sqlite3Int());
     map.registerType("float", new FloatType());
+    map.registerType(/decimal|numeric/i, undefined, (sqlType) => {
+      const precisionMatch = /\(\s*(\d+)/.exec(sqlType);
+      const precision = precisionMatch ? parseInt(precisionMatch[1], 10) : undefined;
+      const scaleMatch = /\(\s*\d+\s*,\s*(\d+)\s*\)/.exec(sqlType);
+      // Rails: extract_scale returns 0 when no scale specified; use DecimalWithoutScale
+      const scale = scaleMatch
+        ? parseInt(scaleMatch[1], 10)
+        : precision !== undefined
+          ? 0
+          : undefined;
+      if (scale === 0) return new DecimalWithoutScale({ precision });
+      return new DecimalType({ precision, scale });
+    });
     map.registerType("decimal", new DecimalType());
     map.registerType("boolean", new BooleanType());
     map.registerType("date", new DateType());
     map.registerType("datetime", new DateTimeType());
+    map.registerType("timestamp", new DateTimeType());
     map.registerType("time", new TimeType());
     map.registerType("blob", new BinaryType());
     map.registerType("binary", new BinaryType());
     map.registerType("json", new JsonType());
-    map.registerType("bigint", new BigIntegerType());
     map.registerType("numeric", new DecimalWithoutScale());
     // SQLite type affinity — regex matches for flexible type names
     map.registerType(/int/i, undefined, (lookupKey) => {
-      if (/bigint/i.test(lookupKey)) return new BigIntegerType();
-      return new IntegerType();
+      if (/bigint/i.test(lookupKey)) return sqlite3Int(8);
+      return sqlite3Int();
     });
-    map.registerType(/char|clob/i, undefined, () => new StringType());
+    // Explicit "bigint" registered after /int/i so it takes priority (TypeMap
+    // reverses entries; last registered wins on exact matches vs regex).
+    map.registerType("bigint", sqlite3Int(8));
+    map.registerType(/char/i, undefined, () => new StringType());
+    map.registerType(/clob/i, undefined, () => new TextType());
     map.registerType(/blob/i, undefined, () => new BinaryType());
     map.registerType(/real|floa|doub/i, undefined, () => new FloatType());
     return map;
@@ -582,11 +636,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   isSharedCache(): boolean {
-    const SQLITE_OPEN_SHAREDCACHE = 0x00020000;
-    const flags = this._config.flags;
-    if (typeof flags === "number") {
-      return (flags & SQLITE_OPEN_SHAREDCACHE) !== 0;
-    }
     const qIdx = this._filename.indexOf("?");
     if (qIdx === -1) return false;
     return this._filename.slice(qIdx).includes("cache=shared");
@@ -677,13 +726,39 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.executeMutation(`DROP INDEX IF EXISTS ${quoteColumnName(indexName)}`);
   }
 
-  async virtualTables(): Promise<string[]> {
-    const rows = await this.execute(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND sql LIKE '%VIRTUAL%'",
+  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
+  async virtualTableExists(tableName: string): Promise<boolean> {
+    try {
+      const rows = await this.execute(
+        `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND type = 'virtual' AND name = ?`,
+        [tableName],
+        "SCHEMA",
+      );
+      return rows.length > 0;
+    } catch {
+      const rows = await this.execute(
+        `SELECT name FROM sqlite_master WHERE type='table' AND sql LIKE '%VIRTUAL%' AND name = ?`,
+        [tableName],
+        "SCHEMA",
+      );
+      return rows.length > 0;
+    }
+  }
+
+  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
+  // Returns { tableName => [moduleName, argsString] }
+  async virtualTables(): Promise<Record<string, [string, string]>> {
+    const rows = (await this.execute(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql LIKE '%VIRTUAL%'",
       [],
       "SCHEMA",
-    );
-    return rows.map((r) => String(r.name));
+    )) as Array<{ name: string; sql: string }>;
+    const result: Record<string, [string, string]> = {};
+    for (const r of rows) {
+      const m = /USING\s+(\w+)\s*\((.*)\)\s*$/is.exec(r.sql);
+      if (m) result[r.name] = [m[1], m[2]];
+    }
+    return result;
   }
 
   override async createVirtualTable(
@@ -1056,11 +1131,23 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * matches Rails' SQLite3::SchemaStatements#tables filter.
    */
   async tables(): Promise<string[]> {
-    const rows = (await this.execute(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-      [],
-      "SCHEMA",
-    )) as Array<{ name: string }>;
+    // Uses pragma_table_list (SQLite 3.37+) to match Rails' data_source_sql.
+    // type='table' excludes shadow tables (FTS5 etc.) and virtual tables.
+    // Falls back to sqlite_master for older SQLite versions.
+    let rows: Array<{ name: string }>;
+    try {
+      rows = (await this.execute(
+        "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        [],
+        "SCHEMA",
+      )) as Array<{ name: string }>;
+    } catch {
+      rows = (await this.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        [],
+        "SCHEMA",
+      )) as Array<{ name: string }>;
+    }
     return rows.map((r) => r.name);
   }
 

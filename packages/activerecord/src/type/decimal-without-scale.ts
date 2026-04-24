@@ -4,19 +4,20 @@
  * Used for NUMERIC columns declared without a scale — the value is an
  * integer but the type reports as `:decimal` for schema purposes.
  *
- * Rails:
- *
- * ```ruby
- * class DecimalWithoutScale < ActiveModel::Type::BigInteger
- *   def type; :decimal; end
- *   def type_cast_for_schema(value); value.to_s.inspect; end
- * end
- * ```
+ * Rails source inherits from BigInteger, but our TS implementation extends
+ * IntegerType directly so that cast() returns a plain number (not BigInt),
+ * matching Ruby's to_i behavior for integer truncation.
  */
 
-import { BigIntegerType } from "@blazetrails/activemodel";
+import { IntegerType } from "@blazetrails/activemodel";
 
-export class DecimalWithoutScale extends BigIntegerType {
+export class DecimalWithoutScale extends IntegerType {
+  // Default limit to 8 bytes — matching Rails' BigInteger ancestry as an
+  // 8-byte signed integer range while keeping IntegerType truncation semantics.
+  constructor(options: ConstructorParameters<typeof IntegerType>[0] = {}) {
+    super({ ...options, limit: options.limit ?? 8 });
+  }
+
   override readonly name: string = "decimal";
 
   override type(): string {

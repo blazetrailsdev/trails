@@ -1122,6 +1122,15 @@ export class MigrationContext {
     this._indexes.delete(name);
   }
 
+  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#create_virtual_table
+  async createVirtualTable(name: string, moduleName: string, args: string[]): Promise<void> {
+    if (typeof (this.adapter as any).createVirtualTable === "function") {
+      await (this.adapter as any).createVirtualTable(name, moduleName, args);
+      this._tables.add(name);
+    }
+    // Non-SQLite adapters: no-op; virtual tables are SQLite-specific.
+  }
+
   private _mapType(type: string): string {
     const an = this._adapterName;
     switch (type.toLowerCase()) {

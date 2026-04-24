@@ -565,10 +565,10 @@ describe("SqliteAdapter", () => {
     it("resolves SQLite affinity types via regex", () => {
       expect(adapter.lookupCastType("varchar").name).toBe("string");
       expect(adapter.lookupCastType("character").name).toBe("string");
-      expect(adapter.lookupCastType("clob").name).toBe("string");
+      expect(adapter.lookupCastType("clob").name).toBe("text");
       expect(adapter.lookupCastType("real").name).toBe("float");
       expect(adapter.lookupCastType("double").name).toBe("float");
-      expect(adapter.lookupCastType("bigint").name).toBe("big_integer");
+      expect(adapter.lookupCastType("bigint").name).toBe("integer");
       expect(adapter.lookupCastType("tinyint").name).toBe("integer");
     });
   });
