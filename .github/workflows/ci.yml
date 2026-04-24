@@ -502,7 +502,16 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build dependency packages for trails query runner
-        run: pnpm --filter @blazetrails/arel --filter @blazetrails/activesupport --filter @blazetrails/activemodel build
+        # activerecord is needed for AR-style fixtures (ar-*): ar_dump.ts
+        # imports Base from @blazetrails/activerecord and fixture models.ts
+        # files do too. Built in dep order — a single `--filter` invocation
+        # races (pnpm may start activemodel before activesupport's dist
+        # lands), so step through each package explicitly.
+        run: |
+          pnpm --filter @blazetrails/activesupport build
+          pnpm --filter @blazetrails/activemodel build
+          pnpm --filter @blazetrails/arel build
+          pnpm --filter @blazetrails/activerecord build
       - name: Run trails-side query dump
         run: pnpm tsx scripts/parity/run.ts --type=query --side=trails
       - uses: actions/upload-artifact@v4

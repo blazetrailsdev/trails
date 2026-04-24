@@ -58,14 +58,16 @@ function parityTypeConfig(type: ParityType): TypeConfig {
       extraDumpArgs: [],
     };
   }
-  // Query fixtures for v1 scope are Arel-only (arel-* under scripts/parity/
-  // fixtures/). AR-style fixtures (ar-*) are planned for v2 and will land
-  // under this same type. scripts/parity/query/diff.ts already seeds from
-  // both arel-* and ar-* so flipping this matcher is the only change needed
-  // when v2 lands.
+  // Query fixtures cover two families:
+  //   - arel-*  : raw Arel (no models). Runs through dump.rb / dump.ts.
+  //   - ar-*    : ActiveRecord queries (models + relation). Runs through
+  //               ar_dump.rb / ar_dump.ts.
+  // Each fixture's runner is selected by prefix in dumpOne() below; the
+  // TypeConfig holds the arel pair as the default and `dumpOne` swaps in
+  // the ar pair when the fixture name starts with "ar-".
   const frozen = process.env.PARITY_FROZEN_AT;
   return {
-    matches: (name) => /^arel-/.test(name),
+    matches: (name) => /^(arel|ar)-/.test(name),
     outRails: "scripts/parity/.out/query/rails",
     outTrails: "scripts/parity/.out/query/trails",
     rubyDump: "scripts/parity/query/ruby/dump.rb",
@@ -74,6 +76,14 @@ function parityTypeConfig(type: ParityType): TypeConfig {
     extraDumpArgs: frozen ? ["--frozen-at", frozen] : [],
   };
 }
+
+/** AR fixture prefix → different runner scripts from arel- fixtures. */
+function isArFixture(name: string): boolean {
+  return /^ar-/.test(name);
+}
+
+const AR_RUBY_DUMP = "scripts/parity/query/ruby/ar_dump.rb";
+const AR_NODE_DUMP = "scripts/parity/query/node/ar_dump.ts";
 
 function assertRepoRoot(): void {
   if (!existsSync(FIXTURES_DIR)) {
@@ -217,17 +227,20 @@ function dumpOne(cfg: TypeConfig, label: "rails" | "trails", fixture: string): P
   const fixtureDir = join(FIXTURES_DIR, fixture);
   const outDir = label === "rails" ? cfg.outRails : cfg.outTrails;
   const outFile = join(outDir, `${fixture}.json`);
+  // ar-* fixtures use dedicated AR runners that load models.{rb,ts}
+  // before evaluating the query. arel-* fixtures use the plain runners.
+  const rubyScript = isArFixture(fixture) ? AR_RUBY_DUMP : cfg.rubyDump;
+  const nodeScript = isArFixture(fixture) ? AR_NODE_DUMP : cfg.nodeDump;
   // Buffered so each fixture's verbose dump output prints as one contiguous
   // block — otherwise concurrent workers interleave lines and CI logs become
   // unreadable.
   if (label === "rails") {
-    return run(
-      "bundle",
-      ["exec", "ruby", cfg.rubyDump, fixtureDir, outFile, ...cfg.extraDumpArgs],
-      { env: { BUNDLE_GEMFILE: GEMFILE }, buffered: true },
-    );
+    return run("bundle", ["exec", "ruby", rubyScript, fixtureDir, outFile, ...cfg.extraDumpArgs], {
+      env: { BUNDLE_GEMFILE: GEMFILE },
+      buffered: true,
+    });
   }
-  return run("pnpm", ["exec", "tsx", cfg.nodeDump, fixtureDir, outFile, ...cfg.extraDumpArgs], {
+  return run("pnpm", ["exec", "tsx", nodeScript, fixtureDir, outFile, ...cfg.extraDumpArgs], {
     buffered: true,
   });
 }
