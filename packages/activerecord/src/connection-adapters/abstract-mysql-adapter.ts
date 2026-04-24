@@ -31,6 +31,21 @@ import {
   columnNameWithOrderMatcher as mysqlColumnNameWithOrderMatcher,
 } from "./mysql/quoting.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
+import { TypeMap } from "../type/type-map.js";
+import {
+  StringType,
+  IntegerType,
+  FloatType,
+  BooleanType,
+  BinaryType,
+  DecimalType,
+} from "@blazetrails/activemodel";
+import { UnsignedInteger } from "../type/unsigned-integer.js";
+import { Date as DateType } from "../type/date.js";
+import { DateTime as DateTimeType } from "../type/date-time.js";
+import { Time as TimeType } from "../type/time.js";
+import { Text as TextType } from "../type/text.js";
+import { Json as JsonType } from "../type/json.js";
 
 const NATIVE_DATABASE_TYPES: Record<string, { name: string; limit?: number }> = {
   primary_key: { name: "bigint auto_increment PRIMARY KEY" },
@@ -559,6 +574,83 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (config.sslKey) args.push(`--ssl-key=${config.sslKey}`);
     if (config.database) args.push(config.database as string);
     return args;
+  }
+
+  // Mirrors: AbstractMysqlAdapter::initialize_type_map + extended_type_map
+  static buildTypeMap(options: { emulateBooleans?: boolean } = {}): TypeMap {
+    const map = new TypeMap();
+    const intType = (limit: number) => (sql: string) =>
+      /\bunsigned\b/i.test(sql) ? new UnsignedInteger({ limit }) : new IntegerType({ limit });
+
+    map.registerType(/tinytext/i, undefined, () => new TextType());
+    map.registerType(/tinyblob/i, undefined, () => new BinaryType());
+    map.registerType(/mediumtext/i, undefined, () => new TextType());
+    map.registerType(/mediumblob/i, undefined, () => new BinaryType());
+    map.registerType(/longtext/i, undefined, () => new TextType());
+    map.registerType(/longblob/i, undefined, () => new BinaryType());
+    map.registerType(/text/i, undefined, () => new TextType());
+    map.registerType(/blob/i, undefined, () => new BinaryType());
+    map.registerType(/^float/i, undefined, () => new FloatType());
+    map.registerType(/^double/i, undefined, () => new FloatType());
+    map.registerType(/^bigint/i, undefined, intType(8));
+    map.registerType(/^mediumint/i, undefined, intType(3));
+    map.registerType(/^smallint/i, undefined, intType(2));
+    map.registerType(/^tinyint/i, undefined, intType(1));
+    map.registerType(/^int/i, undefined, intType(4));
+    map.registerType(/^year/i, undefined, () => new IntegerType());
+    map.registerType(/^bit/i, undefined, () => new BinaryType());
+    map.registerType(/^binary/i, undefined, () => new BinaryType());
+    map.registerType(/^varbinary/i, undefined, () => new BinaryType());
+    map.registerType(/^enum/i, undefined, () => new StringType());
+    map.registerType(/^set/i, undefined, () => new StringType());
+    map.registerType(/^char/i, undefined, () => new StringType());
+    map.registerType(/^varchar/i, undefined, () => new StringType());
+    map.registerType(/decimal/i, undefined, () => new DecimalType());
+    map.registerType(/numeric/i, undefined, () => new DecimalType());
+    map.registerType("boolean", new BooleanType());
+    map.registerType("date", new DateType());
+    map.registerType(/^datetime/i, undefined, () => new DateTimeType());
+    map.registerType(/^timestamp/i, undefined, () => new DateTimeType());
+    map.registerType(/^time\b/i, undefined, () => new TimeType());
+    map.registerType("json", new JsonType());
+    // emulate_booleans: tinyint(1) → boolean
+    if (options.emulateBooleans) {
+      map.registerType(/^tinyint\(1\)/i, undefined, () => new BooleanType());
+    }
+    return map;
+  }
+
+  private _typeMap: TypeMap | null = null;
+  private _emulateBooleans = true;
+
+  get emulateBooleans(): boolean {
+    return this._emulateBooleans;
+  }
+
+  set emulateBooleans(value: boolean) {
+    this._emulateBooleans = value;
+    this._typeMap = null; // invalidate cache
+  }
+
+  get nativeTypeMap(): TypeMap {
+    if (!this._typeMap) {
+      this._typeMap = (this.constructor as typeof AbstractMysqlAdapter).buildTypeMap({
+        emulateBooleans: this._emulateBooleans,
+      });
+    }
+    return this._typeMap;
+  }
+
+  lookupCastType(sqlType: string): import("@blazetrails/activemodel").Type {
+    return this.nativeTypeMap.lookup(sqlType.toLowerCase().trim());
+  }
+
+  lookupCastTypeFromColumn(column: {
+    sqlType?: string | null;
+  }): import("@blazetrails/activemodel").Type | null {
+    const sqlType = column.sqlType?.trim();
+    if (!sqlType) return null;
+    return this.lookupCastType(sqlType);
   }
 
   static extendedTypeMap(options: {
