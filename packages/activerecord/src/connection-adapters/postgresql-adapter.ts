@@ -23,7 +23,7 @@ import {
   initializeTypeMap as staticInitializeTypeMap,
 } from "./postgresql/type-map-init.js";
 import { inspectExplainOption } from "../adapter.js";
-import type { DatabaseAdapter, ExplainOption, TrailsAdapterOptions } from "../adapter.js";
+import type { DatabaseAdapter, ExplainOption, PostgreSQLAdapterOptions } from "../adapter.js";
 import {
   ConnectionNotEstablished,
   DatabaseConnectionError,
@@ -153,6 +153,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
+  private _minMessages = "warning";
+  private _sessionVariables: Record<string, string | number | boolean | null | "default"> = {};
+  private _configuredClients = new WeakSet<pg.PoolClient>();
   // Per-pg.Client statement pool. PG's prepared statements are
   // session-scoped, so each physical client gets its own pool with
   // its own counter (matching Rails' `PostgreSQL::StatementPool`).
@@ -220,12 +223,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
   }
 
-  constructor(config: string | (pg.PoolConfig & TrailsAdapterOptions)) {
+  constructor(config: string | (pg.PoolConfig & PostgreSQLAdapterOptions)) {
     super();
     // Rails: `PostgreSQLAdapter` inherits the abstract adapter's
     // `default_prepared_statements = true`.
     this.preparedStatements = true;
     if (typeof config === "string") {
+      this._minMessages = "warning";
+      this._sessionVariables = {};
       this._driverPool = new pg.Pool({ connectionString: config });
       return;
     }
@@ -237,11 +242,77 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // `pg.Pool` is constructed — otherwise a throw here would leave
     // a live driver pool with no cleanup path on the half-built
     // adapter.
-    const { statementLimit, preparedStatements, insertReturning, ...pgConfig } = config;
+    const {
+      statementLimit,
+      preparedStatements,
+      insertReturning,
+      minMessages,
+      variables,
+      ...pgConfig
+    } = config;
     if (statementLimit !== undefined) this.statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
     if (insertReturning !== undefined) this._useInsertReturning = insertReturning;
+    if (minMessages !== undefined && typeof minMessages !== "string") {
+      throw new TypeError(`minMessages must be a string, got ${typeof minMessages}`);
+    }
+    if (variables !== null && variables !== undefined) {
+      if (typeof variables !== "object" || Array.isArray(variables)) {
+        throw new TypeError("variables must be a plain object");
+      }
+      const variablesPrototype = Object.getPrototypeOf(variables);
+      if (variablesPrototype !== Object.prototype && variablesPrototype !== null) {
+        throw new TypeError("variables must be a plain object");
+      }
+      for (const [key, val] of Object.entries(variables)) {
+        if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(key)) {
+          throw new Error(`Invalid PostgreSQL session variable name: ${JSON.stringify(key)}`);
+        }
+        if (
+          val !== null &&
+          typeof val !== "string" &&
+          typeof val !== "boolean" &&
+          typeof val !== "number"
+        ) {
+          throw new TypeError(
+            `variables[${JSON.stringify(key)}] must be string | number | boolean | null, got ${typeof val}`,
+          );
+        }
+      }
+    }
+    this._minMessages = minMessages ?? "warning";
+    // Freeze a shallow copy so post-construction mutation can't bypass the
+    // key/value validation above and introduce un-sanitized SQL fragments.
+    this._sessionVariables = Object.freeze({ ...(variables ?? {}) });
     this._driverPool = new pg.Pool(pgConfig);
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#configure_connection. Runs once per new
+   * physical connection, tracked by WeakSet so it runs exactly once per
+   * client regardless of how many times the client is checked out from
+   * the pool. Called (and awaited) inside _acquireFreshClient so errors
+   * propagate and misconfigured clients are never handed to user code.
+   */
+  private async _maybeConfigureConnection(client: pg.PoolClient): Promise<void> {
+    if (this._configuredClients.has(client)) return;
+    // Mark only after all queries succeed so a partial failure doesn't
+    // leave the client flagged as configured on its next checkout.
+    // Mirrors: set_standard_conforming_strings — required for correct quoting behaviour.
+    await client.query("SET standard_conforming_strings = on");
+    // Mirrors: SET intervalstyle — ISO 8601 so intervals parse cleanly.
+    await client.query("SET intervalstyle = iso_8601");
+    await client.query(`SET client_min_messages TO ${this.quoteLiteral(this._minMessages)}`);
+    for (const [key, val] of Object.entries(this._sessionVariables)) {
+      if (val === null) continue;
+      if (val === "default") {
+        await client.query(`SET SESSION ${key} TO DEFAULT`);
+      } else {
+        const pgVal = val === true ? "on" : val === false ? "off" : String(val);
+        await client.query(`SET SESSION ${key} TO ${this.quoteLiteral(pgVal)}`);
+      }
+    }
+    this._configuredClients.add(client);
   }
 
   /**
@@ -545,6 +616,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
     const client = await this._driverPool.connect();
     try {
+      await this._maybeConfigureConnection(client);
       await this._maybeDrainOrphanedPreparedStatements(client);
     } catch (error) {
       client.release(error instanceof Error ? error : new Error(String(error)));

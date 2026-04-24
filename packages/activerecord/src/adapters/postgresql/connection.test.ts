@@ -1,138 +1,246 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/connection_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, describe, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
-describeIfPg("PostgreSQLAdapter", () => {
+describeIfPg("PostgresqlConnectionTest", () => {
   let adapter: PostgreSQLAdapter;
+
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
+
   afterEach(async () => {
     await adapter.close();
   });
 
-  describe("PostgreSQLConnectionTest", () => {
-    it("encoding", async () => {
-      const rows = await adapter.execute(
-        `SELECT pg_encoding_to_char(encoding) AS encoding FROM pg_database WHERE datname = current_database()`,
-      );
-      expect(rows).toHaveLength(1);
-      expect(rows[0].encoding).toBeTruthy();
-    });
+  it("encoding", async () => {
+    const enc = await adapter.encoding();
+    expect(enc).toBeTruthy();
+  });
 
-    it("collation", async () => {
-      const rows = await adapter.execute(
-        `SELECT datcollate FROM pg_database WHERE datname = current_database()`,
-      );
-      expect(rows).toHaveLength(1);
-      expect(rows[0].datcollate).toBeTruthy();
-    });
+  it("collation", async () => {
+    const col = await adapter.collation();
+    expect(col).toBeTruthy();
+  });
 
-    it("ctype", async () => {
-      const rows = await adapter.execute(
-        `SELECT datctype FROM pg_database WHERE datname = current_database()`,
-      );
-      expect(rows).toHaveLength(1);
-      expect(rows[0].datctype).toBeTruthy();
-    });
+  it("ctype", async () => {
+    const ct = await adapter.ctype();
+    expect(ct).toBeTruthy();
+  });
 
-    it.skip("indexes logs name", async () => {});
-    it.skip("table alias length logs name", async () => {});
+  it("default client min messages", async () => {
+    const level = await adapter.clientMinMessages();
+    expect(level).toBe("warning");
+  });
 
-    it("current database logs name", async () => {
-      const rows = await adapter.execute("SELECT current_database() AS db");
-      expect(rows[0].db).toBeTruthy();
-    });
+  it.skip("connection options", async () => {
+    // Requires establish_connection with options: "-c geqo=off" and leasing model connections
+  });
 
-    it.skip("encoding logs name", async () => {});
-    it.skip("schema names logs name", async () => {});
-    it.skip("statement key is logged", async () => {});
+  it.skip("reset", async () => {
+    // Requires reset!() — clears session config and returns connection to clean state
+  });
 
-    it("set session variable true", async () => {
-      await adapter.exec("SET enable_seqscan = ON");
-      const rows = await adapter.execute("SHOW enable_seqscan");
-      expect(rows[0].enable_seqscan).toBe("on");
-    });
+  it.skip("reset with transaction", async () => {
+    // Requires reset!() with an open transaction
+  });
 
-    it("set session variable false", async () => {
-      await adapter.exec("SET enable_seqscan = OFF");
-      const rows = await adapter.execute("SHOW enable_seqscan");
-      expect(rows[0].enable_seqscan).toBe("off");
-    });
+  it.skip("tables logs name", async () => {
+    // Requires SQLSubscriber / ActiveSupport::Notifications query tagging
+  });
 
-    it("set session variable nil", async () => {
-      await adapter.exec("SET enable_seqscan = DEFAULT");
-      const rows = await adapter.execute("SHOW enable_seqscan");
-      expect(rows[0].enable_seqscan).toBe("on");
-    });
+  it.skip("indexes logs name", async () => {
+    // Requires SQLSubscriber / ActiveSupport::Notifications query tagging
+  });
 
-    it("set session variable default", async () => {
-      await adapter.exec("SET enable_seqscan = DEFAULT");
-      const rows = await adapter.execute("SHOW enable_seqscan");
-      expect(rows[0].enable_seqscan).toBe("on");
-    });
+  it.skip("table exists logs name", async () => {
+    // Requires SQLSubscriber / ActiveSupport::Notifications query tagging
+  });
 
-    it("set session variable reset", async () => {
-      await adapter.exec("SET enable_seqscan = OFF");
-      await adapter.exec("RESET enable_seqscan");
-      const rows = await adapter.execute("SHOW enable_seqscan");
-      expect(rows[0].enable_seqscan).toBe("on");
-    });
+  it.skip("table alias length logs name", async () => {
+    // Requires SQLSubscriber / ActiveSupport::Notifications query tagging
+  });
 
-    it("set session timezone", async () => {
-      await adapter.exec("SET timezone = 'UTC'");
-      const rows = await adapter.execute("SHOW timezone");
-      expect(rows[0].TimeZone).toBe("UTC");
-    });
+  it.skip("current database logs name", async () => {
+    // Requires SQLSubscriber / ActiveSupport::Notifications query tagging
+  });
 
-    it("get advisory lock", async () => {
-      const rows = await adapter.execute("SELECT pg_try_advisory_lock(12345) AS locked");
-      expect(rows[0].locked).toBe(true);
-      await adapter.execute("SELECT pg_advisory_unlock(12345)");
-    });
+  it.skip("encoding logs name", async () => {
+    // Requires SQLSubscriber / ActiveSupport::Notifications query tagging
+  });
 
-    it("release advisory lock", async () => {
-      await adapter.execute("SELECT pg_try_advisory_lock(12346)");
-      const rows = await adapter.execute("SELECT pg_advisory_unlock(12346) AS unlocked");
-      expect(rows[0].unlocked).toBe(true);
-    });
+  it.skip("schema names logs name", async () => {
+    // Requires SQLSubscriber / ActiveSupport::Notifications query tagging
+  });
 
-    it.skip("advisory lock with xact", async () => {});
-    it.skip("reconnection after actual disconnection", async () => {});
-    it.skip("reconnection after simulated disconnection", async () => {});
-    it("set client min messages", async () => {
-      await adapter.exec("SET client_min_messages = 'warning'");
-      const rows = await adapter.execute("SHOW client_min_messages");
-      expect(rows[0].client_min_messages).toBe("warning");
-    });
-    it.skip("only warn on first encounter of unrecognized oid", async () => {});
-    it.skip("only warn on first encounter of undefined column type", async () => {});
-    it("default client min messages", async () => {
-      await adapter.exec("RESET client_min_messages");
-      const rows = await adapter.execute("SHOW client_min_messages");
-      expect(rows[0].client_min_messages).toBe("notice");
-    });
-    it.skip("connection options", async () => {});
-    it.skip("reset", async () => {});
-    it.skip("reset with transaction", async () => {});
-    it.skip("prepare false with binds", async () => {});
-    it.skip("reconnection after actual disconnection with verify", async () => {});
-    it("get and release advisory lock", async () => {
-      const lockRows = await adapter.execute("SELECT pg_try_advisory_lock(99999) AS locked");
-      try {
-        expect(lockRows[0].locked).toBe(true);
-        const unlockRows = await adapter.execute("SELECT pg_advisory_unlock(99999) AS unlocked");
-        expect(unlockRows[0].unlocked).toBe(true);
-      } finally {
-        await adapter.execute("SELECT pg_advisory_unlock(99999)");
-      }
-    });
+  it.skip("statement key is logged", async () => {
+    // Requires SQLSubscriber payload inspection and prepared statement name tracking
+  });
 
-    it("release non existent advisory lock", async () => {
-      const rows = await adapter.execute("SELECT pg_advisory_unlock(88888) AS unlocked");
-      expect(rows[0].unlocked).toBe(false);
+  it.skip("prepare false with binds", async () => {
+    // Requires QueryAttribute / Relation::QueryAttribute with prepare: false exec_query path
+  });
+
+  it.skip("reconnection after actual disconnection with verify", async () => {
+    // Requires verify!() / active?() and fixture connection pool repair infrastructure
+  });
+
+  it("set session variable true", async () => {
+    const a = new PostgreSQLAdapter({
+      connectionString: PG_TEST_URL,
+      variables: { debug_print_plan: true },
     });
+    try {
+      const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
+      expect(rows.rows).toEqual([["on"]]);
+    } finally {
+      await a.close();
+    }
+  });
+
+  it("set session variable false", async () => {
+    const a = new PostgreSQLAdapter({
+      connectionString: PG_TEST_URL,
+      variables: { debug_print_plan: false },
+    });
+    try {
+      const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
+      expect(rows.rows).toEqual([["off"]]);
+    } finally {
+      await a.close();
+    }
+  });
+
+  it("set session variable nil", async () => {
+    // null means skip SET — value stays at server default, same as a connection with no variables config.
+    const baseline = await adapter.execQuery("SHOW DEBUG_PRINT_PLAN");
+    const a = new PostgreSQLAdapter({
+      connectionString: PG_TEST_URL,
+      variables: { debug_print_plan: null },
+    });
+    try {
+      const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
+      expect(rows.rows).toEqual(baseline.rows);
+    } finally {
+      await a.close();
+    }
+  });
+
+  it("set session variable default", async () => {
+    // "default" issues SET SESSION key TO DEFAULT — resets to compile default, same as no config.
+    const baseline = await adapter.execQuery("SHOW DEBUG_PRINT_PLAN");
+    const a = new PostgreSQLAdapter({
+      connectionString: PG_TEST_URL,
+      variables: { debug_print_plan: "default" },
+    });
+    try {
+      const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
+      expect(rows.rows).toEqual(baseline.rows);
+    } finally {
+      await a.close();
+    }
+  });
+
+  it("set session timezone", async () => {
+    const a = new PostgreSQLAdapter({
+      connectionString: PG_TEST_URL,
+      variables: { timezone: "America/New_York" },
+    });
+    try {
+      const rows = await a.execute("SHOW TIME ZONE");
+      expect(rows[0]?.TimeZone).toBe("America/New_York");
+    } finally {
+      await a.close();
+    }
+  });
+
+  it("get and release advisory lock", async () => {
+    const lockId = 52959019;
+    const listLocks = `SELECT objid FROM pg_locks WHERE locktype = 'advisory'`;
+
+    const got = await adapter.getAdvisoryLock(lockId);
+    expect(got).toBe(true);
+
+    const rows = await adapter.execute(listLocks);
+    const found = rows.some((r) => Number(r.objid) === lockId);
+    expect(found).toBe(true);
+
+    const released = await adapter.releaseAdvisoryLock(lockId);
+    expect(released).toBe(true);
+
+    const rowsAfter = await adapter.execute(listLocks);
+    const stillHeld = rowsAfter.some((r) => Number(r.objid) === lockId);
+    expect(stillHeld).toBe(false);
+  });
+
+  it("release non existent advisory lock", async () => {
+    const fakeLockId = 29400750;
+    const result = await adapter.releaseAdvisoryLock(fakeLockId);
+    expect(result).toBe(false);
+  });
+
+  it("non-default minMessages is applied to connection", async () => {
+    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, minMessages: "notice" });
+    try {
+      const level = await a.clientMinMessages();
+      expect(level).toBe("notice");
+    } finally {
+      await a.close();
+    }
+  });
+});
+
+describe("PostgreSQLAdapter constructor validation", () => {
+  it("rejects invalid variable key", () => {
+    expect(
+      () =>
+        new PostgreSQLAdapter({ connectionString: PG_TEST_URL, variables: { "bad;key": "val" } }),
+    ).toThrow("Invalid PostgreSQL session variable name");
+  });
+
+  it("rejects undefined variable value", () => {
+    expect(
+      () =>
+        new PostgreSQLAdapter({
+          connectionString: PG_TEST_URL,
+          variables: { debug_print_plan: undefined as unknown as null },
+        }),
+    ).toThrow("must be string | number | boolean | null");
+  });
+
+  it("rejects object variable value", () => {
+    expect(
+      () =>
+        new PostgreSQLAdapter({
+          connectionString: PG_TEST_URL,
+          variables: { debug_print_plan: {} as unknown as string },
+        }),
+    ).toThrow("must be string | number | boolean | null");
+  });
+
+  it("accepts numeric variable value (e.g. statement_timeout: 5000)", async () => {
+    let a: PostgreSQLAdapter | undefined;
+    try {
+      expect(() => {
+        a = new PostgreSQLAdapter({
+          connectionString: PG_TEST_URL,
+          variables: { statement_timeout: 5000 },
+        });
+      }).not.toThrow();
+    } finally {
+      await a?.close();
+    }
+  });
+
+  it("rejects non-plain-object variables", () => {
+    expect(
+      () =>
+        new PostgreSQLAdapter({
+          connectionString: PG_TEST_URL,
+          variables: new Map() as unknown as Record<string, string>,
+        }),
+    ).toThrow("variables must be a plain object");
   });
 });

@@ -31,6 +31,18 @@ export interface TrailsAdapterOptions {
 }
 
 /**
+ * PostgreSQL-specific adapter options that extend the shared base.
+ * Kept separate so MySQL2/SQLite3 destructuring of `TrailsAdapterOptions`
+ * never receives — and leaks — these keys into their driver configs.
+ */
+export interface PostgreSQLAdapterOptions extends TrailsAdapterOptions {
+  // Mirrors: database.yml `min_messages` — SET client_min_messages on connect (default: "warning")
+  minMessages?: string;
+  // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection
+  variables?: Record<string, string | number | boolean | null | "default">;
+}
+
+/**
  * Stringify an arbitrary value for inclusion in an EXPLAIN validation
  * error message. `as any` callers can hand us arbitrary shapes —
  * circular objects, BigInts, Symbols, functions — and a raw
