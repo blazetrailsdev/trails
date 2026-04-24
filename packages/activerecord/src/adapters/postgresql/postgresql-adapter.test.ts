@@ -4,6 +4,7 @@
 import pg from "pg";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import * as Arel from "@blazetrails/arel";
 import {
   ConnectionNotEstablished,
   InvalidForeignKey,
@@ -142,13 +143,13 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("columns for distinct with order", async () => {
       expect(adapter.columnsForDistinct("posts.id", ["posts.created_at desc"])).toBe(
-        "posts.id, posts.created_at",
+        "posts.created_at AS alias_0, posts.id",
       );
     });
 
     it("columns for distinct with order and a column prefix", async () => {
       expect(adapter.columnsForDistinct("posts.id", ["posts.created_at desc", "posts.title"])).toBe(
-        "posts.id, posts.created_at, posts.title",
+        "posts.created_at AS alias_0, posts.title AS alias_1, posts.id",
       );
     });
     it("translate exception class", async () => {
@@ -608,14 +609,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(indexes.find((i) => i.name === "idx_nulls_nd")).toBeDefined();
     });
     it("columns for distinct with nulls", async () => {
-      expect(adapter.columnsForDistinct("posts.id", ["posts.created_at desc NULLS FIRST"])).toBe(
-        "posts.id, posts.created_at",
+      expect(adapter.columnsForDistinct("posts.title", ["posts.updater_id desc nulls first"])).toBe(
+        "posts.updater_id AS alias_0, posts.title",
+      );
+      expect(adapter.columnsForDistinct("posts.title", ["posts.updater_id desc nulls last"])).toBe(
+        "posts.updater_id AS alias_0, posts.title",
       );
     });
 
     it("columns for distinct without order specifiers", async () => {
-      expect(adapter.columnsForDistinct("posts.id", ["posts.created_at"])).toBe(
-        "posts.id, posts.created_at",
+      expect(adapter.columnsForDistinct("posts.title", ["posts.updater_id"])).toBe(
+        "posts.updater_id AS alias_0, posts.title",
+      );
+      expect(adapter.columnsForDistinct("posts.title", ["posts.updater_id nulls last"])).toBe(
+        "posts.updater_id AS alias_0, posts.title",
+      );
+      expect(adapter.columnsForDistinct("posts.title", ["posts.updater_id nulls first"])).toBe(
+        "posts.updater_id AS alias_0, posts.title",
       );
     });
     it.skip("raise error when cannot translate exception", async () => {});
@@ -623,8 +633,36 @@ describeIfPg("PostgreSQLAdapter", () => {
     it.skip("reload type map for newly defined types", async () => {});
     it.skip("unparsed defaults are at least set when saving", async () => {});
     it.skip("only check for insensitive comparison capability once", async () => {});
-    it.skip("extensions omits current schema name", async () => {});
-    it.skip("extensions includes non current schema name", async () => {});
+    it("extensions omits current schema name", async () => {
+      const wasEnabled = await adapter.extensionEnabled("hstore");
+      if (wasEnabled) await adapter.disableExtension("hstore");
+      await adapter.exec(`CREATE SCHEMA IF NOT EXISTS customschema`);
+      try {
+        await adapter.exec(`CREATE EXTENSION hstore SCHEMA customschema`);
+        const exts = await adapter.extensions();
+        expect(exts).toContain("customschema.hstore");
+      } finally {
+        await adapter.exec(`DROP SCHEMA IF EXISTS customschema CASCADE`);
+        if (wasEnabled) await adapter.enableExtension("hstore");
+      }
+    });
+
+    it("extensions includes non current schema name", async () => {
+      const wasEnabled = await adapter.extensionEnabled("hstore");
+      const currentSchemaRows = await adapter.execute(
+        `SELECT quote_ident(current_schema()) AS quoted_current_schema`,
+      );
+      const quotedCurrentSchema = currentSchemaRows[0].quoted_current_schema as string;
+      if (wasEnabled) await adapter.disableExtension("hstore");
+      try {
+        await adapter.exec(`CREATE EXTENSION hstore SCHEMA ${quotedCurrentSchema}`);
+        const exts = await adapter.extensions();
+        expect(exts).toContain("hstore");
+      } finally {
+        await adapter.exec(`DROP EXTENSION IF EXISTS hstore`);
+        if (wasEnabled) await adapter.enableExtension("hstore");
+      }
+    });
     it.skip("ignores warnings when behaviour ignore", async () => {});
     it.skip("logs warnings when behaviour log", async () => {});
     it.skip("raises warnings when behaviour raise", async () => {});
@@ -700,28 +738,37 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("columns for distinct one order", () => {
       expect(adapter.columnsForDistinct("posts.id", ["posts.created_at desc"])).toBe(
-        "posts.id, posts.created_at",
+        "posts.created_at AS alias_0, posts.id",
       );
     });
 
     it("columns for distinct few orders", () => {
       expect(
-        adapter.columnsForDistinct("posts.id", ["posts.created_at desc", "posts.updated_at asc"]),
-      ).toBe("posts.id, posts.created_at, posts.updated_at");
+        adapter.columnsForDistinct("posts.id", ["posts.created_at desc", "posts.position asc"]),
+      ).toBe("posts.created_at AS alias_0, posts.position AS alias_1, posts.id");
     });
 
     it("columns for distinct with case", () => {
-      expect(adapter.columnsForDistinct("posts.id", ["UPPER(posts.name)"])).toBe(
-        "posts.id, UPPER(posts.name)",
+      expect(
+        adapter.columnsForDistinct("posts.id", [
+          "CASE WHEN author.is_active THEN UPPER(author.name) ELSE UPPER(author.email) END",
+        ]),
+      ).toBe(
+        "CASE WHEN author.is_active THEN UPPER(author.name) ELSE UPPER(author.email) END AS alias_0, posts.id",
       );
     });
 
     it("columns for distinct blank not nil orders", () => {
-      expect(adapter.columnsForDistinct("posts.id", [""])).toBe("posts.id");
+      expect(adapter.columnsForDistinct("posts.id", ["posts.created_at desc", "", "   "])).toBe(
+        "posts.created_at AS alias_0, posts.id",
+      );
     });
 
-    it.skip("columns for distinct with arel order", () => {
-      /* needs Arel order node support */
+    it("columns for distinct with arel order", () => {
+      const order = new Arel.Nodes.Descending(Arel.sql("posts.created_at"));
+      expect(adapter.columnsForDistinct("posts.id", [order])).toBe(
+        "posts.created_at AS alias_0, posts.id",
+      );
     });
 
     it("bad connection", async () => {

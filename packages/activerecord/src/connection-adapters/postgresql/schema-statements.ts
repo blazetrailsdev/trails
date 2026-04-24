@@ -235,7 +235,10 @@ export interface SchemaStatements {
       enumType?: string;
     },
   ): string;
-  columnsForDistinct(columns: string, orders: string[]): string;
+  columnsForDistinct(
+    columns: string | string[],
+    orders?: (string | import("@blazetrails/arel").Nodes.Node)[],
+  ): string;
   updateTableDefinition(tableName: string, base: unknown): unknown;
   createSchemaDumper(options: unknown): unknown;
   foreignKeyColumnFor(tableName: string, columnName?: string): string;

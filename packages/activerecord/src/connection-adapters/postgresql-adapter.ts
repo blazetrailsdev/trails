@@ -1853,20 +1853,40 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return pgTypeCast(value);
   }
 
-  columnsForDistinct(columns: string, orders: string[]): string {
-    if (!orders || orders.length === 0) return columns;
-    const orderColumns = orders
-      .map((o) => o.replace(/\s+(ASC|DESC)\s*(NULLS\s+(FIRST|LAST))?\s*/gi, "").trim())
-      .filter((c) => c.length > 0);
-    if (orderColumns.length === 0) return columns;
-    return `${columns}, ${orderColumns.join(", ")}`;
+  columnsForDistinct(columns: string | string[], orders?: (string | Nodes.Node)[]): string {
+    const base = Array.isArray(columns) ? columns.join(", ") : columns;
+    const visitor = this.arelVisitor;
+    // Mirrors Rails two-pass compact_blank: filter blanks before AND after stripping
+    // so an order that becomes empty after stripping (e.g. bare "DESC") doesn't
+    // consume an alias index slot and shift subsequent aliases.
+    const orderColumns = (orders ?? [])
+      .map((o) => (typeof o === "string" ? o : visitor.compile(o as Nodes.Node)))
+      .filter((o) => o.trim().length > 0)
+      .map((o) =>
+        o
+          .replace(/\s+(?:ASC|DESC)\b/gi, "")
+          .replace(/\s+NULLS\s+(?:FIRST|LAST)\b/gi, "")
+          .trim(),
+      )
+      .filter((col) => col.length > 0)
+      .map((col, i) => `${col} AS alias_${i}`);
+    if (orderColumns.length === 0) return base;
+    return [...orderColumns, base].join(", ");
   }
 
   async extensions(): Promise<string[]> {
-    const rows = await this.schemaQuery(
-      `SELECT extname FROM pg_extension WHERE extname != 'plpgsql'`,
-    );
-    return rows.map((r) => r.extname as string);
+    // Rails does not filter plpgsql or any built-in extension — the full list
+    // (including pg_catalog.plpgsql) is returned, matching PostgreSQLAdapter#extensions.
+    const rows = await this.schemaQuery(`
+      SELECT pg_extension.extname, n.nspname AS schema,
+             current_schema() AS current_schema
+      FROM pg_extension
+      JOIN pg_namespace n ON pg_extension.extnamespace = n.oid
+    `);
+    return rows.map((r) => {
+      const schema = r.schema === r.current_schema ? null : (r.schema as string);
+      return [schema, r.extname as string].filter(Boolean).join(".");
+    });
   }
 
   async extensionEnabled(name: string): Promise<boolean> {
