@@ -9,6 +9,14 @@ export class ImmutableStringType extends ValueType<string> {
 
   cast(value: unknown): string | null {
     if (value === null || value === undefined) return null;
+    // Rails type/immutable_string.rb#cast_value:
+    //   case value
+    //   when true  then "t"
+    //   when false then "f"
+    //   else value.to_s
+    //   end
+    if (value === true) return Object.freeze("t") as string;
+    if (value === false) return Object.freeze("f") as string;
     const str = String(value);
     return Object.freeze(str) as string;
   }

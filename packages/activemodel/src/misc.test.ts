@@ -387,9 +387,13 @@ describe("ActiveModel", () => {
 
     // -- Acceptance --
     describe("acceptance", () => {
+      // Rails' equivalent uses a virtual attribute; boolean here so `"1"` /
+      // `true` round-trip through cast as `true` and match the default accept
+      // list `["1", true]`, whereas a string-typed attr would cast `true` to
+      // "t" (per type/immutable_string.rb) and rightly fail.
       class Terms extends Model {
         static {
-          this.attribute("accepted", "string");
+          this.attribute("accepted", "boolean");
           this.validates("accepted", { acceptance: true });
         }
       }

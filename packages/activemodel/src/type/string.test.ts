@@ -4,8 +4,10 @@ import { Types } from "../index.js";
 describe("StringTest", () => {
   it("type casting", () => {
     const type = new Types.StringType();
-    expect(type.cast(true)).toBe("true");
-    expect(type.cast(false)).toBe("false");
+    // Rails type/string.rb inherits from type/immutable_string.rb#cast_value,
+    // which maps true/false to the PG literal form "t"/"f".
+    expect(type.cast(true)).toBe("t");
+    expect(type.cast(false)).toBe("f");
     expect(type.cast(123)).toBe("123");
   });
 

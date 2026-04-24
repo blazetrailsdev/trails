@@ -5,6 +5,11 @@ export class StringType extends ImmutableStringType {
 
   cast(value: unknown): string | null {
     if (value === null || value === undefined) return null;
+    // Rails type/string.rb subclasses immutable_string.rb, so the
+    // boolean `true -> "t"` / `false -> "f"` mapping lives in the
+    // superclass. Freezing is a no-op on primitive strings, so there's
+    // no behavior lost by delegating the bool branch.
+    if (typeof value === "boolean") return super.cast(value);
     return String(value);
   }
 

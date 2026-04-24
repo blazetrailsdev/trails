@@ -94,9 +94,15 @@ describe("AcceptanceValidationTest", () => {
   });
 
   it("validates acceptance of true", () => {
+    // Rails' Topic uses `attr_accessor :terms_of_service`, preserving the
+    // assigned value without casting; its tests rely on `true` matching the
+    // default accept list `["1", true]`. Our Model requires a declared
+    // attribute, so use `boolean` here — `true` round-trips through cast.
+    // A `string`-typed attribute would cast `true` to "t" (per
+    // type/immutable_string.rb) and rightly not match the default list.
     class Terms extends Model {
       static {
-        this.attribute("terms", "string");
+        this.attribute("terms", "boolean");
         this.validates("terms", { acceptance: true });
       }
     }
@@ -111,6 +117,33 @@ describe("AcceptanceValidationTest", () => {
     expect(p.isValid()).toBe(false);
     const p2 = new Person({ terms: "1" });
     expect(p2.isValid()).toBe(true);
+  });
+
+  it("validates acceptance with a scalar accept option", () => {
+    // Rails' `acceptable_option?` does `Array(options[:accept]).include?(value)`,
+    // so a non-array `accept:` is normalized to a one-element list.
+    class Terms extends Model {
+      static {
+        this.attribute("terms", "string");
+        this.validates("terms", { acceptance: { accept: "yes" } });
+      }
+    }
+    expect(new Terms({ terms: "yes" }).isValid()).toBe(true);
+    expect(new Terms({ terms: "y" }).isValid()).toBe(false);
+  });
+
+  it("validates acceptance with an iterable (Set) accept option", () => {
+    // Rails' `Array(options[:accept])` coerces via `to_a`, so a Set/Enumerator
+    // should be spread into the list of accepted values.
+    class Terms extends Model {
+      static {
+        this.attribute("terms", "string");
+        this.validates("terms", { acceptance: { accept: new Set(["yes", "ok"]) } });
+      }
+    }
+    expect(new Terms({ terms: "yes" }).isValid()).toBe(true);
+    expect(new Terms({ terms: "ok" }).isValid()).toBe(true);
+    expect(new Terms({ terms: "no" }).isValid()).toBe(false);
   });
 
   it("setup! auto-defines attribute when not explicitly declared", () => {
