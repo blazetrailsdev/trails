@@ -239,6 +239,8 @@ export class Error {
       format = I18n.t(primaryKey, {
         defaults: fallbackDefaults,
         defaultValue: "%{attribute} %{message}",
+        attribute: humanAttr,
+        message,
       });
     } else {
       format = I18n.t(`${i18nScope}.errors.format`, {
@@ -247,10 +249,12 @@ export class Error {
           { key: "errors.format" },
         ],
         defaultValue: "%{attribute} %{message}",
+        attribute: humanAttr,
+        message,
       });
     }
 
-    return format.replace("%{attribute}", humanAttr).replace("%{message}", message);
+    return format;
   }
 
   static generateMessage(
