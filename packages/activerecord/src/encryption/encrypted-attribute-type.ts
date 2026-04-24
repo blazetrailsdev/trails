@@ -4,7 +4,11 @@ import type { EncryptorLike } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
 import { isEncryptionDisabled, isProtectedMode } from "./context.js";
 import { Configurable } from "./configurable.js";
-import { Encryption as EncryptionError } from "./errors.js";
+import {
+  Encryption as EncryptionError,
+  Decryption as DecryptionError,
+  Base as BaseEncryptionError,
+} from "./errors.js";
 import { NullEncryptor } from "./null-encryptor.js";
 
 /**
@@ -147,11 +151,37 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     if (value === null || value === undefined) return value;
     if (this._default !== undefined && this._default === value) return value;
 
-    if (this.supportUnencryptedData && !this.isEncrypted(value)) {
+    try {
+      return this._encryptor.decrypt(String(value), this.decryptionOptions());
+    } catch (error) {
+      if (!(error instanceof BaseEncryptionError)) throw error;
+      if (this.scheme.previousSchemes.length === 0) {
+        return this._handleDeserializeError(error, value);
+      }
+      return this._tryPreviousTypes(value);
+    }
+  }
+
+  private _tryPreviousTypes(value: unknown): unknown {
+    const prev = this.previousTypes;
+    for (let i = 0; i < prev.length; i++) {
+      try {
+        return prev[i].deserialize(value);
+      } catch (error) {
+        if (!(error instanceof BaseEncryptionError)) throw error;
+        if (i === prev.length - 1) {
+          return this._handleDeserializeError(error, value);
+        }
+      }
+    }
+    return value;
+  }
+
+  private _handleDeserializeError(error: BaseEncryptionError, value: unknown): unknown {
+    if (error instanceof DecryptionError && this.supportUnencryptedData) {
       return value;
     }
-
-    return this._encryptor.decrypt(String(value), this.decryptionOptions());
+    throw error;
   }
 
   private encrypt(value: string): string {
