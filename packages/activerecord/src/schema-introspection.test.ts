@@ -6,7 +6,9 @@ import {
   introspectColumns,
   introspectIndexes,
   introspectPrimaryKey,
+  introspectForeignKeys,
 } from "./schema-introspection.js";
+import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 
 /**
  * Return a proxy over `adapter` that hides the named methods so the
@@ -176,5 +178,75 @@ describe("introspectPrimaryKey", () => {
     const pk = await introspectPrimaryKey(stripped, "widgets");
 
     expect(pk).toEqual(["id"]);
+  });
+});
+
+describe("introspectForeignKeys", () => {
+  it("uses adapter.foreignKeys() when the adapter implements it", async () => {
+    let calledWith: string | undefined;
+    const fk = new ForeignKeyDefinition("reviews", "books", "book_id", "id", "fk_reviews_book_id");
+    const adapter = {
+      async foreignKeys(table: string): Promise<ForeignKeyDefinition[]> {
+        calledWith = table;
+        return [fk];
+      },
+    } as unknown as Parameters<typeof introspectForeignKeys>[0];
+
+    const result = await introspectForeignKeys(adapter, "reviews");
+
+    expect(calledWith).toBe("reviews");
+    expect(result).toEqual([fk]);
+  });
+
+  it("returns composite FKs as comma-separated strings, not arrays", async () => {
+    // Confirms the `column: "a_id,b_id"` contract the codegen layer depends on.
+    const fk = new ForeignKeyDefinition(
+      "memberships",
+      "accounts",
+      "tenant_id,account_id",
+      "tenant_id,id",
+      "fk_memberships_composite",
+    );
+    const adapter = {
+      async foreignKeys(_t: string): Promise<ForeignKeyDefinition[]> {
+        return [fk];
+      },
+    } as unknown as Parameters<typeof introspectForeignKeys>[0];
+
+    const [result] = await introspectForeignKeys(adapter, "memberships");
+
+    expect(typeof result.column).toBe("string");
+    expect(result.column).toBe("tenant_id,account_id");
+    expect(typeof result.primaryKey).toBe("string");
+    expect(result.primaryKey).toBe("tenant_id,id");
+  });
+
+  it("returns [] from the SchemaStatements fallback when adapter lacks foreignKeys()", async () => {
+    const realAdapter = createTestAdapter();
+    const ctx = new MigrationContext(realAdapter);
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
+
+    const stripped = withoutMethods(realAdapter, ["foreignKeys"]);
+
+    // SchemaStatements.foreignKeys() checks the underlying adapter for
+    // .foreignKeys() and returns [] when it's not a function. Our wrapper
+    // goes through that same fallback path when the adapter is stripped.
+    const fks = await introspectForeignKeys(stripped, "users");
+
+    expect(fks).toEqual([]);
+  });
+
+  it("returns [] for a real table with no foreign keys", async () => {
+    const realAdapter = createTestAdapter();
+    const ctx = new MigrationContext(realAdapter);
+    await ctx.createTable("standalone", {}, (t) => {
+      t.string("name");
+    });
+
+    const fks = await introspectForeignKeys(realAdapter, "standalone");
+
+    expect(fks).toEqual([]);
   });
 });

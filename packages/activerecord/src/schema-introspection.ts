@@ -16,6 +16,7 @@
 import type { DatabaseAdapter } from "./adapter.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import type { Column } from "./connection-adapters/column.js";
+import type { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 
 type AdapterWithTables = { tables(): Promise<string[]> };
 type AdapterWithColumns = { columns(table: string): Promise<Column[]> };
@@ -24,6 +25,9 @@ type AdapterWithIndexes = {
 };
 type AdapterWithPrimaryKey = {
   primaryKey(table: string): Promise<string | string[] | null>;
+};
+type AdapterWithForeignKeys = {
+  foreignKeys(table: string): Promise<ForeignKeyDefinition[]>;
 };
 
 /** Minimal index descriptor shared by all adapters. */
@@ -46,6 +50,9 @@ function hasIndexes(a: unknown): a is AdapterWithIndexes {
 }
 function hasPrimaryKey(a: unknown): a is AdapterWithPrimaryKey {
   return typeof (a as AdapterWithPrimaryKey).primaryKey === "function";
+}
+function hasForeignKeys(a: unknown): a is AdapterWithForeignKeys {
+  return typeof (a as AdapterWithForeignKeys).foreignKeys === "function";
 }
 
 // Memoize `SchemaStatements` per-adapter so the fallback path doesn't
@@ -121,4 +128,24 @@ export async function introspectPrimaryKey(
   // Fallback: columns with primaryKey=true in declaration order.
   const cols = await introspectColumns(adapter, table);
   return cols.filter((c) => c.primaryKey).map((c) => c.name);
+}
+
+/**
+ * Return foreign-key definitions for `table`. Uses `adapter.foreignKeys()`
+ * when implemented (SQLite / PostgreSQL / MySQL2 all do), else falls back
+ * to `SchemaStatements.foreignKeys()` — which itself degrades to an empty
+ * array when the adapter can't surface constraint metadata. No portable
+ * fallback parses `information_schema` / `PRAGMA foreign_key_list(...)`,
+ * so `[]` is the honest answer for unsupported adapters.
+ *
+ * Note: `ForeignKeyDefinition.column` and `.primaryKey` are comma-separated
+ * strings for composite foreign keys (e.g. "a_id,b_id"), not arrays.
+ * Callers that care about composite FKs should check `.includes(",")`.
+ */
+export async function introspectForeignKeys(
+  adapter: DatabaseAdapter,
+  table: string,
+): Promise<ForeignKeyDefinition[]> {
+  if (hasForeignKeys(adapter)) return adapter.foreignKeys(table);
+  return schemaStatementsFor(adapter).foreignKeys(table);
 }
