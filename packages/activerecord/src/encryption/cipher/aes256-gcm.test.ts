@@ -12,7 +12,7 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     const key = generateKey();
     const result = cipher.encrypt("hello world", key);
     const decrypted = cipher.decrypt(result.payload, key, result.iv, result.authTag);
-    expect(decrypted).toBe("hello world");
+    expect(decrypted.toString("utf-8")).toBe("hello world");
   });
 
   it("works with empty strings", () => {
@@ -20,7 +20,16 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     const key = generateKey();
     const result = cipher.encrypt("", key);
     const decrypted = cipher.decrypt(result.payload, key, result.iv, result.authTag);
-    expect(decrypted).toBe("");
+    expect(decrypted.toString("utf-8")).toBe("");
+  });
+
+  it("accepts a Buffer as input (for compressed binary payloads)", () => {
+    const cipher = new Cipher();
+    const key = generateKey();
+    const inputBuf = Buffer.from([0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe]);
+    const result = cipher.encrypt(inputBuf, key);
+    const decrypted = cipher.decrypt(result.payload, key, result.iv, result.authTag);
+    expect(decrypted).toEqual(inputBuf);
   });
 
   it("uses non-deterministic encryption by default", () => {

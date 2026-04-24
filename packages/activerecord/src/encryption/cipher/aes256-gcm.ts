@@ -24,16 +24,18 @@ export class Cipher {
   }
 
   encrypt(
-    data: string,
+    data: string | Buffer,
     key: string,
     options?: { deterministic?: boolean },
   ): { payload: string; iv: string; authTag: string } {
     this._validateKeyLength(key);
     const crypto = getCrypto();
     const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
+    // Accept Buffer (e.g. compressed binary data) or string (UTF-8 text).
+    const inputBuf = Buffer.isBuffer(data) ? data : Buffer.from(data, "utf-8");
     let iv: Buffer;
     if (options?.deterministic ?? this.deterministic) {
-      iv = crypto.createHmac("sha256", keyBuf).update(data).digest().subarray(0, IV_LENGTH);
+      iv = crypto.createHmac("sha256", keyBuf).update(inputBuf).digest().subarray(0, IV_LENGTH);
     } else {
       iv = crypto.randomBytes(IV_LENGTH);
     }
@@ -41,7 +43,7 @@ export class Cipher {
       authTagLength: AUTH_TAG_LENGTH,
     });
     const encrypted = Buffer.concat([
-      Buffer.from(cipher.update(Buffer.from(data, "utf-8"))),
+      Buffer.from(cipher.update(inputBuf)),
       Buffer.from(cipher.final()),
     ]);
     if (!cipher.getAuthTag) {
@@ -56,13 +58,23 @@ export class Cipher {
     };
   }
 
-  decrypt(payload: string, keys: string | string[], iv: string, authTag: string): string {
+  /**
+   * Decrypt a payload and return the raw bytes.
+   *
+   * **Breaking change from pre-PR-C behaviour**: previously returned a `string`;
+   * now returns `Buffer` to match Rails, which stores raw (possibly binary)
+   * bytes in the AES cipher. Callers must decode explicitly:
+   *   - plain text: `cipher.decrypt(...).toString("utf-8")`
+   *   - compressed: pass the Buffer directly to `compressor.inflate()`
+   *
+   * `Encryptor` handles this automatically; only direct `Cipher` users are affected.
+   */
+  decrypt(payload: string, keys: string | string[], iv: string, authTag: string): Buffer {
     const keyList = Array.isArray(keys) ? keys : [keys];
     const ivBuf = Buffer.from(iv, "base64");
     const authTagBuf = Buffer.from(authTag, "base64");
     const encryptedBuf = Buffer.from(payload, "base64");
 
-    const crypto = getCrypto();
     for (const key of keyList) {
       try {
         const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
@@ -73,11 +85,10 @@ export class Cipher {
           throw new ConfigError("Crypto adapter does not support GCM auth tags (setAuthTag)");
         }
         decipher.setAuthTag(authTagBuf);
-        const decrypted = Buffer.concat([
+        return Buffer.concat([
           Buffer.from(decipher.update(encryptedBuf)),
           Buffer.from(decipher.final()),
         ]);
-        return decrypted.toString("utf-8");
       } catch (e) {
         if (e instanceof ConfigError) throw e;
         continue;

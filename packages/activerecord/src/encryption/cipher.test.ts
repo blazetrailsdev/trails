@@ -13,7 +13,7 @@ describe("ActiveRecord::Encryption::CipherTest", () => {
     const key = generateKey();
     const result = cipher.encrypt("hello world", key);
     const decrypted = cipher.decrypt(result.payload, key, result.iv, result.authTag);
-    expect(decrypted).toBe("hello world");
+    expect(decrypted.toString("utf-8")).toBe("hello world");
   });
 
   it("by default, encrypts uses random initialization vectors for each encryption operation", () => {
@@ -57,7 +57,7 @@ describe("ActiveRecord::Encryption::CipherTest", () => {
     const key2 = generateKey();
     const result = cipher.encrypt("hello", key2);
     const decrypted = cipher.decrypt(result.payload, [key1, key2], result.iv, result.authTag);
-    expect(decrypted).toBe("hello");
+    expect(decrypted.toString("utf-8")).toBe("hello");
   });
 
   it("decrypt will raise an ActiveRecord::Encryption::Errors::Decryption error when none of the keys works", () => {
@@ -76,7 +76,7 @@ describe("ActiveRecord::Encryption::CipherTest", () => {
     const text = "héllo wörld";
     const result = cipher.encrypt(text, key);
     const decrypted = cipher.decrypt(result.payload, key, result.iv, result.authTag);
-    expect(decrypted).toBe(text);
+    expect(decrypted.toString("utf-8")).toBe(text);
   });
 
   it("can encode unicode strings with emojis", () => {
@@ -85,6 +85,6 @@ describe("ActiveRecord::Encryption::CipherTest", () => {
     const text = "Hello 🌍🚀";
     const result = cipher.encrypt(text, key);
     const decrypted = cipher.decrypt(result.payload, key, result.iv, result.authTag);
-    expect(decrypted).toBe(text);
+    expect(decrypted.toString("utf-8")).toBe(text);
   });
 });

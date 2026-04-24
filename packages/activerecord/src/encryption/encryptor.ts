@@ -11,6 +11,9 @@ import { ConfigError, DecryptionError, ForbiddenClass } from "./errors.js";
 import type { Compressor } from "./config.js";
 import { defaultCompressor } from "./config.js";
 
+// Mirrors: ActiveRecord::Encryption::Encryptor::THRESHOLD_TO_JUSTIFY_COMPRESSION
+const THRESHOLD_TO_JUSTIFY_COMPRESSION = 140;
+
 export interface EncryptorOptions {
   compress?: boolean;
   compressor?: Compressor;
@@ -60,19 +63,23 @@ export class Encryptor {
       throw new ConfigError("No encryption key provided");
     }
 
-    let data = clearText;
+    // Pass string or raw compressed Buffer to cipher — mirrors Rails which feeds
+    // raw binary bytes from deflate directly into AES without base64 encoding.
+    let cipherInput: string | Buffer = clearText;
     let compressed = false;
     if (this._compress) {
-      const originalByteLength = Buffer.byteLength(data, "utf-8");
-      const compressedBuf = this._compressor.deflate(data);
-      const compressedBase64 = Buffer.from(compressedBuf).toString("base64");
-      if (Buffer.byteLength(compressedBase64, "utf-8") < originalByteLength) {
-        data = compressedBase64;
-        compressed = true;
+      const originalByteLength = Buffer.byteLength(clearText, "utf-8");
+      if (originalByteLength > THRESHOLD_TO_JUSTIFY_COMPRESSION) {
+        const deflated = this._compressor.deflate(clearText);
+        const compressedBuf = Buffer.isBuffer(deflated) ? deflated : Buffer.from(deflated);
+        if (compressedBuf.length < originalByteLength) {
+          cipherInput = compressedBuf;
+          compressed = true;
+        }
       }
     }
 
-    const { payload, iv, authTag } = this._cipher.encrypt(data, key, {
+    const { payload, iv, authTag } = this._cipher.encrypt(cipherInput, key, {
       deterministic: options?.deterministic,
     });
 
@@ -117,14 +124,15 @@ export class Encryptor {
       throw new DecryptionError("No decryption key provided");
     }
 
-    const decrypted = this._cipher.decrypt(message.payload, keys, iv, authTag);
+    // cipher.decrypt returns raw bytes — inflate directly for compressed payloads,
+    // decode as UTF-8 for plain text. Mirrors Rails which passes raw bytes to/from cipher.
+    const decryptedBuf = this._cipher.decrypt(message.payload, keys, iv, authTag);
 
     if (compressed) {
-      const compressedBuf = Buffer.from(decrypted, "base64");
-      return this._compressor.inflate(compressedBuf);
+      return this._compressor.inflate(decryptedBuf);
     }
 
-    return decrypted;
+    return decryptedBuf.toString("utf-8");
   }
 
   isEncrypted(text: string): boolean {

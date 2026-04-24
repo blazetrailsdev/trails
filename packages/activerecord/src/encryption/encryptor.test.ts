@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Encryptor } from "./encryptor.js";
 import { DecryptionError, ForbiddenClass } from "./errors.js";
+import { MessageSerializer } from "./message-serializer.js";
 import * as crypto from "crypto";
 
 function generateKey(): string {
@@ -54,6 +55,62 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     const encrypted = enc.encrypt("hello", { key });
     const decrypted = enc.decrypt(encrypted, { key });
     expect(decrypted).toBe("hello");
+  });
+
+  it("compresses when raw compressed bytes < original even if base64(compressed) > original", () => {
+    // Regression test for C1: the old code compared base64(compressed).length vs original.length,
+    // which incorrectly skipped compression when base64 overhead pushed the encoded size above the
+    // original. The new code compares raw bytes, so compression is applied whenever deflated bytes
+    // are smaller — base64 encoding happens after the decision.
+    //
+    // Arrange: a compressor that returns 106 raw bytes for 141-byte input.
+    //   original = 141 bytes → compressed = 106 bytes → base64(106) = 144 bytes > 141 bytes
+    //   Old code: base64(144) NOT < 141 → skipped compression (bug)
+    //   New code: 106 < 141 → compresses (correct)
+    const originalText = "a".repeat(141);
+    const originalByteLen = Buffer.byteLength(originalText, "utf-8"); // 141
+    const compressedRaw = Buffer.alloc(106); // 106 raw bytes → base64 = 144 bytes > 141
+    const compressedBase64 = compressedRaw.toString("base64"); // 144 bytes
+    expect(compressedBase64.length).toBeGreaterThan(originalByteLen); // proves base64 > original
+
+    const spyCompressor = {
+      deflate: (_data: string) => compressedRaw,
+      inflate: (_data: Buffer | Uint8Array) => originalText, // simulate decompression
+    };
+
+    const enc = new Encryptor({ compress: true, compressor: spyCompressor });
+    const key = generateKey();
+    const encrypted = enc.encrypt(originalText, { key });
+
+    // Verify the c (compressed) header is set in the message
+    const serializer = new MessageSerializer();
+    const message = serializer.load(encrypted);
+    expect(message.headers.get("c")).toBe(true);
+
+    // Full round-trip
+    const decrypted = enc.decrypt(encrypted, { key });
+    expect(decrypted).toBe(originalText);
+  });
+
+  it("short strings under threshold are not compressed even when compress is enabled", () => {
+    let deflateCallCount = 0;
+    const spyCompressor = {
+      deflate: (data: string) => {
+        deflateCallCount++;
+        return Buffer.from(data, "utf-8");
+      },
+      inflate: (data: Buffer | Uint8Array) => Buffer.from(data).toString("utf-8"),
+    };
+    const enc = new Encryptor({ compress: true, compressor: spyCompressor });
+    const key = generateKey();
+
+    // Exactly at threshold (140 bytes) — not compressed
+    enc.encrypt("x".repeat(140), { key });
+    expect(deflateCallCount).toBe(0);
+
+    // One byte above threshold — deflate is called
+    enc.encrypt("x".repeat(141), { key });
+    expect(deflateCallCount).toBe(1);
   });
 
   it("trying to encrypt custom classes raises a ForbiddenClass exception", () => {
