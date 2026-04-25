@@ -588,3 +588,25 @@ describe("OverridingAccessorsTest", () => {
     expect(p.readAttribute("name")).toBe("Alice");
   });
 });
+describe("humanAttributeName()", () => {
+  it("humanizes attribute names at the Model level", () => {
+    class User extends Model {
+      static {
+        this.attribute("first_name", "string");
+      }
+    }
+    expect(User.humanAttributeName("first_name")).toBe("First name");
+    expect(User.humanAttributeName("email")).toBe("Email");
+  });
+});
+
+describe("i18nScope", () => {
+  it("returns 'activemodel' by default", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    expect(User.i18nScope).toBe("activemodel");
+  });
+});

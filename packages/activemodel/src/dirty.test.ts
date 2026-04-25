@@ -458,3 +458,243 @@ describe("clearChangesInformation", () => {
     expect(Object.keys(p.previousChanges).length).toBe(0);
   });
 });
+describe("clearAttributeChanges", () => {
+  it("clears changes for specific attributes only", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+
+    const p = new Person({ name: "Alice", age: 30 });
+    p.changesApplied();
+    p.writeAttribute("name", "Bob");
+    p.writeAttribute("age", 31);
+    expect(p.changedAttributes).toContain("name");
+    expect(p.changedAttributes).toContain("age");
+
+    p.clearAttributeChanges(["name"]);
+    expect(p.changedAttributes).not.toContain("name");
+    expect(p.changedAttributes).toContain("age");
+  });
+});
+
+describe("attributeChanged with from/to options", () => {
+  it("returns true when from/to match the change", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u.writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { from: "Alice", to: "Bob" })).toBe(true);
+  });
+
+  it("returns false when from does not match", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u.writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { from: "Charlie", to: "Bob" })).toBe(false);
+  });
+
+  it("returns false when to does not match", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u.writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { from: "Alice", to: "Charlie" })).toBe(false);
+  });
+
+  it("supports only from option", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u.writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { from: "Alice" })).toBe(true);
+    expect(u.attributeChanged("name", { from: "Wrong" })).toBe(false);
+  });
+
+  it("supports only to option", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u.writeAttribute("name", "Bob");
+    expect(u.attributeChanged("name", { to: "Bob" })).toBe(true);
+    expect(u.attributeChanged("name", { to: "Wrong" })).toBe(false);
+  });
+
+  it("willSaveChangeToAttribute supports from/to", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u.writeAttribute("name", "Bob");
+    expect(u.willSaveChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
+    expect(u.willSaveChangeToAttribute("name", { from: "Wrong" })).toBe(false);
+  });
+
+  it("savedChangeToAttribute supports from/to", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.changesApplied();
+    u.writeAttribute("name", "Bob");
+    u.changesApplied();
+    expect(u.savedChangeToAttribute("name", { from: "Alice", to: "Bob" })).toBe(true);
+    expect(u.savedChangeToAttribute("name", { from: "Alice", to: "Wrong" })).toBe(false);
+    expect(u.savedChangeToAttribute("name", { from: "Wrong", to: "Bob" })).toBe(false);
+  });
+});
+
+describe("attributePreviouslyChanged / attributePreviouslyWas", () => {
+  it("attributePreviouslyChanged returns true for attributes changed in last save", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.writeAttribute("name", "Bob");
+    u.changesApplied(); // simulate save — records name change as previous
+    expect(u.attributePreviouslyChanged("name")).toBe(true);
+  });
+
+  it("attributePreviouslyChanged supports from/to options", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.writeAttribute("name", "Bob");
+    u.changesApplied();
+    expect(u.attributePreviouslyChanged("name", { from: "Alice", to: "Bob" })).toBe(true);
+    expect(u.attributePreviouslyChanged("name", { to: "Charlie" })).toBe(false);
+  });
+
+  it("attributePreviouslyWas returns value before last save", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    u.writeAttribute("name", "Bob");
+    u.changesApplied();
+    expect(u.attributePreviouslyWas("name")).toBe("Alice");
+  });
+});
+
+describe("changesToSave", () => {
+  it("returns the changes hash for unsaved attributes", () => {
+    class User extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    User.attribute("name", "string");
+    User.attribute("age", "integer");
+
+    const u = new User({ name: "Alice", age: 25 });
+    u.writeAttribute("name", "Bob");
+    const changes = u.changesToSave;
+    expect(changes["name"]).toEqual(["Alice", "Bob"]);
+    expect(changes["age"]).toBeUndefined();
+  });
+
+  it("returns empty object when no changes", () => {
+    class User extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    User.attribute("name", "string");
+
+    const u = new User({ name: "Alice" });
+    expect(u.changesToSave).toEqual({});
+  });
+});
+
+describe("attributesInDatabase", () => {
+  it("returns database values for changed attributes", () => {
+    class User extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    User.attribute("name", "string");
+    User.attribute("age", "integer");
+
+    const u = new User({ name: "Alice", age: 25 });
+    u.writeAttribute("name", "Bob");
+    u.writeAttribute("age", 30);
+    const dbValues = u.attributesInDatabase;
+    expect(dbValues["name"]).toBe("Alice");
+    expect(dbValues["age"]).toBe(25);
+  });
+
+  it("returns empty object when no changes", () => {
+    class User extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    User.attribute("name", "string");
+
+    const u = new User({ name: "Alice" });
+    expect(u.attributesInDatabase).toEqual({});
+  });
+});
+
+describe("hasChangesToSave", () => {
+  it("returns false when no changes", () => {
+    class User extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    User.attribute("name", "string");
+
+    const u = new User({ name: "Alice" });
+    expect(u.hasChangesToSave).toBe(false);
+  });
+
+  it("returns true when there are unsaved changes", () => {
+    class User extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    User.attribute("name", "string");
+
+    const u = new User({ name: "Alice" });
+    u.writeAttribute("name", "Bob");
+    expect(u.hasChangesToSave).toBe(true);
+  });
+});

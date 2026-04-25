@@ -52,7 +52,7 @@ describe("CallbacksTest", () => {
     expect(p.isValid()).toBe(true);
   });
 
-  it("after_create callbacks with both callbacks declared in different lines", async () => {
+  it("after_create callbacks with both callbacks declared in different lines", () => {
     const log: string[] = [];
     class Person extends Model {
       static {
@@ -917,5 +917,88 @@ describe("afterCommit / afterRollback callbacks", () => {
       }
     }
     expect(new Order({ total: 1 }).isValid()).toBe(true);
+  });
+});
+describe("defineModelCallbacks()", () => {
+  it("creates before/after/around methods for custom events", () => {
+    class Payment extends Model {
+      static {
+        this.attribute("amount", "integer");
+        this.defineModelCallbacks("process", "refund");
+      }
+    }
+
+    const log: string[] = [];
+    (Payment as any).beforeProcess((_record: any) => {
+      log.push("before_process");
+    });
+    (Payment as any).afterProcess((_record: any) => {
+      log.push("after_process");
+    });
+
+    const p = new Payment({ amount: 100 });
+    // Run callbacks manually
+    (Payment as any)._callbackChain.runBefore("process", p);
+    (Payment as any)._callbackChain.runAfter("process", p);
+    expect(log).toEqual(["before_process", "after_process"]);
+  });
+
+  it("creates around callback", () => {
+    class Payment extends Model {
+      static {
+        this.attribute("amount", "integer");
+        this.defineModelCallbacks("charge");
+      }
+    }
+
+    expect(typeof (Payment as any).aroundCharge).toBe("function");
+  });
+});
+
+describe("callbacks with prepend option", () => {
+  it("prepend: true puts callback first in the chain", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const order: string[] = [];
+    User.beforeSave(() => {
+      order.push("first");
+    });
+    User.beforeSave(
+      () => {
+        order.push("prepended");
+      },
+      { prepend: true },
+    );
+
+    const u = new User({ name: "Alice" });
+    (User as any)._callbackChain.runBefore("save", u);
+    expect(order).toEqual(["prepended", "first"]);
+  });
+});
+
+describe("withOptions()", () => {
+  it("applies common validation options to all validates calls", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.attribute("active", "boolean", { default: true });
+      }
+    }
+
+    User.withOptions({ on: "create" }, (m) => {
+      m.validates("name", { presence: true });
+      m.validates("email", { presence: true });
+    });
+
+    // Validations only run with "create" context, not without
+    const user = new User();
+    expect(user.isValid()).toBe(true);
+    expect(user.isValid("create")).toBe(false);
+    expect(user.errors.on("name")).toContain("can't be blank");
+    expect(user.errors.on("email")).toContain("can't be blank");
   });
 });

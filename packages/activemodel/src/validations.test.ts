@@ -510,7 +510,7 @@ describe("ValidationsTest", () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" as any, if: () => true });
+        this.validates("name", { presence: true, on: "create", if: () => true });
       }
     }
     expect(new Person({}).isValid()).toBe(true); // no context
@@ -1915,5 +1915,391 @@ describe("custom messages", () => {
     const long = new Custom({ name: "abcdef" });
     long.isValid();
     expect(long.errors.get("name")).toContain("too many!");
+  });
+});
+describe("errors.fullMessagesFor()", () => {
+  it("full_messages_for contains all the error messages for the given attribute indifferent", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.validates("name", { presence: true });
+        this.validates("email", { presence: true });
+      }
+    }
+    const u = new User({});
+    u.isValid();
+    expect(u.errors.fullMessagesFor("name")).toEqual(["Name can't be blank"]);
+    expect(u.errors.fullMessagesFor("email")).toEqual(["Email can't be blank"]);
+    expect(u.errors.fullMessagesFor("other")).toEqual([]);
+  });
+});
+
+describe("errors.ofKind()", () => {
+  it("of_kind? defaults message to :invalid", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+      }
+    }
+    const u = new User({});
+    u.isValid();
+    expect(u.errors.ofKind("name", "blank")).toBe(true);
+    expect(u.errors.ofKind("name", "invalid")).toBe(false);
+    // Without a type arg, ofKind checks for any error on the attribute.
+    expect(u.errors.ofKind("name")).toBe(true);
+    expect(u.errors.ofKind("other")).toBe(false);
+  });
+});
+
+describe("validators / validatorsOn", () => {
+  it("returns all registered validators", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.validates("name", { presence: true });
+        this.validates("email", { presence: true, length: { minimum: 5 } });
+      }
+    }
+    const validators = User.validators();
+    // presence on name, presence on email, length on email
+    expect(validators.length).toBe(3);
+  });
+
+  it("returns validators for a specific attribute", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.validates("name", { presence: true, length: { minimum: 2, maximum: 50 } });
+        this.validates("email", { presence: true });
+      }
+    }
+    const nameValidators = User.validatorsOn("name");
+    expect(nameValidators.length).toBe(2); // presence + length
+    const emailValidators = User.validatorsOn("email");
+    expect(emailValidators.length).toBe(1); // presence only
+  });
+
+  it("returns empty array for attribute with no validators", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("bio", "string");
+        this.validates("name", { presence: true });
+      }
+    }
+    expect(User.validatorsOn("bio")).toEqual([]);
+  });
+});
+
+describe("custom validation contexts", () => {
+  it("with a class that adds errors on create and validating a new model", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("terms_accepted", "string");
+        this.validates("name", { presence: true });
+        this.validates("terms_accepted", { presence: true, on: "registration" });
+      }
+    }
+    const u = new User({ name: "Alice" });
+    // Without context, terms_accepted validation is skipped
+    expect(u.isValid()).toBe(true);
+    // With custom context, terms_accepted presence validation runs
+    expect(u.isValid("registration")).toBe(false);
+  });
+
+  it("with a class that adds errors on update and validating a new model", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.validates("name", { presence: true });
+        this.validates("email", { presence: true, on: "create" });
+      }
+    }
+    const u = new User({ name: "Alice" });
+    expect(u.isValid("create")).toBe(false);
+    expect(u.isValid("update")).toBe(true);
+  });
+});
+
+describe("Errors enhancements", () => {
+  it("delete removes details on given attribute", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    u.errors.add("name", "blank");
+    u.errors.add("name", "too_short");
+    u.errors.add("email", "blank");
+    const removed = u.errors.delete("name");
+    expect(removed.length).toBe(2);
+    expect(u.errors.count).toBe(1);
+  });
+
+  it("delete with type only removes matching errors", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    u.errors.add("name", "blank");
+    u.errors.add("name", "too_short");
+    const removed = u.errors.delete("name", "blank");
+    expect(removed.length).toBe(1);
+    expect(u.errors.count).toBe(1);
+  });
+
+  it("each iterates over all errors", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    u.errors.add("name", "blank");
+    u.errors.add("email", "invalid");
+    const collected: string[] = [];
+    u.errors.each((e) => collected.push(`${e.attribute}:${e.type}`));
+    expect(collected).toEqual(["name:blank", "email:invalid"]);
+  });
+
+  it("merge errors", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u1 = new User({});
+    const u2 = new User({});
+    u1.errors.add("name", "blank");
+    u2.errors.merge(u1.errors);
+    expect(u2.errors.count).toBe(1);
+    expect(u2.errors.get("name")).toEqual(["can't be blank"]);
+  });
+
+  it("to_hash returns the error messages hash", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    u.errors.add("name", "blank");
+    u.errors.add("name", "too_short");
+    u.errors.add("email", "invalid");
+    const hash = u.errors.toHash();
+    expect(hash.name.length).toBe(2);
+    expect(hash.email.length).toBe(1);
+  });
+
+  it("include?", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    u.errors.add("name", "blank");
+    expect(u.errors.include("name")).toBe(true);
+    expect(u.errors.include("email")).toBe(false);
+  });
+
+  it("messages returns grouped messages", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    u.errors.add("name", "blank");
+    expect(u.errors.messages).toEqual({ name: ["can't be blank"] });
+  });
+
+  it("full_messages creates a list of error messages with the attribute name included", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    expect(u.errors.fullMessage("name", "is required")).toBe("Name is required");
+    expect(u.errors.fullMessage("base", "Something went wrong")).toBe("Something went wrong");
+  });
+});
+
+describe("conditional validates (if/unless)", () => {
+  it("skips validation when if condition returns false", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("requires_name", "boolean");
+        this.validates("name", {
+          presence: true,
+          if: (record: any) => record.readAttribute("requires_name") === true,
+        });
+      }
+    }
+    const u = new User({ requires_name: false });
+    expect(u.isValid()).toBe(true);
+  });
+
+  it("runs validation when if condition returns true", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("requires_name", "boolean");
+        this.validates("name", {
+          presence: true,
+          if: (record: any) => record.readAttribute("requires_name") === true,
+        });
+      }
+    }
+    const u = new User({ requires_name: true });
+    expect(u.isValid()).toBe(false);
+  });
+
+  it("skips validation when unless condition returns true", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("skip_validation", "boolean");
+        this.validates("name", {
+          presence: true,
+          unless: (record: any) => record.readAttribute("skip_validation") === true,
+        });
+      }
+    }
+    const u = new User({ skip_validation: true });
+    expect(u.isValid()).toBe(true);
+  });
+
+  it("runs validation when unless condition returns false", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("skip_validation", "boolean");
+        this.validates("name", {
+          presence: true,
+          unless: (record: any) => record.readAttribute("skip_validation") === true,
+        });
+      }
+    }
+    const u = new User({ skip_validation: false });
+    expect(u.isValid()).toBe(false);
+  });
+});
+
+describe("validates_*_of shorthand methods", () => {
+  it("validate presences", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.validatesPresenceOf("name", "email");
+      }
+    }
+    const u = new User({});
+    expect(u.isValid()).toBe(false);
+    expect(u.errors.get("name").length).toBeGreaterThan(0);
+    expect(u.errors.get("email").length).toBeGreaterThan(0);
+  });
+
+  it("validates absence of", () => {
+    class User extends Model {
+      static {
+        this.attribute("spam", "string");
+        this.validatesAbsenceOf("spam");
+      }
+    }
+    const u = new User({ spam: "not empty" });
+    expect(u.isValid()).toBe(false);
+  });
+
+  it("validatesLengthOf validates length", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validatesLengthOf("name", { minimum: 3 });
+      }
+    }
+    expect(new User({ name: "AB" }).isValid()).toBe(false);
+    expect(new User({ name: "ABC" }).isValid()).toBe(true);
+  });
+
+  it("validatesNumericalityOf validates numericality", () => {
+    class Item extends Model {
+      static {
+        this.attribute("price", "float");
+        this.validatesNumericalityOf("price", { greaterThan: 0 });
+      }
+    }
+    expect(new Item({ price: -1 }).isValid()).toBe(false);
+    expect(new Item({ price: 10 }).isValid()).toBe(true);
+  });
+
+  it("validatesInclusionOf validates inclusion", () => {
+    class User extends Model {
+      static {
+        this.attribute("role", "string");
+        this.validatesInclusionOf("role", { in: ["admin", "user"] });
+      }
+    }
+    expect(new User({ role: "hacker" }).isValid()).toBe(false);
+    expect(new User({ role: "admin" }).isValid()).toBe(true);
+  });
+
+  it("validatesFormatOf validates format", () => {
+    class User extends Model {
+      static {
+        this.attribute("email", "string");
+        this.validatesFormatOf("email", { with: /@/ });
+      }
+    }
+    expect(new User({ email: "nope" }).isValid()).toBe(false);
+    expect(new User({ email: "a@b.com" }).isValid()).toBe(true);
+  });
+
+  it("validatesConfirmationOf validates confirmation", () => {
+    class User extends Model {
+      static {
+        this.attribute("password", "string");
+        this.validatesConfirmationOf("password");
+      }
+    }
+    const u = new User({ password: "secret", passwordConfirmation: "mismatch" });
+    expect(u.isValid()).toBe(false);
+  });
+});
+
+describe("Errors#generateMessage", () => {
+  it("generate_message works without i18n_scope", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    expect(u.errors.generateMessage("name", "blank")).toBe("can't be blank");
+    expect(u.errors.generateMessage("name", "invalid")).toBe("is invalid");
+  });
+
+  it("substitutes options into message", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    expect(u.errors.generateMessage("age", "greater_than", { count: 0 })).toBe(
+      "must be greater than 0",
+    );
   });
 });

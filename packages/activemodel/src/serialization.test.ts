@@ -570,6 +570,95 @@ describe("Serialization", () => {
   });
 });
 
-// =========================================================================
-// Types — Date, DateTime, Decimal
-// =========================================================================
+describe("toXml()", () => {
+  it("serializes model to XML", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    const u = new User({ name: "Alice", age: 30 });
+    const xml = u.toXml();
+    expect(xml).toContain("<user>");
+    expect(xml).toContain("<name>Alice</name>");
+    expect(xml).toContain('<age type="integer">30</age>');
+    expect(xml).toContain("</user>");
+  });
+
+  it("handles null values", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    const xml = u.toXml();
+    expect(xml).toContain('nil="true"');
+  });
+
+  it("supports custom root element", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    const xml = u.toXml({ root: "person" });
+    expect(xml).toContain("<person>");
+    expect(xml).toContain("</person>");
+  });
+});
+
+// ===========================================================================
+// fromJson
+// ===========================================================================
+describe("fromJson", () => {
+  it("from_json should work without a root (class attribute)", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    const u = new User({});
+    u.fromJson('{"name":"Alice","age":30}');
+    expect(u.readAttribute("name")).toBe("Alice");
+    expect(u.readAttribute("age")).toBe(30);
+  });
+
+  it("returns this for chaining", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    const result = u.fromJson('{"name":"Bob"}');
+    expect(result).toBe(u);
+  });
+
+  it("from_json should work with a root (method parameter)", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({});
+    u.fromJson('{"user":{"name":"Charlie"}}', true);
+    expect(u.readAttribute("name")).toBe("Charlie");
+  });
+
+  it("marks attributes as changed via dirty tracking", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Original" });
+    u.changesApplied();
+    u.fromJson('{"name":"Updated"}');
+    expect(u.changed).toBe(true);
+    expect(u.changedAttributes).toContain("name");
+  });
+});

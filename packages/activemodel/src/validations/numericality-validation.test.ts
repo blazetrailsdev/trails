@@ -520,3 +520,38 @@ describe("numericality comparison operators", () => {
     expect(new OT({ count: 0 }).isValid()).toBe(false);
   });
 });
+describe("numericality with in: range", () => {
+  it("validates value is within range", () => {
+    class User extends Model {
+      static {
+        this.attribute("age", "integer");
+        this.validates("age", { numericality: { in: [18, 65] } });
+      }
+    }
+
+    const u1 = new User({ age: 25 });
+    expect(u1.isValid()).toBe(true);
+
+    const u2 = new User({ age: 10 });
+    expect(u2.isValid()).toBe(false);
+    expect(u2.errors.fullMessages.length).toBeGreaterThan(0);
+
+    const u3 = new User({ age: 70 });
+    expect(u3.isValid()).toBe(false);
+  });
+
+  it("accepts boundary values", () => {
+    class User extends Model {
+      static {
+        this.attribute("score", "integer");
+        this.validates("score", { numericality: { in: [0, 100] } });
+      }
+    }
+
+    const u1 = new User({ score: 0 });
+    expect(u1.isValid()).toBe(true);
+
+    const u2 = new User({ score: 100 });
+    expect(u2.isValid()).toBe(true);
+  });
+});

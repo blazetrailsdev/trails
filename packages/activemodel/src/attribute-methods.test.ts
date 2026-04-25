@@ -331,3 +331,118 @@ describe("hasAttribute", () => {
     expect(w.hasAttribute("unknown")).toBe(false);
   });
 });
+describe("attribute method prefix/suffix/affix", () => {
+  it("defines prefixed methods for attributes", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attributeMethodPrefix("clear_");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    expect((u as any)["clear_name"]()).toBe("Alice");
+  });
+
+  it("defines suffixed methods for attributes", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attributeMethodSuffix("_before_type_cast");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    expect((u as any)["name_before_type_cast"]()).toBe("Alice");
+  });
+
+  it("defines affix methods with both prefix and suffix", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attributeMethodAffix({ prefix: "reset_", suffix: "_to_default" });
+      }
+    }
+    const u = new User({ name: "Alice" });
+    expect((u as any)["reset_name_to_default"]()).toBe("Alice");
+  });
+});
+
+describe("respondTo", () => {
+  it("returns true for defined methods", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    expect(u.respondTo("readAttribute")).toBe(true);
+    expect(u.respondTo("isValid")).toBe(true);
+  });
+
+  it("returns true for attributes", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    expect(u.respondTo("name")).toBe(true);
+  });
+
+  it("returns false for non-existent methods/attributes", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    expect(u.respondTo("nonExistentMethod")).toBe(false);
+  });
+});
+
+describe("attributeMissing", () => {
+  it("returns null by default for unknown attributes", () => {
+    class User extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    User.attribute("name", "string");
+
+    const u = new User({ name: "Alice" });
+    expect(u.readAttribute("nonexistent")).toBeNull();
+  });
+
+  it("can be overridden to provide custom behavior", () => {
+    class User extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+      attributeMissing(name: string): unknown {
+        return `missing:${name}`;
+      }
+    }
+    User.attribute("name", "string");
+
+    const u = new User({ name: "Alice" });
+    expect(u.readAttribute("nonexistent")).toBe("missing:nonexistent");
+    // Known attributes still work normally
+    expect(u.readAttribute("name")).toBe("Alice");
+  });
+});
+
+describe("attributeNames (instance)", () => {
+  it("returns the same names as the class method", () => {
+    class User extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    User.attribute("name", "string");
+    User.attribute("age", "integer");
+
+    const u = new User({ name: "Alice", age: 25 });
+    expect(u.attributeNames()).toEqual(User.attributeNames());
+    expect(u.attributeNames()).toContain("name");
+    expect(u.attributeNames()).toContain("age");
+  });
+});

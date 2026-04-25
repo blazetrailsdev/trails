@@ -140,3 +140,40 @@ describe("ConfirmationValidationTest", () => {
     expect(Person._attributeDefinitions.has("emailConfirmation")).toBe(true);
   });
 });
+describe("ConfirmationValidator caseSensitive", () => {
+  it("title confirmation with case sensitive option true", () => {
+    class User extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { confirmation: true });
+      }
+    }
+    const u = new User({ title: "Alice" });
+    u._attributes.set("titleConfirmation", "alice");
+    expect(u.isValid()).toBe(false);
+  });
+
+  it("title confirmation with case sensitive option false", () => {
+    class User extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { confirmation: { caseSensitive: false } });
+      }
+    }
+    const u = new User({ title: "Alice" });
+    u._attributes.set("titleConfirmation", "alice");
+    expect(u.isValid()).toBe(true);
+  });
+
+  it("still fails when values differ with caseSensitive: false", () => {
+    class User extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { confirmation: { caseSensitive: false } });
+      }
+    }
+    const u = new User({ title: "alice" });
+    u._attributes.set("titleConfirmation", "bob");
+    expect(u.isValid()).toBe(false);
+  });
+});
