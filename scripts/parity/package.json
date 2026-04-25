@@ -5,8 +5,9 @@
   "type": "module",
   "description": "Parity-pipeline runner scripts. Workspace package so dump.ts can import @blazetrails/arel directly.",
   "dependencies": {
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/arel": "workspace:*",
-    "@blazetrails/activerecord": "workspace:*",
-    "@blazetrails/activemodel": "workspace:*"
+    "@blazetrails/activerecord": "workspace:*"
   }
 }

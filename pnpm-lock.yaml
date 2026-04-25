@@ -261,6 +261,9 @@ importers:
       '@blazetrails/activerecord':
         specifier: workspace:*
         version: link:../../packages/activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../../packages/activesupport
       '@blazetrails/arel':
         specifier: workspace:*
         version: link:../../packages/arel

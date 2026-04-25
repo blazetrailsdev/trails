@@ -58,5 +58,13 @@
   "ar-44": {
     "side": "diff",
     "reason": "LEFT OUTER JOIN table-name quoting: trails emits 'LEFT OUTER JOIN authors ON ...' (bare table identifier); Rails emits 'LEFT OUTER JOIN \"authors\" ON ...'. Same root cause as ar-01's INNER JOIN quoting gap."
+  },
+  "ar-51": {
+    "side": "diff",
+    "reason": "GROUP BY qualification in string-having query: trails emits 'GROUP BY status' (bare); Rails qualifies to 'GROUP BY \"orders\".\"status\"'. Same root cause as ar-17 / ar-42."
+  },
+  "ar-52": {
+    "side": "diff",
+    "reason": "Datetime serialization in WHERE BETWEEN: trails formats Date as ISO 8601 ('1999-12-25T00:00:00.000Z'); Rails formats as SQL datetime ('1999-12-25 00:00:00'). The T separator, milliseconds, and Z suffix are wrong for standard SQL datetime literals."
   }
 }
