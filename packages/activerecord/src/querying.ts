@@ -129,7 +129,7 @@ export function from<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#select */
 export function select<T extends typeof Base>(
   this: T,
-  ...columns: string[]
+  ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
 ): Relation<InstanceType<T>> {
   return this.all().select(...columns);
 }

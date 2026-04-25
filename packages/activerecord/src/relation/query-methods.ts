@@ -152,9 +152,12 @@ function withRecursiveBang(this: QueryMethodsHost, ...ctes: Array<Record<string,
 }
 
 function reselectBang(this: QueryMethodsHost, ...columns: any[]): any {
-  this._selectColumns = columns.map((c: any) =>
-    typeof c === "object" && c !== null && "value" in c ? c : String(c),
-  );
+  this._selectColumns = columns.map((c: any) => {
+    if (c instanceof Nodes.Node) return c;
+    if (typeof c === "object" && c !== null && "value" in c)
+      return new Nodes.SqlLiteral((c as { value: string }).value);
+    return String(c);
+  });
   return this;
 }
 
@@ -166,17 +169,49 @@ function reselectBang(this: QueryMethodsHost, ...columns: any[]): any {
  */
 function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   const flat = columns.flat(Infinity);
-  const normalized = flat.map((c: any) =>
-    typeof c === "object" && c !== null && "value" in c ? c : String(c),
-  );
+  const normalized = flat.map((c: any) => {
+    if (c instanceof Nodes.Node) return c;
+    if (typeof c === "object" && c !== null && "value" in c)
+      return new Nodes.SqlLiteral((c as { value: string }).value);
+    return String(c);
+  });
   if (this._selectColumns === null) this._selectColumns = [];
-  const keyOf = (c: unknown) => (typeof c === "string" ? c : (c as { value: string }).value);
-  const seen = new Set(this._selectColumns.map(keyOf));
+  const seenStrings = new Set<string>();
+  const seenNodeHashes = new Map<number, Nodes.Node[]>();
+  const nodeIsDuplicate = (node: Nodes.Node): boolean => {
+    const h = node.hash();
+    const bucket = seenNodeHashes.get(h);
+    if (!bucket) return false;
+    return bucket.some((n) => n.eql(node));
+  };
+  const addNodeToSeen = (node: Nodes.Node): void => {
+    const h = node.hash();
+    const bucket = seenNodeHashes.get(h);
+    if (bucket) bucket.push(node);
+    else seenNodeHashes.set(h, [node]);
+  };
+  for (const existing of this._selectColumns) {
+    if (typeof existing === "string") seenStrings.add(existing);
+    else if (existing instanceof Nodes.Node) addNodeToSeen(existing);
+    else seenStrings.add((existing as { value: string }).value);
+  }
   for (const col of normalized) {
-    const key = keyOf(col);
-    if (!seen.has(key)) {
-      this._selectColumns.push(col);
-      seen.add(key);
+    if (typeof col === "string") {
+      if (!seenStrings.has(col)) {
+        this._selectColumns.push(col);
+        seenStrings.add(col);
+      }
+    } else if (col instanceof Nodes.Node) {
+      if (!nodeIsDuplicate(col)) {
+        this._selectColumns.push(col);
+        addNodeToSeen(col);
+      }
+    } else {
+      const key = (col as { value: string }).value;
+      if (!seenStrings.has(key)) {
+        this._selectColumns.push(col);
+        seenStrings.add(key);
+      }
     }
   }
   return this;

@@ -104,7 +104,7 @@ export class Relation<T extends Base> {
   private _rawOrderClauses: string[] = [];
   private _limitValue: number | null = null;
   private _offsetValue: number | null = null;
-  private _selectColumns: (string | Nodes.SqlLiteral)[] | null = null;
+  private _selectColumns: (string | Nodes.Node)[] | null = null;
   private _isDistinct = false;
   private _distinctOnColumns: string[] = [];
   private _groupColumns: string[] = [];
@@ -116,7 +116,12 @@ export class Relation<T extends Base> {
     type: "union" | "unionAll" | "intersect" | "except";
     other: Relation<T>;
   } | null = null;
-  private _joinClauses: Array<{ type: "inner" | "left"; table: string; on: string }> = [];
+  private _joinClauses: Array<{
+    type: "inner" | "left";
+    table: string;
+    on: string;
+    quoted?: boolean;
+  }> = [];
   private _rawJoins: string[] = [];
   private _includesAssociations: string[] = [];
   private _preloadAssociations: string[] = [];
@@ -557,12 +562,12 @@ export class Relation<T extends Base> {
    *   select(record => record.active)   // block form (returns array)
    */
   select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...columns: (string | Nodes.SqlLiteral)[]): Relation<T>;
+  select(...columns: (string | Nodes.Node)[]): Relation<T>;
   select(...args: any[]): Relation<T> | Promise<T[]> {
     if (args.length === 1 && typeof args[0] === "function") {
       return this.toArray().then((records) => records.filter(args[0]));
     }
-    const columns = args.map((a: any) => (a instanceof Nodes.SqlLiteral ? a : String(a)));
+    const columns = args.map((a: any) => (a instanceof Nodes.Node ? a : String(a)));
     return this._clone()._selectBang(...columns);
   }
 
@@ -571,7 +576,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#reselect
    */
-  reselect(...columns: (string | Nodes.SqlLiteral)[]): Relation<T> {
+  reselect(...columns: (string | Nodes.Node)[]): Relation<T> {
     return this._clone().reselectBang(...columns);
   }
 
@@ -708,7 +713,11 @@ export class Relation<T extends Base> {
     }
     if (this._selectColumns !== null) {
       const cols = this._selectColumns.map((c) =>
-        c instanceof Nodes.SqlLiteral ? `sql(${JSON.stringify(c.value)})` : JSON.stringify(c),
+        c instanceof Nodes.SqlLiteral
+          ? `sql(${JSON.stringify(c.value)})`
+          : c instanceof Nodes.Node
+            ? `sql(${JSON.stringify(c.toSql())})`
+            : JSON.stringify(c),
       );
       parts.push(`.select(${cols.join(", ")})`);
     }
@@ -913,10 +922,15 @@ export class Relation<T extends Base> {
       if (resolved) {
         if (Array.isArray(resolved)) {
           for (const join of resolved) {
-            rel._joinClauses.push({ type: "inner", table: join.table, on: join.on });
+            rel._joinClauses.push({ type: "inner", table: join.table, on: join.on, quoted: true });
           }
         } else {
-          rel._joinClauses.push({ type: "inner", table: resolved.table, on: resolved.on });
+          rel._joinClauses.push({
+            type: "inner",
+            table: resolved.table,
+            on: resolved.on,
+            quoted: true,
+          });
         }
       } else {
         rel._rawJoins.push(tableOrSql);
@@ -940,10 +954,15 @@ export class Relation<T extends Base> {
       if (resolved) {
         if (Array.isArray(resolved)) {
           for (const join of resolved) {
-            rel._joinClauses.push({ type: "left", table: join.table, on: join.on });
+            rel._joinClauses.push({ type: "left", table: join.table, on: join.on, quoted: true });
           }
         } else {
-          rel._joinClauses.push({ type: "left", table: resolved.table, on: resolved.on });
+          rel._joinClauses.push({
+            type: "left",
+            table: resolved.table,
+            on: resolved.on,
+            quoted: true,
+          });
         }
       } else {
         rel._joinClauses.push({ type: "left", table, on: "1=1" });
@@ -1970,11 +1989,12 @@ export class Relation<T extends Base> {
 
   private _applyJoinsToManager(manager: SelectManager): void {
     for (const join of this._joinClauses) {
+      const tableNode = join.quoted ? new Table(join.table) : join.table;
       const onNode = new Nodes.SqlLiteral(join.on);
       if (join.type === "inner") {
-        manager.join(join.table, onNode);
+        manager.join(tableNode, onNode);
       } else {
-        manager.outerJoin(join.table, onNode);
+        manager.outerJoin(tableNode, onNode);
       }
     }
     for (const rawJoin of this._rawJoins) {
@@ -2475,7 +2495,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#select_values
    */
-  get selectValues(): (string | Nodes.SqlLiteral)[] {
+  get selectValues(): (string | Nodes.Node)[] {
     return this._selectColumns ?? [];
   }
 
@@ -2694,7 +2714,7 @@ export class Relation<T extends Base> {
   private _buildProjections(table: Table): any[] {
     if (this._selectColumns) {
       return this._selectColumns.map((c) => {
-        if (c instanceof Nodes.SqlLiteral) return c;
+        if (c instanceof Nodes.Node) return c;
         if (/[(*\s]/.test(c)) return new Nodes.SqlLiteral(c);
         return table.get(c);
       });

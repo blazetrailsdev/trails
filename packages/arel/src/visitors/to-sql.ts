@@ -1252,10 +1252,14 @@ export class ToSql implements NodeVisitor<SQLString> {
   }
 
   private visitTable(node: Table): SQLString {
+    const quoted = node.name
+      .split(".")
+      .map((p) => `"${p}"`)
+      .join(".");
     if (node.tableAlias) {
-      this.collector.append(`"${node.name}" "${node.tableAlias}"`);
+      this.collector.append(`${quoted} "${node.tableAlias}"`);
     } else {
-      this.collector.append(`"${node.name}"`);
+      this.collector.append(quoted);
     }
     return this.collector;
   }

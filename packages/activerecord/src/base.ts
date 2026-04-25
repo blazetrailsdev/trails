@@ -8,6 +8,7 @@ import {
   DeleteManager,
   Nodes,
   sql as arelSql,
+  setToSqlVisitor,
 } from "@blazetrails/arel";
 import type { DatabaseAdapter } from "./adapter.js";
 import type { Relation } from "./relation.js";
@@ -208,6 +209,20 @@ export function _setScopeProxyWrapper(wrapper: (rel: any) => any): void {
 let _onAdapterSet: ((modelClass: any) => void) | null = null;
 export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): void {
   _onAdapterSet = hook;
+}
+
+// Mirrors Rails' AbstractAdapter#arel_visitor — routes Node#toSql() through the
+// dialect-specific visitor (e.g. SQLite booleans as 1/0, no FOR UPDATE, etc.).
+// This is process-global: the last-assigned adapter's visitor wins, matching
+// Rails' single-connection-per-process assumption. Multi-adapter processes must
+// manage visitor selection themselves.
+function _wireArelVisitor(adapter: DatabaseAdapter): void {
+  const visitor = (adapter as { arelVisitor?: object }).arelVisitor;
+  if (visitor) {
+    setToSqlVisitor(
+      (visitor as object).constructor as new () => { compile(node: Nodes.Node): string },
+    );
+  }
 }
 
 /**
@@ -644,6 +659,7 @@ export class Base extends Model {
       return;
     }
     this._adapter = adapter;
+    _wireArelVisitor(adapter);
     if (_onAdapterSet) _onAdapterSet(this);
 
     // Full schema reset on adapter swap: drops schema-sourced defs and
@@ -713,6 +729,7 @@ export class Base extends Model {
     const modelPool = this._connectionHandler.retrieveConnectionPool(this.name);
     if (modelPool) {
       this._adapter = modelPool.checkout();
+      _wireArelVisitor(this._adapter);
       if (_onAdapterSet) _onAdapterSet(this);
       return this._adapter;
     }
@@ -724,6 +741,7 @@ export class Base extends Model {
     if (connPool) {
       if (!connectionClass._adapter) {
         connectionClass._adapter = connPool.checkout();
+        _wireArelVisitor(connectionClass._adapter);
         if (_onAdapterSet) _onAdapterSet(connectionClass);
       }
       return connectionClass._adapter;

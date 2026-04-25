@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, Relation, IrreversibleOrderError } from "./index.js";
+import { Associations, registerModel, modelRegistry } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -116,6 +117,18 @@ describe("RelationTest", () => {
     // reselect replaces previous select
     const sql = Post.select("title").reselect("body").toSql();
     expect(sql).toContain("body");
+  });
+
+  it("select with arel node emits SQL alias", () => {
+    class Book extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const sql = Book.select(Book.arelTable.get("title").as("t")).toSql();
+    expect(sql).toContain('"title" AS t');
+    expect(sql).not.toContain("[object Object]");
   });
 
   it("find_by with hash conditions returns the first matching record", async () => {
@@ -351,6 +364,35 @@ describe("RelationTest", () => {
     }
     const sql = Post.all().annotate("counting").toSql();
     expect(sql).toContain("counting");
+  });
+
+  it("association join quotes the table name", () => {
+    const adp = freshAdapter();
+    class Comment extends Base {
+      static _tableName = "comments";
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adp;
+      }
+    }
+    class Post extends Base {
+      static _tableName = "posts";
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        Associations.hasMany.call(this, "comments", {
+          className: "Comment",
+          foreignKey: "post_id",
+        });
+      }
+    }
+    registerModel("Comment", Comment);
+    try {
+      const sql = Post.joins("comments").toSql();
+      expect(sql).toContain('INNER JOIN "comments"');
+    } finally {
+      modelRegistry.delete("Comment");
+    }
   });
 
   it("joins with string array", () => {

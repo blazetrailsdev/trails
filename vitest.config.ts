@@ -39,8 +39,9 @@ export default defineConfig({
       "scripts/parity/**/*.test.ts",
     ],
     exclude: ["**/node_modules/**", "**/dist/**", "packages/website/**", "packages/*/dx-tests/**"],
-    setupFiles: process.env.MYSQL_TEST_URL
-      ? ["./packages/activerecord/src/test-setup-mysql.ts"]
-      : [],
+    setupFiles: [
+      "./packages/activerecord/src/test-setup.ts",
+      ...(process.env.MYSQL_TEST_URL ? ["./packages/activerecord/src/test-setup-mysql.ts"] : []),
+    ],
   },
 });
