@@ -225,16 +225,21 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   }
 
   private encrypt(value: string): string {
-    return this._encryptor.encrypt(value, this.encryptionOptions());
+    // When fixed (default for deterministic), use the oldest previous scheme so
+    // existing ciphertexts remain stable across key rotations. When fixed: false,
+    // use the current (newest) scheme. Mirrors Rails' Scheme#oldest_encryption_scheme.
+    const encryptingScheme =
+      this.scheme.isFixed() && this.scheme.previousSchemes.length > 0
+        ? this.scheme.previousSchemes[this.scheme.previousSchemes.length - 1]
+        : this.scheme;
+    return encryptingScheme.encryptor.encrypt(value, this._encryptionOptionsFor(encryptingScheme));
   }
 
-  private encryptionOptions(): Record<string, unknown> {
+  private _encryptionOptionsFor(scheme: Scheme): Record<string, unknown> {
     const opts: Record<string, unknown> = {
-      deterministic: this.scheme.deterministic,
+      deterministic: scheme.deterministic,
     };
-    // Mirror Rails: only pass key_provider, never the raw key.
-    // scheme.keyProvider auto-derives from key: or deterministic: if needed.
-    const kp = this.scheme.keyProvider;
+    const kp = scheme.keyProvider;
     if (kp != null) opts.keyProvider = kp;
     return opts;
   }

@@ -61,6 +61,7 @@ export interface SchemeOptions {
   keyProvider?: unknown;
   key?: string;
   deterministic?: boolean;
+  fixed?: boolean;
   supportUnencryptedData?: boolean;
   downcase?: boolean;
   ignoreCase?: boolean;
@@ -126,8 +127,11 @@ export class Scheme {
     return this._opts.supportUnencryptedData ?? Configurable.config.supportUnencryptedData;
   }
 
+  // fixed: true (default for deterministic) → serialize uses the oldest previous
+  // scheme so existing deterministic ciphertexts remain stable across key rotations.
+  // fixed: false → serialize always uses the current (newest) scheme.
   isFixed(): boolean {
-    return this.deterministic;
+    return this._opts.fixed ?? this.deterministic;
   }
 
   merge(other: Scheme): Scheme {
@@ -152,6 +156,7 @@ export class Scheme {
     if (o.keyProvider !== undefined) opts.keyProvider = o.keyProvider;
     if (o.key !== undefined) opts.key = o.key;
     if (o.deterministic !== undefined) opts.deterministic = o.deterministic;
+    if (o.fixed !== undefined) opts.fixed = o.fixed;
     if (o.downcase !== undefined) opts.downcase = o.downcase;
     if (o.ignoreCase !== undefined) opts.ignoreCase = o.ignoreCase;
     if (o.previousSchemes !== undefined) opts.previousSchemes = o.previousSchemes;

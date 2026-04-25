@@ -6,6 +6,12 @@ import { Decryption as DecryptionError } from "./errors.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import type { SchemeOptions } from "./scheme.js";
+import { installExtendedQueriesIfConfigured } from "./install.js";
+import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
+import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
+import { Relation } from "../relation.js";
+import { Base } from "../index.js";
+import { UniquenessValidator } from "../validations.js";
 import {
   freshAdapter,
   configureEncryption,
@@ -233,11 +239,141 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     expect(() => type.deserialize("some invalid ciphertext")).toThrow(DecryptionError);
   });
 
-  it.skip("deterministic encryption is fixed by default: it will always use the oldest scheme to encrypt data", () => {});
-  it.skip("don't use global previous schemes with a different deterministic nature", () => {});
-  it.skip("deterministic encryption will use the newest encryption scheme to encrypt data when setting it to { fixed: false }", () => {});
-  it.skip("use global previous schemes when performing queries", () => {});
-  it.skip("don't use global previous schemes with a different deterministic nature when performing queries", () => {});
+  it("deterministic encryption is fixed by default: it will always use the oldest scheme to encrypt data", () => {
+    Configurable.config.supportUnencryptedData = false;
+    const oldEncryptor = new TestEncryptor({ alice: "alice_old_cipher" });
+    const currentEncryptor = new TestEncryptor({ alice: "alice_new_cipher" });
+    const oldScheme = new Scheme({ encryptor: oldEncryptor, deterministic: true });
+    const type = new EncryptedAttributeType({
+      scheme: new Scheme({
+        encryptor: currentEncryptor,
+        deterministic: true,
+        previousSchemes: [oldScheme],
+      }),
+    });
+    // fixed: true by default for deterministic → serialize uses oldest scheme
+    const cipher = type.serialize("alice") as string;
+    expect(cipher).toBe("alice_old_cipher");
+    // decrypt path falls back: current can't decrypt it, oldest can
+    expect(type.deserialize(cipher)).toBe("alice");
+  });
+
+  it("don't use global previous schemes with a different deterministic nature", () => {
+    Configurable.config.supportUnencryptedData = false;
+    Configurable.config.previousSchemes = [];
+    Configurable.config.previous = [
+      { encryptor: new TestEncryptor({ det: "cipher_det" }), deterministic: true } as SchemeOptions,
+      { encryptor: new TestEncryptor({ nondet: "cipher_nondet" }) } as SchemeOptions,
+    ];
+
+    const modelClass = { _attributeDefinitions: new Map() };
+    // Non-deterministic attribute — only the non-deterministic global scheme is compatible.
+    EncryptableRecord.encrypts(modelClass, "name", {
+      encryptor: new TestEncryptor({ current: "current_cipher" }),
+    });
+
+    const type = modelClass._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
+    expect(type.previousTypes).toHaveLength(1);
+    expect(type.deserialize("cipher_nondet")).toBe("nondet");
+    expect(() => type.deserialize("cipher_det")).toThrow(DecryptionError);
+  });
+
+  it("deterministic encryption will use the newest encryption scheme to encrypt data when setting it to { fixed: false }", () => {
+    Configurable.config.supportUnencryptedData = false;
+    const oldEncryptor = new TestEncryptor({ alice: "alice_old_cipher" });
+    const currentEncryptor = new TestEncryptor({ alice: "alice_new_cipher" });
+    const oldScheme = new Scheme({ encryptor: oldEncryptor, deterministic: true });
+    const type = new EncryptedAttributeType({
+      scheme: new Scheme({
+        encryptor: currentEncryptor,
+        deterministic: true,
+        fixed: false,
+        previousSchemes: [oldScheme],
+      }),
+    });
+    // fixed: false → serialize uses current (newest) scheme
+    const cipher = type.serialize("alice") as string;
+    expect(cipher).toBe("alice_new_cipher");
+    expect(type.deserialize(cipher)).toBe("alice");
+  });
+
+  it("use global previous schemes when performing queries", async () => {
+    Configurable.config.supportUnencryptedData = false;
+    const savedExtendQueries = Configurable.config.extendQueries;
+
+    // Snapshot prototype methods before installing query patches (mirrors uniqueness-validations.test.ts).
+    const savedMethods = {
+      where: Relation.prototype.where,
+      exists: (Relation.prototype as any).exists,
+      scopeForCreate: (Relation.prototype as any).scopeForCreate,
+      findBy: (Base as any).findBy,
+      serialize: EncryptedAttributeType.prototype.serialize,
+    };
+
+    Configurable.config.extendQueries = true;
+    installExtendedQueriesIfConfigured();
+    try {
+      const prevEncryptor = new TestEncryptor({ alice: "alice_prev_cipher" });
+      const currentEncryptor = new TestEncryptor({ alice: "alice_cur_cipher" });
+
+      // fixed: false so the attribute stores with the current cipher ("alice_cur_cipher").
+      // The raw row uses the prev cipher ("alice_prev_cipher"), which is only findable
+      // if query expansion includes the global previous scheme — proving the expansion works.
+      Configurable.config.previousSchemes = [];
+      Configurable.config.previous = [
+        { encryptor: prevEncryptor, deterministic: true } as SchemeOptions,
+      ];
+
+      const adp = freshAdapter();
+      const Author = makeFreshModel(adp, { id: "integer", name: "string" });
+      Author.encrypts("name", { encryptor: currentEncryptor, deterministic: true, fixed: false });
+      new Author();
+
+      // Insert a row encrypted with the previous scheme directly (legacy row).
+      const Raw = makeFreshModel(adp, { id: "integer", name: "string" });
+      Raw._tableName = Author._tableName;
+      new Raw();
+      await Raw.create({ name: "alice_prev_cipher" });
+
+      // Without query expansion, findBy would only search for "alice_cur_cipher" and miss
+      // the row. With expansion, the prev-scheme ciphertext is also included → found.
+      const found = await Author.findBy({ name: "alice" });
+      expect(found).not.toBeNull();
+      expect(found!.name).toBe("alice");
+    } finally {
+      Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;
+      (Relation.prototype as any).exists = savedMethods.exists;
+      (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
+      (Base as any).findBy = savedMethods.findBy;
+      EncryptedAttributeType.prototype.serialize =
+        savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
+      (ExtendedDeterministicQueries as any)._installed = false;
+      ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
+      Configurable.config.extendQueries = savedExtendQueries;
+    }
+  });
+
+  it("don't use global previous schemes with a different deterministic nature when performing queries", () => {
+    Configurable.config.supportUnencryptedData = false;
+    Configurable.config.previousSchemes = [];
+    Configurable.config.previous = [
+      { encryptor: new TestEncryptor({ det: "cipher_det" }), deterministic: true } as SchemeOptions,
+      { encryptor: new TestEncryptor({ nondet: "cipher_nondet" }) } as SchemeOptions,
+    ];
+
+    const modelClass = { _attributeDefinitions: new Map() };
+    // Deterministic attribute — only the deterministic global scheme is compatible.
+    EncryptableRecord.encrypts(modelClass, "name", {
+      encryptor: new TestEncryptor({ current: "current_cipher" }),
+      deterministic: true,
+    });
+
+    const type = modelClass._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
+    // Only the deterministic global previous scheme is wired in.
+    expect(type.previousTypes).toHaveLength(1);
+    expect(type.deserialize("cipher_det")).toBe("det");
+    expect(() => type.deserialize("cipher_nondet")).toThrow(DecryptionError);
+  });
 });
 
 describe("global previous schemes wiring — config.previous → EncryptableRecord.encrypts", () => {
