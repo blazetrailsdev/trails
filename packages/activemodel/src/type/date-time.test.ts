@@ -36,3 +36,19 @@ describe("DateTimeTest", () => {
     expect(serialized).toEqual(cast);
   });
 });
+describe("DateTimeType", () => {
+  const type = new Types.DateTimeType();
+
+  it("has name 'datetime'", () => {
+    expect(type.name).toBe("datetime");
+  });
+
+  it("casts null to null", () => {
+    expect(type.cast(null)).toBe(null);
+  });
+
+  it("casts Date to Date", () => {
+    const d = new Date("2024-01-15T10:30:00Z");
+    expect(type.cast(d)).toBe(d);
+  });
+});

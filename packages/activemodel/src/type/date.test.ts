@@ -67,3 +67,37 @@ describe("DateTest", () => {
     expect(d!.getUTCFullYear()).toBe(2024);
   });
 });
+describe("DateType", () => {
+  const type = new Types.DateType();
+
+  it("has name 'date'", () => {
+    expect(type.name).toBe("date");
+  });
+
+  it("casts Date to Date", () => {
+    const d = new Date("2024-01-15");
+    expect(type.cast(d)).toBe(d);
+  });
+
+  it("casts null to null", () => {
+    expect(type.cast(null)).toBe(null);
+  });
+
+  it("casts undefined to null", () => {
+    expect(type.cast(undefined)).toBe(null);
+  });
+
+  it("casts invalid string to null", () => {
+    expect(type.cast("not-a-date")).toBe(null);
+  });
+
+  it("deserialize delegates to cast", () => {
+    const result = type.deserialize("2024-01-15");
+    expect(result).toBeInstanceOf(Date);
+  });
+
+  it("serialize delegates to cast", () => {
+    const result = type.serialize("2024-01-15");
+    expect(result).toBeInstanceOf(Date);
+  });
+});

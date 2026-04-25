@@ -207,3 +207,26 @@ describe("InclusionValidationTest", () => {
     expect(new Person({ role: "guest" }).isValid()).toBe(false);
   });
 });
+describe("inclusion allowNil", () => {
+  it("validates inclusion of with allow nil", () => {
+    // Mirrors Rails inclusion_validation_test.rb#test_validates_inclusion_of_with_allow_nil
+    // which sets `allow_nil: true` explicitly.
+    class WithNil extends Model {
+      static {
+        this.attribute("status", "string");
+        this.validates("status", { inclusion: { in: ["a", "b"], allowNil: true } });
+      }
+    }
+    expect(new WithNil({}).isValid()).toBe(true);
+  });
+
+  it("validates nil when allowNil is false", () => {
+    class NoNil extends Model {
+      static {
+        this.attribute("status", "string");
+        this.validates("status", { inclusion: { in: ["a", "b"], allowNil: false } });
+      }
+    }
+    expect(new NoNil({}).isValid()).toBe(false);
+  });
+});

@@ -192,3 +192,21 @@ describe("FormatValidationTest", () => {
     expect(new Person({ email: "invalid" }).isValid()).toBe(false);
   });
 });
+describe("format with 'without' option", () => {
+  class NoNumbers extends Model {
+    static {
+      this.attribute("name", "string");
+      this.validates("name", { format: { without: /\d/ } });
+    }
+  }
+
+  it("accepts values not matching 'without'", () => {
+    expect(new NoNumbers({ name: "dean" }).isValid()).toBe(true);
+  });
+
+  it("rejects values matching 'without'", () => {
+    const n = new NoNumbers({ name: "dean123" });
+    expect(n.isValid()).toBe(false);
+    expect(n.errors.get("name")).toContain("is invalid");
+  });
+});

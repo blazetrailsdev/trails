@@ -475,3 +475,48 @@ describe("NumericalityValidationTest", () => {
     expect(new Person({ value: "0" }).isValid()).toBe(false);
   });
 });
+describe("numericality comparison operators", () => {
+  it("validates numericality with greater than or equal", () => {
+    class GTE extends Model {
+      static {
+        this.attribute("age", "integer");
+        this.validates("age", { numericality: { greaterThanOrEqualTo: 18 } });
+      }
+    }
+    expect(new GTE({ age: 18 }).isValid()).toBe(true);
+    expect(new GTE({ age: 17 }).isValid()).toBe(false);
+  });
+
+  it("validates numericality with less than or equal to", () => {
+    class LTE extends Model {
+      static {
+        this.attribute("rating", "integer");
+        this.validates("rating", { numericality: { lessThanOrEqualTo: 5 } });
+      }
+    }
+    expect(new LTE({ rating: 5 }).isValid()).toBe(true);
+    expect(new LTE({ rating: 6 }).isValid()).toBe(false);
+  });
+
+  it("validates numericality with equal to", () => {
+    class EQ extends Model {
+      static {
+        this.attribute("answer", "integer");
+        this.validates("answer", { numericality: { equalTo: 42 } });
+      }
+    }
+    expect(new EQ({ answer: 42 }).isValid()).toBe(true);
+    expect(new EQ({ answer: 41 }).isValid()).toBe(false);
+  });
+
+  it("validates numericality with other than", () => {
+    class OT extends Model {
+      static {
+        this.attribute("count", "integer");
+        this.validates("count", { numericality: { otherThan: 0 } });
+      }
+    }
+    expect(new OT({ count: 1 }).isValid()).toBe(true);
+    expect(new OT({ count: 0 }).isValid()).toBe(false);
+  });
+});

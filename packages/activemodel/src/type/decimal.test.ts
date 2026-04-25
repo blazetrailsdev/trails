@@ -106,3 +106,35 @@ describe("DecimalTest", () => {
     expect(Number(result)).toBeCloseTo(0.3333333333);
   });
 });
+describe("DecimalType", () => {
+  const type = new Types.DecimalType();
+
+  it("has name 'decimal'", () => {
+    expect(type.name).toBe("decimal");
+  });
+
+  it("type cast decimal", () => {
+    expect(type.cast(42.5)).toBe("42.5");
+  });
+
+  it("casts string number to string", () => {
+    expect(type.cast("3.14")).toBe("3.14");
+  });
+
+  it("casts integer to string", () => {
+    expect(type.cast(100)).toBe("100");
+  });
+
+  it("casts null to null", () => {
+    expect(type.cast(null)).toBe(null);
+  });
+
+  it("type cast decimal from invalid string", () => {
+    // Mirrors Rails decimal_test.rb — "" nils out; leading-numeric
+    // prefix is kept; no-numeric-prefix returns BigDecimal(0).
+    expect(type.cast("")).toBe(null);
+    expect(type.cast("1ignore")).toBe("1");
+    expect(type.cast("bad1")).toBe("0");
+    expect(type.cast("bad")).toBe("0");
+  });
+});

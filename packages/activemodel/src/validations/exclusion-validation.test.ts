@@ -123,3 +123,14 @@ describe("ExclusionValidationTest", () => {
     expect(new Person({ status: "banned" }).isValid()).toBe(false);
   });
 });
+describe("exclusion allowNil", () => {
+  it("skips nil by default", () => {
+    class WithNil extends Model {
+      static {
+        this.attribute("role", "string");
+        this.validates("role", { exclusion: { in: ["admin"] } });
+      }
+    }
+    expect(new WithNil({}).isValid()).toBe(true);
+  });
+});

@@ -184,3 +184,14 @@ describe("AcceptanceValidationTest", () => {
     expect(Agreement._attributeDefinitions.get("terms")!.virtual).toBeUndefined();
   });
 });
+describe("acceptance skips nil", () => {
+  it("skips nil by default", () => {
+    class Terms extends Model {
+      static {
+        this.attribute("terms", "string");
+        this.validates("terms", { acceptance: true });
+      }
+    }
+    expect(new Terms({}).isValid()).toBe(true);
+  });
+});
