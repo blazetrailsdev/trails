@@ -6833,4 +6833,6 @@ describe("RelationTest", () => {
     }
     expect(Post.where({ title: "" })).toBeInstanceOf(Relation);
   });
+
+  it.skip("loading with one association with non preload", () => {});
 });

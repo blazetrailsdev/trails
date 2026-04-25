@@ -13,7 +13,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.close();
   });
 
-  describe("PostgreSQLVirtualColumnTest", () => {
+  describe("PostgresqlVirtualColumnTest", () => {
     it.skip("virtual column", async () => {});
     it.skip("virtual column default", async () => {});
     it.skip("virtual column type cast", async () => {});
@@ -25,6 +25,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it.skip("virtual column with full inserts", () => {});
     it.skip("stored column", () => {});
     it.skip("change table", () => {});
+    it.skip("build fixture sql", () => {});
   });
 
   describe("PostgresqlXmlTest", () => {

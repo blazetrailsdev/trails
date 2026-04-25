@@ -4069,6 +4069,32 @@ describe("EagerAssociationTest", () => {
     expect(receipt).not.toBeNull();
     expect(receipt.number).toBe("R001");
   });
+
+  it.skip("preloading too many ids", () => {});
+  it.skip("eager loading too many ids", () => {});
+  it.skip("eager with has one through join model with conditions on the through", () => {});
+  it.skip("loading with one association with non preload", () => {});
+  it.skip("loading with multiple associations", () => {});
+  it.skip("including duplicate objects from has many", () => {});
+  it.skip("associations loaded for all records", () => {});
+  it.skip("loading from an association that has a hash of conditions", () => {});
+  it.skip("loading with no associations", () => {});
+  it.skip("eager association loading with belongs to", () => {});
+  it.skip("eager with has one dependent does not destroy dependent", () => {});
+  it.skip("preconfigured includes with belongs to", () => {});
+  it.skip("preconfigured includes with has many", () => {});
+  it.skip("preload belongs to uses exclusive scope", () => {});
+  it.skip("preload has many uses exclusive scope", () => {});
+  it.skip("preload has one using primary key", () => {});
+  it.skip("include has one using primary key", () => {});
+  it.skip("preloading empty belongs to", () => {});
+  it.skip("deep preload", () => {});
+  it.skip("preloading the same association twice works", () => {});
+});
+
+describe("EagerLoadingTooManyIdsTest", () => {
+  it.skip("preloading too many ids", () => {});
+  it.skip("eager loading too many ids", () => {});
 });
 
 // ==========================================================================

@@ -290,3 +290,16 @@ describe("password reset token", () => {
     expect((user as any).passwordResetToken).toBeUndefined();
   });
 });
+
+describe("SecurePasswordTest", () => {
+  it.skip("authenticate_by authenticates when password is correct", () => {});
+  it.skip("authenticate_by does not authenticate when password is incorrect", () => {});
+  it.skip("authenticate_by takes the same amount of time regardless of whether record is found", () => {});
+  it.skip("authenticate_by short circuits when password is nil", () => {});
+  it.skip("authenticate_by short circuits when password is an empty string", () => {});
+  it.skip("authenticate_by finds record using multiple attributes", () => {});
+  it.skip("authenticate_by authenticates using multiple passwords", () => {});
+  it.skip("authenticate_by requires at least one password", () => {});
+  it.skip("authenticate_by requires at least one attribute", () => {});
+  it.skip("authenticate_by accepts any object that implements to_h", () => {});
+});

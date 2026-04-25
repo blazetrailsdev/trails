@@ -498,6 +498,10 @@ describe("AggregationsTest", () => {
   it.skip("allow nil set address attributes to nil", () => {});
   it.skip("nil raises error when allow nil is false", () => {});
   it.skip("nil return from converter is respected when allow nil is true", () => {});
+  it.skip("nil return from converter results in failure when allow nil is false", () => {});
+  it.skip("do not run the converter when nil was set", () => {});
+  it.skip("assigning hash to custom converter", () => {});
+  it.skip("assigning hash without custom converter", () => {});
 });
 
 describe("OverridingAggregationsTest", () => {

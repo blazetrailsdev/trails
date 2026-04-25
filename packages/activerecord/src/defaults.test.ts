@@ -14,17 +14,15 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("MysqlDefaultExpressionTest", () => {
-  // MySQL-specific default expression tests require a MySQL adapter.
-  // MemoryAdapter does not support SQL default expressions; these remain skipped.
-  it.skip("schema dump includes default expression — requires MySQL adapter", () => {});
-  it.skip("schema dump includes default expression with single quotes reflected correctly — requires MySQL adapter", () => {});
-  it.skip("schema dump datetime includes default expression — requires MySQL adapter", () => {});
-  it.skip("schema dump datetime includes precise default expression — requires MySQL adapter", () => {});
-  it.skip("schema dump datetime includes precise default expression with on update — requires MySQL adapter", () => {});
-  it.skip("schema dump timestamp includes default expression — requires MySQL adapter", () => {});
-  it.skip("schema dump timestamp includes precise default expression — requires MySQL adapter", () => {});
-  it.skip("schema dump timestamp includes precise default expression with on update — requires MySQL adapter", () => {});
-  it.skip("schema dump timestamp without default expression — requires MySQL adapter", () => {});
+  it.skip("schema dump includes default expression", () => {});
+  it.skip("schema dump includes default expression with single quotes reflected correctly", () => {});
+  it.skip("schema dump datetime includes default expression", () => {});
+  it.skip("schema dump datetime includes precise default expression", () => {});
+  it.skip("schema dump datetime includes precise default expression with on update", () => {});
+  it.skip("schema dump timestamp includes default expression", () => {});
+  it.skip("schema dump timestamp includes precise default expression", () => {});
+  it.skip("schema dump timestamp includes precise default expression with on update", () => {});
+  it.skip("schema dump timestamp without default expression", () => {});
 });
 
 describe("DefaultNumbersTest", () => {
@@ -188,13 +186,11 @@ describe("DefaultStringsTest", () => {
 });
 
 describe("PostgresqlDefaultExpressionTest", () => {
-  // PostgreSQL-specific default expression tests require a PostgreSQL adapter.
-  it.skip("schema dump includes default expression — requires PostgreSQL adapter", () => {});
+  it.skip("schema dump includes default expression", () => {});
 });
 
 describe("Sqlite3DefaultExpressionTest", () => {
-  // SQLite3-specific default expression tests require a SQLite3 adapter.
-  it.skip("schema dump includes default expression — requires SQLite3 adapter", () => {});
+  it.skip("schema dump includes default expression", () => {});
 });
 
 describe("DefaultTest", () => {

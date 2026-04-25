@@ -84,4 +84,31 @@ describe("InstrumentationTest", () => {
     Notifications.instrument("test.noblock", { data: 1 });
     expect(published).toBe(true);
   });
+
+  it.skip("payload name on load", () => {});
+  it.skip("payload name on create", () => {});
+  it.skip("payload name on update", () => {});
+  it.skip("payload name on update all", () => {});
+  it.skip("payload name on destroy", () => {});
+  it.skip("payload name on delete all", () => {});
+  it.skip("payload name on pluck", () => {});
+  it.skip("payload name on count", () => {});
+  it.skip("payload name on grouped count", () => {});
+  it.skip("payload row count on select all", () => {});
+  it.skip("payload row count on pluck", () => {});
+  it.skip("payload row count on raw sql", () => {});
+  it.skip("payload row count on cache", () => {});
+  it.skip("payload connection with query cache disabled", () => {});
+  it.skip("payload connection with query cache enabled", () => {});
+  it.skip("no instantiation notification when no records", () => {});
+});
+
+describe("TransactionInSqlActiveRecordPayloadTest", () => {
+  it.skip("payload without an open transaction", () => {});
+  it.skip("payload with an open transaction", () => {});
+});
+
+describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
+  it.skip("payload without an open transaction", () => {});
+  it.skip("payload with an open transaction", () => {});
 });

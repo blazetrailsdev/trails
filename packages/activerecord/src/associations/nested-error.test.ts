@@ -14,4 +14,8 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
   it.skip("index unaffected by reject_if", () => {
     /* needs NestedError class and index_errors support */
   });
+
+  describe("AssociationsNestedErrorWithSingularAssociationTest", () => {
+    it.skip("no index when singular association", () => {});
+  });
 });

@@ -194,6 +194,10 @@ describe("StatementCacheTest", () => {
     expect(sql).not.toContain("?");
   });
 
+  it.skip("find by does not use statement cache if table name is changed", () => {});
+  it.skip("find does not use statement cache if table name is changed", () => {});
+  it.skip("find association does not use statement cache if table name is changed", () => {});
+
   it("StatementCache.create unprepared path uses PartialQuery with Substitute slots", async () => {
     await import("./relation.js");
     const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");

@@ -475,4 +475,17 @@ describe("AssociationCallbacksTest", () => {
     const all = await (Comment as any).all().toArray();
     expect(all.length).toBe(0);
   });
+
+  it.skip("has many callbacks halt execution when abort is trown when adding to association", () => {});
+  it.skip("has many callbacks halt execution when abort is trown when removing from association", () => {});
+  it.skip("has many callbacks with create!", () => {});
+  it.skip("has many callbacks for save on parent", () => {});
+  it.skip("has many callbacks for destroy on parent", () => {});
+  it.skip("has and belongs to many add callback", () => {});
+  it.skip("has and belongs to many before add called before save", () => {});
+  it.skip("has and belongs to many after add called after save", () => {});
+  it.skip("has and belongs to many remove callback", () => {});
+  it.skip("has and belongs to many does not fire callbacks on clear", () => {});
+  it.skip("has and belongs to many callbacks for save on parent", () => {});
+  it.skip("dont add if before callback raises exception", () => {});
 });
