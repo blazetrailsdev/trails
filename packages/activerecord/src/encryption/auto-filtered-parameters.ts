@@ -1,4 +1,5 @@
 import { underscore } from "@blazetrails/activesupport";
+import { Configurable } from "./configurable.js";
 
 /**
  * Automatically adds encrypted attribute names to the application's
@@ -22,6 +23,8 @@ export class AutoFilteredParameters {
   }
 
   attributeWasDeclared(klass: any, attribute: string): void {
+    if (!Configurable.config.addToFilterParameters) return;
+    if (Configurable.config.excludeFromFilterParameters.includes(attribute)) return;
     if (this._collecting) {
       this.collectForLater(klass, attribute);
     } else {

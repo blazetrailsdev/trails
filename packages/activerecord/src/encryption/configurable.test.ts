@@ -3,6 +3,7 @@ import { Configurable } from "./configurable.js";
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { EncryptableRecord } from "./encryptable-record.js";
+import { AutoFilteredParameters } from "./auto-filtered-parameters.js";
 import type { SchemeOptions } from "./scheme.js";
 
 describe("ActiveRecord::Encryption::ConfigurableTest", () => {
@@ -15,6 +16,8 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       deterministicKey: c.deterministicKey,
       keyDerivationSalt: c.keyDerivationSalt,
       previousSchemes: [...c.previousSchemes],
+      addToFilterParameters: c.addToFilterParameters,
+      excludeFromFilterParameters: [...c.excludeFromFilterParameters],
     };
   }
 
@@ -28,6 +31,8 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     c.deterministicKey = savedConfig.deterministicKey;
     c.keyDerivationSalt = savedConfig.keyDerivationSalt;
     c.previousSchemes = savedConfig.previousSchemes;
+    c.addToFilterParameters = savedConfig.addToFilterParameters;
+    c.excludeFromFilterParameters = savedConfig.excludeFromFilterParameters;
     Contexts.resetDefaultContext();
   });
 
@@ -86,7 +91,93 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     }
   });
 
-  it.skip("installing autofiltered parameters will add the encrypted attribute as a filter parameter using the dot notation", () => {});
-  it.skip("installing autofiltered parameters will work with unnamed classes", () => {});
-  it.skip("exclude the installation of autofiltered params", () => {});
+  it("installing autofiltered parameters will add the encrypted attribute as a filter parameter using the dot notation", () => {
+    const filterParameters: string[] = [];
+    const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
+    autoFilteredParameters.enable();
+
+    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+      autoFilteredParameters.attributeWasDeclared(klass, name);
+    });
+
+    try {
+      // Named class: filter key is "underscore(ClassName).attribute"
+      class EncryptedPost {}
+      const modelClass = Object.assign(EncryptedPost, { _attributeDefinitions: new Map() });
+      EncryptableRecord.encrypts(modelClass, "title");
+
+      expect(filterParameters).toContain("encrypted_post.title");
+    } finally {
+      dispose();
+    }
+  });
+
+  it("installing autofiltered parameters will work with unnamed classes", () => {
+    const filterParameters: string[] = [];
+    const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
+    autoFilteredParameters.enable();
+
+    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+      autoFilteredParameters.attributeWasDeclared(klass, name);
+    });
+
+    try {
+      // Truly anonymous class (empty .name): filter key is just the attribute name
+      const modelClass = Object.assign(class {}, { _attributeDefinitions: new Map() });
+      EncryptableRecord.encrypts(modelClass, "secret");
+
+      expect(filterParameters).toContain("secret");
+      expect(filterParameters.every((f) => !f.includes("."))).toBe(true);
+    } finally {
+      dispose();
+    }
+  });
+
+  it("exclude the installation of autofiltered params", () => {
+    Configurable.config.addToFilterParameters = false;
+
+    const filterParameters: string[] = [];
+    const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
+    autoFilteredParameters.enable();
+
+    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+      autoFilteredParameters.attributeWasDeclared(klass, name);
+    });
+
+    try {
+      class AnotherModel {}
+      const modelClass = Object.assign(AnotherModel, { _attributeDefinitions: new Map() });
+      EncryptableRecord.encrypts(modelClass, "email");
+
+      // addToFilterParameters = false → nothing is added
+      expect(filterParameters).toHaveLength(0);
+    } finally {
+      dispose();
+    }
+  });
+
+  it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {
+    Configurable.config.excludeFromFilterParameters = ["secret_token"];
+
+    const filterParameters: string[] = [];
+    const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
+    autoFilteredParameters.enable();
+
+    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+      autoFilteredParameters.attributeWasDeclared(klass, name);
+    });
+
+    try {
+      class PaymentModel {}
+      const modelClass = Object.assign(PaymentModel, { _attributeDefinitions: new Map() });
+      EncryptableRecord.encrypts(modelClass, "card_number");
+      EncryptableRecord.encrypts(modelClass, "secret_token");
+
+      // "card_number" is added; "secret_token" is excluded
+      expect(filterParameters).toContain("payment_model.card_number");
+      expect(filterParameters).not.toContain("payment_model.secret_token");
+    } finally {
+      dispose();
+    }
+  });
 });
