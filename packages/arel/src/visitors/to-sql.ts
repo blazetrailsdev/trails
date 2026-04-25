@@ -1265,7 +1265,9 @@ export class ToSql implements NodeVisitor<SQLString> {
   }
 
   private visitAttribute(node: Nodes.Attribute): SQLString {
-    this.collector.append(`"${node.relation.tableAlias || node.relation.name}"."${node.name}"`);
+    const tbl = (node.relation.tableAlias || node.relation.name).replace(/"/g, '""');
+    const col = node.name.replace(/"/g, '""');
+    this.collector.append(`"${tbl}"."${col}"`);
     return this.collector;
   }
 
@@ -1276,7 +1278,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (!attr || typeof attr.name !== "string") {
       throw new UnsupportedVisitError("UnqualifiedColumn must wrap an Attribute node with a name");
     }
-    this.collector.append(`"${attr.name}"`);
+    this.collector.append(`"${attr.name.replace(/"/g, '""')}"`);
     return this.collector;
   }
 

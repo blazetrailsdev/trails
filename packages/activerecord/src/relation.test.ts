@@ -106,6 +106,57 @@ describe("RelationTest", () => {
     expect(post.isPersisted()).toBe(true);
   });
 
+  it("dotted string order passes through as raw SQL (Rails treats all string orders as SqlLiteral)", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    // Rails never strips or re-qualifies cross-table references in string form.
+    expect(Post.order("comments.body ASC").toSql()).toContain("ORDER BY comments.body ASC");
+    expect(Post.order("posts.id DESC").toSql()).toContain("ORDER BY posts.id DESC");
+  });
+
+  it("order by primary key stays table-qualified even before schema reflection", () => {
+    // The PK (`id`) may not be in _attributeDefinitions before schema loads,
+    // but must remain table-qualified to avoid ambiguous-column errors on JOINs.
+    class Post extends Base {
+      static _tableName = "posts";
+      static {
+        this.adapter = adapter;
+      }
+    }
+    expect(Post.order({ id: "desc" }).toSql()).toContain('"posts"."id" DESC');
+  });
+
+  it("order by unknown column (subquery alias) uses bare quoted name", () => {
+    class Developer extends Base {
+      static _tableName = "developers";
+      static {
+        this.attribute("commits", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const RANKED = "(SELECT id, commits AS hotness FROM developers) developers";
+    const sql = Developer.from(RANKED).order({ hotness: "desc" }).limit(10).toSql();
+    expect(sql).toContain('"hotness" DESC');
+    expect(sql).not.toContain('"developers"."hotness"');
+  });
+
+  it("order by known column uses table-qualified attribute", () => {
+    class Developer extends Base {
+      static _tableName = "developers";
+      static {
+        this.attribute("commits", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const sql = Developer.order({ commits: "desc" }).toSql();
+    expect(sql).toContain('"developers"."commits" DESC');
+  });
+
   it("group by bare column name qualifies via table", () => {
     class Order extends Base {
       static _tableName = "orders";

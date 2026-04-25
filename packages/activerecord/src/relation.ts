@@ -2883,6 +2883,16 @@ export class Relation<T extends Base> {
     return new Visitors.ToSql().compile(node);
   }
 
+  // Returns true when `col` is a known schema attribute OR is (part of) the
+  // model's primary key. The PK check is needed because `_attributeDefinitions`
+  // may not yet contain `id` (before schema reflection), but it must still be
+  // table-qualified to avoid ambiguous-column errors on joined relations.
+  private _isKnownColumn(col: string): boolean {
+    if (this._modelClass._attributeDefinitions.has(col)) return true;
+    const pk = this._modelClass.primaryKey;
+    return Array.isArray(pk) ? pk.includes(col) : pk === col;
+  }
+
   private _applyOrderToManager(manager: SelectManager, table: Table): void {
     // Raw order clauses (from inOrderOf)
     for (const rawClause of this._rawOrderClauses) {
@@ -2890,27 +2900,56 @@ export class Relation<T extends Base> {
     }
     for (const clause of this._orderClauses) {
       if (typeof clause === "string") {
+        const trimmed = clause.trim();
         // Detect SQL expressions (functions, parens, operators) and pass as raw SQL
-        if (clause.includes("(") || /\bcase\b/i.test(clause) || clause.includes("||")) {
-          manager.order(new Nodes.SqlLiteral(clause));
+        if (trimmed.includes("(") || /\bcase\b/i.test(trimmed) || trimmed.includes("||")) {
+          manager.order(new Nodes.SqlLiteral(trimmed));
         } else {
           // Parse "column ASC/DESC" or "table.column ASC/DESC" strings
-          const match = clause.match(/^([\w.]+)\s+(ASC|DESC)$/i);
+          const match = trimmed.match(/^([A-Za-z_$][\w$.]*)\s+(ASC|DESC)$/i);
           if (match) {
-            // Strip table prefix if present (e.g. "posts.score" → "score")
             const rawCol = match[1];
-            const col = rawCol.includes(".") ? rawCol.split(".").pop()! : rawCol;
             const dir = match[2].toUpperCase();
-            manager.order(dir === "DESC" ? table.get(col).desc() : table.get(col).asc());
+            // Any dotted identifier (one or more dots) passes through as raw SQL.
+            if (rawCol.includes(".")) {
+              manager.order(new Nodes.SqlLiteral(trimmed));
+            } else {
+              const node = this._isKnownColumn(rawCol)
+                ? table.get(rawCol)
+                : new Nodes.UnqualifiedColumn(table.get(rawCol));
+              manager.order(
+                dir === "DESC" ? new Nodes.Descending(node) : new Nodes.Ascending(node),
+              );
+            }
           } else {
-            // Strip table prefix if present
-            const col = clause.includes(".") ? clause.split(".").pop()! : clause;
-            manager.order(table.get(col).asc());
+            // Not "col DIR" form. Only wrap plain letter-start identifiers;
+            // everything else (positional "1", NULLS FIRST, commas, etc.) is raw SQL.
+            if (/^[A-Za-z_$][\w$]*$/.test(trimmed)) {
+              const node = this._isKnownColumn(trimmed)
+                ? table.get(trimmed)
+                : new Nodes.UnqualifiedColumn(table.get(trimmed));
+              manager.order(new Nodes.Ascending(node));
+            } else {
+              manager.order(new Nodes.SqlLiteral(trimmed));
+            }
           }
         }
       } else {
         const [col, dir] = clause;
-        manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
+        // Mirrors Rails' arel_column: unknown columns (e.g. subquery aliases
+        // from .from()) get a bare quoted name, not a table-qualified attribute.
+        // Dotted keys (e.g. "comments.body") pass through as raw SQL with direction.
+        if (/^[\w$]+(\.[\w$]+)+$/.test(col)) {
+          const lit = new Nodes.SqlLiteral(col);
+          manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
+        } else if (this._isKnownColumn(col)) {
+          manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
+        } else {
+          const unqual = new Nodes.UnqualifiedColumn(table.get(col));
+          manager.order(
+            dir === "desc" ? new Nodes.Descending(unqual) : new Nodes.Ascending(unqual),
+          );
+        }
       }
     }
   }
