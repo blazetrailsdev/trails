@@ -1,4 +1,8 @@
 {
+  "ar-01": {
+    "side": "diff",
+    "reason": "Datetime microseconds in WHERE ? bind: trails serializes a Date as '2026-04-18 13:00:41.729000' (with microseconds); Rails serializes as '2026-04-18 13:00:41' (truncated to seconds). Only manifests when frozen-at has non-zero milliseconds. Same datetime serialization family as ar-52."
+  },
   "ar-16": {
     "side": "diff",
     "reason": "Book.all().eagerLoad(\"author\").limit(10): trails eagerLoad pushes the association into _eagerLoadAssociations but doesn't emit the LEFT OUTER JOIN + column-aliased SELECT that Rails produces. Rails emits 'SELECT \"books\".\"id\" AS t0_r0, ... FROM \"books\" LEFT OUTER JOIN \"authors\" ON ... LIMIT 10'; trails emits the bare 'SELECT \"books\".* FROM \"books\" LIMIT 10'. Real trails-missing feature: eagerLoad's JOIN + column-projection behaviour."
@@ -22,5 +26,13 @@
   "ar-52": {
     "side": "diff",
     "reason": "Datetime serialization in WHERE BETWEEN: trails formats Date as ISO 8601 ('1999-12-25T00:00:00.000Z'); Rails formats as SQL datetime ('1999-12-25 00:00:00'). The T separator, milliseconds, and Z suffix are wrong for standard SQL datetime literals."
+  },
+  "ar-55": {
+    "side": "diff",
+    "reason": "Nested table-keyed where hash: where({authors: {name: 'Rails'}}) — Rails expands nested hashes into table-qualified predicates ('\"authors\".\"name\" = \\'Rails\\''); trails serializes the inner object as a JSON string ('\"books\".\"authors\" = \\'{\"name\":\"Rails\"}\\'). trails-missing: PredicateBuilder should handle nested table→column hash form."
+  },
+  "ar-57": {
+    "side": "diff",
+    "reason": "includes + references + string where: Rails promotes includes(:author) to a LEFT OUTER JOIN + column-aliased SELECT when references(:author) is combined with a string WHERE touching that table (same mechanism as eagerLoad). trails emits a plain SELECT with the WHERE clause but no JOIN. Same root cause as ar-16 — eagerLoad JOIN + column-projection behaviour is not implemented."
   }
 }

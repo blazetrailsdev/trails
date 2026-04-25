@@ -143,8 +143,18 @@ async function main(): Promise<void> {
     // 2. Connect via trails AR — the models module's class definitions
     //    inherit from Base and read Base.adapter lazily, so the connection
     //    must exist before any model method is invoked. establishConnection
-    //    sets Base.adapter for the whole process.
+    //    registers the connection pool; accessing Base.adapter immediately
+    //    after checks out the connection and triggers _wireArelVisitor, which
+    //    sets the adapter-specific Arel visitor (e.g. Visitors.SQLite) on the
+    //    process-global registry. Without this eager access Relation#toSql()
+    //    would use the default generic visitor since it never touches
+    //    Base.adapter itself, producing incorrect boolean/date literals.
     await Base.establishConnection(dbPath);
+    void Base.adapter; // trigger _wireArelVisitor so the correct Arel visitor is active
+    // Regression coverage: fixtures ar-09/ar-11/ar-19/ar-29 each produce a
+    // distinct wrong literal under the generic visitor (TRUE/FALSE, FOR UPDATE)
+    // vs the correct SQLite literal (1/0, empty lock). Their PASS status in CI
+    // acts as the integration test for this visitor-wiring invariant.
 
     // 3. Import query.ts. Fixtures end with `export default <relation>`
     //    and typically `import { Book } from "./models.js"` (ESM convention
