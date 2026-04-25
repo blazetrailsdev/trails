@@ -28,6 +28,7 @@ import { join, resolve, dirname, basename } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { CanonicalQuery } from "../../canonical/query-types.js";
 import { Base } from "@blazetrails/activerecord";
+import { Visitors } from "@blazetrails/arel";
 
 function usage(): never {
   process.stderr.write(
@@ -175,10 +176,85 @@ async function main(): Promise<void> {
       );
     }
 
-    // 4. Extract SQL. AR Relation.toSql() renders SQL with literals inlined;
-    //    binds[] is always empty, same contract as the arel runner.
+    // 4. Extract SQL — two forms:
+    //    a) Inlined: toSql() with all values embedded as literals.
+    //    b) Parameterized: compileWithBinds extracts date values as bind
+    //       params (? placeholders), matching the execution path Rails uses
+    //       for INSERT/UPDATE and how AR actually passes values to the driver.
     const sqlStr = (result as { toSql(): string }).toSql().trim();
-    const binds: string[] = [];
+
+    const rel = result as { arel?(): { ast: unknown } };
+    let paramSql = sqlStr;
+    let binds: string[] = [];
+    if (typeof rel.arel === "function") {
+      const manager = rel.arel();
+      if (manager && typeof (manager as { ast: unknown }).ast !== "undefined") {
+        // paramSql/binds are informational-only; wrap the entire extraction so any
+        // unexpected visitor or bind-processing error falls back to sql / empty binds.
+        try {
+          // Use the adapter-wired dialect visitor (e.g. Visitors.SQLite for SQLite)
+          // so boolean literals, DISTINCT, etc. match the actual execution dialect.
+          const adapterVisitor = (Base.adapter as { arelVisitor?: unknown }).arelVisitor;
+          const visitorCtor =
+            adapterVisitor != null ? (adapterVisitor as object).constructor : Visitors.ToSql;
+          const visitor = new (visitorCtor as new () => InstanceType<typeof Visitors.ToSql>)();
+          const [ps, bs] = (
+            visitor as unknown as { compileWithBinds(node: unknown): [string, unknown[]] }
+          ).compileWithBinds((manager as { ast: unknown }).ast);
+          // Resolve QueryAttribute/BindParam wrappers to their DB value first.
+          const resolvedBinds = (bs as unknown[]).map((b) => {
+            if (b != null && typeof b === "object" && "valueForDatabase" in b) {
+              const vfd = (b as { valueForDatabase?: unknown }).valueForDatabase;
+              return typeof vfd === "function" ? (vfd as () => unknown).call(b) : vfd;
+            }
+            return b;
+          });
+
+          // Use the visitor's own quoting for re-inlining non-Date scalars so the
+          // SQL literal style (e.g. boolean 1/0 on SQLite) matches the dialect.
+          const quotingVisitor = visitor as unknown as { quote?: (v: unknown) => string };
+          const quoteBindValue = (v: unknown): string => {
+            if (typeof quotingVisitor.quote === "function") return quotingVisitor.quote(v);
+            if (typeof v === "string") return `'${v.replace(/'/g, "''")}'`;
+            if (v == null) return "NULL";
+            return String(v);
+          };
+
+          // Build a consistent paramSql where ONLY Date values become `?`; all
+          // other bind values are re-inlined using the visitor's quoting rules.
+          // This keeps `? count = binds.length` and matches adapter-specific rendering.
+          let placeholderIdx = 0;
+          const dateBind: Date[] = [];
+          let mismatch = false;
+          const processedParamSql = ps.replace(/\?/g, () => {
+            if (placeholderIdx >= resolvedBinds.length) {
+              mismatch = true;
+              return "?";
+            }
+            const v = resolvedBinds[placeholderIdx++];
+            if (v instanceof Date) {
+              dateBind.push(v);
+              return "?";
+            }
+            return quoteBindValue(v);
+          });
+          if (placeholderIdx !== resolvedBinds.length) mismatch = true;
+
+          if (mismatch || dateBind.length === 0) {
+            // No datetime binds (or placeholder/bind count diverged): keep paramSql
+            // identical to sql so there's no whitespace/quoting drift in output.
+            paramSql = sqlStr;
+            binds = [];
+          } else {
+            paramSql = processedParamSql.trim();
+            binds = dateBind.map((b) => b.toISOString());
+          }
+        } catch {
+          paramSql = sqlStr;
+          binds = [];
+        }
+      }
+    }
 
     // 5. Write CanonicalQuery JSON
     const canonical: CanonicalQuery = {
@@ -186,6 +262,7 @@ async function main(): Promise<void> {
       fixture: fixtureName,
       frozenAt: frozenTs,
       sql: sqlStr,
+      paramSql,
       binds,
     };
 

@@ -184,6 +184,8 @@ async function main(): Promise<void> {
     //    TreeManager#toSql()  packages/arel/src/tree-manager.ts
     //    Arel inlines bind values into the SQL string — no separate bind array.
     const sqlStr = (result as { toSql(): string }).toSql().trim();
+    // Arel arel-* fixtures have no bind params — paramSql equals sql.
+    const paramSql = sqlStr;
     const binds: string[] = [];
 
     // 6. Write CanonicalQuery JSON
@@ -192,6 +194,7 @@ async function main(): Promise<void> {
       fixture: fixtureName,
       frozenAt: frozenTs,
       sql: sqlStr,
+      paramSql,
       binds,
     };
 

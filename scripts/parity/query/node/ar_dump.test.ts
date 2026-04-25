@@ -115,6 +115,20 @@ describe("ar_dump.ts", () => {
     }
   });
 
+  it("extracts datetime binds for ar-65 (typed where-hash predicate)", () => {
+    const { code, stdout, stderr, json } = runDumpReadJson("ar-65");
+    expect(code, `stdout: ${stdout}\nstderr: ${stderr}`).toBe(0);
+    // ar-65: Order.where({ created_at: new Date() }) — frozen at 2000-01-01T00:00:00.000Z
+    // The Date value is extracted as a bind param by compileWithBinds, so:
+    //   paramSql has a single ? placeholder
+    //   binds holds the ISO 8601 UTC string for the frozen time
+    expect(json.binds).toEqual(["2000-01-01T00:00:00.000Z"]);
+    expect(typeof json.paramSql).toBe("string");
+    expect((json.paramSql as string).includes("?")).toBe(true);
+    // sql still has the inlined literal (toSql path)
+    expect((json.sql as string).includes("?")).toBe(false);
+  });
+
   it("exits non-zero on an unknown fixture directory", () => {
     // Typo'd or missing fixture dir — the most common operator error.
     // We want it to fail fast with a readable errno, not deep inside AR.

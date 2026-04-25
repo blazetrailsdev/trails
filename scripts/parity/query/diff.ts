@@ -231,10 +231,27 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const railsNorm = stableJson(railsRaw);
-      const trailsNorm = stableJson(trailsRaw);
+      // paramSql and binds are informational-only — excluded from cross-side comparison:
+      //   - Rails SQLite inlines datetime values in to_sql() → bound_attributes is empty
+      //     → binds = [], paramSql = sql.
+      //   - trails extracts datetime values via compileWithBinds → binds is non-empty,
+      //     paramSql has ? placeholders.
+      // This structural asymmetry means cross-side bind comparison would always fail for
+      // datetime fixtures regardless of semantic correctness. Both fields remain in the
+      // output JSON for introspection and future use if the Rails runner is updated.
+      //
+      // Match excludes both paramSql and binds (informational-only fields).
+      // Patch also excludes paramSql (per-side asymmetric, noisy in diffs) but
+      // keeps binds so datetime bind values remain visible in failure output.
+      const forMatch = (doc: Record<string, unknown>) =>
+        stableJson({ ...doc, paramSql: undefined, binds: undefined });
+      const forPatch = (doc: Record<string, unknown>) =>
+        stableJson({ ...doc, paramSql: undefined });
+      const railsNorm = forMatch(railsRaw as Record<string, unknown>);
+      const trailsNorm = forMatch(trailsRaw as Record<string, unknown>);
+      const match = railsNorm === trailsNorm;
 
-      if (railsNorm === trailsNorm) {
+      if (match) {
         if (gap) {
           // Gap has closed — ask the operator to remove it.
           unexpectedPass++;
@@ -257,15 +274,13 @@ async function main(): Promise<void> {
               `FAIL  ${name}  (expected ${gap.side}, actual diff: ${gap.reason})\n`,
             );
           } else {
-            // "output differs" not "SQL differs" — the diff compares the whole
-            // CanonicalQuery JSON (sql + binds + frozenAt), not just sql.
             process.stdout.write(`FAIL  ${name}  (output differs — not in known-gaps)\n`);
           }
           const patch = createTwoFilesPatch(
             `rails/${file}`,
             `trails/${file}`,
-            railsNorm,
-            trailsNorm,
+            forPatch(railsRaw as Record<string, unknown>),
+            forPatch(trailsRaw as Record<string, unknown>),
             "",
             "",
             { context: 4 },

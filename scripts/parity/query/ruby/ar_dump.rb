@@ -124,11 +124,71 @@ Dir.mktmpdir("parity-ar-ruby-") do |tmpdir|
       raise "[#{fixture_name}] query.rb returned #{result.class}: expected an AR relation / Arel manager responding to #to_sql"
     end
 
-    # 5. Extract SQL. For AR relations, Relation#to_sql renders the SQL
-    #    with literal values inlined (binds pre-substituted), so binds is
-    #    always []. Same contract as the arel runner.
+    # 5. Extract SQL — two forms:
+    #    a) Inlined (sql): to_sql() with all values embedded as literals.
+    #    b) Parameterized (paramSql + binds): build both from the same Arel
+    #       Collectors::Bind pass so paramSql and binds stay in sync.
+    #       Only datetime values become ? placeholders; other scalars are
+    #       re-inlined so ? count = binds.length (mirrors trails' approach).
+    #       Falls back to sql / empty binds if the collector raises or counts diverge.
     sql_str = result.to_sql.strip
     binds = []
+    param_sql = sql_str
+
+    if result.respond_to?(:arel)
+      begin
+        arel_obj = result.arel
+        conn = ActiveRecord::Base.connection
+        visitor = conn.visitor
+
+        # Composite gives us the full placeholder SQL string (SQLString) and
+        # the raw bind list (Bind) in one pass. Using Bind alone doesn't
+        # accumulate SQL fragments, so parts.join would not produce usable SQL.
+        sql_collector  = Arel::Collectors::SQLString.new
+        bind_collector = Arel::Collectors::Bind.new
+        collector = Arel::Collectors::Composite.new(sql_collector, bind_collector)
+        visitor.accept(arel_obj.ast, collector)
+
+        placeholder_sql   = sql_collector.value.to_s.strip
+        bind_values       = bind_collector.value
+        placeholder_count = placeholder_sql.count("?")
+
+        if placeholder_count == bind_values.length
+          bind_index = 0
+
+          rebuilt_sql = placeholder_sql.gsub("?") do
+            bind = bind_values[bind_index]
+            bind_index += 1
+
+            val =
+              if bind.respond_to?(:value_for_database)
+                bind.value_for_database
+              elsif bind.respond_to?(:value)
+                bind.value.respond_to?(:value_for_database) ? bind.value.value_for_database : bind.value
+              else
+                bind
+              end
+
+            if val.respond_to?(:utc)
+              binds << val.utc.iso8601(3)
+              "?"
+            else
+              conn.quote(val)
+            end
+          end
+
+          param_sql = binds.any? ? rebuilt_sql : sql_str
+        end
+        # If counts diverge (literal ? in SQL, or collector mismatch) leave
+        # binds = [] and param_sql = sql_str — the defaults set above.
+      rescue StandardError
+        # paramSql/binds are informational-only; any collector/visitor error
+        # (e.g. NoMethodError for preparable= in Rails 8.0, NameError, etc.)
+        # falls back to sql_str / empty binds so the runner stays resilient.
+        binds = []
+        param_sql = sql_str
+      end
+    end
 
     # 6. Write CanonicalQuery JSON
     canonical = {
@@ -136,6 +196,7 @@ Dir.mktmpdir("parity-ar-ruby-") do |tmpdir|
       "fixture"  => fixture_name,
       "frozenAt" => frozen_ts,
       "sql"      => sql_str,
+      "paramSql" => param_sql,
       "binds"    => binds,
     }
 

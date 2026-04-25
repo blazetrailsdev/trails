@@ -127,6 +127,8 @@ Dir.mktmpdir("parity-query-ruby-") do |tmpdir|
     #    (activerecord-8.0.2/lib/.../abstract/database_statements.rb:52), so we
     #    call to_sql directly. This mirrors the trails side which uses .toSql().
     sql_str = result.to_sql.strip
+    # Arel arel-* fixtures inline all values — no bind params.
+    param_sql = sql_str
     binds = []
 
     # 6. Write CanonicalQuery JSON
@@ -135,6 +137,7 @@ Dir.mktmpdir("parity-query-ruby-") do |tmpdir|
       "fixture"  => fixture_name,
       "frozenAt" => frozen_ts,
       "sql"      => sql_str,
+      "paramSql" => param_sql,
       "binds"    => binds,
     }
 

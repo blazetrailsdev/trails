@@ -36,6 +36,8 @@ class ArDumpTest < Minitest::Test
     assert_equal DEFAULT_FROZEN_AT,  result["frozenAt"]
     assert_equal 'SELECT "books".* FROM "books"', result["sql"]
     assert_equal [],                 result["binds"]
+    assert result.key?("paramSql"),  "output must include paramSql"
+    assert_equal result["sql"],      result["paramSql"]
   ensure
     File.delete(out_path) if out_path && File.exist?(out_path)
   end

@@ -4,7 +4,7 @@
   "title": "CanonicalQuery",
   "description": "Version 1 canonical query output — SQL string and bind params for one Arel / AR expression.",
   "type": "object",
-  "required": ["version", "fixture", "frozenAt", "sql", "binds"],
+  "required": ["version", "fixture", "frozenAt", "sql", "paramSql", "binds"],
   "additionalProperties": false,
   "properties": {
     "version": {
@@ -24,9 +24,13 @@
       "type": "string",
       "description": "SQL string produced by to_sql (Ruby) or .toSql() (TypeScript) on the expression returned by the query script. The expression may be an Arel node or a manager, each exposing .toSql() through its own API surface."
     },
+    "paramSql": {
+      "type": "string",
+      "description": "Parameterized SQL template with ? placeholders for datetime bind values only. Equals sql when no datetime binds. On the trails side, compileWithBinds extracts Date values as ? and re-inlines non-Date scalars so ? count = binds.length. On the Rails side, built via Arel::Collectors::Composite; falls back to sql on any collector error. Not compared cross-side (informational only)."
+    },
     "binds": {
       "type": "array",
-      "description": "Ordered bind parameter values, all stringified. Empty array when the expression has no bind parameters.",
+      "description": "Datetime-valued bind params only, as ISO 8601 UTC strings. Non-datetime scalars are re-inlined into paramSql; other scalar types (strings, numbers) use BindParam nodes on the trails side but are inlined by Rails, so they are excluded to avoid structural asymmetry. Empty when no datetime binds. Informational only — not compared cross-side.",
       "items": { "type": "string" }
     }
   }
