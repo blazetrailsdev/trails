@@ -58,5 +58,9 @@
   "ar-38": {
     "side": "diff",
     "reason": "Boolean literal in subquery WHERE: trails emits 'approved = TRUE', Rails on SQLite emits 'approved = 1'. Same root cause as ar-09 / ar-11 / ar-19 — boolean serialization is type-system-driven, not adapter-aware."
+  },
+  "ar-42": {
+    "side": "diff",
+    "reason": "Multi-column GROUP BY qualification: trails emits 'GROUP BY author_id, published_year' (bare); Rails qualifies each to '\"books\".\"author_id\", \"books\".\"published_year\"'. Same root cause as ar-17 (single-column form)."
   }
 }
