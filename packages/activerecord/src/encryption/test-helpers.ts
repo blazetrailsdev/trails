@@ -165,6 +165,7 @@ export function makeEncryptedBookIgnoreCase(adapter: DatabaseAdapter) {
     static {
       this.attribute("id", "integer");
       this.attribute("name", "string");
+      this.attribute("original_name", "string");
       this.adapter = adapter;
       this.encrypts("name", { deterministic: true, ignoreCase: true });
     }

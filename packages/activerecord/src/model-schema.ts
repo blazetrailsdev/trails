@@ -723,7 +723,12 @@ function applyColumnsHash(
       continue;
     }
     const proto = (host as unknown as { prototype: object }).prototype;
-    if (!Object.prototype.hasOwnProperty.call(proto, name)) {
+    // Skip if this class or any parent prototype already has a custom accessor —
+    // prevents schema reflection from overwriting an ignore_case (or other)
+    // override that was installed on a parent class.
+    const parentProto = Object.getPrototypeOf(proto);
+    const inheritedFromParent = parentProto != null && name in (parentProto as object);
+    if (!Object.prototype.hasOwnProperty.call(proto, name) && !inheritedFromParent) {
       Object.defineProperty(proto, name, {
         get(this: { readAttribute(n: string): unknown }) {
           return this.readAttribute(name);

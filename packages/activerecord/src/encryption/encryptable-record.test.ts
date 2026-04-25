@@ -257,8 +257,13 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(found!.name).toBe("dune");
   });
 
-  it.skip("when ignore_case: true, it ignores case in queries but keep it when reading the attribute", () => {
-    // requires dual-column storage (name + original_name) not yet implemented
+  it("when ignore_case: true, it ignores case in queries but keep it when reading the attribute", async () => {
+    const Book = makeEncryptedBookIgnoreCase(freshAdapter());
+    new Book();
+    await Book.create({ name: "Dune" });
+    const book = await Book.findBy({ name: "dune" });
+    expect(book).not.toBeNull();
+    expect(book!.name).toBe("Dune");
   });
 
   it("when ignore_case: true, it lets you update attributes normally", async () => {
@@ -411,9 +416,42 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
   it.skip("can dump and load records that use encryption", () => {});
   it.skip("supports decrypting data encrypted non deterministically with SHA1 when digest class is SHA256", () => {});
-  it.skip("when ignore_case: true, it keeps both the attribute and the _original counterpart encrypted", () => {});
-  it.skip("when ignore_case: true, it returns the actual value when not encrypted", () => {});
-  it.skip("when ignore_case: true, users can override accessors and call super", () => {});
+  it("when ignore_case: true, it keeps both the attribute and the _original counterpart encrypted", async () => {
+    const Book = makeEncryptedBookIgnoreCase(freshAdapter());
+    new Book();
+    const book = await Book.create({ name: "Dune" });
+    assertEncryptedAttribute(book, "name", "Dune");
+    assertEncryptedAttribute(book, "original_name", "Dune");
+    // In-memory read before save reflects the assigned value immediately.
+    const unsaved = new Book({ name: "Arrakis" });
+    expect(unsaved.name).toBe("Arrakis");
+    // Null-clearing: assigning null clears original_name and returns null.
+    unsaved.name = null;
+    expect(unsaved.name).toBeNull();
+  });
+
+  it("when ignore_case: true, it returns the actual value when not encrypted", async () => {
+    Configurable.config.supportUnencryptedData = true;
+    const Book = makeEncryptedBookIgnoreCase(freshAdapter());
+    new Book();
+    const book = await withoutEncryption(async () => Book.create({ name: "Dune" }));
+    expect(book.name).toBe("Dune");
+  });
+
+  it("when ignore_case: true, users can override accessors and call super", async () => {
+    const Book = makeEncryptedBookIgnoreCase(freshAdapter());
+    const OverridingBook = class extends Book {
+      get name() {
+        return `${super.name}-overridden`;
+      }
+    };
+    new Book();
+    await Book.create({ name: "Dune" });
+    const found = await Book.findBy({ name: "dune" });
+    expect(found).not.toBeNull();
+    const overridingInstance = found!.becomes(OverridingBook);
+    expect(overridingInstance.name).toBe("Dune-overridden");
+  });
   it.skip("binary data can be encrypted", () => {});
   it.skip("binary data can be encrypted uncompressed", () => {});
   it.skip("serialized binary data can be encrypted", () => {});

@@ -206,11 +206,74 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
     if (Configurable.config.validateColumnSize) {
       EncryptableRecord.validateColumnSize(klass, name);
     }
+    if (options.ignoreCase) {
+      _preserveOriginalEncrypted(klass, name, options);
+    }
   }
 
   if (klass._attributeDefinitions?.size > 0) {
     applyPendingEncryptions(klass);
   }
+}
+
+/**
+ * Mirrors Rails' EncryptableRecord::ClassMethods#preserve_original_encrypted.
+ * When ignore_case: true, stores the original-cased value in an additional
+ * `original_<name>` encrypted attribute, and overrides the reader so reads
+ * return the original-cased value rather than the downcased one.
+ */
+function _preserveOriginalEncrypted(klass: any, name: string, options: EncryptsOptions): void {
+  const originalAttrName = `original_${name}`;
+
+  // Register the original-case column as encrypted (without ignoreCase/downcase).
+  const { ignoreCase: _ic, downcase: _dc, ...originalOptions } = options;
+  encrypts(klass, originalAttrName, originalOptions);
+
+  // Before each save, copy the in-memory value of `name` into `original_name`
+  // when `name` has been written (is dirty). Using `readAttribute` bypasses
+  // the prototype getter so we read directly from the attribute store, not from
+  // `original_name`. Only syncing when dirty prevents a freshly-loaded record
+  // whose `readAttribute(name)` would return the decrypted downcased value from
+  // overwriting the original-cased `original_name` on an unrelated save.
+  // Mirrors Rails' `name= { self.original_name = value; super(value) }`.
+  if (typeof klass.beforeSave === "function") {
+    klass.beforeSave((record: any) => {
+      // For new records, always sync — changedAttributes is empty because attrs
+      // were assigned before the dirty snapshot in the constructor.
+      // For persisted records, only sync when `name` was actually written to
+      // avoid overwriting original_name with the downcased decrypted value on
+      // unrelated saves.
+      const isNew =
+        typeof record.isNewRecord === "function" ? record.isNewRecord() : !record.isPersisted?.();
+      const changed: string[] = Array.isArray(record.changedAttributes)
+        ? record.changedAttributes
+        : [];
+      if (!isNew && !changed.includes(name)) return;
+      const plaintext = record.readAttribute(name);
+      record.writeAttribute(originalAttrName, plaintext);
+    });
+  }
+
+  // Override the accessor on the prototype. Mirrors Rails'
+  // override_accessors_to_preserve_original:
+  //   - getter returns original_name when present, falls back to name for
+  //     legacy rows that predate the original_name column
+  //   - setter writes both name (for downcased query) and original_name
+  //     (for case-preserving reads) immediately, so in-memory reads see
+  //     the new value before the record is saved
+  Object.defineProperty(klass.prototype, name, {
+    configurable: true,
+    get(this: any) {
+      const originalValue = this.readAttribute(originalAttrName);
+      if (originalValue != null) return originalValue;
+      // Fallback for legacy rows where original_name is absent.
+      return this.readAttribute(name);
+    },
+    set(this: any, value: unknown) {
+      this.writeAttribute(name, value);
+      this.writeAttribute(originalAttrName, value);
+    },
+  });
 }
 
 /**
