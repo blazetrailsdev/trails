@@ -46,5 +46,17 @@
   "ar-33": {
     "side": "diff",
     "reason": "Relation#select with an Arel attribute As node: trails emits literal '[object Object]' because Relation#select accepts only string | SqlLiteral and toString-coerces other inputs; Rails accepts Arel nodes and renders them via the visitor. trails-missing: select() should accept Arel nodes (Attribute, As, etc.) and call toSql on them."
+  },
+  "ar-36": {
+    "side": "diff",
+    "reason": "where.missing(:assoc): Rails emits LEFT OUTER JOIN \"authors\" ON ... WHERE \"authors\".\"id\" IS NULL (works for any association type). trails shortcuts a belongs_to to WHERE \"books\".\"author_id\" IS NULL — equivalent for belongs_to but diverges from Rails' SQL and won't work for has_one/has_many. Real trails-missing: whereMissing should emit the JOIN form."
+  },
+  "ar-37": {
+    "side": "diff",
+    "reason": "where.associated(:assoc): Rails emits INNER JOIN \"authors\" ON ... WHERE \"authors\".\"id\" IS NOT NULL. trails shortcuts a belongs_to to WHERE \"books\".\"author_id\" IS NOT NULL. Same shape gap as ar-36 — whereAssociated should emit the INNER JOIN + assoc-side IS NOT NULL form."
+  },
+  "ar-38": {
+    "side": "diff",
+    "reason": "Boolean literal in subquery WHERE: trails emits 'approved = TRUE', Rails on SQLite emits 'approved = 1'. Same root cause as ar-09 / ar-11 / ar-19 — boolean serialization is type-system-driven, not adapter-aware."
   }
 }

@@ -1,0 +1,1 @@
+Book.where.missing(:author)

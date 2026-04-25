@@ -1,0 +1,1 @@
+Book.where.associated(:author)
