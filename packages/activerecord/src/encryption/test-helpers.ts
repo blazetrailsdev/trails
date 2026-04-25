@@ -226,7 +226,12 @@ export function assertEncryptedAttribute(
 ): void {
   // Verify the attribute reads back as the expected plaintext.
   const readValue = model[attrName];
-  if (readValue !== expectedValue) {
+  const valuesEqual =
+    readValue === expectedValue ||
+    (readValue instanceof Date &&
+      expectedValue instanceof Date &&
+      readValue.getTime() === expectedValue.getTime());
+  if (!valuesEqual) {
     throw new Error(
       `assertEncryptedAttribute: expected ${attrName} to equal ` +
         `${JSON.stringify(expectedValue)}, got ${JSON.stringify(readValue)}`,
@@ -234,12 +239,22 @@ export function assertEncryptedAttribute(
   }
 
   // Verify the DB-bound value differs from the plaintext — confirms real encryption.
-  // Empty strings are also encrypted by EncryptedAttributeType.serialize(), so
-  // include them in this check (only skip null/undefined).
+  // For non-string types (e.g. Date), also compare against the serialized string
+  // form since dbValue is always a string while expectedValue may be an object.
   if (expectedValue !== null && expectedValue !== undefined) {
     const dbValues = model._attributes.valuesForDatabase();
     const dbValue = dbValues[attrName];
-    if (dbValue === expectedValue) {
+    const type = model._attributes?.getAttribute?.(attrName)?.type;
+    const rawSerialized =
+      type && typeof (type as any).castType?.serialize === "function"
+        ? (type as any).castType.serialize(expectedValue)
+        : null;
+    // Normalize to string for comparison (EncryptedAttributeType calls String() before encrypting).
+    const serializedPlaintext = rawSerialized != null ? String(rawSerialized) : null;
+    if (
+      dbValue === expectedValue ||
+      (serializedPlaintext != null && dbValue === serializedPlaintext)
+    ) {
       throw new Error(
         `assertEncryptedAttribute: expected ${attrName} to be encrypted ` +
           `(DB value ≠ plaintext), but valuesForDatabase() returned the plaintext unchanged.`,

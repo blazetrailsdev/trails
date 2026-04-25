@@ -457,7 +457,37 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it.skip("serialized binary data can be encrypted", () => {});
   it.skip("deterministic ciphertexts remain constant", () => {});
   it.skip("can compress data with custom compressor", () => {});
-  it.skip("type method returns cast type", () => {});
-  it.skip("encrypts normalized data", () => {});
-  it.skip("encrypts attribute data", () => {});
+  it("type method returns cast type", () => {
+    const Book = makeEncryptedBook(freshAdapter());
+    new Book();
+    const Post = makeEncryptedPost(freshAdapter());
+    new Post();
+    expect((Book as any).typeForAttribute("name").type()).toBe("string");
+    expect((Post as any).typeForAttribute("body").type()).toBe("string");
+  });
+
+  it("encrypts normalized data", async () => {
+    // Both NormalizedFirst and NormalizedSecond use downcase:true normalization.
+    const adp = freshAdapter();
+    const BookNormalized = makeFreshModel(adp, { id: "integer", name: "string", logo: "string" });
+    BookNormalized.encrypts("name", { deterministic: true, downcase: true });
+    BookNormalized.encrypts("logo", { deterministic: true, downcase: true });
+    new BookNormalized();
+    const b1 = await BookNormalized.create({ name: "Book" });
+    assertEncryptedAttribute(await BookNormalized.find(b1.id), "name", "book");
+    const b2 = await BookNormalized.create({ logo: "Book" });
+    assertEncryptedAttribute(await BookNormalized.find(b2.id), "logo", "book");
+  });
+
+  it("encrypts attribute data", async () => {
+    // The DB column stores ciphertext (text), while the cast type is date.
+    // In Rails, encrypted attribute columns are always text in the schema.
+    const adp = freshAdapter();
+    const BookDate = makeFreshModel(adp, { id: "integer", name: "string" });
+    await BookDate.create({ name: "bootstrap" }); // write triggers text column creation
+    BookDate.attribute("name", "date"); // override cast type to date (DB stays text)
+    BookDate.encrypts("name");
+    const book = await BookDate.create({ name: "2024-01-01" });
+    assertEncryptedAttribute(book, "name", new Date("2024-01-01"));
+  });
 });

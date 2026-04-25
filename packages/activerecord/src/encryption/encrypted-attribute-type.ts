@@ -134,6 +134,10 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     return this.scheme.deterministic ?? false;
   }
 
+  override type(): string {
+    return this.castType.type();
+  }
+
   get previousTypes(): EncryptedAttributeType[] {
     // Memoize on supportUnencryptedData so the clean-text scheme gets
     // recomputed if the config toggles at runtime (Rails does the same
