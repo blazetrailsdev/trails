@@ -19,14 +19,6 @@
     "side": "diff",
     "reason": "in_order_of: multiple divergences vs Rails. (1) Rails adds WHERE \"books\".\"status\" IN (values) to filter to the named set; trails omits it. (2) Rails CASE values are 1-indexed; trails 0-indexed with ELSE branch. (3) Rails appends ASC; trails leaves direction bare. (4) Rails qualifies the column ('\"books\".\"status\"'); trails leaves it bare. Real implementation gap — trails Relation#inOrderOf is incomplete vs ActiveRecord::QueryMethods#in_order_of."
   },
-  "ar-36": {
-    "side": "diff",
-    "reason": "where.missing(:assoc): Rails emits LEFT OUTER JOIN \"authors\" ON ... WHERE \"authors\".\"id\" IS NULL (works for any association type). trails shortcuts a belongs_to to WHERE \"books\".\"author_id\" IS NULL — equivalent for belongs_to but diverges from Rails' SQL and won't work for has_one/has_many. Real trails-missing: whereMissing should emit the JOIN form."
-  },
-  "ar-37": {
-    "side": "diff",
-    "reason": "where.associated(:assoc): Rails emits INNER JOIN \"authors\" ON ... WHERE \"authors\".\"id\" IS NOT NULL. trails shortcuts a belongs_to to WHERE \"books\".\"author_id\" IS NOT NULL. Same shape gap as ar-36 — whereAssociated should emit the INNER JOIN + assoc-side IS NOT NULL form."
-  },
   "ar-57": {
     "side": "diff",
     "reason": "includes + references + string where: Rails promotes includes(:author) to a LEFT OUTER JOIN + column-aliased SELECT when references(:author) is combined with a string WHERE touching that table (same mechanism as eagerLoad). trails emits a plain SELECT with the WHERE clause but no JOIN. Same root cause as ar-16 — eagerLoad JOIN + column-projection behaviour is not implemented."
