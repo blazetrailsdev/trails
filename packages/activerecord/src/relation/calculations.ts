@@ -204,6 +204,12 @@ async function groupedAggregate(
   return result;
 }
 
+/**
+ * SQL COUNT() results are returned as JS number. This diverges from
+ * Rails, which returns arbitrary-precision Integer. Tables with more
+ * than 2^53-1 rows would silently lose precision; the practical risk
+ * is negligible but the divergence is documented.
+ */
 export async function performCount(
   this: CalculationRelation,
   column?: string,
@@ -278,6 +284,11 @@ export async function performSum(
   return ((await singleAggregate(this, "sum", column, true)) as number | bigint) ?? 0;
 }
 
+/**
+ * Rails returns BigDecimal for average on integer/decimal columns.
+ * We return number here — precision is lost for values whose average
+ * exceeds Number.MAX_SAFE_INTEGER (2^53-1).
+ */
 export async function performAverage(
   this: CalculationRelation,
   column: string,

@@ -1558,6 +1558,24 @@ describe("BasicsTest", () => {
     expect(ids).toContain(u1.id);
     expect(ids).toContain(u2.id);
   });
+
+  it("ids returns tuples for composite primary keys", async () => {
+    class Order extends Base {
+      static {
+        this.primaryKey = ["shop_id", "id"];
+        this.attribute("shop_id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const o1 = await Order.create({ shop_id: 1, name: "first" });
+    const o2 = await Order.create({ shop_id: 2, name: "second" });
+    const ids = await Order.ids();
+    expect(ids).toHaveLength(2);
+    // Each element is a tuple [shop_id, id]
+    expect(ids).toContainEqual([o1.readAttribute("shop_id"), o1.readAttribute("id")]);
+    expect(ids).toContainEqual([o2.readAttribute("shop_id"), o2.readAttribute("id")]);
+  });
   it("minimum returns min value", async () => {
     class User extends Base {
       static {
