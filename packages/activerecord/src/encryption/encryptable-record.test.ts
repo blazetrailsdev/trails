@@ -20,6 +20,7 @@ import {
   DecryptionError,
   EncryptionError,
   AUTHOR_NAME_LIMIT,
+  Base,
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
 import { EncryptableRecord } from "./encryptable-record.js";
@@ -305,8 +306,53 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(isEncryptedAttribute(Post, "id")).toBe(false);
   });
 
-  it.skip("encrypts serialized attributes", () => {});
-  it.skip("encrypts serialized attributes where encrypts is declared first", () => {});
+  it("encrypts serialized attributes", async () => {
+    // `attribute("settings", "json")` registers a JSON cast type; `encrypts("settings")`
+    // wraps it in EncryptedAttributeType so the serialized JSON string is encrypted.
+    const adp = freshAdapter();
+    const Article = makeFreshModel(adp, { id: "integer", settings: "json" });
+    Article.encrypts("settings");
+    new Article();
+
+    const settings = { theme: "dark", font_size: 16 };
+    const article = await Article.create({ settings });
+
+    // The DB value is a ciphertext, not the raw JSON string.
+    const dbValue = article._attributes.valuesForDatabase()["settings"] as string;
+    expect(typeof dbValue).toBe("string");
+    expect(dbValue).not.toBe(JSON.stringify(settings));
+
+    // Round-trip: the object is decrypted and deserialized on read.
+    const reloaded = await Article.find(article.id);
+    expect(reloaded.settings).toEqual(settings);
+  });
+
+  it("encrypts serialized attributes where encrypts is declared first", async () => {
+    // _pendingEncryptions defers the wrapping until attribute() is called.
+    // applyPendingEncryptions() then wraps the resolved JSON type, so declaration
+    // order (encrypts before attribute) is transparent.
+    const adp = freshAdapter();
+    const Article = class extends Base {
+      static {
+        this.adapter = adp;
+        this.encrypts("settings"); // declared BEFORE the JSON type
+        this.attribute("id", "integer");
+        this.attribute("settings", "json");
+      }
+    } as any;
+    new Article();
+
+    const settings = { theme: "light", font_size: 14 };
+    const article = await Article.create({ settings });
+
+    const dbValue = article._attributes.valuesForDatabase()["settings"] as string;
+    expect(typeof dbValue).toBe("string");
+    expect(dbValue).not.toBe(JSON.stringify(settings));
+
+    const reloaded = await Article.find(article.id);
+    expect(reloaded.settings).toEqual(settings);
+  });
+
   it.skip("encrypts store attributes with accessors", () => {});
   it("encryption errors when saving records will raise the error and don't save anything", async () => {
     const Book = makeBookThatWillFailToEncryptName(freshAdapter());
