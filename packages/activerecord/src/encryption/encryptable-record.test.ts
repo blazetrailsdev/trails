@@ -9,6 +9,7 @@ import {
   makeEncryptedBookWithDowncaseName,
   makeEncryptedBookIgnoreCase,
   makeEncryptedAuthor,
+  makeBookThatWillFailToEncryptName,
   makeFreshModel,
   makeKeyProvider,
   assertEncryptedAttribute,
@@ -16,6 +17,7 @@ import {
   withEncryptionContext,
   withoutEncryption,
   DecryptionError,
+  EncryptionError,
   AUTHOR_NAME_LIMIT,
 } from "./test-helpers.js";
 import { Configurable } from "./configurable.js";
@@ -300,9 +302,46 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it.skip("encrypts serialized attributes", () => {});
   it.skip("encrypts serialized attributes where encrypts is declared first", () => {});
   it.skip("encrypts store attributes with accessors", () => {});
-  it.skip("encryption errors when saving records will raise the error and don't save anything", () => {});
-  it.skip("can't modify encrypted attributes when frozen_encryption is true", () => {});
-  it.skip("can only save unencrypted attributes when frozen encryption is true", () => {});
+  it("encryption errors when saving records will raise the error and don't save anything", async () => {
+    const Book = makeBookThatWillFailToEncryptName(freshAdapter());
+    new Book();
+    const countBefore = await Book.count();
+    await expect(Book.create({ name: "Dune" })).rejects.toThrow(EncryptionError);
+    expect(await Book.count()).toBe(countBefore);
+  });
+
+  it("can't modify encrypted attributes when frozen_encryption is true", async () => {
+    const Post = makeEncryptedPost(freshAdapter());
+    new Post();
+    const post = await Post.create({ title: "Original", body: "body" });
+    post.title = "Some new title";
+    expect(post.isValid()).toBe(true);
+    withEncryptionContext({ frozenEncryption: true }, () => {
+      expect(post.isValid()).toBe(false);
+    });
+  });
+
+  it("can only save unencrypted attributes when frozen encryption is true", async () => {
+    // Build a model with one encrypted (name) and one non-encrypted (notes) attribute.
+    const adp = freshAdapter();
+    const Article = makeFreshModel(adp, { id: "integer", name: "string", notes: "string" });
+    Article.encrypts("name");
+    new Article();
+    const article = await Article.create({ name: "Dune", notes: "original" });
+    // Updating a non-encrypted attribute via save succeeds even when frozen.
+    await withEncryptionContext({ frozenEncryption: true }, async () => {
+      article.notes = "updated";
+      await article.save();
+    });
+    const reloaded = await Article.find(article.id);
+    expect(reloaded.notes).toBe("updated");
+    // Updating an encrypted attribute fails validation when frozen.
+    withEncryptionContext({ frozenEncryption: true }, () => {
+      article.name = "New title";
+      expect(article.isValid()).toBe(false);
+      expect(article.errors.added("name", "can't be modified because it is encrypted")).toBe(true);
+    });
+  });
   it("validate column sizes", async () => {
     const Author = makeEncryptedAuthor(freshAdapter());
     new Author();

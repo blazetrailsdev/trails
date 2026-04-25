@@ -25,7 +25,7 @@ import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Cipher } from "./encryption/cipher/aes256-gcm.js";
 import { globalPreviousSchemesFor, EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
-import { withoutEncryption } from "./encryption/context.js";
+import { withoutEncryption, getEncryptionContext } from "./encryption/context.js";
 
 /**
  * The simple encryptor surface `Base.encrypts({ encryptor })` accepts.
@@ -250,6 +250,34 @@ export function applyPendingEncryptions(klass: any): void {
     for (const { name } of pending) {
       EncryptableRecord.validateColumnSize(klass, name);
     }
+  }
+
+  // Register the frozen-encryption validator once per class. Own-property check
+  // so subclasses that have already snapped their callback chain don't miss it —
+  // if a subclass cloned _callbackChain before the parent installed this
+  // validator, `in` would suppress installation even though the clone lacks it.
+  // The validator reads `record.constructor._encryptedAttributes` at call time,
+  // so it correctly handles STI subclasses with different encrypted attribute sets.
+  if (
+    !Object.prototype.hasOwnProperty.call(klass, "_frozenEncryptionValidatorInstalled") &&
+    typeof klass.validate === "function"
+  ) {
+    klass._frozenEncryptionValidatorInstalled = true;
+    klass.validate((record: any) => {
+      if (!getEncryptionContext().frozenEncryption) return;
+      // Use record.constructor so STI subclasses consult their own
+      // encrypted_attributes list — mirrors Rails' self.class.encrypted_attributes.
+      const encryptedAttrs: Set<string> =
+        (record.constructor as any)._encryptedAttributes ?? new Set();
+      const changed: string[] = Array.isArray(record.changedAttributes)
+        ? record.changedAttributes
+        : [];
+      for (const attr of changed) {
+        if (encryptedAttrs.has(attr)) {
+          record.errors.add(attr, "can't be modified because it is encrypted");
+        }
+      }
+    });
   }
 }
 

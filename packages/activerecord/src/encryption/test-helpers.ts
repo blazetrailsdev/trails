@@ -15,9 +15,10 @@ import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { clearDefaultKeyProviderCache } from "./scheme.js";
 import { withEncryptionContext, withoutEncryption } from "./context.js";
-import { DecryptionError } from "./errors.js";
+import { DecryptionError, EncryptionError } from "./errors.js";
+import type { Encryptor } from "../encryption.js";
 
-export { withEncryptionContext, withoutEncryption, DecryptionError };
+export { withEncryptionContext, withoutEncryption, DecryptionError, EncryptionError };
 
 // ─── Test key material ────────────────────────────────────────────────────────
 
@@ -179,6 +180,29 @@ export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
       this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
       this.adapter = adapter;
       this.encrypts("name");
+    }
+  } as any;
+}
+
+const _failingEncryptor: Encryptor = {
+  encrypt(_value: string): string {
+    throw new EncryptionError("deliberate encryption failure");
+  },
+  decrypt(ciphertext: string): string {
+    return ciphertext;
+  },
+  isEncrypted(_text: string): boolean {
+    return false;
+  },
+};
+
+export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
+  return class BookThatWillFailToEncryptName extends Base {
+    static {
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+      this.encrypts("name", { encryptor: _failingEncryptor });
     }
   } as any;
 }

@@ -33,6 +33,7 @@ export class Context {
 export interface EncryptionContext {
   encryptionDisabled?: boolean;
   protectedMode?: boolean;
+  frozenEncryption?: boolean;
   keyProvider?: unknown;
   [key: string]: unknown;
 }
