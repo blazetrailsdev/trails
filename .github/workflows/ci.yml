@@ -5,9 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    # `labeled` fires so parity jobs can be opted in via a PR label
-    # without pushing a new commit. `run-parity` is the label name
-    # matched in the `changes` job below.
+    # Per-adapter parity labels opt in specific suites without a new commit:
+    #   run-parity-sqlite   — schema + query parity (SQLite fixtures)
+    #   run-parity-postgres — Postgres-specific parity (future)
+    #   run-parity-mysql    — MySQL/MariaDB-specific parity (future)
     types: [opened, synchronize, reopened, labeled]
   schedule:
     # Weekly post-merge sweep so slow regressions can't hide between
@@ -29,7 +30,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
-      parity_relevant: ${{ steps.filter.outputs.parity_relevant }}
+      parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
+      parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
+      parity_mysql: ${{ steps.filter.outputs.parity_mysql }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,33 +71,32 @@ jobs:
               echo "docs_only=true" >> "$GITHUB_OUTPUT"
             fi
           fi
-          # parity_relevant: the Rails↔trails parity sweep is expensive
-          # (~15-20 CI minutes of setup across 7 jobs), and almost every
-          # PR touches `packages/*/src/**`, so a path filter would still
-          # run it nearly every time. Instead run on:
-          #   - `push` to main (catches regressions immediately after merge)
-          #   - weekly `schedule` cron (catches slow drifts between pushes)
-          #   - manual `workflow_dispatch` (debugging)
-          #   - PRs carrying the `run-parity` label (opt-in per PR when
-          #     the author knows their change could shift SQL output)
-          # Plain PRs without the label skip all 7 parity jobs.
+          # Per-adapter parity gates. Each suite is expensive (~15-20 CI
+          # minutes across 7 jobs), so plain PRs skip all parity. Run on:
+          #   - push to main / schedule / workflow_dispatch → all adapters
+          #   - PRs carrying a per-adapter label → only that adapter
+          # `any(.[]; ...)` guards against the `.[].name == "..."` bug where
+          # jq -e bases exit status on the last element of a stream.
           case "${{ github.event_name }}" in
             push|schedule|workflow_dispatch)
-              echo "parity_relevant=true" >> "$GITHUB_OUTPUT"
+              echo "parity_sqlite=true"   >> "$GITHUB_OUTPUT"
+              echo "parity_postgres=true" >> "$GITHUB_OUTPUT"
+              echo "parity_mysql=true"    >> "$GITHUB_OUTPUT"
               ;;
             pull_request)
-              # `any(.[]; ...)` rather than `.[].name == "..."` because the
-              # latter emits one boolean per label and `jq -e`'s exit status
-              # reflects only the last element — so a PR with labels
-              # ["run-parity", "bug"] would miss.
-              if echo "$PR_LABELS" | jq -e 'any(.[]; .name == "run-parity")' >/dev/null; then
-                echo "parity_relevant=true" >> "$GITHUB_OUTPUT"
-              else
-                echo "parity_relevant=false" >> "$GITHUB_OUTPUT"
-              fi
+              for adapter in sqlite postgres mysql; do
+                label="run-parity-${adapter}"
+                if echo "$PR_LABELS" | jq -e --arg l "$label" 'any(.[]; .name == $l)' >/dev/null; then
+                  echo "parity_${adapter}=true"  >> "$GITHUB_OUTPUT"
+                else
+                  echo "parity_${adapter}=false" >> "$GITHUB_OUTPUT"
+                fi
+              done
               ;;
             *)
-              echo "parity_relevant=false" >> "$GITHUB_OUTPUT"
+              echo "parity_sqlite=false"   >> "$GITHUB_OUTPUT"
+              echo "parity_postgres=false" >> "$GITHUB_OUTPUT"
+              echo "parity_mysql=false"    >> "$GITHUB_OUTPUT"
               ;;
           esac
 
@@ -371,7 +373,7 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.parity_relevant == 'true'
+      needs.changes.outputs.parity_sqlite == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -415,7 +417,7 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.parity_relevant == 'true'
+      needs.changes.outputs.parity_sqlite == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -445,7 +447,7 @@ jobs:
       - schema-parity-trails
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.parity_relevant == 'true' &&
+      needs.changes.outputs.parity_sqlite == 'true' &&
       needs.schema-parity-rails.result == 'success' &&
       needs.schema-parity-trails.result == 'success'
     runs-on: ubuntu-latest
@@ -475,7 +477,7 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.parity_relevant == 'true'
+      needs.changes.outputs.parity_sqlite == 'true'
     runs-on: ubuntu-latest
     outputs:
       # Minted once per workflow run and consumed by both dump jobs so they
@@ -496,7 +498,7 @@ jobs:
       - query-parity-frozen-at
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.parity_relevant == 'true'
+      needs.changes.outputs.parity_sqlite == 'true'
     runs-on: ubuntu-latest
     env:
       PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
@@ -537,7 +539,7 @@ jobs:
       - query-parity-frozen-at
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.parity_relevant == 'true'
+      needs.changes.outputs.parity_sqlite == 'true'
     runs-on: ubuntu-latest
     env:
       PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
@@ -578,7 +580,7 @@ jobs:
       - query-parity-trails
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.parity_relevant == 'true' &&
+      needs.changes.outputs.parity_sqlite == 'true' &&
       needs.query-parity-rails.result == 'success' &&
       needs.query-parity-trails.result == 'success'
     runs-on: ubuntu-latest
