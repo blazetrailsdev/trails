@@ -402,3 +402,155 @@ describe("ComparisonValidationTest", () => {
     expect(new Score({ value: 101 }).isValid()).toBe(false);
   });
 });
+describe("ComparisonValidator", () => {
+  it("validates greaterThan", () => {
+    class Order extends Model {
+      static {
+        this.attribute("quantity", "integer");
+        this.validates("quantity", { comparison: { greaterThan: 0 } });
+      }
+    }
+    expect(new Order({ quantity: 5 }).isValid()).toBe(true);
+    expect(new Order({ quantity: 0 }).isValid()).toBe(false);
+    expect(new Order({ quantity: -1 }).isValid()).toBe(false);
+  });
+
+  it("validates greaterThanOrEqualTo", () => {
+    class Order extends Model {
+      static {
+        this.attribute("quantity", "integer");
+        this.validates("quantity", { comparison: { greaterThanOrEqualTo: 1 } });
+      }
+    }
+    expect(new Order({ quantity: 1 }).isValid()).toBe(true);
+    expect(new Order({ quantity: 0 }).isValid()).toBe(false);
+  });
+
+  it("validates lessThan", () => {
+    class Rating extends Model {
+      static {
+        this.attribute("score", "integer");
+        this.validates("score", { comparison: { lessThan: 10 } });
+      }
+    }
+    expect(new Rating({ score: 9 }).isValid()).toBe(true);
+    expect(new Rating({ score: 10 }).isValid()).toBe(false);
+  });
+
+  it("validates lessThanOrEqualTo", () => {
+    class Rating extends Model {
+      static {
+        this.attribute("score", "integer");
+        this.validates("score", { comparison: { lessThanOrEqualTo: 10 } });
+      }
+    }
+    expect(new Rating({ score: 10 }).isValid()).toBe(true);
+    expect(new Rating({ score: 11 }).isValid()).toBe(false);
+  });
+
+  it("validates comparison with equal to using numeric", () => {
+    class Confirmation extends Model {
+      static {
+        this.attribute("value", "integer");
+        this.validates("value", { comparison: { equalTo: 42 } });
+      }
+    }
+    expect(new Confirmation({ value: 42 }).isValid()).toBe(true);
+    expect(new Confirmation({ value: 43 }).isValid()).toBe(false);
+  });
+
+  it("validates comparison with other than using numeric", () => {
+    class Item extends Model {
+      static {
+        this.attribute("status", "integer");
+        this.validates("status", { comparison: { otherThan: 0 } });
+      }
+    }
+    expect(new Item({ status: 1 }).isValid()).toBe(true);
+    expect(new Item({ status: 0 }).isValid()).toBe(false);
+  });
+
+  it("validates comparison with proc", () => {
+    class Event extends Model {
+      static {
+        this.attribute("startDate", "date");
+        this.attribute("endDate", "date");
+        this.validates("endDate", {
+          comparison: { greaterThan: (record: any) => record.readAttribute("startDate") },
+        });
+      }
+    }
+    const valid = new Event({
+      startDate: new Date("2024-01-01"),
+      endDate: new Date("2024-01-02"),
+    });
+    expect(valid.isValid()).toBe(true);
+
+    const invalid = new Event({
+      startDate: new Date("2024-01-02"),
+      endDate: new Date("2024-01-01"),
+    });
+    expect(invalid.isValid()).toBe(false);
+  });
+
+  it("validates comparison with greater than using date", () => {
+    const tomorrow = new Date("2024-06-02");
+    class Booking extends Model {
+      static {
+        this.attribute("checkIn", "date");
+        this.validates("checkIn", { comparison: { greaterThanOrEqualTo: tomorrow } });
+      }
+    }
+    expect(new Booking({ checkIn: new Date("2024-06-02") }).isValid()).toBe(true);
+    expect(new Booking({ checkIn: new Date("2024-06-01") }).isValid()).toBe(false);
+  });
+
+  it("validates comparison with greater than using string", () => {
+    class Item extends Model {
+      static {
+        this.attribute("code", "string");
+        this.validates("code", { comparison: { greaterThan: "A" } });
+      }
+    }
+    expect(new Item({ code: "B" }).isValid()).toBe(true);
+    expect(new Item({ code: "A" }).isValid()).toBe(false);
+  });
+
+  it("validates comparison with nil allowed", () => {
+    class Item extends Model {
+      static {
+        this.attribute("quantity", "integer");
+        this.validates("quantity", { comparison: { greaterThan: 0 } });
+      }
+    }
+    expect(new Item({}).isValid()).toBe(true);
+  });
+
+  it("supports custom message", () => {
+    class Item extends Model {
+      static {
+        this.attribute("qty", "integer");
+        this.validates("qty", {
+          comparison: { greaterThan: 0, message: "must be positive" },
+        });
+      }
+    }
+    const item = new Item({ qty: 0 });
+    expect(item.isValid()).toBe(false);
+    expect(item.errors.fullMessages).toContain("Qty must be positive");
+  });
+
+  it("validates comparison of multiple values", () => {
+    class Score extends Model {
+      static {
+        this.attribute("value", "integer");
+        this.validates("value", {
+          comparison: { greaterThanOrEqualTo: 0, lessThanOrEqualTo: 100 },
+        });
+      }
+    }
+    expect(new Score({ value: 50 }).isValid()).toBe(true);
+    expect(new Score({ value: -1 }).isValid()).toBe(false);
+    expect(new Score({ value: 101 }).isValid()).toBe(false);
+  });
+});

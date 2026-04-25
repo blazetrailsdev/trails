@@ -497,3 +497,79 @@ describe("SerializationTest", () => {
     });
   });
 });
+describe("Serialization", () => {
+  class Post extends Model {
+    static {
+      this.attribute("title", "string");
+      this.attribute("body", "string");
+      this.attribute("rating", "integer");
+    }
+
+    get summary(): string {
+      return String(this.readAttribute("title")).slice(0, 10);
+    }
+  }
+
+  it("method serializable hash should work", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    expect(p.serializableHash()).toEqual({
+      title: "Hello",
+      body: "World",
+      rating: 5,
+    });
+  });
+
+  it("method serializable hash should work with only option", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    expect(p.serializableHash({ only: ["title"] })).toEqual({
+      title: "Hello",
+    });
+  });
+
+  it("method serializable hash should work with except option", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    expect(p.serializableHash({ except: ["body"] })).toEqual({
+      title: "Hello",
+      rating: 5,
+    });
+  });
+
+  it("method serializable hash should work with methods option", () => {
+    const p = new Post({ title: "Hello World!", body: "c", rating: 3 });
+    const result = p.serializableHash({ methods: ["summary"] });
+    expect(result.summary).toBe("Hello Worl");
+  });
+
+  it("method serializable hash should work with only and methods", () => {
+    const p = new Post({ title: "Test", body: "c", rating: 3 });
+    const result = p.serializableHash({
+      only: ["title"],
+      methods: ["summary"],
+    });
+    expect(Object.keys(result).sort()).toEqual(["summary", "title"]);
+  });
+
+  it("asJson returns same as serializableHash", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    expect(p.asJson()).toEqual(p.serializableHash());
+  });
+
+  it("toJson returns valid JSON string", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    const parsed = JSON.parse(p.toJson());
+    expect(parsed.title).toBe("Hello");
+    expect(parsed.rating).toBe(5);
+  });
+
+  it("include as string for single association", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    const author = { _attributes: new Map([["name", "Alice"]]) };
+    (p as any)._preloadedAssociations = new Map([["author", author]]);
+    const result = p.serializableHash({ include: "author" });
+    expect((result.author as any).name).toBe("Alice");
+  });
+});
+
+// =========================================================================
+// Types — Date, DateTime, Decimal
+// =========================================================================

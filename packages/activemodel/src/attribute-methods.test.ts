@@ -316,3 +316,18 @@ describe("AttributeMethodsTest", () => {
     expect(p.readAttribute("name")).toBe("Alice");
   });
 });
+describe("hasAttribute", () => {
+  it("returns true for defined attributes", () => {
+    class Widget extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("size", "integer");
+      }
+    }
+
+    const w = new Widget({ name: "Test" });
+    expect(w.hasAttribute("name")).toBe(true);
+    expect(w.hasAttribute("size")).toBe(true);
+    expect(w.hasAttribute("unknown")).toBe(false);
+  });
+});

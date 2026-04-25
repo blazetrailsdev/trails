@@ -1321,3 +1321,131 @@ describe("ValidationsTest", () => {
     });
   });
 });
+describe("validatesEach", () => {
+  it("validates each", () => {
+    class Payment extends Model {
+      static {
+        this.attribute("price", "integer");
+        this.attribute("discount", "integer");
+        this.validatesEach(["price", "discount"], (record, attr, value) => {
+          if (typeof value === "number" && value < 0) {
+            record.errors.add(attr, "invalid", { message: "must be non-negative" });
+          }
+        });
+      }
+    }
+
+    const p = new Payment({ price: -5, discount: 10 });
+    expect(p.isValid()).toBe(false);
+    expect(p.errors.fullMessages).toContain("Price must be non-negative");
+
+    const p2 = new Payment({ price: 5, discount: -3 });
+    expect(p2.isValid()).toBe(false);
+    expect(p2.errors.fullMessages).toContain("Discount must be non-negative");
+
+    const p3 = new Payment({ price: 5, discount: 10 });
+    expect(p3.isValid()).toBe(true);
+  });
+
+  it("supports conditional options", () => {
+    class Payment extends Model {
+      static {
+        this.attribute("price", "integer");
+        this.attribute("discount", "integer");
+        this.validatesEach(
+          ["price", "discount"],
+          (record, attr, value) => {
+            if (typeof value === "number" && value < 0) {
+              record.errors.add(attr, "invalid", { message: "must be non-negative" });
+            }
+          },
+          { if: (record) => record.readAttribute("price") !== null },
+        );
+      }
+    }
+
+    const p = new Payment({ price: null, discount: -3 });
+    expect(p.isValid()).toBe(true);
+  });
+});
+
+describe("validatesWith", () => {
+  it("validation with class that adds errors", () => {
+    class EvenValidator {
+      validate(record: any) {
+        const val = record.readAttribute("count");
+        if (typeof val === "number" && val % 2 !== 0) {
+          record.errors.add("count", "invalid", { message: "must be even" });
+        }
+      }
+    }
+
+    class Item extends Model {
+      static {
+        this.attribute("count", "integer");
+        this.validatesWith(EvenValidator);
+      }
+    }
+
+    const item = new Item({ count: 3 });
+    expect(item.isValid()).toBe(false);
+    expect(item.errors.fullMessages).toContain("Count must be even");
+
+    const item2 = new Item({ count: 4 });
+    expect(item2.isValid()).toBe(true);
+  });
+
+  it("passes all configuration options to the validator class", () => {
+    class ThresholdValidator {
+      threshold: number;
+      constructor(options: any = {}) {
+        this.threshold = options.threshold ?? 10;
+      }
+      validate(record: any) {
+        const val = record.readAttribute("score");
+        if (typeof val === "number" && val < this.threshold) {
+          record.errors.add("score", "invalid", {
+            message: `must be at least ${this.threshold}`,
+          });
+        }
+      }
+    }
+
+    class Game extends Model {
+      static {
+        this.attribute("score", "integer");
+        this.validatesWith(ThresholdValidator, { threshold: 50 });
+      }
+    }
+
+    const g = new Game({ score: 30 });
+    expect(g.isValid()).toBe(false);
+    expect(g.errors.fullMessages).toContain("Score must be at least 50");
+
+    const g2 = new Game({ score: 60 });
+    expect(g2.isValid()).toBe(true);
+  });
+
+  it("supports conditional options", () => {
+    class AlwaysInvalidValidator {
+      validate(record: any) {
+        record.errors.add("base", "invalid", { message: "always invalid" });
+      }
+    }
+
+    class Widget extends Model {
+      static {
+        this.attribute("active", "boolean");
+        this.validatesWith(AlwaysInvalidValidator, {
+          if: (r: any) => r.readAttribute("active") === true,
+        });
+      }
+    }
+
+    const w = new Widget({ active: false });
+    expect(w.isValid()).toBe(true);
+
+    const w2 = new Widget({ active: true });
+    expect(w2.isValid()).toBe(false);
+  });
+});

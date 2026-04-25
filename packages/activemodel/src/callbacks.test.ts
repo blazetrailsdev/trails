@@ -693,3 +693,229 @@ describe("unified sync/async runner", () => {
     expect(log).toEqual(["before", "block", "after"]);
   });
 });
+describe("Callbacks", () => {
+  it("before/after callbacks run in order", () => {
+    const order: string[] = [];
+    class Ordered extends Model {
+      static {
+        this.attribute("name", "string");
+        this.beforeSave(() => {
+          order.push("before");
+        });
+        this.afterSave(() => {
+          order.push("after");
+        });
+      }
+    }
+    const o = new Ordered();
+    o.runCallbacks("save", () => {
+      order.push("action");
+    });
+    expect(order).toEqual(["before", "action", "after"]);
+  });
+
+  it("around callbacks wrap the action", () => {
+    const order: string[] = [];
+    class Around extends Model {
+      static {
+        this.attribute("name", "string");
+        this.aroundSave((_record, proceed) => {
+          order.push("around_before");
+          proceed();
+          order.push("around_after");
+        });
+      }
+    }
+    const a = new Around();
+    a.runCallbacks("save", () => {
+      order.push("action");
+    });
+    expect(order).toEqual(["around_before", "action", "around_after"]);
+  });
+
+  it("further callbacks should not be called if before validation throws abort", () => {
+    const order: string[] = [];
+    class Halting extends Model {
+      static {
+        this.attribute("name", "string");
+        this.beforeSave(() => {
+          order.push("before");
+          return false;
+        });
+        this.afterSave(() => {
+          order.push("after");
+        });
+      }
+    }
+    const h = new Halting();
+    const result = h.runCallbacks("save", () => {
+      order.push("action");
+    });
+    expect(result).toBe(false);
+    expect(order).toEqual(["before"]);
+    expect(order).not.toContain("action");
+    expect(order).not.toContain("after");
+  });
+
+  it("before_validation halting prevents validations from running", () => {
+    class NoValidate extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+        this.beforeValidation(() => false);
+      }
+    }
+    const n = new NoValidate();
+    expect(n.isValid()).toBe(false);
+    expect(n.errors.count).toBe(0); // validations never ran
+  });
+
+  it("complete callback chain", () => {
+    const order: string[] = [];
+    class Full extends Model {
+      static {
+        this.beforeSave(() => {
+          order.push("before_save");
+        });
+        this.aroundSave((_r, proceed) => {
+          order.push("around_before");
+          proceed();
+          order.push("around_after");
+        });
+        this.afterSave(() => {
+          order.push("after_save");
+        });
+      }
+    }
+    new Full().runCallbacks("save", () => {
+      order.push("save");
+    });
+    expect(order).toEqual(["before_save", "around_before", "save", "around_after", "after_save"]);
+  });
+});
+
+describe("Callbacks (extended)", () => {
+  it("afterValidation runs after validation", () => {
+    const order: string[] = [];
+    class Validated extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+        this.afterValidation(() => {
+          order.push("after_validation");
+        });
+      }
+    }
+    const v = new Validated({ name: "dean" });
+    v.isValid();
+    expect(order).toContain("after_validation");
+  });
+
+  it("afterValidation runs even when invalid", () => {
+    const order: string[] = [];
+    class Validated extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+        this.afterValidation(() => {
+          order.push("after_validation");
+        });
+      }
+    }
+    const v = new Validated();
+    v.isValid();
+    expect(order).toContain("after_validation");
+  });
+
+  it("callback inheritance — child inherits parent callbacks", () => {
+    const order: string[] = [];
+    class Parent extends Model {
+      static {
+        this.attribute("name", "string");
+        this.beforeSave(() => {
+          order.push("parent_before");
+        });
+      }
+    }
+    class Child extends Parent {
+      static {
+        this.beforeSave(() => {
+          order.push("child_before");
+        });
+      }
+    }
+    const c = new Child();
+    c.runCallbacks("save", () => {
+      order.push("action");
+    });
+    expect(order).toContain("parent_before");
+    expect(order).toContain("child_before");
+    expect(order.indexOf("parent_before")).toBeLessThan(order.indexOf("child_before"));
+  });
+
+  it("child callbacks do not affect parent", () => {
+    const parentOrder: string[] = [];
+    const childOrder: string[] = [];
+    class Parent extends Model {
+      static {
+        this.attribute("name", "string");
+        this.beforeSave(() => {
+          parentOrder.push("parent");
+          childOrder.push("parent");
+        });
+      }
+    }
+    class Child extends Parent {
+      static {
+        this.beforeSave(() => {
+          childOrder.push("child");
+        });
+      }
+    }
+    new Parent().runCallbacks("save", () => {
+      parentOrder.push("action");
+    });
+    expect(parentOrder).not.toContain("child");
+  });
+
+  it("custom validate with method name string", () => {
+    class WithMethod extends Model {
+      static {
+        this.attribute("value", "integer");
+        this.validate("validateCustom");
+      }
+      validateCustom() {
+        if (this.readAttribute("value") === 0) {
+          this.errors.add("value", "invalid", { message: "cannot be zero" });
+        }
+      }
+    }
+    expect(new WithMethod({ value: 1 }).isValid()).toBe(true);
+    const w = new WithMethod({ value: 0 });
+    expect(w.isValid()).toBe(false);
+    expect(w.errors.get("value")).toContain("cannot be zero");
+  });
+});
+
+describe("afterCommit / afterRollback callbacks", () => {
+  it("registers afterCommit callback", () => {
+    class Order extends Model {
+      static {
+        this.attribute("total", "integer");
+        this.afterCommit(() => {});
+      }
+    }
+    // Should not throw
+    expect(new Order({ total: 1 }).isValid()).toBe(true);
+  });
+
+  it("registers afterRollback callback", () => {
+    class Order extends Model {
+      static {
+        this.attribute("total", "integer");
+        this.afterRollback(() => {});
+      }
+    }
+    expect(new Order({ total: 1 }).isValid()).toBe(true);
+  });
+});
