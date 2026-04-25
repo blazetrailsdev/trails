@@ -53,23 +53,46 @@ export const ImmutableString = ImmutableStringType;
 export const String = StringType;
 export const Value = ValueType;
 
-const registry = new AdapterSpecificRegistry();
+let _registry = new AdapterSpecificRegistry();
+let _defaultValue: Type | undefined;
+let _currentAdapterResolver: (() => string) | undefined;
 
-registry.register("big_integer", BigIntegerType);
-registry.register("binary", BinaryType);
-registry.register("boolean", BooleanType);
-registry.register("date", Date);
-registry.register("datetime", DateTime);
-registry.register("decimal", DecimalType);
-registry.register("float", FloatType);
-registry.register("integer", IntegerType);
-registry.register("immutable_string", ImmutableStringType);
-registry.register("json", Json);
-registry.register("string", StringType);
-registry.register("text", Text);
-registry.register("time", Time);
+_registry.register("big_integer", BigIntegerType, { override: false });
+_registry.register("binary", BinaryType, { override: false });
+_registry.register("boolean", BooleanType, { override: false });
+_registry.register("date", Date, { override: false });
+_registry.register("datetime", DateTime, { override: false });
+_registry.register("decimal", DecimalType, { override: false });
+_registry.register("float", FloatType, { override: false });
+_registry.register("integer", IntegerType, { override: false });
+_registry.register("immutable_string", ImmutableStringType, { override: false });
+_registry.register("json", Json, { override: false });
+_registry.register("string", StringType, { override: false });
+_registry.register("text", Text, { override: false });
+_registry.register("time", Time, { override: false });
 
-export { registry };
+/** Mirrors Rails' `ActiveRecord::Type.registry` (attr_accessor getter). */
+export function registry(): AdapterSpecificRegistry {
+  return _registry;
+}
+
+/**
+ * Mirrors Rails' `ActiveRecord::Type.registry=` (attr_accessor setter).
+ *
+ * Replaces the active registry wholesale. Callers are responsible for
+ * re-registering any types they need — this is intentional: Rails' own
+ * TypeTest swaps in a blank AdapterSpecificRegistry per test and restores
+ * the original in teardown, so a pre-populated registry is not the default.
+ */
+export function setRegistry(r: AdapterSpecificRegistry): void {
+  _registry = r;
+  _defaultValue = undefined;
+}
+
+// Called by Base to wire the real connection adapter into type lookups.
+export function setCurrentAdapterResolver(resolver: () => string): void {
+  _currentAdapterResolver = resolver;
+}
 
 export function register(
   typeName: string,
@@ -77,15 +100,16 @@ export function register(
   options?: { adapter?: string; override?: boolean },
   block?: (...args: unknown[]) => Type,
 ): void {
-  registry.register(typeName, klass, options, block);
+  _registry.register(typeName, klass, options, block);
 }
 
 export function lookup(symbol: string, options?: { adapter?: string }): Type {
-  return registry.lookup(symbol, options);
+  const adapter = options?.adapter ?? currentAdapterName();
+  return _registry.lookup(symbol, { ...options, adapter });
 }
 
 export function defaultValue(): Type {
-  return new ValueType();
+  return (_defaultValue ??= new ValueType());
 }
 
 /**
@@ -99,8 +123,10 @@ export function adapterNameFrom(model: { adapter?: unknown }): string {
 }
 
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.
+// When Base wires setCurrentAdapterResolver(), it reads the real connection adapter.
 export function currentAdapterName(getBase?: () => { adapter?: unknown }): string {
-  return getBase ? adapterNameFrom(getBase()) : "sqlite";
+  if (getBase) return adapterNameFrom(getBase());
+  return _currentAdapterResolver?.() ?? "sqlite";
 }
 
 // Override ActiveModel's type registry with AR-specific types so that
