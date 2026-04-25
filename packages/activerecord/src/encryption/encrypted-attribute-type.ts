@@ -11,6 +11,32 @@ import {
 } from "./errors.js";
 import { NullEncryptor } from "./null-encryptor.js";
 
+function _normalizeEncoding(encoding: string): "utf8" | "ascii" | "latin1" | null {
+  switch (encoding.toLowerCase().replace(/[^a-z0-9]/g, "")) {
+    case "utf8":
+      return "utf8";
+    case "ascii":
+    case "usascii":
+      return "ascii";
+    case "latin1":
+    case "iso88591":
+    case "binary":
+    case "ascii8bit":
+      return "latin1";
+    default:
+      return null;
+  }
+}
+
+function _replaceUnencodable(value: string, maxCodePoint: number): string {
+  const out: string[] = [];
+  for (const char of value) {
+    const cp = char.codePointAt(0)!;
+    out.push(cp > maxCodePoint || (cp >= 0xd800 && cp <= 0xdfff) ? "?" : char);
+  }
+  return out.join("");
+}
+
 /**
  * An ActiveModel type that encrypts/decrypts attribute values. This is
  * the central piece connecting the encryption system with `encrypts`
@@ -88,7 +114,9 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     const casted = this.castType.serialize?.(value) ?? value;
     if (casted === null || casted === undefined) return null;
     const str = typeof casted === "string" ? casted : String(casted);
-    const toEncrypt = this.scheme.downcase || this.scheme.ignoreCase ? str.toLowerCase() : str;
+    const normalized = this.deterministic ? this._applyForcedEncoding(str) : str;
+    const toEncrypt =
+      this.scheme.downcase || this.scheme.ignoreCase ? normalized.toLowerCase() : normalized;
     return this.encrypt(toEncrypt);
   }
 
@@ -182,6 +210,14 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
       return value;
     }
     throw error;
+  }
+
+  private _applyForcedEncoding(value: string): string {
+    const forced = Configurable.config.forcedEncodingForDeterministicEncryption;
+    if (!forced) return value;
+    const enc = _normalizeEncoding(forced);
+    if (enc === null || enc === "utf8") return value;
+    return _replaceUnencodable(value, enc === "ascii" ? 0x7f : 0xff);
   }
 
   private encrypt(value: string): string {

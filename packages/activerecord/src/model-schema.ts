@@ -610,6 +610,7 @@ export function loadSchema(this: SchemaHost): void {
         name,
         type: def.type?.name ?? null,
         default: def.defaultValue ?? null,
+        limit: (def as any).limit ?? null,
       };
     }
     workHost._columnsHash = hash;
@@ -703,6 +704,7 @@ function applyColumnsHash(
     }
 
     const defaultValue = (column as { default?: unknown }).default ?? null;
+    const colLimit = (column as { limit?: number | null }).limit ?? null;
 
     host._attributeDefinitions.set(name, {
       name,
@@ -710,6 +712,7 @@ function applyColumnsHash(
       defaultValue,
       userProvided: false,
       source: "schema",
+      ...(colLimit != null ? { limit: colLimit } : {}),
     });
 
     if (name === "id") {

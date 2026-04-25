@@ -23,7 +23,7 @@ import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Cipher } from "./encryption/cipher/aes256-gcm.js";
-import { globalPreviousSchemesFor } from "./encryption/encryptable-record.js";
+import { globalPreviousSchemesFor, EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { withoutEncryption } from "./encryption/context.js";
 
@@ -203,6 +203,9 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
   for (const name of names) {
     klass._pendingEncryptions.push({ name, scheme });
     klass._encryptedAttributes.add(name);
+    if (Configurable.config.validateColumnSize) {
+      EncryptableRecord.validateColumnSize(klass, name);
+    }
   }
 
   if (klass._attributeDefinitions?.size > 0) {
@@ -237,6 +240,16 @@ export function applyPendingEncryptions(klass: any): void {
       [name],
       (_attrName: string, castType: Type) => new EncryptedAttributeType({ scheme, castType }),
     );
+  }
+
+  // Re-run column-size validation after schema reflection so limits learned
+  // from the DB (not declared via attribute()) are also picked up. Safe even
+  // if validateColumnSize already ran at encrypts() time — it guards against
+  // registering the same LengthValidator twice.
+  if (Configurable.config.validateColumnSize) {
+    for (const { name } of pending) {
+      EncryptableRecord.validateColumnSize(klass, name);
+    }
   }
 }
 

@@ -121,8 +121,14 @@ function extractColumnsFromModels(): void {
     if (attrs) {
       for (const [name, def] of attrs) {
         if (name === "id" && !isCpk && !isCustomPk) continue;
-        let colType = sqlType(def.type?.name || "string");
-        if (isMysql() && pkCols.includes(name) && colType === "TEXT") {
+        const innerType = (def.type as any)?.castType ?? def.type;
+        let colType = sqlType(innerType?.name || "string");
+        const limit = (def as any).limit;
+        const innerTypeName = innerType?.name;
+        const isStringType = innerTypeName === "string" || innerTypeName === "text";
+        if (limit != null && isStringType && (colType === "TEXT" || colType === "VARCHAR(255)")) {
+          colType = `VARCHAR(${limit})`;
+        } else if (isMysql() && pkCols.includes(name) && colType === "TEXT") {
           colType = "VARCHAR(255)";
         }
         columns.set(name, colType);

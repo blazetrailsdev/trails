@@ -28,6 +28,7 @@ interface AttributeDefinition {
   defaultValue?: unknown;
   userProvided?: boolean;
   source?: "user" | "schema";
+  limit?: number | null;
 }
 
 /**
@@ -36,11 +37,15 @@ interface AttributeDefinition {
  * Mirrors: ActiveRecord::Attributes (class-level methods)
  */
 export interface Attributes {
-  attribute(name: string, type: string, options?: { default?: unknown }): void;
+  attribute(
+    name: string,
+    type: string,
+    options?: { default?: unknown; limit?: number | null },
+  ): void;
   defineAttribute(
     name: string,
     castType: Type,
-    options?: { default?: unknown; userProvidedDefault?: boolean },
+    options?: { default?: unknown; userProvidedDefault?: boolean; limit?: number | null },
   ): void;
   _defaultAttributes(): AttributeSet;
 }
@@ -58,7 +63,7 @@ export function defineAttribute(
   this: AnyClass,
   name: string,
   castType: Type,
-  options: { default?: unknown; userProvidedDefault?: boolean } = {},
+  options: { default?: unknown; userProvidedDefault?: boolean; limit?: number | null } = {},
 ): void {
   // STI subclasses share the base's _attributeDefinitions — route to the
   // base to avoid forking a subclass-local map that drifts from the base.
@@ -86,6 +91,7 @@ export function defineAttribute(
     defaultValue: resolvedDefault ?? null,
     userProvided: userProvidedDefault,
     source: userProvidedDefault ? "user" : "schema",
+    ...(options.limit != null ? { limit: options.limit } : {}),
   });
 
   resetDefaultAttributes(this);

@@ -577,7 +577,12 @@ export class Base extends Model {
   static attribute(
     name: string,
     typeName: string,
-    options?: { default?: unknown; virtual?: boolean; userProvidedDefault?: boolean },
+    options?: {
+      default?: unknown;
+      virtual?: boolean;
+      userProvidedDefault?: boolean;
+      limit?: number | null;
+    },
   ): void {
     // STI subclasses share the base's `_attributeDefinitions` — matching
     // Rails' `ActiveRecord::Inheritance` where `attribute_types` is a

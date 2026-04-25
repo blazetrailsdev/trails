@@ -36,6 +36,7 @@ interface ConfigSnapshot {
   keyDerivationSalt: string | undefined;
   supportUnencryptedData: boolean;
   previousSchemes: typeof Configurable.config.previousSchemes;
+  forcedEncodingForDeterministicEncryption: string;
 }
 
 export function snapshotEncryptionConfig(): ConfigSnapshot {
@@ -46,6 +47,7 @@ export function snapshotEncryptionConfig(): ConfigSnapshot {
     keyDerivationSalt: c.keyDerivationSalt,
     supportUnencryptedData: c.supportUnencryptedData,
     previousSchemes: [...c.previousSchemes],
+    forcedEncodingForDeterministicEncryption: c.forcedEncodingForDeterministicEncryption,
   };
 }
 
@@ -56,6 +58,7 @@ export function restoreEncryptionConfig(snapshot: ConfigSnapshot): void {
   c.keyDerivationSalt = snapshot.keyDerivationSalt;
   c.supportUnencryptedData = snapshot.supportUnencryptedData;
   c.previousSchemes = snapshot.previousSchemes;
+  c.forcedEncodingForDeterministicEncryption = snapshot.forcedEncodingForDeterministicEncryption;
   Contexts.resetDefaultContext();
   // Eagerly clear so the previous test's key material doesn't linger in
   // memory after config reset — the lazy clear on next keyProvider access
@@ -138,7 +141,7 @@ export function makeEncryptedBook(adapter: DatabaseAdapter) {
   return class EncryptedBook extends Base {
     static {
       this.attribute("id", "integer");
-      this.attribute("name", "string");
+      this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
       this.encrypts("name", { deterministic: true });
     }
@@ -167,11 +170,13 @@ export function makeEncryptedBookIgnoreCase(adapter: DatabaseAdapter) {
   } as any;
 }
 
+export const AUTHOR_NAME_LIMIT = 100;
+
 export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
   return class EncryptedAuthor extends Base {
     static {
       this.attribute("id", "integer");
-      this.attribute("name", "string");
+      this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
       this.adapter = adapter;
       this.encrypts("name");
     }

@@ -13,6 +13,7 @@ export interface AttributeDefinition {
   type: Type;
   defaultValue: unknown;
   virtual?: boolean;
+  limit?: number | null;
   /**
    * True when the attribute was declared via `this.attribute(...)` (user code).
    * False when registered from schema reflection (`load_schema`).
@@ -72,6 +73,7 @@ export function attribute(
      * on re-registration.
      */
     userProvidedDefault?: boolean;
+    limit?: number | null;
   },
 ): void {
   const type = typeRegistry.lookup(typeName);
@@ -92,6 +94,7 @@ export function attribute(
     virtual: options?.virtual,
     userProvided,
     source: userProvided ? "user" : "schema",
+    ...(options?.limit != null ? { limit: options.limit } : {}),
   });
 
   // Push to pending-modification queue so _defaultAttributes() replays in

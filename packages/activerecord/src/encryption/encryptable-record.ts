@@ -1,4 +1,5 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
+import { LengthValidator } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { KeyGenerator } from "./key-generator.js";
@@ -138,10 +139,31 @@ export class EncryptableRecord {
           // adapter-resolved type (applyPendingEncryptions re-runs after).
           userProvided: existingDef?.userProvided ?? false,
           source: existingDef?.source ?? "schema",
+          ...((existingDef as any)?.limit != null ? { limit: (existingDef as any).limit } : {}),
         });
       }
 
+      if (Configurable.config.validateColumnSize) {
+        EncryptableRecord.validateColumnSize(modelClass, name);
+      }
+
       Configurable.encryptedAttributeWasDeclared(modelClass, name);
+    }
+  }
+
+  static validateColumnSize(modelClass: any, attribute: string): void {
+    if (typeof modelClass.validatesLengthOf !== "function") return;
+    const limit = (modelClass._attributeDefinitions?.get(attribute) as any)?.limit;
+    if (limit == null) return;
+    // Guard against double registration (called at encrypts() time and again
+    // after schema reflection). Check whether a LengthValidator with this
+    // exact maximum already exists for the attribute.
+    const existing: unknown[] = modelClass._validators?.get(attribute) ?? [];
+    const alreadyRegistered = existing.some(
+      (v: unknown) => v instanceof LengthValidator && (v as any).options?.maximum === limit,
+    );
+    if (!alreadyRegistered) {
+      modelClass.validatesLengthOf(attribute, { maximum: limit });
     }
   }
 
