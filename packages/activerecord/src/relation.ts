@@ -2942,13 +2942,13 @@ export class Relation<T extends Base> {
         if (/^[\w$]+(\.[\w$]+)+$/.test(col)) {
           const lit = new Nodes.SqlLiteral(col);
           manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
-        } else if (this._isKnownColumn(col)) {
-          manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
-        } else {
+        } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(col)) {
           const unqual = new Nodes.UnqualifiedColumn(table.get(col));
           manager.order(
             dir === "desc" ? new Nodes.Descending(unqual) : new Nodes.Ascending(unqual),
           );
+        } else {
+          manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
         }
       }
     }
@@ -3353,11 +3353,12 @@ export class Relation<T extends Base> {
       typeof modelPbAccessor === "function"
         ? modelPbAccessor.call(this._modelClass)
         : modelPbAccessor;
+    const metadata = new TableMetadata(this._modelClass, this.table);
     if (modelPb && typeof modelPb.with === "function") {
-      const metadata = new TableMetadata(this._modelClass, this.table);
       pb = modelPb.with(metadata);
     } else {
       pb = new PredicateBuilder(this.table);
+      pb.setTableContext(metadata);
     }
     this._predicateBuilder = pb;
     return pb;

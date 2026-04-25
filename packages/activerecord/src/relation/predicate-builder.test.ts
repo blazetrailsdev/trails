@@ -1,8 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Table, Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
+import { TableMetadata } from "../table-metadata.js";
+import { Base, registerModel, modelRegistry } from "../index.js";
 
 describe("PredicateBuilderTest", () => {
   it.skip("registering new handlers", () => {});
@@ -148,6 +150,71 @@ describe("PredicateBuilderTest", () => {
       const sql = visitor.compile(node);
       expect(sql).toContain('"users"."name"');
       expect(sql).toContain("alice");
+    });
+  });
+
+  describe("nested table-keyed hash expansion", () => {
+    class PbTestAuthor extends Base {
+      static {
+        this.tableName = "authors";
+      }
+    }
+    class PbTestPost extends Base {
+      static {
+        this.tableName = "posts";
+        this.belongsTo("author");
+      }
+    }
+
+    beforeAll(() => {
+      registerModel("Author", PbTestAuthor);
+      registerModel("Post", PbTestPost);
+    });
+
+    afterAll(() => {
+      modelRegistry.delete("Author");
+      modelRegistry.delete("Post");
+    });
+
+    it("expands where({authors: {name: 'Rails'}}) to \"authors\".\"name\" = 'Rails'", () => {
+      const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
+      const builder = meta.predicateBuilder;
+      const nodes = builder.buildFromHash({ authors: { name: "Rails" } });
+      const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
+      expect(sql).toContain('"authors"."name"');
+      expect(sql).toContain("Rails");
+      expect(sql).not.toContain('"posts"."authors"');
+    });
+
+    it("negated form expands whereNot({authors: {name: 'Rails'}}) to NOT \"authors\".\"name\" = 'Rails'", () => {
+      const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
+      const builder = meta.predicateBuilder;
+      const nodes = builder.buildNegatedFromHash({ authors: { name: "Rails" } });
+      const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
+      expect(sql).toContain('"authors"."name"');
+      expect(sql).toContain("Rails");
+      expect(sql).not.toContain('"posts"."authors"');
+      expect(sql).toMatch(/NOT\b|!=|<>/);
+    });
+
+    it("does not expand when key is a known column on the current table (mirrors Rails !table.has_column? guard)", () => {
+      class PbTestProduct extends Base {
+        static {
+          this.tableName = "products";
+          this.attribute("metadata", "string");
+          registerModel("PbTestProduct", this);
+        }
+      }
+      try {
+        const meta = new TableMetadata(PbTestProduct as any, new Table("products"));
+        const builder = meta.predicateBuilder;
+        const nodes = builder.buildFromHash({ metadata: { foo: "bar" } });
+        const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
+        expect(sql).toContain('"products"."metadata"');
+        expect(sql).not.toContain('"metadata"."foo"');
+      } finally {
+        modelRegistry.delete("PbTestProduct");
+      }
     });
   });
 });

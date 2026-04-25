@@ -220,6 +220,21 @@ describe("RelationTest", () => {
     expect(sql).not.toContain("authors.name");
   });
 
+  it("hash-form order qualifies column with table name", () => {
+    class User extends Base {
+      static {
+        this.tableName = "users";
+        this.adapter = adapter;
+      }
+    }
+    const sql = User.order({ created_at: "desc" }).limit(10).toSql();
+    expect(sql).toContain('"users"."created_at" DESC');
+
+    const multiKeySql = User.order({ title: "asc", id: "desc" }).limit(10).toSql();
+    expect(multiKeySql).toContain('"users"."title" ASC');
+    expect(multiKeySql).toContain('"users"."id" DESC');
+  });
+
   it("multiple selects", () => {
     class Post extends Base {
       static {

@@ -28,6 +28,7 @@ export class PredicateBuilder {
   private relationHandler: RelationHandler;
   private associationMap: Map<string, AssociationMapping> = new Map();
   private handlers: Array<[any, { call(attr: Nodes.Attribute, value: any): Nodes.Node }]> = [];
+  private _tableContext: any = null;
 
   constructor(table: Table) {
     this.table = table;
@@ -89,6 +90,17 @@ export class PredicateBuilder {
             nodes.push(new Nodes.Not(new Nodes.Grouping(g)));
           }
         }
+      } else if (
+        isPlainObject(value) &&
+        this._tableContext &&
+        typeof this._tableContext.associatedTable === "function" &&
+        !this._tableContext.hasColumn?.(key)
+      ) {
+        const assocPb: PredicateBuilder = this._tableContext.associatedTable(key).predicateBuilder;
+        const innerNodes = negated
+          ? assocPb.buildNegatedFromHash(value as Record<string, unknown>)
+          : assocPb.buildFromHash(value as Record<string, unknown>);
+        nodes.push(...innerNodes);
       } else {
         const attr = this.resolveColumn(key);
         nodes.push(negated ? this.buildNegated(attr, value) : this.build(attr, value));
@@ -336,11 +348,17 @@ export class PredicateBuilder {
   }
 
   with(context: any): PredicateBuilder {
-    const builder = new PredicateBuilder(this.table);
+    const table = context?.arelTable ?? this.table;
+    const builder = new PredicateBuilder(table);
     builder.setAssociationMap(this.associationMap);
     builder.handlers = [...this.handlers];
-    (builder as any)._context = context;
+    builder._tableContext = context;
     return builder;
+  }
+
+  /** Set context without cloning — use only when constructing a fresh builder. */
+  setTableContext(context: any): void {
+    this._tableContext = context;
   }
 
   static references(conditions: Record<string, unknown>): Nodes.SqlLiteral[] {
