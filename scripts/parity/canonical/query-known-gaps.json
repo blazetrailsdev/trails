@@ -66,5 +66,17 @@
   "ar-23": {
     "side": "diff",
     "reason": "ORDER BY column qualification with .from(...) using a single raw SQL string that already includes the alias: trails qualifies the order column to '\"developers\".\"hotness\"'; Rails leaves it bare as '\"hotness\"'. Same SQL semantic, lexically differ. Inverse direction from ar-17's GROUP BY case."
+  },
+  "ar-29": {
+    "side": "diff",
+    "reason": ".lock on SQLite: trails emits 'FOR UPDATE' regardless of adapter; Rails knows SQLite has no row-level locking and emits no lock clause. trails should make Relation#lock adapter-aware (mirror Rails' AbstractAdapter#lock_clause / SQLite returning empty)."
+  },
+  "ar-32": {
+    "side": "diff",
+    "reason": "in_order_of: multiple divergences vs Rails. (1) Rails adds WHERE \"books\".\"status\" IN (values) to filter to the named set; trails omits it. (2) Rails CASE values are 1-indexed; trails 0-indexed with ELSE branch. (3) Rails appends ASC; trails leaves direction bare. (4) Rails qualifies the column ('\"books\".\"status\"'); trails leaves it bare. Real implementation gap — trails Relation#inOrderOf is incomplete vs ActiveRecord::QueryMethods#in_order_of."
+  },
+  "ar-33": {
+    "side": "diff",
+    "reason": "Relation#select with an Arel attribute As node: trails emits literal '[object Object]' because Relation#select accepts only string | SqlLiteral and toString-coerces other inputs; Rails accepts Arel nodes and renders them via the visitor. trails-missing: select() should accept Arel nodes (Attribute, As, etc.) and call toSql on them."
   }
 }

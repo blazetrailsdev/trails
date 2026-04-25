@@ -1,0 +1,1 @@
+Book.select(:id, :title)
