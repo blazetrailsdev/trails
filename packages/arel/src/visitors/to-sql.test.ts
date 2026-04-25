@@ -753,13 +753,54 @@ describe("the to_sql visitor", () => {
   it("should visit_Date", () => {
     const d = new Date("2020-01-02T12:00:00.000Z");
     const sql = new Visitors.ToSql().compile(new Nodes.Quoted(d));
-    expect(sql).toBe("'2020-01-02T12:00:00.000Z'");
+    // Mirrors Rails' AbstractAdapter#quoted_date: space separator, seconds precision.
+    expect(sql).toBe("'2020-01-02 12:00:00'");
   });
 
   it("should visit_DateTime", () => {
     const dt = { toISOString: () => "2020-01-02T03:04:05.000Z" };
     const sql = new Visitors.ToSql().compile(new Nodes.Quoted(dt));
-    expect(sql).toBe("'2020-01-02T03:04:05.000Z'");
+    expect(sql).toBe("'2020-01-02 03:04:05'");
+  });
+
+  it("should visit_Date with fractional seconds retains microseconds", () => {
+    const d = new Date("2026-04-18T13:00:41.729Z");
+    const sql = new Visitors.ToSql().compile(new Nodes.Quoted(d));
+    // "729" → padded to "729000" microseconds
+    expect(sql).toBe("'2026-04-18 13:00:41.729000'");
+  });
+
+  it("should visit_Date-like with 1-digit fraction normalises to microseconds", () => {
+    // "7" → "700000" μs (not "007000" which the old ms*1000 approach produced)
+    const obj = { toISOString: () => "2020-01-02T03:04:05.7Z" };
+    const sql = new Visitors.ToSql().compile(new Nodes.Quoted(obj as unknown as Date));
+    expect(sql).toBe("'2020-01-02 03:04:05.700000'");
+  });
+
+  it("should visit_Date with zero ms emits bare seconds (Rails quoted_date format)", () => {
+    const d = new Date("2000-01-01T00:00:00.000Z");
+    const sql = new Visitors.ToSql().compile(new Nodes.Quoted(d));
+    expect(sql).toBe("'2000-01-01 00:00:00'");
+  });
+
+  it("should visit_Date-like with no fractional part (no trailing Z artifact)", () => {
+    // Handles objects whose toISOString() omits the fractional part, e.g. "...T00:00:00Z".
+    const obj = { toISOString: () => "2026-01-01T00:00:00Z" };
+    const sql = new Visitors.ToSql().compile(new Nodes.Quoted(obj as unknown as Date));
+    expect(sql).toBe("'2026-01-01 00:00:00'");
+    expect(sql).not.toContain("Z");
+  });
+
+  it("should extract Date as bind param in compileWithBinds", () => {
+    const users = new Table("users");
+    const d = new Date("2020-01-02T12:00:00.000Z");
+    const node = users.get("created_at").eq(new Nodes.Quoted(d));
+    const [sql, binds] = new Visitors.ToSql().compileWithBinds(node);
+    // Placeholder in SQL, actual Date in binds array.
+    expect(sql).toContain("?");
+    expect(sql).not.toContain("2020-01-02");
+    expect(binds).toHaveLength(1);
+    expect(binds[0]).toBe(d);
   });
 
   it("should visit_Float", () => {

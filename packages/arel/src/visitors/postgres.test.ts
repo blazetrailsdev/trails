@@ -137,6 +137,18 @@ describe("PostgresTest", () => {
       expect(sql).not.toContain("alice");
       expect(binds).toEqual([42, "alice"]);
     });
+
+    it("compileWithBinds uses $N placeholders for Quoted Date values", () => {
+      const visitor = new Visitors.PostgreSQLWithBinds();
+      const d = new Date("2020-01-02T12:00:00.000Z");
+      const node = users.get("created_at").eq(new Nodes.Quoted(d));
+      const [sql, binds] = visitor.compileWithBinds(node);
+      expect(sql).toContain("$1");
+      expect(sql).not.toContain("?");
+      expect(sql).not.toContain("2020-01-02");
+      expect(binds).toHaveLength(1);
+      expect(binds[0]).toBe(d);
+    });
   });
 
   describe("Nodes::RollUp", () => {

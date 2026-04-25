@@ -102,4 +102,9 @@ export class PostgreSQLWithBinds extends PostgreSQL {
     }
     return this.collector;
   }
+
+  protected override addDateBind(value: unknown): void {
+    this.bindIndex += 1;
+    this.collector.addBind(value, () => `$${this.bindIndex}`);
+  }
 }

@@ -23,7 +23,13 @@ import { detectAdapterName } from "../adapter-name.js";
  */
 export function groupColumnToArel(col: string, table: Table): Nodes.Node {
   const trimmed = col.trim();
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) return table.get(trimmed);
+  // Plain identifier → qualify via model table (e.g. "created_at" → "orders"."created_at").
+  if (/^[A-Za-z_]\w*$/.test(trimmed)) return table.get(trimmed);
+  // Simple table.column → create a cross-table Attribute (e.g. "authors.name" → "authors"."name").
+  // Mirrors Rails' arel_columns which calls table[column] on the referenced table.
+  const dotMatch = trimmed.match(/^([A-Za-z_]\w*)\.([A-Za-z_]\w*)$/);
+  if (dotMatch) return new Table(dotMatch[1]).get(dotMatch[2]);
+  // SQL expressions, casts, positional args, etc. pass through as raw SQL.
   return new Nodes.SqlLiteral(trimmed);
 }
 

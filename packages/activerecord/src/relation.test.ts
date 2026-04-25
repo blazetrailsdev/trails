@@ -207,6 +207,19 @@ describe("RelationTest", () => {
     expect(Order.group("1").toSql()).toContain("GROUP BY 1");
   });
 
+  it("group by dotted table.column qualifies each part", () => {
+    class Book extends Base {
+      static _tableName = "books";
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const sql = Book.group("authors.name").toSql();
+    expect(sql).toContain('"authors"."name"');
+    expect(sql).not.toContain("authors.name");
+  });
+
   it("multiple selects", () => {
     class Post extends Base {
       static {
