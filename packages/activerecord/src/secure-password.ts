@@ -1,5 +1,6 @@
 import { getCrypto } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import { generatesTokenFor } from "./token-for.js";
 
 /**
  * Secure password support using PBKDF2 (Web Crypto API).
@@ -44,9 +45,11 @@ function verifyPassword(password: string, digest: string): boolean {
  */
 export function hasSecurePassword(
   modelClass: typeof Base,
-  options: { validations?: boolean } = {},
+  options: { validations?: boolean; resetToken?: boolean } = {},
 ): void {
   const runValidations = options.validations !== false;
+  const attribute = "password";
+  const digestAttr = `${attribute}_digest`;
 
   // Store the raw password temporarily for hashing during save
   const passwordKey = Symbol("password");
@@ -77,7 +80,7 @@ export function hasSecurePassword(
   // authenticate method
   Object.defineProperty(modelClass.prototype, "authenticate", {
     value: function (this: Base, password: string): Base | false {
-      const digest = this._readAttribute("password_digest");
+      const digest = this._readAttribute(digestAttr);
       if (!digest) return false;
       return verifyPassword(password, digest as string) ? this : false;
     },
@@ -85,12 +88,23 @@ export function hasSecurePassword(
     configurable: true,
   });
 
-  // Hook into save to hash the password
+  // Hook into save to hash the password. Use writeAttribute (not
+  // _attributes.set) so the dirty tracker marks the column changed and
+  // an UPDATE SQL includes the new digest — required for token
+  // invalidation to round-trip through the DB.
   modelClass.beforeSave(function (record: Base) {
     const rawPassword = (record as any)[passwordKey];
-    if (rawPassword != null) {
+    // Rails `password=` setter skips hashing for empty strings
+    // (active_model/secure_password.rb) — an empty password is not a
+    // valid password, so we leave the existing digest untouched.
+    if (rawPassword != null && rawPassword !== "") {
       const digest = hashPassword(rawPassword);
-      record._attributes.set("password_digest", digest);
+      record.writeAttribute(digestAttr, digest);
+      // Clear the raw password after hashing so subsequent saves don't
+      // rehash with a new random salt (changing the digest on every save
+      // would invalidate outstanding password-reset tokens).
+      (record as any)[passwordKey] = null;
+      (record as any)[confirmationKey] = null;
     }
   });
 
@@ -99,7 +113,6 @@ export function hasSecurePassword(
     modelClass.validate(function (record: any) {
       const rawPassword = record[passwordKey];
       const isNew = record.isNewRecord();
-      const digestChanged = record.attributeChanged("password_digest");
 
       // Password must be present on create or when explicitly set
       if (isNew && (rawPassword === null || rawPassword === undefined || rawPassword === "")) {
@@ -113,6 +126,71 @@ export function hasSecurePassword(
           message: "doesn't match Password",
         });
       }
+    });
+  }
+
+  // Password reset token infrastructure.
+  // Mirrors: ActiveModel::SecurePassword#has_secure_password reset_token block
+  // (secure_password.rb:162-178). Rails gates this on defined?(ActiveRecord::Base)
+  // which is always true here — we're already in ActiveRecord.
+  const runResetToken = options.resetToken !== false;
+  if (runResetToken) {
+    const purpose = `${attribute}_reset` as const;
+    const FIFTEEN_MINUTES = 15 * 60;
+
+    // Register the token purpose. The generator derives a version by hashing
+    // the current digest with SHA-256 and embedding the first 16 hex chars.
+    // When the password (and therefore the digest) changes, the hash changes
+    // too — existing tokens are automatically invalidated, matching Rails'
+    // BCrypt::Password#version approach.
+    generatesTokenFor(modelClass, purpose, {
+      expiresIn: FIFTEEN_MINUTES,
+      generator: (record: Base) => {
+        const digest = record._readAttribute(digestAttr);
+        if (typeof digest !== "string" || !digest) return "";
+        // Derive a version from the digest without embedding raw digest
+        // bytes in the token (MessageVerifier is signed, not encrypted, so
+        // the payload is readable). A short hash of the digest changes
+        // whenever the digest changes (password updated → old tokens stale)
+        // but doesn't expose the digest itself.
+        // Mirrors Rails' BCrypt::Password#version which returns the bcrypt
+        // version string — not the raw digest — for the same purpose.
+        const buf = getCrypto().createHash("sha256").update(digest).digest();
+        return buf.toString("hex").slice(0, 16);
+      },
+    });
+
+    // ${attribute}_reset_token → generate_token_for(:"${attribute}_reset")
+    // Mirrors: define_method :"#{attribute}_reset_token"
+    const resetTokenMethod = `${attribute}ResetToken`;
+    Object.defineProperty(modelClass.prototype, resetTokenMethod, {
+      get: function (this: Base) {
+        return (this as any).generateTokenFor(purpose);
+      },
+      configurable: true,
+    });
+
+    // Class method: findBy${Attribute}ResetToken(token)
+    // Mirrors: alias_method :"find_by_#{attribute}_reset_token", :find_by_token_for
+    const cap = attribute.charAt(0).toUpperCase() + attribute.slice(1);
+    const findByMethod = `findBy${cap}ResetToken`;
+    Object.defineProperty(modelClass, findByMethod, {
+      value: function (this: typeof Base, token: string) {
+        return (this as any).findByTokenFor(purpose, token);
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    // Class method: findBy${Attribute}ResetToken!(token)
+    // Mirrors: define_method :"find_by_#{attribute}_reset_token!"
+    const findByBangMethod = `${findByMethod}Bang`;
+    Object.defineProperty(modelClass, findByBangMethod, {
+      value: function (this: typeof Base, token: string) {
+        return (this as any).findByTokenForBang(purpose, token);
+      },
+      writable: true,
+      configurable: true,
     });
   }
 }
