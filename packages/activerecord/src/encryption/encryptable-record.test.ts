@@ -415,7 +415,24 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it.skip("loading records with encrypted attributes defined on columns with default values", () => {
     // requires upsert/insert_on_duplicate_update support
   });
-  it.skip("can dump and load records that use encryption", () => {});
+  it("can dump and load records that use encryption", async () => {
+    // Mirrors Rails' Marshal.dump/Marshal.load test: after serializing a model's raw
+    // attribute state (ciphertexts) and reconstructing a new instance via the DB-load
+    // path, the encrypted attribute should decrypt correctly on read.
+    const Book = makeEncryptedBook(freshAdapter());
+    new Book();
+
+    const book = await Book.create({ name: "Dune" });
+
+    // Capture raw DB values (ciphertexts) — equivalent to what Marshal.dump preserves.
+    const rawValues = book._attributes.valuesForDatabase();
+
+    // Reconstruct via _instantiate (the DB-load path) so writeFromDatabase → deserialize
+    // is invoked, matching how Rails Marshal.load reconstructs AR objects.
+    const loadedBook = (Book as any)._instantiate(rawValues);
+
+    expect(loadedBook.name).toBe("Dune");
+  });
   it("supports decrypting data encrypted non deterministically with SHA1 when digest class is SHA256", async () => {
     Configurable.configure({
       primaryKey: "the primary key",
