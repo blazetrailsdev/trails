@@ -1,0 +1,1 @@
+Book.limit(0)
