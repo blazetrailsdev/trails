@@ -1,0 +1,1 @@
+Book.joins(:author, :reviews)

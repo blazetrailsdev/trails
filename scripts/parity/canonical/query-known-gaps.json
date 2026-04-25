@@ -1,4 +1,16 @@
 {
+  "ar-12": {
+    "side": "diff",
+    "reason": "ORDER BY hash-column qualification: #839 fixed ar-23 (ORDER BY in .from() context) but introduced a partial regression — hash-order columns that are not the primary key (e.g. created_at, title) are emitted bare ('\"created_at\" DESC') while Rails qualifies them ('\"users\".\"created_at\" DESC'). The `id` column is qualified because it matches the PK; other columns are not."
+  },
+  "ar-39": {
+    "side": "diff",
+    "reason": "ORDER BY multi-column partial qualification: first column in multi-key order hash is qualified ('\"books\".\"id\" ASC') but second is bare ('\"title\" DESC'). Same root cause as ar-12 — only pk-matching columns get the table qualifier from #839's fix."
+  },
+  "ar-64": {
+    "side": "diff",
+    "reason": "ORDER BY multi-column partial qualification (reverse order): first column bare ('\"title\" ASC'), second qualified ('\"books\".\"id\" DESC'). Same root cause as ar-12 and ar-39 — the id column is qualified regardless of position."
+  },
   "ar-01": {
     "side": "diff",
     "reason": "Datetime microseconds in WHERE ? bind: trails serializes a Date as '2026-04-18 13:00:41.729000' (with microseconds); Rails serializes as '2026-04-18 13:00:41' (truncated to seconds). Only manifests when frozen-at has non-zero milliseconds. Same datetime serialization family as ar-52."
