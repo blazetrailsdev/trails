@@ -1,3 +1,4 @@
+import { Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
 import { SecurePassword } from "./secure-password.js";
 import { Error as ActiveModelError } from "./error.js";
 
@@ -9,21 +10,29 @@ export interface RailtieConfig {
 /**
  * Railtie — initialization hooks for ActiveModel.
  *
- * Mirrors: ActiveModel::Railtie
+ * Mirrors: ActiveModel::Railtie < ::Rails::Railtie
+ * (activemodel/lib/active_model/railtie.rb)
  *
- * In Rails, the Railtie sets:
- *   - ActiveModel::SecurePassword.min_cost based on environment
- *   - ActiveModel::Error.i18n_customize_full_message from config
- *
- * Since we don't have a full Rails application context, the Railtie
- * exposes a static `initialize` method that applies the same defaults.
+ * Extends the base Railtie exported from `@blazetrails/activesupport`,
+ * matching the Rails inheritance pattern, and registers itself so it
+ * participates in the global initialization pipeline.
  */
-export class Railtie {
+export class Railtie extends BaseRailtie {
+  static {
+    registerRailtie(this);
+
+    this.initializer("active_model.secure_password", () => {
+      SecurePassword.minCost = Railtie.detectEnv() === "test";
+    });
+  }
+
+  /**
+   * One-shot configuration helper (non-Rails convenience kept for
+   * backwards-compat with existing callers).
+   */
   static initialize(config?: RailtieConfig): void {
     const env = config?.env ?? Railtie.detectEnv();
-
     SecurePassword.minCost = env === "test";
-
     ActiveModelError.i18nCustomizeFullMessage = config?.i18nCustomizeFullMessage ?? false;
   }
 
