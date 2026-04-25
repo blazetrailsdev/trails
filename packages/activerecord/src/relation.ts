@@ -30,6 +30,7 @@ import {
   VALID_UNSCOPING_VALUES,
   argumentError,
   type UnscopeType,
+  type AssociationSpec,
 } from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
 import { wrapWithScopeProxy } from "./relation/delegation.js";
@@ -123,9 +124,9 @@ export class Relation<T extends Base> {
     quoted?: boolean;
   }> = [];
   private _rawJoins: string[] = [];
-  private _includesAssociations: string[] = [];
-  private _preloadAssociations: string[] = [];
-  private _eagerLoadAssociations: string[] = [];
+  private _includesAssociations: AssociationSpec[] = [];
+  private _preloadAssociations: AssociationSpec[] = [];
+  private _eagerLoadAssociations: AssociationSpec[] = [];
   private _isReadonly = false;
   private _isStrictLoading = false;
   private _annotations: string[] = [];
@@ -1206,7 +1207,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#includes
    */
-  includes(...associations: string[]): Relation<T> {
+  includes(...associations: AssociationSpec[]): Relation<T> {
     return this._clone().includesBang(...associations);
   }
 
@@ -1215,7 +1216,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#preload
    */
-  preload(...associations: string[]): Relation<T> {
+  preload(...associations: AssociationSpec[]): Relation<T> {
     return this._clone().preloadBang(...associations);
   }
 
@@ -1224,7 +1225,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#eager_load
    */
-  eagerLoad(...associations: string[]): Relation<T> {
+  eagerLoad(...associations: AssociationSpec[]): Relation<T> {
     return this._clone().eagerLoadBang(...associations);
   }
 
@@ -1584,7 +1585,7 @@ export class Relation<T extends Base> {
    * promoted to eager_load. See `references_eager_loaded_tables?`
    * in Rails relation.rb — the check is boolean, not per-association.
    */
-  private _includesToPromoteFromReferences(): string[] {
+  private _includesToPromoteFromReferences(): AssociationSpec[] {
     if (this._referencesValues.length === 0) return [];
     if (this._includesAssociations.length === 0) return [];
 
@@ -1601,11 +1602,19 @@ export class Relation<T extends Base> {
     const hasUnjoined = refs.some((ref) => !joinedTables.has(ref));
     if (!hasUnjoined) return [];
 
+    // Rails promotes ALL includes to eager_load when references points to an
+    // unjoined table. We promote flat string includes here; nested hash specs
+    // are left to the preloader because our JoinDependency does not yet
+    // support recursively joining nested association specs. Promoting hash
+    // top-level keys without also recursively joining their sub-associations
+    // would leave sub-associations unloaded. See: references_eager_loaded_tables?
     const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
-    return this._includesAssociations.filter((name) => !alreadyEagerLoaded.has(name));
+    return this._includesAssociations.filter(
+      (name): name is string => typeof name === "string" && !alreadyEagerLoaded.has(name),
+    );
   }
 
-  private async _executeEagerLoad(eagerAssocs?: string[]): Promise<void> {
+  private async _executeEagerLoad(eagerAssocs?: AssociationSpec[]): Promise<void> {
     const eagerAssociations = eagerAssocs ?? this._eagerLoadAssociations;
     const basePk = (this._modelClass as any).primaryKey ?? "id";
     if (
@@ -1624,8 +1633,13 @@ export class Relation<T extends Base> {
     const { JoinDependency } = await import("./associations/join-dependency.js");
     const jd = new JoinDependency(this._modelClass);
 
-    const fallbackAssocs: string[] = [];
+    const fallbackAssocs: AssociationSpec[] = [];
     for (const assocName of eagerAssociations) {
+      if (typeof assocName !== "string") {
+        // Nested hash specs fall back to preload
+        fallbackAssocs.push(assocName);
+        continue;
+      }
       if (assocName.includes(".")) {
         // Nested paths fall back to preload until per-level grouping is implemented
         fallbackAssocs.push(assocName);
@@ -2980,7 +2994,10 @@ export class Relation<T extends Base> {
     return normalized.map((node) => `(${this._compileArelNode(node)})`);
   }
 
-  private async _preloadAssociationsForRecords(records: T[], assocNames: string[]): Promise<void> {
+  private async _preloadAssociationsForRecords(
+    records: T[],
+    assocNames: AssociationSpec[],
+  ): Promise<void> {
     if (assocNames.length === 0) return;
     const { Preloader } = await import("./associations/preloader.js");
     const preloader = new Preloader({
@@ -3381,8 +3398,9 @@ export class Relation<T extends Base> {
 
   get joinedIncludesValues(): string[] {
     if (this._joinClauses.length === 0) return [];
-    return this._includesAssociations.filter((assoc) =>
-      this._joinClauses.some((j) => j.table === assoc),
+    return this._includesAssociations.filter(
+      (assoc): assoc is string =>
+        typeof assoc === "string" && this._joinClauses.some((j) => j.table === assoc),
     );
   }
 
@@ -3452,7 +3470,7 @@ export class Relation<T extends Base> {
     return tracker;
   }
 
-  preloadAssociations(): string[] {
+  preloadAssociations(): AssociationSpec[] {
     return [...this._preloadAssociations, ...this._includesAssociations];
   }
 

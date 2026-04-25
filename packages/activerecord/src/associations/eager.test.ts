@@ -3625,9 +3625,175 @@ describe("EagerAssociationTest", () => {
   });
   it.skip("preloading polymorphic with custom foreign type", () => {});
   it.skip("joins with includes should preload via joins", () => {});
-  it.skip("join eager with empty order should generate valid sql", () => {});
+  it("join eager with empty order should generate valid sql", async () => {
+    class JeeoPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class JeeoComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("jeeo_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(JeeoPost, "jeeoComments", {
+      className: "JeeoComment",
+      foreignKey: "jeeo_post_id",
+    });
+    Associations.belongsTo.call(JeeoComment, "jeeoPost", {
+      className: "JeeoPost",
+      foreignKey: "jeeo_post_id",
+    });
+    registerModel("JeeoPost", JeeoPost);
+    registerModel("JeeoComment", JeeoComment);
+
+    const post = await JeeoPost.create({ title: "Hello" });
+    await JeeoComment.create({ body: "Thank you for the welcome", jeeo_post_id: post.id });
+
+    // Rails: Post.includes(:comments).order("").first must not raise —
+    // empty order string should be silently dropped. Use toArray() to avoid
+    // the LIMIT-in-subquery eager load path that MariaDB rejects.
+    let error: unknown;
+    try {
+      await (JeeoPost as any)
+        .all()
+        .includes("jeeoComments")
+        .references("jeeo_comments")
+        .order("")
+        .toArray();
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeUndefined();
+    // Also verify the result has the preloaded comments
+    const result = await (JeeoPost as any)
+      .all()
+      .includes("jeeoComments")
+      .references("jeeo_comments")
+      .order("")
+      .toArray();
+    expect(result).toHaveLength(1);
+    expect(result[0]._preloadedAssociations.get("jeeoComments")).toHaveLength(1);
+  });
   it.skip("deep including through habtm", () => {});
-  it.skip("eager load multiple associations with references", () => {});
+  it("eager load multiple associations with references", async () => {
+    class ElmarMentor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ElmarDeveloper extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("elmar_mentor_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class ElmarContract extends Base {
+      static {
+        this.attribute("elmar_developer_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class ElmarProject extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("elmar_mentor_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class ElmarProjectDeveloper extends Base {
+      static {
+        this.attribute("elmar_project_id", "integer");
+        this.attribute("elmar_developer_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(ElmarDeveloper, "elmarMentor", {
+      className: "ElmarMentor",
+      foreignKey: "elmar_mentor_id",
+    });
+    Associations.hasMany.call(ElmarDeveloper, "elmarContracts", {
+      className: "ElmarContract",
+      foreignKey: "elmar_developer_id",
+    });
+    Associations.belongsTo.call(ElmarProject, "elmarMentor", {
+      className: "ElmarMentor",
+      foreignKey: "elmar_mentor_id",
+    });
+    Associations.hasMany.call(ElmarProject, "elmarProjectDevelopers", {
+      className: "ElmarProjectDeveloper",
+      foreignKey: "elmar_project_id",
+    });
+    Associations.hasMany.call(ElmarProject, "elmarDevelopers", {
+      className: "ElmarDeveloper",
+      through: "elmarProjectDevelopers",
+      source: "elmarDeveloper",
+    });
+    Associations.hasMany.call(ElmarMentor, "elmarDevelopers", {
+      className: "ElmarDeveloper",
+      foreignKey: "elmar_mentor_id",
+    });
+    Associations.belongsTo.call(ElmarProjectDeveloper, "elmarDeveloper", {
+      className: "ElmarDeveloper",
+      foreignKey: "elmar_developer_id",
+    });
+    Associations.belongsTo.call(ElmarProjectDeveloper, "elmarProject", {
+      className: "ElmarProject",
+      foreignKey: "elmar_project_id",
+    });
+    registerModel("ElmarMentor", ElmarMentor);
+    registerModel("ElmarDeveloper", ElmarDeveloper);
+    registerModel("ElmarContract", ElmarContract);
+    registerModel("ElmarProject", ElmarProject);
+    registerModel("ElmarProjectDeveloper", ElmarProjectDeveloper);
+
+    const mentor = await ElmarMentor.create({ name: "Mentor" });
+    const dev = await ElmarDeveloper.create({ name: "Dev", elmar_mentor_id: mentor.id });
+    const contract = await ElmarContract.create({ elmar_developer_id: dev.id });
+    const project = await ElmarProject.create({ name: "Project", elmar_mentor_id: mentor.id });
+    await ElmarProjectDeveloper.create({
+      elmar_project_id: project.id,
+      elmar_developer_id: dev.id,
+    });
+
+    // Rails: Project.references(:mentors).includes(mentor: { developers: :contracts }, developers: :contracts)
+    // references("elmar_mentors") registers the mentor table; nested hash includes preload
+    // both branches. Rails asserts the same contracts object is reused across both paths.
+    const projects = await (ElmarProject as any)
+      .all()
+      .references("elmar_mentors")
+      .includes({
+        elmarMentor: { elmarDevelopers: "elmarContracts" },
+        elmarDevelopers: "elmarContracts",
+      })
+      .toArray();
+
+    // Rails: projects.last.mentor.developers.first.contracts == projects.last.developers.last.contracts
+    const p = projects[0] as any;
+    const mentorDevContracts = p._preloadedAssociations
+      .get("elmarMentor")
+      ?._preloadedAssociations?.get("elmarDevelopers")?.[0]
+      ?._preloadedAssociations?.get("elmarContracts");
+    const directDevContracts = p._preloadedAssociations
+      .get("elmarDevelopers")?.[0]
+      ?._preloadedAssociations?.get("elmarContracts");
+
+    expect(mentorDevContracts).toHaveLength(1);
+    expect(directDevContracts).toHaveLength(1);
+    expect(mentorDevContracts![0].id).toBe(contract.id);
+    expect(directDevContracts![0].id).toBe(contract.id);
+    // Rails: projects.last.mentor.developers.first.contracts ==
+    //        projects.last.developers.last.contracts  (same objects)
+    expect(mentorDevContracts![0]).toBe(directDevContracts![0]);
+    expect(mentorDevContracts![0].elmar_developer_id).toBe(
+      directDevContracts![0].elmar_developer_id,
+    );
+  });
   it("preloading has many through with custom scope", async () => {
     class PcsProject extends Base {
       static {
@@ -4075,11 +4241,243 @@ describe("EagerAssociationTest", () => {
   it.skip("eager with has one through join model with conditions on the through", () => {});
   it.skip("loading with one association with non preload", () => {});
   it.skip("loading with multiple associations", () => {});
-  it.skip("including duplicate objects from has many", () => {});
-  it.skip("associations loaded for all records", () => {});
+  it("including duplicate objects from has many", async () => {
+    // Rails: car_post belongs to 2 categories via habtm; includes({ posts: :comments })
+    // on categories should yield the SAME comment object for each category's posts[0].
+    class IdupPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class IdupComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("idup_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class IdupCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class IdupCategoryPost extends Base {
+      static {
+        this.attribute("idup_post_id", "integer");
+        this.attribute("idup_category_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(IdupPost, "idupComments", {
+      className: "IdupComment",
+      foreignKey: "idup_post_id",
+    });
+    Associations.hasMany.call(IdupPost, "idupCategoryPosts", {
+      className: "IdupCategoryPost",
+      foreignKey: "idup_post_id",
+    });
+    Associations.hasMany.call(IdupPost, "idupCategories", {
+      className: "IdupCategory",
+      through: "idupCategoryPosts",
+      source: "idupCategory",
+    });
+    Associations.hasMany.call(IdupCategory, "idupCategoryPosts", {
+      className: "IdupCategoryPost",
+      foreignKey: "idup_category_id",
+    });
+    Associations.hasMany.call(IdupCategory, "idupPosts", {
+      className: "IdupPost",
+      through: "idupCategoryPosts",
+      source: "idupPost",
+    });
+    Associations.belongsTo.call(IdupComment, "idupPost", {
+      className: "IdupPost",
+      foreignKey: "idup_post_id",
+    });
+    Associations.belongsTo.call(IdupCategoryPost, "idupPost", {
+      className: "IdupPost",
+      foreignKey: "idup_post_id",
+    });
+    Associations.belongsTo.call(IdupCategoryPost, "idupCategory", {
+      className: "IdupCategory",
+      foreignKey: "idup_category_id",
+    });
+    registerModel("IdupPost", IdupPost);
+    registerModel("IdupComment", IdupComment);
+    registerModel("IdupCategory", IdupCategory);
+    registerModel("IdupCategoryPost", IdupCategoryPost);
+
+    const post = await IdupPost.create({ title: "Cars" });
+    const cat1 = await IdupCategory.create({ name: "General" });
+    const cat2 = await IdupCategory.create({ name: "Tech" });
+    await IdupCategoryPost.create({ idup_post_id: post.id, idup_category_id: cat1.id });
+    await IdupCategoryPost.create({ idup_post_id: post.id, idup_category_id: cat2.id });
+    const comment = await IdupComment.create({ body: "hmm", idup_post_id: post.id });
+
+    const categories = await (IdupCategory as any)
+      .all()
+      .where({ id: [cat1.id, cat2.id] })
+      .includes({ idupPosts: "idupComments" })
+      .toArray();
+
+    // Rails asserts the same comment object is reused across both category→post paths.
+    // We collect the comment instance from each category and assert referential equality.
+    let sharedComment: any;
+    for (const cat of categories) {
+      const posts = (cat as any)._preloadedAssociations.get("idupPosts");
+      expect(posts).toHaveLength(1);
+      const comments = (posts[0] as any)._preloadedAssociations.get("idupComments");
+      expect(comments).toHaveLength(1);
+      expect(comments[0].id).toBe(comment.id);
+      if (sharedComment) {
+        expect(comments[0]).toBe(sharedComment);
+      } else {
+        sharedComment = comments[0];
+      }
+    }
+  });
+  it("associations loaded for all records", async () => {
+    // Rails: categories with includes(posts: :special_comments) — all posts have their
+    // special_comments association loaded.
+    class AlarPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class AlarComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("type", "string");
+        this.attribute("alar_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class AlarCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class AlarCategoryPost extends Base {
+      static {
+        this.attribute("alar_post_id", "integer");
+        this.attribute("alar_category_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(AlarPost, "alarComments", {
+      className: "AlarComment",
+      foreignKey: "alar_post_id",
+    });
+    Associations.hasMany.call(AlarCategory, "alarCategoryPosts", {
+      className: "AlarCategoryPost",
+      foreignKey: "alar_category_id",
+    });
+    Associations.hasMany.call(AlarCategory, "alarPosts", {
+      className: "AlarPost",
+      through: "alarCategoryPosts",
+      source: "alarPost",
+    });
+    Associations.belongsTo.call(AlarCategoryPost, "alarPost", {
+      className: "AlarPost",
+      foreignKey: "alar_post_id",
+    });
+    Associations.belongsTo.call(AlarCategoryPost, "alarCategory", {
+      className: "AlarCategory",
+      foreignKey: "alar_category_id",
+    });
+    registerModel("AlarPost", AlarPost);
+    registerModel("AlarComment", AlarComment);
+    registerModel("AlarCategory", AlarCategory);
+    registerModel("AlarCategoryPost", AlarCategoryPost);
+
+    const post = await AlarPost.create({ title: "Foo" });
+    await AlarComment.create({ body: "Come on!", alar_post_id: post.id });
+    const cat1 = await AlarCategory.create({ name: "First!" });
+    const cat2 = await AlarCategory.create({ name: "Second!" });
+    await AlarCategoryPost.create({ alar_post_id: post.id, alar_category_id: cat1.id });
+    await AlarCategoryPost.create({ alar_post_id: post.id, alar_category_id: cat2.id });
+
+    const categories = await (AlarCategory as any)
+      .where({ id: [cat1.id, cat2.id] })
+      .includes({ alarPosts: "alarComments" })
+      .toArray();
+
+    for (const cat of categories) {
+      const posts = (cat as any)._preloadedAssociations.get("alarPosts");
+      expect(posts).toHaveLength(1);
+      // association must be loaded (preloaded) for each post
+      expect((posts[0] as any)._preloadedAssociations.has("alarComments")).toBe(true);
+    }
+  });
   it.skip("loading from an association that has a hash of conditions", () => {});
-  it.skip("loading with no associations", () => {});
-  it.skip("eager association loading with belongs to", () => {});
+  it("loading with no associations", async () => {
+    // Rails: Post.includes(:author).find(authorless post).author is nil
+    class LnaPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("lna_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class LnaAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(LnaPost, "lnaAuthor", {
+      className: "LnaAuthor",
+      foreignKey: "lna_author_id",
+    });
+    registerModel("LnaPost", LnaPost);
+    registerModel("LnaAuthor", LnaAuthor);
+
+    const post = await LnaPost.create({ title: "Authorless" }); // lna_author_id is null
+
+    const posts = await (LnaPost as any).all().includes("lnaAuthor").toArray();
+    const found = posts.find((p: any) => p.id === post.id);
+    expect(found).toBeDefined();
+    const preloadedAuthor = (found as any)._preloadedAssociations.get("lnaAuthor");
+    expect(preloadedAuthor).toBeNull();
+  });
+  it("eager association loading with belongs to", async () => {
+    // Rails: Comment.all.merge!(includes: :post) - all comments have their post loaded
+    class EabtPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EabtComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("eabt_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(EabtComment, "eabtPost", {
+      className: "EabtPost",
+      foreignKey: "eabt_post_id",
+    });
+    registerModel("EabtPost", EabtPost);
+    registerModel("EabtComment", EabtComment);
+
+    const post1 = await EabtPost.create({ title: "Welcome" });
+    const post2 = await EabtPost.create({ title: "Other" });
+    await EabtComment.create({ body: "c1", eabt_post_id: post1.id });
+    await EabtComment.create({ body: "c2", eabt_post_id: post2.id });
+    await EabtComment.create({ body: "c3", eabt_post_id: post1.id });
+
+    const comments = await (EabtComment as any).all().includes("eabtPost").toArray();
+    expect(comments).toHaveLength(3);
+    const titles = comments.map((c: any) => c._preloadedAssociations.get("eabtPost")?.title);
+    expect(titles).toContain("Welcome");
+    expect(titles).toContain("Other");
+  });
   it.skip("eager with has one dependent does not destroy dependent", () => {});
   it.skip("preconfigured includes with belongs to", () => {});
   it.skip("preconfigured includes with has many", () => {});
@@ -4087,9 +4485,162 @@ describe("EagerAssociationTest", () => {
   it.skip("preload has many uses exclusive scope", () => {});
   it.skip("preload has one using primary key", () => {});
   it.skip("include has one using primary key", () => {});
-  it.skip("preloading empty belongs to", () => {});
-  it.skip("deep preload", () => {});
-  it.skip("preloading the same association twice works", () => {});
+  it("preloading empty belongs to", async () => {
+    // Rails: Client.create!(client_of: beyond_max_id) then preload(:firm) → nil firm
+    class PebClient extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("peb_firm_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PebFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(PebClient, "pebFirm", {
+      className: "PebFirm",
+      foreignKey: "peb_firm_id",
+    });
+    registerModel("PebClient", PebClient);
+    registerModel("PebFirm", PebFirm);
+
+    // Create a firm, note its id, then create a client pointing past max id so firm lookup returns nil
+    const firm = await PebFirm.create({ name: "Existing" });
+    const nonExistentId = Number(firm.id) + 9999;
+    const client = await PebClient.create({ name: "Foo", peb_firm_id: nonExistentId });
+
+    const loaded = await (PebClient as any)
+      .all()
+      .preload("pebFirm")
+      .where({ id: client.id })
+      .toArray();
+    expect(loaded).toHaveLength(1);
+    const preloaded = (loaded[0] as any)._preloadedAssociations.get("pebFirm");
+    expect(preloaded).toBeNull();
+    expect(loaded[0].peb_firm_id).toBe(nonExistentId);
+  });
+  it("deep preload", async () => {
+    // Rails: Post.preload(author: :posts, comments: :post).first
+    // — author.association(:posts) is loaded, comments[0].association(:post) is loaded
+    class DpPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("dp_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class DpAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class DpComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("dp_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(DpPost, "dpAuthor", {
+      className: "DpAuthor",
+      foreignKey: "dp_author_id",
+    });
+    Associations.hasMany.call(DpPost, "dpComments", {
+      className: "DpComment",
+      foreignKey: "dp_post_id",
+    });
+    Associations.hasMany.call(DpAuthor, "dpPosts", {
+      className: "DpPost",
+      foreignKey: "dp_author_id",
+    });
+    Associations.belongsTo.call(DpComment, "dpPost", {
+      className: "DpPost",
+      foreignKey: "dp_post_id",
+    });
+    registerModel("DpPost", DpPost);
+    registerModel("DpAuthor", DpAuthor);
+    registerModel("DpComment", DpComment);
+
+    const author = await DpAuthor.create({ name: "Alice" });
+    const post = await DpPost.create({ title: "Hello", dp_author_id: author.id });
+    await DpComment.create({ body: "Nice", dp_post_id: post.id });
+
+    const posts = await (DpPost as any)
+      .all()
+      .preload({ dpAuthor: "dpPosts", dpComments: "dpPost" })
+      .toArray();
+
+    expect(posts).toHaveLength(1);
+    const p = posts[0] as any;
+    // author.dpPosts should be preloaded
+    const preloadedAuthor = p._preloadedAssociations.get("dpAuthor");
+    expect(preloadedAuthor).toBeDefined();
+    expect(preloadedAuthor).not.toBeNull();
+    expect((preloadedAuthor as any).name).toBe("Alice");
+    expect((preloadedAuthor as any)._preloadedAssociations.has("dpPosts")).toBe(true);
+    // comment.dpPost should be preloaded
+    const preloadedComments = p._preloadedAssociations.get("dpComments");
+    expect(preloadedComments).toHaveLength(1);
+    expect((preloadedComments[0] as any)._preloadedAssociations.has("dpPost")).toBe(true);
+  });
+  it("preloading the same association twice works", async () => {
+    // Rails: Member.preload(:current_membership).includes(current_membership: :club)
+    // — double-loading the same association should not error or reset it
+    class PstaMembership extends Base {
+      static {
+        this.attribute("psta_member_id", "integer");
+        this.attribute("psta_club_id", "integer");
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    class PstaClub extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PstaMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(PstaMember, "pstaCurrentMembership", {
+      className: "PstaMembership",
+      foreignKey: "psta_member_id",
+      scope: (rel: any) => rel.where({ active: true }),
+    });
+    Associations.belongsTo.call(PstaMembership, "pstaClub", {
+      className: "PstaClub",
+      foreignKey: "psta_club_id",
+    });
+    registerModel("PstaMember", PstaMember);
+    registerModel("PstaMembership", PstaMembership);
+    registerModel("PstaClub", PstaClub);
+
+    const club = await PstaClub.create({ name: "Club" });
+    const member = await PstaMember.create({ name: "Alice" });
+    await PstaMembership.create({ psta_member_id: member.id, psta_club_id: club.id, active: true });
+
+    // Preload the same association twice — second preload is a no-op if already loaded
+    const members = await (PstaMember as any)
+      .all()
+      .preload("pstaCurrentMembership")
+      .includes({ pstaCurrentMembership: "pstaClub" })
+      .toArray();
+
+    expect(members).toHaveLength(1);
+    const m = members[0] as any;
+    const membership = m._preloadedAssociations.get("pstaCurrentMembership");
+    expect(membership).toBeDefined();
+    expect(membership).not.toBeNull();
+    expect((membership as any).psta_club_id).toBe(club.id);
+  });
 });
 
 describe("EagerLoadingTooManyIdsTest", () => {

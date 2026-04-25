@@ -152,4 +152,12 @@ describe("RelationMutationTest", () => {
     const sql = Post.distinct().toSql();
     expect(sql).toContain("DISTINCT");
   });
+
+  it("order! with empty string does not emit ORDER BY", () => {
+    const { Post } = makeModel();
+    // Test the bang method directly — order() delegates to orderBang() on a clone.
+    const rel = Post.all();
+    (rel as any).orderBang("");
+    expect(rel.toSql()).not.toContain("ORDER BY");
+  });
 });

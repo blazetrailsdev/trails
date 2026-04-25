@@ -65,6 +65,15 @@ export class CTEJoin {
   }
 }
 
+/**
+ * A single eager-loading specification: either a plain association name string
+ * or a nested hash mirroring Rails' `includes(author: :posts)` syntax.
+ *
+ * Mirrors: the argument accepted by ActiveRecord::QueryMethods#includes,
+ * #preload, and #eager_load.
+ */
+export type AssociationSpec = string | { [assoc: string]: AssociationSpec | AssociationSpec[] };
+
 // ---------------------------------------------------------------------------
 // Host interface: the shape of `this` for bang methods mixed into Relation.
 // Uses TS `private` keyword fields which are accessible at runtime.
@@ -84,9 +93,9 @@ interface QueryMethodsHost {
   _lockValue: string | null;
   _joinClauses: Array<{ type: "inner" | "left"; table: string; on: string }>;
   _rawJoins: string[];
-  _includesAssociations: string[];
-  _preloadAssociations: string[];
-  _eagerLoadAssociations: string[];
+  _includesAssociations: AssociationSpec[];
+  _preloadAssociations: AssociationSpec[];
+  _eagerLoadAssociations: AssociationSpec[];
   _isReadonly: boolean;
   _isStrictLoading: boolean;
   _annotations: string[];
@@ -109,17 +118,17 @@ interface QueryMethodsHost {
 // The non-bang version calls `spawn.foo!` (clone then mutate).
 // ---------------------------------------------------------------------------
 
-function includesBang(this: QueryMethodsHost, ...associations: string[]): any {
+function includesBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
   this._includesAssociations.push(...associations);
   return this;
 }
 
-function eagerLoadBang(this: QueryMethodsHost, ...associations: string[]): any {
+function eagerLoadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
   this._eagerLoadAssociations.push(...associations);
   return this;
 }
 
-function preloadBang(this: QueryMethodsHost, ...associations: string[]): any {
+function preloadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
   this._preloadAssociations.push(...associations);
   return this;
 }
@@ -235,6 +244,11 @@ function orderBang(
   while (i < args.length) {
     const arg = args[i];
     if (typeof arg === "string") {
+      if (arg.trim() === "") {
+        const next = args[i + 1];
+        i += typeof next === "string" && /^(asc|desc)$/i.test(next) ? 2 : 1;
+        continue;
+      }
       const next = args[i + 1];
       if (typeof next === "string" && /^(asc|desc)$/i.test(next)) {
         this._orderClauses.push([arg, next.toLowerCase() as "asc" | "desc"]);
@@ -257,14 +271,28 @@ function reorderBang(
   ...args: Array<string | Record<string, "asc" | "desc">>
 ): any {
   this._orderClauses = [];
-  for (const arg of args) {
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i];
     if (typeof arg === "string") {
+      if (arg.trim() === "") {
+        const next = args[i + 1];
+        i += typeof next === "string" && /^(asc|desc)$/i.test(next) ? 2 : 1;
+        continue;
+      }
+      const next = args[i + 1];
+      if (typeof next === "string" && /^(asc|desc)$/i.test(next)) {
+        this._orderClauses.push([arg, next.toLowerCase() as "asc" | "desc"]);
+        i += 2;
+        continue;
+      }
       this._orderClauses.push(arg);
     } else {
       for (const [col, dir] of Object.entries(arg)) {
         this._orderClauses.push([col, dir]);
       }
     }
+    i++;
   }
   return this;
 }
