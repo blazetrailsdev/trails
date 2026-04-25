@@ -54,5 +54,9 @@
   "ar-42": {
     "side": "diff",
     "reason": "Multi-column GROUP BY qualification: trails emits 'GROUP BY author_id, published_year' (bare); Rails qualifies each to '\"books\".\"author_id\", \"books\".\"published_year\"'. Same root cause as ar-17 (single-column form)."
+  },
+  "ar-44": {
+    "side": "diff",
+    "reason": "LEFT OUTER JOIN table-name quoting: trails emits 'LEFT OUTER JOIN authors ON ...' (bare table identifier); Rails emits 'LEFT OUTER JOIN \"authors\" ON ...'. Same root cause as ar-01's INNER JOIN quoting gap."
   }
 }
