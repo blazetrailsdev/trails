@@ -6,6 +6,7 @@ import {
   restoreEncryptionConfig,
   makeEncryptedPost,
   makeEncryptedBook,
+  makeEncryptedBookIgnoreCase,
   makeFreshModel,
   makeKeyProvider,
   assertEncryptedAttribute,
@@ -205,9 +206,61 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     expect(reloaded.readAttributeBeforeTypeCast("name")).not.toBe(oldCiphertext);
   });
 
-  it.skip("encrypt won't change the encoding of strings even when compression is used", () => {});
-  it.skip("encrypt will honor forced encoding for deterministic attributes", () => {});
-  it.skip("encrypt won't force encoding for deterministic attributes when option is nil", () => {});
-  it.skip("encrypt will preserve case when :ignore_case option is used", () => {});
-  it.skip("re-encrypting will preserve case when :ignore_case option is used", () => {});
+  it("encrypt won't change the encoding of strings even when compression is used", async () => {
+    // JS strings have no explicit encoding — verify value round-trips unchanged.
+    const Post = makeEncryptedPost(freshAdapter());
+    // String must exceed THRESHOLD_TO_JUSTIFY_COMPRESSION (140 bytes) to exercise
+    // the compressed payload path in Encryptor.
+    const title = `The Starfleet is here! ${"OMG👌".repeat(30)}`;
+    const post = await withoutEncryption(() => Post.create({ title, body: "some body" }));
+    await post.encrypt();
+    const reloaded = await Post.find(post.id);
+    expect(reloaded.title).toBe(title);
+  });
+
+  it("encrypt will honor forced encoding for deterministic attributes", async () => {
+    Configurable.config.forcedEncodingForDeterministicEncryption = "UTF-8";
+    const Book = makeEncryptedBook(freshAdapter());
+    new Book();
+    const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
+    await book.encrypt();
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("Dune");
+  });
+
+  it("encrypt won't force encoding for deterministic attributes when option is nil", async () => {
+    Configurable.config.forcedEncodingForDeterministicEncryption = "";
+    const Book = makeEncryptedBook(freshAdapter());
+    new Book();
+    const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
+    await book.encrypt();
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("Dune");
+  });
+
+  it("encrypt will preserve case when :ignore_case option is used", async () => {
+    Configurable.config.supportUnencryptedData = true;
+    const Book = makeEncryptedBookIgnoreCase(freshAdapter());
+    new Book();
+    const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
+    // Before encryption, reads back the plaintext original case.
+    expect(await withoutEncryption(async () => (await Book.find(book.id)).name)).toBe("Dune");
+    expect(book.name).toBe("Dune");
+    await book.encrypt();
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("Dune");
+  });
+
+  it("re-encrypting will preserve case when :ignore_case option is used", async () => {
+    Configurable.config.supportUnencryptedData = true;
+    const Book = makeEncryptedBookIgnoreCase(freshAdapter());
+    new Book();
+    const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
+    expect(await withoutEncryption(async () => (await Book.find(book.id)).name)).toBe("Dune");
+    expect(book.name).toBe("Dune");
+    await book.encrypt();
+    await book.encrypt();
+    const reloaded = await Book.find(book.id);
+    expect(reloaded.name).toBe("Dune");
+  });
 });

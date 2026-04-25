@@ -415,7 +415,38 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // requires upsert/insert_on_duplicate_update support
   });
   it.skip("can dump and load records that use encryption", () => {});
-  it.skip("supports decrypting data encrypted non deterministically with SHA1 when digest class is SHA256", () => {});
+  it("supports decrypting data encrypted non deterministically with SHA1 when digest class is SHA256", async () => {
+    Configurable.configure({
+      primaryKey: "the primary key",
+      deterministicKey: "the deterministic key",
+      keyDerivationSalt: "the salt",
+    });
+    Configurable.config.supportSha1ForNonDeterministicEncryption = true;
+
+    const { KeyGenerator } = await import("./key-generator.js");
+    const { DerivedSecretKeyProvider } = await import("./derived-secret-key-provider.js");
+
+    const keyProviderSha1 = new DerivedSecretKeyProvider("the primary key", {
+      keyGenerator: new KeyGenerator("SHA1"),
+    });
+    const keyProviderSha256 = new DerivedSecretKeyProvider("the primary key", {
+      keyGenerator: new KeyGenerator("SHA256"),
+    });
+
+    const adp = freshAdapter();
+    const PostSha1 = makeFreshModel(adp, { id: "integer", title: "string", body: "string" });
+    PostSha1.encrypts("title", { keyProvider: keyProviderSha1 });
+    new PostSha1();
+    await PostSha1.create({ title: "Post 1", body: "body" });
+
+    const PostSha256 = makeFreshModel(adp, { id: "integer", title: "string", body: "string" });
+    PostSha256._tableName = (PostSha1 as any)._tableName;
+    PostSha256.encrypts("title", { keyProvider: keyProviderSha256 });
+    new PostSha256();
+
+    const posts = await PostSha256.all();
+    expect(posts.map((p: any) => p.title)).toContain("Post 1");
+  });
   it("when ignore_case: true, it keeps both the attribute and the _original counterpart encrypted", async () => {
     const Book = makeEncryptedBookIgnoreCase(freshAdapter());
     new Book();
