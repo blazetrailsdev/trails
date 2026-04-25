@@ -2182,18 +2182,9 @@ export class Relation<T extends Base> {
    * Pluck the primary key values.
    *
    * Mirrors: ActiveRecord::Relation#ids
-   *
-   * Return type is `unknown[]` in both cases:
-   * - Single-column PKs: each element is a scalar (string | number | bigint).
-   *   The concrete JS type depends on the adapter — SQLite returns bigint for
-   *   big_integer PKs (safeIntegers); PG returns decimal string for int8;
-   *   MySQL returns string for large BIGINT values and number for small ones.
-   * - Composite PKs: each element is itself an array (tuple of scalars).
    */
   async ids(): Promise<unknown[]> {
-    const pk = this._modelClass.primaryKey;
-    const cols = Array.isArray(pk) ? pk : [pk];
-    return this.pluck(...(cols as [string, ...string[]]));
+    return this.pluck(this._modelClass.primaryKey as string);
   }
 
   /**
