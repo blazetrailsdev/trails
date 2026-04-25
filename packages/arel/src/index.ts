@@ -11,7 +11,8 @@ export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 export { quoteArrayLiteral } from "./quote-array.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
-import { registerNodeDeps } from "./nodes/node.js";
+import { registerNodeDeps, setToSqlVisitor } from "./nodes/node.js";
+export { setToSqlVisitor };
 import { Not } from "./nodes/unary.js";
 import { Grouping } from "./nodes/grouping.js";
 import { Or } from "./nodes/or.js";

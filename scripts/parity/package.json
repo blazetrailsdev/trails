@@ -1,0 +1,12 @@
+{
+  "name": "@blazetrails/parity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Parity-pipeline runner scripts. Workspace package so dump.ts can import @blazetrails/arel directly.",
+  "dependencies": {
+    "@blazetrails/arel": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*"
+  }
+}

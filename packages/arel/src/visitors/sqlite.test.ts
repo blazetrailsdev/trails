@@ -8,7 +8,8 @@ describe("SqliteTest", () => {
     it("should handle nil", () => {
       const node = users.get("name").isDistinctFrom(null);
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toContain("IS DISTINCT FROM");
+      // SQLite has no IS DISTINCT FROM; it uses IS NOT for null-aware !=.
+      expect(sql).toBe('"users"."name" IS NOT NULL');
     });
   });
 
@@ -39,23 +40,20 @@ describe("SqliteTest", () => {
     it("should handle column names on both sides", () => {
       const node = users.get("id").isNotDistinctFrom(posts.get("user_id"));
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
-      expect(sql).toContain('"users"."id"');
-      expect(sql).toContain('"posts"."user_id"');
+      // SQLite uses IS for null-aware equality (no IS NOT DISTINCT FROM).
+      expect(sql).toBe('"users"."id" IS "posts"."user_id"');
     });
 
     it("should handle nil", () => {
       const node = users.get("name").isNotDistinctFrom(null);
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
-      expect(sql).toContain('"users"."name"');
-      expect(sql).toContain("NULL");
+      expect(sql).toBe('"users"."name" IS NULL');
     });
 
     it("should construct a valid generic SQL statement", () => {
       const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
+      expect(sql).toBe('"users"."name" IS 1');
     });
   });
 

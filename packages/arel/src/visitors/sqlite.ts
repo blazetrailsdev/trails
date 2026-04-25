@@ -65,4 +65,18 @@ export class SQLite extends ToSql {
     if (typeof value === "boolean") return value ? "1" : "0";
     return super.quote(value);
   }
+
+  /**
+   * SQLite has no `IS DISTINCT FROM`; it overloads `IS` / `IS NOT` to be
+   * NULL-aware equality/inequality. Rails routes `IsDistinctFrom` /
+   * `IsNotDistinctFrom` through the SQLite adapter and emits `IS NOT` /
+   * `IS` accordingly.
+   */
+  protected override visitIsDistinctFrom(node: Nodes.IsDistinctFrom): SQLString {
+    return this.visitBinaryOp(node, "IS NOT");
+  }
+
+  protected override visitIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
+    return this.visitBinaryOp(node, "IS");
+  }
 }

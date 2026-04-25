@@ -1,7 +1,6 @@
 import { Node } from "./nodes/node.js";
 import { PlainString } from "./collectors/plain-string.js";
 import { Dot } from "./visitors/dot.js";
-import { ToSql } from "./visitors/to-sql.js";
 import { Limit, Offset } from "./nodes/unary.js";
 import { buildQuoted } from "./nodes/casted.js";
 
@@ -70,7 +69,10 @@ export abstract class TreeManager {
   }
 
   toSql(): string {
-    const visitor = new ToSql();
-    return visitor.compile(this.ast);
+    // Route through the same Node#toSql() the registry powers, so a
+    // `setToSqlVisitor()` override (e.g. SQLite for the parity runner)
+    // applies to managers as well as raw nodes. Plain `new ToSql()`
+    // would always be the generic visitor.
+    return this.ast.toSql();
   }
 }

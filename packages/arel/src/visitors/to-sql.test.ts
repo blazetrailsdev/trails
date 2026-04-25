@@ -688,6 +688,22 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(aliased.get("id"));
       expect(sql).toBe('"u"."id"');
     });
+
+    it("emits a subquery alias bare (Rails AliasPredication via SqlLiteral name)", () => {
+      // SelectManager#as wraps the relation in a Grouping, which Rails'
+      // visit_Arel_Nodes_TableAlias renders bare via quote_table_name's
+      // SqlLiteral pass-through. Trails matches on the relation shape.
+      const sub = users.project(users.get("id")).as("sub");
+      const sql = new Visitors.ToSql().compile(sub);
+      expect(sql).toContain(") sub");
+      expect(sql).not.toContain('"sub"');
+    });
+
+    it("keeps regular table aliases quoted", () => {
+      const aliased = new Nodes.TableAlias(users, "u");
+      const sql = new Visitors.ToSql().compile(aliased);
+      expect(sql).toContain('"users" "u"');
+    });
   });
 
   it("should visit_Arel_Nodes_And", () => {

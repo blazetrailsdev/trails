@@ -1,3 +1,4 @@
 packages:
   - "packages/*"
   - "scripts/guides-typecheck"
+  - "scripts/parity"

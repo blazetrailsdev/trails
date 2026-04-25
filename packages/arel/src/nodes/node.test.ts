@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, SelectManager, Nodes, Visitors } from "../index.js";
+import { Table, SelectManager, Nodes, Visitors, setToSqlVisitor } from "../index.js";
 
 describe("TestNode", () => {
   const users = new Table("users");
@@ -91,5 +91,41 @@ describe("TestNode", () => {
     const b = new Nodes.Casted("hello", attr);
     expect(a.value).toBe(b.value);
     expect(a.attribute).toBe(b.attribute);
+  });
+});
+
+describe("setToSqlVisitor", () => {
+  // The override is process-global (it mutates the module-level
+  // registry). Restore the default in `finally` so subsequent tests in
+  // the same worker don't see the SQLite override leak across.
+  const restore = (): void => setToSqlVisitor(Visitors.ToSql);
+
+  it("Node#toSql() routes through the configured visitor", () => {
+    try {
+      const users = new Table("users");
+      const node = users.get("name").isDistinctFrom(null);
+      // Generic visitor.
+      expect(node.toSql()).toBe(`"users"."name" IS DISTINCT FROM NULL`);
+      // SQLite visitor.
+      setToSqlVisitor(Visitors.SQLite);
+      expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
+    } finally {
+      restore();
+    }
+  });
+
+  it("TreeManager#toSql() (SelectManager) also routes through the configured visitor", () => {
+    try {
+      const users = new Table("users");
+      const mgr = users.project(users.get("id")).where(users.get("active").isNotDistinctFrom(true));
+      expect(mgr.toSql()).toContain("IS NOT DISTINCT FROM");
+      setToSqlVisitor(Visitors.SQLite);
+      const sqlite = mgr.toSql();
+      // SQLite emits IS for IS NOT DISTINCT FROM, and `1` for true.
+      expect(sqlite).toContain('"users"."active" IS 1');
+      expect(sqlite).not.toContain("IS NOT DISTINCT FROM");
+    } finally {
+      restore();
+    }
   });
 });

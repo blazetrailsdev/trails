@@ -126,9 +126,8 @@ export class ToSql implements NodeVisitor<SQLString> {
     if (node instanceof Nodes.Between) return this.visitBetween(node);
     if (node instanceof Nodes.Regexp) return this.visitRegexp(node);
     if (node instanceof Nodes.NotRegexp) return this.visitNotRegexp(node);
-    if (node instanceof Nodes.IsDistinctFrom) return this.visitBinaryOp(node, "IS DISTINCT FROM");
-    if (node instanceof Nodes.IsNotDistinctFrom)
-      return this.visitBinaryOp(node, "IS NOT DISTINCT FROM");
+    if (node instanceof Nodes.IsDistinctFrom) return this.visitIsDistinctFrom(node);
+    if (node instanceof Nodes.IsNotDistinctFrom) return this.visitIsNotDistinctFrom(node);
     if (node instanceof Nodes.Assignment) return this.visitAssignment(node);
     if (node instanceof Nodes.As) return this.visitAs(node);
 
@@ -599,6 +598,14 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
+  protected visitIsDistinctFrom(node: Nodes.IsDistinctFrom): SQLString {
+    return this.visitBinaryOp(node, "IS DISTINCT FROM");
+  }
+
+  protected visitIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
+    return this.visitBinaryOp(node, "IS NOT DISTINCT FROM");
+  }
+
   private visitIn(node: Nodes.In): SQLString {
     if (Array.isArray(node.right) && node.right.length === 0) {
       // Empty IN is always false — Rails uses 1=0
@@ -1064,7 +1071,22 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   private visitTableAlias(node: Nodes.TableAlias): SQLString {
     this.visit(node.relation);
-    this.collector.append(` "${node.name}"`);
+    // Rails: `SelectManager#as` wraps the alias name in a SqlLiteral,
+    // and `AbstractAdapter#quote_table_name` returns SqlLiterals
+    // unchanged — so subquery aliases render bare. We approximate the
+    // same outcome at the visitor layer by checking whether the
+    // relation is a Grouping (the shape `SelectManager#as` produces);
+    // plain `Table#alias("foo")` keeps `"foo"`. Caveat: callers that
+    // construct a TableAlias on a Table with a SqlLiteral name
+    // wouldn't get the bare form here — Rails would. The runtime
+    // signature of `TableAlias.name` is `string`, so that path isn't
+    // currently reachable, but it's a Rails-fidelity divergence to
+    // revisit if the type widens.
+    if (node.relation instanceof Nodes.Grouping) {
+      this.collector.append(` ${node.name}`);
+    } else {
+      this.collector.append(` "${node.name}"`);
+    }
     return this.collector;
   }
 

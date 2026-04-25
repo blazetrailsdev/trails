@@ -253,6 +253,18 @@ importers:
         specifier: workspace:*
         version: link:../../packages/trailties
 
+  scripts/parity:
+    dependencies:
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../../packages/activemodel
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../../packages/activerecord
+      '@blazetrails/arel':
+        specifier: workspace:*
+        version: link:../../packages/arel
+
 packages:
 
   '@adobe/css-tools@4.4.4':

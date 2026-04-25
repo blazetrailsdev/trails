@@ -1,12 +1,4 @@
 {
-  "arel-17": {
-    "side": "diff",
-    "reason": "is_distinct_from: trails emits 'IS DISTINCT FROM' (SQL standard); Rails on SQLite emits 'IS NOT' (SQLite extension). Both are semantically equivalent but lexically differ."
-  },
-  "arel-44": {
-    "side": "diff",
-    "reason": "subquery alias quoting: Rails emits the alias bare (sub); trails emits the quoted identifier (\"sub\"). Real ToSql visitor divergence."
-  },
   "ar-01": {
     "side": "diff",
     "reason": "Book.joins(:reviews): with models registered via registerModel() in the fixture's models.ts, trails Relation#joins(name) does resolve the association and emit an INNER JOIN on the FK. The remaining diff is table-name quoting — trails emits 'INNER JOIN reviews ON ...' where Rails emits 'INNER JOIN \"reviews\" ON ...'. Column references on both sides are quoted identically; only the table identifier after INNER JOIN is bare on trails."

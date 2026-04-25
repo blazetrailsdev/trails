@@ -146,7 +146,24 @@ async function main(): Promise<void> {
       db.close();
     }
 
-    // 2. Import query.ts. Fixtures end with `export default <expr>` — see
+    // 2. Wire the SQLite visitor through the package registry so both
+    //    `Node#toSql()` and `TreeManager#toSql()` route through it
+    //    (TreeManager.toSql delegates to the AST node's toSql, which
+    //    uses _registry.ToSql). Mirrors the Rails side's
+    //    `establish_connection adapter: "sqlite3"` — for example,
+    //    `IS DISTINCT FROM` now emits as `IS NOT` because
+    //    Visitors.SQLite#visitIsDistinctFrom overrides it.
+    //
+    //    Imported as `@blazetrails/arel` (not via dist path) because
+    //    scripts/parity is itself a workspace package — see
+    //    scripts/parity/package.json. That ensures Node ESM dedupes
+    //    this import with the fixture's `@blazetrails/arel` import to a
+    //    single module instance, so the registry override is visible
+    //    to the fixture's nodes.
+    const arel = await import("@blazetrails/arel");
+    arel.setToSqlVisitor(arel.Visitors.SQLite);
+
+    // 4. Import query.ts. Fixtures end with `export default <expr>` — see
     //    scripts/parity/translate/arel.ts (generateTs).
     const queryUrl = pathToFileURL(join(fixtureDirAbs, "query.ts")).href;
     const mod = (await import(queryUrl)) as { default: unknown };
@@ -162,14 +179,14 @@ async function main(): Promise<void> {
       );
     }
 
-    // 3. Extract SQL. Arel node/manager both expose .toSql():
+    // 5. Extract SQL. Arel node/manager both expose .toSql():
     //    Node#toSql()         packages/arel/src/nodes/node.ts
     //    TreeManager#toSql()  packages/arel/src/tree-manager.ts
     //    Arel inlines bind values into the SQL string — no separate bind array.
     const sqlStr = (result as { toSql(): string }).toSql().trim();
     const binds: string[] = [];
 
-    // 4. Write CanonicalQuery JSON
+    // 6. Write CanonicalQuery JSON
     const canonical: CanonicalQuery = {
       version: 1,
       fixture: fixtureName,
