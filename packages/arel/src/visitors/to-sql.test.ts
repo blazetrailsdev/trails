@@ -480,7 +480,11 @@ describe("the to_sql visitor", () => {
 
     it("should handle arbitrary operators", () => {
       const node = new Nodes.UnaryOperation("-", new Nodes.Quoted(1));
-      expect(new Visitors.ToSql().compile(node)).toContain("-1");
+      // Rails' visit_Arel_Nodes_UnaryOperation emits `" #{operator} "` —
+      // space on both sides of the operator. Lock the exact byte sequence
+      // (including the leading space) so any spacing regression is caught
+      // by this test, not just by parity.
+      expect(new Visitors.ToSql().compile(node)).toBe(" - 1");
     });
   });
 

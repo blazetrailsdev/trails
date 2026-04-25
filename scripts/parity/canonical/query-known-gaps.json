@@ -3,41 +3,9 @@
     "side": "diff",
     "reason": "is_distinct_from: trails emits 'IS DISTINCT FROM' (SQL standard); Rails on SQLite emits 'IS NOT' (SQLite extension). Both are semantically equivalent but lexically differ."
   },
-  "arel-24": {
-    "side": "trails-missing",
-    "reason": "arithmetic chain (users[:age] / 3 - employees[:time_at_company]): trails Attribute#divide returns a node without a .subtract method — predication-after-arithmetic chain is incomplete."
-  },
-  "arel-25": {
-    "side": "trails-missing",
-    "reason": "arithmetic predication gap — same family as arel-24 (trails arithmetic ops do not chain into further predicates)."
-  },
-  "arel-26": {
-    "side": "trails-missing",
-    "reason": "arithmetic predication gap — same family as arel-24."
-  },
-  "arel-27": {
-    "side": "trails-missing",
-    "reason": "arithmetic predication gap — same family as arel-24."
-  },
-  "arel-28": {
-    "side": "trails-missing",
-    "reason": "arithmetic predication gap — same family as arel-24."
-  },
-  "arel-29": {
-    "side": "trails-missing",
-    "reason": "arithmetic predication gap — same family as arel-24."
-  },
-  "arel-30": {
-    "side": "trails-missing",
-    "reason": "(~users[:bitmap]).gt(0): trails Nodes.BitwiseNot does not implement predication methods (no .gt/.lt/.eq chain)."
-  },
   "arel-44": {
     "side": "diff",
     "reason": "subquery alias quoting: Rails emits the alias bare (sub); trails emits the quoted identifier (\"sub\"). Real ToSql visitor divergence."
-  },
-  "arel-47": {
-    "side": "trails-missing",
-    "reason": "photos[:id].count.gt(5): trails Attribute#count returns a node without predication methods — HAVING aggregate-comparison chain incomplete."
   },
   "ar-01": {
     "side": "diff",

@@ -1,5 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
-import { NodeExpression } from "./node-expression.js";
+import { NodeExpression, registerBuildQuoted } from "./node-expression.js";
 import type { Attribute } from "../attributes/attribute.js";
 import { ATTRIBUTE_BRAND } from "./binary.js";
 import { BindParam } from "./bind-param.js";
@@ -38,6 +38,8 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (isAttribute(attribute)) return new Casted(other, attribute as Attribute);
   return new Quoted(other);
 }
+
+registerBuildQuoted(buildQuoted);
 
 function isAttribute(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
