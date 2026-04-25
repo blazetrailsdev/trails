@@ -1,43 +1,15 @@
 {
-  "ar-01": {
-    "side": "diff",
-    "reason": "Book.joins(:reviews): with models registered via registerModel() in the fixture's models.ts, trails Relation#joins(name) does resolve the association and emit an INNER JOIN on the FK. The remaining diff is table-name quoting — trails emits 'INNER JOIN reviews ON ...' where Rails emits 'INNER JOIN \"reviews\" ON ...'. Column references on both sides are quoted identically; only the table identifier after INNER JOIN is bare on trails."
-  },
-  "ar-09": {
-    "side": "diff",
-    "reason": "Boolean literal serialization: trails' ToSql renders JS booleans as the TRUE/FALSE keywords; Rails on SQLite writes 1/0 (SQLite's BOOLEAN maps to INTEGER, so Rails serialises to the integer form). Semantically equivalent but lexically differ."
-  },
-  "ar-11": {
-    "side": "diff",
-    "reason": "Boolean literal serialization in WHERE with array + nil: trails emits 'tall = FALSE OR tall IS NULL'; Rails emits 'tall = 0 OR tall IS NULL'. Same root cause as ar-09."
-  },
   "ar-16": {
     "side": "diff",
     "reason": "Book.all().eagerLoad(\"author\").limit(10): trails eagerLoad pushes the association into _eagerLoadAssociations but doesn't emit the LEFT OUTER JOIN + column-aliased SELECT that Rails produces. Rails emits 'SELECT \"books\".\"id\" AS t0_r0, ... FROM \"books\" LEFT OUTER JOIN \"authors\" ON ... LIMIT 10'; trails emits the bare 'SELECT \"books\".* FROM \"books\" LIMIT 10'. Real trails-missing feature: eagerLoad's JOIN + column-projection behaviour."
-  },
-  "ar-17": {
-    "side": "diff",
-    "reason": "GROUP BY column qualification: trails emits 'GROUP BY created_at' (bare); Rails qualifies to 'GROUP BY \"orders\".\"created_at\"'. Same SQL semantic, lexically differ."
-  },
-  "ar-19": {
-    "side": "diff",
-    "reason": "Boolean literal in WHERE: trails emits 'active = TRUE', Rails on SQLite emits 'active = 1'. Same root cause as ar-09 / ar-11."
   },
   "ar-23": {
     "side": "diff",
     "reason": "ORDER BY column qualification with .from(...) using a single raw SQL string that already includes the alias: trails qualifies the order column to '\"developers\".\"hotness\"'; Rails leaves it bare as '\"hotness\"'. Same SQL semantic, lexically differ. Inverse direction from ar-17's GROUP BY case."
   },
-  "ar-29": {
-    "side": "diff",
-    "reason": ".lock on SQLite: trails emits 'FOR UPDATE' regardless of adapter; Rails knows SQLite has no row-level locking and emits no lock clause. trails should make Relation#lock adapter-aware (mirror Rails' AbstractAdapter#lock_clause / SQLite returning empty)."
-  },
   "ar-32": {
     "side": "diff",
     "reason": "in_order_of: multiple divergences vs Rails. (1) Rails adds WHERE \"books\".\"status\" IN (values) to filter to the named set; trails omits it. (2) Rails CASE values are 1-indexed; trails 0-indexed with ELSE branch. (3) Rails appends ASC; trails leaves direction bare. (4) Rails qualifies the column ('\"books\".\"status\"'); trails leaves it bare. Real implementation gap — trails Relation#inOrderOf is incomplete vs ActiveRecord::QueryMethods#in_order_of."
-  },
-  "ar-33": {
-    "side": "diff",
-    "reason": "Relation#select with an Arel attribute As node: trails emits literal '[object Object]' because Relation#select accepts only string | SqlLiteral and toString-coerces other inputs; Rails accepts Arel nodes and renders them via the visitor. trails-missing: select() should accept Arel nodes (Attribute, As, etc.) and call toSql on them."
   },
   "ar-36": {
     "side": "diff",
@@ -46,22 +18,6 @@
   "ar-37": {
     "side": "diff",
     "reason": "where.associated(:assoc): Rails emits INNER JOIN \"authors\" ON ... WHERE \"authors\".\"id\" IS NOT NULL. trails shortcuts a belongs_to to WHERE \"books\".\"author_id\" IS NOT NULL. Same shape gap as ar-36 — whereAssociated should emit the INNER JOIN + assoc-side IS NOT NULL form."
-  },
-  "ar-38": {
-    "side": "diff",
-    "reason": "Boolean literal in subquery WHERE: trails emits 'approved = TRUE', Rails on SQLite emits 'approved = 1'. Same root cause as ar-09 / ar-11 / ar-19 — boolean serialization is type-system-driven, not adapter-aware."
-  },
-  "ar-42": {
-    "side": "diff",
-    "reason": "Multi-column GROUP BY qualification: trails emits 'GROUP BY author_id, published_year' (bare); Rails qualifies each to '\"books\".\"author_id\", \"books\".\"published_year\"'. Same root cause as ar-17 (single-column form)."
-  },
-  "ar-44": {
-    "side": "diff",
-    "reason": "LEFT OUTER JOIN table-name quoting: trails emits 'LEFT OUTER JOIN authors ON ...' (bare table identifier); Rails emits 'LEFT OUTER JOIN \"authors\" ON ...'. Same root cause as ar-01's INNER JOIN quoting gap."
-  },
-  "ar-51": {
-    "side": "diff",
-    "reason": "GROUP BY qualification in string-having query: trails emits 'GROUP BY status' (bare); Rails qualifies to 'GROUP BY \"orders\".\"status\"'. Same root cause as ar-17 / ar-42."
   },
   "ar-52": {
     "side": "diff",

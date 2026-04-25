@@ -8,9 +8,24 @@
  * Mirrors: ActiveRecord::Calculations
  */
 
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, Table } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import { detectAdapterName } from "../adapter-name.js";
+
+/**
+ * Qualify a GROUP BY column string as an Arel attribute node when it is a
+ * plain SQL identifier (letters, digits, underscores), mirroring Rails'
+ * `arel_columns` / `build_group` behaviour. Positional args ("1"), cast
+ * expressions ("created_at::date"), and SQL expressions pass through as
+ * SqlLiteral.
+ *
+ * @internal exported so Relation can share the implementation.
+ */
+export function groupColumnToArel(col: string, table: Table): Nodes.Node {
+  const trimmed = col.trim();
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) return table.get(trimmed);
+  return new Nodes.SqlLiteral(trimmed);
+}
 
 interface CalculationRelation {
   _modelClass: {
@@ -174,11 +189,13 @@ async function groupedAggregate(
 ): Promise<Record<string, unknown>> {
   const table = rel._modelClass.arelTable;
   const groupCol = rel._groupColumns[0];
+  const groupNode = groupColumnToArel(groupCol, table);
   const aggNode = buildAggNode(table, fn, column, rel._isDistinct);
-  const manager = table.project(table.get(groupCol).as("group_key"), aggNode.as("val"));
+  const groupKeyAlias = new Nodes.As(groupNode, new Nodes.SqlLiteral("group_key"));
+  const manager = table.project(groupKeyAlias, aggNode.as("val"));
   rel._applyJoinsToManager(manager);
   rel._applyWheresToManager(manager, table);
-  manager.group(groupCol);
+  manager.group(groupNode);
 
   if (rel._limitValue !== null) manager.take(rel._limitValue);
   if (rel._offsetValue !== null) manager.skip(rel._offsetValue);

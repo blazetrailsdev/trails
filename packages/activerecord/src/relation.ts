@@ -37,7 +37,7 @@ import { InsertAll } from "./insert-all.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
-import { Calculations } from "./relation/calculations.js";
+import { Calculations, groupColumnToArel } from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
@@ -1662,7 +1662,7 @@ export class Relation<T extends Base> {
     this._applyOrderToManager(manager, table);
 
     if (this._isDistinct) manager.distinct();
-    for (const col of this._groupColumns) manager.group(col);
+    for (const col of this._groupColumns) manager.group(groupColumnToArel(col, table));
     if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
     if (this._lockValue) manager.lock(this._lockValue);
 
@@ -2054,7 +2054,7 @@ export class Relation<T extends Base> {
     const manager = table.project(new Nodes.SqlLiteral("1 AS one"));
     rel._applyJoinsToManager(manager);
     rel._applyWheresToManager(manager, table);
-    for (const col of rel._groupColumns) manager.group(col);
+    for (const col of rel._groupColumns) manager.group(groupColumnToArel(col, table));
     if (!rel._havingClause.isEmpty()) manager.having(rel._havingClause.ast);
     manager.take(1);
     const rows = await rel._modelClass.adapter.execute(manager.toSql());
@@ -2761,7 +2761,7 @@ export class Relation<T extends Base> {
     if (this._limitValue !== null) manager.take(this._limitValue);
     if (this._offsetValue !== null) manager.skip(this._offsetValue);
     for (const col of this._groupColumns) {
-      manager.group(col);
+      manager.group(groupColumnToArel(col, table));
     }
     return manager;
   }
@@ -2813,7 +2813,7 @@ export class Relation<T extends Base> {
     if (this._offsetValue !== null) manager.skip(this._offsetValue);
 
     for (const col of this._groupColumns) {
-      manager.group(col);
+      manager.group(groupColumnToArel(col, table));
     }
 
     if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);

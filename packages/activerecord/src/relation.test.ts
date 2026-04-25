@@ -106,6 +106,56 @@ describe("RelationTest", () => {
     expect(post.isPersisted()).toBe(true);
   });
 
+  it("group by bare column name qualifies via table", () => {
+    class Order extends Base {
+      static _tableName = "orders";
+      static {
+        this.attribute("created_at", "string");
+        this.attribute("total", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const sql = Order.group("created_at").toSql();
+    expect(sql).toContain('"orders"."created_at"');
+    expect(sql).not.toMatch(/GROUP BY created_at[^"]/);
+  });
+
+  it("group by multiple bare columns qualifies each via table", () => {
+    class Book extends Base {
+      static _tableName = "books";
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("published_year", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const sql = Book.group("author_id", "published_year").toSql();
+    expect(sql).toContain('"books"."author_id"');
+    expect(sql).toContain('"books"."published_year"');
+    expect(sql).not.toMatch(/GROUP BY author_id[^"]/);
+    expect(sql).not.toMatch(/,\s*published_year[^"]/);
+  });
+
+  it("group by SQL expression passes through unqualified", () => {
+    class Order extends Base {
+      static _tableName = "orders";
+      static {
+        this.attribute("created_at", "string");
+        this.adapter = adapter;
+      }
+    }
+    // Function expressions pass through as raw SQL (not quoted as identifier)
+    const fnSql = Order.group("DATE(created_at)").toSql();
+    expect(fnSql).toContain("GROUP BY DATE(created_at)");
+    expect(fnSql).not.toContain('"orders"."DATE(created_at)"');
+    // Cast expressions pass through as raw SQL (not quoted as identifier)
+    const castSql = Order.group("created_at::date").toSql();
+    expect(castSql).toContain("GROUP BY created_at::date");
+    expect(castSql).not.toContain('"orders"."created_at::date"');
+    // Positional GROUP BY passes through as raw SQL
+    expect(Order.group("1").toSql()).toContain("GROUP BY 1");
+  });
+
   it("multiple selects", () => {
     class Post extends Base {
       static {
