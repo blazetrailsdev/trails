@@ -10,6 +10,7 @@ import {
   makeEncryptedBookIgnoreCase,
   makeEncryptedAuthor,
   makeBookThatWillFailToEncryptName,
+  makeEncryptedBookWithCustomCompressor,
   makeFreshModel,
   makeKeyProvider,
   assertEncryptedAttribute,
@@ -486,8 +487,23 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it.skip("binary data can be encrypted", () => {});
   it.skip("binary data can be encrypted uncompressed", () => {});
   it.skip("serialized binary data can be encrypted", () => {});
-  it.skip("deterministic ciphertexts remain constant", () => {});
-  it.skip("can compress data with custom compressor", () => {});
+  it.skip("deterministic ciphertexts remain constant", () => {
+    // Requires exact Rails-compatible test key configuration to decrypt the
+    // hardcoded ciphertext. Deferred until key derivation parity is confirmed.
+  });
+
+  it("can compress data with custom compressor", async () => {
+    const Book = makeEncryptedBookWithCustomCompressor(freshAdapter());
+    new Book();
+    // String length > 140 bytes to trigger compression path.
+    const name = "a".repeat(141);
+    const book = await Book.create({ name });
+    const reloaded = await Book.find(book.id);
+    // inflate adds "[compressed] " prefix, verifying the custom compressor path
+    // was exercised — mirrors Rails' EncryptedBookWithCustomCompressor assertion.
+    expect(reloaded.name).toMatch(/^\[compressed\] /);
+    expect(reloaded.name).toBe("[compressed] " + name);
+  });
   it("type method returns cast type", () => {
     const Book = makeEncryptedBook(freshAdapter());
     new Book();
