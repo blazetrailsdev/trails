@@ -70,16 +70,71 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     expect(dup.errors.count).toBe(1);
   });
 
-  it.skip("uniqueness validations work when mixing encrypted an unencrypted data", () => {
-    // requires same adapter/table access from two different model classes
+  it("uniqueness validations work when mixing encrypted an unencrypted data", async () => {
+    // Global supportUnencryptedData = true → plain-text fallback scheme is appended to
+    // previousTypes, so the uniqueness query also searches for the unencrypted value.
+    Configurable.config.supportUnencryptedData = true;
+
+    const adp = freshAdapter();
+    const Book = makeFreshModel(adp, { id: "integer", name: "string" });
+    Book.validatesUniqueness("name");
+    Book.encrypts("name", { deterministic: true, downcase: true });
+    new Book();
+
+    // Insert unencrypted "dune" directly (simulates a row that leaked plain text).
+    const RawBook = makeFreshModel(adp, { id: "integer", name: "string" });
+    RawBook._tableName = Book._tableName;
+    new RawBook();
+    await RawBook.create({ name: "dune" });
+
+    // Creating an encrypted duplicate should fail: the query expansion includes
+    // the plain-text "dune" and finds the existing raw row.
+    const dup = await Book.create({ name: "dune" });
+    expect(dup.errors.count).toBe(1);
   });
 
-  it.skip("uniqueness validations do not work when mixing encrypted an unencrypted data and unencrypted data is opted out per-attribute", () => {
-    // needs supportUnencryptedData per-attribute option
+  it("uniqueness validations do not work when mixing encrypted an unencrypted data and unencrypted data is opted out per-attribute", async () => {
+    // Global supportUnencryptedData = true, but the attribute opts out via per-attribute
+    // supportUnencryptedData: false — so no plain-text fallback in previousTypes.
+    Configurable.config.supportUnencryptedData = true;
+
+    const adp = freshAdapter();
+    const Book = makeFreshModel(adp, { id: "integer", name: "string" });
+    Book.validatesUniqueness("name");
+    Book.encrypts("name", { deterministic: true, downcase: true, supportUnencryptedData: false });
+    new Book();
+
+    const RawBook = makeFreshModel(adp, { id: "integer", name: "string" });
+    RawBook._tableName = Book._tableName;
+    new RawBook();
+    await RawBook.create({ name: "dune" });
+
+    // Validation passes: the plain-text row is invisible to the query because
+    // the per-attribute opt-out disables the clean-text fallback scheme.
+    const book = await Book.create({ name: "dune" });
+    expect(book.errors.count).toBe(0);
   });
 
-  it.skip("uniqueness validations work when mixing encrypted an unencrypted data and unencrypted data is opted in per-attribute", () => {
-    // needs supportUnencryptedData per-attribute option
+  it("uniqueness validations work when mixing encrypted an unencrypted data and unencrypted data is opted in per-attribute", async () => {
+    // Global supportUnencryptedData = false, but the attribute explicitly opts in via
+    // supportUnencryptedData: true — so the plain-text fallback IS included.
+    Configurable.config.supportUnencryptedData = false;
+
+    const adp = freshAdapter();
+    const Book = makeFreshModel(adp, { id: "integer", name: "string" });
+    Book.validatesUniqueness("name");
+    Book.encrypts("name", { deterministic: true, downcase: true, supportUnencryptedData: true });
+    new Book();
+
+    const RawBook = makeFreshModel(adp, { id: "integer", name: "string" });
+    RawBook._tableName = Book._tableName;
+    new RawBook();
+    await RawBook.create({ name: "dune" });
+
+    // Validation fails: per-attribute opt-in adds the clean-text fallback scheme even
+    // though the global config has supportUnencryptedData = false.
+    const dup = await Book.create({ name: "dune" });
+    expect(dup.errors.count).toBe(1);
   });
 
   it("uniqueness validations work when using old encryption schemes", async () => {
