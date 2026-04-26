@@ -26,10 +26,20 @@ describe("NestedAttributesWithCallbacksTest", () => {
   });
 
   it.skip("Assignment updates records in target when not loaded", () => {
-    /* TODO: needs helpers from original file */
+    // Requires birds_with_add association and nested attribute fixtures
   });
 
   it.skip("Assignment updates records in target when loaded", () => {
-    /* TODO: needs helpers from original file */
+    // Requires birds_with_add association and nested attribute fixtures
+  });
+
+  // Second pair: same name prefix, but "and callback loads target" suffix
+  // (Rails' test extractor sees these as duplicate descriptions)
+  it.skip("Assignment updates records in target when not loaded", () => {
+    // Requires birds_with_add_load association — callback loads target before assignment
+  });
+
+  it.skip("Assignment updates records in target when loaded", () => {
+    // Requires birds_with_add_load association — callback loads target before assignment
   });
 });

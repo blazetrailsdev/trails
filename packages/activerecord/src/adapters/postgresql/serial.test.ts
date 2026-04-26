@@ -14,34 +14,50 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlSerialTest", () => {
-    it.skip("serial column", async () => {});
-    it.skip("smallserial column", async () => {});
-    it.skip("serial default", async () => {});
-    it.skip("serial sequence name", async () => {});
-    it.skip("serial schema dump", async () => {});
-    it.skip("serial migration", async () => {});
-    it.skip("serial primary key", async () => {});
-    it.skip("bigserial primary key", async () => {});
-    it.skip("serial not null", async () => {});
-    it.skip("serial reset", async () => {});
-    it.skip("serial custom sequence", async () => {});
-    it.skip("not serial column", async () => {});
-    it.skip("schema dump with not serial", async () => {});
-    it.skip("serial columns 2", async () => {});
+    it.skip("serial column", async () => {
+      // Requires postgresql_serials fixture table
+    });
+    it.skip("not serial column", async () => {
+      // Requires postgresql_serials fixture table
+    });
+    it.skip("schema dump with shorthand", async () => {
+      // Requires postgresql_serials fixture table + schema dump helper
+    });
+    it.skip("schema dump with not serial", async () => {
+      // Requires postgresql_serials fixture table + schema dump helper
+    });
   });
 
-  describe("PostgreSQLBigSerialTest", () => {
-    it.skip("bigserial column", async () => {});
-    it.skip("not bigserial column", async () => {});
-    it.skip("schema dump with not bigserial", async () => {});
+  describe("PostgresqlBigSerialTest", () => {
+    it.skip("bigserial column", async () => {
+      // Requires postgresql_big_serials fixture table
+    });
+    it.skip("not bigserial column", async () => {
+      // Requires postgresql_big_serials fixture table
+    });
+    it.skip("schema dump with shorthand", async () => {
+      // Requires postgresql_big_serials fixture table + schema dump helper
+    });
+    it.skip("schema dump with not bigserial", async () => {
+      // Requires postgresql_big_serials fixture table + schema dump helper
+    });
   });
 
   describe("CollidedSequenceNameTest", () => {
-    it.skip("serial columns", async () => {});
-    it.skip("schema dump with collided sequence name", async () => {});
+    it.skip("serial columns", async () => {
+      // Requires collided_sequence_name fixture table
+    });
+    it.skip("schema dump with collided sequence name", async () => {
+      // Requires collided_sequence_name fixture table + schema dump helper
+    });
   });
 
   describe("LongerSequenceNameDetectionTest", () => {
-    it.skip("schema dump with long table name", async () => {});
+    it.skip("serial columns", async () => {
+      // Requires longer_sequence_name fixture table
+    });
+    it.skip("schema dump with long table name", async () => {
+      // Requires longer_sequence_name fixture table + schema dump helper
+    });
   });
 });
