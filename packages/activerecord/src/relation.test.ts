@@ -287,6 +287,38 @@ describe("RelationTest", () => {
     }
   });
 
+  it("inOrderOf emits WHERE IN filter + CASE WHEN ... ASC (Rails form)", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const sql = Book.all().inOrderOf("status", ["published", "draft", "archived"]).toSql();
+    expect(sql).toContain(`"books"."status" IN ('published', 'draft', 'archived')`);
+    expect(sql).toContain(`CASE WHEN "books"."status" = 'published' THEN 1`);
+    expect(sql).toContain(`WHEN "books"."status" = 'draft' THEN 2`);
+    expect(sql).toContain(`WHEN "books"."status" = 'archived' THEN 3`);
+    expect(sql).toMatch(/END ASC/);
+    expect(sql).not.toContain("ELSE");
+    expect(sql).not.toContain("THEN 0");
+  });
+
+  it("inOrderOf with filter:false emits ELSE and no WHERE IN", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const sql = Book.all().inOrderOf("status", ["published", "draft"], false).toSql();
+    expect(sql).toContain(`CASE WHEN "books"."status" = 'published' THEN 1`);
+    expect(sql).toContain(`WHEN "books"."status" = 'draft' THEN 2`);
+    expect(sql).toContain("ELSE 3");
+    expect(sql).toMatch(/END ASC/);
+    expect(sql).not.toContain(" IN (");
+  });
+
   it("whereMissing with hasMany emits LEFT OUTER JOIN + target_pk IS NULL", () => {
     class WmhAuthor extends Base {
       static {

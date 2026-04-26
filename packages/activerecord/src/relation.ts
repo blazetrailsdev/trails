@@ -798,25 +798,47 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#in_order_of
    */
-  inOrderOf(column: string, values: unknown[]): Relation<T> {
+  inOrderOf(column: string, values: unknown[], filter = true): Relation<T> {
+    if (values.length === 0) return this.none();
+
+    // Use the model's arelTable so the attribute retains type-casting metadata,
+    // mirroring Rails' order_column which resolves through the model's arel_table.
+    const arelCol = this._modelClass.arelTable.get(column);
+
+    // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
+    const normalized = values.map((v) => (v === undefined ? null : v));
+
+    // Build CASE WHEN col = v1 THEN 1 ... END ASC (searched form, 1-indexed).
+    // Mirrors Rails' build_case_for_value_position: Arel::Nodes::Case.new (no operand)
+    // with column.eq(value) predicates. No ELSE when filter=true (the default).
+    const caseNode = new Nodes.Case();
+    normalized.forEach((v, i) => {
+      caseNode.when(arelCol.eq(v), new Nodes.Quoted(i + 1));
+    });
+    if (!filter) {
+      caseNode.else(new Nodes.Quoted(values.length + 1));
+    }
+    const orderNode = new Nodes.Ascending(caseNode);
+
+    // Push to _orderClauses (not _rawOrderClauses) so the CASE expression is
+    // appended in call-order relative to any existing order clauses.
+    // _applyOrderToManager detects CASE-style SQL via the "(" heuristic and
+    // a /\bcase\b/i check, then emits it as SqlLiteral.
     const rel = this._clone();
-    // Generate a CASE WHEN ... expression for ordering
-    const cases = values
-      .map((v, i) => {
-        const quoted =
-          v === null
-            ? "NULL"
-            : typeof v === "number"
-              ? String(v)
-              : `'${String(v).replace(/'/g, "''")}'`;
-        return `WHEN "${column}" = ${quoted} THEN ${i}`;
-      })
-      .join(" ");
-    const caseExpr = `CASE ${cases} ELSE ${values.length} END`;
-    // Use raw SQL order — push as a string that the order manager treats as raw
-    rel._orderClauses = [];
-    rel._rawOrderClauses = rel._rawOrderClauses ?? [];
-    rel._rawOrderClauses.push(caseExpr);
+    rel._orderClauses.push(orderNode.toSql());
+
+    // Add WHERE col IN (values) filter — mirrors Rails' arel_column.in(values.compact).
+    // Attribute#in uses buildQuoted (no type-caster context), matching Rails which
+    // pre-casts values via type_cast_for_database before calling in(). Callers
+    // should pre-cast for typed columns (e.g. enum integer mappings).
+    if (filter) {
+      const hasNull = normalized.includes(null);
+      const nonNull = normalized.filter((v) => v !== null);
+      let whereNode: Nodes.Node = arelCol.in(nonNull);
+      if (hasNull) whereNode = new Nodes.Or(whereNode, arelCol.eq(null));
+      rel._whereClause.predicates.push(hasNull ? new Nodes.Grouping(whereNode) : whereNode);
+    }
+
     return rel;
   }
 

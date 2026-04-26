@@ -39,8 +39,10 @@ describe("FieldOrderedValuesTest", () => {
         this.adapter = adapter;
       }
     }
+    // Rails: return spawn.none! if values.empty? — produces WHERE (1=0), no CASE.
     const sql = Post.all().inOrderOf("status", []).toSql();
-    expect(sql).toContain("CASE");
+    expect(sql).toContain("1=0");
+    expect(sql).not.toContain("CASE");
   });
 
   it("in order of with enums values", () => {
