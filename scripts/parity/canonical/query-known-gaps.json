@@ -1,4 +1,16 @@
 {
+  "ar-01": {
+    "side": "diff",
+    "reason": "Datetime SQL serialization does not honour column precision: trails serializes Date binds with microsecond precision ('.677000'), Rails truncates to whole seconds when the DATETIME column has no precision spec (as in this fixture's bare `created_at DATETIME`). Rails: 'reviews.created_at > ''2026-04-19 00:46:48'''; trails: 'reviews.created_at > ''2026-04-19 00:46:48.677000'''. Flakes by frozen-at: PR #854 'closed' this gap because that run's frozen-at landed on a whole second. Real fix is in Date→SQL serialization to drop fractional seconds for unscaled DATETIME columns."
+  },
+  "ar-52": {
+    "side": "diff",
+    "reason": "Same datetime-precision gap as ar-01 (BETWEEN form): rails binds are 'YYYY-MM-DDTHH:MM:SS.000Z' (truncated to seconds for an unprecisioned DATETIME column), trails binds keep the millisecond component from the frozen-at value, and the inlined SQL gains '.NNN000' microseconds. Flakes whenever the parity workflow's frozen-at is not on a whole second."
+  },
+  "ar-65": {
+    "side": "diff",
+    "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) — rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
+  },
   "ar-16": {
     "side": "diff",
     "reason": "Book.all().eagerLoad(\"author\").limit(10): trails eagerLoad pushes the association into _eagerLoadAssociations but doesn't emit the LEFT OUTER JOIN + column-aliased SELECT that Rails produces. Rails emits 'SELECT \"books\".\"id\" AS t0_r0, ... FROM \"books\" LEFT OUTER JOIN \"authors\" ON ... LIMIT 10'; trails emits the bare 'SELECT \"books\".* FROM \"books\" LIMIT 10'. Real trails-missing feature: eagerLoad's JOIN + column-projection behaviour."
