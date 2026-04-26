@@ -22,5 +22,9 @@
   "ar-98": {
     "side": "diff",
     "reason": "where.not with hash (multi-key): Rails emits WHERE NOT (\"books\".\"status\" = 'draft' AND \"books\".\"active\" = 0); trails emits individual != predicates joined with AND — logically different semantics."
+  },
+  "ar-99": {
+    "side": "diff",
+    "reason": "from() with subquery alias: Rails does not quote the subquery alias ('books'); trails always quotes table aliases. Rails: 'SELECT \"books\".* FROM (SELECT \"books\".* FROM \"books\" WHERE \"books\".\"active\" = 1) books'; trails: 'SELECT \"books\".* FROM (SELECT \"books\".* FROM \"books\" WHERE \"books\".\"active\" = 1) \"books\"'. Root cause: Arel's alias quoting is unconditional; Rails' parser handles bare aliases specially in FROM clauses."
   }
 }
