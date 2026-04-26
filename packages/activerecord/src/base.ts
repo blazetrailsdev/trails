@@ -90,7 +90,7 @@ import * as LockingPessimistic from "./locking/pessimistic.js";
 import * as Translation from "./translation.js";
 import * as Sanitization from "./sanitization.js";
 import * as Querying from "./querying.js";
-import { include, extend, type Included } from "@blazetrails/activesupport";
+import { include, extend, type Included, type ParameterFilter } from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
   attributePresent as _attributePresent,
@@ -122,6 +122,8 @@ import {
   isEqual as _isEqual,
   isPresent as _isPresent,
   isBlank as _isBlank,
+  filterAttributes as _coreFilterAttributes,
+  inspectionFilter as _coreInspectionFilter,
 } from "./core.js";
 import * as _Core from "./core.js";
 import * as _Persistence from "./persistence.js";
@@ -401,6 +403,24 @@ export class Base extends Model {
   static _tableName: string | null = null;
   static _primaryKey: string | string[] = "id";
   static readonly _isActiveRecordBase = true;
+
+  // Mirrors: ActiveRecord::Base.filter_attributes = [] at class definition time.
+  static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];
+
+  static get filterAttributes(): (string | RegExp | ((key: string, value: unknown) => unknown))[] {
+    return _coreFilterAttributes.call(this);
+  }
+
+  static set filterAttributes(
+    value: (string | RegExp | ((key: string, value: unknown) => unknown))[],
+  ) {
+    _coreFilterAttributes.call(this, value);
+  }
+
+  static inspectionFilter(): ParameterFilter {
+    return _coreInspectionFilter.call(this);
+  }
+
   static _adapter: DatabaseAdapter | null = null;
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _configPath: string | null = null;

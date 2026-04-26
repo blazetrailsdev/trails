@@ -51,6 +51,10 @@ export class InspectionMask {
   inspect(): string {
     return this._value;
   }
+
+  toJSON(): string {
+    return this._value;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -72,13 +76,16 @@ interface CoreRecord {
  */
 export function inspect(this: CoreRecord): string {
   const ctor = this.constructor as { name: string };
+  const filter = inspectionFilter.call(this.constructor as CoreHost);
   const attrs = Array.from(this._attributes)
     .map(([k, v]) => {
-      if (v === null) return `${k}: nil`;
-      if (v instanceof InspectionMask) return `${k}: ${v}`;
-      if (typeof v === "string") return `${k}: "${v}"`;
-      if (v instanceof Date) return `${k}: "${v.toISOString()}"`;
-      return `${k}: ${JSON.stringify(v)}`;
+      if (v === null || v === undefined) return `${k}: nil`;
+      const filtered = filter.filterParam(k, v);
+      if (filtered instanceof InspectionMask) return `${k}: ${filtered}`;
+      if (filtered === null || filtered === undefined) return `${k}: nil`;
+      if (typeof filtered === "string") return `${k}: "${filtered}"`;
+      if (filtered instanceof Date) return `${k}: "${filtered.toISOString()}"`;
+      return `${k}: ${JSON.stringify(filtered)}`;
     })
     .join(", ");
   return `#<${ctor.name} ${attrs}>`;
@@ -90,9 +97,12 @@ export function inspect(this: CoreRecord): string {
  * Mirrors: ActiveRecord::Core#attribute_for_inspect
  */
 export function attributeForInspect(this: CoreRecord, attr: string): string {
-  const value = this.readAttribute(attr);
-  if (value === null || value === undefined) return "nil";
+  const raw = this.readAttribute(attr);
+  if (raw === null || raw === undefined) return "nil";
+  const filter = inspectionFilter.call(this.constructor as CoreHost);
+  const value = filter.filterParam(attr, raw);
   if (value instanceof InspectionMask) return value.toString();
+  if (value === null || value === undefined) return "nil";
   if (typeof value === "string") {
     if (value.length > 50) return `"${value.substring(0, 50)}..."`;
     return `"${value}"`;
@@ -272,7 +282,7 @@ export function fullInspect(this: CoreRecord): string {
 
 interface CoreHost {
   name: string;
-  _filterAttributes?: string[];
+  _filterAttributes?: (string | RegExp | ((key: string, value: unknown) => unknown))[];
   _inspectionFilter?: any;
   _connectionClass?: boolean;
   _destroyAssociationAsyncJob?: any;
@@ -491,31 +501,36 @@ export function generatedAssociationMethods(this: CoreHost): Set<string> {
 /**
  * Rails: delegates to superclass if @filter_attributes is nil.
  */
-export function filterAttributes(this: CoreHost, value?: string[]): string[] {
+export function filterAttributes(
+  this: CoreHost,
+  value?: (string | RegExp | ((key: string, value: unknown) => unknown))[],
+): (string | RegExp | ((key: string, value: unknown) => unknown))[] {
   if (value !== undefined) {
     this._filterAttributes = value;
     this._inspectionFilter = null;
   }
-  if (this._filterAttributes !== undefined) return this._filterAttributes;
+  if (Object.prototype.hasOwnProperty.call(this, "_filterAttributes"))
+    return this._filterAttributes!;
   const parent = parentClass(this);
   if (parent) return filterAttributes.call(parent);
   return [];
 }
 
+const INSPECTION_MASK = new InspectionMask();
+
 /**
  * Rails: creates an ActiveSupport::ParameterFilter with an InspectionMask.
- * We approximate with a filter function that checks attribute names against
- * the filter list and replaces matching values with [FILTERED].
+ * Delegates up the class hierarchy if no own filterAttributes are set, so
+ * per-class overrides don't cache stale Base filters (hasOwnProperty guards).
  */
 export function inspectionFilter(this: CoreHost): ParameterFilter {
   if (this._inspectionFilter) return this._inspectionFilter;
-  if (this._filterAttributes === undefined) {
+  if (!Object.prototype.hasOwnProperty.call(this, "_filterAttributes")) {
     const parent = parentClass(this);
     if (parent) return inspectionFilter.call(parent);
   }
-  const mask = new InspectionMask();
   this._inspectionFilter = new ParameterFilter(this._filterAttributes ?? [], {
-    mask: mask.toString(),
+    mask: INSPECTION_MASK,
   });
   return this._inspectionFilter;
 }
