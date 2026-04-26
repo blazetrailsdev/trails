@@ -2994,6 +2994,29 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const saved = await pirate.save();
     expect(saved).toBe(false);
   });
+
+  it("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    // Create extra parts in the DB that are NOT loaded into memory
+    await Part.create({ name: "Mast", ship_id: ship.id });
+    await Part.create({ name: "Stern", ship_id: ship.id });
+    // Nothing is cached on pirate or ship — parts association is NOT loaded
+    expect((ship as any)._cachedAssociations?.has("parts")).toBeFalsy();
+    // isValid() should not trigger a load of the parts association
+    let queryCount = 0;
+    const sub = Notifications.subscribe("sql.active_record", (evt: any) => {
+      // Count only SELECT queries (not DDL from table creation)
+      if (evt.payload?.sql?.trim().toUpperCase().startsWith("SELECT")) queryCount++;
+    });
+    try {
+      ship.isValid();
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(queryCount).toBe(0);
+  });
 });
 
 // Rails: NestedAttributesOnACollectionAssociationTests is mixed into
@@ -3002,6 +3025,9 @@ describe("TestNestedAttributesOnAHasManyAssociation", () => {
   let adapter: DatabaseAdapter;
   beforeEach(() => {
     adapter = freshAdapter();
+  });
+  afterEach(() => {
+    Notifications.unsubscribeAll();
   });
 
   function makeModels() {

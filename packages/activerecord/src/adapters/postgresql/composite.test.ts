@@ -14,9 +14,23 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlCompositeTest", () => {
-    it.skip("column", async () => {});
-    it.skip("composite value", async () => {});
-    it.skip("composite mapping", async () => {});
-    it.skip("composite write", async () => {});
+    it.skip("column", async () => {
+      // Requires postgresql_composites table fixture with composite type.
+    });
+    it.skip("composite value", async () => {
+      // Requires postgresql_composites table fixture with composite type.
+    });
+    it.skip("composite mapping", async () => {
+      // Requires composite type registered in PostgreSQL and postgresql_composites fixture.
+    });
+    it.skip("composite write", async () => {
+      // Requires postgresql_composites table fixture with composite type.
+    });
+  });
+
+  describe("PostgresqlCompositeWithCustomOidTest", () => {
+    it.skip("composite mapping", async () => {
+      // Requires custom OID composite type fixture. PG-only.
+    });
   });
 });

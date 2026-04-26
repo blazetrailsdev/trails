@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import { Notifications } from "@blazetrails/activesupport";
 
 let adapter: SQLite3Adapter;
 
@@ -12,6 +13,7 @@ beforeEach(() => {
 
 afterEach(() => {
   adapter.close();
+  Notifications.unsubscribeAll();
 });
 
 describe("SQLite3AdapterTest", () => {
@@ -243,8 +245,19 @@ describe("SQLite3AdapterTest", () => {
     expect(rows).toHaveLength(1);
   });
 
-  // null-overridden: Rails logging instrumentation
-  // it.skip("insert logged", () => {});
+  it("insert logged", async () => {
+    const sql = `INSERT INTO "items" ("name") VALUES ('logged')`;
+    const logged: string[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event.payload?.sql?.includes("INSERT")) logged.push(event.payload.sql);
+    });
+    try {
+      await adapter.executeMutation(sql);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(logged.some((s) => s.includes("INSERT") && s.includes("logged"))).toBe(true);
+  });
 
   it("insert id value returned", async () => {
     const id1 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('a')`);
@@ -272,8 +285,19 @@ describe("SQLite3AdapterTest", () => {
     expect(rows[1].name).toBe("b");
   });
 
-  // null-overridden: Rails logging instrumentation
-  // it.skip("select rows logged", () => {});
+  it("select rows logged", async () => {
+    const sql = `select * from "items"`;
+    const logged: string[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event.payload?.sql?.toLowerCase().startsWith("select")) logged.push(event.payload.sql);
+    });
+    try {
+      await adapter.execute(sql);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(logged.some((s) => s.toLowerCase().startsWith("select"))).toBe(true);
+  });
 
   it("transaction", async () => {
     await adapter.beginTransaction();
@@ -325,8 +349,18 @@ describe("SQLite3AdapterTest", () => {
     expect(reqCol!.notnull).toBe(1);
   });
 
-  // null-overridden: Rails logging instrumentation
-  // it.skip("indexes logs", () => {});
+  it("indexes logs", async () => {
+    const logged: string[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event.payload?.sql) logged.push(event.payload.sql);
+    });
+    try {
+      await adapter.indexes("items");
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(logged.length).toBeGreaterThan(0);
+  });
 
   it("no indexes", async () => {
     const rows = await adapter.execute(`PRAGMA index_list("items")`);
@@ -540,10 +574,22 @@ describe("SQLite3AdapterTest", () => {
     fs.unlinkSync(tmpFile);
   });
 
-  // null-overridden: Rails YAML config feature (strict_strings_mode)
-  // it.skip("strict strings by default", () => {});
-  // it.skip("strict strings by default and true in database yml", () => {});
-  // it.skip("strict strings by default and false in database yml", () => {});
+  // Rails' SQLite3Adapter has a class-level `strict_strings_by_default` setting that
+  // controls whether string-typed WHERE values require exact binary matching. When
+  // disabled (default), Rails performs a loose match and assert_nothing_raised;
+  // when enabled or set true in database.yml, loose matches raise. Trails' adapter
+  // does not yet implement this config knob.
+  it.skip("strict strings by default", () => {
+    // Requires SQLite3Adapter.strict_strings_by_default class config (not implemented)
+  });
+
+  it.skip("strict strings by default and true in database yml", () => {
+    // Requires SQLite3Adapter.strict_strings_by_default class config (not implemented)
+  });
+
+  it.skip("strict strings by default and false in database yml", () => {
+    // Requires SQLite3Adapter.strict_strings_by_default class config (not implemented)
+  });
 
   it("rowid column", async () => {
     adapter.exec(`CREATE TABLE "rowid_test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
