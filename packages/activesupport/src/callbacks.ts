@@ -1,6 +1,8 @@
+type AnyRecord = any;
+
 export type CallbackKind = "before" | "after" | "around";
 
-export type CallbackCondition = (target: any) => boolean;
+export type CallbackCondition = (target: AnyRecord) => boolean;
 
 export interface CallbackOptions {
   if?: CallbackCondition | CallbackCondition[];
@@ -9,196 +11,38 @@ export interface CallbackOptions {
 }
 
 export interface DefineCallbacksOptions {
-  terminator?: boolean;
+  /**
+   * Mirrors Rails' :terminator option. Pass a function `(target, fn) => boolean` (returns true
+   * to halt) or `false` to disable halting entirely. Defaults to halting when a before callback
+   * returns `false`.
+   */
+  terminator?: ((target: AnyRecord, fn: () => unknown) => boolean) | false;
+  skipAfterCallbacksIfTerminated?: boolean;
+  scope?: string[];
 }
 
-export type BeforeCallback = (target: any) => any;
-export type AfterCallback = (target: any) => void;
-export type AroundCallback = (target: any, next: () => void) => void;
+export type BeforeCallback = (target: AnyRecord) => AnyRecord;
+export type AfterCallback = (target: AnyRecord) => void;
+export type AroundCallback = (target: AnyRecord, next: () => void) => void;
 export type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
 
-export class Callback {
-  readonly kind: CallbackKind;
-  readonly filter: AnyCallback;
-  readonly options: CallbackOptions;
-  readonly name: string;
+// ---------------------------------------------------------------------------
+// Conditionals
+// ---------------------------------------------------------------------------
 
-  constructor(
-    name: string,
-    filter: AnyCallback,
-    kind: CallbackKind,
-    options: CallbackOptions = {},
-  ) {
-    this.name = name;
-    this.filter = filter;
-    this.kind = kind;
-    this.options = options;
-  }
-
-  matches(kind: CallbackKind, filter?: AnyCallback): boolean {
-    if (this.kind !== kind) return false;
-    if (filter && this.filter !== filter) return false;
-    return true;
-  }
-
-  apply(target: any, block?: () => void): boolean {
-    if (!Value.check(this.options, target)) return true;
-
-    if (this.kind === "before") {
-      return (this.filter as BeforeCallback)(target) !== false;
-    } else if (this.kind === "after") {
-      (this.filter as AfterCallback)(target);
-      return true;
-    } else if (this.kind === "around") {
-      if (!block) {
-        throw new Error("Around callbacks require a block/next function");
-      }
-      (this.filter as AroundCallback)(target, block);
-      return true;
-    }
-    return true;
-  }
-}
-
-export class CallbackChain {
-  readonly name: string;
-  readonly config: DefineCallbacksOptions;
-  private chain: Callback[];
-
-  constructor(name: string, config: DefineCallbacksOptions = {}) {
-    this.name = name;
-    this.config = { terminator: true, ...config };
-    this.chain = [];
-  }
-
-  get entries(): Callback[] {
-    return this.chain;
-  }
-
-  append(callback: Callback): void {
-    this.chain.push(callback);
-  }
-
-  prepend(callback: Callback): void {
-    this.chain.unshift(callback);
-  }
-
-  remove(kind: CallbackKind, filter?: AnyCallback): void {
-    this.chain = this.chain.filter((cb) => !cb.matches(kind, filter));
-  }
-
-  clear(): void {
-    this.chain = [];
-  }
-
-  compile(): CallbackSequence {
-    return new CallbackSequence(this);
-  }
-
-  get isEmpty(): boolean {
-    return this.chain.length === 0;
-  }
-}
-
-export class CallbackSequence {
-  private readonly callbackChain: CallbackChain;
-
-  constructor(callbackChain: CallbackChain) {
-    this.callbackChain = callbackChain;
-  }
-
-  invoke(target: any, block?: () => void): boolean {
-    const entries = this.callbackChain.entries;
-    const terminator = this.callbackChain.config.terminator !== false;
-
-    const befores = entries.filter((e) => e.kind === "before");
-    const afters = entries.filter((e) => e.kind === "after");
-    const arounds = entries.filter((e) => e.kind === "around");
-
-    for (const entry of befores) {
-      if (!Value.check(entry.options, target)) continue;
-      const result = (entry.filter as BeforeCallback)(target);
-      if (terminator && result === false) return false;
-    }
-
-    let core = () => {
-      block?.();
-    };
-
-    for (let i = arounds.length - 1; i >= 0; i--) {
-      const entry = arounds[i];
-      const inner = core;
-      if (!Value.check(entry.options, target)) continue;
-      core = () => {
-        (entry.filter as AroundCallback)(target, inner);
-      };
-    }
-
-    core();
-
-    for (let i = afters.length - 1; i >= 0; i--) {
-      const entry = afters[i];
-      if (!Value.check(entry.options, target)) continue;
-      (entry.filter as AfterCallback)(target);
-    }
-
-    return true;
-  }
-}
-
-export class MethodCall {
-  constructor(readonly methodName: string) {}
-
-  make(target: any, _value: any): any {
-    return target[this.methodName]?.call(target);
-  }
-}
-
-export class ObjectCall {
-  constructor(
-    readonly target: any,
-    readonly methodName: string,
-  ) {}
-
-  make(instance: any, _value: any): any {
-    return this.target[this.methodName]?.call(this.target, instance);
-  }
-}
-
-export class InstanceExec0 {
-  constructor(readonly fn: () => any) {}
-
-  make(target: any, _value: any): any {
-    return this.fn.call(target);
-  }
-}
-
-export class InstanceExec1 {
-  constructor(readonly fn: (target: any) => any) {}
-
-  make(target: any, _value: any): any {
-    return this.fn(target);
-  }
-}
-
-export class InstanceExec2 {
-  constructor(readonly fn: (target: any, value: any) => any) {}
-
-  make(target: any, value: any): any {
-    return this.fn(target, value);
-  }
-}
-
-export class ProcCall {
-  constructor(readonly fn: (...args: any[]) => any) {}
-
-  make(target: any, _value: any): any {
-    return this.fn(target);
-  }
-}
-
+/** Mirrors: ActiveSupport::Callbacks::Conditionals::Value */
 export class Value {
-  static check(options: CallbackOptions, target: any): boolean {
+  private readonly block: (value: AnyRecord) => unknown;
+
+  constructor(block: (value: AnyRecord) => unknown) {
+    this.block = block;
+  }
+
+  call(_target: AnyRecord, value: AnyRecord): unknown {
+    return this.block(value);
+  }
+
+  static check(options: CallbackOptions, target: AnyRecord): boolean {
     if (options.if) {
       const conditions = Array.isArray(options.if) ? options.if : [options.if];
       if (!conditions.every((cond) => cond(target))) return false;
@@ -211,29 +55,286 @@ export class Value {
   }
 }
 
+// ---------------------------------------------------------------------------
+// CallTemplate — protocol for wrapping callables
+// ---------------------------------------------------------------------------
+
+/** Mirrors: ActiveSupport::Callbacks::CallTemplate */
+export interface CallTemplate {
+  expand(target: AnyRecord, value: AnyRecord, block: (() => unknown) | null): unknown[];
+  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown;
+  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean;
+}
+
+/** Mirrors: ActiveSupport::Callbacks::CallTemplate::MethodCall */
+export class MethodCall implements CallTemplate {
+  constructor(readonly methodName: PropertyKey) {}
+
+  expand(target: AnyRecord, _value: AnyRecord, block: (() => unknown) | null): unknown[] {
+    return [target, block, this.methodName];
+  }
+
+  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+    const m = this.methodName;
+    return (target: AnyRecord) => target[m]?.();
+  }
+
+  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+    const m = this.methodName;
+    return (target: AnyRecord) => !target[m]?.();
+  }
+
+  make(target: AnyRecord, _value: AnyRecord): AnyRecord {
+    return target[this.methodName]?.call(target);
+  }
+}
+
+/** Mirrors: ActiveSupport::Callbacks::CallTemplate::ObjectCall */
+export class ObjectCall implements CallTemplate {
+  constructor(
+    readonly target: AnyRecord,
+    readonly methodName: string,
+  ) {}
+
+  expand(target: AnyRecord, _value: AnyRecord, block: (() => unknown) | null): unknown[] {
+    return [this.target ?? target, block, this.methodName, target];
+  }
+
+  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+    const ot = this.target;
+    const m = this.methodName;
+    return (target: AnyRecord) => (ot ?? target)[m]?.(target);
+  }
+
+  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+    const ot = this.target;
+    const m = this.methodName;
+    return (target: AnyRecord) => !(ot ?? target)[m]?.(target);
+  }
+
+  make(instance: AnyRecord, _value: AnyRecord): AnyRecord {
+    const t = this.target ?? instance;
+    return t[this.methodName]?.call(t, instance);
+  }
+}
+
+/** Mirrors: ActiveSupport::Callbacks::CallTemplate::InstanceExec0 */
+export class InstanceExec0 implements CallTemplate {
+  constructor(readonly fn: () => AnyRecord) {}
+
+  expand(target: AnyRecord, _value: AnyRecord, block: (() => unknown) | null): unknown[] {
+    return [target, this.fn, "instanceExec"];
+  }
+
+  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+    const f = this.fn;
+    return (target: AnyRecord) => f.call(target);
+  }
+
+  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+    const f = this.fn;
+    return (target: AnyRecord) => !f.call(target);
+  }
+
+  make(target: AnyRecord, _value: AnyRecord): AnyRecord {
+    return this.fn.call(target);
+  }
+}
+
+/** Mirrors: ActiveSupport::Callbacks::CallTemplate::InstanceExec1 */
+export class InstanceExec1 implements CallTemplate {
+  constructor(readonly fn: (target: AnyRecord) => AnyRecord) {}
+
+  expand(target: AnyRecord, _value: AnyRecord, block: (() => unknown) | null): unknown[] {
+    return [target, this.fn, "instanceExec", target];
+  }
+
+  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+    const f = this.fn;
+    return (target: AnyRecord) => f(target);
+  }
+
+  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+    const f = this.fn;
+    return (target: AnyRecord) => !f(target);
+  }
+
+  make(target: AnyRecord, _value: AnyRecord): AnyRecord {
+    return this.fn(target);
+  }
+}
+
+/** Mirrors: ActiveSupport::Callbacks::CallTemplate::InstanceExec2 */
+export class InstanceExec2 implements CallTemplate {
+  constructor(readonly fn: (target: AnyRecord, value: AnyRecord) => AnyRecord) {}
+
+  expand(target: AnyRecord, value: AnyRecord, block: (() => unknown) | null): unknown[] {
+    return [target, this.fn, "instanceExec", target, block];
+  }
+
+  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+    const f = this.fn;
+    return (target: AnyRecord, value: AnyRecord) => f(target, value);
+  }
+
+  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+    const f = this.fn;
+    return (target: AnyRecord, value: AnyRecord) => !f(target, value);
+  }
+
+  make(target: AnyRecord, value: AnyRecord): AnyRecord {
+    return this.fn(target, value);
+  }
+}
+
+/** Mirrors: ActiveSupport::Callbacks::CallTemplate::ProcCall */
+export class ProcCall implements CallTemplate {
+  constructor(readonly fn: (...args: AnyRecord[]) => AnyRecord) {}
+
+  expand(target: AnyRecord, value: AnyRecord, block: (() => unknown) | null): unknown[] {
+    return [this.fn, block, "call", target, value];
+  }
+
+  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+    const f = this.fn;
+    return (target: AnyRecord, value: AnyRecord) => f(target, value);
+  }
+
+  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+    const f = this.fn;
+    return (target: AnyRecord, value: AnyRecord) => !f(target, value);
+  }
+
+  make(target: AnyRecord, _value: AnyRecord): AnyRecord {
+    return this.fn(target);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Filters
+// ---------------------------------------------------------------------------
+
+/** Environment struct threaded through the compiled filter chain. */
+export interface FilterEnvironment {
+  target: AnyRecord;
+  halted: boolean;
+  value: AnyRecord;
+}
+
+/** Mirrors: ActiveSupport::Callbacks::Filters::Before */
 export class Before {
-  static build(callback: Callback, _options: DefineCallbacksOptions): (target: any) => boolean {
-    const terminator = _options.terminator !== false;
-    return (target: any) => {
+  readonly userCallback: (target: AnyRecord, value: AnyRecord) => unknown;
+  readonly userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>;
+  readonly haltedLambda: (target: AnyRecord, fn: () => unknown) => boolean;
+  readonly filter: AnyCallback | string | symbol;
+  readonly name: string;
+
+  constructor(
+    userCallback: (target: AnyRecord, value: AnyRecord) => unknown,
+    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>,
+    chainConfig: { terminator?: ((target: AnyRecord, fn: () => unknown) => boolean) | false },
+    filter: AnyCallback | string | symbol = "",
+    name: string = "",
+  ) {
+    this.userCallback = userCallback;
+    this.userConditions = userConditions;
+    this.haltedLambda =
+      chainConfig.terminator === false
+        ? (_t: AnyRecord, fn: () => unknown) => {
+            fn();
+            return false;
+          }
+        : (chainConfig.terminator ?? ((_t: AnyRecord, fn: () => unknown) => fn() === false));
+    this.filter = filter;
+    this.name = name;
+  }
+
+  call(env: FilterEnvironment): FilterEnvironment {
+    const { target, value, halted } = env;
+    if (!halted && this.userConditions.every((c) => c(target, value))) {
+      const resultLambda = () => this.userCallback(target, value);
+      env.halted = this.haltedLambda(target, resultLambda);
+    }
+    return env;
+  }
+
+  apply(seq: CallbackSequence): CallbackSequence {
+    return seq.before(this);
+  }
+
+  static build(
+    callback: Callback,
+    options: DefineCallbacksOptions,
+  ): (target: AnyRecord) => boolean {
+    const terminatorFn = options.terminator;
+    return (target: AnyRecord) => {
       if (!Value.check(callback.options, target)) return true;
-      const result = (callback.filter as BeforeCallback)(target);
-      return !(terminator && result === false);
+      const cb = callback.filter as BeforeCallback;
+      if (terminatorFn === false) {
+        cb(target);
+        return true;
+      } // run but never halt
+      if (terminatorFn) return !terminatorFn(target, () => cb(target));
+      return cb(target) !== false;
     };
   }
 }
 
+/** Mirrors: ActiveSupport::Callbacks::Filters::After */
 export class After {
-  static build(callback: Callback): (target: any) => void {
-    return (target: any) => {
+  readonly userCallback: (target: AnyRecord, value: AnyRecord) => unknown;
+  readonly userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>;
+  readonly halting: boolean;
+
+  constructor(
+    userCallback: (target: AnyRecord, value: AnyRecord) => unknown,
+    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>,
+    chainConfig: { skipAfterCallbacksIfTerminated?: boolean },
+  ) {
+    this.userCallback = userCallback;
+    this.userConditions = userConditions;
+    this.halting = chainConfig.skipAfterCallbacksIfTerminated ?? false;
+  }
+
+  call(env: FilterEnvironment): FilterEnvironment {
+    const { target, value, halted } = env;
+    if ((!halted || !this.halting) && this.userConditions.every((c) => c(target, value))) {
+      this.userCallback(target, value);
+    }
+    return env;
+  }
+
+  apply(seq: CallbackSequence): CallbackSequence {
+    return seq.after(this);
+  }
+
+  static build(callback: Callback): (target: AnyRecord) => void {
+    return (target: AnyRecord) => {
       if (!Value.check(callback.options, target)) return;
       (callback.filter as AfterCallback)(target);
     };
   }
 }
 
+/** Mirrors: ActiveSupport::Callbacks::Filters::Around */
 export class Around {
-  static build(callback: Callback): (target: any, block: () => void) => void {
-    return (target: any, block: () => void) => {
+  private readonly userCallback: CallTemplate;
+  private readonly userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>;
+
+  constructor(
+    userCallback: CallTemplate,
+    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>,
+  ) {
+    this.userCallback = userCallback;
+    this.userConditions = userConditions;
+  }
+
+  apply(seq: CallbackSequence): CallbackSequence {
+    return seq.around(this.userCallback, this.userConditions);
+  }
+
+  static build(callback: Callback): (target: AnyRecord, block: () => void) => void {
+    return (target: AnyRecord, block: () => void) => {
       if (!Value.check(callback.options, target)) {
         block();
         return;
@@ -242,6 +343,397 @@ export class Around {
     };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Callback
+// ---------------------------------------------------------------------------
+
+/** Mirrors: ActiveSupport::Callbacks::Callback */
+export class Callback {
+  kind: CallbackKind;
+  name: string;
+  readonly filter: AnyCallback | string | symbol;
+  readonly options: CallbackOptions;
+  readonly chainConfig: DefineCallbacksOptions;
+
+  private _compiled: Before | After | Around | undefined;
+
+  constructor(
+    name: string,
+    filter: AnyCallback | string | symbol,
+    kind: CallbackKind,
+    options: CallbackOptions = {},
+    chainConfig: DefineCallbacksOptions = {},
+  ) {
+    this.name = name;
+    this.filter = filter;
+    this.kind = kind;
+    this.options = options;
+    this.chainConfig = chainConfig;
+  }
+
+  matches(kind: CallbackKind, filter?: AnyCallback | string | symbol): boolean {
+    if (this.kind !== kind) return false;
+    if (filter && this.filter !== filter) return false;
+    return true;
+  }
+
+  mergeConditionalOptions(
+    chain: { name: string; config: DefineCallbacksOptions },
+    ifOption: CallbackCondition[],
+    unlessOption: CallbackCondition[],
+  ): Callback {
+    const existingIf = Array.isArray(this.options.if)
+      ? this.options.if
+      : this.options.if
+        ? [this.options.if]
+        : [];
+    const existingUnless = Array.isArray(this.options.unless)
+      ? this.options.unless
+      : this.options.unless
+        ? [this.options.unless]
+        : [];
+    return new Callback(
+      chain.name,
+      this.filter,
+      this.kind,
+      {
+        if: [...existingIf, ...unlessOption],
+        unless: [...existingUnless, ...ifOption],
+      },
+      chain.config,
+    );
+  }
+
+  isDuplicates(other: Callback): boolean {
+    if (typeof this.filter === "string") {
+      return this.kind === other.kind && this.filter === other.filter;
+    }
+    return false;
+  }
+
+  get compiled(): Before | After | Around {
+    if (this._compiled) return this._compiled;
+
+    const userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean> = [];
+    const ifConds = Array.isArray(this.options.if)
+      ? this.options.if
+      : this.options.if
+        ? [this.options.if]
+        : [];
+    const unlessConds = Array.isArray(this.options.unless)
+      ? this.options.unless
+      : this.options.unless
+        ? [this.options.unless]
+        : [];
+    for (const c of ifConds) userConditions.push((t) => c(t));
+    for (const c of unlessConds) userConditions.push((t) => !c(t));
+
+    const callTemplate =
+      typeof this.filter === "function"
+        ? new ProcCall(this.filter)
+        : new MethodCall(this.filter as PropertyKey);
+
+    if (this.kind === "before") {
+      this._compiled = new Before(
+        callTemplate.makeLambda(),
+        userConditions,
+        this.chainConfig,
+        this.filter,
+        this.name,
+      );
+    } else if (this.kind === "after") {
+      this._compiled = new After(callTemplate.makeLambda(), userConditions, {
+        skipAfterCallbacksIfTerminated: this.chainConfig.skipAfterCallbacksIfTerminated,
+      });
+    } else {
+      this._compiled = new Around(callTemplate, userConditions);
+    }
+    return this._compiled!;
+  }
+
+  currentScopes(): string[] {
+    const scope = this.chainConfig.scope ?? ["kind"];
+    return scope.map((s) => (s === "kind" ? String(this.kind) : String((this as AnyRecord)[s])));
+  }
+
+  apply(target: AnyRecord, block?: () => void): boolean {
+    if (!Value.check(this.options, target)) return true;
+
+    if (this.kind === "before") {
+      return (this.filter as BeforeCallback)(target) !== false;
+    } else if (this.kind === "after") {
+      (this.filter as AfterCallback)(target);
+      return true;
+    } else if (this.kind === "around") {
+      if (!block) throw new Error("Around callbacks require a block/next function");
+      (this.filter as AroundCallback)(target, block);
+      return true;
+    }
+    return true;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CallbackSequence
+// ---------------------------------------------------------------------------
+
+/**
+ * Compiled, linked-list callback sequence.
+ * Mirrors: ActiveSupport::Callbacks::CallbackSequence
+ */
+export class CallbackSequence {
+  readonly nested: CallbackSequence | null;
+  private readonly callTemplate: CallTemplate | null;
+  private readonly userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean> | null;
+  private beforeList: Before[] | null = null;
+  private afterList: After[] | null = null;
+
+  constructor(
+    nested: CallbackSequence | null = null,
+    callTemplate: CallTemplate | null = null,
+    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean> | null = null,
+  ) {
+    this.nested = nested;
+    this.callTemplate = callTemplate;
+    this.userConditions = userConditions;
+  }
+
+  before(b: Before): this {
+    (this.beforeList ??= []).unshift(b);
+    return this;
+  }
+
+  after(a: After): this {
+    (this.afterList ??= []).push(a);
+    return this;
+  }
+
+  around(
+    callTemplate: CallTemplate,
+    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>,
+  ): CallbackSequence {
+    const sequence = new CallbackSequence(this, callTemplate, userConditions);
+    sequence._callbackChain = this._callbackChain;
+    return sequence;
+  }
+
+  isSkip(env: FilterEnvironment): boolean {
+    if (env.halted) return true;
+    if (!this.userConditions) return false;
+    return !this.userConditions.every((c) => c(env.target, env.value));
+  }
+
+  isFinal(): boolean {
+    return !this.callTemplate;
+  }
+
+  expandCallTemplate(env: FilterEnvironment, block: (() => unknown) | null): unknown[] {
+    return this.callTemplate!.expand(env.target, env.value, block);
+  }
+
+  invokeBefore(env: FilterEnvironment): void {
+    this.beforeList?.forEach((b) => b.call(env));
+  }
+
+  invokeAfter(env: FilterEnvironment): void {
+    this.afterList?.forEach((a) => a.call(env));
+  }
+
+  invoke(target: AnyRecord, block?: () => void): boolean {
+    const callbackChain = this._callbackChain;
+    if (!callbackChain) {
+      block?.();
+      return true;
+    }
+    return callbackChain._invoke(target, block);
+  }
+
+  // Back-reference set by CallbackChain.compile() for invoke() convenience
+  _callbackChain: CallbackChain | null = null;
+}
+
+// ---------------------------------------------------------------------------
+// CallbackChain
+// ---------------------------------------------------------------------------
+
+export class CallbackChain {
+  readonly name: string;
+  readonly config: DefineCallbacksOptions;
+  private chain: Callback[];
+
+  constructor(name: string, config: DefineCallbacksOptions = {}) {
+    this.name = name;
+    this.config = {
+      // Default terminator: halt if before-callback returns false
+      terminator: (_target: AnyRecord, fn: () => unknown) => fn() === false,
+      ...config,
+    };
+    this.chain = [];
+  }
+
+  get entries(): Callback[] {
+    return this.chain;
+  }
+
+  each(fn: (cb: Callback) => void): void {
+    this.chain.forEach(fn);
+  }
+
+  index(cb: Callback): number {
+    return this.chain.indexOf(cb);
+  }
+
+  insert(idx: number, cb: Callback): void {
+    this.chain.splice(idx, 0, cb);
+  }
+
+  delete(cb: Callback): void {
+    const i = this.chain.indexOf(cb);
+    if (i !== -1) this.chain.splice(i, 1);
+  }
+
+  append(callback: Callback): void {
+    this.chain.push(callback);
+  }
+
+  prepend(callback: Callback): void {
+    this.chain.unshift(callback);
+  }
+
+  remove(kind: CallbackKind, filter?: AnyCallback | string | symbol): void {
+    this.chain = this.chain.filter((cb) => !cb.matches(kind, filter));
+  }
+
+  clear(): void {
+    this.chain = [];
+  }
+
+  compile(): CallbackSequence {
+    const seq = new CallbackSequence();
+    seq._callbackChain = this;
+    return seq;
+  }
+
+  get isEmpty(): boolean {
+    return this.chain.length === 0;
+  }
+
+  _invoke(target: AnyRecord, block?: () => void): boolean {
+    const terminatorFn = this.config.terminator;
+    const skipAfterIfTerminated = this.config.skipAfterCallbacksIfTerminated ?? false;
+    const entries = this.chain;
+
+    const befores = entries.filter((e) => e.kind === "before");
+    const afters = entries.filter((e) => e.kind === "after");
+    const arounds = entries.filter((e) => e.kind === "around");
+
+    // Run before callbacks; track whether the chain was halted.
+    let halted = false;
+    for (const entry of befores) {
+      if (!Value.check(entry.options, target)) continue;
+      const cb = entry.filter as BeforeCallback;
+      if (terminatorFn === false) {
+        cb(target); // terminator disabled — never halt
+      } else if (terminatorFn) {
+        if (terminatorFn(target, () => cb(target))) {
+          halted = true;
+          break;
+        }
+      } else {
+        if (cb(target) === false) {
+          halted = true;
+          break;
+        }
+      }
+    }
+
+    // Run around+block only when not halted (mirrors Rails CallbackSequence#skip?).
+    if (!halted) {
+      let core = () => {
+        block?.();
+      };
+      for (let i = arounds.length - 1; i >= 0; i--) {
+        const entry = arounds[i];
+        const inner = core;
+        if (!Value.check(entry.options, target)) continue;
+        core = () => {
+          (entry.filter as AroundCallback)(target, inner);
+        };
+      }
+      core();
+    }
+
+    // After callbacks run even when halted unless skipAfterCallbacksIfTerminated is true.
+    // Mirrors: Filters::After#call — `(!halted || !@halting)`
+    if (!halted || !skipAfterIfTerminated) {
+      for (let i = afters.length - 1; i >= 0; i--) {
+        const entry = afters[i];
+        if (!Value.check(entry.options, target)) continue;
+        (entry.filter as AfterCallback)(target);
+      }
+    }
+
+    return !halted;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ClassMethods
+// ---------------------------------------------------------------------------
+
+const CALLBACK_FILTER_TYPES: CallbackKind[] = ["before", "after", "around"];
+
+/**
+ * Mirrors: ActiveSupport::Callbacks::ClassMethods#normalize_callback_params
+ */
+export function normalizeCallbackParams(
+  filters: Array<CallbackKind | AnyCallback | string | symbol | Record<string, unknown>>,
+  block: AnyCallback | null,
+): [CallbackKind, Array<AnyCallback | string | symbol>, Record<string, unknown>] {
+  const rest = [...filters];
+  let type: CallbackKind = "before";
+  if (rest.length > 0 && CALLBACK_FILTER_TYPES.includes(rest[0] as CallbackKind)) {
+    type = rest.shift() as CallbackKind;
+  }
+  let options: Record<string, unknown> = {};
+  if (
+    rest.length > 0 &&
+    typeof rest[rest.length - 1] === "object" &&
+    rest[rest.length - 1] !== null &&
+    !("call" in (rest[rest.length - 1] as object))
+  ) {
+    options = rest.pop() as unknown as Record<string, unknown>;
+  }
+  if (block) rest.unshift(block);
+  return [type, rest as Array<AnyCallback | string | symbol>, options];
+}
+
+/**
+ * Mirrors: ActiveSupport::Callbacks::ClassMethods#__update_callbacks
+ */
+export function __updateCallbacks(
+  name: string,
+  targets: Array<{
+    getCallbacks(name: string): CallbackChain;
+    setCallbacks(name: string, chain: CallbackChain): void;
+  }>,
+  fn: (target: AnyRecord, chain: CallbackChain) => void,
+): void {
+  [...targets].reverse().forEach((target) => {
+    const chain = target.getCallbacks(name);
+    const dup = new CallbackChain(chain.name, chain.config);
+    chain.entries.forEach((e) =>
+      dup.append(new Callback(e.name, e.filter, e.kind, { ...e.options }, dup.config)),
+    );
+    fn(target, dup);
+    target.setCallbacks(name, dup);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Namespaces (mirrors Rails module nesting)
+// ---------------------------------------------------------------------------
 
 const _ct = { MethodCall, ObjectCall, InstanceExec0, InstanceExec1, InstanceExec2, ProcCall };
 export namespace CallTemplate {
@@ -265,6 +757,10 @@ export namespace Filters {
   export const Around = _filt.Around;
 }
 
+// ---------------------------------------------------------------------------
+// Runtime API (unchanged from original)
+// ---------------------------------------------------------------------------
+
 export interface ClassMethods {
   defineCallbacks(name: string, options?: DefineCallbacksOptions): void;
   beforeCallback(name: string, callback: BeforeCallback, options?: CallbackOptions): void;
@@ -276,16 +772,19 @@ export interface ClassMethods {
 
 const CALLBACKS = Symbol("callbacks");
 
-function getCallbackChains(target: any): Map<string, CallbackChain> {
+function getCallbackChains(target: AnyRecord): Map<string, CallbackChain> {
   if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
     const parent: Map<string, CallbackChain> | undefined = target[CALLBACKS];
     const own = new Map<string, CallbackChain>();
     if (parent) {
       for (const [name, chain] of parent) {
-        own.set(name, new CallbackChain(chain.name, chain.config));
+        const newChain = new CallbackChain(chain.name, chain.config);
         for (const entry of chain.entries) {
-          own.get(name)!.append(new Callback(entry.name, entry.filter, entry.kind, entry.options));
+          newChain.append(
+            new Callback(entry.name, entry.filter, entry.kind, entry.options, newChain.config),
+          );
         }
+        own.set(name, newChain);
       }
     }
     target[CALLBACKS] = own;
@@ -295,7 +794,7 @@ function getCallbackChains(target: any): Map<string, CallbackChain> {
 
 export namespace Callbacks {
   export function defineCallbacks(
-    target: any,
+    target: AnyRecord,
     name: string,
     options: DefineCallbacksOptions = {},
   ): void {
@@ -306,7 +805,7 @@ export namespace Callbacks {
   }
 
   export function setCallback(
-    target: any,
+    target: AnyRecord,
     name: string,
     kind: CallbackKind,
     callback: AnyCallback,
@@ -317,7 +816,7 @@ export namespace Callbacks {
     if (!chain) {
       throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
     }
-    const entry = new Callback(name, callback, kind, options);
+    const entry = new Callback(name, callback, kind, options, chain.config);
     if (options.prepend) {
       chain.prepend(entry);
     } else {
@@ -326,7 +825,7 @@ export namespace Callbacks {
   }
 
   export function skipCallback(
-    target: any,
+    target: AnyRecord,
     name: string,
     kind: CallbackKind,
     callback?: AnyCallback,
@@ -337,13 +836,13 @@ export namespace Callbacks {
     chain.remove(kind, callback);
   }
 
-  export function resetCallbacks(target: any, name: string): void {
+  export function resetCallbacks(target: AnyRecord, name: string): void {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (chain) chain.clear();
   }
 
-  export function runCallbacks(target: any, name: string, block?: () => void): boolean {
+  export function runCallbacks(target: AnyRecord, name: string, block?: () => void): boolean {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) {
@@ -356,7 +855,7 @@ export namespace Callbacks {
 }
 
 export function defineCallbacks(
-  target: any,
+  target: AnyRecord,
   name: string,
   options: DefineCallbacksOptions = {},
 ): void {
@@ -364,7 +863,7 @@ export function defineCallbacks(
 }
 
 export function setCallback(
-  target: any,
+  target: AnyRecord,
   name: string,
   kind: CallbackKind,
   callback: AnyCallback,
@@ -374,7 +873,7 @@ export function setCallback(
 }
 
 export function skipCallback(
-  target: any,
+  target: AnyRecord,
   name: string,
   kind: CallbackKind,
   callback?: AnyCallback,
@@ -382,15 +881,15 @@ export function skipCallback(
   Callbacks.skipCallback(target, name, kind, callback);
 }
 
-export function resetCallbacks(target: any, name: string): void {
+export function resetCallbacks(target: AnyRecord, name: string): void {
   Callbacks.resetCallbacks(target, name);
 }
 
-export function runCallbacks(target: any, name: string, block?: () => void): boolean {
+export function runCallbacks(target: AnyRecord, name: string, block?: () => void): boolean {
   return Callbacks.runCallbacks(target, name, block);
 }
 
-export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {
+export function CallbacksMixin<TBase extends new (...args: AnyRecord[]) => object>(Base?: TBase) {
   const ActualBase = (Base ?? class {}) as TBase;
 
   class WithCallbacks extends ActualBase {

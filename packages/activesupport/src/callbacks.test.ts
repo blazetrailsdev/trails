@@ -1472,3 +1472,70 @@ describe("AfterSaveConditionalPersonCallbackTest", () => {
     expect(target.history).toEqual(["string2", "string1"]);
   });
 });
+
+describe("custom terminator function", () => {
+  it("custom terminator halts when it returns true", () => {
+    const log: string[] = [];
+    const target = { log };
+    defineCallbacks(target, "save", {
+      terminator: (_t, fn) => {
+        const result = fn();
+        return result === "halt";
+      },
+    });
+    setCallback(target, "save", "before", () => "halt");
+    setCallback(target, "save", "before", (t: any) => t.log.push("second"));
+    runCallbacks(target, "save", () => log.push("block"));
+    expect(log).not.toContain("second");
+    expect(log).not.toContain("block");
+  });
+
+  it("custom terminator does not halt when it returns false", () => {
+    const log: string[] = [];
+    const target = { log };
+    defineCallbacks(target, "save", {
+      terminator: (_t, fn) => {
+        fn();
+        return false;
+      },
+    });
+    setCallback(target, "save", "before", () => false);
+    setCallback(target, "save", "before", (t: any) => t.log.push("second"));
+    runCallbacks(target, "save", () => log.push("block"));
+    expect(log).toContain("second");
+    expect(log).toContain("block");
+  });
+});
+
+describe("skipAfterCallbacksIfTerminated", () => {
+  it("after callbacks run by default even when halted", () => {
+    const log: string[] = [];
+    const target = { log };
+    defineCallbacks(target, "save"); // no skipAfterCallbacksIfTerminated
+    setCallback(target, "save", "before", () => false);
+    setCallback(target, "save", "after", (t: any) => t.log.push("after"));
+    const result = runCallbacks(target, "save");
+    expect(result).toBe(false); // halted
+    expect(log).toContain("after"); // after callbacks still run
+  });
+
+  it("skips after callbacks when halted and option is set", () => {
+    const log: string[] = [];
+    const target = { log };
+    defineCallbacks(target, "save", { skipAfterCallbacksIfTerminated: true });
+    setCallback(target, "save", "before", () => false);
+    setCallback(target, "save", "after", (t: any) => t.log.push("after"));
+    runCallbacks(target, "save");
+    expect(log).not.toContain("after");
+  });
+
+  it("runs after callbacks when not halted even with option set", () => {
+    const log: string[] = [];
+    const target = { log };
+    defineCallbacks(target, "save", { skipAfterCallbacksIfTerminated: true });
+    setCallback(target, "save", "before", () => undefined);
+    setCallback(target, "save", "after", (t: any) => t.log.push("after"));
+    runCallbacks(target, "save");
+    expect(log).toContain("after");
+  });
+});
