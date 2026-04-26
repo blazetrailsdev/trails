@@ -1789,7 +1789,7 @@ export class Relation<T extends Base> {
       loadedRecords = this._records;
     } else {
       const sql = this._toSql();
-      const result = await this._modelClass.adapter.selectAll(sql, "Load");
+      const result = await this._modelClass.adapter.selectAll(sql, `${this._modelClass.name} Load`);
       if (token !== this._loadToken) return [];
       const rows = result.toArray();
       loadedRecords = this._instrumentInstantiation(rows);
@@ -2476,14 +2476,14 @@ export class Relation<T extends Base> {
     if (this._offsetValue !== null) manager.skip(this._offsetValue);
 
     const sql = manager.toSql();
-    const rows = await this._modelClass.adapter.execute(sql);
+    const result = await this._modelClass.adapter.selectAll(sql, `${this._modelClass.name} Pluck`);
 
+    const rows = result.toArray();
     if (columns.length === 1) {
       const name = columnNames[0];
       if (name) {
         return rows.map((row) => row[name]);
       }
-      // For expressions, return the first column value from each row
       return rows.map((row) => Object.values(row)[0]);
     }
     return rows.map((row) => {
@@ -2524,7 +2524,7 @@ export class Relation<T extends Base> {
       um.where(arelSql(cond));
     }
 
-    return this._modelClass.adapter.execUpdate(um.toSql(), "Update All");
+    return this._modelClass.adapter.execUpdate(um.toSql(), `${this._modelClass.name} Update All`);
   }
 
   /**
@@ -2555,7 +2555,7 @@ export class Relation<T extends Base> {
       dm.where(arelSql(cond));
     }
 
-    return this._modelClass.adapter.execDelete(dm.toSql(), "Delete All");
+    return this._modelClass.adapter.execDelete(dm.toSql(), `${this._modelClass.name} Delete All`);
   }
 
   /**
@@ -3298,7 +3298,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#with
    */
-  with(...ctes: Array<Record<string, Relation<any> | string>>): Relation<T> {
+  with(
+    ...ctes: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
+  ): Relation<T> {
     return this._clone().withBang(...ctes);
   }
 

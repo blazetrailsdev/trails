@@ -856,4 +856,62 @@ describe("Static shorthands (Rails-guided)", () => {
       /* needs association + scoping */
     });
   }); // HasManyScopingTest
+
+  describe("HasAndBelongsToManyScopingTest", () => {
+    it("forwarding of static methods", async () => {
+      class Category extends Base {
+        static {
+          this.attribute("name", "string");
+          this.adapter = adapter;
+          // Register as a scope so the relation proxy can forward it,
+          // mirroring Rails' CollectionProxy#method_missing delegation.
+          (this as any).scope("whatAreYou", () => "a category...");
+        }
+      }
+      await Category.create({ name: "test" });
+      // Direct call on the class
+      expect((Category as any).whatAreYou()).toBe("a category...");
+      // Forwarded through the relation proxy — mirrors @welcome.categories.what_are_you
+      const relation = Category.all();
+      expect((relation as any).whatAreYou()).toBe("a category...");
+    });
+
+    it("nested scope finder", async () => {
+      class Category extends Base {
+        static {
+          this.attribute("name", "string");
+          this.adapter = adapter;
+        }
+      }
+      await Category.create({ name: "cat1" });
+      await Category.create({ name: "cat2" });
+      // Mirrors Rails: Category.where("1=0").scoping { assert_equal 2, categories.count }
+      // The nested scope context is active; queries inside respect it.
+      await Category.where({ name: "cat1" }).scoping(async () => {
+        expect(await Category.count()).toBe(1);
+        // Further nested scope merges with outer — cat2 satisfies inner but not outer
+        await Category.where({ name: "cat2" }).scoping(async () => {
+          expect(await Category.count()).toBe(0);
+        });
+        expect(await Category.count()).toBe(1);
+      });
+    });
+
+    it("none scoping", async () => {
+      class Category extends Base {
+        static {
+          this.attribute("name", "string");
+          this.adapter = adapter;
+        }
+      }
+      await Category.create({ name: "cat1" });
+      await Category.create({ name: "cat2" });
+      // Category.none.scoping { assert_equal 0, categories.count }
+      await Category.none().scoping(async () => {
+        expect(await Category.count()).toBe(0);
+      });
+      // After exiting the none scope, the full count is restored
+      expect(await Category.count()).toBe(2);
+    });
+  }); // HasAndBelongsToManyScopingTest
 });

@@ -199,7 +199,7 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     this.cache.clear();
   }
 
-  async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
+  async execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]> {
     this._queryCount++;
 
     // Strip leading SQL comments (e.g. from QueryLogs prepend) before detecting statement type
@@ -216,16 +216,16 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     // preventing stale results when the cache is re-enabled later.
     if (!isSelect && !isReadOnlyCte) {
       if (this.cache.dirties) this.cache.clear();
-      return this.inner.execute(sql, binds);
+      return this.inner.execute(sql, binds, name);
     }
 
     if (!this.cache.enabled) {
-      return this.inner.execute(sql, binds);
+      return this.inner.execute(sql, binds, name);
     }
 
     // Don't cache locked queries (SELECT ... FOR UPDATE)
     if (/\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i.test(sql)) {
-      return this.inner.execute(sql, binds);
+      return this.inner.execute(sql, binds, name);
     }
 
     const key = cacheKey(sql, binds);
@@ -237,7 +237,7 @@ export class QueryCacheAdapter implements DatabaseAdapter {
       const bindArray = binds ?? [];
       Notifications.instrument("sql.active_record", {
         sql,
-        name: "SQL",
+        name: name ?? "SQL",
         binds: bindArray,
         type_casted_binds: castBinds(bindArray),
         connection: this,
@@ -247,14 +247,14 @@ export class QueryCacheAdapter implements DatabaseAdapter {
       return cached.map((row) => ({ ...row }));
     }
     return this.cache.computeIfAbsent(key, async () => {
-      return this.inner.execute(sql, binds);
+      return this.inner.execute(sql, binds, name);
     });
   }
 
-  async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
+  async executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number> {
     this._queryCount++;
     if (this.cache.dirties) this.cache.clear();
-    return this.inner.executeMutation(sql, binds);
+    return this.inner.executeMutation(sql, binds, name);
   }
 
   async beginTransaction(): Promise<void> {
@@ -370,56 +370,56 @@ export class QueryCacheAdapter implements DatabaseAdapter {
         return Result.fromRowHashes(cached.map((row) => ({ ...row })));
       }
     }
-    const rows = await this.execute(sql, binds);
+    const rows = await this.execute(sql, binds, name ?? undefined);
     return Result.fromRowHashes(rows);
   }
 
   async selectOne(
     sql: string,
-    _name?: string | null,
+    name?: string | null,
     binds?: unknown[],
   ): Promise<Record<string, unknown> | undefined> {
-    const rows = await this.execute(sql, binds);
+    const rows = await this.execute(sql, binds, name ?? undefined);
     return rows[0];
   }
 
-  async selectValue(sql: string, _name?: string | null, binds?: unknown[]): Promise<unknown> {
-    const rows = await this.execute(sql, binds);
+  async selectValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown> {
+    const rows = await this.execute(sql, binds, name ?? undefined);
     if (rows.length === 0) return undefined;
     const keys = Object.keys(rows[0]);
     return keys.length > 0 ? rows[0][keys[0]] : undefined;
   }
 
-  async selectValues(sql: string, _name?: string | null, binds?: unknown[]): Promise<unknown[]> {
-    const rows = await this.execute(sql, binds);
+  async selectValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]> {
+    const rows = await this.execute(sql, binds, name ?? undefined);
     if (rows.length === 0) return [];
     const firstKey = Object.keys(rows[0])[0];
     if (firstKey === undefined) return rows.map(() => undefined);
     return rows.map((row) => row[firstKey]);
   }
 
-  async selectRows(sql: string, _name?: string | null, binds?: unknown[]): Promise<unknown[][]> {
-    const rows = await this.execute(sql, binds);
+  async selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]> {
+    const rows = await this.execute(sql, binds, name ?? undefined);
     if (rows.length === 0) return [];
     const keys = Object.keys(rows[0]);
     return rows.map((row) => keys.map((key) => row[key]));
   }
 
-  async execQuery(sql: string, _name?: string | null, binds?: unknown[]): Promise<Result> {
-    const rows = await this.execute(sql, binds);
+  async execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result> {
+    const rows = await this.execute(sql, binds, name ?? undefined);
     return Result.fromRowHashes(rows);
   }
 
-  async execInsert(sql: string, _name?: string | null, binds?: unknown[]): Promise<number> {
-    return this.executeMutation(sql, binds);
+  async execInsert(sql: string, name?: string | null, binds?: unknown[]): Promise<number> {
+    return this.executeMutation(sql, binds, name ?? undefined);
   }
 
-  async execDelete(sql: string, _name?: string | null, binds?: unknown[]): Promise<number> {
-    return this.executeMutation(sql, binds);
+  async execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number> {
+    return this.executeMutation(sql, binds, name ?? undefined);
   }
 
-  async execUpdate(sql: string, _name?: string | null, binds?: unknown[]): Promise<number> {
-    return this.executeMutation(sql, binds);
+  async execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number> {
+    return this.executeMutation(sql, binds, name ?? undefined);
   }
 
   isWriteQuery(sql: string): boolean {

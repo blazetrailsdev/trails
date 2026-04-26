@@ -2242,11 +2242,13 @@ export class Base extends Model {
       im.insert(insertValues);
       sql = im.toSql();
     }
-    this._pendingOperation = ctor.adapter.execInsert(sql, "Insert").then((insertedId) => {
-      if (!Array.isArray(ctor.primaryKey) && this.id === null) {
-        this._attributes.set(ctor.primaryKey, insertedId);
-      }
-    });
+    this._pendingOperation = ctor.adapter
+      .execInsert(sql, `${ctor.name} Create`)
+      .then((insertedId) => {
+        if (!Array.isArray(ctor.primaryKey) && this.id === null) {
+          this._attributes.set(ctor.primaryKey, insertedId);
+        }
+      });
   }
 
   private _performUpdate(): void {
@@ -2311,11 +2313,13 @@ export class Base extends Model {
       }
     }
 
-    this._pendingOperation = ctor.adapter.execUpdate(um.toSql(), "Update").then((affected) => {
-      if (ctor.lockingEnabled && affected === 0) {
-        throw new StaleObjectError(this, "update");
-      }
-    });
+    this._pendingOperation = ctor.adapter
+      .execUpdate(um.toSql(), `${ctor.name} Update`)
+      .then((affected) => {
+        if (ctor.lockingEnabled && affected === 0) {
+          throw new StaleObjectError(this, "update");
+        }
+      });
   }
 
   // update / updateBang extracted to persistence.ts; wired via include() below.
@@ -2348,7 +2352,7 @@ export class Base extends Model {
           }
         }
 
-        const affected = await ctor.adapter.execDelete(dm.toSql(), "Destroy");
+        const affected = await ctor.adapter.execDelete(dm.toSql(), `${ctor.name} Destroy`);
         if (ctor.lockingEnabled && affected === 0) {
           throw new StaleObjectError(this, "destroy");
         }

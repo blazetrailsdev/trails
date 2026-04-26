@@ -32,8 +32,9 @@ describe("RelationMutationTest", () => {
 
   it("#!", () => {
     const { Post } = makeModel();
-    const sql = Post.where({ title: "x" }).toSql();
-    expect(sql).toContain("WHERE");
+    // cover representative multi-value (where) and single-value (group) query methods via generated SQL
+    expect(Post.where({ title: "x" }).toSql()).toContain("WHERE");
+    expect(Post.group("title").toSql()).toContain("GROUP");
   });
 
   it("#_select!", () => {

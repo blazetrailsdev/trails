@@ -480,7 +480,7 @@ class SchemaAdapter implements DatabaseAdapter {
     return sql;
   }
 
-  async execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]> {
+  async execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]> {
     await this.setup();
     sql = this.fixSqliteCompat(sql);
     let lastError: unknown;
@@ -492,7 +492,7 @@ class SchemaAdapter implements DatabaseAdapter {
       const sp = useSp ? `_sr_${attempt}` : "";
       try {
         if (useSp) await this.inner.createSavepoint(sp);
-        const result = await this.inner.execute(sql, binds);
+        const result = await this.inner.execute(sql, binds, name);
         if (useSp) await this.inner.releaseSavepoint(sp);
         return result;
       } catch (e: any) {
@@ -512,7 +512,7 @@ class SchemaAdapter implements DatabaseAdapter {
     throw lastError;
   }
 
-  async executeMutation(sql: string, binds?: unknown[]): Promise<number> {
+  async executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number> {
     await this.setup();
     sql = this.fixSqliteCompat(sql);
 
@@ -546,7 +546,7 @@ class SchemaAdapter implements DatabaseAdapter {
       const sp = useSp ? `_sr_m_${attempt}` : "";
       try {
         if (useSp) await this.inner.createSavepoint(sp);
-        const result = await this.inner.executeMutation(sql, binds);
+        const result = await this.inner.executeMutation(sql, binds, name);
         if (useSp) await this.inner.releaseSavepoint(sp);
         return result;
       } catch (e: any) {

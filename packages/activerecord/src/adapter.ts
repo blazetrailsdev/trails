@@ -105,13 +105,13 @@ export interface DatabaseAdapter {
   /**
    * Execute a SQL query and return rows.
    */
-  execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
+  execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;
 
   /**
    * Execute a SQL statement that modifies data (INSERT/UPDATE/DELETE).
    * Returns the number of affected rows (or the inserted ID for INSERT).
    */
-  executeMutation(sql: string, binds?: unknown[]): Promise<number>;
+  executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
 
   /**
    * Begin a transaction.

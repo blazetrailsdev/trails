@@ -166,11 +166,76 @@ function referencesBang(this: QueryMethodsHost, ...tables: string[]): any {
   return this;
 }
 
+/** Validate and resolve a CTE name+query into a SQL string. */
+function resolveCteEntry(name: string, query: unknown): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw argumentError(
+      `Invalid CTE name "${name}": must be a valid SQL identifier (letters, digits, underscores, not starting with a digit).`,
+    );
+  }
+  if (query === null || query === undefined) {
+    throw argumentError(
+      `Invalid argument for with(): null/undefined is not allowed for CTE "${name}".`,
+    );
+  }
+  if (Array.isArray(query)) {
+    if (query.length === 0) throw argumentError(`Empty array passed for CTE "${name}".`);
+    for (const q of query) {
+      if (typeof q !== "string" && typeof (q as any)?.toSql !== "function") {
+        const typeName =
+          q !== null && typeof q === "object"
+            ? `type object (${(q as object).constructor?.name ?? "unknown"})`
+            : `type ${typeof q}`;
+        throw argumentError(`Unsupported argument type in array for CTE "${name}": ${typeName}`);
+      }
+    }
+    // Do NOT wrap individual subqueries in extra parens: the CTE body is already
+    // wrapped as `AS (...)` in toSql(), so `SELECT ... UNION SELECT ...` is valid.
+    // Parenthesized `(SELECT ...) UNION (SELECT ...)` is rejected by SQLite inside CTEs.
+    return (query as any[])
+      .map((q: any) => (typeof q === "string" ? q : q.toSql()))
+      .join(" UNION ");
+  }
+  const q = query as any;
+  if (typeof q !== "string" && typeof q?.toSql !== "function") {
+    const typeName =
+      q !== null && typeof q === "object"
+        ? `type object (${(q as object).constructor?.name ?? "unknown"})`
+        : `type ${typeof q}`;
+    throw argumentError(
+      `Unsupported argument type for CTE "${name}": expected a SQL string or Relation, got ${typeName}`,
+    );
+  }
+  return typeof q === "string" ? q : q.toSql();
+}
+
+/** Upsert a CTE into _ctes by name (last-write-wins), matching Rails behavior. */
+function upsertCte(
+  ctes: Array<{ name: string; sql: string; recursive: boolean }>,
+  name: string,
+  sql: string,
+  recursive: boolean,
+): void {
+  const existing = ctes.findIndex((c) => c.name === name);
+  if (existing >= 0) {
+    ctes[existing] = { name, sql, recursive };
+  } else {
+    ctes.push({ name, sql, recursive });
+  }
+}
+
 function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, any>>): any {
   for (const cte of ctes) {
+    if (!isPlainObject(cte)) {
+      const typeName =
+        cte !== null && typeof cte === "object"
+          ? `type object (${(cte as object).constructor?.name ?? "unknown"})`
+          : `type ${typeof cte}`;
+      throw argumentError(`Unsupported argument type: ${typeName}`);
+    }
     for (const [name, query] of Object.entries(cte)) {
-      const sql = typeof query === "string" ? query : query.toSql();
-      this._ctes.push({ name, sql, recursive: false });
+      const sql = resolveCteEntry(name, query);
+      upsertCte(this._ctes, name, sql, false);
     }
   }
   return this;
@@ -178,9 +243,16 @@ function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, any>>): 
 
 function withRecursiveBang(this: QueryMethodsHost, ...ctes: Array<Record<string, any>>): any {
   for (const cte of ctes) {
+    if (!isPlainObject(cte)) {
+      const typeName =
+        cte !== null && typeof cte === "object"
+          ? `type object (${(cte as object).constructor?.name ?? "unknown"})`
+          : `type ${typeof cte}`;
+      throw argumentError(`Unsupported argument type: ${typeName}`);
+    }
     for (const [name, query] of Object.entries(cte)) {
-      const sql = typeof query === "string" ? query : query.toSql();
-      this._ctes.push({ name, sql, recursive: true });
+      const sql = resolveCteEntry(name, query);
+      upsertCte(this._ctes, name, sql, true);
     }
   }
   return this;
@@ -416,7 +488,8 @@ export type UnscopeType =
   | "having"
   | "optimizerHints"
   | "annotate"
-  | "createWith";
+  | "createWith"
+  | "with";
 
 export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeType>([
   "where",
@@ -437,6 +510,7 @@ export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeT
   "optimizerHints",
   "annotate",
   "createWith",
+  "with",
 ]);
 
 function unscopeBang(
@@ -509,6 +583,9 @@ function unscopeBang(
           break;
         case "annotate":
           this._annotations = [];
+          break;
+        case "with":
+          this._ctes = [];
           break;
       }
     } else if (scope && typeof scope === "object") {

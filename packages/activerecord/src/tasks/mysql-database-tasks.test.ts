@@ -50,13 +50,13 @@ describe("MySQLDatabaseTasks", () => {
       constructor(_opts: unknown) {
         void _opts;
       }
-      async execute(sql: string, binds?: unknown[]) {
+      async execute(sql: string, binds?: unknown[], _name?: string) {
         executeCalls.push({ sql, binds });
         // information_schema.tables result — returns three user tables
         // plus the two bookkeeping tables that truncateAll must skip.
         return [{ table_name: "widgets" }, { table_name: "posts" }, { table_name: "comments" }];
       }
-      async executeMutation(sql: string) {
+      async executeMutation(sql: string, _binds?: unknown[], _name?: string) {
         mutationCalls.push(sql);
       }
       close = closeMock;

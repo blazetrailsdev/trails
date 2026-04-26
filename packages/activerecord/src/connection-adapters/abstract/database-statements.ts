@@ -1136,8 +1136,8 @@ export { deleteStatement as remove };
 // ---------------------------------------------------------------------------
 
 interface DatabaseStatementsDefaultsHost {
-  execute(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
-  executeMutation(sql: string, binds?: unknown[]): Promise<number>;
+  execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;
+  executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
 }
 
@@ -1158,20 +1158,20 @@ export const DatabaseStatements = {
   async selectOne(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    _name?: string | null,
+    name?: string | null,
     binds?: unknown[],
   ): Promise<Record<string, unknown> | undefined> {
-    const rows = await this.execute(sql, binds);
+    const rows = await this.execute(sql, binds, name ?? "SQL");
     return rows[0];
   },
 
   async selectValue(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    _name?: string | null,
+    name?: string | null,
     binds?: unknown[],
   ): Promise<unknown> {
-    const rows = await this.execute(sql, binds);
+    const rows = await this.execute(sql, binds, name ?? "SQL");
     if (rows.length === 0) return undefined;
     const keys = Object.keys(rows[0]);
     return keys.length > 0 ? rows[0][keys[0]] : undefined;
@@ -1180,10 +1180,10 @@ export const DatabaseStatements = {
   async selectValues(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    _name?: string | null,
+    name?: string | null,
     binds?: unknown[],
   ): Promise<unknown[]> {
-    const rows = await this.execute(sql, binds);
+    const rows = await this.execute(sql, binds, name ?? "SQL");
     if (rows.length === 0) return [];
     const firstKey = Object.keys(rows[0])[0];
     if (firstKey === undefined) return rows.map(() => undefined);
@@ -1193,10 +1193,10 @@ export const DatabaseStatements = {
   async selectRows(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    _name?: string | null,
+    name?: string | null,
     binds?: unknown[],
   ): Promise<unknown[][]> {
-    const rows = await this.execute(sql, binds);
+    const rows = await this.execute(sql, binds, name ?? "SQL");
     if (rows.length === 0) return [];
     const keys = Object.keys(rows[0]);
     return rows.map((row) => keys.map((key) => row[key]));
@@ -1205,38 +1205,38 @@ export const DatabaseStatements = {
   async execQuery(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    _name?: string | null,
+    name?: string | null,
     binds?: unknown[],
   ): Promise<Result> {
-    const rows = await this.execute(sql, binds);
+    const rows = await this.execute(sql, binds, name ?? "SQL");
     return Result.fromRowHashes(rows);
   },
 
   async execInsert(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    _name?: string | null,
+    name?: string | null,
     binds?: unknown[],
   ): Promise<number> {
-    return this.executeMutation(sql, binds);
+    return this.executeMutation(sql, binds, name ?? "SQL");
   },
 
   async execDelete(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    _name?: string | null,
+    name?: string | null,
     binds?: unknown[],
   ): Promise<number> {
-    return this.executeMutation(sql, binds);
+    return this.executeMutation(sql, binds, name ?? "SQL");
   },
 
   async execUpdate(
     this: DatabaseStatementsDefaultsHost,
     sql: string,
-    _name?: string | null,
+    name?: string | null,
     binds?: unknown[],
   ): Promise<number> {
-    return this.executeMutation(sql, binds);
+    return this.executeMutation(sql, binds, name ?? "SQL");
   },
 
   isWriteQuery(sql: string): boolean {

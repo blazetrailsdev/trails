@@ -45,10 +45,14 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   }
   readonly inTransaction = false;
 
-  async execute(_sql: string, _binds?: unknown[]): Promise<Record<string, unknown>[]> {
+  async execute(
+    _sql: string,
+    _binds?: unknown[],
+    _name?: string,
+  ): Promise<Record<string, unknown>[]> {
     return [];
   }
-  async executeMutation(_sql: string, _binds?: unknown[]): Promise<number> {
+  async executeMutation(_sql: string, _binds?: unknown[], _name?: string): Promise<number> {
     return 0;
   }
   async beginTransaction(): Promise<void> {}
