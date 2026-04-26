@@ -735,6 +735,38 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     return { Firm, Account };
   }
 
+  it("should save parent but not invalid child", async () => {
+    // Without autosave: invalid has_one child does not block parent save
+    class PFirm extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class PAccount extends Base {
+      static {
+        this.attribute("credit_limit", "integer");
+        this.attribute("p_firm_id", "integer");
+        this.validates("credit_limit", { presence: true });
+      }
+    }
+    PFirm.adapter = adapter;
+    PAccount.adapter = adapter;
+    registerModel("PFirm", PFirm);
+    registerModel("PAccount", PAccount);
+    Associations.hasOne.call(PFirm, "pAccount", { foreignKey: "p_firm_id" });
+
+    const firm = new PFirm({ name: "GlobalMegaCorp" });
+    expect(firm.isValid()).toBe(true);
+
+    const account = new PAccount({});
+    cacheAssoc(firm, "pAccount", account);
+    expect(account.isValid()).toBe(false);
+
+    const saved = await firm.save();
+    expect(saved).toBe(true);
+    expect(account.isPersisted()).toBe(false);
+  });
+
   it("save fails for invalid has one", async () => {
     const { Firm, Account } = makeModels();
     const firm = await Firm.create({ name: "Acme" });

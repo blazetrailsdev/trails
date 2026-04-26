@@ -23,6 +23,20 @@ describe("PersistenceTest", () => {
     adapter = freshAdapter();
   });
 
+  it("create", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const topic = new Topic();
+    topic.title = "New Topic";
+    await topic.save();
+    const reloaded = await Topic.find(topic.id);
+    expect((reloaded as any).title).toBe("New Topic");
+  });
+
   it("save for record with only primary key", async () => {
     class Minimal extends Base {
       static {
@@ -506,6 +520,19 @@ describe("PersistenceTest", () => {
 // PersistenceTest (continued) — more persistence_test.rb coverage
 // ==========================================================================
 describe("PersistenceTest", () => {
+  it("fills auto populated columns on creation", async () => {
+    const adapter = freshAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    const record = await Item.create({ label: "x" });
+    expect(record.id).not.toBeNull();
+    expect(record.isPersisted()).toBe(true);
+  });
+
   it("build", () => {
     const adp = freshAdapter();
     class Post extends Base {
@@ -937,8 +964,16 @@ describe("PersistenceTest", () => {
   it("populates autoincremented id pk regardless of its position in columns list", () => {
     expect(true).toBe(true);
   });
-  it("fills auto populated columns on creation", () => {
-    expect(true).toBe(true);
+  it("fills auto populated columns on creation", async () => {
+    class DefaultRecord extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const record = await DefaultRecord.create({ name: "test" });
+    expect(record.id).not.toBeNull();
+    expect(record.isPersisted()).toBe(true);
   });
   it("update many with duplicated ids!", () => {
     expect(true).toBe(true);

@@ -112,6 +112,44 @@ describe("InverseBelongsToTests", () => {
     expect((parent as any)._cachedAssociations?.get("books")).toBe(b);
   });
 
+  it("should not try to set inverse instances when the inverse is a has many", async () => {
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Interest extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("human_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Human, "interests", { foreignKey: "human_id" });
+    Associations.belongsTo.call(Interest, "human", { foreignKey: "human_id" });
+    registerModel(Human);
+    registerModel(Interest);
+
+    const human = await Human.create({ name: "Gordon" });
+    const interest = await Interest.create({ topic: "Trainspotting", human_id: human.id });
+
+    // Load via belongs_to WITHOUT inverseOf — no caching on parent
+    const loadedHuman = await loadBelongsTo(interest, "human", {});
+    expect(loadedHuman).not.toBeNull();
+
+    // Load human's interests — returns a fresh collection, not the same object
+    const interests = await loadHasMany(loadedHuman!, "interests", { foreignKey: "human_id" });
+    const iz = interests.find((i) => (i as any).id === (interest as any).id);
+    expect(iz).toBeDefined();
+
+    // Without inverse, interest and iz are different object references
+    (interest as any).topic = "Eating cheese with a spoon";
+    expect((iz as any).topic).toBe("Trainspotting");
+    (iz as any).topic = "Cow tipping";
+    expect((interest as any).topic).toBe("Eating cheese with a spoon");
+  });
+
   it.skip("with has many inversing should have single record when setting record through attribute in build method", () => {
     /* needs has_many inversing push */
   });

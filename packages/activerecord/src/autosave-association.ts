@@ -184,6 +184,10 @@ export function validateAssociations(record: Base, context?: ValidationContextAr
 
     for (const assoc of associations) {
       if (assoc.options.validate === false) continue;
+      // Rails only validates has_one/belongs_to children when autosave or validate: true is set.
+      // has_many and habtm validate by default (unless validate: false above).
+      const isCollection = assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany";
+      if (!isCollection && !assoc.options.autosave && assoc.options.validate !== true) continue;
 
       const cached =
         (record as any)._cachedAssociations?.get(assoc.name) ??
