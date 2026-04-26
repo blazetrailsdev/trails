@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   Base,
   RecordNotFound,
@@ -16,6 +16,7 @@ import { Associations } from "./associations.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
+import { Notifications } from "@blazetrails/activesupport";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -2559,6 +2560,10 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     adapter = freshAdapter();
   });
 
+  afterEach(() => {
+    Notifications.unsubscribeAll();
+  });
+
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
@@ -2749,7 +2754,28 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     expect(replies[0].text).toBe("new-great-grandchild");
   });
 
-  it.skip("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", () => {});
+  it("when extra records exist for associations, validate (which calls nested_records_changed_for_autosave?) should not load them up", async () => {
+    const { Pirate, Ship, Part } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    // Create extra parts in the DB that are NOT loaded into memory
+    await Part.create({ name: "Mast", ship_id: ship.id });
+    await Part.create({ name: "Stern", ship_id: ship.id });
+    // Nothing is cached on ship — part association is NOT loaded (hasOne)
+    expect((ship as any)._cachedAssociations?.has("part")).toBeFalsy();
+    // Counting queries: isValid() should not trigger a load of the part association
+    let queryCount = 0;
+    const sub = Notifications.subscribe("sql.active_record", () => {
+      queryCount++;
+    });
+    try {
+      ship.isValid();
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    // No DB queries should fire: _nestedRecordsChangedForAutosave skips unloaded associations
+    expect(queryCount).toBe(0);
+  });
 });
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
@@ -2967,5 +2993,42 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     cacheAssoc(pirate, "ships", [ship]);
     const saved = await pirate.save();
     expect(saved).toBe(false);
+  });
+});
+
+// Rails: NestedAttributesOnACollectionAssociationTests is mixed into
+// TestNestedAttributesOnAHasManyAssociation and TestNestedAttributesOnAHasAndBelongsToManyAssociation.
+describe("TestNestedAttributesOnAHasManyAssociation", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  function makeModels() {
+    class Bird extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Pirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Pirate, "birds", { className: "Bird", foreignKey: "pirate_id" });
+    registerModel("Bird", Bird);
+    registerModel("Pirate", Pirate);
+    acceptsNestedAttributesFor(Pirate, "birds");
+    return { Bird, Pirate };
+  }
+
+  it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
+    const { Pirate } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    assignNestedAttributes(pirate, "birds", [{ id: 1234567890, name: "Ghost Bird" }]);
+    await expect(pirate.save()).rejects.toThrow(RecordNotFound);
   });
 });
