@@ -125,19 +125,23 @@ export class Notifications {
    * Fire-and-forget (no block):
    *   Notifications.instrument("cache.miss", { key });
    */
+  private static _buildEvent(name: string, payload?: EventPayload, current?: Event[]): Event {
+    const event = new Event(name, new Date(), payload ?? {});
+    const stack = current ?? this._eventStack();
+    const parent = stack[stack.length - 1];
+    if (parent) {
+      parent.children.push(event);
+    }
+    return event;
+  }
+
   static instrument<T>(
     name: string,
     payload?: EventPayload,
     block?: () => T,
   ): T extends undefined ? void : T {
-    const event = new Event(name, new Date(), payload ?? {});
-
-    // Track nesting for child events
     const current = this._eventStack();
-    const parent = current[current.length - 1];
-    if (parent) {
-      parent.children.push(event);
-    }
+    const event = this._buildEvent(name, payload, current);
 
     if (!block) {
       event.finish();
@@ -168,13 +172,8 @@ export class Notifications {
     payload?: EventPayload,
     block?: () => Promise<T>,
   ): Promise<T extends undefined ? void : T> {
-    const event = new Event(name, new Date(), payload ?? {});
-
     const current = this._eventStack();
-    const parent = current[current.length - 1];
-    if (parent) {
-      parent.children.push(event);
-    }
+    const event = this._buildEvent(name, payload, current);
 
     if (!block) {
       event.finish();
@@ -202,7 +201,9 @@ export class Notifications {
    * Mirrors ActiveSupport::Notifications.publish.
    */
   static publish(name: string, payload?: EventPayload): void {
-    this.instrument(name, payload);
+    const event = this._buildEvent(name, payload);
+    event.finish();
+    this._notify(event, true);
   }
 
   // -------------------------------------------------------------------------
@@ -242,13 +243,17 @@ export class Notifications {
   // Internal
   // -------------------------------------------------------------------------
 
-  private static _notify(event: Event): void {
+  private static _notify(event: Event, propagate = false): void {
     for (const sub of this._subscribers) {
       if (this._matches(sub.pattern, event.name)) {
-        try {
+        if (propagate) {
           sub.callback(event);
-        } catch {
-          // Swallow subscriber errors — matches Rails behavior
+        } else {
+          try {
+            sub.callback(event);
+          } catch {
+            // Swallow subscriber errors — matches Rails instrument() behavior
+          }
         }
       }
     }
