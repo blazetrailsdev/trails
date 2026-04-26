@@ -206,7 +206,7 @@ export class Relation<T extends Base> {
   private _modelClass: typeof Base;
   /** @internal */
   _whereClause: WhereClause = WhereClause.empty();
-  private _orderClauses: Array<string | [string, "asc" | "desc"]> = [];
+  private _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string }> = [];
   private _rawOrderClauses: string[] = [];
   private _limitValue: number | null = null;
   private _offsetValue: number | null = null;
@@ -2858,8 +2858,12 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#order_values
    */
-  get orderValues(): Array<string | [string, "asc" | "desc"]> {
-    return [...this._orderClauses];
+  get orderValues(): Array<string | [string, "asc" | "desc"] | Nodes.Node> {
+    return this._orderClauses.map((clause) =>
+      typeof clause === "object" && !Array.isArray(clause) && "raw" in clause
+        ? new Nodes.SqlLiteral((clause as { raw: string }).raw)
+        : clause,
+    );
   }
 
   /**
@@ -3358,6 +3362,10 @@ export class Relation<T extends Base> {
       manager.order(new Nodes.SqlLiteral(rawClause));
     }
     for (const clause of this._orderClauses) {
+      if (typeof clause === "object" && !Array.isArray(clause) && "raw" in clause) {
+        manager.order(new Nodes.SqlLiteral((clause as { raw: string }).raw));
+        continue;
+      }
       if (typeof clause === "string") {
         const trimmed = clause.trim();
         // Detect SQL expressions (functions, parens, operators) and pass as raw SQL
@@ -3395,7 +3403,7 @@ export class Relation<T extends Base> {
             }
           }
         }
-      } else {
+      } else if (Array.isArray(clause)) {
         const [col, dir] = clause;
         // Function expressions, quoted identifiers, and dotted names must be
         // emitted as raw SQL — table.get() would double-quote them incorrectly.

@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { sql } from "@blazetrails/arel";
 import { Base, Relation, IrreversibleOrderError } from "./index.js";
 import { Associations, registerModel, modelRegistry } from "./associations.js";
 
@@ -117,6 +118,25 @@ describe("RelationTest", () => {
     // Rails never strips or re-qualifies cross-table references in string form.
     expect(Post.order("comments.body ASC").toSql()).toContain("ORDER BY comments.body ASC");
     expect(Post.order("posts.id DESC").toSql()).toContain("ORDER BY posts.id DESC");
+  });
+
+  it("order(sql(...)) passes computed aliases and raw expressions through verbatim without table qualification", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    // Computed select alias — must not be qualified as "posts"."avg_rating"
+    expect(Post.order(sql("avg_rating DESC")).toSql()).toContain("ORDER BY avg_rating DESC");
+    expect(Post.order(sql("avg_rating DESC")).toSql()).not.toContain('"posts"."avg_rating"');
+    // Chained: plain col comes before raw literal, both in call order
+    expect(Post.order({ id: "asc" }).order(sql("score DESC")).toSql()).toContain(
+      'ORDER BY "posts"."id" ASC, score DESC',
+    );
+    // Raw SQL expressions pass through verbatim
+    expect(Post.order(sql("RANDOM()")).toSql()).toContain("ORDER BY RANDOM()");
   });
 
   it("order by primary key stays table-qualified even before schema reflection", () => {

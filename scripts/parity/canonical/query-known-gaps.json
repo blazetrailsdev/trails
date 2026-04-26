@@ -10,5 +10,9 @@
   "ar-65": {
     "side": "diff",
     "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) — rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
+  },
+  "ar-133": {
+    "side": "diff",
+    "reason": "from() does not handle Arel::Nodes::As arguments: Rails accepts an Arel As node (SelectManager#as result) as the from() value and inlines it as a parenthesised subquery — 'FROM (SELECT ...) ranked'. Trails' from() handler checks for Relation, string, or string+alias, but falls through to a bare toString() for Arel nodes, producing 'FROM [object Object]'. Real fix: detect Arel As / SelectManager in the from() handler and call toSql() on them."
   }
 }
