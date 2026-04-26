@@ -11,6 +11,8 @@ import {
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
 import { RecordNotSaved, RecordNotUnique } from "./errors.js";
+import { disallowRawSqlBang } from "./sanitization.js";
+import { columnNameMatcher as abstractColumnNameMatcher } from "./connection-adapters/abstract/quoting.js";
 import { modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
@@ -129,6 +131,48 @@ function validateExplainOptions(options: ExplainOption[]): void {
  *
  * Mirrors: ActiveRecord::Relation
  */
+
+function hasTopLevelComma(s: string): boolean {
+  let depth = 0;
+  let quote: '"' | "'" | "`" | null = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (quote) {
+      if (ch === "\\") {
+        i++;
+        continue;
+      }
+      // SQL doubled-quote escape ("" or ``)
+      if (ch === quote && s[i + 1] === quote) {
+        i++;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+      continue;
+    }
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (ch === "," && depth === 0) return true;
+  }
+  return false;
+}
+
+function resolveColumnNameMatcher(adapter: any): RegExp {
+  // Walk adapter → inner (SchemaAdapter wraps the real adapter) to find a
+  // static columnNameMatcher on the concrete adapter class.
+  let a = adapter;
+  while (a) {
+    const matcher = (a.constructor as any)?.columnNameMatcher?.();
+    if (matcher) return matcher;
+    a = a.inner;
+  }
+  return abstractColumnNameMatcher();
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
   private _modelClass: typeof Base;
@@ -669,8 +713,16 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#order
    */
-  order(...args: Array<string | Record<string, "asc" | "desc">>): Relation<T> {
-    return this._clone().orderBang(...args);
+  order(
+    ...args: Array<
+      | string
+      | Record<string, "asc" | "desc" | "ASC" | "DESC">
+      | Nodes.Node
+      | string[]
+      | [Nodes.Node, ...unknown[]]
+    >
+  ): Relation<T> {
+    return this._clone().orderBang(...(args as any));
   }
 
   /**
@@ -780,8 +832,16 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#reorder
    */
-  reorder(...args: Array<string | Record<string, "asc" | "desc">>): Relation<T> {
-    return this._clone().reorderBang(...args);
+  reorder(
+    ...args: Array<
+      | string
+      | Record<string, "asc" | "desc" | "ASC" | "DESC">
+      | Nodes.Node
+      | string[]
+      | [Nodes.Node, ...unknown[]]
+    >
+  ): Relation<T> {
+    return this._clone().reorderBang(...(args as any));
   }
 
   /**
@@ -2360,13 +2420,51 @@ export class Relation<T extends Base> {
   ): Promise<unknown[]> {
     if (this._isNone) return [];
 
+    // Mirrors Rails' disallow_raw_sql! check on pluck arguments.
+    // Uses the broader column_name_matcher (allows functions like UPPER(col))
+    // rather than column_name_with_order_matcher (which is stricter, for order).
+    const stringColumns = columns.filter((c): c is string => typeof c === "string");
+    if (stringColumns.length > 0) {
+      disallowRawSqlBang(stringColumns, resolveColumnNameMatcher(this._modelClass.adapter));
+    }
+
     const table = this._modelClass.arelTable;
-    const projections = columns.map((c) => (typeof c === "string" ? table.get(c) : c));
+    const projections = columns.map((c) => {
+      if (typeof c !== "string") return c;
+      // Table-qualified ("table.col"), quoted ('"table"."col"'), function expressions,
+      // or comma-separated lists must pass through as raw SQL.
+      // Comma-separated lists are not allowed in a single pluck argument —
+      // each column must be passed as a separate argument for correct result mapping.
+      if (hasTopLevelComma(c)) {
+        throw argumentError(
+          `pluck does not allow comma-separated column lists in a single argument. ` +
+            `Pass each column as a separate argument: pluck("col1", "col2")`,
+        );
+      }
+      const isComplex =
+        c.includes(".") ||
+        c.includes("(") ||
+        c.includes('"') ||
+        c.includes("`") ||
+        c.includes("::") ||
+        /\s+AS\s+/i.test(c);
+      return isComplex ? new Nodes.SqlLiteral(c) : table.get(c);
+    });
     // Extract column names for result mapping
     const columnNames = columns.map((c) => {
-      if (typeof c === "string") return c;
+      if (typeof c === "string") {
+        // Explicit AS alias is reliable on all adapters.
+        const asMatch = c.match(/\s+AS\s+(?:"([^"]+)"|`([^`]+)`|(\w+))\s*$/i);
+        if (asMatch) return asMatch[1] ?? asMatch[2] ?? asMatch[3];
+        // Function expressions: the result column label is adapter-specific and
+        // can't be reliably predicted — use positional fallback (return null).
+        if (c.includes("(")) return null;
+        // Table-qualified or quoted identifiers: extract the last plain identifier segment.
+        const dotMatch = c.match(/(?:["`]?\w+["`]?\.)? *["`]?(\w+)["`]?\s*$/);
+        if (dotMatch) return dotMatch[1];
+        return c;
+      }
       if (c instanceof Nodes.Attribute) return c.name;
-      // For functions/literals, use the SQL representation
       return null;
     });
     const manager = table.project(...projections);
@@ -3134,10 +3232,9 @@ export class Relation<T extends Base> {
         }
       } else {
         const [col, dir] = clause;
-        // Mirrors Rails' arel_column: unknown columns (e.g. subquery aliases
-        // from .from()) get a bare quoted name, not a table-qualified attribute.
-        // Dotted keys (e.g. "comments.body") pass through as raw SQL with direction.
-        if (/^[\w$]+(\.[\w$]+)+$/.test(col)) {
+        // Function expressions, quoted identifiers, and dotted names must be
+        // emitted as raw SQL — table.get() would double-quote them incorrectly.
+        if (/[()"`]|::/.test(col) || /^[\w$]+(\.[\w$]+)+$/.test(col)) {
           const lit = new Nodes.SqlLiteral(col);
           manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
         } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(col)) {

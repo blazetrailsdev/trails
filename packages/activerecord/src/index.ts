@@ -210,6 +210,7 @@ export {
   AttributeAssignmentError,
   TransactionIsolationError,
   IrreversibleOrderError,
+  UnknownAttributeReference,
 } from "./errors.js";
 export {
   ReadonlyAttributeError,

@@ -16,6 +16,8 @@ import {
   quoteColumnName as pgQuoteColumnName,
   quoteString as pgQuoteString,
   quoteDefaultExpression as pgQuoteDefaultExpression,
+  columnNameMatcher as pgColumnNameMatcher,
+  columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
 } from "./postgresql/quoting.js";
 import { TypeMapInitializer, type PgTypeRow } from "./postgresql/oid/type-map-initializer.js";
 import {
@@ -75,6 +77,14 @@ import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapter {
   override get adapterName(): string {
     return "PostgreSQL";
+  }
+
+  static columnNameMatcher(): RegExp {
+    return pgColumnNameMatcher();
+  }
+
+  static columnNameWithOrderMatcher(): RegExp {
+    return pgColumnNameWithOrderMatcher();
   }
 
   override get active(): boolean {

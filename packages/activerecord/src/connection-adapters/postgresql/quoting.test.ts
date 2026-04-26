@@ -65,9 +65,9 @@ describe("PostgreSQL quoting", () => {
     expect(quoteDefaultExpression(["a", "b"], column, typeMap)).toBe(" DEFAULT '{a,b}'");
   });
 
-  it("documents the JavaScript regexp limitation for nested functions", () => {
+  it("supports nested function calls up to 2 levels deep", () => {
     expect(columnNameMatcher().test("lower(name)")).toBe(true);
-    expect(columnNameMatcher().test("lower(trim(name))")).toBe(false);
+    expect(columnNameMatcher().test("lower(trim(name))")).toBe(true);
   });
 
   it("unescapes hex bytea values we now own locally", () => {

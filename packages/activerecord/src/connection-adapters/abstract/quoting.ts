@@ -267,7 +267,14 @@ export function sanitizeAsSqlComment(value: unknown): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting::ClassMethods#column_name_matcher
  */
 export function columnNameMatcher(): RegExp {
-  return /^((?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:(?:\s+AS)?\s+\w+)?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:(?:\s+AS)?\s+\w+)?)*$/i;
+  // Direct JS translation of Rails' abstract adapter column_name_matcher.
+  // Ruby source uses \g<2> for recursion; JS approximates at 2 levels
+  // (handles length(trim(col)) and similar real-world cases).
+  //
+  // Rails Ruby:
+  //   /((?:\w+\.)?\w+ | \w+\((?:|\g<2>)\)) (?:(?:\s+AS)?\s+\w+)?
+  //   (?:\s*,\s*\g<1>)*/ix
+  return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:(?:\s+AS)?\s+\w+)?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:(?:\s+AS)?\s+\w+)?)*$/i;
 }
 
 /**
@@ -276,7 +283,13 @@ export function columnNameMatcher(): RegExp {
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting::ClassMethods#column_name_with_order_matcher
  */
 export function columnNameWithOrderMatcher(): RegExp {
-  return /^((?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
+  // Direct JS translation of Rails' abstract adapter column_name_with_order_matcher.
+  // No COLLATE (abstract has none); NULLS FIRST/LAST included per Rails abstract pattern.
+  //
+  // Rails Ruby:
+  //   /((?:\w+\.)?\w+ | \w+\((?:|\g<2>)\)) (?:\s+ASC|\s+DESC)?
+  //   (?:\s+NULLS\s+(?:FIRST|LAST))? (?:\s*,\s*\g<1>)*/ix
+  return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
 }
 
 function isSqlLiteral(value: unknown): value is { value: string } {

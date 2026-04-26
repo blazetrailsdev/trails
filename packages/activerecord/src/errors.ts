@@ -536,6 +536,22 @@ export class SQLWarning extends AdapterError {
   }
 }
 
+/**
+ * Raised when a query method is called with a non-attribute argument that
+ * would be used as raw SQL without sanitization.
+ *
+ * Mirrors: ActiveRecord::UnknownAttributeReference
+ */
+export class UnknownAttributeReference extends ActiveRecordError {
+  constructor(message?: string) {
+    super(
+      message ??
+        "Dangerous query method (method whose arguments are used as raw SQL) called with non-attribute argument(s)",
+    );
+    this.name = "UnknownAttributeReference";
+  }
+}
+
 export class MultiparameterAssignmentErrors extends ActiveRecordError {
   readonly errors: Error[];
 

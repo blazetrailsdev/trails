@@ -292,21 +292,32 @@ export function unescapeBytea(value: string): Buffer {
 }
 
 export function columnNameMatcher(): RegExp {
-  // Rails uses recursive regexp syntax for nested function calls. JavaScript
-  // RegExp cannot express that directly, so this mirrors the current abstract
-  // limitation and only allows a bare identifier inside function calls.
-  return /^((?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:(?:\s+AS)?\s+\w+)?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:(?:\s+AS)?\s+\w+)?)*$/i;
+  // Mirrors Rails PostgreSQL column_name_matcher.
+  // Supports "schema"."table"."col" quoted identifiers, ::type casts, and
+  // 0-or-1-arg function calls (2-level unrolling of Ruby's recursive \g<2>).
+  // col branch carries its own (?:::\w+)? so backtracking col→func works.
+  const col0 = String.raw`(?:(?:\w+|"\w+")\.){0,2}(?:\w+|"\w+")(?:::\w+)?`;
+  const col1 = String.raw`(?:${col0}|\w+\((?:|${col0})\)(?:::\w+)?)`;
+  const atom = String.raw`(?:${col0}|\w+\((?:|${col1})\)(?:::\w+)?)`;
+  const id = String.raw`(?:\w+|"\w+")`;
+  return new RegExp(
+    `^(${atom}(?:(?:\\s+AS)?\\s+${id})?)(?:\\s*,\\s*${atom}(?:(?:\\s+AS)?\\s+${id})?)*$`,
+    "i",
+  );
 }
 
 /**
  * Mirrors: PostgreSQL::Quoting::ClassMethods#column_name_with_order_matcher.
- * Same core expression as columnNameMatcher plus optional COLLATE/ASC/DESC/
- * NULLS ordering suffixes. Rails only accepts quoted collation names
- * (`"\w+"`), so this does too — unquoted `COLLATE C` is rejected, matching
- * Rails exactly.
+ * Same atom as columnNameMatcher plus COLLATE, ASC/DESC, NULLS FIRST/LAST.
  */
 export function columnNameWithOrderMatcher(): RegExp {
-  return /^((?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:\s+COLLATE\s+"\w+")?(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|\w+)\))(?:\s+COLLATE\s+"\w+")?(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
+  const col0 = String.raw`(?:(?:\w+|"\w+")\.){0,2}(?:\w+|"\w+")(?:::\w+)?`;
+  const col1 = String.raw`(?:${col0}|\w+\((?:|${col0})\)(?:::\w+)?)`;
+  const atom = String.raw`(?:${col0}|\w+\((?:|${col1})\)(?:::\w+)?)`;
+  return new RegExp(
+    `^(${atom}(?:\\s+COLLATE\\s+"\\w+")?(?:\\s+ASC|\\s+DESC)?(?:\\s+NULLS\\s+(?:FIRST|LAST))?)(?:\\s*,\\s*${atom}(?:\\s+COLLATE\\s+"\\w+")?(?:\\s+ASC|\\s+DESC)?(?:\\s+NULLS\\s+(?:FIRST|LAST))?)*$`,
+    "i",
+  );
 }
 
 /**

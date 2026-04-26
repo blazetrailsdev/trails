@@ -6,7 +6,7 @@
 
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { quote, quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
-import { PreparedStatementInvalid } from "./errors.js";
+import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
 
 /**
  * Sanitize a SQL template with bind parameters.
@@ -120,7 +120,7 @@ export function disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], permi
     }
   }
   if (unexpected.length > 0) {
-    throw new Error(
+    throw new UnknownAttributeReference(
       `Dangerous query method (method whose arguments are used as raw SQL) ` +
         `called with non-attribute argument(s): ${unexpected.map((a) => `"${a}"`).join(", ")}`,
     );
