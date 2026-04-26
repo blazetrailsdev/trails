@@ -78,7 +78,7 @@ jobs:
           # `any(.[]; ...)` guards against the `.[].name == "..."` bug where
           # jq -e bases exit status on the last element of a stream.
           case "${{ github.event_name }}" in
-            push|schedule|workflow_dispatch)
+            schedule|workflow_dispatch)
               echo "parity_sqlite=true"   >> "$GITHUB_OUTPUT"
               echo "parity_postgres=true" >> "$GITHUB_OUTPUT"
               echo "parity_mysql=true"    >> "$GITHUB_OUTPUT"
