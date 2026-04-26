@@ -17,11 +17,7 @@ function prependImportScripts() {
     generateBundle(_: unknown, bundle: Record<string, { type: string; code?: string }>) {
       for (const file of Object.values(bundle)) {
         if (file.type === "chunk" && file.code) {
-          file.code =
-            'importScripts("/sql-wasm.js");\n' +
-            "var __external_stub = new Proxy({}, { get: () => __external_stub });\n" +
-            "var process = { env: {} };\n" +
-            file.code;
+          file.code = 'importScripts("/sql-wasm.js");\n' + file.code;
         }
       }
     },
@@ -86,12 +82,8 @@ export default defineConfig({
           "process",
         ].includes(id),
       output: {
-        // Map all externals to globals. sql.js → initSqlJs (loaded via
-        // importScripts). Everything else → __external_stub (a Proxy that
-        // returns itself on any property access, defined in the banner).
-        globals: (id: string) => {
-          if (id === "sql.js") return "initSqlJs";
-          return "__external_stub";
+        globals: {
+          "sql.js": "initSqlJs",
         },
       },
     },
