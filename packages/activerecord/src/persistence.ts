@@ -21,6 +21,11 @@ import {
   RecordNotSaved,
   UnknownAttributeError,
 } from "./errors.js";
+import {
+  hasMultiparameterKeys,
+  extractMultiparameterCallstack,
+  executeMultiparameterAssignment,
+} from "./multiparameter-attribute-assignment.js";
 import { clearAutosaveState } from "./autosave-association.js";
 import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
@@ -631,6 +636,31 @@ export function valuesAt(this: AttributeIO, ...keys: string[]): unknown[] {
  * happen in a follow-up.)
  */
 export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
+  if (hasMultiparameterKeys(attrs)) {
+    const { multiparams, regular } = extractMultiparameterCallstack(attrs);
+    // Assign regular attributes first (with existing error wrapping)
+    for (const [key, value] of Object.entries(regular)) {
+      try {
+        this.writeAttribute(key, value);
+      } catch (e) {
+        let repr: string;
+        try {
+          repr = JSON.stringify(value);
+        } catch {
+          repr = String(value);
+        }
+        throw new AttributeAssignmentError(
+          `error on assignment ${repr} to ${key} (${e instanceof Error ? e.message : String(e)})`,
+          e instanceof Error ? e : undefined,
+          key,
+        );
+      }
+    }
+    // Then assign multiparameter attributes (throws MultiparameterAssignmentErrors)
+    executeMultiparameterAssignment(this as any, multiparams);
+    return;
+  }
+
   for (const [key, value] of Object.entries(attrs)) {
     try {
       this.writeAttribute(key, value);

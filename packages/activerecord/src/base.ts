@@ -138,6 +138,11 @@ import {
 } from "./scoping/default.js";
 import * as NamedScoping from "./scoping/named.js";
 import { Associations as _Associations, updateCounterCaches } from "./associations.js";
+import {
+  hasMultiparameterKeys,
+  extractMultiparameterCallstack,
+  executeMultiparameterAssignment,
+} from "./multiparameter-attribute-assignment.js";
 
 /** @internal */
 export function quoteSqlValue(v: unknown, asArray = false): string {
@@ -1999,7 +2004,45 @@ export class Base extends Model {
 
   constructor(attrs: Record<string, unknown> = {}) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
-    super(attrs);
+    if (hasMultiparameterKeys(attrs)) {
+      // Mirrors Rails: Base#initialize calls assign_attributes which handles
+      // multiparameter keys. We split: regular attrs go through the Model
+      // constructor for setup, mp attrs are assembled after.
+      //
+      // Suppress after_initialize so it fires after ALL attrs are present
+      // (not just the regular subset), and re-snapshot dirty state so mp
+      // attrs appear clean (part of initial construction, not changes).
+      const ctor = new.target as typeof Base;
+      const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
+      const hadOwnSuppressor = Object.prototype.hasOwnProperty.call(
+        suppressor,
+        "_suppressInitializeCallback",
+      );
+      const wasSuppressed = suppressor._suppressInitializeCallback;
+      suppressor._suppressInitializeCallback = true;
+      const { multiparams, regular } = extractMultiparameterCallstack(attrs);
+      try {
+        super(regular);
+      } finally {
+        // Always restore the flag even if super() throws, so later instances
+        // on this class still fire after_initialize normally.
+        if (hadOwnSuppressor) {
+          suppressor._suppressInitializeCallback = wasSuppressed;
+        } else {
+          delete (suppressor as { _suppressInitializeCallback?: boolean })
+            ._suppressInitializeCallback;
+        }
+      }
+      executeMultiparameterAssignment(this as any, multiparams);
+      // Re-snapshot so mp attrs are part of the initial clean state.
+      (this as any)._dirty.snapshot((this as any)._attributes);
+      // Now fire after_initialize with all attrs assembled.
+      if (!wasSuppressed) {
+        ctor._callbackChain.runAfter("initialize", this, { strict: "sync" } as any);
+      }
+    } else {
+      super(attrs);
+    }
   }
 
   // --- Persistence instance predicates (wired via include() after class body) ---
@@ -2867,3 +2910,20 @@ include(Base, {
 // and on validates (AR's validates routes remaining rules through Model.validates).
 _setSuperIsValid(Model.prototype.isValid);
 _setSuperValidates(Model.validates);
+
+// Add attributes= setter (Rails: alias for assign_attributes) while preserving
+// the existing Model getter. Can't go through include() since object-literal
+// setters lose their descriptor; defineProperty merges both halves cleanly.
+{
+  const modelGetter = Object.getOwnPropertyDescriptor(Model.prototype, "attributes")?.get;
+  if (modelGetter) {
+    Object.defineProperty(Base.prototype, "attributes", {
+      get: modelGetter,
+      set(this: Base, attrs: Record<string, unknown>) {
+        this.assignAttributes(attrs);
+      },
+      configurable: true,
+      enumerable: false,
+    });
+  }
+}
