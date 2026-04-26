@@ -32,6 +32,10 @@ export class TableMetadata {
     return this._arelTable.typeForAttribute(columnName);
   }
 
+  typeForAttribute(columnName: string): any {
+    return this._arelTable.typeForAttribute(columnName);
+  }
+
   hasColumn(columnName: string): boolean {
     if (!this._klass) return false;
     const hash = columnsHash.call(this._klass);

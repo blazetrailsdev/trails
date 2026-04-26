@@ -14,11 +14,20 @@ import type { Range } from "../../connection-adapters/postgresql/oid/range.js";
  *   where({ created_at: new Range(null, end) })     → created_at <= end
  */
 export class RangeHandler {
-  constructor() {}
+  private _castBound?: (attribute: Nodes.Attribute, value: unknown) => unknown;
+
+  constructor(castBound?: (attribute: Nodes.Attribute, value: unknown) => unknown) {
+    this._castBound = castBound;
+  }
 
   call(attribute: Nodes.Attribute, value: Range): Nodes.Node {
-    const beginVal = value.begin;
-    const endVal = value.end;
+    // Cast bounds through the attribute's type (e.g. integer casts "1-meowmeow" → 1)
+    const cast = this._castBound
+      ? (v: unknown) => this._castBound!(attribute, v)
+      : (v: unknown) => v;
+    const beginVal =
+      value.begin !== null && value.begin !== undefined ? cast(value.begin) : value.begin;
+    const endVal = value.end !== null && value.end !== undefined ? cast(value.end) : value.end;
 
     if (beginVal === null || beginVal === undefined) {
       if (endVal === null || endVal === undefined) {
@@ -36,5 +45,26 @@ export class RangeHandler {
     }
 
     return attribute.between(beginVal, endVal);
+  }
+
+  callNegated(attribute: Nodes.Attribute, value: Range): Nodes.Node {
+    const cast = this._castBound
+      ? (v: unknown) => this._castBound!(attribute, v)
+      : (v: unknown) => v;
+    const beginVal =
+      value.begin !== null && value.begin !== undefined ? cast(value.begin) : value.begin;
+    const endVal = value.end !== null && value.end !== undefined ? cast(value.end) : value.end;
+
+    if (beginVal === null || beginVal === undefined) {
+      if (endVal === null || endVal === undefined) return attribute.isNull();
+      return value.excludeEnd ? attribute.gteq(endVal) : attribute.gt(endVal);
+    }
+    if (endVal === null || endVal === undefined) {
+      return attribute.lt(beginVal);
+    }
+    if (value.excludeEnd) {
+      return new Nodes.Grouping(new Nodes.Or(attribute.lt(beginVal), attribute.gteq(endVal)));
+    }
+    return attribute.notBetween(beginVal, endVal);
   }
 }
