@@ -4,10 +4,11 @@
  *
  * Mirrors: ActiveRecord::QueryMethods
  */
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, SelectManager, Table as ArelTable, sql as arelSql } from "@blazetrails/arel";
+import { Attribute, ValueType } from "@blazetrails/activemodel";
+import { ActiveRecordError, IrreversibleOrderError, PreparedStatementInvalid } from "../errors.js";
 import { FromClause } from "./from-clause.js";
 import { WhereClause } from "./where-clause.js";
-import { IrreversibleOrderError } from "../errors.js";
 import { sanitizeSqlArray, disallowRawSqlBang } from "../sanitization.js";
 import {
   quote,
@@ -1080,6 +1081,403 @@ function constructJoinDependency(
     }
   }
   return jd;
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers — mirrors ActiveRecord::QueryMethods private block.
+// Non-exported so the extractor marks them internal: true.
+// ---------------------------------------------------------------------------
+
+function asyncBang(this: QueryMethodsHost): QueryMethodsHost {
+  (this as any)._async = true;
+  return this;
+}
+
+function async(this: QueryMethodsHost): QueryMethodsHost {
+  const rel = (this as any).spawn();
+  rel._async = true;
+  return rel;
+}
+
+function assertModifiableBang(this: QueryMethodsHost): void {
+  if ((this as any)._loaded) {
+    throw new ActiveRecordError("can't modify a loaded relation");
+  }
+}
+
+function isBlankArgument(value: unknown): boolean {
+  if (value === null || value === undefined || value === false) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) return value.length === 0;
+  if (isPlainObject(value)) return Object.keys(value).length === 0;
+  return false;
+}
+
+function checkIfMethodHasArgumentsBang(
+  this: QueryMethodsHost,
+  methodName: string,
+  args: unknown[],
+  message?: string,
+): void {
+  if (!args || args.length === 0) {
+    throw argumentError(message ?? `The method .${methodName}() must contain arguments.`);
+  }
+  const flat = flattenedArgs(args);
+  args.length = 0;
+  for (const a of flat) {
+    if (!isBlankArgument(a)) args.push(a);
+  }
+}
+
+function flattenedArgs(args: unknown[]): unknown[] {
+  return args.flatMap((e) => {
+    if (Array.isArray(e)) return flattenedArgs(e);
+    // Only expand plain objects — leave class instances (Arel nodes, Dates, …) as-is.
+    if (isPlainObject(e)) return flattenedArgs(Object.entries(e).flat());
+    return e;
+  });
+}
+
+const VALID_DIRECTIONS = new Set(["asc", "desc"]);
+
+function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
+  for (const arg of args) {
+    if (!isPlainObject(arg)) continue;
+    for (const [, value] of Object.entries(arg)) {
+      if (isPlainObject(value)) {
+        validateOrderArgs.call(this, [value]);
+      } else if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
+        throw argumentError(`Direction "${value}" is invalid. Valid directions are: asc, desc`);
+      }
+    }
+  }
+}
+
+function processWithArgs(this: QueryMethodsHost, args: unknown[]): Record<string, unknown>[] {
+  return args.flatMap((arg) => {
+    if (!isPlainObject(arg)) {
+      const desc =
+        arg === null
+          ? "null"
+          : Array.isArray(arg)
+            ? "Array"
+            : typeof arg !== "object"
+              ? `${String(arg)} (${typeof arg})`
+              : ((arg as any).constructor?.name ?? "object");
+      throw argumentError(`Unsupported argument type: ${desc}. Expected a plain object/hash.`);
+    }
+    return Object.entries(arg).map(([k, v]) => ({ [k]: v }));
+  });
+}
+
+function buildCastValue(name: string, value: unknown): Attribute {
+  return Attribute.withCastValue(name, value, new ValueType());
+}
+
+function buildNamedBoundSqlLiteral(
+  this: QueryMethodsHost,
+  statement: string,
+  values: Record<string, unknown>,
+): Nodes.BoundSqlLiteral {
+  const namedBinds: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (value instanceof Nodes.Node) {
+      namedBinds[key] = arelSql(value.toSql());
+    } else {
+      namedBinds[key] = value;
+    }
+  }
+  try {
+    return new Nodes.BoundSqlLiteral(`(${statement})`, [], namedBinds);
+  } catch (e: any) {
+    throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
+  }
+}
+
+function buildBoundSqlLiteral(
+  this: QueryMethodsHost,
+  statement: string,
+  values: unknown[],
+): Nodes.BoundSqlLiteral {
+  const positionalBinds = values.map((value) => {
+    if (value instanceof Nodes.Node) {
+      return arelSql(value.toSql());
+    }
+    return value;
+  });
+  try {
+    return new Nodes.BoundSqlLiteral(`(${statement})`, positionalBinds, {});
+  } catch (e: any) {
+    throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
+  }
+}
+
+function buildSubquery(
+  this: QueryMethodsHost,
+  subqueryAlias: string,
+  selectValue: unknown,
+): SelectManager {
+  // Rails: except(:optimizer_hints).arel.as(alias) — use unscope (our except is SQL EXCEPT, not query-part removal)
+  const relation =
+    typeof (this as any).unscope === "function" ? (this as any).unscope("optimizerHints") : this;
+  if (typeof (relation as any).toArel !== "function") {
+    throw new ActiveRecordError("Cannot build subquery: relation does not support toArel()");
+  }
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(subqueryAlias)) {
+    throw argumentError(`Invalid subquery alias "${subqueryAlias}": must be a safe SQL identifier`);
+  }
+  const aliasedSubquery = (relation as any).toArel().as(subqueryAlias);
+  const sm = new SelectManager();
+  sm.from(aliasedSubquery);
+  sm.project(selectValue as any);
+  const hints: string[] = (this as any)._optimizerHints ?? [];
+  if (hints.length > 0) sm.optimizerHints(...hints);
+  return sm;
+}
+
+function isDoesNotSupportReverse(order: string): boolean {
+  const plain = String(order);
+  if (
+    plain.includes(",") &&
+    plain.split(",").some((s) => s.split("(").length !== s.split(")").length)
+  ) {
+    return true;
+  }
+  return /\bnulls\s+(?:first|last)\b/i.test(plain);
+}
+
+function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown[] {
+  if (orderQuery.length === 0) {
+    const pk = (this as any)._modelClass?.primaryKey;
+    if (pk) {
+      if (Array.isArray(pk)) {
+        throw new IrreversibleOrderError(
+          "Relation has no current order and table has a composite primary key; cannot determine default reverse order",
+        );
+      }
+      const table: any = (this as any)._modelClass?.arelTable;
+      const modelClass: any = (this as any)._modelClass;
+      const arelTable =
+        modelClass?.arelTable ??
+        (modelClass?.tableName ? new ArelTable(modelClass.tableName) : null);
+      return [
+        arelTable
+          ? new Nodes.Descending(arelTable.get(pk))
+          : new Nodes.Descending(new Nodes.SqlLiteral(pk)),
+      ];
+    }
+    throw new IrreversibleOrderError(
+      "Relation has no current order and table has no primary key to be used as default order",
+    );
+  }
+  return orderQuery.flatMap((o) => {
+    // Use reverse() when available (Ascending, Descending, NullsFirst, NullsLast),
+    // fall back to desc() for other Arel nodes (Attribute, NodeExpression, etc.).
+    // Guard instanceof Nodes.Node to avoid matching arrays which also have reverse().
+    if (o instanceof Nodes.Node) {
+      if (typeof (o as any).reverse === "function") return [(o as any).reverse()];
+      if (typeof (o as any).desc === "function") return [(o as any).desc()];
+    }
+    if (typeof o === "string") {
+      if (isDoesNotSupportReverse(o)) {
+        throw new IrreversibleOrderError(
+          `Order ${JSON.stringify(o)} cannot be reversed automatically`,
+        );
+      }
+      return o.split(",").map((s) => {
+        s = s.trim();
+        if (/\sasc$/i.test(s)) return s.replace(/\sasc$/i, " DESC");
+        if (/\sdesc$/i.test(s)) return s.replace(/\sdesc$/i, " ASC");
+        return `${s} DESC`;
+      });
+    }
+    return [o];
+  });
+}
+
+function extractTableNameFrom(orderTerm: string): string | null {
+  const match = orderTerm.match(/^\W?(\w+)\W?\./);
+  return match ? match[1] : null;
+}
+
+function symbolToName(s: symbol): string {
+  const name = Symbol.keyFor(s) ?? s.description;
+  if (name === undefined || name.trim() === "") {
+    throw argumentError("Order symbols must have a non-blank name");
+  }
+  return name;
+}
+
+function columnReferences(orderArgs: unknown[]): string[] {
+  const refs: string[] = [];
+  for (const arg of orderArgs) {
+    if (typeof arg === "string" || typeof arg === "symbol") {
+      const term = typeof arg === "symbol" ? symbolToName(arg) : arg;
+      const t = extractTableNameFrom(term);
+      if (t) refs.push(t);
+    } else if (arg instanceof Nodes.Attribute) {
+      refs.push((arg as any).relation.name);
+    } else if (arg instanceof Nodes.Ordering) {
+      const expr = (arg as any).expr;
+      if (expr instanceof Nodes.Attribute) refs.push(expr.relation.name);
+    } else if (isPlainObject(arg)) {
+      for (const [key, value] of Object.entries(arg)) {
+        if (isPlainObject(value)) {
+          // Nested hash { table: { col: dir } } — key is the table name.
+          refs.push(key);
+        } else {
+          const t = extractTableNameFrom(String(key));
+          if (t) refs.push(t);
+        }
+      }
+    }
+  }
+  return refs;
+}
+
+function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
+  return orderArgs.map((arg) => (this as any)._modelClass?.sanitizeSqlForOrder?.(arg) ?? arg);
+}
+
+function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbol)[] {
+  const result: (string | symbol)[] = [];
+  for (const arg of orderArgs) {
+    if (Array.isArray(arg)) {
+      result.push(...flattenedOrderKeysForRawSqlCheck(arg));
+    } else if (typeof arg === "string" || typeof arg === "symbol") {
+      result.push(arg);
+    } else if (arg instanceof Nodes.Node) {
+      // Arel nodes (SqlLiteral, Attribute, Ordering, …) are pre-sanitized; skip them.
+    } else if (isPlainObject(arg)) {
+      for (const [key, value] of Object.entries(arg)) {
+        result.push(key);
+        if (isPlainObject(value)) result.push(...flattenedOrderKeysForRawSqlCheck([value]));
+      }
+    }
+  }
+  return result;
+}
+
+function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
+  // disallowRawSqlBang skips symbols — resolve symbol names to strings first
+  // so their descriptions are validated against the column-name matcher.
+  const keysForCheck = flattenedOrderKeysForRawSqlCheck(orderArgs).map((k) =>
+    typeof k === "symbol" ? symbolToName(k) : k,
+  );
+  disallowRawSqlBang(keysForCheck, resolveOrderMatcher(this));
+  validateOrderArgs.call(this, orderArgs);
+  const refs = columnReferences(orderArgs);
+  if (refs.length > 0) {
+    const existing: string[] = (this as any)._referencesValues ?? [];
+    (this as any)._referencesValues = [...new Set([...existing, ...refs])];
+  }
+  // Rails maps Symbol args to Ascending nodes and Hash args to directional nodes.
+  const mapped: unknown[] = [];
+  for (const arg of orderArgs) {
+    if (typeof arg === "symbol") {
+      // Resolve against the current relation's table, not a table named after the column.
+      const name = symbolToName(arg);
+      const modelTable = (this as any)._modelClass?.arelTable;
+      const attr = modelTable ? modelTable.get(name) : arelSql(name);
+      mapped.push(new Nodes.Ascending(attr));
+    } else if (isPlainObject(arg)) {
+      for (const [key, value] of Object.entries(arg)) {
+        if (isPlainObject(value)) {
+          // Nested hash: { table: { col: dir } } → table.col DESC/ASC (quoted via ArelTable)
+          for (const [field, dir] of Object.entries(value)) {
+            const attr = new ArelTable(key).get(field);
+            mapped.push(
+              String(dir).toLowerCase() === "desc"
+                ? new Nodes.Descending(attr)
+                : new Nodes.Ascending(attr),
+            );
+          }
+        } else {
+          // Flat hash: { col: dir } — resolve against the current table.
+          const modelTable = (this as any)._modelClass?.arelTable;
+          const attr = modelTable ? modelTable.get(key) : arelSql(key);
+          mapped.push(
+            String(value).toLowerCase() === "desc"
+              ? new Nodes.Descending(attr)
+              : new Nodes.Ascending(attr),
+          );
+        }
+      }
+    } else {
+      mapped.push(arg);
+    }
+  }
+  orderArgs.length = 0;
+  orderArgs.push(...mapped);
+}
+
+function buildOrderNode(clause: unknown): unknown {
+  if (clause instanceof Nodes.Node) return clause;
+  if (typeof clause === "string") return new Nodes.SqlLiteral(clause);
+  if (typeof clause === "symbol") return new Nodes.SqlLiteral(symbolToName(clause));
+  if (Array.isArray(clause) && clause.length === 2) {
+    const [col, dir] = clause;
+    if (col instanceof Nodes.Node) {
+      return String(dir).toLowerCase() === "desc"
+        ? new Nodes.Descending(col)
+        : new Nodes.Ascending(col);
+    }
+    if (typeof col === "string" || typeof col === "symbol") {
+      const expr = new Nodes.SqlLiteral(typeof col === "symbol" ? symbolToName(col) : col);
+      return String(dir).toLowerCase() === "desc"
+        ? new Nodes.Descending(expr)
+        : new Nodes.Ascending(expr);
+    }
+    throw argumentError(`Unsupported order column type: ${Object.prototype.toString.call(col)}`);
+  }
+  throw argumentError(`Unsupported order clause type: ${Object.prototype.toString.call(clause)}`);
+}
+
+function buildOrder(this: QueryMethodsHost, arel: any): void {
+  const orders = ((this as any)._orderClauses ?? [])
+    .filter((o: unknown) => o !== null && o !== undefined && o !== "")
+    .map(buildOrderNode);
+  if (orders.length > 0) arel.order?.(...orders);
+}
+
+function buildCaseForValuePosition(
+  this: QueryMethodsHost,
+  column: unknown,
+  values: unknown[],
+  options: { filter?: boolean } = {},
+): unknown {
+  const filter = options.filter !== false;
+  const node = new Nodes.Case();
+  values.forEach((value, i) => {
+    node.when((column as any).eq(value), i + 1);
+  });
+  if (!filter) (node as any).else(values.length + 1);
+  return new Nodes.Ascending(node);
+}
+
+function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]): unknown[] {
+  const builder = (this as any).predicateBuilder;
+  return attrs.flatMap((attr) => {
+    if (attr !== null && typeof attr === "object" && typeof (attr as any).eq === "function") {
+      return [attr];
+    }
+    if (attr !== null && typeof attr === "object" && !Array.isArray(attr)) {
+      return Object.entries(attr as Record<string, unknown>).flatMap(([table, columns]) => {
+        const tableName = String(table);
+        return (Array.isArray(columns) ? columns : [columns]).map(
+          (col) =>
+            builder?.resolveArelAttribute?.(tableName, String(col)) ??
+            new ArelTable(tableName).get(String(col)),
+        );
+      });
+    }
+    const s = String(attr);
+    if (s.includes(".")) {
+      const [table, col] = s.split(".", 2);
+      return [builder?.resolveArelAttribute?.(table, col) ?? new ArelTable(table).get(col)];
+    }
+    return [s];
+  });
 }
 
 // ---------------------------------------------------------------------------
