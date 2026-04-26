@@ -1849,6 +1849,7 @@ export class Base extends Model {
   declare static offset: typeof Querying.offset;
   declare static distinct: typeof Querying.distinct;
   declare static joins: typeof Querying.joins;
+  declare static optimizerHints: typeof Querying.optimizerHints;
   declare static leftJoins: typeof Querying.leftJoins;
   declare static leftOuterJoins: typeof Querying.leftOuterJoins;
   declare static none: typeof Querying.none;

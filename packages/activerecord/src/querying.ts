@@ -173,8 +173,33 @@ export function joins<T extends typeof Base>(
   this: T,
   tableOrSql?: string,
   on?: string,
+): Relation<InstanceType<T>>;
+export function joins<T extends typeof Base>(
+  this: T,
+  ...nodes: import("@blazetrails/arel").Nodes.Join[]
+): Relation<InstanceType<T>>;
+export function joins<T extends typeof Base>(
+  this: T,
+  ...args: Array<string | import("@blazetrails/arel").Nodes.Join>
+): Relation<InstanceType<T>>;
+export function joins<T extends typeof Base>(
+  this: T,
+  ...args: Array<string | import("@blazetrails/arel").Nodes.Join | undefined>
 ): Relation<InstanceType<T>> {
-  return this.all().joins(tableOrSql, on);
+  const relation = this.all();
+  if (args.length === 0 || typeof args[0] === "string" || args[0] === undefined) {
+    const [tableOrSql, on] = args as [string?, string?];
+    return relation.joins(tableOrSql, on);
+  }
+  return relation.joins(...(args as import("@blazetrails/arel").Nodes.Join[]));
+}
+
+/** Mirrors: ActiveRecord::Querying#optimizer_hints */
+export function optimizerHints<T extends typeof Base>(
+  this: T,
+  ...hints: string[]
+): Relation<InstanceType<T>> {
+  return this.all().optimizerHints(...hints);
 }
 
 /** Mirrors: ActiveRecord::Querying#left_joins */

@@ -1027,6 +1027,16 @@ export class Relation<T extends Base> {
     return this._clone().optimizerHintsBang(...hints);
   }
 
+  /**
+   * Return a fresh unscoped relation for the model, discarding any
+   * WHERE/ORDER/etc. conditions on this relation.
+   *
+   * Mirrors: ActiveRecord::Relation#unscoped — delegates to klass.unscoped.
+   */
+  unscoped(): Relation<T> {
+    return this._modelClass.unscoped() as Relation<T>;
+  }
+
   // merge and spawn are mixed in from spawn-methods.ts
 
   /**
@@ -1129,33 +1139,41 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Add an INNER JOIN. Accepts an association name, a raw SQL string, or
-   * a table name with an ON condition.
+   * Add one or more INNER JOINs. Accepts:
+   * - An association name (resolved to a JOIN via reflection)
+   * - A raw SQL string
+   * - Two strings: (table, onClause) — explicit JOIN/ON pair
+   * - Arel `Nodes.Join` instances (e.g. from `SelectManager#joinSources`)
+   * - Any mix of the above as variadic args
    *
-   * Mirrors: ActiveRecord::Relation#joins
+   * Mirrors: ActiveRecord::Relation#joins — Rails' `joins(*args)` is variadic
+   * and accepts strings, symbol association names, or Arel join nodes.
    */
-  joins(tableOrSql?: string, on?: string): Relation<T> {
-    if (!tableOrSql) return this._clone();
+  joins(tableOrSql?: string, on?: string): Relation<T>;
+  joins(...nodes: Nodes.Join[]): Relation<T>;
+  joins(...args: Array<string | Nodes.Join>): Relation<T>;
+  joins(...args: Array<string | Nodes.Join | undefined>): Relation<T> {
     const rel = this._clone();
-    if (on) {
-      rel._joinClauses.push({ type: "inner", table: tableOrSql, on });
-    } else {
-      const resolved = rel._resolveAssociationJoin(tableOrSql);
+    // Two-string-argument form: joins(table, onClause) — preserved for back-compat.
+    if (args.length === 2 && typeof args[0] === "string" && typeof args[1] === "string") {
+      rel._joinClauses.push({ type: "inner", table: args[0], on: args[1] });
+      return rel;
+    }
+    for (const arg of args) {
+      if (!arg) continue;
+      // Arel join node (InnerJoin / OuterJoin / StringJoin etc. from joinSources).
+      if (arg instanceof Nodes.Join) {
+        rel._rawJoins.push(arg.toSql());
+        continue;
+      }
+      const resolved = rel._resolveAssociationJoin(arg);
       if (resolved) {
-        if (Array.isArray(resolved)) {
-          for (const join of resolved) {
-            rel._joinClauses.push({ type: "inner", table: join.table, on: join.on, quoted: true });
-          }
-        } else {
-          rel._joinClauses.push({
-            type: "inner",
-            table: resolved.table,
-            on: resolved.on,
-            quoted: true,
-          });
+        const entries = Array.isArray(resolved) ? resolved : [resolved];
+        for (const j of entries) {
+          rel._joinClauses.push({ type: "inner", table: j.table, on: j.on, quoted: true });
         }
       } else {
-        rel._rawJoins.push(tableOrSql);
+        rel._rawJoins.push(arg);
       }
     }
     return rel;
@@ -3210,9 +3228,10 @@ export class Relation<T extends Base> {
             if (rawCol.includes(".")) {
               manager.order(new Nodes.SqlLiteral(trimmed));
             } else {
-              const node = this._isKnownColumn(rawCol)
-                ? table.get(rawCol)
-                : new Nodes.UnqualifiedColumn(table.get(rawCol));
+              const node =
+                !this._fromClause.isEmpty() && !this._isKnownColumn(rawCol)
+                  ? new Nodes.UnqualifiedColumn(table.get(rawCol))
+                  : table.get(rawCol);
               manager.order(
                 dir === "DESC" ? new Nodes.Descending(node) : new Nodes.Ascending(node),
               );
@@ -3221,9 +3240,10 @@ export class Relation<T extends Base> {
             // Not "col DIR" form. Only wrap plain letter-start identifiers;
             // everything else (positional "1", NULLS FIRST, commas, etc.) is raw SQL.
             if (/^[A-Za-z_$][\w$]*$/.test(trimmed)) {
-              const node = this._isKnownColumn(trimmed)
-                ? table.get(trimmed)
-                : new Nodes.UnqualifiedColumn(table.get(trimmed));
+              const node =
+                !this._fromClause.isEmpty() && !this._isKnownColumn(trimmed)
+                  ? new Nodes.UnqualifiedColumn(table.get(trimmed))
+                  : table.get(trimmed);
               manager.order(new Nodes.Ascending(node));
             } else {
               manager.order(new Nodes.SqlLiteral(trimmed));

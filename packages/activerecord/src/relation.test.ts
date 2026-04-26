@@ -235,6 +235,78 @@ describe("RelationTest", () => {
     expect(multiKeySql).toContain('"users"."id" DESC');
   });
 
+  it("unscoped() on a relation discards WHERE/ORDER and returns fresh relation", () => {
+    class Post extends Base {
+      static {
+        this.tableName = "posts";
+        this.adapter = adapter;
+      }
+    }
+    const sql = Post.where({ active: true }).order("created_at").unscoped().order("title").toSql();
+    expect(sql).not.toContain("active");
+    expect(sql).not.toContain('"posts"."created_at"');
+    expect(sql).toContain('"posts"."title"');
+  });
+
+  it("joins() accepts Arel join nodes from joinSources", () => {
+    class Author extends Base {
+      static {
+        this.tableName = "authors";
+        this.adapter = adapter;
+      }
+    }
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const books = Book.arelTable;
+    const authors = Author.arelTable;
+    const joinSources = books
+      .join(authors)
+      .on(books.get("author_id").eq(authors.get("id"))).joinSources;
+    const sql = Book.joins(...joinSources).toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).toContain('"authors"');
+    expect(sql).toContain('"books"."author_id"');
+  });
+
+  it("string ORDER BY plain identifier qualifies with table name", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    expect(Book.order("title").toSql()).toContain('"books"."title"');
+  });
+
+  it("string ORDER BY in .from() subquery context stays unqualified for unknown columns", () => {
+    class Developer extends Base {
+      static {
+        this.tableName = "developers";
+        this.adapter = adapter;
+      }
+    }
+    const RANKED = "SELECT id, commits AS hotness FROM developers";
+    const sql = Developer.from(RANKED).order("hotness desc").limit(10).toSql();
+    expect(sql).toContain('"hotness" DESC');
+    expect(sql).not.toContain('"developers"."hotness"');
+  });
+
+  it("Model.optimizerHints() delegates to all().optimizerHints()", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const sql = Book.optimizerHints("SeqScan(books)").where({ active: true }).toSql();
+    expect(sql).toContain("SeqScan(books)");
+    expect(sql).toContain('"books"."active"');
+  });
+
   it("whereMissing emits LEFT OUTER JOIN + assoc_pk IS NULL", () => {
     class WmAuthor extends Base {
       static {

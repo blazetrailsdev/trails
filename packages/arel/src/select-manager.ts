@@ -330,8 +330,8 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#join_sources
    */
-  get joinSources(): Node[] {
-    return [...this.core.source.right];
+  get joinSources(): Join[] {
+    return [...this.core.source.right] as Join[];
   }
 
   /**
