@@ -259,13 +259,18 @@ export function superclassesMatch(
 }
 
 /**
- * Whether a given method belongs to the current comparison bucket.
- * Default mode (showPrivates=false) keeps only public API methods; with
- * `--privates` the comparison runs exclusively against internal methods.
+ * Comparison bucket a method participates in.
+ *   - "public":  default — public API only (drops `internal: true`)
+ *   - "all":     `--privates` — public + private combined
+ *   - "private": `--privates-only` — private/protected only
  * Exported so compare.test.ts can pin the filter semantics.
  */
-export function methodInMode(m: MethodInfo, showPrivates: boolean): boolean {
-  return showPrivates ? m.internal === true : m.internal !== true;
+export type CompareMode = "public" | "all" | "private";
+
+export function methodInMode(m: MethodInfo, mode: CompareMode): boolean {
+  if (mode === "all") return true;
+  if (mode === "private") return m.internal === true;
+  return m.internal !== true;
 }
 
 // ---------------------------------------------------------------------------
@@ -288,12 +293,15 @@ function main() {
   const showFiles = args.includes("--files");
   const showIncomplete = args.includes("--incomplete");
   const showInheritance = args.includes("--inheritance");
-  // When --privates is passed, the comparison runs against internal-only
-  // methods (Ruby `private`/`protected`, TS `private`/`protected`,
-  // `#`-prefixed fields). Without it, internal methods are filtered out
-  // and the numbers match the historical public-API coverage.
-  const showPrivates = args.includes("--privates");
-  const methodMatchesMode = (m: MethodInfo): boolean => methodInMode(m, showPrivates);
+  // Comparison bucket:
+  //   default        → public API only (matches historical coverage numbers)
+  //   --privates     → public + private combined (full surface)
+  //   --privates-only→ private/protected only (Ruby `private`/`protected`,
+  //                    TS `private`/`protected`, `#`-prefixed fields)
+  const privatesOnly = args.includes("--privates-only");
+  const includePrivates = args.includes("--privates");
+  const mode: CompareMode = privatesOnly ? "private" : includePrivates ? "all" : "public";
+  const methodMatchesMode = (m: MethodInfo): boolean => methodInMode(m, mode);
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
   const tsPath = path.join(OUTPUT_DIR, "ts-api.json");
@@ -814,24 +822,21 @@ function main() {
     });
   }
 
-  // Write JSON. Separate file for the --privates run so the public artifact
-  // isn't clobbered when both run back-to-back in CI.
-  const jsonFilename = showPrivates ? "api-comparison-privates.json" : "api-comparison.json";
+  // Write JSON. Separate file per mode so artifacts don't clobber each
+  // other when multiple runs land back-to-back in CI.
+  const jsonFilename =
+    mode === "private"
+      ? "api-comparison-privates-only.json"
+      : mode === "all"
+        ? "api-comparison-privates.json"
+        : "api-comparison.json";
   const jsonPath = path.join(OUTPUT_DIR, jsonFilename);
   fs.writeFileSync(
     jsonPath,
     JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2),
   );
 
-  printReport(
-    results,
-    showMissing,
-    showFiles,
-    filterPkg,
-    showIncomplete,
-    showInheritance,
-    showPrivates,
-  );
+  printReport(results, showMissing, showFiles, filterPkg, showIncomplete, showInheritance, mode);
 }
 
 // ---------------------------------------------------------------------------
@@ -845,13 +850,15 @@ function printReport(
   filterPkg: string | null,
   showIncomplete = false,
   showInheritance = false,
-  showPrivates = false,
+  mode: CompareMode = "public",
 ) {
-  if (showPrivates) {
+  if (mode === "private") {
     console.log(
       `\n  (comparing internal/private API surface — ` +
         `Ruby private/protected, TS private/protected, TS #-prefixed fields)`,
     );
+  } else if (mode === "all") {
+    console.log(`\n  (comparing full API surface — public + private/protected combined)`);
   }
   let grandTotal = 0;
   let grandMatched = 0;

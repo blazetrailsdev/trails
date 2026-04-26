@@ -220,6 +220,16 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
           line,
           file: relPath,
         });
+      } else if (
+        (ts.isFunctionDeclaration(node) || ts.isVariableStatement(node)) &&
+        !isExported(node)
+      ) {
+        // Non-exported file-local helpers map to Rails private methods
+        // per the project mixin convention (CLAUDE.md). Record them as
+        // internal so `--privates` mode can match them.
+        for (const helper of extractFileLocalHelpers(node, relPath)) {
+          fileFunctions.push(helper);
+        }
       }
     });
 
@@ -351,7 +361,11 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
 
     // If a file has exported functions but no class/interface/namespace,
     // also create a module entry from the file name for backward compat.
-    if (!fileHasClassOrModule && fileFunctions.length > 0) {
+    // Only count public functions: a file with only non-exported helpers
+    // (all `internal: true`) shouldn't fabricate a module — there's no
+    // public surface for the module to represent.
+    const hasPublicFn = fileFunctions.some((fn) => !fn.internal);
+    if (!fileHasClassOrModule && hasPublicFn) {
       const baseName = path.basename(relPath, ".ts");
       const moduleName = baseName
         .split("-")
@@ -403,6 +417,60 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
  * null if the specifier doesn't target a local file. Caller must
  * already have POSIX-normalized `fromRel`.
  */
+/**
+ * Extract file-local (non-exported) function helpers from a top-level
+ * statement. These map to Rails private methods under the project's
+ * mixin convention (CLAUDE.md): file-local helpers next to the class
+ * that owns the Rails port. Returns one MethodInfo per helper found,
+ * each tagged `internal: true` so `--privates` mode picks them up and
+ * public mode filters them out.
+ *
+ * Handles two shapes:
+ *   - `function helper(...) {}`
+ *   - `const helper = (...) => {}` / `const helper = function (...) {}`
+ *
+ * Caller must already have ensured `node` is not exported.
+ */
+export function extractFileLocalHelpers(
+  node: ts.FunctionDeclaration | ts.VariableStatement,
+  relPath: string,
+): MethodInfo[] {
+  const out: MethodInfo[] = [];
+
+  if (ts.isFunctionDeclaration(node)) {
+    if (!node.name) return out;
+    const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
+    out.push({
+      name: node.name.text,
+      visibility: "private",
+      params: extractParameters(node.parameters),
+      isStatic: false,
+      line,
+      file: relPath,
+      internal: true,
+    });
+    return out;
+  }
+
+  for (const decl of node.declarationList.declarations) {
+    if (!ts.isIdentifier(decl.name)) continue;
+    const init = decl.initializer;
+    if (!init) continue;
+    if (!ts.isArrowFunction(init) && !ts.isFunctionExpression(init)) continue;
+    const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
+    out.push({
+      name: decl.name.text,
+      visibility: "private",
+      params: extractParameters(init.parameters),
+      isStatic: false,
+      line,
+      file: relPath,
+      internal: true,
+    });
+  }
+  return out;
+}
+
 export function resolveRelModule(fromRel: string, spec: string): string | null {
   if (!spec.startsWith("./") && !spec.startsWith("../")) return null;
   const fromDir = path.posix.dirname(fromRel);

@@ -183,21 +183,27 @@ describe("methodInMode", () => {
     ...(internal ? { internal: true } : {}),
   });
 
-  it("keeps public methods when --privates is off", () => {
-    expect(methodInMode(method(false), false)).toBe(true);
-    expect(methodInMode(method(true), false)).toBe(false);
+  it("public mode keeps only public methods (default)", () => {
+    expect(methodInMode(method(false), "public")).toBe(true);
+    expect(methodInMode(method(true), "public")).toBe(false);
   });
 
-  it("keeps only internal methods when --privates is on", () => {
-    expect(methodInMode(method(true), true)).toBe(true);
-    expect(methodInMode(method(false), true)).toBe(false);
+  it("private mode keeps only internal methods (--privates-only)", () => {
+    expect(methodInMode(method(true), "private")).toBe(true);
+    expect(methodInMode(method(false), "private")).toBe(false);
+  });
+
+  it("all mode keeps both public and internal methods (--privates)", () => {
+    expect(methodInMode(method(true), "all")).toBe(true);
+    expect(methodInMode(method(false), "all")).toBe(true);
   });
 
   it("treats missing internal flag as public", () => {
     // Legacy fixture manifests may not set `internal` at all; those
     // methods must count toward the public surface, not drop out.
     const bare: MethodInfo = { name: "x", visibility: "public", params: [] };
-    expect(methodInMode(bare, false)).toBe(true);
-    expect(methodInMode(bare, true)).toBe(false);
+    expect(methodInMode(bare, "public")).toBe(true);
+    expect(methodInMode(bare, "private")).toBe(false);
+    expect(methodInMode(bare, "all")).toBe(true);
   });
 });

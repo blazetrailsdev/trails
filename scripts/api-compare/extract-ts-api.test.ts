@@ -8,8 +8,8 @@
 
 import { describe, it, expect } from "vitest";
 import * as ts from "typescript";
-import { resolveRelModule, extractClass } from "./extract-ts-api.js";
-import type { ClassInfo } from "./types.js";
+import { resolveRelModule, extractClass, extractFileLocalHelpers } from "./extract-ts-api.js";
+import type { ClassInfo, MethodInfo } from "./types.js";
 
 function extractFromSource(source: string, className = "Foo"): ClassInfo {
   const filename = "virtual.ts";
@@ -77,6 +77,67 @@ describe("resolveRelModule", () => {
     const result = resolveRelModule("dir/sub/file.ts", "./sibling.js");
     expect(result).toBe("dir/sub/sibling.ts");
     expect(result).not.toContain("\\");
+  });
+});
+
+function helpersFromSource(source: string): MethodInfo[] {
+  const sourceFile = ts.createSourceFile("virtual.ts", source, ts.ScriptTarget.Latest, true);
+  const out: MethodInfo[] = [];
+  ts.forEachChild(sourceFile, (node) => {
+    if (
+      (ts.isFunctionDeclaration(node) || ts.isVariableStatement(node)) &&
+      !ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+    ) {
+      for (const h of extractFileLocalHelpers(node, "virtual.ts")) out.push(h);
+    }
+  });
+  return out;
+}
+
+describe("extractFileLocalHelpers", () => {
+  it("captures non-exported function declarations as internal/private", () => {
+    const helpers = helpersFromSource(`
+      function invertPredicate(node) { return node; }
+      function exceptPredicates(cols) { return cols; }
+      export function predicatesWithWrappedSqlLiterals(p) { return p; }
+    `);
+    const names = helpers.map((h) => h.name);
+    expect(names).toEqual(["invertPredicate", "exceptPredicates"]);
+    for (const h of helpers) {
+      expect(h.visibility).toBe("private");
+      expect(h.internal).toBe(true);
+      expect(h.isStatic).toBe(false);
+    }
+  });
+
+  it("captures non-exported arrow and function-expression consts", () => {
+    const helpers = helpersFromSource(`
+      const arrowHelper = (x) => x;
+      const fnHelper = function (a, b) { return a + b; };
+      const notAFunction = 42;
+      export const exportedArrow = (x) => x;
+    `);
+    const names = helpers.map((h) => h.name);
+    expect(names).toEqual(["arrowHelper", "fnHelper"]);
+    expect(helpers[0].params.map((p) => p.name)).toEqual(["x"]);
+    expect(helpers[1].params.map((p) => p.name)).toEqual(["a", "b"]);
+    for (const h of helpers) expect(h.internal).toBe(true);
+  });
+
+  it("ignores exported declarations and non-function consts", () => {
+    const helpers = helpersFromSource(`
+      export function shouldSkip() {}
+      export const alsoSkip = () => {};
+      const literal = "string";
+      const obj = { x: 1 };
+    `);
+    expect(helpers).toEqual([]);
+  });
+
+  it("records line numbers for traceback", () => {
+    const helpers = helpersFromSource(`function first() {}\nfunction second() {}\n`);
+    expect(helpers[0].line).toBe(1);
+    expect(helpers[1].line).toBe(2);
   });
 });
 
