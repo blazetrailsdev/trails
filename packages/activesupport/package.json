@@ -38,6 +38,14 @@
       "types": "./dist/gzip.d.ts",
       "default": "./dist/gzip.js"
     },
+    "./temporal": {
+      "types": "./dist/temporal.d.ts",
+      "default": "./dist/temporal.js"
+    },
+    "./testing/temporal-helpers": {
+      "types": "./dist/testing/temporal-helpers.d.ts",
+      "default": "./dist/testing/temporal-helpers.js"
+    },
     "./cache/file-store": {
       "types": "./dist/cache/file-store.d.ts",
       "default": "./dist/cache/file-store.js"
@@ -59,6 +67,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
     "yaml": "^2.8.3"
   }
 }

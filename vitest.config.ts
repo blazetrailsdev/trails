@@ -8,6 +8,14 @@ export default defineConfig({
         __dirname,
         "packages/activesupport/src/message-verifier.ts",
       ),
+      "@blazetrails/activesupport/temporal": path.resolve(
+        __dirname,
+        "packages/activesupport/src/temporal.ts",
+      ),
+      "@blazetrails/activesupport/testing/temporal-helpers": path.resolve(
+        __dirname,
+        "packages/activesupport/src/testing/temporal-helpers.ts",
+      ),
       "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/src/index.ts"),
       "@blazetrails/arel/src": path.resolve(__dirname, "packages/arel/src"),
       "@blazetrails/arel": path.resolve(__dirname, "packages/arel/src/index.ts"),

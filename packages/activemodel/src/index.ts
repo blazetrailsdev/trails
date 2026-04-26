@@ -109,3 +109,13 @@ export {
 } from "./secure-password.js";
 export { SerializeCastValue } from "./type/serialize-cast-value.js";
 export { Builder as AttributeSetBuilder } from "./attribute-set/builder.js";
+export {
+  DateInfinity,
+  DateNegativeInfinity,
+  isDateInfinity,
+  isDateNegativeInfinity,
+} from "./type/internal/sentinels.js";
+export type {
+  DateInfinity as DateInfinityType,
+  DateNegativeInfinity as DateNegativeInfinityType,
+} from "./type/internal/sentinels.js";
