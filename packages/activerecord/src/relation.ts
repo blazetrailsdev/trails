@@ -52,6 +52,7 @@ import { ExplainRegistry } from "./explain-registry.js";
 import { inspectExplainOption } from "./adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
+import { JoinDependency } from "./associations/join-dependency.js";
 
 /**
  * A Relation returned from `load()` / `reload()` — a normal Relation with
@@ -1717,8 +1718,7 @@ export class Relation<T extends Base> {
    */
   async isMany(): Promise<boolean> {
     if (this._loaded) return this._records.length > 1;
-    const c = await this.count();
-    return (c as number) > 1;
+    return (await this.limitedCount()) > 1;
   }
 
   /**
@@ -1728,8 +1728,7 @@ export class Relation<T extends Base> {
    */
   async isOne(): Promise<boolean> {
     if (this._loaded) return this._records.length === 1;
-    const c = await this.count();
-    return (c as number) === 1;
+    return (await this.limitedCount()) === 1;
   }
 
   /**
@@ -1887,36 +1886,70 @@ export class Relation<T extends Base> {
   /**
    * Rails all-or-nothing promotion: if ANY references_values entry
    * refers to a table that is NOT already joined, ALL includes get
-   * promoted to eager_load. See `references_eager_loaded_tables?`
-   * in Rails relation.rb — the check is boolean, not per-association.
+   * promoted to eager_load.
    */
   private _includesToPromoteFromReferences(): AssociationSpec[] {
-    if (this._referencesValues.length === 0) return [];
-    if (this._includesAssociations.length === 0) return [];
-
-    const joinedTables = new Set(
-      this._joinClauses
-        .map((j) => j.table.toLowerCase())
-        .concat([
-          String(
-            (this._modelClass as unknown as { tableName?: string }).tableName ?? "",
-          ).toLowerCase(),
-        ]),
-    );
-    const refs = this._referencesValues.map((t) => t.toLowerCase());
-    const hasUnjoined = refs.some((ref) => !joinedTables.has(ref));
-    if (!hasUnjoined) return [];
-
+    if (!this.referencesEagerLoadedTables()) return [];
+    const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
     // Rails promotes ALL includes to eager_load when references points to an
     // unjoined table. We promote flat string includes here; nested hash specs
     // are left to the preloader because our JoinDependency does not yet
-    // support recursively joining nested association specs. Promoting hash
-    // top-level keys without also recursively joining their sub-associations
-    // would leave sub-associations unloaded. See: references_eager_loaded_tables?
-    const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
+    // support recursively joining nested association specs.
     return this._includesAssociations.filter(
       (name): name is string => typeof name === "string" && !alreadyEagerLoaded.has(name),
     );
+  }
+
+  /**
+   * Returns true when any references_values entry points to a table that is
+   * not already joined — triggers promoting includes to eager_load.
+   *
+   * Mirrors: ActiveRecord::Relation#references_eager_loaded_tables?
+   */
+  private referencesEagerLoadedTables(): boolean {
+    if (this._referencesValues.length === 0) return false;
+    if (this._includesAssociations.length === 0) return false;
+
+    // _rawJoins are the string-form equivalent of Rails' Arel::Nodes::StringJoin.
+    // Rails' references_eager_loaded_tables? extracts table names from StringJoin
+    // nodes via tables_in_string; mirror that by passing each raw SQL string
+    // directly to tablesInString (wrapping as StringJoin for type-level parity).
+    const joinedTables = new Set<string>([
+      ...this._joinClauses.map((j) => j.table.toLowerCase()),
+      ...this._rawJoins.flatMap((s) => {
+        // Wrap as StringJoin (Rails' Arel::Nodes::StringJoin equivalent) and
+        // read back via instanceof to stay type-safe with no unsafe cast.
+        const join = new Nodes.StringJoin(new Nodes.SqlLiteral(s));
+        const sqlText = join.left instanceof Nodes.SqlLiteral ? join.left.value : s;
+        return this.tablesInString(sqlText);
+      }),
+      String((this._modelClass as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
+    ]);
+
+    return this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
+  }
+
+  /**
+   * Extracts table-like identifiers from a raw SQL string (e.g. a JOIN fragment).
+   *
+   * Mirrors: ActiveRecord::Relation#tables_in_string
+   */
+  private tablesInString(sql: string): string[] {
+    if (!sql) return [];
+    // Mirrors Rails' tables_in_string regex: /[a-zA-Z_][.\w]+(?=.?\.)/
+    // The `.?` lookahead allows one non-dot char (e.g. a closing `"`) between
+    // the identifier and the qualifying dot, so `"posts"."col"` correctly
+    // yields `posts`. Downcase to match Rails' Oracle compat comment.
+    const matches = sql.match(/[a-zA-Z_][\w.]+(?=.?\.)/g) ?? [];
+    return matches.map((s) => s.toLowerCase()).filter((s) => s !== "raw_sql_");
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation#limited_count
+   */
+  private limitedCount(): Promise<number> {
+    if (this._limitValue != null) return this.count() as Promise<number>;
+    return this.limit(2).count() as Promise<number>;
   }
 
   private async _executeEagerLoad(eagerAssocs?: AssociationSpec[]): Promise<void> {
@@ -1935,7 +1968,6 @@ export class Relation<T extends Base> {
       return;
     }
 
-    const { JoinDependency } = await import("./associations/join-dependency.js");
     const jd = new JoinDependency(this._modelClass);
 
     const fallbackAssocs: AssociationSpec[] = [];
@@ -1965,53 +1997,8 @@ export class Relation<T extends Base> {
       return;
     }
 
-    const table = this._modelClass.arelTable;
-    const manager = table.project(new Nodes.SqlLiteral(jd.buildSelectSql()));
+    const manager = this._buildEagerJoinManager(jd, basePk);
 
-    // Apply JoinDependency's LEFT OUTER JOINs
-    for (const node of jd.nodes) {
-      (manager as any).core.source.right.push(
-        new Nodes.StringJoin(new Nodes.SqlLiteral(node.joinSql)),
-      );
-    }
-
-    // Apply relation's existing joins, WHERE, ORDER, LIMIT, OFFSET, etc.
-    this._applyJoinsToManager(manager);
-    this._applyWheresToManager(manager, table);
-    this._applyOrderToManager(manager, table);
-
-    if (this._isDistinct) manager.distinct();
-    for (const col of this._groupColumns) manager.group(groupColumnToArel(col, table));
-    if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
-    if (this._lockValue) manager.lock(this._lockValue);
-
-    // When LIMIT/OFFSET is present, use a subquery for parent IDs to avoid
-    // JOIN fan-out changing the number of parent records returned.
-    if (this._limitValue !== null || this._offsetValue !== null) {
-      const tableName = (this._modelClass as any).tableName;
-      const idSubquery = table.project(`"${tableName}"."${basePk}"`);
-      (idSubquery as any).distinct();
-      for (const node of jd.nodes) {
-        (idSubquery as any).core.source.right.push(
-          new Nodes.StringJoin(new Nodes.SqlLiteral(node.joinSql)),
-        );
-      }
-      this._applyJoinsToManager(idSubquery as any);
-      this._applyWheresToManager(idSubquery as any, table);
-      this._applyOrderToManager(idSubquery as any, table);
-      if (this._limitValue !== null) (idSubquery as any).take(this._limitValue);
-      if (this._offsetValue !== null) (idSubquery as any).skip(this._offsetValue);
-      manager.where(
-        new Nodes.SqlLiteral(`"${tableName}"."${basePk}" IN (${(idSubquery as any).toSql()})`),
-      );
-    } else {
-      if (this._limitValue !== null) manager.take(this._limitValue);
-      if (this._offsetValue !== null) manager.skip(this._offsetValue);
-    }
-
-    if (this._optimizerHints.length > 0) {
-      manager.optimizerHints(...this._optimizerHints);
-    }
     let sql = manager.toSql();
     if (this._annotations.length > 0) {
       const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
@@ -2317,7 +2304,7 @@ export class Relation<T extends Base> {
       }
     }
     for (const rawJoin of this._rawJoins) {
-      (manager as any).core.source.right.push(new Nodes.StringJoin(new Nodes.SqlLiteral(rawJoin)));
+      manager.appendStringJoin(rawJoin);
     }
   }
 
@@ -3164,7 +3151,109 @@ export class Relation<T extends Base> {
     return this._toSqlWithoutSetOp();
   }
 
+  // Mirrors: ActiveRecord::Relation#eager_loading?
+  private _eagerLoadingForSql(): boolean {
+    if (this._eagerLoadAssociations.length > 0) return true;
+    return this._includesToPromoteFromReferences().length > 0;
+  }
+
+  /**
+   * Shared helper used by both _buildEagerSql (toSql path) and _executeEagerLoad
+   * (execution path). Builds a SelectManager with JoinDependency column aliases,
+   * LEFT OUTER JOINs, WHERE/ORDER/DISTINCT/GROUP/HAVING/LOCK/HINTS applied, and
+   * LIMIT/OFFSET handling via the limitable-reflections check.
+   *
+   * Mirrors: ActiveRecord::Relation#apply_join_dependency +
+   *          ActiveRecord::Associations::JoinDependency#apply_column_aliases
+   */
+  private _buildEagerJoinManager(jd: JoinDependency, basePk: string): SelectManager {
+    const table = this._modelClass.arelTable;
+
+    const manager = table.project(new Nodes.SqlLiteral(jd.buildSelectSql()));
+
+    for (const node of jd.nodes) {
+      manager.appendStringJoin(node.joinSql);
+    }
+
+    this._applyJoinsToManager(manager);
+    this._applyWheresToManager(manager, table);
+    this._applyOrderToManager(manager, table);
+    if (this._isDistinct) manager.distinct();
+    for (const col of this._groupColumns) manager.group(groupColumnToArel(col, table));
+    if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
+    if (this._lockValue) manager.lock(this._lockValue);
+    if (this._optimizerHints.length > 0) manager.optimizerHints(...this._optimizerHints);
+
+    // LIMIT/OFFSET: use a subquery for collection associations to avoid fan-out
+    // (mirrors Rails' using_limitable_reflections? check in finder_methods.rb).
+    // Non-collection associations (belongsTo, hasOne) are limitable — apply directly.
+    const hasLimit = this._limitValue !== null || this._offsetValue !== null;
+    if (hasLimit) {
+      const isLimitable = jd.nodes.every((n) => n.assocType !== "hasMany");
+      if (isLimitable) {
+        if (this._limitValue !== null) manager.take(this._limitValue);
+        if (this._offsetValue !== null) manager.skip(this._offsetValue);
+      } else {
+        // Build a parent-ID subquery using Arel nodes so quoting is consistent.
+        const pkAttr = table.get(basePk);
+        const idSubquery = table.project(pkAttr);
+        idSubquery.distinct();
+        for (const node of jd.nodes) {
+          idSubquery.appendStringJoin(node.joinSql);
+        }
+        this._applyJoinsToManager(idSubquery);
+        this._applyWheresToManager(idSubquery, table);
+        this._applyOrderToManager(idSubquery, table);
+        if (this._limitValue !== null) idSubquery.take(this._limitValue);
+        if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
+        // pkAttr.in(subquery) produces "table"."pk" IN (SELECT ...) via Arel
+        manager.where(pkAttr.in(idSubquery));
+      }
+    }
+
+    return manager;
+  }
+
+  // Mirrors: ActiveRecord::Relation#to_sql when eager_loading? — builds the
+  // JoinDependency SQL synchronously for toSql()/parity runner use.
+  // Returns null if no eager associations could be joined (fall back to plain SQL).
+  private _buildEagerSql(): string | null {
+    if (this._setOperation || !this._fromClause.isEmpty() || this._ctes.length > 0) return null;
+
+    const allEager = [
+      ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
+    ];
+    if (allEager.length === 0) return null;
+
+    const basePk = (this._modelClass as any).primaryKey ?? "id";
+    if (Array.isArray(basePk)) return null;
+
+    const jd = new JoinDependency(this._modelClass);
+    for (const assocName of allEager) {
+      if (typeof assocName !== "string") continue;
+      jd.addAssociation(assocName);
+    }
+    if (jd.nodes.length === 0) return null;
+
+    const manager = this._buildEagerJoinManager(jd, basePk);
+
+    let sql = manager.toSql();
+    if (this._annotations.length > 0) {
+      const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
+      sql = `${sql} ${comments}`;
+    }
+    return sql;
+  }
+
   private _toSqlWithoutSetOp(): string {
+    // Eager loading: emit JoinDependency SQL (mirrors Rails to_sql + eager_loading?)
+    if (this._eagerLoadingForSql()) {
+      const eagerSql = this._buildEagerSql();
+      if (eagerSql !== null) return eagerSql;
+      // If _buildEagerSql returns null (e.g. unresolvable association),
+      // fall through to plain SQL so toSql() always returns something useful.
+    }
+
     const table = this._modelClass.arelTable;
     const projections = this._buildProjections(table);
     const manager = table.project(...(projections as any));

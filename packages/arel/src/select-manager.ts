@@ -579,6 +579,20 @@ export class SelectManager extends TreeManager {
   }
 
   /**
+   * Append a raw-SQL join fragment (a StringJoin) to the FROM sources.
+   * Use this instead of reaching into `core.source.right` directly when
+   * you need to add a pre-built JOIN string (e.g. `LEFT OUTER JOIN … ON …`).
+   *
+   * Mirrors: the join_sources mutation pattern in Rails' JoinDependency
+   * (relation.joins!(join_dependency) calls join_constraints which pushes
+   * StringJoin nodes onto the Arel manager's join_sources).
+   */
+  appendStringJoin(sql: string): this {
+    this.core.source.right.push(new StringJoin(new SqlLiteral(sql), null));
+    return this;
+  }
+
+  /**
    * Factory: create an AND node.
    */
   createAnd(nodes: Node[]): And {

@@ -249,9 +249,64 @@ export async function performCount(
     return groupedAggregate(this, "count", column ?? "*", true) as Promise<Record<string, number>>;
   }
 
-  if (this._limitValue !== null) {
-    const rows = await this.toArray();
-    return rows.length;
+  if (this._limitValue !== null || this._offsetValue !== null) {
+    // Rails: build_count_subquery — wraps the limited relation as a subquery
+    // and counts its rows without instantiating records.
+    // Mirrors: ActiveRecord::Calculations#build_count_subquery
+    const innerTable = this._modelClass.arelTable;
+    let innerManager: ReturnType<typeof innerTable.project>;
+    // columnAlias: what the outer COUNT targets. Mirrors Rails:
+    //   column_name == :all → Arel.star   (outer: COUNT(*))
+    //   else                → "count_column" (outer: COUNT(count_column))
+    const effectiveCol = column === "*" ? undefined : column;
+    let columnAlias: Nodes.Node;
+    if (this._isDistinct && effectiveCol) {
+      // DISTINCT + specific column: project that column aliased as count_column
+      // with DISTINCT applied so the inner query counts distinct non-NULL values
+      // of the requested column (matches COUNT(DISTINCT col) semantics).
+      innerManager = innerTable.project(innerTable.get(effectiveCol).as("count_column"));
+      innerManager.distinct();
+      columnAlias = new Nodes.SqlLiteral("count_column");
+    } else if (this._isDistinct) {
+      // DISTINCT + count(*): project PK with DISTINCT to deduplicate rows.
+      // Use table.get(c) so PK refs are qualified (unambiguous with joins).
+      const pk = (this._modelClass as any).primaryKey ?? "id";
+      if (Array.isArray(pk)) {
+        innerManager = innerTable.project(...pk.map((c: string) => innerTable.get(c)));
+      } else {
+        innerManager = innerTable.project(innerTable.get(pk));
+      }
+      innerManager.distinct();
+      columnAlias = new Nodes.SqlLiteral("*");
+    } else if (effectiveCol) {
+      // Specific column requested: project it aliased as count_column so the
+      // outer COUNT(count_column) excludes NULLs, matching non-limited semantics.
+      const colNode = innerTable.get(effectiveCol);
+      innerManager = innerTable.project(colNode.as("count_column"));
+      columnAlias = new Nodes.SqlLiteral("count_column");
+    } else {
+      innerManager = innerTable.project(new Nodes.SqlLiteral("1 AS one"));
+      columnAlias = new Nodes.SqlLiteral("*");
+    }
+    this._applyJoinsToManager(innerManager);
+    this._applyWheresToManager(innerManager, innerTable);
+    if (this._limitValue !== null) innerManager.take(this._limitValue);
+    if (this._offsetValue !== null) innerManager.skip(this._offsetValue);
+    // Wrap inner query as Arel AST: Grouping (parens) + TableAlias.
+    // Mirrors Rails: Arel::Nodes::TableAlias.new(Arel::Nodes::Grouping.new(inner), alias)
+    const subqueryNode = new Nodes.TableAlias(
+      new Nodes.Grouping(innerManager.ast),
+      "subquery_for_count",
+    );
+    const countNode = new Nodes.NamedFunction("COUNT", [columnAlias]);
+    const outerManager = innerTable.project(countNode.as("count"));
+    outerManager.from(subqueryNode);
+    const result = await this._modelClass.adapter.selectAll(
+      outerManager.toSql(),
+      `${this._modelClass.name} Count`,
+    );
+    const rows = result.toArray() as Record<string, unknown>[];
+    return Number(rows[0]?.count ?? 0);
   }
 
   const table = this._modelClass.arelTable;

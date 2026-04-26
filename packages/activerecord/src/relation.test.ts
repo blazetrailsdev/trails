@@ -1147,4 +1147,126 @@ describe("RelationTest", () => {
     }
     expect(() => Post.order("LOWER(title) ASC").reverseOrder()).toThrow(IrreversibleOrderError);
   });
+
+  it("eagerLoad emits LEFT OUTER JOIN and t0_r0-style column aliases", () => {
+    try {
+      class Author extends Base {
+        static {
+          this.attribute("name", "string");
+          this.adapter = adapter;
+          registerModel(this);
+        }
+      }
+      class Book extends Base {
+        static {
+          this.attribute("title", "string");
+          this.attribute("author_id", "integer");
+          Associations.belongsTo.call(this, "author", { className: "Author" });
+          this.adapter = adapter;
+          registerModel(this);
+        }
+      }
+      const sql = Book.all().eagerLoad("author").toSql();
+      expect(sql).toMatch(/"books"\."id" AS t0_r/);
+      expect(sql).toMatch(/"authors"\.".*" AS t1_r/);
+      expect(sql).toContain('LEFT OUTER JOIN "authors" ON');
+      expect(sql).not.toMatch(/LEFT OUTER JOIN "authors" "t\d+"/);
+    } finally {
+      modelRegistry.delete("Author");
+      modelRegistry.delete("Book");
+    }
+  });
+
+  it("eagerLoad with LIMIT emits direct LIMIT for non-collection associations", () => {
+    try {
+      class Author extends Base {
+        static {
+          this.attribute("name", "string");
+          this.adapter = adapter;
+          registerModel(this);
+        }
+      }
+      class Book extends Base {
+        static {
+          this.attribute("title", "string");
+          this.attribute("author_id", "integer");
+          Associations.belongsTo.call(this, "author", { className: "Author" });
+          this.adapter = adapter;
+          registerModel(this);
+        }
+      }
+      const sql = Book.all().eagerLoad("author").limit(10).toSql();
+      expect(sql).toContain("LIMIT 10");
+      expect(sql).not.toContain(" IN (SELECT");
+    } finally {
+      modelRegistry.delete("Author");
+      modelRegistry.delete("Book");
+    }
+  });
+
+  it("eagerLoad hasMany with LIMIT uses IN-subquery to avoid fan-out", () => {
+    try {
+      class EagerComment extends Base {
+        static {
+          this.tableName = "eager_comments";
+          this.attribute("body", "string");
+          this.attribute("eager_article_id", "integer");
+          this.adapter = adapter;
+          registerModel(this);
+        }
+      }
+      class EagerArticle extends Base {
+        static {
+          this.tableName = "eager_articles";
+          this.attribute("title", "string");
+          Associations.hasMany.call(this, "eagerComments", {
+            className: "EagerComment",
+            foreignKey: "eager_article_id",
+          });
+          this.adapter = adapter;
+          registerModel(this);
+        }
+      }
+      // hasMany is a collection association → not limitable → IN-subquery for fan-out avoidance
+      const sql = EagerArticle.all().eagerLoad("eagerComments").limit(5).toSql();
+      expect(sql).toContain(" IN (SELECT");
+      // LIMIT 5 lives inside the subquery, not on the outer query
+      expect(sql).toMatch(/IN \(SELECT .* LIMIT 5\)/s);
+    } finally {
+      modelRegistry.delete("EagerComment");
+      modelRegistry.delete("EagerArticle");
+    }
+  });
+
+  it("includes + references promotes to eager load SQL", () => {
+    try {
+      class Author extends Base {
+        static {
+          this.attribute("name", "string");
+          this.adapter = adapter;
+          registerModel(this);
+        }
+      }
+      class Book extends Base {
+        static {
+          this.attribute("title", "string");
+          this.attribute("author_id", "integer");
+          Associations.belongsTo.call(this, "author", { className: "Author" });
+          this.adapter = adapter;
+          registerModel(this);
+        }
+      }
+      const sql = Book.all()
+        .includes("author")
+        .where("authors.name = 'Rails'")
+        .references("authors")
+        .toSql();
+      expect(sql).toContain('LEFT OUTER JOIN "authors" ON');
+      expect(sql).toMatch(/"books"\."id" AS t0_r/);
+      expect(sql).toContain("authors.name = 'Rails'");
+    } finally {
+      modelRegistry.delete("Author");
+      modelRegistry.delete("Book");
+    }
+  });
 });

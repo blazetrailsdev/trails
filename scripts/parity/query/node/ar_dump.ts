@@ -27,7 +27,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, dirname, basename } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { CanonicalQuery } from "../../canonical/query-types.js";
-import { Base } from "@blazetrails/activerecord";
+import { Base, modelRegistry } from "@blazetrails/activerecord";
 import { Visitors } from "@blazetrails/arel";
 
 function usage(): never {
@@ -166,6 +166,21 @@ async function main(): Promise<void> {
     const queryUrl = pathToFileURL(join(fixtureDirAbs, "query.ts")).href;
     const mod = (await import(queryUrl)) as { default: unknown };
     const result = mod.default;
+
+    // 3b. Pre-warm the schema cache for all registered model classes so that
+    //     toSql() can emit column-aliased SQL for eager_load. Rails loads schema
+    //     synchronously; trails' schema cache is populated async from the DB on
+    //     first access. Without this step, JoinDependency sees an empty schema
+    //     cache and falls back to only the primary key.
+    for (const [name, klass] of modelRegistry) {
+      try {
+        await (klass as unknown as { loadSchema(): Promise<void> }).loadSchema();
+      } catch (err) {
+        process.stderr.write(
+          `parity ar_dump: warning: schema pre-warm failed for ${name}: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      }
+    }
 
     if (result === null || result === undefined) {
       throw new Error(`[${fixtureName}] query.ts default export is ${result}`);

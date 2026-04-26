@@ -34,6 +34,12 @@ export interface JoinNode {
   immediateAssocName: string;
   /** Dotted parent path, or null if directly on the base model */
   parentPath: string | null;
+  /**
+   * The SQL name used for this node's table in JOIN and SELECT expressions.
+   * Equals tableName when the real name was free (no collision); equals
+   * tableAlias (tN) when there was a naming collision.
+   */
+  effectiveSqlName: string;
 }
 
 export interface AliasMap {
@@ -44,7 +50,18 @@ export interface AliasMap {
 }
 
 function getModelColumns(modelClass: any): string[] {
-  const cols: string[] = modelClass.columnNames?.() ?? [];
+  // columnsHash() triggers loadSchema() which populates _attributeDefinitions
+  // from the schema cache before columnNames() reads them. Guard with try/catch
+  // in case the model is abstract or has no adapter configured yet.
+  let ch: Record<string, unknown> | undefined;
+  if (typeof modelClass.columnsHash === "function") {
+    try {
+      ch = modelClass.columnsHash() as Record<string, unknown>;
+    } catch {
+      ch = undefined;
+    }
+  }
+  const cols: string[] = ch ? Object.keys(ch) : (modelClass.columnNames?.() ?? []);
   const pk = modelClass.primaryKey ?? "id";
   if (Array.isArray(pk)) {
     for (const k of pk) {
@@ -102,10 +119,15 @@ export class JoinDependency {
   private _nextTableIndex = 1;
   private _nodes: JoinNode[] = [];
   private _aliases: AliasMap[] = [];
+  // Tracks real table names already in use to detect collisions.
+  // When a joined table's real name is unique, we skip the tN alias in SQL
+  // (matching Rails' AliasTracker which only aliases on collision).
+  private _usedTableNames: Set<string>;
 
   constructor(baseModel: typeof Base) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
+    this._usedTableNames = new Set([this._baseAlias]);
     this._buildBaseAliases();
   }
 
@@ -144,7 +166,8 @@ export class JoinDependency {
       targetTable = (targetModel as any).tableName;
       const targetPk = assocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
       if (Array.isArray(targetPk)) return null;
-      joinOn = `"${tableAlias}"."${targetPk}" = "${sourceAlias}"."${foreignKey}"`;
+      // effectiveName resolved below after targetTable is known
+      joinOn = `PLACEHOLDER."${targetPk}" = "${sourceAlias}"."${foreignKey}"`;
     } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
       if (assocDef.options.through) {
         return this._addThroughAssociation(
@@ -167,15 +190,28 @@ export class JoinDependency {
       if (Array.isArray(foreignKey)) return null;
       const primaryKey = assocDef.options.primaryKey ?? sourcePk;
       if (Array.isArray(primaryKey)) return null;
-      joinOn = `"${tableAlias}"."${foreignKey}" = "${sourceAlias}"."${primaryKey}"`;
+      joinOn = `PLACEHOLDER."${foreignKey}" = "${sourceAlias}"."${primaryKey}"`;
 
       if (assocDef.options.as) {
         const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-        joinOn += ` AND "${tableAlias}"."${typeCol}" = '${modelClass.name}'`;
+        joinOn += ` AND PLACEHOLDER."${typeCol}" = '${modelClass.name}'`;
       }
     } else {
       return null;
     }
+
+    // Rails only aliases a joined table when its real name is already in use
+    // (AliasTracker: aliases[table_name] == 0 → use real name). Mirror that:
+    // use the real table name in SQL when there's no collision, otherwise fall
+    // back to the sequential tN alias.
+    // Track real table names only — collision check is against the real name.
+    // effectiveName is the tN alias when there IS a collision, but we still
+    // record targetTable so future joins against the same real table also alias.
+    const effectiveName = this._usedTableNames.has(targetTable!) ? tableAlias : targetTable!;
+    this._usedTableNames.add(targetTable!);
+
+    // Substitute the PLACEHOLDER with the effective SQL name
+    joinOn = joinOn.replace(/PLACEHOLDER/g, `"${effectiveName}"`);
 
     // Apply association scope as additional ON conditions
     if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
@@ -184,34 +220,38 @@ export class JoinDependency {
       if (scopeSql) {
         const whereMatch = scopeSql.match(/\bWHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s*$)/i);
         if (whereMatch) {
-          const scopeWhere = whereMatch[1].replace(
-            new RegExp(`"${targetTable}"`, "g"),
-            `"${tableAlias}"`,
-          );
+          const scopeWhere = whereMatch[1].replaceAll(`"${targetTable!}"`, `"${effectiveName}"`);
           joinOn += ` AND ${scopeWhere}`;
         }
       }
     }
 
     // Add STI type constraint if target is an STI subclass
-    joinOn = this._addStiConstraint(joinOn, targetModel!, tableAlias);
+    joinOn = this._addStiConstraint(joinOn, targetModel!, effectiveName);
 
     // Guard against composite PK on target model
     const targetModelPk = (targetModel as any).primaryKey ?? "id";
     if (Array.isArray(targetModelPk)) return null;
 
     const columns = getModelColumns(targetModel);
+
+    // Build JOIN SQL: only emit the alias clause when effectiveName differs
+    // from the real table name (i.e. there was a collision and we used tN).
+    const joinTableExpr =
+      effectiveName === targetTable! ? `"${targetTable!}"` : `"${targetTable!}" "${effectiveName}"`;
+
     const node: JoinNode = {
       tableIndex,
       tableAlias,
       tableName: targetTable!,
+      effectiveSqlName: effectiveName,
       modelClass: targetModel!,
       columns,
       assocName: options?.parentAssocName ? `${options.parentAssocName}.${assocName}` : assocName,
       immediateAssocName: assocName,
       parentPath: options?.parentAssocName ?? null,
       assocType,
-      joinSql: `LEFT OUTER JOIN "${targetTable!}" "${tableAlias}" ON ${joinOn}`,
+      joinSql: `LEFT OUTER JOIN ${joinTableExpr} ON ${joinOn}`,
     };
 
     for (let i = 0; i < columns.length; i++) {
@@ -260,20 +300,26 @@ export class JoinDependency {
       }
       lastNode = node;
       currentModel = node.modelClass;
-      currentAlias = node.tableAlias;
+      // Use effectiveSqlName, not tableAlias: the JOIN SQL references the
+      // effective name (real table name or tN alias), so the next level's ON
+      // clause must use the same name as the source of the join.
+      currentAlias = node.effectiveSqlName;
       parentPath = parentPath ? `${parentPath}.${part}` : part;
     }
     return lastNode;
   }
 
   private _buildSelectExpressions(): string[] {
-    const aliasByIndex = new Map<number, string>();
-    aliasByIndex.set(this._baseTableIndex, this._baseAlias);
-    for (const node of this._nodes) aliasByIndex.set(node.tableIndex, node.tableAlias);
+    const effectiveNameByIndex = new Map<number, string>();
+    effectiveNameByIndex.set(this._baseTableIndex, this._baseAlias);
+    for (const node of this._nodes) {
+      effectiveNameByIndex.set(node.tableIndex, node.effectiveSqlName);
+    }
 
     return this._aliases.map((a) => {
-      const tableAlias = aliasByIndex.get(a.tableIndex)!;
-      return `"${tableAlias}"."${a.column}" AS "${a.alias}"`;
+      const effectiveName = effectiveNameByIndex.get(a.tableIndex)!;
+      // Rails emits column aliases as SqlLiteral (bare, not quoted).
+      return `"${effectiveName}"."${a.column}" AS ${a.alias}`;
     });
   }
 
@@ -318,13 +364,21 @@ export class JoinDependency {
     return joins;
   }
 
-  instantiate(resultSet: Record<string, unknown>[], _strictLoadingValue?: boolean): any[] {
-    const { parents } = this.instantiateFromRows(resultSet);
-    return parents;
+  instantiate(resultSet: Record<string, unknown>[], strictLoadingValue?: boolean): any[] {
+    return this.construct(resultSet, strictLoadingValue);
   }
 
   applyColumnAliases(relation: any): any {
-    const selectExprs = this._buildSelectExpressions();
+    // Rails: aliases.columns.map { |c| Arel::Nodes::As.new(...) }
+    // Trails: build the same SQL strings via the aliases object.
+    const effectiveNameByIndex = new Map<number, string>();
+    effectiveNameByIndex.set(this._baseTableIndex, this._baseAlias);
+    for (const node of this._nodes) {
+      effectiveNameByIndex.set(node.tableIndex, node.effectiveSqlName);
+    }
+    const selectExprs = this.aliases()
+      .columns()
+      .map((a) => `"${effectiveNameByIndex.get(a.tableIndex)!}"."${a.column}" AS ${a.alias}`);
     if (typeof relation.reselectBang === "function") {
       relation.reselectBang(...selectExprs);
       return relation;
@@ -397,7 +451,7 @@ export class JoinDependency {
       let parentKey: unknown;
       if (!seenRawPks.has(rawPk)) {
         seenRawPks.add(rawPk);
-        const parent = (this._baseModel as any)._instantiate(parentAttrs);
+        const parent = this.constructModel(parentAttrs, null);
         parentKey = parent._readAttribute(basePk);
         rawToKey.set(rawPk, parentKey);
         parentMap.set(parentKey, parent);
@@ -425,7 +479,7 @@ export class JoinDependency {
 
         if (!seenPks.has(rawChildPk)) {
           seenPks.add(rawChildPk);
-          const child = (node.modelClass as any)._instantiate(childAttrs);
+          const child = this.constructModel(childAttrs, node);
           const parentAssocs = assocMap.get(parentKey)!;
           if (!parentAssocs.has(node.assocName)) {
             parentAssocs.set(node.assocName, []);
@@ -436,6 +490,56 @@ export class JoinDependency {
     }
 
     return { parents: [...parentMap.values()], associations: assocMap };
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::JoinDependency#join_root_alias
+   * (protected in Rails — the alias used for the root table in the query)
+   */
+  protected get joinRootAlias(): string {
+    return this._baseAlias;
+  }
+
+  /**
+   * Builds and returns an Aliases object covering all tables in this dependency.
+   *
+   * Mirrors: ActiveRecord::Associations::JoinDependency#aliases
+   */
+  private aliases(): Aliases {
+    const baseAliasMap: AliasMap[] = this._aliases.filter(
+      (a) => a.tableIndex === this._baseTableIndex,
+    );
+    const tables: Array<{ node: JoinNode | null; columns: AliasMap[] }> = [
+      { node: null, columns: baseAliasMap },
+    ];
+    for (const node of this._nodes) {
+      const nodeCols = this._aliases.filter((a) => a.tableIndex === node.tableIndex);
+      tables.push({ node, columns: nodeCols });
+    }
+    return new Aliases(tables);
+  }
+
+  /**
+   * Constructs AR model instances from a flat result row set, assigning
+   * associations. Entry point for the eager-load instantiation phase.
+   *
+   * Mirrors: ActiveRecord::Associations::JoinDependency#construct
+   */
+  private construct(resultSet: Record<string, unknown>[], _strictLoadingValue?: boolean): any[] {
+    return this.instantiateFromRows(resultSet).parents;
+  }
+
+  /**
+   * Instantiates a single model record from a hash of aliased row attributes.
+   * Deduplication of repeated parent rows is handled by instantiateFromRows
+   * (the `seenRawPks` / `parentMap` logic); this method just constructs the
+   * model object for a given attribute hash.
+   *
+   * Mirrors: ActiveRecord::Associations::JoinDependency#construct_model
+   */
+  private constructModel(attrs: Record<string, unknown>, node: JoinNode | null): any {
+    const modelClass = node ? node.modelClass : this._baseModel;
+    return (modelClass as any)._instantiate(attrs);
   }
 
   private _buildBaseAliases(): void {
@@ -523,6 +627,7 @@ export class JoinDependency {
         tableIndex: throughTableIndex,
         tableAlias: throughAlias,
         tableName: throughTable,
+        effectiveSqlName: throughAlias,
         modelClass: throughModel as typeof Base,
         columns: throughColumns,
         assocName: throughNodeName,
@@ -588,10 +693,7 @@ export class JoinDependency {
       if (scopeSql) {
         const whereMatch = scopeSql.match(/\bWHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s*$)/i);
         if (whereMatch) {
-          const scopeWhere = whereMatch[1].replace(
-            new RegExp(`"${targetTable}"`, "g"),
-            `"${targetAlias}"`,
-          );
+          const scopeWhere = whereMatch[1].replaceAll(`"${targetTable}"`, `"${targetAlias}"`);
           targetJoinOn += ` AND ${scopeWhere}`;
         }
       }
@@ -620,6 +722,7 @@ export class JoinDependency {
     const node: JoinNode = {
       tableIndex: targetTableIndex,
       tableAlias: targetAlias,
+      effectiveSqlName: targetAlias,
       tableName: targetTable,
       modelClass: targetModel,
       columns: targetColumns,
