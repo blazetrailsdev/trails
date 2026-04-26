@@ -14,5 +14,9 @@
   "ar-82": {
     "side": "trails-missing",
     "reason": "Model.optimizer_hints() class-method delegation not implemented. Rails delegates optimizer_hints() from the class to its default scope relation; trails only has it as an instance method on Relation, so Book.optimizerHints(...) throws."
+  },
+  "ar-87": {
+    "side": "diff",
+    "reason": "Relation#joins() does not accept Arel join nodes. Rails joins() flattens its args and handles Arel::Nodes::InnerJoin entries in build_joins; trails joins() only accepts strings, coercing any non-string to [object Object]. Rails: 'SELECT \"books\".* FROM \"books\" INNER JOIN \"authors\" ON ...'; trails: 'SELECT \"books\".* FROM \"books\" [object Object]'."
   }
 }
