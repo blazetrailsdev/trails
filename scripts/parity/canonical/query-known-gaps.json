@@ -1,7 +1,7 @@
 {
   "ar-01": {
     "side": "diff",
-    "reason": "Datetime SQL serialization does not honour column precision: trails serializes Date binds with microsecond precision ('.677000'), Rails truncates to whole seconds when the DATETIME column has no precision spec (as in this fixture's bare `created_at DATETIME`). Rails: 'reviews.created_at > ''2026-04-19 00:46:48'''; trails: 'reviews.created_at > ''2026-04-19 00:46:48.677000'''. Flakes by frozen-at: PR #854 'closed' this gap because that run's frozen-at landed on a whole second. Real fix is in Date→SQL serialization to drop fractional seconds for unscaled DATETIME columns."
+    "reason": "Datetime SQL serialization does not honour column precision: trails serializes Date binds with microsecond precision ('.677000'), Rails truncates to whole seconds when the DATETIME column has no precision spec (as in this fixture's bare `created_at DATETIME`). Rails: 'reviews.created_at > ''2026-04-19 00:46:48'''; trails: 'reviews.created_at > ''2026-04-19 00:46:48.677000'''. Flakes by frozen-at: PR #854 'closed' this gap because that run's frozen-at landed on a whole second. Real fix is in Date\u2192SQL serialization to drop fractional seconds for unscaled DATETIME columns."
   },
   "ar-52": {
     "side": "diff",
@@ -9,7 +9,7 @@
   },
   "ar-65": {
     "side": "diff",
-    "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) — rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
+    "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) \u2014 rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
   },
   "ar-16": {
     "side": "diff",
@@ -17,11 +17,7 @@
   },
   "ar-57": {
     "side": "diff",
-    "reason": "includes + references + string where: Rails promotes includes(:author) to a LEFT OUTER JOIN + column-aliased SELECT when references(:author) is combined with a string WHERE touching that table (same mechanism as eagerLoad). trails emits a plain SELECT with the WHERE clause but no JOIN. Same root cause as ar-16 — eagerLoad JOIN + column-projection behaviour is not implemented."
-  },
-  "ar-98": {
-    "side": "diff",
-    "reason": "where.not with hash (multi-key): Rails emits WHERE NOT (\"books\".\"status\" = 'draft' AND \"books\".\"active\" = 0); trails emits individual != predicates joined with AND — logically different semantics."
+    "reason": "includes + references + string where: Rails promotes includes(:author) to a LEFT OUTER JOIN + column-aliased SELECT when references(:author) is combined with a string WHERE touching that table (same mechanism as eagerLoad). trails emits a plain SELECT with the WHERE clause but no JOIN. Same root cause as ar-16 \u2014 eagerLoad JOIN + column-projection behaviour is not implemented."
   },
   "ar-99": {
     "side": "diff",
