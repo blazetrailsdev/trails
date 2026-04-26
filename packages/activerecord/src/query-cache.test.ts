@@ -188,17 +188,65 @@ describe("QueryCacheTest", () => {
     });
   });
 
-  it.skip("select one with cache", () => {
-    /* needs selectOne API */
+  it("select one with cache", async () => {
+    const { cached } = setup();
+    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('sel_one')");
+    await cached.withCache(async () => {
+      cached.resetCounters();
+      const sql = 'SELECT * FROM "tasks" LIMIT 1';
+      const r1 = await cached.selectOne(sql);
+      const hitsAfterFirst = cached.cacheHits;
+      const r2 = await cached.selectOne(sql);
+      expect(r1).toBeDefined();
+      expect(r2).toBeDefined();
+      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+    });
   });
-  it.skip("select value with cache", () => {
-    /* needs selectValue API */
+
+  it("select value with cache", async () => {
+    const { cached } = setup();
+    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('sel_val')");
+    await cached.withCache(async () => {
+      cached.resetCounters();
+      const sql = 'SELECT title FROM "tasks" LIMIT 1';
+      const v1 = await cached.selectValue(sql);
+      const hitsAfterFirst = cached.cacheHits;
+      const v2 = await cached.selectValue(sql);
+      expect(v1).toBe("sel_val");
+      expect(v2).toBe("sel_val");
+      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+    });
   });
-  it.skip("select values with cache", () => {
-    /* needs selectValues API */
+
+  it("select values with cache", async () => {
+    const { cached } = setup();
+    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('a')");
+    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('b')");
+    await cached.withCache(async () => {
+      cached.resetCounters();
+      const sql = 'SELECT title FROM "tasks" ORDER BY title';
+      const v1 = await cached.selectValues(sql);
+      const hitsAfterFirst = cached.cacheHits;
+      const v2 = await cached.selectValues(sql);
+      expect(v1).toEqual(["a", "b"]);
+      expect(v2).toEqual(["a", "b"]);
+      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+    });
   });
-  it.skip("select rows with cache", () => {
-    /* needs selectRows API */
+
+  it("select rows with cache", async () => {
+    const { cached } = setup();
+    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('row1')");
+    await cached.withCache(async () => {
+      cached.resetCounters();
+      const sql = 'SELECT * FROM "tasks" LIMIT 1';
+      const r1 = await cached.selectRows(sql);
+      const hitsAfterFirst = cached.cacheHits;
+      const r2 = await cached.selectRows(sql);
+      expect(Array.isArray(r1[0])).toBe(true);
+      expect(r1).toEqual(r2);
+      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst);
+    });
   });
 
   it("query cache dups results correctly", async () => {
@@ -212,8 +260,32 @@ describe("QueryCacheTest", () => {
     expect(r1[0]).toEqual(r2[0]);
   });
 
-  it.skip("cache notifications can be overridden", () => {
-    /* needs notification system */
+  it("cache notifications can be overridden", async () => {
+    // Rails: cached hits emit sql.active_record with cached:true so callers can
+    // distinguish cache hits from real queries in instrumentation subscribers.
+    const { cached } = setup();
+    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('notif')");
+    const events: unknown[] = [];
+    const { Notifications } = await import("@blazetrails/activesupport");
+    const sub = Notifications.subscribe("sql.active_record", (event) => {
+      events.push(event);
+    });
+    const sql = 'SELECT * FROM "tasks"';
+    try {
+      await cached.withCache(async () => {
+        await cached.selectAll(sql);
+        await cached.selectAll(sql); // second call → cache hit
+      });
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    // Filter by sql and connection to avoid false positives from concurrent tests
+    // (Notifications is a process-global singleton).
+    const cachedEvent = (events as any[]).find(
+      (e: any) =>
+        e?.payload?.cached === true && e?.payload?.sql === sql && e?.payload?.connection === cached,
+    );
+    expect(cachedEvent).toBeDefined();
   });
 
   it("cache does not raise exceptions", async () => {
@@ -376,17 +448,77 @@ describe("QueryCacheStore public re-export", () => {
 });
 
 describe("QueryCacheMutableParamTest", () => {
-  it.skip("query cache handles mutated binds", () => {
-    /* needs bind parameter mutation detection */
+  it("query cache handles mutated binds", async () => {
+    // Rails: mutating a bind array after a query is cached must not corrupt the
+    // cached result or produce wrong results on later calls.
+    const { cached } = setup();
+    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('bind_task')");
+    await cached.withCache(async () => {
+      cached.resetCounters();
+      const binds = ["bind_task"];
+      const sql = 'SELECT * FROM "tasks" WHERE title = ?';
+      const r1 = await cached.execute(sql, binds);
+      expect(r1).toHaveLength(1);
+      const hitsAfterFirst = cached.cacheHits;
+
+      // Mutate the original array — this changes the cache key, so the next call
+      // must not find a cache hit and must return 0 rows (the mutated value does not exist).
+      binds[0] = "nonexistent";
+      const r2 = await cached.execute(sql, binds);
+      expect(r2).toHaveLength(0);
+      expect(cached.cacheHits).toBe(hitsAfterFirst); // no hit — different key
+
+      // Re-query with the original bind value — the previously cached entry must
+      // still be intact (mutation did not corrupt it).
+      const hitsAfterMutated = cached.cacheHits;
+      const r3 = await cached.execute(sql, ["bind_task"]);
+      expect(r3).toHaveLength(1);
+      expect(r1[0]).toEqual(r3[0]);
+      expect(cached.cacheHits).toBeGreaterThan(hitsAfterMutated); // cache hit restored
+    });
   });
 });
 
 describe("QuerySerializedParamTest", () => {
-  it.skip("query serialized active record", () => {
-    /* needs serialization support */
+  it("query serialized active record", async () => {
+    // Rails parity: repeated lookups scoped to the same primary-key value
+    // produce a cache hit and return identical results. (Rails supports passing
+    // an AR record directly via id_for_database; here we use the primitive id,
+    // which is the value the ORM ultimately binds for both cases.)
+    const { cached, Task } = setup();
+    const t = await Task.create({ title: "serialized_ar" });
+    await cached.withCache(async () => {
+      cached.resetCounters();
+      const r1 = await Task.where({ id: t.id }).toArray();
+      expect(r1).toHaveLength(1);
+      expect(r1[0]?.id).toBe(t.id);
+      const hitsAfterFirst = cached.cacheHits;
+      const r2 = await Task.where({ id: t.id }).toArray();
+      expect(r2).toHaveLength(1);
+      expect(r2[0]?.id).toBe(t.id);
+      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst); // cache hit
+    });
   });
-  it.skip("query serialized string", () => {
-    /* needs serialization support */
+
+  it("query serialized string", async () => {
+    // Verifies that identical string bind values produce identical cache keys —
+    // the cache key is derived from value equality, so two separate but equal
+    // strings hit the same cache entry.
+    const { cached } = setup();
+    await cached.executeMutation("INSERT INTO tasks (title) VALUES ('str_serial')");
+    await cached.withCache(async () => {
+      cached.resetCounters();
+      const sql = 'SELECT * FROM "tasks" WHERE title = ?';
+      // Two separately constructed string values with the same content must share a cache key.
+      const bind1 = "str_serial";
+      const bind2 = `${"str"}_serial`; // constructed separately, same value
+      const r1 = await cached.execute(sql, [bind1]);
+      expect(r1).toHaveLength(1);
+      const hitsAfterFirst = cached.cacheHits;
+      const r2 = await cached.execute(sql, [bind2]);
+      expect(r2).toHaveLength(1);
+      expect(cached.cacheHits).toBeGreaterThan(hitsAfterFirst); // value equality → cache hit
+    });
   });
 });
 
