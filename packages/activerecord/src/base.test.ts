@@ -17,6 +17,7 @@ import { quoteSqlValue } from "./base.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
+import { connectedToStack } from "./core.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -2293,18 +2294,164 @@ describe("BasicsTest", () => {
       Base.protectedEnvironments = original;
     }
   });
-  it.skip("cannot call connects_to on non-abstract or non-ActiveRecord::Base classes", () => {});
-  it.skip("cannot call connected_to with role and shard on non-abstract classes", () => {});
-  it.skip("can call connected_to with role and shard on abstract classes", () => {});
-  it.skip("cannot call connected_to on the abstract class that did not establish the connection", () => {});
-  it.skip("#connecting_to with role", () => {});
-  it.skip("#connecting_to with role and shard", () => {});
-  it.skip("#connecting_to with prevent_writes", () => {});
-  it.skip("#connected_to_many cannot be called on anything but ActiveRecord::Base", () => {});
-  it.skip("#connected_to_many cannot be called with classes that include ActiveRecord::Base", () => {});
-  it.skip("#connected_to_many sets prevent_writes if role is reading", () => {});
-  it.skip("#connected_to_many with a single argument for classes", () => {});
-  it.skip("#connected_to_many with a multiple classes without brackets works", () => {});
+  it("cannot call connects_to on non-abstract or non-ActiveRecord::Base classes", () => {
+    class Bird extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+    expect(() => Bird.connectsTo({ database: { writing: "arunit" } })).toThrow(NotImplementedError);
+    expect(() => Bird.connectsTo({ database: { writing: "arunit" } })).toThrow(
+      "`connects_to` can only be called on ActiveRecord::Base or abstract classes",
+    );
+  });
+  it("cannot call connected_to with role and shard on non-abstract classes", () => {
+    class Bird extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+    expect(() => Bird.connectedTo({ role: "reading", shard: "default" }, () => {})).toThrow(
+      NotImplementedError,
+    );
+    expect(() => Bird.connectedTo({ role: "reading", shard: "default" }, () => {})).toThrow(
+      "calling `connected_to` is only allowed on ActiveRecord::Base or abstract classes.",
+    );
+  });
+  it("can call connected_to with role and shard on abstract classes", () => {
+    class SecondAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    SecondAbstractClass.connectedTo({ role: "reading", shard: "default" }, () => {
+      expect(SecondAbstractClass.connectedToQ({ role: "reading", shard: "default" })).toBe(true);
+    });
+  });
+  it("cannot call connected_to on the abstract class that did not establish the connection", () => {
+    class ThirdAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    expect(() => ThirdAbstractClass.connectedTo({ role: "reading" }, () => {})).toThrow(
+      NotImplementedError,
+    );
+    expect(() => ThirdAbstractClass.connectedTo({ role: "reading" }, () => {})).toThrow(
+      "calling `connected_to` is only allowed on the abstract class that established the connection.",
+    );
+  });
+  it("#connecting_to with role", () => {
+    class SecondAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    SecondAbstractClass.connectingTo({ role: "reading" });
+    try {
+      expect(SecondAbstractClass.connectedToQ({ role: "reading" })).toBe(true);
+      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
+    } finally {
+      // pop the stack entry added by connectingTo
+      connectedToStack().pop();
+    }
+  });
+  it("#connecting_to with role and shard", () => {
+    class SecondAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    SecondAbstractClass.connectingTo({ role: "reading", shard: "default" });
+    try {
+      expect(SecondAbstractClass.connectedToQ({ role: "reading", shard: "default" })).toBe(true);
+    } finally {
+      connectedToStack().pop();
+    }
+  });
+  it("#connecting_to with prevent_writes", () => {
+    class SecondAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    SecondAbstractClass.connectingTo({ role: "writing", preventWrites: true });
+    try {
+      expect(SecondAbstractClass.connectedToQ({ role: "writing" })).toBe(true);
+      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
+    } finally {
+      connectedToStack().pop();
+    }
+  });
+  it("#connected_to_many cannot be called on anything but ActiveRecord::Base", () => {
+    class SecondAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    expect(() =>
+      SecondAbstractClass.connectedToMany([SecondAbstractClass], { role: "writing" }, () => {}),
+    ).toThrow(NotImplementedError);
+  });
+  it("#connected_to_many cannot be called with classes that include ActiveRecord::Base", () => {
+    class SecondAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    expect(() => Base.connectedToMany([Base], { role: "writing" }, () => {})).toThrow(
+      NotImplementedError,
+    );
+  });
+  it("#connected_to_many sets prevent_writes if role is reading", () => {
+    class SecondAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    Base.connectedToMany([SecondAbstractClass], { role: "reading" }, () => {
+      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
+      expect(Base.currentPreventingWrites()).toBe(false);
+    });
+  });
+  it("#connected_to_many with a single argument for classes", () => {
+    class SecondAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    Base.connectedToMany(SecondAbstractClass, { role: "reading" }, () => {
+      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
+      expect(Base.currentPreventingWrites()).toBe(false);
+    });
+  });
+  it("#connected_to_many with a multiple classes without brackets works", () => {
+    class FirstAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    class SecondAbstractClass extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    Base.connectedToMany(FirstAbstractClass, SecondAbstractClass, { role: "reading" }, () => {
+      expect(FirstAbstractClass.currentPreventingWrites()).toBe(true);
+      expect(SecondAbstractClass.currentPreventingWrites()).toBe(true);
+      expect(Base.currentPreventingWrites()).toBe(false);
+    });
+  });
   it("singular table name guesses", () => {
     class Mouse extends Base {}
     expect(Mouse.tableName).toBe("mice");

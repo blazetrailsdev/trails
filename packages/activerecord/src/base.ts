@@ -393,6 +393,7 @@ export class Base extends Model {
   // -- Class-level configuration --
   static _tableName: string | null = null;
   static _primaryKey: string | string[] = "id";
+  static readonly _isActiveRecordBase = true;
   static _adapter: DatabaseAdapter | null = null;
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _configPath: string | null = null;
@@ -475,6 +476,10 @@ export class Base extends Model {
    */
   static primaryClassQ(): boolean {
     return this.connectionClassForSelf() === Base;
+  }
+
+  static currentPreventingWrites(): boolean {
+    return _Core.currentPreventingWrites.call(this);
   }
 
   /**
