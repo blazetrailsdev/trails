@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base, Relation, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { sql as arelSql } from "@blazetrails/arel";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -1348,7 +1349,10 @@ describe("RelationTest", () => {
     await expect(Item.find(999999)).rejects.toThrow(RecordNotFound);
   });
 
-  it.skip("joins with string sql and string interpolation", () => {});
+  it.skip("joins with string sql and string interpolation", () => {
+    // Rails: Post.joins("INNER JOIN ... WHERE x = ?", value) — parameterized join strings
+    // String interpolation in join clauses not yet implemented
+  });
 
   it("first with count and order", async () => {
     const items = (await Item.order("name").first(2)) as any[];
@@ -1415,7 +1419,14 @@ describe("RelationTest", () => {
     expect(banana!.name).toBe("Banana");
   });
 
-  it.skip("dynamic find by after find by id", () => {});
+  it("dynamic find by after find by id", async () => {
+    // Rails: model.find_by used after find — ensures findBy works in any scope
+    const apple = await Item.find(1);
+    expect(apple).not.toBeNull();
+    const banana = await Item.findBy({ name: "Banana" });
+    expect(banana).not.toBeNull();
+    expect((banana as any).name).toBe("Banana");
+  });
 
   it("bound to array of records", async () => {
     const all = await Item.all().toArray();
@@ -1423,8 +1434,18 @@ describe("RelationTest", () => {
     expect(all.length).toBe(3);
   });
 
-  it.skip("merging joins has an order", () => {});
-  it.skip("joins with select and subquery", () => {});
+  it("merging joins has an order", () => {
+    // Rails: merging a joins relation with an ordered relation preserves both
+    const joinsRelation = Item.joins(`INNER JOIN "items" AS "cats" ON "cats"."id" = 1`);
+    const orderedRelation = Item.order("name");
+    const sql = joinsRelation.merge(orderedRelation).toSql();
+    expect(sql).toContain("ORDER BY");
+    expect(sql).toContain("INNER JOIN");
+  });
+
+  it.skip("joins with select and subquery", () => {
+    // Requires complex subquery in FROM with joins — not yet supported
+  });
 
   it("except or only clears and then applies new where conditions", async () => {
     const rel = Item.where({ category: "fruit" }).only("where");
@@ -1602,7 +1623,15 @@ describe("RelationTest", () => {
     expect(items[0].name).toBe("Banana");
   });
 
-  it.skip("dynamic finder", () => {});
+  it("dynamic finder", async () => {
+    // Rails: x = Post.where(...); assert_respond_to x.model, :find_by_id
+    // The relation's model class should respond to findBy (dynamic finder equivalent)
+    const relation = Item.where({ category: "fruit" });
+    const model = relation.model;
+    expect(typeof model.findBy).toBe("function");
+    const apple = await model.findBy({ id: 1 });
+    expect((apple as any).name).toBe("Apple");
+  });
 
   it("scoped first", async () => {
     const first = await Item.where({ category: "fruit" }).order("name").first();
@@ -1637,18 +1666,42 @@ describe("RelationTest", () => {
     expect(sql).toContain("name");
   });
 
-  it.skip("finding with assoc order", () => {});
+  it("finding with assoc order", async () => {
+    // Rails: Topic.order(id: :desc) — hash-style ordering
+    const items = await Item.order({ price: "desc" }).toArray();
+    expect(items).toHaveLength(3);
+    expect(items[0].price).toBe(3); // highest price first
+  });
 
-  it.skip("finding with arel assoc order", () => {});
+  it("finding with arel assoc order", async () => {
+    // Rails: Topic.order(Arel.sql("id") => :desc) — Arel sql node as hash key
+    // Arel::SqlLiteral is a String subclass in Ruby so it works as a hash key;
+    // in TS the Arel node is passed directly to order() which extracts its SQL
+    const items = await Item.order(arelSql("price DESC")).toArray();
+    expect(items).toHaveLength(3);
+    expect(items[0].price).toBe(3);
+  });
 
-  it.skip("finding with reversed assoc order", () => {});
+  it("finding with reversed assoc order", async () => {
+    // Rails: Topic.order(id: :asc).reverse_order
+    const items = await Item.order({ price: "asc" }).reverseOrder().toArray();
+    expect(items).toHaveLength(3);
+    expect(items[0].price).toBe(3); // reversed: descending
+  });
 
   it("reverse arel order with function", () => {
     const sql = Item.order("name ASC").reverseOrder().toSql();
     expect(sql).toContain("DESC");
   });
 
-  it.skip("reverse arel assoc order with function", () => {});
+  it("reverse arel assoc order with function", () => {
+    // Rails: Topic.order(Arel.sql("lower(title)") => :asc).reverse_order
+    // Arel SQL node as hash key: the direction is stored separately so reversal flips it
+    // In TS we use the hash form with an expression string as key (Arel.sql returns a string node)
+    const sql = Item.order({ "LOWER(name)": "asc" }).reverseOrder().toSql();
+    // The expression is preserved and the direction is flipped
+    expect(sql).toMatch(/LOWER\(name\)\s+DESC/i);
+  });
 
   it("reverse order with function other predicates", () => {
     const sql = Item.order("name DESC").reverseOrder().toSql();
@@ -1697,7 +1750,10 @@ describe("RelationTest", () => {
     expect(items[0].name).toBe("Banana");
   });
 
-  it.skip("to sql on eager join", () => {});
+  it.skip("to sql on eager join", () => {
+    // Rails: Post.eager_load(:last_comment).order("comments.id DESC").to_sql
+    // eagerLoad builds JOIN queries; toSql on that result not yet implemented
+  });
 
   it("find id", async () => {
     const item = await Item.find(1);
@@ -1714,18 +1770,42 @@ describe("RelationTest", () => {
     expect(sql).toContain("IN");
   });
 
-  it.skip("where id with delegated ar object", () => {});
+  it.skip("where id with delegated ar object", () => {
+    // Rails: Author.where(id: SimpleDelegator.new(author)) — unwraps delegated objects
+    // JS has no SimpleDelegator equivalent; not implementable
+  });
 
-  it.skip("where relation with delegated ar object", () => {});
+  it.skip("where relation with delegated ar object", () => {
+    // Rails: Post.where(author: SimpleDelegator.new(author)) — delegated AR object in assoc where
+    // JS has no SimpleDelegator equivalent; not implementable
+  });
 
   it("typecasting where with array", async () => {
     const items = await Item.where({ price: [1, 2] }).toArray();
     expect(items).toHaveLength(2);
   });
 
-  it.skip("find all using where with relation with bound values", () => {});
-  it.skip("find all using where with relation and alternate primary key", () => {});
-  it.skip("find all using where with relation with joins", () => {});
+  it("find all using where with relation with bound values", async () => {
+    // Rails: Post.where(id: david.posts.select(:id)) — relation as subquery
+    const fruitIds = Item.where({ category: "fruit" }).select("id");
+    const items = await Item.where({ id: fruitIds }).order("name").toArray();
+    expect(items).toHaveLength(2);
+    expect(items.map((i: any) => i.name)).toEqual(["Apple", "Banana"]);
+  });
+
+  it.skip("find all using where with relation and alternate primary key", () => {
+    // Requires model with non-standard primary key (minivan_id) — not in Item fixture
+  });
+
+  it("find all using where with relation with joins", async () => {
+    // Rails: Author.where(id: Author.joins(:posts).where(id: david.id))
+    // A relation with joins used as a subquery for WHERE id IN (...)
+    const fruitRelWithJoin = Item.where({ category: "fruit" }).joins(
+      `INNER JOIN "items" AS "items2" ON "items2"."id" = "items"."id"`,
+    );
+    const items = await Item.where({ id: fruitRelWithJoin }).toArray();
+    expect(items).toHaveLength(2);
+  });
 
   it("create with array", async () => {
     const item = await Item.all().create({ name: "Durian", price: 8, category: "fruit" });
@@ -1776,7 +1856,11 @@ describe("RelationTest", () => {
     expect(item.isNewRecord()).toBe(true);
   });
 
-  it.skip("find or create by race condition", () => {});
+  it.skip("find or create by race condition", () => {
+    // Requires stub-based mocking of find_by to simulate a race condition retry;
+    // tests findOrCreateBy retry logic when a concurrent insert happens between
+    // the initial find and create — not directly testable without method stubbing
+  });
 
   it("find or create by with block", async () => {
     const item = await Item.all().findOrCreateBy({ name: "Fig" }, { price: 4, category: "fruit" });
@@ -3404,8 +3488,17 @@ describe("RelationTest", () => {
 });
 
 describe("RelationTest", () => {
-  it.skip("returns a SelectManager", () => {
-    /* needs toArel() to return Arel SelectManager */
+  it("returns a SelectManager", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const manager = User.all().toArel();
+    // Rails: assert_kind_of Arel::SelectManager, relation.arel
+    expect(manager).toBeDefined();
+    expect(typeof manager.toSql).toBe("function");
+    expect(manager.toSql()).toContain("SELECT");
   });
 
   it("respects limit and offset", () => {
@@ -4537,8 +4630,22 @@ describe("RelationTest", () => {
     expect(sql).toContain("ORDER BY");
   });
 
-  it.skip("finding with reversed arel assoc order", () => {
-    /* needs association-based ordering with Arel */
+  it("finding with reversed arel assoc order", async () => {
+    // Rails: Topic.order(Arel.sql("id") => :asc).reverse_order
+    // An Arel SQL node as hash key: direction stored separately → reversal flips asc ↔ desc
+    // In TS, arelSql("id") is a Node; for hash-form ordering we use the string key directly
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Post.create({ title: "a" });
+    await Post.create({ title: "b" });
+    // Use Arel SQL node to order, then reverse — verifies the Arel node path
+    const sql = Post.order(arelSql("title ASC")).reverseOrder().toSql();
+    // Reversing a plain SQL string reverses "ASC" → "DESC"
+    expect(sql).toContain("DESC");
   });
 
   it("reverse order with function", () => {
@@ -6659,8 +6766,17 @@ describe("RelationTest", () => {
     expect(found[0].id).toBe(t.id);
   });
 
-  it.skip("joins with string array", () => {
-    /* needs string-based joins support */
+  it("joins with string array", async () => {
+    // Rails: Post.joins(["INNER JOIN ...", "INNER JOIN ..."]) — array of SQL strings
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await Topic.create({ title: "hello" });
+    const sql = Topic.joins([`INNER JOIN "topics" AS "t2" ON "t2"."id" = "topics"."id"`]).toSql();
+    expect(sql).toContain("INNER JOIN");
   });
 
   it("find_by with multi-arg conditions returns the first matching record", async () => {
@@ -6712,7 +6828,9 @@ describe("RelationTest", () => {
     expect(found).not.toBeNull();
   });
 
-  it.skip("eager association loading of stis with multiple references", () => {
+  it.skip("eager association loading of stis with multiple references", async () => {
+    // Requires STI polymorphic eager loading with multiple references —
+    // eagerLoad with nested includes across STI subclasses not yet supported
     /* fixture-dependent */
   });
 
@@ -6810,8 +6928,22 @@ describe("RelationTest", () => {
     expect(first).not.toBe(second);
   });
 
-  it.skip("create with block", () => {
-    /* needs block/yield support in create */
+  it("create with block", async () => {
+    // Rails: Bird.create { |bird| bird.name = "sparrow"; bird.color = "grey" }
+    class Bird extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("color", "string");
+        this.adapter = adapter;
+      }
+    }
+    const sparrow = await Bird.create({}, (bird: any) => {
+      bird.name = "sparrow";
+      bird.color = "grey";
+    });
+    expect(sparrow.isPersisted()).toBe(true);
+    expect((sparrow as any).name).toBe("sparrow");
+    expect((sparrow as any).color).toBe("grey");
   });
 
   describe("CreateOrFindByWithinTransactions", () => {
@@ -6850,5 +6982,8 @@ describe("RelationTest", () => {
     expect(Post.where({ title: "" })).toBeInstanceOf(Relation);
   });
 
-  it.skip("loading with one association with non preload", () => {});
+  it.skip("loading with one association with non preload", () => {
+    // Rails: eager_load with non-preload strategy (JOIN-based) — requires eagerLoad
+    // implementation that builds a JOIN query rather than a separate SELECT
+  });
 });

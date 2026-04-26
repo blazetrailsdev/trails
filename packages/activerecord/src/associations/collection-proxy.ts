@@ -988,7 +988,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
   }
 
-  private async _pushThrough(records: T[], skipCallbacks = false): Promise<void> {
+  private async _pushThrough(records: T[], skipCallbacks = false, bang = false): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
@@ -1025,8 +1025,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         continue;
       // Save the target record if it's new
       if (record.isNewRecord()) {
-        const saved = await record.save();
-        if (!saved) continue;
+        if (bang) {
+          await record.saveBang(); // raises RecordInvalid if invalid
+        } else {
+          const saved = await record.save();
+          if (!saved) continue;
+        }
       }
       // Create the join record
       const joinAttrs: Record<string, unknown> = {
@@ -1048,7 +1052,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         joinAttrs[typeCol] = ctor.name;
         delete joinAttrs[ownerFk as string];
       }
-      const joinRecord = await throughModel.create(joinAttrs);
+      let joinRecord: Base;
+      if (bang) {
+        // Bang form: raise RecordInvalid if join record is invalid (mirrors Rails' save!)
+        joinRecord = new throughModel(joinAttrs);
+        await joinRecord.saveBang();
+      } else {
+        joinRecord = await throughModel.create(joinAttrs);
+      }
       if (joinRecord.isPersisted()) {
         this._target.push(record);
         if (!skipCallbacks) {
@@ -2042,6 +2053,56 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async append(...records: T[]): Promise<void> {
     return this.push(...records);
+  }
+
+  /**
+   * Bang version of append — raises RecordInvalid when a target record or join
+   * record is invalid (mirrors Rails' << / save! behavior).
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#<< (bang semantics)
+   */
+  async appendBang(...records: T[]): Promise<void> {
+    this._ensureThroughWritable();
+    if (this._assocDef.options.through) {
+      await this._pushThrough(records, false, true);
+      return;
+    }
+    // Non-through: push() assigns the FK and calls save() for each record.
+    // After push(), raise RecordInvalid for any record that is still new (save failed)
+    // or still has dirty changes (save returned false without retry — bang raises on
+    // the initial failure rather than attempting a second save).
+    await this.push(...records);
+
+    for (const record of records) {
+      if (record.isNewRecord()) {
+        // New record still unsaved — push()'s save() returned false
+        throw new RecordInvalid(record as unknown as object);
+      }
+      if (
+        typeof (record as any).hasChangesToSave === "function" &&
+        (record as any).hasChangesToSave()
+      ) {
+        // Persisted record still has unsaved changes after push() — raise without retrying
+        throw new RecordInvalid(record as unknown as object);
+      }
+    }
+    return;
+  }
+
+  /**
+   * Delegates to the target model class's transaction method.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#transaction
+   */
+  async transaction<R>(
+    fn: (tx: unknown) => Promise<R>,
+    options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
+  ): Promise<R | undefined> {
+    const klass = this.model;
+    if (typeof klass.transaction === "function") {
+      return klass.transaction(fn as any, options);
+    }
+    return fn(undefined);
   }
 
   /**

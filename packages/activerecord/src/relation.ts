@@ -1189,15 +1189,18 @@ export class Relation<T extends Base> {
    */
   joins(tableOrSql?: string, on?: string): Relation<T>;
   joins(...nodes: Nodes.Join[]): Relation<T>;
-  joins(...args: Array<string | Nodes.Join>): Relation<T>;
-  joins(...args: Array<string | Nodes.Join | undefined>): Relation<T> {
+  joins(stringArray: string[]): Relation<T>;
+  joins(...args: Array<string | string[] | Nodes.Join>): Relation<T>;
+  joins(...args: Array<string | string[] | Nodes.Join | undefined>): Relation<T> {
     const rel = this._clone();
     // Two-string-argument form: joins(table, onClause) — preserved for back-compat.
     if (args.length === 2 && typeof args[0] === "string" && typeof args[1] === "string") {
       rel._joinClauses.push({ type: "inner", table: args[0], on: args[1] });
       return rel;
     }
-    for (const arg of args) {
+    // Flatten string arrays: joins(["str1", "str2"]) mirrors Rails array form
+    const flatArgs = args.flatMap((a) => (Array.isArray(a) ? a : [a]));
+    for (const arg of flatArgs) {
       if (!arg) continue;
       // Arel join node (InnerJoin / OuterJoin / StringJoin etc. from joinSources).
       if (arg instanceof Nodes.Join) {

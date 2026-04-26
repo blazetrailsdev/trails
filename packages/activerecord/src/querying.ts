@@ -137,7 +137,13 @@ export function select<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#order */
 export function order<T extends typeof Base>(
   this: T,
-  ...args: Array<string | Record<string, "asc" | "desc">>
+  ...args: Array<
+    | string
+    | Record<string, "asc" | "desc" | "ASC" | "DESC">
+    | import("@blazetrails/arel").Nodes.Node
+    | string[]
+    | [import("@blazetrails/arel").Nodes.Node, ...unknown[]]
+  >
 ): Relation<InstanceType<T>> {
   return this.all().order(...args);
 }
@@ -180,13 +186,26 @@ export function joins<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
+  stringArray: string[],
+): Relation<InstanceType<T>>;
+export function joins<T extends typeof Base>(
+  this: T,
   ...args: Array<string | import("@blazetrails/arel").Nodes.Join>
 ): Relation<InstanceType<T>>;
 export function joins<T extends typeof Base>(
   this: T,
-  ...args: Array<string | import("@blazetrails/arel").Nodes.Join | undefined>
+  ...args: Array<string | string[] | import("@blazetrails/arel").Nodes.Join | undefined>
 ): Relation<InstanceType<T>> {
   const relation = this.all();
+  // Flatten string array passed as single argument: joins(["a", "b"])
+  // Gate on all-string to avoid misrouting mixed or non-string arrays.
+  if (
+    args.length === 1 &&
+    Array.isArray(args[0]) &&
+    (args[0] as unknown[]).every((x) => typeof x === "string")
+  ) {
+    return relation.joins(args[0] as string[]);
+  }
   if (args.length === 0 || typeof args[0] === "string" || args[0] === undefined) {
     const [tableOrSql, on] = args as [string?, string?];
     return relation.joins(tableOrSql, on);
