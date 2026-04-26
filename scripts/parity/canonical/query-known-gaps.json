@@ -30,5 +30,9 @@
   "ar-87": {
     "side": "diff",
     "reason": "Relation#joins() does not accept Arel join nodes. Rails joins() flattens its args and handles Arel::Nodes::InnerJoin entries in build_joins; trails joins() only accepts strings, coercing any non-string to [object Object]. Rails: 'SELECT \"books\".* FROM \"books\" INNER JOIN \"authors\" ON ...'; trails: 'SELECT \"books\".* FROM \"books\" [object Object]'."
+  },
+  "ar-98": {
+    "side": "diff",
+    "reason": "where.not with hash (multi-key): Rails emits WHERE NOT (\"books\".\"status\" = 'draft' AND \"books\".\"active\" = 0); trails emits individual != predicates joined with AND — logically different semantics."
   }
 }
