@@ -13,6 +13,7 @@ import {
   star as arelStar,
 } from "@blazetrails/arel";
 import {
+  ActiveRecordError,
   AttributeAssignmentError,
   ReadOnlyRecord,
   RecordNotDestroyed,
@@ -24,6 +25,7 @@ import { clearAutosaveState } from "./autosave-association.js";
 import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { RecordInvalid, performValidations } from "./validations.js";
+import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
@@ -972,4 +974,253 @@ export function becomesBang<
     );
   }
   return instance;
+}
+
+// ---------------------------------------------------------------------------
+// Private instance helpers — mirrors ActiveRecord::Persistence private block.
+// Non-exported so the extractor marks them internal: true.
+// ---------------------------------------------------------------------------
+
+interface PersistencePrivateHost {
+  _newRecord: boolean;
+  _destroyed: boolean;
+  _previouslyNewRecord: boolean;
+  _readonly?: boolean;
+  readAttribute(name: string): unknown;
+  writeAttribute(name: string, value: unknown): void;
+  isNewRecord(): boolean;
+  isDestroyed(): boolean;
+  id: unknown;
+  constructor: {
+    name: string;
+    primaryKey: string | string[];
+    _defaultScope?: unknown;
+    currentScope?: unknown | (() => unknown);
+    defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
+    readonlyAttributeQ?(name: string): boolean;
+    withConnection?(fn: (conn: unknown) => Promise<void>): Promise<void>;
+    adapter: { execDelete(sql: string, name: string): Promise<number> };
+  };
+}
+
+function initInternals(this: PersistencePrivateHost): void {
+  this._newRecord = true;
+  this._destroyed = false;
+  this._previouslyNewRecord = false;
+  // Mirrors the Transactions#init_internals super chain — those fields live here too.
+  (this as any)._triggerUpdateCallback = null;
+  (this as any)._triggerDestroyCallback = null;
+}
+
+function strictLoadedAssociations(this: any): string[] {
+  const cache: Map<string, any> = this._associationInstances;
+  if (!cache) return [];
+  const result: string[] = [];
+  for (const [name, assoc] of cache) {
+    const owner = assoc?.owner;
+    if (owner?._strictLoading && !owner?.isStrictLoadingNPlusOneOnly?.()) {
+      result.push(name);
+    }
+  }
+  return result;
+}
+
+function _findRecord(
+  this: PersistencePrivateHost & { constructor: any },
+  options?: { lock?: boolean | string },
+): Promise<unknown> {
+  const ctor = this.constructor as any;
+  const preloads = strictLoadedAssociations.call(this);
+  let scope = ctor.all();
+  if (preloads.length > 0) scope = scope.preload(...preloads);
+  const constraints = _inMemoryQueryConstraintsHash.call(this);
+  if (options?.lock) scope = scope.lock(options.lock);
+  // Rails uses find_by! — raises RecordNotFound when not found.
+  return scope.findByBang(constraints);
+}
+
+function _inMemoryQueryConstraintsHash(this: PersistencePrivateHost): Record<string, unknown> {
+  const constraintsList = queryConstraintsList.call(this.constructor as any);
+  if (!constraintsList) {
+    const pk = this.constructor.primaryKey as string;
+    return { [pk]: this.id };
+  }
+  return Object.fromEntries(constraintsList.map((col) => [col, this.readAttribute(col)]));
+}
+
+function isApplyScoping(this: PersistencePrivateHost, options?: { unscoped?: boolean }): boolean {
+  if (options?.unscoped) return false;
+  const ctor = this.constructor as any;
+  const hasDefaultScope = !!ctor._defaultScope;
+  const current = typeof ctor.currentScope === "function" ? ctor.currentScope() : ctor.currentScope;
+  return !!(hasDefaultScope || current);
+}
+
+function _queryConstraintsHash(this: any): Record<string, unknown> {
+  const constraintsList = queryConstraintsList.call(this.constructor as any);
+  if (!constraintsList) {
+    const pk = this.constructor.primaryKey as string;
+    return { [pk]: this.idInDatabase?.() ?? this.id };
+  }
+  return Object.fromEntries(
+    constraintsList.map((col: string) => [
+      col,
+      this.attributeInDatabase?.(col) ?? this.readAttribute(col),
+    ]),
+  );
+}
+
+function destroyAssociations(this: PersistencePrivateHost): void {}
+
+function destroyRow(this: PersistencePrivateHost): Promise<number> {
+  return _deleteRow.call(this);
+}
+
+function _deleteRow(this: PersistencePrivateHost): Promise<number> {
+  return _deleteRecord.call(this.constructor as any, _queryConstraintsHash.call(this));
+}
+
+function _touchRow(this: any, attributeNames: string[], time?: Date | null): Promise<number> {
+  const t = time ?? new Date();
+  for (const attr of attributeNames) {
+    this._writeAttribute(attr, t);
+  }
+  return _updateRow.call(this, attributeNames, "touch");
+}
+
+function _updateRow(
+  this: PersistencePrivateHost,
+  attributeNames: string[],
+  _attemptedAction = "update",
+): Promise<number> {
+  const values: Record<string, unknown> = {};
+  for (const name of attributeNames) {
+    values[name] = this.readAttribute(name);
+  }
+  return _updateRecord.call(this.constructor as any, values, _queryConstraintsHash.call(this));
+}
+
+function createOrUpdate(this: any): Promise<boolean> {
+  if (this._readonly) _raiseReadonlyRecordError.call(this);
+  if (this._destroyed) return Promise.resolve(false);
+  if (this._newRecord) {
+    return _createRecord.call(this).then(() => true);
+  }
+  const attrNames: string[] = Array.from((this as any)._attributes?.keys?.() ?? []);
+  const ctor = this.constructor as any;
+  const colNames: string[] = ctor.columnNames?.() ?? attrNames;
+  const counterCacheCols: Set<string> = ctor._counterCacheColumns ?? new Set();
+  const filteredNames = attrNames.filter((n: string) => {
+    if (!colNames.includes(n)) return false;
+    if (ctor.readonlyAttributeQ?.(n)) return false;
+    if (counterCacheCols.has(n)) return false;
+    return true;
+  });
+  if (filteredNames.length === 0) {
+    this._triggerUpdateCallback = true;
+    this._previouslyNewRecord = false;
+    return Promise.resolve(true);
+  }
+  return _updateRow.call(this, filteredNames).then((affected: number) => {
+    this._triggerUpdateCallback = affected === 1;
+    this._previouslyNewRecord = false;
+    return true;
+  });
+}
+
+async function _createRecord(this: any): Promise<unknown> {
+  const ctor = this.constructor as any;
+  const allNames: string[] = Array.from(this._attributes?.keys?.() ?? []);
+  const colNames: string[] = ctor.columnNames?.() ?? allNames;
+  // Mirrors attributes_for_create: exclude PK columns whose value is nil.
+  const pk = ctor.primaryKey;
+  const pkCols: string[] = Array.isArray(pk) ? pk : [pk];
+  const names = allNames.filter((n: string) => {
+    if (!colNames.includes(n)) return false;
+    if (pkCols.includes(n) && this._readAttribute(n) == null) return false;
+    return true;
+  });
+
+  const values: Record<string, unknown> = {};
+  for (const name of names) {
+    values[name] = this._readAttribute(name);
+  }
+
+  const doInsert = async (connection: unknown) => {
+    // _insertRecord returns the inserted row id (a number). Align with the existing
+    // class method contract — no returning-columns array; adapter sets PK via execInsert.
+    const insertedId = await _insertRecord.call(ctor, connection as any, values);
+    if (!Array.isArray(ctor.primaryKey) && this._readAttribute(ctor.primaryKey) == null) {
+      this._writeAttribute(ctor.primaryKey, insertedId);
+    }
+  };
+
+  if (ctor.withConnection) {
+    await ctor.withConnection(doInsert);
+  } else {
+    await doInsert(ctor.adapter);
+  }
+
+  this._newRecord = false;
+  this._previouslyNewRecord = true;
+  return this.id;
+}
+
+function verifyReadonlyAttribute(this: PersistencePrivateHost, name: string): void {
+  if ((this.constructor as any).readonlyAttributeQ?.(name)) {
+    throw new ReadonlyAttributeError(name);
+  }
+}
+
+function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
+  const key = this.constructor.primaryKey;
+  const keyStr = Array.isArray(key) ? key.join(", ") : key;
+  // If an association destroy raised an exception, propagate that instead.
+  const assocEx = (this as any)._associationDestroyException ?? null;
+  if (assocEx) (this as any)._associationDestroyException = null;
+  throw (
+    assocEx ??
+    new RecordNotDestroyed(
+      `Failed to destroy ${this.constructor.name} with ${keyStr}=${String(this.id)}`,
+      this as unknown as object,
+    )
+  );
+}
+
+function _raiseReadonlyRecordError(this: { constructor: { name: string } }): never {
+  throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
+}
+
+function _raiseRecordNotTouchedError(): never {
+  throw new ActiveRecordError(
+    "Cannot touch on a new or destroyed record object. Consider using persisted?, new_record?, or destroyed? before touching.",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Private class helpers — mirrors ActiveRecord::Persistence::ClassMethods private block.
+// ---------------------------------------------------------------------------
+
+function instantiateInstanceOf(
+  klass: { _instantiate(attrs: Record<string, unknown>, colTypes?: Record<string, any>): any },
+  attributes: Record<string, unknown>,
+  columnTypes: Record<string, any> = {},
+  block?: (r: any) => void,
+): any {
+  const record = klass._instantiate(attributes, columnTypes);
+  block?.(record);
+  return record;
+}
+
+function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown>): T {
+  return klass;
+}
+
+function buildDefaultConstraint(this: {
+  _defaultScope?: unknown;
+  defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
+}): unknown {
+  if (!this._defaultScope) return undefined;
+  const defaultWhereClause = this.defaultScoped().whereClause;
+  return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
