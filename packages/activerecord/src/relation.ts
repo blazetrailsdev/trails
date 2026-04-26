@@ -1,4 +1,4 @@
-import { getCrypto, Notifications } from "@blazetrails/activesupport";
+import { hexdigest, Notifications } from "@blazetrails/activesupport";
 import {
   Table,
   SelectManager,
@@ -78,6 +78,23 @@ export type LoadedRelation<R> = Omit<R, "then">;
  * - Throw if a join to the same table with a *different* ON clause exists —
  *   that would require aliasing which is not supported.
  */
+function formatCacheTimestamp(date: Date, format: "usec" | "number" | string): string {
+  const y = date.getUTCFullYear().toString().padStart(4, "0");
+  const mo = (date.getUTCMonth() + 1).toString().padStart(2, "0");
+  const d = date.getUTCDate().toString().padStart(2, "0");
+  const h = date.getUTCHours().toString().padStart(2, "0");
+  const mi = date.getUTCMinutes().toString().padStart(2, "0");
+  const s = date.getUTCSeconds().toString().padStart(2, "0");
+  if (format === "number") return `${y}${mo}${d}${h}${mi}${s}`;
+  if (format !== "usec") {
+    throw new Error(
+      `Unknown cacheTimestampFormat: ${JSON.stringify(format)}. Supported values: "usec", "number".`,
+    );
+  }
+  const ms = date.getUTCMilliseconds().toString().padStart(3, "0");
+  return `${y}${mo}${d}${h}${mi}${s}${ms}000`;
+}
+
 function _addAssocJoin(
   clauses: Array<{ type: "inner" | "left"; table: string; on: string; quoted?: boolean }>,
   type: "inner" | "left",
@@ -1531,6 +1548,8 @@ export class Relation<T extends Base> {
   reset(): this {
     this._loaded = false;
     this._records = [];
+    this._cacheKeys = undefined;
+    this._cacheVersions = undefined;
     // Bump the load token and drop any in-flight loadAsync() promise —
     // an already-running toArray() checks the token after its await and
     // will skip committing if it lost the race, so a stale background
@@ -2563,7 +2582,12 @@ export class Relation<T extends Base> {
       um.where(arelSql(cond));
     }
 
-    return this._modelClass.adapter.execUpdate(um.toSql(), `${this._modelClass.name} Update All`);
+    const count = await this._modelClass.adapter.execUpdate(
+      um.toSql(),
+      `${this._modelClass.name} Update All`,
+    );
+    this.reset();
+    return count;
   }
 
   /**
@@ -2594,7 +2618,12 @@ export class Relation<T extends Base> {
       dm.where(arelSql(cond));
     }
 
-    return this._modelClass.adapter.execDelete(dm.toSql(), `${this._modelClass.name} Delete All`);
+    const count = await this._modelClass.adapter.execDelete(
+      dm.toSql(),
+      `${this._modelClass.name} Delete All`,
+    );
+    this.reset();
+    return count;
   }
 
   /**
@@ -3816,22 +3845,52 @@ export class Relation<T extends Base> {
     }
   }
 
-  cacheKey(): string {
-    return this.computeCacheKey();
+  // Memoized per timestamp column, matching Rails' @cache_keys / @cache_versions.
+  private _cacheKeys: Map<string, Promise<string>> | undefined;
+  private _cacheVersions: Map<string, Promise<string | null>> | undefined;
+
+  /**
+   * Returns a cache key for this relation, including count and timestamp when
+   * collection_cache_versioning is off (the default), or just the query digest
+   * when versioning is on (stable key, use cache_version for the changing part).
+   *
+   * Mirrors: ActiveRecord::Relation#cache_key
+   */
+  async cacheKey(timestampColumn = "updated_at"): Promise<string> {
+    this._cacheKeys ??= new Map();
+    if (!this._cacheKeys.has(timestampColumn)) {
+      this._cacheKeys.set(timestampColumn, this.computeCacheKey(timestampColumn));
+    }
+    return this._cacheKeys.get(timestampColumn)!;
   }
 
-  computeCacheKey(): string {
-    const tableName = this._modelClass.tableName;
-    const sql = this.toSql();
-    const digest = getCrypto().createHash("md5").update(sql).digest("hex");
-    return `${tableName}/query-${digest}`;
+  async computeCacheKey(timestampColumn = "updated_at"): Promise<string> {
+    const key = `${this._modelClass.tableName}/query-${hexdigest(this.toSql())}`;
+    if (this._modelClass.collectionCacheVersioning) {
+      return key;
+    }
+    const version = await this.computeCacheVersion(timestampColumn);
+    return `${key}-${version}`;
   }
 
-  async cacheVersion(): Promise<string> {
-    return this.computeCacheVersion();
+  /**
+   * Returns cache version when collection_cache_versioning is on, null otherwise.
+   *
+   * Mirrors: ActiveRecord::Relation#cache_version
+   */
+  async cacheVersion(timestampColumn = "updated_at"): Promise<string | null> {
+    if (!this._modelClass.collectionCacheVersioning) return null;
+    this._cacheVersions ??= new Map();
+    if (!this._cacheVersions.has(timestampColumn)) {
+      this._cacheVersions.set(
+        timestampColumn,
+        this.computeCacheVersion(timestampColumn) as Promise<string | null>,
+      );
+    }
+    return this._cacheVersions.get(timestampColumn)!;
   }
 
-  async computeCacheVersion(timestampColumn: string = "updated_at"): Promise<string> {
+  async computeCacheVersion(timestampColumn = "updated_at"): Promise<string> {
     let size = 0;
     let timestamp: unknown = null;
 
@@ -3849,44 +3908,62 @@ export class Relation<T extends Base> {
     } else {
       try {
         const collection: Relation<T> = this;
-        const column = this.table.get(timestampColumn);
-        const columnSql = this._compileArelNode(column);
-        const selectTemplate = `COUNT(*) AS "size", MAX(%s) AS "timestamp"`;
+        const tsColumn = this.table.get(timestampColumn);
+        // Build COUNT(*) and MAX(col) projections via Arel nodes.
+        const countStar = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
+        const maxNode = tsColumn.maximum();
 
         if (this._limitValue !== null || (this._offsetValue ?? 0) > 0) {
-          // Has limit/offset — wrap in a subquery like Rails' build_subquery
+          // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
           const subqueryAlias = "subquery_for_cache_key";
           const inner = collection._clone();
-          inner._selectColumns = [`${columnSql} AS collection_cache_key_timestamp`];
+          inner._selectColumns = [
+            this._compileArelNode(tsColumn.as("collection_cache_key_timestamp")),
+          ];
           if (this._isDistinct && (!this._selectColumns || this._selectColumns.length === 0)) {
             inner._selectColumns = [
               this._compileArelNode(this.table.star),
               ...inner._selectColumns!,
             ];
           }
-          const innerSql = inner.toSql();
-          const subqueryColumn = `"${subqueryAlias}"."collection_cache_key_timestamp"`;
-          const sql = `SELECT ${selectTemplate.replace("%s", subqueryColumn)} FROM (${innerSql}) AS "${subqueryAlias}"`;
-          const rows = await this._modelClass.adapter.execute(sql);
+          // Build a proper Arel SelectManager for the outer COUNT/MAX query so
+          // quoting and adapter differences are handled by the AST visitor.
+          // Grouping(SqlLiteral) renders as "(inner sql)" and TableAlias appends
+          // the bare alias name (same pattern SelectManager#as uses in Rails).
+          const subAlias = new Nodes.TableAlias(
+            new Nodes.Grouping(new Nodes.SqlLiteral(inner.toSql())),
+            subqueryAlias,
+          );
+          const subTable = new Table(subqueryAlias);
+          const subColumn = subTable.get("collection_cache_key_timestamp");
+          const outerManager = new SelectManager();
+          outerManager.from(subAlias);
+          outerManager.project(
+            new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]).as("size"),
+            subColumn.maximum().as("timestamp"),
+          );
+          const rows = await this._modelClass.adapter.execute(outerManager.toSql());
           size = Number(rows[0]?.size ?? 0);
           timestamp = rows[0]?.timestamp;
         } else {
-          // No limit/offset — single query with COUNT + MAX
           const query = collection._clone();
           query._orderClauses = [];
           query._rawOrderClauses = [];
-          query._selectColumns = [selectTemplate.replace("%s", columnSql)];
+          query._selectColumns = [
+            this._compileArelNode(countStar.as("size")),
+            this._compileArelNode(maxNode.as("timestamp")),
+          ];
           const rows = await this._modelClass.adapter.execute(query.toSql());
           size = Number(rows[0]?.size ?? 0);
           timestamp = rows[0]?.timestamp;
         }
       } catch {
-        // Timestamp column doesn't exist — compute count-only
         try {
+          const countFallback = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
           const query = this._clone();
           query._orderClauses = [];
           query._rawOrderClauses = [];
-          query._selectColumns = [`COUNT(*) AS "size"`];
+          query._selectColumns = [this._compileArelNode(countFallback.as("size"))];
           const rows = await this._modelClass.adapter.execute(query.toSql());
           size = Number(rows[0]?.size ?? 0);
         } catch {
@@ -3900,7 +3977,6 @@ export class Relation<T extends Base> {
       if (timestamp instanceof Date) {
         ts = timestamp;
       } else if (typeof timestamp === "string") {
-        // Normalize timezone-less timestamps (e.g., SQLite "YYYY-MM-DD HH:MM:SS") to UTC
         const bare = timestamp.trim();
         const m = bare.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/);
         ts = m ? new Date(`${m[1]}T${m[2]}Z`) : new Date(bare);
@@ -3908,16 +3984,18 @@ export class Relation<T extends Base> {
         ts = new Date(timestamp);
       }
       if (ts && !isNaN(ts.getTime())) {
-        return `${size}-${ts.toISOString().replace(/\.\d{3}Z$/, "Z")}`;
+        const fmt = this._modelClass.cacheTimestampFormat;
+        const formatted = formatCacheTimestamp(ts, fmt);
+        return `${size}-${formatted}`;
       }
       return `${size}-${String(timestamp)}`;
     }
     return `${size}`;
   }
 
-  async cacheKeyWithVersion(): Promise<string> {
-    const key = this.cacheKey();
-    const version = await this.cacheVersion();
+  async cacheKeyWithVersion(timestampColumn = "updated_at"): Promise<string> {
+    const key = await this.cacheKey(timestampColumn);
+    const version = await this.cacheVersion(timestampColumn);
     return version ? `${key}-${version}` : key;
   }
 

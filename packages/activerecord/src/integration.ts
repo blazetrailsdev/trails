@@ -195,14 +195,11 @@ export function toParamClass(
 export function collectionCacheKey(
   this: { all(): any },
   collection?: any,
-  _timestampColumn = "updated_at",
-): string {
+  timestampColumn = "updated_at",
+): Promise<string> {
   const rel = collection ?? this.all();
-  if (typeof rel.computeCacheKey === "function") {
-    return rel.computeCacheKey();
-  }
   if (typeof rel.cacheKey === "function") {
-    return rel.cacheKey();
+    return Promise.resolve(rel.cacheKey(timestampColumn));
   }
-  return "";
+  return Promise.resolve("");
 }

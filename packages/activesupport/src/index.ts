@@ -363,6 +363,8 @@ export { OrderedOptions, InheritableOptions } from "./ordered-options.js";
 //   import { Digest } from "@blazetrails/activesupport/digest"
 //   import { SecurityUtils } from "@blazetrails/activesupport/security-utils"
 //   import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file"
+// Thin wrapper exported from the main index for consumers that can't use subpath imports.
+export { hexdigest } from "./hexdigest.js";
 export { WeakSet as DescendantsTrackerWeakSet } from "./descendants-tracker.js";
 export { ActionableError, NonActionable } from "./actionable-error.js";
 export { NullLock } from "./concurrency/null-lock.js";

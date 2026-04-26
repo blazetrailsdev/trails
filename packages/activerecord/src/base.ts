@@ -411,6 +411,7 @@ export class Base extends Model {
   static paramDelimiter = "_";
   static cacheVersioning = false;
   static cacheTimestampFormat: "usec" | "number" = "usec";
+  static collectionCacheVersioning = false;
   static _tableNamePrefix = "";
   static _tableNameSuffix = "";
   static _protectedEnvironments: string[] = ["production"];
