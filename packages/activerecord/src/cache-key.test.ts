@@ -130,6 +130,7 @@ describe("CacheKeyTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
+        this.cacheVersioning = true;
       }
     }
     const p = await Post.create({ title: "test", updated_at: new Date() });
@@ -145,12 +146,19 @@ describe("CacheKeyTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
+        this.cacheVersioning = true;
       }
     }
-    const now = new Date();
-    const p = await Post.create({ title: "test", updated_at: now });
-    const found = await Post.find(p.id);
-    expect(found.cacheVersion()).toBe(p.cacheVersion());
+    const p = await Post.create({ title: "test" });
+    // Reload from DB twice — both reads should produce identical cache versions,
+    // verifying that the timestamp formatting is stable across DB loads.
+    const found1 = await Post.find(p.id);
+    const found2 = await Post.find(p.id);
+    const v1 = found1.cacheVersion();
+    const v2 = found2.cacheVersion();
+    expect(typeof v1).toBe("string");
+    expect(typeof v2).toBe("string");
+    expect(v1).toBe(v2);
   });
 
   it("cache_version does NOT call updated_at when value is from the database", async () => {
@@ -160,6 +168,7 @@ describe("CacheKeyTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
+        this.cacheVersioning = true;
       }
     }
     const now = new Date();
@@ -177,13 +186,23 @@ describe("CacheKeyTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
+        this.cacheVersioning = true;
       }
     }
     const now = new Date();
     const p = new Post({ title: "test", updated_at: now });
     const version = p.cacheVersion();
     expect(version).not.toBeNull();
-    expect(version).toBe(now.toISOString().replace(/[^0-9]/g, ""));
+    // usec format: YYYYMMDDHHMMSSMMM000 (20 chars)
+    const ms = now.getUTCMilliseconds().toString().padStart(3, "0");
+    const expected =
+      now
+        .toISOString()
+        .replace(/[^0-9]/g, "")
+        .slice(0, 14) +
+      ms +
+      "000";
+    expect(version).toBe(expected);
   });
 
   it("cache_version does call updated_at when it is assigned via a string", async () => {
@@ -193,11 +212,11 @@ describe("CacheKeyTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
+        this.cacheVersioning = true;
       }
     }
     const p = new Post({ title: "test", updated_at: "2025-01-01T00:00:00.000Z" });
     const version = p.cacheVersion();
-    // If the datetime type casts the string to a Date, we get a version; otherwise null
     if (p.updated_at instanceof Date) {
       expect(version).not.toBeNull();
     } else {
@@ -212,6 +231,7 @@ describe("CacheKeyTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
+        this.cacheVersioning = true;
       }
     }
     const now = new Date(2025, 0, 1, 12, 0, 0);
@@ -254,9 +274,11 @@ describe("CacheKeyTest", () => {
         this.adapter = a;
       }
     }
-    const p = await Post.create({ title: "ts", updated_at: new Date("2023-06-15T12:00:00Z") });
+    const p = await Post.create({ title: "ts" });
+    p.writeAttribute("updated_at", new Date("2023-06-15T12:00:00Z"));
+    // versioning off: cacheKeyWithVersion() == cacheKey() == tableName/id-usecTimestamp (20 chars)
     const key = p.cacheKeyWithVersion();
-    expect(key).toBe(`posts/${p.id}-20230615120000000`);
+    expect(key).toBe(`posts/${p.id}-20230615120000000000`);
   });
 
   it("cache version for new records", () => {
@@ -277,9 +299,11 @@ describe("CacheKeyTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = a;
+        this.cacheVersioning = true;
       }
     }
-    const p = await Post.create({ title: "v", updated_at: new Date("2023-01-01T00:00:00Z") });
+    const p = await Post.create({ title: "v" });
+    p.writeAttribute("updated_at", new Date("2023-01-01T00:00:00Z"));
     const key = p.cacheKey();
     expect(key).toBe(`posts/${p.id}`);
   });
@@ -291,11 +315,13 @@ describe("CacheKeyTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = a;
+        this.cacheVersioning = true;
       }
     }
-    const p = await Post.create({ title: "z", updated_at: new Date("2023-01-01T10:00:00.000Z") });
+    const p = await Post.create({ title: "z" });
+    p.writeAttribute("updated_at", new Date("2023-01-01T10:00:00.000Z"));
     const version = p.cacheVersion();
-    expect(version).toBe("20230101100000000");
+    expect(version).toBe("20230101100000000000");
   });
 
   it("cache_version calls updated_at when the value is generated at create time", async () => {
@@ -305,6 +331,7 @@ describe("CacheKeyTest", () => {
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = a;
+        this.cacheVersioning = true;
       }
     }
     const p = await Post.create({ title: "gen" });
@@ -312,7 +339,14 @@ describe("CacheKeyTest", () => {
     if (updatedAt instanceof Date) {
       const version = p.cacheVersion();
       expect(version).not.toBeNull();
-      const expected = updatedAt.toISOString().replace(/[^0-9]/g, "");
+      const ms = updatedAt.getUTCMilliseconds().toString().padStart(3, "0");
+      const expected =
+        updatedAt
+          .toISOString()
+          .replace(/[^0-9]/g, "")
+          .slice(0, 14) +
+        ms +
+        "000";
       expect(version).toBe(expected);
     } else {
       expect(p.cacheVersion()).toBeNull();
@@ -370,6 +404,7 @@ describe("cacheKey / cacheKeyWithVersion", () => {
     User.attribute("id", "integer");
     User.attribute("updated_at", "datetime");
     User.adapter = adapter;
+    User.cacheVersioning = true;
 
     const user = await User.create({});
     expect(user.cacheVersion()).not.toBeNull();

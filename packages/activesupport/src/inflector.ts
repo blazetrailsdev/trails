@@ -174,9 +174,14 @@ export function parameterize(
 ): string {
   const { separator = "-", preserveCase = false } = options;
 
-  // Transliterate (basic - strip non-ASCII)
-  // eslint-disable-next-line no-control-regex
-  let result = str.replace(/[^\x00-\x7F]/g, "");
+  // Mirrors Rails' transliterate: NFD-decompose to strip combining diacritical
+  // marks (U+0300–U+036F), then drop any remaining non-ASCII characters.
+  // This converts café→cafe, Müller→muller, matching Rails' default behavior.
+  let result = str
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[^\x00-\x7F]/g, "");
 
   if (separator === "") {
     const words = result.split(/[^a-z0-9]+/gi).filter((w) => w.length > 0);

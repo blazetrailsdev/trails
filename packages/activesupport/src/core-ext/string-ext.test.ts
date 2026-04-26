@@ -330,6 +330,10 @@ describe("StringInflectionsTest", () => {
     expect(parameterize("!@#Leading bad characters")).toBe("leading-bad-characters");
     expect(parameterize("Squeeze   separators")).toBe("squeeze-separators");
     expect(parameterize("Test with + sign")).toBe("test-with-sign");
+    // Diacritic transliteration (matches Rails' transliterate behavior)
+    expect(parameterize("café")).toBe("cafe");
+    expect(parameterize("Müller")).toBe("muller");
+    expect(parameterize("naïve")).toBe("naive");
   });
 
   it("string parameterized normal preserve case", () => {
@@ -415,6 +419,10 @@ describe("StringInflectionsTest", () => {
     expect(
       truncate("Oh dear! Oh dear! I shall be late!", 18, { omission: "...", separator: " " }),
     ).toBe("Oh dear! Oh...");
+    // Separator falls at exactly the truncation boundary (Rails rindex behavior)
+    expect(truncate("ab-ab-ab-ab-ab-ab-ab-rest", 20, { omission: "", separator: /-/ })).toBe(
+      "ab-ab-ab-ab-ab-ab-ab",
+    );
   });
 
   it("truncate with omission and regexp separator", () => {

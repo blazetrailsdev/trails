@@ -5709,6 +5709,7 @@ describe("CalculationsTest", () => {
         this.attribute("name", "string");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
+        this.cacheVersioning = true; // stable key without timestamp
       }
     }
 

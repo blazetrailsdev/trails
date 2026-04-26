@@ -32,8 +32,10 @@ export function truncate(
   const { omission = "...", separator } = options;
   if (str.length <= length) return str;
   const truncateAt = Math.max(0, length - omission.length);
-  let stop = str.slice(0, truncateAt);
   if (separator) {
+    // Mirrors Rails' String#rindex(separator, truncateAt): find the last
+    // occurrence of the separator at or before position truncateAt (inclusive).
+    const searchStr = str.slice(0, truncateAt + 1);
     const sepPattern =
       typeof separator === "string"
         ? new RegExp(separator.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"), "g")
@@ -43,16 +45,16 @@ export function truncate(
           );
     let lastIndex = -1;
     let match: RegExpExecArray | null;
-    while ((match = sepPattern.exec(stop)) !== null) {
+    while ((match = sepPattern.exec(searchStr)) !== null) {
       if (match[0].length === 0) {
         sepPattern.lastIndex++;
         continue;
       }
       lastIndex = match.index;
     }
-    if (lastIndex >= 0) stop = stop.slice(0, lastIndex);
+    if (lastIndex >= 0) return str.slice(0, lastIndex) + omission;
   }
-  return stop + omission;
+  return str.slice(0, truncateAt) + omission;
 }
 
 export function truncateWords(
