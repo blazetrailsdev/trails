@@ -18,9 +18,5 @@
   "ar-57": {
     "side": "diff",
     "reason": "includes + references + string where: Rails promotes includes(:author) to a LEFT OUTER JOIN + column-aliased SELECT when references(:author) is combined with a string WHERE touching that table (same mechanism as eagerLoad). trails emits a plain SELECT with the WHERE clause but no JOIN. Same root cause as ar-16 \u2014 eagerLoad JOIN + column-projection behaviour is not implemented."
-  },
-  "ar-99": {
-    "side": "diff",
-    "reason": "from() with subquery alias: Rails does not quote the subquery alias ('books'); trails always quotes table aliases. Rails: 'SELECT \"books\".* FROM (SELECT \"books\".* FROM \"books\" WHERE \"books\".\"active\" = 1) books'; trails: 'SELECT \"books\".* FROM (SELECT \"books\".* FROM \"books\" WHERE \"books\".\"active\" = 1) \"books\"'. Root cause: Arel's alias quoting is unconditional; Rails' parser handles bare aliases specially in FROM clauses."
   }
 }

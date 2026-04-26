@@ -534,6 +534,32 @@ describe("RelationTest", () => {
     expect(sql).toContain("FROM");
   });
 
+  it("from(relation, alias) emits bare alias (mirrors Rails SqlLiteral unquoted path)", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.attribute("active", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    const sql = Book.from(Book.where({ active: true }), "books").toSql();
+    // Rails: FROM (SELECT "books".* FROM "books" WHERE ...) books  ← bare alias
+    expect(sql).toMatch(/FROM \(SELECT .+\) books/);
+    expect(sql).not.toContain(') "books"');
+  });
+
+  it("from(rawSql, alias) emits bare alias for valid identifiers", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const sql = Book.from("(SELECT * FROM books WHERE active = 1) books", "books").toSql();
+    expect(sql).toMatch(/\) books/);
+    expect(sql).not.toContain(') "books"');
+  });
+
   it("relation with annotation includes comment in to sql", () => {
     class Post extends Base {
       static {

@@ -102,6 +102,16 @@ function _buildOnString(...predicates: Nodes.Node[]): string {
   return new Visitors.ToSql().compile(node);
 }
 
+/**
+ * Return the alias bare if it is a valid SQL identifier (letters/digits/underscore,
+ * starting with a letter or underscore), otherwise double-quote and escape it.
+ * Mirrors Rails: aliases come from Symbol/string caller code — Rails assumes they
+ * are safe identifiers. We add a guard so malformed aliases don't produce invalid SQL.
+ */
+function _safeAlias(alias: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(alias) ? alias : `"${alias.replace(/"/g, '""')}"`;
+}
+
 function validateExplainOptions(options: ExplainOption[]): void {
   let seenHash = false;
   for (let i = 0; i < options.length; i++) {
@@ -3161,9 +3171,12 @@ export class Relation<T extends Base> {
       if (raw instanceof Relation) {
         const subSql = raw.toSql();
         const name = alias ?? "subquery";
-        fromExpr = `(${subSql}) "${name.replace(/"/g, '""')}"`;
+        // Rails wraps the alias in SqlLiteral so quote_table_name leaves it bare.
+        // Only emit bare when the alias is a safe identifier; fall back to quoted
+        // for names that would produce invalid SQL or risk injection.
+        fromExpr = `(${subSql}) ${_safeAlias(name)}`;
       } else if (alias) {
-        fromExpr = `${raw} "${alias.replace(/"/g, '""')}"`;
+        fromExpr = `${raw} ${_safeAlias(alias)}`;
       } else {
         fromExpr = raw;
       }
