@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
+import { touchAttributesWithTime } from "./timestamp.js";
 
 /**
  * Counter cache operations for ActiveRecord models.
@@ -109,6 +110,8 @@ function buildPkPredicate(
   return attr.eq(id);
 }
 
+type ResetCountersOptions = { touch?: boolean | string | string[] };
+
 /**
  * Reset counter caches by recounting the actual associated records.
  *
@@ -117,14 +120,26 @@ function buildPkPredicate(
 export async function resetCounters(
   this: typeof Base,
   id: unknown,
-  ...counterNames: string[]
+  ...args: [...counterNames: string[], options: ResetCountersOptions] | [...counterNames: string[]]
 ): Promise<void> {
+  let options: ResetCountersOptions = {};
+  const counterNames: string[] = [];
+  for (const arg of args) {
+    if (typeof arg === "string") {
+      counterNames.push(arg);
+    } else {
+      options = arg;
+    }
+  }
+
   const record = await this.find(id);
   const assocDefs = (this as any)._associations as
     | Array<{ type: string; name: string; options: any }>
     | undefined;
   const hasManyAssocs = assocDefs?.filter((a) => a.type === "hasMany") ?? [];
   const { resolveCounterColumn, countHasMany } = await import("./associations.js");
+
+  const updates: Record<string, unknown> = {};
   for (const counterName of counterNames) {
     let assoc = hasManyAssocs.find((a) => a.name === counterName);
     let counterColumn: string;
@@ -153,7 +168,20 @@ export async function resetCounters(
     }
 
     const count = await countHasMany(record, assoc.name, assoc.options);
-    await record.updateColumn(counterColumn, count);
+    updates[counterColumn] = count;
+  }
+
+  if (options.touch) {
+    const isEmptyArray = Array.isArray(options.touch) && options.touch.length === 0;
+    if (!isEmptyArray) {
+      const names = options.touch === true ? [] : ([] as string[]).concat(options.touch);
+      const touchUpdates = touchAttributesWithTime.call(this, ...names);
+      Object.assign(updates, touchUpdates);
+    }
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await this.unscoped().where(buildPkPredicate(this, record.id)).updateAll(updates);
   }
 }
 

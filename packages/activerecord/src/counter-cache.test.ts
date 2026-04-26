@@ -870,8 +870,70 @@ describe("CounterCacheTest", () => {
     const after = await Topic.find(t.id);
     expect(after.replies_count).toBe(3);
   });
-  it.skip("reset counters with touch true touches the counter cache association", () => {});
-  it.skip("reset counters with touch option touches the counter cache association", () => {});
+  it("reset counters with touch true touches the counter cache association", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    const originalTime = new Date("2020-01-01T00:00:00.000Z");
+    const t = await Topic.create({ title: "test", updated_at: originalTime });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await Reply.create({ content: "r2", topic_id: t.id });
+    await Reply.create({ content: "r3", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 50 });
+    await Topic.resetCounters(t.id, "replies", { touch: true });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(3);
+    const updatedTime =
+      reloaded.updated_at instanceof Date
+        ? reloaded.updated_at.getTime()
+        : Number(new Date(String(reloaded.updated_at)));
+    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+  });
+
+  it("reset counters with touch option touches the counter cache association", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "test" });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 50 });
+    await Topic.resetCounters(t.id, "replies", { touch: "written_on" });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
+    expect(reloaded.written_on).not.toBeNull();
+  });
   it("counter gets decremented when associated record is destroyed", async () => {
     class Topic extends Base {
       static {
@@ -1384,17 +1446,15 @@ describe("CounterCacheTest", () => {
         this.adapter = adapter;
       }
     }
-    const originalTime = new Date("2020-01-01");
-    const t = await Topic.create({ title: "test", updated_at: originalTime });
+    const t = await Topic.create({
+      title: "test",
+      updated_at: new Date("2020-01-01T00:00:00.000Z"),
+    });
+    const before = await Topic.find(t.id);
     await Topic.updateCounters(t.id, { replies_count: 1 }, { touch: [] as string[] });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(1);
-    const updatedAt = reloaded.updated_at;
-    if (updatedAt instanceof Date) {
-      expect(updatedAt.getTime()).toBe(originalTime.getTime());
-    } else {
-      expect(String(updatedAt)).toContain("2020");
-    }
+    expect(String(reloaded.updated_at)).toBe(String(before.updated_at));
   });
 
   it("update counters with touch: true", async () => {
@@ -1418,10 +1478,142 @@ describe("CounterCacheTest", () => {
     expect(updatedTime).toBeGreaterThan(originalTime.getTime());
   });
 
-  it.skip("update counters of multiple records with touch: true", () => {});
-  it.skip("update multiple counters with touch: true", () => {});
-  it.skip("reset counters with touch: true", () => {});
-  it.skip("reset multiple counters with touch: true", () => {});
+  it("update counters of multiple records with touch: true", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const originalTime = new Date("2020-01-01T00:00:00.000Z");
+    const t1 = await Topic.create({ title: "a", updated_at: originalTime });
+    const t2 = await Topic.create({ title: "b", updated_at: originalTime });
+    await Topic.updateCounters([t1.id, t2.id], { replies_count: 2 }, { touch: true });
+    const r1 = await Topic.find(t1.id);
+    const r2 = await Topic.find(t2.id);
+    expect(r1.replies_count).toBe(2);
+    expect(r2.replies_count).toBe(2);
+    const t1Time =
+      r1.updated_at instanceof Date
+        ? r1.updated_at.getTime()
+        : Number(new Date(String(r1.updated_at)));
+    const t2Time =
+      r2.updated_at instanceof Date
+        ? r2.updated_at.getTime()
+        : Number(new Date(String(r2.updated_at)));
+    expect(t1Time).toBeGreaterThan(originalTime.getTime());
+    expect(t2Time).toBeGreaterThan(originalTime.getTime());
+  });
+
+  it("update multiple counters with touch: true", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("unique_replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const originalTime = new Date("2020-01-01T00:00:00.000Z");
+    const t = await Topic.create({ title: "test", updated_at: originalTime });
+    await Topic.updateCounters(
+      t.id,
+      { replies_count: 2, unique_replies_count: 2 },
+      { touch: true },
+    );
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(2);
+    expect(reloaded.unique_replies_count).toBe(2);
+    const updatedTime =
+      reloaded.updated_at instanceof Date
+        ? reloaded.updated_at.getTime()
+        : Number(new Date(String(reloaded.updated_at)));
+    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+  });
+
+  it("reset counters with touch: true", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    const originalTime = new Date("2020-01-01T00:00:00.000Z");
+    const t = await Topic.create({ title: "test", updated_at: originalTime });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 50 });
+    await Topic.resetCounters(t.id, "replies", { touch: true });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
+    const updatedTime =
+      reloaded.updated_at instanceof Date
+        ? reloaded.updated_at.getTime()
+        : Number(new Date(String(reloaded.updated_at)));
+    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+  });
+
+  it("reset multiple counters with touch: true", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("unique_replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class UniqueReply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.belongsTo.call(UniqueReply, "topic", { counterCache: "unique_replies_count" });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    Associations.hasMany.call(Topic, "uniqueReplies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    registerModel(UniqueReply);
+    const originalTime = new Date("2020-01-01T00:00:00.000Z");
+    const t = await Topic.create({ title: "test", updated_at: originalTime });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await UniqueReply.create({ content: "ur1", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 5, unique_replies_count: 7 });
+    await Topic.resetCounters(t.id, "replies", "uniqueReplies", { touch: true });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
+    expect(reloaded.unique_replies_count).toBe(1);
+    const updatedTime =
+      reloaded.updated_at instanceof Date
+        ? reloaded.updated_at.getTime()
+        : Number(new Date(String(reloaded.updated_at)));
+    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+  });
 
   it("increment counters with touch: true", async () => {
     class Topic extends Base {
@@ -1483,9 +1675,98 @@ describe("CounterCacheTest", () => {
     expect(reloaded.written_on).not.toBeNull();
   });
 
-  it.skip("update multiple counters with touch: :written_on", () => {});
-  it.skip("reset counters with touch: :written_on", () => {});
-  it.skip("reset multiple counters with touch: :written_on", () => {});
+  it("update multiple counters with touch: :written_on", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("unique_replies_count", "integer", { default: 0 });
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ title: "test" });
+    await Topic.updateCounters(
+      t.id,
+      { replies_count: 2, unique_replies_count: 2 },
+      { touch: "written_on" },
+    );
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(2);
+    expect(reloaded.unique_replies_count).toBe(2);
+    expect(reloaded.written_on).not.toBeNull();
+  });
+
+  it("reset counters with touch: :written_on", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "test" });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 50 });
+    await Topic.resetCounters(t.id, "replies", { touch: "written_on" });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
+    expect(reloaded.written_on).not.toBeNull();
+  });
+
+  it("reset multiple counters with touch: :written_on", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("unique_replies_count", "integer", { default: 0 });
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class UniqueReply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.belongsTo.call(UniqueReply, "topic", { counterCache: "unique_replies_count" });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    Associations.hasMany.call(Topic, "uniqueReplies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    registerModel(UniqueReply);
+    const t = await Topic.create({ title: "test" });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await UniqueReply.create({ content: "ur1", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 49, unique_replies_count: 24 });
+    await Topic.resetCounters(t.id, "replies", "uniqueReplies", { touch: "written_on" });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
+    expect(reloaded.unique_replies_count).toBe(1);
+    expect(reloaded.written_on).not.toBeNull();
+  });
 
   it("increment counters with touch: :written_on", async () => {
     class Topic extends Base {
@@ -1537,9 +1818,106 @@ describe("CounterCacheTest", () => {
     expect(reloaded.written_on).not.toBeNull();
   });
 
-  it.skip("update multiple counters with touch: %i( updated_at written_on )", () => {});
-  it.skip("reset counters with touch: %i( updated_at written_on )", () => {});
-  it.skip("reset multiple counters with touch: %i( updated_at written_on )", () => {});
+  it("update multiple counters with touch: %i( updated_at written_on )", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("unique_replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Topic.create({ title: "test" });
+    await Topic.updateCounters(
+      t.id,
+      { replies_count: 2, unique_replies_count: 2 },
+      { touch: ["updated_at", "written_on"] },
+    );
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(2);
+    expect(reloaded.unique_replies_count).toBe(2);
+    expect(reloaded.updated_at).not.toBeNull();
+    expect(reloaded.written_on).not.toBeNull();
+  });
+
+  it("reset counters with touch: %i( updated_at written_on )", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "test" });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 50 });
+    await Topic.resetCounters(t.id, "replies", { touch: ["updated_at", "written_on"] });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
+    expect(reloaded.updated_at).not.toBeNull();
+    expect(reloaded.written_on).not.toBeNull();
+  });
+
+  it("reset multiple counters with touch: %i( updated_at written_on )", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("unique_replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class UniqueReply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.belongsTo.call(UniqueReply, "topic", { counterCache: "unique_replies_count" });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    Associations.hasMany.call(Topic, "uniqueReplies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    registerModel(UniqueReply);
+    const t = await Topic.create({ title: "test" });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    await UniqueReply.create({ content: "ur1", topic_id: t.id });
+    await Topic.updateCounters(t.id, { replies_count: 50, unique_replies_count: 50 });
+    await Topic.resetCounters(t.id, "replies", "uniqueReplies", {
+      touch: ["updated_at", "written_on"],
+    });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
+    expect(reloaded.unique_replies_count).toBe(1);
+    expect(reloaded.updated_at).not.toBeNull();
+    expect(reloaded.written_on).not.toBeNull();
+  });
 
   it("increment counters with touch: %i( updated_at written_on )", async () => {
     class Topic extends Base {
