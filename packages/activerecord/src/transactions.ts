@@ -515,3 +515,126 @@ export function isTriggerTransactionalCallbacks(record: Base): boolean {
     (triggerDestroy && record.isDestroyed())
   );
 }
+
+// ---------------------------------------------------------------------------
+// Private instance helpers — mirrors ActiveRecord::Transactions private block.
+// Non-exported so the extractor marks them internal: true.
+// ---------------------------------------------------------------------------
+
+// Mirrors: attr_reader :_committed_already_called
+function _committedAlreadyCalled(record: Base): boolean | null {
+  return (record as any)._committedAlreadyCalled ?? null;
+}
+
+// Mirrors: attr_reader :_trigger_update_callback
+function _triggerUpdateCallback(record: Base): boolean | null {
+  return (record as any)._triggerUpdateCallback ?? null;
+}
+
+// Mirrors: attr_reader :_trigger_destroy_callback
+function _triggerDestroyCallback(record: Base): boolean | null {
+  return (record as any)._triggerDestroyCallback ?? null;
+}
+
+// Mirrors: ActiveRecord::Transactions#init_internals
+function initInternals(record: Base): void {
+  const r = record as any;
+  r._startTransactionState = null;
+  r._committedAlreadyCalled = null;
+  r._newRecordBeforeLastCommit = null;
+}
+
+// Mirrors: ActiveRecord::Transactions#clear_transaction_record_state
+function clearTransactionRecordState(record: Base): void {
+  const r = record as any;
+  if (!r._startTransactionState) return;
+  r._startTransactionState.level -= 1;
+  if (r._startTransactionState.level < 1) r._startTransactionState = null;
+}
+
+// Mirrors: ActiveRecord::Transactions#transaction_include_any_action?
+function isTransactionIncludeAnyAction(record: Base, actions: string[]): boolean {
+  const r = record as any;
+  return actions.some((action) => {
+    switch (action) {
+      case "create":
+        return record.isPersisted() && !!r._newRecordBeforeLastCommit;
+      case "update":
+        return (
+          !(r._newRecordBeforeLastCommit || record.isDestroyed()) && !!r._triggerUpdateCallback
+        );
+      case "destroy":
+        return !!r._triggerDestroyCallback;
+      default:
+        return false;
+    }
+  });
+}
+
+// Mirrors: ActiveRecord::Transactions#add_to_transaction
+async function addToTransaction(record: Base, ensureFinalize = true): Promise<void> {
+  const ctor = record.constructor as any;
+  if (typeof ctor.withConnection === "function") {
+    await ctor.withConnection(async (connection: any) => {
+      connection.addTransactionRecord?.(record, ensureFinalize);
+    });
+  }
+}
+
+// Mirrors: ActiveRecord::Transactions#has_transactional_callbacks?
+function hasTransactionalCallbacks(record: Base): boolean {
+  const ctor = record.constructor as any;
+  const chain = ctor._callbackChain;
+  if (!chain) return false;
+  const entries: Array<{ event: string }> = (chain as any).callbacks ?? [];
+  return entries.some(
+    (e) => e.event === "rollback" || e.event === "commit" || e.event === "before_commit",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Private class helpers — mirrors ActiveRecord::Transactions::ClassMethods private block.
+// ---------------------------------------------------------------------------
+
+// Mirrors: ActiveRecord::Transactions::ClassMethods#prepend_option
+function prependOption(this: unknown): Record<string, unknown> {
+  return {};
+}
+
+const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
+
+// Mirrors: ActiveRecord::Transactions::ClassMethods#set_options_for_callbacks!
+function setOptionsForCallbacksBang(
+  args: unknown[],
+  enforcedOptions: Record<string, unknown> = {},
+): void {
+  const lastArg = args[args.length - 1];
+  const options: Record<string, unknown> =
+    lastArg !== null && typeof lastArg === "object" && !Array.isArray(lastArg)
+      ? (args.pop() as Record<string, unknown>)
+      : {};
+  Object.assign(options, enforcedOptions);
+  args.push(options);
+
+  if (options.on) {
+    const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
+    assertValidTransactionAction(fireOn);
+    const existingIf = options.if as CallbackFn | CallbackFn[] | undefined;
+    options.if = (record: Base) => {
+      if (!isTransactionIncludeAnyAction(record, fireOn)) return false;
+      if (!existingIf) return true;
+      if (Array.isArray(existingIf)) return existingIf.every((fn) => fn(record));
+      return (existingIf as CallbackFn)(record) as boolean;
+    };
+  }
+}
+
+// Mirrors: ActiveRecord::Transactions::ClassMethods#assert_valid_transaction_action
+function assertValidTransactionAction(actions: string[]): void {
+  const invalid = actions.filter((a) => !VALID_TRANSACTION_ACTIONS.has(a));
+  if (invalid.length > 0) {
+    throw new ArgumentError(
+      `:on conditions for after_commit and after_rollback callbacks have to be one of [:create, :destroy, :update]`,
+    );
+  }
+}
