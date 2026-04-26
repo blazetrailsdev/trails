@@ -150,7 +150,9 @@ describe("WhereTest", () => {
     expect(sql).toContain('"posts"');
     expect(sql).toContain("title");
   });
-  it.skip("where with table name and target table joined", () => {});
+  it.skip("where with table name and target table joined", () => {
+    /* needs JOIN across tables */
+  });
   it("where with string and bound variable", () => {
     class Post extends Base {
       static {
@@ -283,11 +285,21 @@ describe("WhereTest", () => {
     const sql = Post.where({ title: ["a", "b"] }).toSql();
     expect(sql).toContain("IN");
   });
-  it.skip("belongs to association where with non primary key", () => {});
-  it.skip("where with association conditions", () => {});
-  it.skip("where association with default scope", () => {});
-  it.skip("where with strong parameters", () => {});
-  it.skip("where with conditions on both tables", () => {});
+  it.skip("belongs to association where with non primary key", () => {
+    /* needs belongs_to association with automatic JOIN */
+  });
+  it.skip("where with association conditions", () => {
+    /* needs association-scoped WHERE with automatic JOIN */
+  });
+  it.skip("where association with default scope", () => {
+    /* needs association-scoped WHERE with automatic JOIN */
+  });
+  it.skip("where with strong parameters", () => {
+    /* needs ActionController::Parameters integration in this test setup or ActiveRecord.where support for coercing Parameters to a plain hash */
+  });
+  it.skip("where with conditions on both tables", () => {
+    /* needs JOIN across tables */
+  });
   it("where with blank condition", () => {
     class Post extends Base {
       static {
@@ -338,11 +350,21 @@ describe("WhereTest", () => {
     const result = await Post.where({ views: new Range(1, 10, true) }).toArray();
     expect(result).toHaveLength(2);
   });
-  it.skip("where on association with custom primary key", () => {});
-  it.skip("where with association polymorphic", () => {});
-  it.skip("where with unsupported association raises", () => {});
-  it.skip("where with arel star", () => {});
-  it.skip("where on association with relation", () => {});
+  it.skip("where on association with custom primary key", () => {
+    /* needs association-scoped WHERE with automatic JOIN */
+  });
+  it.skip("where with association polymorphic", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("where with unsupported association raises", () => {
+    /* needs association infrastructure for error path */
+  });
+  it.skip("where with arel star", () => {
+    /* Arel.star as hash key raises ArgumentError in Rails; behavior not yet validated */
+  });
+  it.skip("where on association with relation", () => {
+    /* needs association-scoped subquery */
+  });
   it("where with numeric comparison", () => {
     class Post extends Base {
       static {
@@ -687,26 +709,154 @@ describe("WhereTest", () => {
     const rel2 = rel1.where({ title: "b" });
     expect(rel1.toSql()).not.toEqual(rel2.toSql());
   });
-  it.skip("where with tuple syntax", () => {});
-  it.skip("where with tuple syntax on composite models", () => {});
-  it.skip("where with tuple syntax with incorrect arity", () => {});
-  it.skip("where with tuple syntax and regular syntax combined", () => {});
-  it.skip("with tuple syntax and large values list", () => {});
-  it.skip("where with nil cpk association", () => {});
-  it.skip("belongs to shallow where", () => {});
-  it.skip("belongs to nested relation where", () => {});
-  it.skip("belongs to nested where", () => {});
-  it.skip("belongs to nested where with relation", () => {});
-  it.skip("polymorphic shallow where", () => {});
-  it.skip("where not polymorphic id and type as nand", () => {});
-  it.skip("where not association as nand", () => {});
-  it.skip("polymorphic nested array where not", () => {});
-  it.skip("polymorphic array where multiple types", () => {});
-  it.skip("polymorphic nested relation where", () => {});
-  it.skip("polymorphic sti shallow where", () => {});
-  it.skip("polymorphic nested where", () => {});
-  it.skip("polymorphic sti nested where", () => {});
-  it.skip("decorated polymorphic where", () => {});
+  it("where with tuple syntax", async () => {
+    class CpkBook extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("number", "integer");
+        this.attribute("title", "string");
+        this.primaryKey = ["author_id", "number"];
+        this.adapter = adapter;
+      }
+    }
+    await CpkBook.create({ author_id: 1, number: 100, title: "First" });
+    await CpkBook.create({ author_id: 1, number: 200, title: "Second" });
+    await CpkBook.create({ author_id: 2, number: 100, title: "Other" });
+    const result = await CpkBook.where(["author_id", "number"], [[1, 100]]).toArray();
+    expect(result).toHaveLength(1);
+    const book = result[0] as InstanceType<typeof CpkBook>;
+    expect(book.title).toBe("First");
+  });
+
+  it("where with tuple syntax on composite models", async () => {
+    class CpkOrder extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("number", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "number"];
+        this.adapter = adapter;
+      }
+    }
+    await CpkOrder.create({ shop_id: 1, number: 10, status: "pending" });
+    await CpkOrder.create({ shop_id: 2, number: 20, status: "shipped" });
+    const result = await CpkOrder.where(
+      ["shop_id", "number"],
+      [
+        [1, 10],
+        [2, 20],
+      ],
+    ).toArray();
+    expect(result).toHaveLength(2);
+  });
+
+  it("where with tuple syntax with incorrect arity", () => {
+    class CpkPost extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("number", "integer");
+        this.primaryKey = ["shop_id", "number"];
+        this.adapter = adapter;
+      }
+    }
+    // Tuple inner length (1) doesn't match column count (2) — must raise with the specific mismatch details
+    expect(() => CpkPost.where(["shop_id", "number"], [[1]])).toThrow(
+      "tuple arity 1 does not match column count 2",
+    );
+  });
+
+  it("where with tuple syntax and regular syntax combined", async () => {
+    class CpkItem extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("number", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "number"];
+        this.adapter = adapter;
+      }
+    }
+    await CpkItem.create({ shop_id: 1, number: 1, status: "active" });
+    await CpkItem.create({ shop_id: 1, number: 2, status: "inactive" });
+    await CpkItem.create({ shop_id: 2, number: 1, status: "active" });
+    const result = await CpkItem.where(
+      ["shop_id", "number"],
+      [
+        [1, 1],
+        [1, 2],
+      ],
+    )
+      .where({ status: "active" })
+      .toArray();
+    expect(result).toHaveLength(1);
+    const item = result[0] as InstanceType<typeof CpkItem>;
+    expect(item.shop_id).toBe(1);
+    expect(item.number).toBe(1);
+  });
+
+  it("with tuple syntax and large values list", async () => {
+    class CpkEntry extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("number", "integer");
+        this.attribute("title", "string");
+        this.primaryKey = ["shop_id", "number"];
+        this.adapter = adapter;
+      }
+    }
+    const tuples: [number, number][] = [];
+    for (let i = 1; i <= 20; i++) {
+      await CpkEntry.create({ shop_id: 1, number: i, title: `item${i}` });
+      if (i <= 10) tuples.push([1, i]);
+    }
+    const result = await CpkEntry.where(["shop_id", "number"], tuples).toArray();
+    expect(result).toHaveLength(10);
+  });
+
+  it.skip("where with nil cpk association", () => {
+    /* needs belongs_to with composite primary key — association infrastructure gap */
+  });
+  it.skip("belongs to shallow where", () => {
+    /* needs belongs_to association with automatic JOIN */
+  });
+  it.skip("belongs to nested relation where", () => {
+    /* needs belongs_to association with automatic JOIN */
+  });
+  it.skip("belongs to nested where", () => {
+    /* needs belongs_to association with automatic JOIN */
+  });
+  it.skip("belongs to nested where with relation", () => {
+    /* needs belongs_to association with automatic JOIN */
+  });
+  it.skip("polymorphic shallow where", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("where not polymorphic id and type as nand", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("where not association as nand", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("polymorphic nested array where not", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("polymorphic array where multiple types", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("polymorphic nested relation where", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("polymorphic sti shallow where", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("polymorphic nested where", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("polymorphic sti nested where", () => {
+    /* needs polymorphic association setup */
+  });
+  it.skip("decorated polymorphic where", () => {
+    /* needs polymorphic association setup */
+  });
   it("where with empty hash and no foreign key", () => {
     class Post extends Base {
       static {
@@ -738,8 +888,12 @@ describe("WhereTest", () => {
     const sql = Post.where({ title: 123.456 }).toSql();
     expect(sql).toContain("123.456");
   });
-  it.skip("where with rational for string column", () => {});
-  it.skip("where with duration for string column", () => {});
+  it.skip("where with rational for string column", () => {
+    /* Rational is a Ruby type with no JS equivalent */
+  });
+  it.skip("where with duration for string column", () => {
+    /* ActiveSupport::Duration exists, but where predicate building/type-casting for Duration values is not implemented yet */
+  });
   it("where with integer for binary column", () => {
     class Post extends Base {
       static {
@@ -760,14 +914,30 @@ describe("WhereTest", () => {
     const sql = Post.where({ data: "hello" }).toSql();
     expect(sql).toContain("hello");
   });
-  it.skip("where on association with custom primary key with relation", () => {});
-  it.skip("where on association with relation performs subselect not two queries", () => {});
-  it.skip("where on association with custom primary key with array of base", () => {});
-  it.skip("where on association with custom primary key with array of ids", () => {});
-  it.skip("where with relation on has many association", () => {});
-  it.skip("where with relation on has one association", () => {});
-  it.skip("where on association with select relation", () => {});
-  it.skip("where on association with collection polymorphic relation", () => {});
+  it.skip("where on association with custom primary key with relation", () => {
+    /* needs association-scoped subquery */
+  });
+  it.skip("where on association with relation performs subselect not two queries", () => {
+    /* needs association-scoped subquery */
+  });
+  it.skip("where on association with custom primary key with array of base", () => {
+    /* needs association-scoped subquery */
+  });
+  it.skip("where on association with custom primary key with array of ids", () => {
+    /* needs association-scoped subquery */
+  });
+  it.skip("where with relation on has many association", () => {
+    /* needs association-scoped WHERE with automatic JOIN */
+  });
+  it.skip("where with relation on has one association", () => {
+    /* needs association-scoped WHERE with automatic JOIN */
+  });
+  it.skip("where on association with select relation", () => {
+    /* needs association-scoped WHERE with automatic JOIN */
+  });
+  it.skip("where on association with collection polymorphic relation", () => {
+    /* needs polymorphic association setup */
+  });
   it("where with unsupported arguments", () => {
     class Post extends Base {
       static {
@@ -1532,15 +1702,15 @@ describe("WhereTest", () => {
   });
 
   it.skip("type casting nested joins", async () => {
-    // requires join fixture setup
+    /* needs join fixture setup */
   });
 
   it.skip("where with through association", async () => {
-    // requires has_many :through
+    /* needs has_many :through */
   });
 
   it.skip("polymorphic nested array where", async () => {
-    // requires polymorphic association fixture
+    /* needs polymorphic association fixture */
   });
 });
 
