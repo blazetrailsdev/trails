@@ -1,0 +1,51 @@
+FROM node:22-slim AS base
+RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
+WORKDIR /app
+
+# Copy workspace root files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+
+# Copy all package.json and tsconfig files for install
+COPY packages/activesupport/package.json packages/activesupport/tsconfig.json packages/activesupport/
+COPY packages/arel/package.json packages/arel/tsconfig.json packages/arel/
+COPY packages/activemodel/package.json packages/activemodel/tsconfig.json packages/activemodel/
+COPY packages/activerecord/package.json packages/activerecord/tsconfig.json packages/activerecord/
+COPY packages/rack/package.json packages/rack/tsconfig.json packages/rack/
+COPY packages/actionview/package.json packages/actionview/tsconfig.json packages/actionview/
+COPY packages/actionpack/package.json packages/actionpack/tsconfig.json packages/actionpack/
+COPY packages/railties/package.json packages/railties/tsconfig.json packages/railties/
+COPY packages/website/package.json packages/website/
+
+# Install deps
+RUN pnpm install --frozen-lockfile
+
+# Copy source
+COPY packages/activesupport/ packages/activesupport/
+COPY packages/arel/ packages/arel/
+COPY packages/activemodel/ packages/activemodel/
+COPY packages/activerecord/ packages/activerecord/
+COPY packages/rack/ packages/rack/
+COPY packages/actionview/ packages/actionview/
+COPY packages/actionpack/ packages/actionpack/
+COPY packages/railties/ packages/railties/
+COPY packages/website/ packages/website/
+
+# Build all packages (tsc)
+RUN pnpm build
+
+# Build website (SW bundle + SvelteKit static)
+WORKDIR /app/packages/website
+RUN pnpm exec svelte-kit sync
+RUN pnpm run build
+
+# Serve static files with a lightweight server
+FROM node:22-slim
+RUN npm install -g serve@14
+WORKDIR /app
+
+COPY --from=base /app/packages/website/build/ ./build/
+
+ENV PORT=5000
+EXPOSE 5000
+
+CMD ["serve", "-s", "build", "-l", "5000"]

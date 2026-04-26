@@ -11,3 +11,4 @@ docs/.vitepress/dist/
 static/sandbox-sw.js
 static/sql-wasm.js
 static/sql-wasm.wasm
+static/blazetrails-types.json
