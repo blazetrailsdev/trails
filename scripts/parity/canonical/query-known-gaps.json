@@ -30,5 +30,25 @@
   "ar-143": {
     "side": "trails-missing",
     "reason": "leftOuterJoins() crashes on nested hash arguments: trails accepts an object into Relation#leftOuterJoins/leftJoins and later tries to build a LEFT OUTER JOIN with that plain object as the table operand (relation.ts:1230+), raising 'Unknown node type: Object'. Real fix: handle or reject nested-hash/object arguments in Relation#leftOuterJoins/leftJoins before _applyJoinsToManager builds Arel JOIN nodes — for example by reusing the nested-association resolution from joins() or adding early argument validation."
+  },
+  "ar-150": {
+    "side": "diff",
+    "reason": "where(assoc_name: relation) uses the literal key as the column name instead of resolving the FK: where({ author: relation }) produces WHERE \"books\".\"author\" IN (...) instead of WHERE \"books\".\"author_id\" IN (...). Rails resolves the association name to its foreign_key via the belongs_to definition; Trails uses the key directly as a column name. Real fix: the WHERE-condition path must check if the key matches an association name and substitute its foreign_key."
+  },
+  "ar-151": {
+    "side": "diff",
+    "reason": "annotate() comment is appended after ORDER BY instead of before it: Rails emits the /* comment */ between the WHERE clause and ORDER BY (e.g. WHERE ... /* comment */ ORDER BY ...); Trails appends it at the very end after ORDER BY (WHERE ... ORDER BY ... /* comment */). Real fix: the SQL-generation path in Relation#toSql must insert annotate comments before ORDER BY, matching Rails' Arel visitor output order."
+  },
+  "ar-152": {
+    "side": "diff",
+    "reason": "has_many with a default scope does not embed the scope condition in the JOIN ON clause: Rails resolves joins(:published_books) to INNER JOIN \"books\" ON \"books\".\"status\" = 'published' AND \"books\".\"author_id\" = ...; Trails emits only INNER JOIN \"books\" ON \"books\".\"author_id\" = ... (scope condition dropped). Real fix: _resolveAssociationJoin must apply the association's :scope condition to the JOIN ON predicate when building the join for a scoped has_many."
+  },
+  "ar-153": {
+    "side": "trails-missing",
+    "reason": "Table#join(...).on(...).joinSources() crashes: Arel's Table#join returns a SelectManager whose ast.cores is undefined (the join builder path does not populate cores), so calling joinSources() throws TypeError: Cannot read properties of undefined (reading 'cores'). Rails returns a fully-formed join-sources array from the same call. Real fix: Table#join must build a SelectManager with a populated SelectCore so joinSources() can read the join list."
+  },
+  "ar-154": {
+    "side": "trails-missing",
+    "reason": "group() does not accept Arel node arguments: group(new Nodes.NamedFunction(...)) throws TypeError: col.trim is not a function because the group implementation calls .trim() on each argument assuming strings. Rails accepts any Arel::Node in group() and passes it to the GROUP BY clause via the Arel visitor. Real fix: the groupBang implementation must handle Arel node arguments by calling .toSql() (or passing them directly to the Arel manager) instead of treating them as strings."
   }
 }

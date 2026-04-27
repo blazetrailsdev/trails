@@ -1,0 +1,1 @@
+Book.joins(Book.arel_table.join(Author.arel_table).on(Book.arel_table[:author_id].eq(Author.arel_table[:id]).and(Author.arel_table[:active].eq(1))).join_sources).select("books.*, authors.name AS author_name")
