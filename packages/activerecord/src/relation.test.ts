@@ -339,11 +339,11 @@ describe("RelationTest", () => {
     expect(authorPos).toBeLessThan(tagPos);
   });
 
-  it("joins() places LeadingJoin ahead of InnerJoin even when passed later", () => {
-    // Rails build_join_buckets routes LeadingJoin → leading_join bucket (prepended)
-    // and non-LeadingJoin → join_node bucket (appended), regardless of argument
-    // order. This matters for eager-loading where join_sources is non-empty
-    // (query_methods.rb:1856-1863, build_joins:1891-1899).
+  it("joins() preserves insertion order with no stashed joins — InnerJoin before LeadingJoin when passed first", () => {
+    // Without stashed_eager_load or stashed_left_joins, Rails routes ALL explicit
+    // join nodes to leading_join in original insertion order (query_methods.rb:1856-1863
+    // else branch: condition `!LeadingJoin && (stashed_eager_load || stashed_left_joins)`
+    // is false, so every node goes to leading_join).
     class Book extends Base {
       static {
         this.tableName = "books";
@@ -360,8 +360,43 @@ describe("RelationTest", () => {
       authors,
       new Nodes.On(new Nodes.SqlLiteral("books.author_id = authors.id")),
     );
-    // leadingJoin passed second — should still appear before innerJoin in SQL
+    // innerJoin passed first → tags appears first (insertion order preserved)
     const sqlStr = Book.joins(innerJoin, leadingJoin).toSql();
+    const authorPos = sqlStr.indexOf('"authors"');
+    const tagPos = sqlStr.indexOf('"tags"');
+    expect(authorPos).toBeGreaterThan(-1);
+    expect(tagPos).toBeGreaterThan(-1);
+    expect(tagPos).toBeLessThan(authorPos);
+  });
+
+  it("joins() with stashed eager-load: LeadingJoin before InnerJoin regardless of argument order", () => {
+    // With stashed joins present (eagerLoad sets _eagerLoadAssociations, the
+    // stashed_eager_load signal), _applyJoinsToManager routes LeadingJoin →
+    // leading_join (prepended first) and non-LeadingJoin → join_node (appended
+    // last). The "author" association need not exist on the model — this test
+    // exercises the routing split in _applyJoinsToManager (toSql path), not
+    // the stashed JOIN SQL insertion in buildJoins (buildArel path).
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const authors = new ArelTable("authors");
+    const tags = new ArelTable("tags");
+    const innerJoin = new Nodes.InnerJoin(
+      tags,
+      new Nodes.On(new Nodes.SqlLiteral("books.tag_id = tags.id")),
+    );
+    const leadingJoin = new Nodes.LeadingJoin(
+      authors,
+      new Nodes.On(new Nodes.SqlLiteral("books.author_id = authors.id")),
+    );
+    // innerJoin passed first, but stashed signal causes routing split:
+    // leadingJoin → prepended, innerJoin → appended → authors before tags in SQL
+    const rel = Book.joins(innerJoin, leadingJoin).eagerLoad("author");
+    const sqlStr = rel.toSql();
     const authorPos = sqlStr.indexOf('"authors"');
     const tagPos = sqlStr.indexOf('"tags"');
     expect(authorPos).toBeGreaterThan(-1);

@@ -2320,21 +2320,23 @@ export class Relation<T extends Base> {
 
   private _applyJoinsToManager(manager: SelectManager): void {
     // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
-    // LeadingJoin nodes go to the leading_join bucket (prepended before any
-    // existing join_sources, including eager-load JoinDependency joins added by
-    // _buildEagerJoinManager). All other nodes — including StringJoin from raw SQL
-    // strings — go to the join_node bucket (appended after existing join_sources).
-    // This matches the stashed_eager_load / stashed_left_joins routing condition:
-    // `!LeadingJoin && (stashed_eager_load || stashed_left_joins) → join_node`.
+    // When stashed joins exist, non-LeadingJoin nodes go to join_node (appended
+    // after), LeadingJoin goes to leading_join (prepended before). Without stashed
+    // joins all nodes go to leading_join in insertion order (Rails' else branch).
+    // Stashed signal: existing join_sources (set by _buildEagerJoinManager before
+    // this call) OR _eagerLoadAssociations (stashed_eager_load equivalent).
+    // _includesAssociations is NOT included — includes may resolve via preload
+    // (no joins), so counting it would incorrectly split even in the non-join path.
+    const hasStashed = manager.joinSourceCount > 0 || this._eagerLoadAssociations.length > 0;
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
     for (const v of this._joinValues) {
       const node: Nodes.Join =
         typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v;
-      if (node instanceof Nodes.LeadingJoin) {
-        leadingJoins.push(node);
-      } else {
+      if (!(node instanceof Nodes.LeadingJoin) && hasStashed) {
         joinNodes.push(node);
+      } else {
+        leadingJoins.push(node);
       }
     }
     if (leadingJoins.length > 0) manager.prependJoinNodes(...leadingJoins);

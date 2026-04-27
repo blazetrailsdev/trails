@@ -334,6 +334,10 @@ export class SelectManager extends TreeManager {
     return [...this.core.source.right] as Join[];
   }
 
+  get joinSourceCount(): number {
+    return this.core.source.right.length;
+  }
+
   /**
    * Return the FROM sources (left side of the source).
    *

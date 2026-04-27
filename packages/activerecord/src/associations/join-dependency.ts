@@ -356,10 +356,12 @@ export class JoinDependency {
     joinsToAdd: JoinDependency[],
     _aliasTracker?: any,
     _references?: string[],
-  ): any[] {
-    const joins = this._nodes.map((n) => arelSql(n.joinSql));
+  ): Nodes.StringJoin[] {
+    const toStringJoin = (n: { joinSql: string }): Nodes.StringJoin =>
+      new Nodes.StringJoin(arelSql(n.joinSql));
+    const joins = this._nodes.map(toStringJoin);
     for (const oj of joinsToAdd) {
-      joins.push(...oj._nodes.map((n) => arelSql(n.joinSql)));
+      joins.push(...oj._nodes.map(toStringJoin));
     }
     return joins;
   }
