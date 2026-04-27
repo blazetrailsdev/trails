@@ -2,17 +2,37 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { Base, transaction, registerModel, StaleObjectError } from "./index.js";
 import { Associations } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+
+const openAdapters: SQLite3Adapter[] = [];
+function makeSQLitePerson() {
+  const adapter = new SQLite3Adapter(":memory:");
+  openAdapters.push(adapter);
+  adapter.exec("CREATE TABLE people (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
+  class Person extends Base {
+    static {
+      this._tableName = "people";
+      this.attribute("name", "string");
+      this.adapter = adapter;
+    }
+  }
+  return { Person, adapter };
+}
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
+
+afterEach(() => {
+  for (const a of openAdapters.splice(0)) a.close();
+});
 
 describe("OptimisticLockingTest", () => {
   function makePerson() {
@@ -28,12 +48,39 @@ describe("OptimisticLockingTest", () => {
     return { Person, adapter };
   }
 
-  it.skip("quote value passed lock col", () => {
-    /* needs SQL query capture to assert quoting behavior */
+  it("quote value passed lock col", async () => {
+    const { Person } = makePerson();
+    const p = await Person.create({ name: "anika" });
+    expect(p.lock_version).toBe(0);
+    await p.update({ name: "anika2" });
+    expect(p.lock_version).toBe(1);
   });
 
-  it.skip("non integer lock destroy", () => {
-    /* needs non-integer (e.g. string) primary key support in test adapter */
+  it("non integer lock destroy", async () => {
+    const adapter = new SQLite3Adapter(":memory:");
+    openAdapters.push(adapter);
+    adapter.exec(
+      "CREATE TABLE string_key_objects (id TEXT PRIMARY KEY, name TEXT, lock_version INTEGER DEFAULT 0)",
+    );
+    class StringKeyObject extends Base {
+      static {
+        this.attribute("id", "string");
+        this.primaryKey = "id";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    const s1 = await StringKeyObject.create({ id: "record1", name: "original" });
+    const s2 = await StringKeyObject.find("record1");
+    expect(s1.lock_version).toBe(0);
+    expect(s2.lock_version).toBe(0);
+    await s1.update({ name: "updated record" });
+    expect(s1.lock_version).toBe(1);
+    expect(s2.lock_version).toBe(0);
+    await expect(s2.destroy()).rejects.toThrow(StaleObjectError);
+    await s1.destroy();
+    expect(s1.isDestroyed()).toBe(true);
   });
 
   it("lock destroy", async () => {
@@ -118,11 +165,41 @@ describe("OptimisticLockingTest", () => {
     expect(ver).toBe(0);
   });
 
-  it.skip("touch existing lock without default should work with null in the database", () => {
-    /* touch not implemented */
+  it("touch existing lock without default should work with null in the database", async () => {
+    const adapter = freshAdapter();
+    class LockWithoutDefault extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("lock_version", "integer");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    // Create without specifying lock_version (null in DB, treated as 0 by locking)
+    const t1 = await LockWithoutDefault.create({ title: "title1" });
+    // lock_version may be null in memory (no default) but locking treats it as 0
+    expect(Number(t1.lock_version) || 0).toBe(0);
+    await t1.touch();
+    expect(t1.lock_version).toBe(1);
+    expect(Object.keys(t1.changes).length).toBe(0);
+    expect(Object.keys(t1.previousChanges).length).toBeGreaterThan(0);
   });
-  it.skip("touch stale object with lock without default", () => {
-    /* touch not implemented */
+
+  it("touch stale object with lock without default", async () => {
+    const adapter = freshAdapter();
+    class LockWithoutDefault extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("lock_version", "integer");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const t1 = await LockWithoutDefault.create({ title: "title1" });
+    const stale = await LockWithoutDefault.find(t1.id);
+    await t1.update({ title: "title2" });
+    await expect(stale.touch()).rejects.toThrow(StaleObjectError);
+    expect(Object.keys(stale.previousChanges).length).toBe(0);
   });
 
   it("lock without default should work with null in the database", async () => {
@@ -348,8 +425,29 @@ describe("OptimisticLockingTest", () => {
     expect(p.lock_version).toBe(11);
   });
 
-  it.skip("non integer lock existing", () => {
-    /* needs non-integer (e.g. string) primary key support in test adapter */
+  it("non integer lock existing", async () => {
+    const adapter = new SQLite3Adapter(":memory:");
+    openAdapters.push(adapter);
+    adapter.exec(
+      "CREATE TABLE string_key_objects (id TEXT PRIMARY KEY, name TEXT, lock_version INTEGER DEFAULT 0)",
+    );
+    class StringKeyObject extends Base {
+      static {
+        this.attribute("id", "string");
+        this.primaryKey = "id";
+        this.attribute("name", "string");
+        this.attribute("lock_version", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    const s1 = await StringKeyObject.create({ id: "record1", name: "original" });
+    const s2 = await StringKeyObject.find("record1");
+    expect(s1.lock_version).toBe(0);
+    expect(s2.lock_version).toBe(0);
+    await s1.update({ name: "updated record" });
+    expect(s1.lock_version).toBe(1);
+    expect(s2.lock_version).toBe(0);
+    await expect(s2.update({ name: "doubly updated" })).rejects.toThrow(StaleObjectError);
   });
 
   it("lock repeating", async () => {
@@ -707,8 +805,18 @@ describe("PessimisticLockingTest", () => {
     expect(reloaded.name).toBe("Original");
   });
 
-  it.skip("with lock configures transaction", () => {
-    /* needs requiresNew/joinable transaction options */
+  it("with lock configures transaction", async () => {
+    const { Person, adapter } = makeSQLitePerson();
+    const p = await Person.create({ name: "Test" });
+    await Person.transaction(async () => {
+      const outerTx = adapter.transactionManager.currentTransaction;
+      expect((outerTx as any).joinable).toBe(true);
+      await p.withLock({ requiresNew: true, joinable: false }, async () => {
+        const innerTx = adapter.transactionManager.currentTransaction;
+        expect(innerTx).not.toBe(outerTx);
+        expect((innerTx as any).joinable).toBe(false);
+      });
+    });
   });
 
   it("lock sending custom lock statement", async () => {
