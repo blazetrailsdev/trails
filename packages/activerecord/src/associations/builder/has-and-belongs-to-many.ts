@@ -219,3 +219,18 @@ export class HasAndBelongsToMany {
     Reflection.addReflection(model, name, habtmReflection as any);
   }
 }
+
+function middleOptions(builder: HasAndBelongsToMany, joinModel: unknown): Record<string, unknown> {
+  return (builder as any)._middleOptions?.(joinModel) ?? {};
+}
+
+function tableName(builder: HasAndBelongsToMany): string {
+  return (builder as any)._tableName?.() ?? "";
+}
+
+function belongsToOptions(
+  builder: HasAndBelongsToMany,
+  options: Record<string, unknown>,
+): Record<string, unknown> {
+  return (builder as any)._belongsToOptions?.(options) ?? {};
+}

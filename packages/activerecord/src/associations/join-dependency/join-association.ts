@@ -204,3 +204,29 @@ function nodeReferencesTable(node: Nodes.Node, tableName: string): boolean {
   });
   return found;
 }
+
+function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | null {
+  // Rails: if StringJoin, prepend constraints to left; otherwise combine via Arel::Nodes::And.
+  // Arel join node fields are readonly — return a new join with updated On constraint.
+  void Nodes.StringJoin;
+  if (!join || !constraints.length) return join as Nodes.Node | null;
+  const arelConstraints = constraints.filter((c): c is Nodes.Node => c instanceof Nodes.Node);
+  if (!arelConstraints.length) return join as Nodes.Node | null;
+  const joinAny = join as any;
+  if (join instanceof Nodes.StringJoin) {
+    const existing = joinAny.left;
+    const allExprs: Nodes.Node[] =
+      existing instanceof Nodes.Node ? [existing, ...arelConstraints] : arelConstraints;
+    const newLeft = allExprs.length === 1 ? allExprs[0] : new Nodes.And(allExprs);
+    return new Nodes.StringJoin(newLeft);
+  } else if (joinAny.right?.expr instanceof Nodes.Node) {
+    const existing = joinAny.right.expr as Nodes.Node;
+    const allExprs: Nodes.Node[] =
+      existing instanceof Nodes.And
+        ? [...existing.children, ...arelConstraints]
+        : [existing, ...arelConstraints];
+    const newExpr = new Nodes.And(allExprs);
+    return new (join as any).constructor(joinAny.left, new Nodes.On(newExpr));
+  }
+  return join as Nodes.Node | null;
+}

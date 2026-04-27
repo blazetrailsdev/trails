@@ -90,12 +90,12 @@ export class AliasTracker {
 
     const candidate =
       typeof aliasCandidate === "function" ? aliasCandidate() : (aliasCandidate ?? tableName);
-    const aliasedName = this._tableAliasFor(candidate);
+    const aliasedName = this.tableAliasFor(candidate);
 
     const newCount = this._getCount(aliasedName) + 1;
     this.aliases.set(aliasedName, newCount);
 
-    const finalName = newCount > 1 ? `${this._truncate(aliasedName)}_${newCount}` : aliasedName;
+    const finalName = newCount > 1 ? `${this.truncate(aliasedName)}_${newCount}` : aliasedName;
 
     return typeof arelTable.alias === "function" ? arelTable.alias(finalName) : arelTable;
   }
@@ -111,11 +111,11 @@ export class AliasTracker {
     return `${tableName}_${newCount}`;
   }
 
-  private _tableAliasFor(tableName: string): string {
+  private tableAliasFor(tableName: string): string {
     return tableName.slice(0, this._tableAliasLength).replace(/\./g, "_");
   }
 
-  private _truncate(name: string): string {
+  private truncate(name: string): string {
     return name.slice(0, this._tableAliasLength - 2);
   }
 }

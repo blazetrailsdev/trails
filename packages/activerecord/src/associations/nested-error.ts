@@ -5,7 +5,9 @@ interface AssociationLike {
   reflection: { name: string };
   isCollection?(): boolean;
   target?: unknown[];
-  options?: { indexErrors?: boolean };
+  nestedAttributesTarget?: unknown[];
+  // Rails index_errors: true = association order, :nested_attributes_order = write order
+  options?: { indexErrors?: boolean | "nestedAttributesOrder" };
 }
 
 interface InnerErrorLike {
@@ -39,12 +41,42 @@ export class NestedError extends ActiveModelNestedError {
   ): string {
     const name = association.reflection.name;
     const isCollection = association.isCollection?.() ?? false;
-    if (isCollection && association.options?.indexErrors) {
-      const index = association.target?.findIndex((r) => r === innerError.base);
+    const indexErrors = association.options?.indexErrors;
+    if (isCollection && indexErrors) {
+      // :nested_attributes_order uses nestedAttributesTarget (write order),
+      // true uses target (association/DB order) — mirrors Rails' ordered_records
+      const records =
+        indexErrors === "nestedAttributesOrder"
+          ? association.nestedAttributesTarget
+          : association.target;
+      const index = records?.findIndex((r) => r === innerError.base);
       if (index != null && index >= 0) {
         return `${name}[${index}].${innerError.attribute}`;
       }
     }
     return `${name}.${innerError.attribute}`;
   }
+}
+
+function association(err: NestedError): NestedError["association"] {
+  return err.association;
+}
+
+function indexErrorsSetting(err: NestedError): boolean | "nestedAttributesOrder" {
+  return (err.association as any).options?.indexErrors ?? false;
+}
+
+function index(err: NestedError, innerError: { base?: unknown }): number | undefined {
+  const records = orderedRecords(err);
+  if (!records || !innerError.base) return undefined;
+  const idx = records.findIndex((r) => r === innerError.base);
+  return idx >= 0 ? idx : undefined;
+}
+
+function orderedRecords(err: NestedError): unknown[] | null {
+  const setting = indexErrorsSetting(err);
+  const assoc = err.association;
+  if (setting === true) return Array.isArray(assoc.target) ? assoc.target : null;
+  if (setting === "nestedAttributesOrder") return (assoc as any).nestedAttributesTarget ?? null;
+  return null;
 }

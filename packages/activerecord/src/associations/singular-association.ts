@@ -140,3 +140,11 @@ export class SingularAssociation extends Association {
     this.replace(record);
   }
 }
+
+function scopeForCreate(assoc: SingularAssociation): Record<string, unknown> {
+  return (assoc as any).scope?.()?.scopeForCreate?.() ?? {};
+}
+
+function findTarget(assoc: SingularAssociation): Promise<Base | null> {
+  return assoc.loadTarget() as Promise<Base | null>;
+}

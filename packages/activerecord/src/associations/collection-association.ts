@@ -139,14 +139,17 @@ export class CollectionAssociation extends Association {
   }
 
   private async concatRecords(records: Base[]): Promise<void> {
+    let result = true;
     for (const record of records) {
-      this.setOwnerAttributes(record);
+      (this as any).raiseOnTypeMismatchBang(record);
       const added = this.addToTarget(record);
       if (!added) continue;
-      if (!this.owner.isNewRecord() && typeof (added as any).save === "function") {
-        await (added as any).save();
+      if (!this.owner.isNewRecord()) {
+        const saved = await insertRecord(this, record, true, false);
+        if (!saved) result = false;
       }
     }
+    if (!result) throw new Error("ActiveRecord::Rollback");
   }
 
   /**
@@ -250,30 +253,36 @@ export class CollectionAssociation extends Association {
    * delete/add only records that have changed.
    */
   replace(otherArray: Base[]): void {
-    const original = [...this.target];
-    const desiredIds = new Set(otherArray.map((r) => this.recordIdentity(r)));
-    const originalIds = new Set(original.map((r) => this.recordIdentity(r)));
-
-    const toRemove = original.filter((r) => !desiredIds.has(this.recordIdentity(r)));
-    const toAdd = otherArray.filter((r) => !originalIds.has(this.recordIdentity(r)));
-
-    for (const record of toRemove) {
-      const proceed = fireAssocCallbacks(this.options.beforeRemove, this.owner, record);
-      if (proceed === false) continue;
-      const idx = this.target.indexOf(record);
-      if (idx !== -1) {
-        this.target.splice(idx, 1);
-        this.removeInverseInstance(record);
+    for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
+    const originalTarget = [...this.target];
+    // Update in-memory target immediately (synchronous) then persist async.
+    // Rails does the same: replace_common_records_in_memory runs first,
+    // then transaction { replace_records } (async) handles DB.
+    replaceCommonRecordsInMemory(this, otherArray, originalTarget);
+    if (this.owner.isNewRecord()) {
+      // For new owners: just set the in-memory target directly
+      this.target = [...otherArray];
+      this.loadedBang();
+    } else if (!arraysEqual(otherArray, originalTarget)) {
+      // Sync in-memory: remove records not in new target, add new ones
+      for (const r of originalTarget) {
+        if (!otherArray.includes(r)) {
+          const idx = this.target.indexOf(r);
+          if (idx !== -1) this.target.splice(idx, 1);
+        }
       }
-      fireAssocCallbacks(this.options.afterRemove, this.owner, record);
+      for (const r of otherArray) {
+        if (!this.target.includes(r)) {
+          this.setOwnerAttributes(r);
+          this.addToTarget(r);
+        }
+      }
+      this.loadedBang();
+      // Persist changes async (matches Rails: transaction { replace_records })
+      void transaction(this, async () => {
+        await replaceRecords(this, otherArray, originalTarget);
+      });
     }
-
-    for (const record of toAdd) {
-      this.setOwnerAttributes(record);
-      this.addToTarget(record);
-    }
-
-    this.loadedBang();
   }
 
   /**
@@ -281,20 +290,15 @@ export class CollectionAssociation extends Association {
    * the in-memory target. For persisted records, uses scope if not loaded.
    */
   async isInclude(record: Base): Promise<boolean> {
-    if (record.isNewRecord()) {
-      return this.target.includes(record);
-    }
-    if (this.isLoaded()) {
-      const identity = this.recordIdentity(record);
-      return this.target.some((r) => this.recordIdentity(r) === identity);
+    if (record.isNewRecord() || this.isLoaded()) {
+      return isIncludeInMemory(this, record);
     }
     const rel = this.scope();
     if (rel && typeof rel.exists === "function") {
       const pk = this.primaryKeyValue(record);
       return await rel.exists(pk);
     }
-    const identity = this.recordIdentity(record);
-    return this.target.some((r) => this.recordIdentity(r) === identity);
+    return isIncludeInMemory(this, record);
   }
 
   /**
@@ -325,33 +329,8 @@ export class CollectionAssociation extends Association {
     record: Base,
     options: { skipCallbacks?: boolean; replace?: boolean } = {},
   ): Base | null {
-    const { skipCallbacks, replace: shouldReplace } = options;
-
-    let index = -1;
-    if (shouldReplace && this._replacedOrAddedTargets.has(record)) {
-      index = this.target.indexOf(record);
-    }
-
-    if (!skipCallbacks) {
-      const proceed = fireAssocCallbacks(this.reflection.options.beforeAdd, this.owner, record);
-      if (proceed === false) return null;
-    }
-
-    this.setInverseInstance(record);
-    this._replacedOrAddedTargets.add(record);
-    this._associationIds = null;
-
-    if (index !== -1) {
-      this.target[index] = record;
-    } else {
-      this.target.push(record);
-    }
-
-    if (!skipCallbacks) {
-      fireAssocCallbacks(this.reflection.options.afterAdd, this.owner, record);
-    }
-
-    return record;
+    const { skipCallbacks = false, replace: shouldReplace = false } = options;
+    return replaceOnTarget(this, record, skipCallbacks, shouldReplace);
   }
 
   /**
@@ -497,52 +476,12 @@ export class CollectionAssociation extends Association {
 
   private async deleteOrDestroy(records: Base[], method?: string): Promise<void> {
     if (records.length === 0) return;
-
-    // Fire beforeRemove callbacks; abort if any returns false
-    for (const record of records) {
-      const proceed = fireAssocCallbacks(this.options.beforeRemove, this.owner, record);
-      if (proceed === false) return;
-    }
-
-    const persisted = records.filter((r) => r.isPersisted());
-    if (method === "destroy") {
-      for (const record of persisted) {
-        if (typeof (record as any).destroy === "function") {
-          await (record as any).destroy();
-        }
-      }
-    } else if (persisted.length > 0) {
-      // Nullify FK columns on persisted records (Rails: delete_records)
-      const fks = this.foreignKeyColumns();
-      const nullAttrs: string[] = [...fks];
-      if (this.reflection.options.as) {
-        nullAttrs.push(`${underscore(this.reflection.options.as)}_type`);
-      }
-      for (const record of persisted) {
-        for (const attr of nullAttrs) {
-          if (typeof (record as any)._writeAttribute === "function") {
-            (record as any)._writeAttribute(attr, null);
-          } else {
-            (record as any)[attr] = null;
-          }
-        }
-        if (typeof (record as any).save === "function") {
-          await (record as any).save();
-        }
-      }
-    }
-
-    for (const record of records) {
-      const idx = this.target.indexOf(record);
-      if (idx !== -1) {
-        this.target.splice(idx, 1);
-      }
-      this.removeInverseInstance(record);
-    }
-    this._associationIds = null;
-
-    for (const record of records) {
-      fireAssocCallbacks(this.options.afterRemove, this.owner, record);
+    for (const record of records) (this as any).raiseOnTypeMismatchBang(record);
+    const existingRecords = records.filter((r) => !r.isNewRecord());
+    if (existingRecords.length === 0) {
+      await removeRecords(this, existingRecords, records, method ?? "");
+    } else {
+      await transaction(this, () => removeRecords(this, existingRecords, records, method ?? ""));
     }
   }
 
@@ -675,4 +614,170 @@ export class CollectionAssociation extends Association {
     }
     return found;
   }
+}
+
+function transaction(assoc: CollectionAssociation, block: () => Promise<void>): Promise<void> {
+  // Rails: reflection.klass.transaction(&block) — uses the reflection's klass, not assoc.klass
+  const klass = (assoc.reflection as any).klass ?? assoc.klass;
+  if (klass && typeof (klass as any).transaction === "function") {
+    return (klass as any).transaction(block);
+  }
+  return block();
+}
+
+async function insertRecord(
+  assoc: CollectionAssociation,
+  record: Base,
+  validate = true,
+  raise = false,
+): Promise<Base | null> {
+  // Mirrors Rails insert_record: set owner FK attributes on the record, then save it.
+  if (typeof (assoc as any).setOwnerAttributes === "function") {
+    (assoc as any).setOwnerAttributes(record);
+  }
+  const saveMethod = raise ? "saveBang" : "save";
+  if (typeof (record as any)[saveMethod] === "function") {
+    const saved = await (record as any)[saveMethod]({ validate });
+    return saved ? record : null;
+  }
+  if (typeof (record as any).save === "function") {
+    const saved = await (record as any).save();
+    if (!saved && raise) throw new Error(`Failed to insert ${record.constructor.name}`);
+    return saved ? record : null;
+  }
+  return record;
+}
+
+async function removeRecords(
+  assoc: CollectionAssociation,
+  existingRecords: Base[],
+  records: Base[],
+  method: string,
+): Promise<void> {
+  // Rails remove_records: fire before callbacks, delete persisted, remove from target, fire after
+  for (const record of records) callback(assoc, "beforeRemove", record);
+  if (existingRecords.length > 0) {
+    await Promise.resolve(deleteRecords(assoc, existingRecords, method));
+  }
+  for (const record of records) {
+    const idx = (assoc.target as Base[]).indexOf(record);
+    if (idx !== -1) (assoc.target as Base[]).splice(idx, 1);
+    assoc.removeInverseInstance(record);
+  }
+  (assoc as any)._associationIds = null;
+  for (const record of records) callback(assoc, "afterRemove", record);
+}
+
+function deleteRecords(assoc: CollectionAssociation, records: Base[], method: string): void {
+  throw new Error(`deleteRecords must be implemented by ${assoc.constructor.name}`);
+}
+
+async function replaceRecords(
+  assoc: CollectionAssociation,
+  newTarget: Base[],
+  originalTarget: Base[],
+): Promise<Base[]> {
+  // Rails: delete(difference(target, new_target)); concat(difference(new_target, target))
+  const toDelete = (assoc.target as Base[]).filter((r) => !newTarget.includes(r));
+  if (toDelete.length > 0) await assoc.delete(...toDelete);
+  const toAdd = newTarget.filter((r) => !(assoc.target as Base[]).includes(r));
+  if (toAdd.length > 0) {
+    const result = await assoc.concat(...toAdd);
+    if (!result) {
+      (assoc as any).target = originalTarget;
+      throw new Error(
+        `Failed to replace ${assoc.reflection.name} because one or more records could not be saved.`,
+      );
+    }
+  }
+  return assoc.target as Base[];
+}
+
+function replaceCommonRecordsInMemory(
+  assoc: CollectionAssociation,
+  newTarget: Base[],
+  originalTarget: Base[],
+): void {
+  const common = newTarget.filter((r) => originalTarget.includes(r));
+  for (const record of common) {
+    replaceOnTarget(assoc, record, true, true);
+  }
+}
+
+function replaceOnTarget(
+  assoc: CollectionAssociation,
+  record: Base,
+  skipCallbacks: boolean,
+  replace: boolean,
+): Base | null {
+  const replaced = assoc as any;
+  let index = -1;
+  if (replace && replaced._replacedOrAddedTargets?.has(record)) {
+    index = (assoc.target as Base[]).indexOf(record);
+  }
+
+  if (!skipCallbacks) {
+    const proceed = fireAssocCallbacks(assoc.reflection.options.beforeAdd, assoc.owner, record);
+    if (proceed === false) return null;
+  }
+
+  assoc.setInverseInstance(record);
+  replaced._replacedOrAddedTargets?.add(record);
+  replaced._associationIds = null;
+
+  const target = assoc.target as Base[];
+  if (index !== -1) {
+    target[index] = record;
+  } else {
+    target.push(record);
+  }
+
+  if (!skipCallbacks) {
+    fireAssocCallbacks(assoc.reflection.options.afterAdd, assoc.owner, record);
+  }
+
+  return record;
+}
+
+function callback(assoc: CollectionAssociation, method: string, record: Base): void {
+  for (const cb of callbacksFor(assoc, method)) {
+    if (typeof cb === "function") cb(method, assoc.owner, record);
+  }
+}
+
+function callbacksFor(assoc: CollectionAssociation, callbackName: string): unknown[] {
+  const fullName = `${callbackName}For${assoc.reflection.name.charAt(0).toUpperCase()}${assoc.reflection.name.slice(1)}`;
+  const owner = assoc.owner.constructor as any;
+  if (typeof owner[fullName] === "function") return owner[fullName]();
+  return [];
+}
+
+function isIncludeInMemory(assoc: CollectionAssociation, record: Base): boolean {
+  // For through reflections, also check through the source chain.
+  const refl = assoc.reflection as any;
+  if (refl.isThroughReflection?.()) {
+    const throughName = refl.options?.through;
+    if (throughName) {
+      const throughAssoc = (assoc.owner as any).association?.(throughName);
+      const sourceRefl = refl.sourceReflection?.();
+      if (throughAssoc && sourceRefl) {
+        const sourceName = sourceRefl.name;
+        const reader = throughAssoc.target as Base[];
+        if (Array.isArray(reader)) {
+          const found = reader.some((source: any) => {
+            const targetRefl = source[sourceName];
+            if (Array.isArray(targetRefl)) return targetRefl.includes(record);
+            return targetRefl === record;
+          });
+          if (found) return true;
+        }
+      }
+    }
+  }
+  return (assoc.target as Base[]).includes(record);
+}
+
+function arraysEqual(a: Base[], b: Base[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((r, i) => r === b[i]);
 }

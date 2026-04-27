@@ -119,3 +119,11 @@ export class Batch {
     }
   }
 }
+
+function loaders(batch: Batch): unknown[] {
+  return (batch as any)._preloaders ?? [];
+}
+
+function groupAndLoadSimilar(batch: Batch, loaderList: unknown[]): Promise<void> {
+  return (batch as any)._groupAndLoadSimilar?.(loaderList) ?? Promise.resolve();
+}

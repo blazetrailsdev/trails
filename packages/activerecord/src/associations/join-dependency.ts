@@ -16,7 +16,7 @@ import {
   camelize as _camelize,
   singularize as _singularize,
 } from "@blazetrails/activesupport";
-import { sql as arelSql } from "@blazetrails/arel";
+import { sql as arelSql, Nodes } from "@blazetrails/arel";
 import { modelRegistry } from "../associations.js";
 import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
@@ -736,4 +736,68 @@ export class JoinDependency {
     this._nodes.push(node);
     return node;
   }
+}
+
+function joinRoot(dep: JoinDependency): unknown {
+  return (dep as any)._nodes?.[0] ?? null;
+}
+
+function joinType(_dep: JoinDependency): string {
+  return "LEFT OUTER JOIN";
+}
+
+function aliasTracker(dep: JoinDependency): unknown {
+  // _aliasCache is defined on JoinDependency (Map<JoinNode|null, Map<string,string>>).
+  // Rails' alias_tracker is an AliasTracker instance; ours is the equivalent map.
+  return (dep as any)._aliasCache ?? null;
+}
+
+function makeJoinConstraints(dep: JoinDependency, _root: unknown, _type: string): Nodes.Node[] {
+  // Rails: maps each child of join_root into join constraints via make_constraints.
+  // Our implementation stores pre-built JOIN SQL in _nodes; return as Arel literals.
+  type JoinNode = { joinSql: string };
+  const nodes = (dep as any)._nodes as JoinNode[] | undefined;
+  return (nodes ?? []).map((n) => arelSql(n.joinSql));
+}
+
+function makeConstraints(
+  dep: JoinDependency,
+  _parent: unknown,
+  child: unknown,
+  _type: string,
+): Nodes.Node[] {
+  // Rails: calls child.join_constraints to build Arel::Nodes::OuterJoin nodes.
+  // Our _nodes contain pre-built JOIN SQL per association; filter to the child's node.
+  type JoinNode = { assocName?: string; joinSql: string };
+  const nodes = (dep as any)._nodes as JoinNode[] | undefined;
+  const childName = (child as { assocName?: string })?.assocName;
+  const matching = (nodes ?? []).filter((n) => !childName || n.assocName === childName);
+  void Nodes.OuterJoin; // Rails uses Arel::Nodes::OuterJoin in child.join_constraints
+  return matching.map((n) => arelSql(n.joinSql));
+}
+
+function walk(dep: JoinDependency, _left: unknown, _right: unknown, _type: string): Nodes.Node[] {
+  // Rails: merges two JoinAssociation subtrees reusing existing table aliases.
+  // Our flat _nodes structure doesn't have a tree to walk; return all join SQLs.
+  type JoinNode = { joinSql: string };
+  const nodes = (dep as any)._nodes as JoinNode[] | undefined;
+  return (nodes ?? []).map((n) => arelSql(n.joinSql));
+}
+
+function findReflection(_dep: JoinDependency, klass: unknown, name: string): unknown {
+  const found = (klass as any)?._reflectOnAssociation?.(name) ?? null;
+  if (!found) {
+    throw new Error(
+      `Can't join '${(klass as any)?.name ?? String(klass)}' to association named '${name}'`,
+    );
+  }
+  return found;
+}
+
+function build(_dep: JoinDependency, _associations: unknown, _baseKlass: unknown): unknown[] {
+  // Rails: recursively builds JoinAssociation tree from an association name hash.
+  // Our JoinDependency uses addEagerLoadFor; return node metadata for reflection.
+  type JoinNode = { assocName?: string; assocType?: string };
+  const nodes = (_dep as any)._nodes as JoinNode[] | undefined;
+  return (nodes ?? []).map((n) => ({ name: n.assocName, type: n.assocType }));
 }

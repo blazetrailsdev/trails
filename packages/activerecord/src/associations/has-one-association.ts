@@ -88,15 +88,30 @@ export class HasOneAssociation extends SingularAssociation {
     super.replace(null);
   }
 
-  protected override replace(record: Base | null): void {
-    // Nullify FK on previous target when swapping records
-    if (this.target && this.target !== record) {
-      this.nullifyOwnerAttributes(this.target);
+  protected override replace(record: Base | null, save = true): void {
+    if (record) (this as any).raiseOnTypeMismatchBang(record);
+    const assigningAnother = this.target !== record;
+    if (assigningAnother || (record as any)?.hasChangesToSave?.()) {
+      const shouldSave = save && (this.owner as any).isPersisted?.();
+      void transactionIf(this, !!shouldSave, async () => {
+        if (this.target && !(this.target as any).isDestroyed?.() && assigningAnother) {
+          await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
+        }
+        if (record) {
+          this.setOwnerAttributes(record);
+          this.setInverseInstance(record);
+          if (shouldSave && typeof (record as any).save === "function") {
+            const saved = await (record as any).save();
+            if (!saved) {
+              this.nullifyOwnerAttributes(record);
+              throw new Error(`Failed to save the new associated ${this.reflection.name}.`);
+            }
+          }
+        }
+      });
     }
-    if (record) {
-      this.setOwnerAttributes(record);
-    }
-    super.replace(record);
+    this.target = record;
+    this.loadedBang();
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
@@ -176,4 +191,26 @@ export class HasOneAssociation extends SingularAssociation {
       }
     }
   }
+}
+
+function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<void> {
+  const target = assoc.target as Base | null;
+  if (!target) return Promise.resolve();
+  if (method === "delete") return (target as any).delete?.() ?? Promise.resolve();
+  if (method === "destroy") return (target as any).destroy?.() ?? Promise.resolve();
+  return Promise.resolve();
+}
+
+function transactionIf(
+  assoc: HasOneAssociation,
+  condition: boolean,
+  block: () => Promise<void>,
+): Promise<void> {
+  if (condition) {
+    const klass = assoc.klass;
+    if (klass && typeof (klass as any).transaction === "function") {
+      return (klass as any).transaction(block);
+    }
+  }
+  return block();
 }

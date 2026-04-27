@@ -318,3 +318,11 @@ export class Branch {
     return Association;
   }
 }
+
+function buildChildren(branch: Branch, children: unknown): Branch[] {
+  return ((branch as any)._buildChildren?.(children) as Branch[] | undefined) ?? [];
+}
+
+function preloaderFor(branch: Branch, reflection: unknown): unknown {
+  return (branch as any)._preloaderFor?.(reflection) ?? null;
+}

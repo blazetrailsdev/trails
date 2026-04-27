@@ -2185,3 +2185,47 @@ applyThenable(CollectionProxy.prototype, "load");
 _setCollectionProxyCtor(
   CollectionProxy as unknown as Parameters<typeof _setCollectionProxyCtor>[0],
 );
+
+function findNthWithLimit(
+  proxy: CollectionProxy<any>,
+  index: number,
+  limit: number,
+): Promise<any[]> {
+  if (isFindFromTarget(proxy)) {
+    // await target hydration before slicing — loadTarget() is async
+    return Promise.resolve((proxy as any).loadTarget?.()).then(() => {
+      const records = (proxy as any)._association?.target;
+      return Array.isArray(records) ? records.slice(index, index + limit) : [];
+    });
+  }
+  return (proxy as any).limit(limit).offset(index).toArray();
+}
+
+function findNthFromLast(proxy: CollectionProxy<any>, index: number): Promise<any> {
+  const records = (proxy as any)._association?.target;
+  if (Array.isArray(records)) {
+    // index=1 → last (records[-1]), index=2 → second-to-last (records[-2]), etc.
+    // Matches Rails: records[-index] == records[length - index]
+    return Promise.resolve(records[records.length - index] ?? null);
+  }
+  // Mirror finder-methods.ts: reverse order then take a positive offset
+  // (negative offset is not valid SQL on most adapters)
+  return (proxy as any)
+    .reverseOrder?.()
+    .offset(index - 1)
+    .limit(1)
+    .toArray()
+    .then((r: any[]) => r[0] ?? null);
+}
+
+function isNullScope(proxy: CollectionProxy<any>): boolean {
+  return !!(proxy as any)._association?.isNullScope?.();
+}
+
+function isFindFromTarget(proxy: CollectionProxy<any>): boolean {
+  return !!(proxy as any)._association?.isFindFromTarget?.();
+}
+
+function execQueries(proxy: CollectionProxy<any>): Promise<any[]> {
+  return proxy.loadTarget() as Promise<any[]>;
+}

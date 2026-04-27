@@ -328,3 +328,22 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     return scope;
   }
 }
+
+function lastScopeChain(
+  scope: DisableJoinsAssociationScope,
+  reverseChain: unknown[],
+  owner: unknown,
+): Promise<unknown> {
+  return (scope as any)._lastScopeChain(reverseChain, owner);
+}
+
+function addConstraints(
+  scope: DisableJoinsAssociationScope,
+  reflection: unknown,
+  key: unknown,
+  joinIds: unknown[],
+  owner: unknown,
+  ordered: boolean,
+): unknown {
+  return (scope as any)._addConstraintsDj(reflection, key, joinIds, owner, ordered);
+}

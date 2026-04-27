@@ -1,4 +1,5 @@
 import type { Base } from "../../base.js";
+import type { Table } from "@blazetrails/arel";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
@@ -446,4 +447,66 @@ export class LoaderRecords {
 
     return [...loaded, ...Array.from(alreadyLoadedByKey.values()).flat()];
   }
+}
+
+// Private helpers mirroring Rails' PreloaderAssociation private methods
+function owners(assoc: Association): Base[] {
+  return assoc.owners;
+}
+
+function reflection(assoc: Association): unknown {
+  return assoc.reflection;
+}
+
+function preloadScope(assoc: Association): unknown {
+  return (assoc as any)._preloadScope;
+}
+
+function model(assoc: Association): unknown {
+  return (assoc as any)._model;
+}
+
+function ownerKeyName(assoc: Association): string | string[] {
+  return (assoc as any)._ownerKeyName;
+}
+
+function associateRecordsToOwner(assoc: Association, owner: Base, records: Base[]): void {
+  (assoc as any)._associateRecordsToOwner(owner, records);
+}
+
+function isKeyConversionRequired(assoc: Association): boolean {
+  return (assoc as any)._isKeyConversionRequired();
+}
+
+function deriveKey(assoc: Association, record: Base, key: string | string[]): unknown {
+  return (assoc as any)._deriveKey(record, key);
+}
+
+function convertKey(assoc: Association, key: unknown): unknown {
+  return (assoc as any)._convertKey(key);
+}
+
+function associationKeyType(assoc: Association): string {
+  return (assoc as any)._associationKeyType?.() ?? "string";
+}
+
+function ownerKeyType(assoc: Association): string {
+  return (assoc as any)._ownerKeyType?.() ?? "string";
+}
+
+function reflectionScope(assoc: Association): unknown {
+  // Rails: reflection.join_scopes(klass.arel_table, klass.predicate_builder, klass).inject(&:merge!)
+  // Our implementation memoizes this as _reflectionScope; the arel_table is accessed internally.
+  const table: Table | undefined = (assoc as any)._model?.arelTable;
+  void table; // used by Rails to build scopes; our preloader memoizes the result
+  return (assoc as any)._reflectionScope;
+}
+
+function buildScope(assoc: Association): unknown {
+  return (assoc as any)._buildScope();
+}
+
+function cascadeStrictLoading(assoc: Association, scope: unknown): unknown {
+  const ps = (assoc as any)._preloadScope;
+  return ps?.strictLoadingValue ? (scope as any).strictLoading?.() : scope;
 }

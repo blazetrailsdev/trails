@@ -77,15 +77,14 @@ export class HasManyAssociation extends CollectionAssociation {
    */
   async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
     this.setOwnerAttributes(record);
-
+    let saved = false;
     if (typeof (record as any).save === "function") {
-      const saved = await (record as any).save({ validate });
-      if (!saved && raise) {
+      saved = !!(await (record as any).save({ validate }));
+      if (!saved && raise)
         throw new Error(`Failed to save the new associated ${this.reflection.name}.`);
-      }
-      return !!saved;
     }
-    return false;
+    // Rails: update_counter_if_success(super, 1) — sync counter on successful insert
+    return updateCounterIfSuccess(this, saved, 1);
   }
 
   protected override async doAsyncFindTarget(): Promise<Base[]> {
@@ -96,4 +95,64 @@ export class HasManyAssociation extends CollectionAssociation {
     if (this.reflection.options.through) return;
     super.setOwnerAttributes(record);
   }
+}
+
+function countRecords(assoc: HasManyAssociation): Promise<number> {
+  return (assoc as any).scope?.()?.count?.() ?? Promise.resolve(0);
+}
+
+async function updateCounter(assoc: HasManyAssociation, difference: number): Promise<void> {
+  const counterCol = assoc.reflection.options.counterCache;
+  if (!counterCol) return;
+  const owner = assoc.owner as any;
+  const column = String(counterCol);
+  if (typeof owner.incrementBang === "function") {
+    await owner.incrementBang(column, difference);
+  } else if (typeof owner.updateCounters === "function") {
+    await owner.updateCounters({ [column]: difference });
+  } else if (typeof owner.increment === "function") {
+    owner.increment(column, difference);
+  }
+}
+
+function updateCounterInMemory(assoc: HasManyAssociation, difference: number): void {
+  const counterCol = assoc.reflection.options.counterCache;
+  if (counterCol) {
+    const owner = assoc.owner as any;
+    const current = Number(owner.readAttribute?.(String(counterCol)) ?? 0);
+    owner.writeAttribute?.(String(counterCol), current + difference);
+  }
+}
+
+function deleteCount(_assoc: HasManyAssociation, method: string, scope: any): Promise<number> {
+  if (method === "deleteAll") return scope.deleteAll?.() ?? Promise.resolve(0);
+  return scope.updateAll?.() ?? Promise.resolve(0);
+}
+
+async function deleteOrNullifyAllRecords(assoc: HasManyAssociation, method: string): Promise<void> {
+  // Rails: count = delete_count(method, scope); update_counter(-count)
+  const scope = (assoc as any).scope?.();
+  const count = await deleteCount(assoc, method, scope);
+  if (count > 0) await updateCounter(assoc, -count);
+}
+
+function deleteRecords(assoc: HasManyAssociation, records: Base[], method: string): Promise<void> {
+  return (assoc as any).delete?.(...records) ?? Promise.resolve();
+}
+
+function updateCounterIfSuccess(
+  assoc: HasManyAssociation,
+  savedSuccessfully: boolean,
+  difference: number,
+): boolean {
+  if (savedSuccessfully) updateCounterInMemory(assoc, difference);
+  return savedSuccessfully;
+}
+
+function difference(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] {
+  return a.filter((r) => !b.includes(r));
+}
+
+function intersection(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] {
+  return a.filter((r) => b.includes(r));
 }

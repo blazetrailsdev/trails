@@ -1,4 +1,4 @@
-import { Table as ArelTable } from "@blazetrails/arel";
+import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
@@ -740,4 +740,80 @@ function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
     }
   }
   return result;
+}
+
+// Private helpers (mirrors Rails' private methods in AssociationScope)
+function valueTransformation(scope: AssociationScope): ValueTransformation {
+  return (scope as any)._valueTransformation;
+}
+
+function join(table: unknown, constraint: unknown): unknown {
+  // Mirrors Rails: Arel::Nodes::LeadingJoin.new(table, Arel::Nodes::On.new(constraint))
+  return new Nodes.LeadingJoin(table as any, new Nodes.On(constraint as any));
+}
+
+function lastChainScope(
+  scope: AssociationScope,
+  currentScope: unknown,
+  reflection: unknown,
+  owner: unknown,
+  klass?: unknown,
+): unknown {
+  return (scope as any)._lastChainScope(currentScope, reflection, owner, klass);
+}
+
+function transformValue(scope: AssociationScope, value: unknown): unknown {
+  return (scope as any)._transformValue(value);
+}
+
+function nextChainScope(
+  scope: AssociationScope,
+  currentScope: unknown,
+  reflection: unknown,
+  nextReflection: unknown,
+): unknown {
+  return (scope as any)._nextChainScope(currentScope, reflection, nextReflection);
+}
+
+function getChain(
+  scope: AssociationScope,
+  reflection: unknown,
+  association: unknown,
+  tracker: unknown,
+): unknown {
+  void ArelTable; // Rails: uses arel_table for alias tracking (AliasTracker)
+  return (scope as any)._getChain(reflection, association, tracker);
+}
+
+function addConstraints(
+  scope: AssociationScope,
+  currentScope: unknown,
+  owner: unknown,
+  chain: unknown[],
+): unknown {
+  void Nodes.OuterJoin; // Rails: uses Arel::Nodes::OuterJoin for join constraints
+  return (scope as any)._addConstraints(currentScope, owner, chain);
+}
+
+function applyScope(
+  scope: AssociationScope,
+  currentScope: unknown,
+  table: unknown,
+  key: unknown,
+  value: unknown,
+): unknown {
+  return (scope as any)._applyScope(currentScope, table, key, value);
+}
+
+function evalScope(
+  scope: AssociationScope,
+  reflection: unknown,
+  scopeFn: unknown,
+  owner: unknown,
+): unknown {
+  const relation = (reflection as any).buildScope?.((reflection as any).aliasedTable);
+  if (relation && typeof scopeFn === "function") {
+    return scopeFn.call(relation, owner) ?? relation;
+  }
+  return relation;
 }

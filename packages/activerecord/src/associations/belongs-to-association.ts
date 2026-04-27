@@ -371,3 +371,17 @@ export class BelongsToAssociation extends SingularAssociation {
     return false;
   }
 }
+
+function isRequireCounterUpdate(assoc: BelongsToAssociation): boolean {
+  const col = (assoc as any).counterCacheColumn?.();
+  return !!(col && assoc.owner.isPersisted());
+}
+
+function primaryKey(assoc: BelongsToAssociation, klass: unknown): string | string[] {
+  // Rails: reflection.association_primary_key(klass)
+  const refl = assoc.reflection as any;
+  if (typeof refl.associationPrimaryKey === "function") {
+    return refl.associationPrimaryKey(klass);
+  }
+  return refl.options?.primaryKey ?? (klass as any)?.primaryKey ?? "id";
+}

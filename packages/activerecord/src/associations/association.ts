@@ -418,4 +418,108 @@ export class Association {
     if (!record) return false;
     return record.isNewRecord() || this.owner.isNewRecord();
   }
+
+  private ensureKlassExistsBang(): typeof Base {
+    const k = this.klass;
+    if (!k) throw new Error(`Could not find the association ${this.reflection.name}`);
+    return k;
+  }
+
+  private async findTarget(): Promise<Base | Base[] | null> {
+    return this.loadTarget();
+  }
+
+  private skipStrictLoading<T>(block: () => T): T {
+    const prev = (this as any)._skipStrictLoading;
+    (this as any)._skipStrictLoading = true;
+    try {
+      return block();
+    } finally {
+      (this as any)._skipStrictLoading = prev;
+    }
+  }
+
+  private isViolatesStrictLoading(): boolean {
+    const ownerAny = this.owner as any;
+    if ((this as any)._skipStrictLoading) return false;
+    return !!(
+      ownerAny._strictLoading && !ownerAny._strictLoadingWhitelist?.includes(this.reflection.name)
+    );
+  }
+
+  private targetScope(): any {
+    return (this.klass as any)?.all?.() ?? null;
+  }
+
+  private scopeForCreate(): Record<string, unknown> {
+    return (this.scope() as any)?.scopeForCreate?.() ?? {};
+  }
+
+  private isFindTarget(): boolean {
+    return this.findTargetNeeded();
+  }
+
+  protected raiseOnTypeMismatchBang(record: Base): void {
+    const klass = this.klass;
+    if (klass && !(record instanceof (klass as any))) {
+      const expectedType =
+        (klass as any).name ??
+        (this.reflection as any).klass?.name ??
+        (this.reflection as any).className ??
+        this.reflection.name;
+      const actualType = record.constructor.name;
+      throw new Error(`${expectedType} expected, got an instance of ${actualType}`);
+    }
+  }
+
+  private inverseReflectionFor(_record: Base): unknown {
+    return (this.reflection as any).inverseOf ?? null;
+  }
+
+  private isInvertibleFor(record: Base): boolean {
+    return !!(this.isForeignKeyFor(record) && this.inverseReflectionFor(record));
+  }
+
+  private isForeignKeyFor(record: Base): boolean {
+    const fk = (this.reflection.options as any).foreignKey;
+    const fkArr = Array.isArray(fk) ? fk : [fk];
+    return fkArr.every((key) => (record as any)._hasAttribute?.(key) ?? key in record);
+  }
+
+  private isSkipStatementCache(scope: any): boolean {
+    // Rails: reflection.has_scope? || scope.eager_loading? ||
+    //        klass.scope_attributes? || reflection.source_reflection.active_record.default_scopes.any?
+    const refl = this.reflection as any;
+    const hasReflScope = !!(refl.hasScope?.() ?? refl.options?.scope);
+    const eagerLoading = !!scope?.eagerLoading?.();
+    const scopeAttrs = !!(this.klass as any)?.hasScopeAttributes?.();
+    const sourceDefaultScopes = !!refl.sourceReflection?.()?.activeRecord?.defaultScopes?.length;
+    return hasReflScope || eagerLoading || scopeAttrs || sourceDefaultScopes;
+  }
+
+  private enqueueDestroyAssociation(options: Record<string, unknown>): void {
+    const jobClass = (this.owner.constructor as any).destroyAssociationAsyncJob;
+    if (jobClass) {
+      const ownerAny = this.owner as any;
+      ownerAny._afterCommitJobs ??= [];
+      ownerAny._afterCommitJobs.push([jobClass, options]);
+    }
+  }
+
+  private isMatchesForeignKey(record: Base): boolean {
+    const fk = (this.reflection.options as any).foreignKey;
+    const fkArr: string[] = Array.isArray(fk) ? fk : [String(fk)];
+    if (this.isForeignKeyFor(record)) {
+      return (
+        fkArr.every((key) => (record as any).readAttribute(key) === (this.owner as any).id) ||
+        (this.isForeignKeyFor(this.owner) &&
+          fkArr.every((key) => (this.owner as any).readAttribute(key) === (record as any).id))
+      );
+    }
+    return fkArr.every((key) => (this.owner as any).readAttribute(key) === (record as any).id);
+  }
+}
+
+function associationScope(assoc: Association): unknown {
+  return assoc.associationScope();
 }
