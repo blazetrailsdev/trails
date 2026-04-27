@@ -1,3 +1,4 @@
+import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
@@ -248,3 +249,17 @@ export const ClassMethods = {
   resetCounters,
   isCounterCacheColumn,
 };
+
+function _createRecord(attributeNames?: any): never {
+  throw new NotImplementedError("ActiveRecord::CounterCache#_create_record is not implemented");
+}
+
+function destroyRow(): never {
+  throw new NotImplementedError("ActiveRecord::CounterCache#destroy_row is not implemented");
+}
+
+function is_foreignKeysEqual(fkey1: any, fkey2: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::CounterCache#_foreign_keys_equal? is not implemented",
+  );
+}

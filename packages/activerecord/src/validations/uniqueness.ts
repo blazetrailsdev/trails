@@ -5,6 +5,7 @@
  * Builds a query against the model's table to check for existing records
  * with the same value, optionally scoped to other columns.
  */
+import { NotImplementedError } from "../errors.js";
 import { EachValidator } from "@blazetrails/activemodel";
 
 /**
@@ -115,4 +116,46 @@ export class UniquenessValidator extends EachValidator {
     });
     asyncValidations.push(validationPromise);
   }
+}
+
+function findFinderClassFor(record: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::UniquenessValidator#find_finder_class_for is not implemented",
+  );
+}
+
+function isValidationNeeded(klass: any, record: any, attribute: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::UniquenessValidator#validation_needed? is not implemented",
+  );
+}
+
+function isCoveredByUniqueIndex(klass: any, record: any, attribute: any, scope: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::UniquenessValidator#covered_by_unique_index? is not implemented",
+  );
+}
+
+function resolveAttributes(record: any, attributes: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::UniquenessValidator#resolve_attributes is not implemented",
+  );
+}
+
+function buildRelation(klass: any, attribute: any, value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::UniquenessValidator#build_relation is not implemented",
+  );
+}
+
+function scopeRelation(record: any, relation: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::UniquenessValidator#scope_relation is not implemented",
+  );
+}
+
+function mapEnumAttribute(klass: any, attribute: any, value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::UniquenessValidator#map_enum_attribute is not implemented",
+  );
 }

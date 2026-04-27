@@ -5,6 +5,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache
  */
 
+import { NotImplementedError } from "../errors.js";
 import { getFs, getPath } from "@blazetrails/activesupport";
 import { Column } from "./column.js";
 import type { ColumnJSON } from "./column.js";
@@ -710,4 +711,34 @@ export class FakePool {
   withConnection<T>(callback: (conn: unknown) => T): T {
     return callback(this._connection);
   }
+}
+
+function emptyCache(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaReflection#empty_cache is not implemented",
+  );
+}
+
+function isIgnoredTable(tableName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCache#ignored_table? is not implemented",
+  );
+}
+
+function deriveColumnsHashAndDeduplicateValues(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCache#derive_columns_hash_and_deduplicate_values is not implemented",
+  );
+}
+
+function deepDeduplicate(value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCache#deep_deduplicate is not implemented",
+  );
+}
+
+function open(filename: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCache#open is not implemented",
+  );
 }

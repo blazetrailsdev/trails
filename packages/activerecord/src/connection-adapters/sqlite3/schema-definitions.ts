@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::TableDefinition
  */
 
+import { NotImplementedError } from "../../errors.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -47,4 +48,16 @@ export class TableDefinition extends AbstractTableDefinition {
     }
     return new ColumnDefinition(name, type, options);
   }
+}
+
+function integerLikePrimaryKeyType(type: any, options: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::TableDefinition#integer_like_primary_key_type is not implemented",
+  );
+}
+
+function validColumnDefinitionOptions(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::TableDefinition#valid_column_definition_options is not implemented",
+  );
 }

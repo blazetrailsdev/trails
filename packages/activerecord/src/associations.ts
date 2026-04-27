@@ -49,7 +49,12 @@ export async function initializeAssociations(): Promise<void> {
     import("./association-relation.js"),
   ]);
 }
-import { StrictLoadingViolationError, ConfigurationError, Rollback } from "./errors.js";
+import {
+  StrictLoadingViolationError,
+  ConfigurationError,
+  Rollback,
+  NotImplementedError,
+} from "./errors.js";
 import {
   AssociationNotFoundError,
   DeleteRestrictionError,
@@ -2177,4 +2182,20 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
       await parent.touch(...(touchOpt as string[]));
     }
   }
+}
+
+function initInternals(): never {
+  throw new NotImplementedError("ActiveRecord::Associations#init_internals is not implemented");
+}
+
+function associationInstanceGet(name: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Associations#association_instance_get is not implemented",
+  );
+}
+
+function associationInstanceSet(name: any, association: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Associations#association_instance_set is not implemented",
+  );
 }

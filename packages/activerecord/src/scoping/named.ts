@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 
@@ -88,3 +89,9 @@ export const ClassMethods = {
   defaultScoped,
   defaultExtensions,
 };
+
+function singletonMethodAdded(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Scoping::Named#singleton_method_added is not implemented",
+  );
+}

@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Encryptor
  */
 
+import { NotImplementedError } from "../errors.js";
 import { Cipher } from "./cipher/aes256-gcm.js";
 import { Message } from "./message.js";
 import { MessageSerializer } from "./message-serializer.js";
@@ -155,4 +156,78 @@ export class Encryptor {
   isCompress(): boolean {
     return this._compress;
   }
+}
+
+function defaultKeyProvider(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#default_key_provider is not implemented",
+  );
+}
+
+function validatePayloadType(clearText: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#validate_payload_type is not implemented",
+  );
+}
+
+function cipher(): never {
+  throw new NotImplementedError("ActiveRecord::Encryption::Encryptor#cipher is not implemented");
+}
+
+function buildEncryptedMessage(clearText: any, keyProvider?: any, cipherOptions?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#build_encrypted_message is not implemented",
+  );
+}
+
+function serializeMessage(message: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#serialize_message is not implemented",
+  );
+}
+
+function deserializeMessage(message: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#deserialize_message is not implemented",
+  );
+}
+
+function serializer(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#serializer is not implemented",
+  );
+}
+
+function compressIfWorthIt(string: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#compress_if_worth_it is not implemented",
+  );
+}
+
+function compress(data: any): never {
+  throw new NotImplementedError("ActiveRecord::Encryption::Encryptor#compress is not implemented");
+}
+
+function uncompressIfNeeded(data: any, compressed: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#uncompress_if_needed is not implemented",
+  );
+}
+
+function uncompress(data: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#uncompress is not implemented",
+  );
+}
+
+function forceEncodingIfNeeded(value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#force_encoding_if_needed is not implemented",
+  );
+}
+
+function forcedEncodingForDeterministicEncryption(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Encryptor#forced_encoding_for_deterministic_encryption is not implemented",
+  );
 }

@@ -9,6 +9,7 @@
  * mysql CLI displays results.
  */
 
+import { NotImplementedError } from "../../errors.js";
 export class ExplainPrettyPrinter {
   pp(result: Array<Record<string, unknown>>, elapsed: number): string {
     if (result.length === 0) return "";
@@ -54,4 +55,28 @@ export class ExplainPrettyPrinter {
 
     return lines.join("\n");
   }
+}
+
+function computeColumnWidths(result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#compute_column_widths is not implemented",
+  );
+}
+
+function buildSeparator(widths: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#build_separator is not implemented",
+  );
+}
+
+function buildCells(items: any, widths: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#build_cells is not implemented",
+  );
+}
+
+function buildFooter(nrows: any, elapsed: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#build_footer is not implemented",
+  );
 }

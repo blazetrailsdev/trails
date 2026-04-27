@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Scheme
  */
 
+import { NotImplementedError } from "../errors.js";
 import { Encryptor, type EncryptorLike } from "./encryptor.js";
 import { ConfigError } from "./errors.js";
 import type { Compressor } from "./config.js";
@@ -221,4 +222,28 @@ export class Scheme {
       throw new ConfigError("compressor can't be used with encryptor");
     }
   }
+}
+
+function validateConfigBang(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Scheme#validate_config! is not implemented",
+  );
+}
+
+function keyProviderFromKey(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Scheme#key_provider_from_key is not implemented",
+  );
+}
+
+function deterministicKeyProvider(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Scheme#deterministic_key_provider is not implemented",
+  );
+}
+
+function defaultKeyProvider(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Scheme#default_key_provider is not implemented",
+  );
 }

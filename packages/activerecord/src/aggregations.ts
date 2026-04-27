@@ -1,3 +1,4 @@
+import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import { reload as persistenceReload } from "./persistence.js";
 import { AggregateReflection } from "./reflection.js";
@@ -145,3 +146,15 @@ export const InstanceMethods = {
   initializeDup,
   reload,
 };
+
+function initInternals(): never {
+  throw new NotImplementedError("ActiveRecord::Aggregations#init_internals is not implemented");
+}
+
+function readerMethod(): never {
+  throw new NotImplementedError("ActiveRecord::Aggregations#reader_method is not implemented");
+}
+
+function writerMethod(): never {
+  throw new NotImplementedError("ActiveRecord::Aggregations#writer_method is not implemented");
+}

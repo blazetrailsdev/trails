@@ -6,7 +6,7 @@ import {
   StatementPool as MysqlStatementPool,
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
-import { MismatchedForeignKey } from "../errors.js";
+import { MismatchedForeignKey, NotImplementedError } from "../errors.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { quoteString as mysqlQuoteString } from "./mysql/quoting.js";
 import { Column } from "./column.js";
@@ -1012,4 +1012,58 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // override via explicit false in config.
     return mysql.createPool({ supportBigNumbers: true, ...config });
   }
+}
+
+function isTextType(type: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#text_type? is not implemented",
+  );
+}
+
+function connect(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#connect is not implemented",
+  );
+}
+
+function reconnect(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#reconnect is not implemented",
+  );
+}
+
+function configureConnection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#configure_connection is not implemented",
+  );
+}
+
+function fullVersion(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#full_version is not implemented",
+  );
+}
+
+function getFullVersion(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#get_full_version is not implemented",
+  );
+}
+
+function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#translate_exception is not implemented",
+  );
+}
+
+function defaultPreparedStatements(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#default_prepared_statements is not implemented",
+  );
+}
+
+function initializeTypeMap(m: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#initialize_type_map is not implemented",
+  );
 }

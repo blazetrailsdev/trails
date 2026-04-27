@@ -8,6 +8,7 @@
  * Mirrors: ActiveRecord::Attributes
  */
 
+import { NotImplementedError } from "./errors.js";
 import {
   Attribute,
   AttributeSet,
@@ -175,4 +176,24 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     cacheHost._cachedDefaultAttributes = attributeSet;
   }
   return cacheHost._cachedDefaultAttributes;
+}
+
+function reloadSchemaFromCache(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Attributes#reload_schema_from_cache is not implemented",
+  );
+}
+
+function defineDefaultAttribute(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Attributes#define_default_attribute is not implemented",
+  );
+}
+
+function resolveTypeName(): never {
+  throw new NotImplementedError("ActiveRecord::Attributes#resolve_type_name is not implemented");
+}
+
+function typeForColumn(): never {
+  throw new NotImplementedError("ActiveRecord::Attributes#type_for_column is not implemented");
 }

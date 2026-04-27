@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
 import { Configurable } from "./configurable.js";
 
@@ -54,4 +55,34 @@ export class AutoFilteredParameters {
       this._filterParameters.push(filter);
     }
   }
+}
+
+function app(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::AutoFilteredParameters#app is not implemented",
+  );
+}
+
+function installCollectingHook(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::AutoFilteredParameters#install_collecting_hook is not implemented",
+  );
+}
+
+function attributeWasDeclared(klass: any, attribute: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::AutoFilteredParameters#attribute_was_declared is not implemented",
+  );
+}
+
+function isCollecting(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::AutoFilteredParameters#collecting? is not implemented",
+  );
+}
+
+function isExcludedFromFilterParameters(filterParameter: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::AutoFilteredParameters#excluded_from_filter_parameters? is not implemented",
+  );
 }

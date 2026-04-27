@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 import { prepend } from "@blazetrails/activesupport";
 import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { getAttributeType } from "./encryptable-record.js";
@@ -281,4 +282,16 @@ export class ExtendedEncryptableType {
     }
     return originalSerialize(data);
   }
+}
+
+function process(value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::ExtendedDeterministicQueries::AdditionalValue#process is not implemented",
+  );
+}
+
+function additionalValuesFor(value: any, type: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery#additional_values_for is not implemented",
+  );
 }

@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::Query
  */
 
+import { NotImplementedError } from "../errors.js";
 import { BooleanType } from "@blazetrails/activemodel";
 
 const booleanType = new BooleanType();
@@ -67,4 +68,10 @@ function castToBoolean(value: unknown): boolean {
   const cast = booleanType.cast(value);
   if (cast !== null) return cast;
   return !!value;
+}
+
+function queryCastAttribute(attrName: any, value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::Query#query_cast_attribute is not implemented",
+  );
 }

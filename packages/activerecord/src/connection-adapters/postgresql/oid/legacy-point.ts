@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::LegacyPoint
  */
 
+import { NotImplementedError } from "../../../errors.js";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class LegacyPoint extends ValueType<[number, number]> {
@@ -47,4 +48,10 @@ export class LegacyPoint extends ValueType<[number, number]> {
     if (isNaN(x) || isNaN(y)) return null;
     return [x, y];
   }
+}
+
+function numberForPoint(number: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::LegacyPoint#number_for_point is not implemented",
+  );
 }

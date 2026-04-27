@@ -16,6 +16,7 @@ import * as ts from "typescript";
 import type { ApiManifest, ClassInfo } from "./types.js";
 import { OUTPUT_DIR, packageSrcDir } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { isNotImplementedStub } from "./extract-ts-api.js";
 
 // ---------------------------------------------------------------------------
 // Dependency rules — add new entries to extend to other packages
@@ -205,14 +206,16 @@ function visitMethodDeclarations(
       return;
     }
     if (ts.isFunctionDeclaration(node) && node.name) {
-      callback(node.name.text, node);
+      if (!isNotImplementedStub(node.body)) callback(node.name.text, node);
       return;
     }
     if (ts.isVariableStatement(node)) {
       for (const decl of node.declarationList.declarations) {
         if (ts.isIdentifier(decl.name) && decl.initializer) {
           if (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer)) {
-            callback(decl.name.text, decl.initializer);
+            if (!isNotImplementedStub(decl.initializer.body)) {
+              callback(decl.name.text, decl.initializer);
+            }
           }
         }
       }

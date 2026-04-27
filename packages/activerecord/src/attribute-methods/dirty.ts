@@ -7,6 +7,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::Dirty
  */
 
+import { NotImplementedError } from "../errors.js";
 interface DirtyRecord {
   changed: boolean;
   changedAttributes: string[];
@@ -132,4 +133,40 @@ export function attributesInDatabase(record: DirtyRecord): Record<string, unknow
     result[key] = newVal;
   }
   return result;
+}
+
+function initInternals(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::Dirty#init_internals is not implemented",
+  );
+}
+
+function _touchRow(attributeNames: any, time: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::Dirty#_touch_row is not implemented",
+  );
+}
+
+function _updateRecord(attributeNames?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::Dirty#_update_record is not implemented",
+  );
+}
+
+function _createRecord(attributeNames?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::Dirty#_create_record is not implemented",
+  );
+}
+
+function attributeNamesForPartialUpdates(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::Dirty#attribute_names_for_partial_updates is not implemented",
+  );
+}
+
+function attributeNamesForPartialInserts(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::Dirty#attribute_names_for_partial_inserts is not implemented",
+  );
 }

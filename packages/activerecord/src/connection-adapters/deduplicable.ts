@@ -8,6 +8,7 @@
  * string keys for deduplication.
  */
 
+import { NotImplementedError } from "../errors.js";
 export interface Deduplicable {
   deduplicateKey(): string;
 }
@@ -27,4 +28,10 @@ export function deduplicate<T extends Deduplicable>(obj: T): T {
   }
   registries.set(key, new WeakRef(obj));
   return obj;
+}
+
+function deduplicated(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Deduplicable#deduplicated is not implemented",
+  );
 }

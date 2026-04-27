@@ -8,6 +8,7 @@
  *          ActiveRecord::ConnectionAdapters::PostgreSQL (top-level module)
  */
 
+import { NotImplementedError } from "../../errors.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -572,4 +573,22 @@ export class AlterTable extends AbstractAlterTable {
   addUniqueConstraint(columnName: string | string[], options: UniqueConstraintOptions = {}): void {
     this.uniqueConstraintAdds.push(this._td.newUniqueConstraintDefinition(columnName, options));
   }
+}
+
+function validColumnDefinitionOptions(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#valid_column_definition_options is not implemented",
+  );
+}
+
+function aliasedTypes(name: any, fallback: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#aliased_types is not implemented",
+  );
+}
+
+function integerLikePrimaryKeyType(type: any, options: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#integer_like_primary_key_type is not implemented",
+  );
 }

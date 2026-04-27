@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SqlTypeMetadata
  */
 
+import { NotImplementedError } from "../errors.js";
 import type { Deduplicable } from "./deduplicable.js";
 
 export class SqlTypeMetadata implements Deduplicable {
@@ -64,4 +65,10 @@ export interface SqlTypeMetadataJSON {
   limit: number | null;
   precision: number | null;
   scale: number | null;
+}
+
+function deduplicated(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SqlTypeMetadata#deduplicated is not implemented",
+  );
 }

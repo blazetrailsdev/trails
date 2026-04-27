@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements
  */
 
+import { NotImplementedError } from "../../errors.js";
 import type { Nodes } from "@blazetrails/arel";
 import type { ExplainOption } from "../../adapter.js";
 import type { Result } from "../../result.js";
@@ -67,4 +68,78 @@ export interface DatabaseStatements {
   buildExplainClause(options?: ExplainOption[]): string;
   // Mirrors: database_statements.rb:110
   setConstraints(deferred: "deferred" | "immediate", ...constraints: string[]): Promise<void>;
+}
+
+function cancelAnyRunningQuery(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#cancel_any_running_query is not implemented",
+  );
+}
+
+function performQuery(
+  rawConnection: any,
+  sql: any,
+  binds: any,
+  typeCastedBinds: any,
+  prepare?: any,
+  notificationPayload?: any,
+  batch?: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query is not implemented",
+  );
+}
+
+function castResult(result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#cast_result is not implemented",
+  );
+}
+
+function affectedRows(result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#affected_rows is not implemented",
+  );
+}
+
+function executeBatch(statements: any, name?: any, kwargs?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#execute_batch is not implemented",
+  );
+}
+
+function buildTruncateStatements(tableNames: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#build_truncate_statements is not implemented",
+  );
+}
+
+function lastInsertIdResult(sequenceName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#last_insert_id_result is not implemented",
+  );
+}
+
+function returningColumnValues(result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#returning_column_values is not implemented",
+  );
+}
+
+function suppressCompositePrimaryKey(pk: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#suppress_composite_primary_key is not implemented",
+  );
+}
+
+function handleWarnings(sql: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#handle_warnings is not implemented",
+  );
+}
+
+function isWarningIgnored(warning: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#warning_ignored? is not implemented",
+  );
 }

@@ -9,6 +9,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::Write
  */
 
+import { NotImplementedError } from "../errors.js";
 import { Model } from "@blazetrails/activemodel";
 
 /**
@@ -35,4 +36,10 @@ export interface Write {
  */
 export function _writeAttribute(this: Model, name: string, value: unknown): void {
   Model.prototype._writeAttribute.call(this, name, value);
+}
+
+function defineMethodAttribute(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::Write#define_method_attribute= is not implemented",
+  );
 }

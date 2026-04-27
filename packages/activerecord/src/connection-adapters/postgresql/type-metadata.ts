@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata
  */
 
+import { NotImplementedError } from "../../errors.js";
 export class TypeMetadata {
   readonly sqlType: string;
   readonly type: string;
@@ -54,4 +55,10 @@ export class TypeMetadata {
       this.scale,
     ]);
   }
+}
+
+function deduplicated(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata#deduplicated is not implemented",
+  );
 }

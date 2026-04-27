@@ -13,7 +13,7 @@ import {
 } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { DatabaseAlreadyExists } from "../errors.js";
+import { DatabaseAlreadyExists, NotImplementedError } from "../errors.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { coercePort } from "./task-utils.js";
 
@@ -412,4 +412,28 @@ export function normalizeSchemaSearchPath(raw: string): string[] {
       return s;
     })
     .filter((s) => s.length > 0 && s !== "$user");
+}
+
+function connection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::PostgreSQLDatabaseTasks#connection is not implemented",
+  );
+}
+
+function establishConnection(config?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::PostgreSQLDatabaseTasks#establish_connection is not implemented",
+  );
+}
+
+function publicSchemaConfig(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::PostgreSQLDatabaseTasks#public_schema_config is not implemented",
+  );
+}
+
+function runCmdError(cmd: any, args: any, action: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::PostgreSQLDatabaseTasks#run_cmd_error is not implemented",
+  );
 }

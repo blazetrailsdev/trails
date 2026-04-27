@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 
@@ -92,4 +93,32 @@ export function isDefaultScopes(
     return scopes.some((s) => s.allQueries);
   }
   return scopes.length > 0;
+}
+
+function buildDefaultScope(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Scoping::Default#build_default_scope is not implemented",
+  );
+}
+
+function isExecuteScope(): never {
+  throw new NotImplementedError("ActiveRecord::Scoping::Default#execute_scope? is not implemented");
+}
+
+function isIgnoreDefaultScope(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Scoping::Default#ignore_default_scope? is not implemented",
+  );
+}
+
+function ignoreDefaultScope(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Scoping::Default#ignore_default_scope= is not implemented",
+  );
+}
+
+function evaluateDefaultScope(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Scoping::Default#evaluate_default_scope is not implemented",
+  );
 }

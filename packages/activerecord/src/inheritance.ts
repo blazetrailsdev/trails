@@ -6,7 +6,7 @@
 
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
-import { NameError, SubclassNotFound } from "./errors.js";
+import { NameError, SubclassNotFound, NotImplementedError } from "./errors.js";
 
 /**
  * Resolve a type name string to a model class.
@@ -290,4 +290,40 @@ export function polymorphicClassFor(_modelClass: typeof Base, name: string): typ
   const klass = modelRegistry.get(name);
   if (!klass) throw new NameError(`uninitialized constant ${name}`);
   return klass;
+}
+
+function initializeInternalsCallback(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Inheritance#initialize_internals_callback is not implemented",
+  );
+}
+
+function ensureProperType(): never {
+  throw new NotImplementedError("ActiveRecord::Inheritance#ensure_proper_type is not implemented");
+}
+
+function setBaseClass(): never {
+  throw new NotImplementedError("ActiveRecord::Inheritance#set_base_class is not implemented");
+}
+
+function discriminateClassForRecord(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Inheritance#discriminate_class_for_record is not implemented",
+  );
+}
+
+function isUsingSingleTableInheritance(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Inheritance#using_single_table_inheritance? is not implemented",
+  );
+}
+
+function typeCondition(): never {
+  throw new NotImplementedError("ActiveRecord::Inheritance#type_condition is not implemented");
+}
+
+function subclassFromAttributes(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Inheritance#subclass_from_attributes is not implemented",
+  );
 }

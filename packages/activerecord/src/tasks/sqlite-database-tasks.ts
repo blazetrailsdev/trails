@@ -13,7 +13,7 @@ import { getFs, getPath } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseTasks } from "./database-tasks.js";
-import { NoDatabaseError, DatabaseAlreadyExists } from "../errors.js";
+import { NoDatabaseError, DatabaseAlreadyExists, NotImplementedError } from "../errors.js";
 
 export class SQLiteDatabaseTasks {
   private readonly dbConfig: DatabaseConfig;
@@ -352,4 +352,28 @@ function splitSqlStatements(sql: string): string[] {
   const tail = buf.trim();
   if (tail) result.push(tail);
   return result;
+}
+
+function connection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::SQLiteDatabaseTasks#connection is not implemented",
+  );
+}
+
+function establishConnection(config?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::SQLiteDatabaseTasks#establish_connection is not implemented",
+  );
+}
+
+function runCmd(cmd: any, args: any, out: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::SQLiteDatabaseTasks#run_cmd is not implemented",
+  );
+}
+
+function runCmdError(cmd: any, args: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::SQLiteDatabaseTasks#run_cmd_error is not implemented",
+  );
 }

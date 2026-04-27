@@ -749,3 +749,9 @@ export const ClassMethods = {
 // unchanged — the registry handles canonical names and aliases, so caller
 // overrides like register("mysql2", ...) aren't shadowed by normalization.
 _setAdapterClassResolver(async (adapterName) => _loadAdapter(adapterName));
+
+function resolveConfigForConnection(configOrEnv: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionHandling#resolve_config_for_connection is not implemented",
+  );
+}

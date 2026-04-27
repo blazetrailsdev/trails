@@ -8,6 +8,7 @@
  *     static { this.hasMany("pages"); this.validatesAssociated("pages"); }
  *   }
  */
+import { NotImplementedError } from "../errors.js";
 import { EachValidator } from "@blazetrails/activemodel";
 
 /**
@@ -52,4 +53,16 @@ export class AssociatedValidator extends EachValidator {
     }
     return undefined;
   }
+}
+
+function isValidObject(record: any, context: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::AssociatedValidator#valid_object? is not implemented",
+  );
+}
+
+function recordValidationContextForAssociation(record: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::AssociatedValidator#record_validation_context_for_association is not implemented",
+  );
 }

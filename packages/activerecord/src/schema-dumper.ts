@@ -15,6 +15,7 @@
  * connection-adapters/abstract/schema-dumper.ts.
  */
 
+import { NotImplementedError } from "./errors.js";
 import type { DatabaseAdapter } from "./adapter.js";
 // Type-only import: SchemaStatements -> SchemaDumper (abstract inner
 // extends this file's base) -> schema-dumper.ts would be a runtime
@@ -640,4 +641,88 @@ function isDatabaseAdapter(v: unknown): v is DatabaseAdapter {
     typeof obj.executeMutation === "function" &&
     typeof obj.adapterName === "string"
   );
+}
+
+function tableName(): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#table_name is not implemented");
+}
+
+function constructor(connection: any, options?: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#initialize is not implemented");
+}
+
+function formattedVersion(): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#formatted_version is not implemented");
+}
+
+function defineParams(): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#define_params is not implemented");
+}
+
+function extensions(stream: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#extensions is not implemented");
+}
+
+function types(stream: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#types is not implemented");
+}
+
+function schemas(stream: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#schemas is not implemented");
+}
+
+function virtualTables(stream: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#virtual_tables is not implemented");
+}
+
+function table(table: any, stream: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#table is not implemented");
+}
+
+function indexesInCreate(table: any, stream: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#indexes_in_create is not implemented");
+}
+
+function indexParts(index: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#index_parts is not implemented");
+}
+
+function checkConstraintsInCreate(table: any, stream: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::SchemaDumper#check_constraints_in_create is not implemented",
+  );
+}
+
+function checkParts(check: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#check_parts is not implemented");
+}
+
+function foreignKeys(table: any, stream: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#foreign_keys is not implemented");
+}
+
+function formatColspec(colspec: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#format_colspec is not implemented");
+}
+
+function formatOptions(options: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#format_options is not implemented");
+}
+
+function formatIndexParts(options: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#format_index_parts is not implemented");
+}
+
+function removePrefixAndSuffix(table: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::SchemaDumper#remove_prefix_and_suffix is not implemented",
+  );
+}
+
+function isIgnored(tableName: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#ignored? is not implemented");
+}
+
+function generateOptions(config: any): never {
+  throw new NotImplementedError("ActiveRecord::SchemaDumper#generate_options is not implemented");
 }

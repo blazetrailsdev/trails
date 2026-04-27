@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation
  */
 
+import { NotImplementedError } from "../../errors.js";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
 import type { ForeignKeyDefinition, ReferentialAction } from "../abstract/schema-definitions.js";
 import { quoteIdentifier, quoteTableName } from "../abstract/quoting.js";
@@ -47,4 +48,88 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
     return sql;
   }
+}
+
+function visit_AlterTable(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_AlterTable is not implemented",
+  );
+}
+
+function visit_AddForeignKey(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_AddForeignKey is not implemented",
+  );
+}
+
+function visit_ForeignKeyDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ForeignKeyDefinition is not implemented",
+  );
+}
+
+function visit_CheckConstraintDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_CheckConstraintDefinition is not implemented",
+  );
+}
+
+function visit_ValidateConstraint(name: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ValidateConstraint is not implemented",
+  );
+}
+
+function visit_ExclusionConstraintDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ExclusionConstraintDefinition is not implemented",
+  );
+}
+
+function visit_UniqueConstraintDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_UniqueConstraintDefinition is not implemented",
+  );
+}
+
+function visit_AddExclusionConstraint(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_AddExclusionConstraint is not implemented",
+  );
+}
+
+function visit_AddUniqueConstraint(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_AddUniqueConstraint is not implemented",
+  );
+}
+
+function visit_ChangeColumnDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ChangeColumnDefinition is not implemented",
+  );
+}
+
+function visit_ChangeColumnDefaultDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ChangeColumnDefaultDefinition is not implemented",
+  );
+}
+
+function addColumnOptionsBang(sql: any, options: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#add_column_options! is not implemented",
+  );
+}
+
+function quotedIncludeColumns(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#quoted_include_columns is not implemented",
+  );
+}
+
+function tableModifierInCreate(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#table_modifier_in_create is not implemented",
+  );
 }

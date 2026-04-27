@@ -7,6 +7,7 @@
  * visit methods for dialect-specific SQL generation.
  */
 
+import { NotImplementedError } from "../../errors.js";
 import {
   type ColumnType,
   type ColumnOptions,
@@ -281,4 +282,112 @@ export class SchemaCreation {
         );
     }
   }
+}
+
+function visit_AlterTable(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_AlterTable is not implemented",
+  );
+}
+
+function visit_ColumnDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_ColumnDefinition is not implemented",
+  );
+}
+
+function visit_AddColumnDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_AddColumnDefinition is not implemented",
+  );
+}
+
+function visit_TableDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_TableDefinition is not implemented",
+  );
+}
+
+function visit_PrimaryKeyDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_PrimaryKeyDefinition is not implemented",
+  );
+}
+
+function visit_ForeignKeyDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_ForeignKeyDefinition is not implemented",
+  );
+}
+
+function visit_AddForeignKey(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_AddForeignKey is not implemented",
+  );
+}
+
+function visit_DropConstraint(name: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_DropConstraint is not implemented",
+  );
+}
+
+function visit_CreateIndexDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_CreateIndexDefinition is not implemented",
+  );
+}
+
+function visit_CheckConstraintDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_CheckConstraintDefinition is not implemented",
+  );
+}
+
+function visit_AddCheckConstraint(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#visit_AddCheckConstraint is not implemented",
+  );
+}
+
+function quotedColumns(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#quoted_columns is not implemented",
+  );
+}
+
+function addTableOptionsBang(createSql: any, o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#add_table_options! is not implemented",
+  );
+}
+
+function columnOptions(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#column_options is not implemented",
+  );
+}
+
+function addColumnOptionsBang(sql: any, options: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#add_column_options! is not implemented",
+  );
+}
+
+function toSql(sql: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#to_sql is not implemented",
+  );
+}
+
+function tableModifierInCreate(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#table_modifier_in_create is not implemented",
+  );
+}
+
+function actionSql(action: any, dependency: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SchemaCreation#action_sql is not implemented",
+  );
 }

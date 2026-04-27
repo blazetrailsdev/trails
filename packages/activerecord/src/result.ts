@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Result
  */
 
+import { NotImplementedError } from "./errors.js";
 export type ColumnType = { deserialize(value: unknown): unknown };
 export type ColumnTypes = Record<string | number, ColumnType>;
 
@@ -240,3 +241,11 @@ export class Result {
 const EMPTY_COLUMNS = Object.freeze([]) as unknown as string[];
 const EMPTY_ROWS = Object.freeze([]) as unknown as unknown[][];
 const EMPTY = Object.freeze(new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_TYPES)) as Result;
+
+function columnType(name: any, index: any, typeOverrides: any): never {
+  throw new NotImplementedError("ActiveRecord::Result#column_type is not implemented");
+}
+
+function hashRows(): never {
+  throw new NotImplementedError("ActiveRecord::Result#hash_rows is not implemented");
+}

@@ -3,6 +3,7 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods
  */
+import { NotImplementedError } from "./errors.js";
 import { isBlank } from "@blazetrails/activesupport";
 import { resolveAliasName } from "@blazetrails/activemodel";
 // ActiveModel provides aliasAttribute and undefineAttributeMethods on Model.
@@ -281,4 +282,32 @@ export function isAttributeMethod(this: AttributeMethodsHost, name: string): boo
 
 export function _hasAttribute(this: AttributeMethodsHost, attrName: string): boolean {
   return this._attributeDefinitions.has(attrName);
+}
+
+function attributesWithValues(attributeNames: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods#attributes_with_values is not implemented",
+  );
+}
+
+function attributesForUpdate(attributeNames: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods#attributes_for_update is not implemented",
+  );
+}
+
+function attributesForCreate(attributeNames: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods#attributes_for_create is not implemented",
+  );
+}
+
+function formatForInspect(name: any, value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods#format_for_inspect is not implemented",
+  );
+}
+
+function isPkAttribute(name: any): never {
+  throw new NotImplementedError("ActiveRecord::AttributeMethods#pk_attribute? is not implemented");
 }

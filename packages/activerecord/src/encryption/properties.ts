@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Properties
  */
 
+import { NotImplementedError } from "../errors.js";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
 const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
@@ -102,4 +103,8 @@ function _typeNameFor(value: unknown): string {
     if (name) return name;
   }
   return t;
+}
+
+function data(): never {
+  throw new NotImplementedError("ActiveRecord::Encryption::Properties#data is not implemented");
 }

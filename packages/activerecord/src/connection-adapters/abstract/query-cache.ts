@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../../errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { DatabaseStatementsHost } from "./database-statements.js";
 
@@ -399,4 +400,40 @@ export function dirtiesQueryCache(
       return original.apply(this, args);
     };
   }
+}
+
+function checkVersion(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::QueryCache::Store#check_version is not implemented",
+  );
+}
+
+function unsetQueryCacheBang(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::QueryCache#unset_query_cache! is not implemented",
+  );
+}
+
+function lookupSqlCache(sql: any, name: any, binds: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::QueryCache#lookup_sql_cache is not implemented",
+  );
+}
+
+function cacheSql(sql: any, name: any, binds: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::QueryCache#cache_sql is not implemented",
+  );
+}
+
+function cacheNotificationInfoResult(sql: any, name: any, binds: any, result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::QueryCache#cache_notification_info_result is not implemented",
+  );
+}
+
+function cacheNotificationInfo(sql: any, name: any, binds: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::QueryCache#cache_notification_info is not implemented",
+  );
 }

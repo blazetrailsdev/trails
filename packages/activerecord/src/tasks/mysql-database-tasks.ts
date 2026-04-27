@@ -7,7 +7,7 @@
 import { getFs, getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { DatabaseAlreadyExists } from "../errors.js";
+import { DatabaseAlreadyExists, NotImplementedError } from "../errors.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { coercePort } from "./task-utils.js";
 
@@ -334,4 +334,28 @@ export class MySQLDatabaseTasks {
   private escapeIdent(value: string): string {
     return value.replace(/`/g, "``");
   }
+}
+
+function connection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::MySQLDatabaseTasks#connection is not implemented",
+  );
+}
+
+function establishConnection(config?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::MySQLDatabaseTasks#establish_connection is not implemented",
+  );
+}
+
+function configurationHashWithoutDatabase(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::MySQLDatabaseTasks#configuration_hash_without_database is not implemented",
+  );
+}
+
+function runCmdError(cmd: any, args: any, action: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::MySQLDatabaseTasks#run_cmd_error is not implemented",
+  );
 }

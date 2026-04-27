@@ -4,6 +4,7 @@
  * Extracts column precision and scale from the database schema
  * and passes them to the ActiveModel validator.
  */
+import { NotImplementedError } from "../errors.js";
 import { NumericalityValidator as BaseNumericalityValidator } from "@blazetrails/activemodel";
 
 // JS Number.MAX_SAFE_INTEGER has 15–16 significant digits. Rails uses
@@ -28,4 +29,16 @@ export class NumericalityValidator extends BaseNumericalityValidator {
     if (typeof klass.typeForAttribute !== "function") return undefined;
     return klass.typeForAttribute(attribute)?.scale ?? undefined;
   }
+}
+
+function columnPrecisionFor(record: any, attribute: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::NumericalityValidator#column_precision_for is not implemented",
+  );
+}
+
+function columnScaleFor(record: any, attribute: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations::NumericalityValidator#column_scale_for is not implemented",
+  );
 }

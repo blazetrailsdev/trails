@@ -1,3 +1,4 @@
+import { NotImplementedError } from "./errors.js";
 import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
@@ -233,3 +234,39 @@ export class LogSubscriber extends BaseLogSubscriber {
 // Register log-level gates matching Rails' class-body `subscribe_log_level` calls.
 LogSubscriber.subscribeLogLevel("sql", "debug");
 LogSubscriber.subscribeLogLevel("strict_loading_violation", "debug");
+
+function typeCastedBinds(castedBinds: any): never {
+  throw new NotImplementedError("ActiveRecord::LogSubscriber#type_casted_binds is not implemented");
+}
+
+function renderBind(attr: any, value: any): never {
+  throw new NotImplementedError("ActiveRecord::LogSubscriber#render_bind is not implemented");
+}
+
+function colorizePayloadName(name: any, payloadName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::LogSubscriber#colorize_payload_name is not implemented",
+  );
+}
+
+function sqlColor(sql: any): never {
+  throw new NotImplementedError("ActiveRecord::LogSubscriber#sql_color is not implemented");
+}
+
+function logger(): never {
+  throw new NotImplementedError("ActiveRecord::LogSubscriber#logger is not implemented");
+}
+
+function debug(progname?: any, block?: any): never {
+  throw new NotImplementedError("ActiveRecord::LogSubscriber#debug is not implemented");
+}
+
+function logQuerySource(): never {
+  throw new NotImplementedError("ActiveRecord::LogSubscriber#log_query_source is not implemented");
+}
+
+function querySourceLocation(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::LogSubscriber#query_source_location is not implemented",
+  );
+}

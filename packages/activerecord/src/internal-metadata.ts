@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::InternalMetadata
  */
 
+import { NotImplementedError } from "./errors.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { detectAdapterName } from "./adapter-name.js";
 import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
@@ -225,4 +226,10 @@ export class InternalMetadata {
     um.where(this.arelTable.get(this.primaryKey).eq(key));
     await this._adapter.executeMutation(um.toSql());
   }
+}
+
+function updateOrCreateEntry(connection: any, key: any, value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::InternalMetadata#update_or_create_entry is not implemented",
+  );
 }

@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Cipher::Aes256Gcm
  */
 
+import { NotImplementedError } from "../../errors.js";
 import { getCrypto } from "@blazetrails/activesupport";
 import { ConfigError, DecryptionError } from "../errors.js";
 
@@ -123,4 +124,16 @@ export class Cipher {
       );
     }
   }
+}
+
+function generateIv(cipher: any, clearText: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Cipher::Aes256Gcm#generate_iv is not implemented",
+  );
+}
+
+function generateDeterministicIv(clearText: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Cipher::Aes256Gcm#generate_deterministic_iv is not implemented",
+  );
 }

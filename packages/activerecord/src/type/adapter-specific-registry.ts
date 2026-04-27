@@ -3,6 +3,7 @@
  *
  * Also defines Registration, DecorationRegistration, and TypeConflictError.
  */
+import { NotImplementedError } from "../errors.js";
 import { Type } from "@blazetrails/activemodel";
 
 export class TypeConflictError extends Error {
@@ -153,4 +154,84 @@ export class AdapterSpecificRegistry {
       return cmp < 0 ? current : best;
     });
   }
+}
+
+function registrations(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::AdapterSpecificRegistry#registrations is not implemented",
+  );
+}
+
+function findRegistration(symbol: any, args?: any[], kwargs?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::AdapterSpecificRegistry#find_registration is not implemented",
+  );
+}
+
+function name(): never {
+  throw new NotImplementedError("ActiveRecord::Type::Registration#name is not implemented");
+}
+
+function block(): never {
+  throw new NotImplementedError("ActiveRecord::Type::Registration#block is not implemented");
+}
+
+function adapter(): never {
+  throw new NotImplementedError("ActiveRecord::Type::Registration#adapter is not implemented");
+}
+
+function override(): never {
+  throw new NotImplementedError("ActiveRecord::Type::Registration#override is not implemented");
+}
+
+function priority(): never {
+  throw new NotImplementedError("ActiveRecord::Type::Registration#priority is not implemented");
+}
+
+function priorityExceptAdapter(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::Registration#priority_except_adapter is not implemented",
+  );
+}
+
+function isMatchesAdapter(adapter?: any, opts?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::Registration#matches_adapter? is not implemented",
+  );
+}
+
+function isConflictsWith(other: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::Registration#conflicts_with? is not implemented",
+  );
+}
+
+function isSamePriorityExceptAdapter(other: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::Registration#same_priority_except_adapter? is not implemented",
+  );
+}
+
+function hasAdapterConflict(other: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::Registration#has_adapter_conflict? is not implemented",
+  );
+}
+
+function options(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::DecorationRegistration#options is not implemented",
+  );
+}
+
+function klass(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::DecorationRegistration#klass is not implemented",
+  );
+}
+
+function isMatchesOptions(kwargs?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Type::DecorationRegistration#matches_options? is not implemented",
+  );
 }

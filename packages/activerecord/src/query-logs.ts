@@ -7,7 +7,7 @@
  * controller, action, etc.) to help trace queries back to application code.
  */
 
-import { ConfigurationError } from "./errors.js";
+import { ConfigurationError, NotImplementedError } from "./errors.js";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
 
@@ -253,4 +253,20 @@ export function escapeComment(content: string): string {
   // Replace comment markers to prevent SQL comment injection
   s = s.replace(/\*\//g, "* /").replace(/\/\*/g, "/ *");
   return s;
+}
+
+function rebuildHandlers(): never {
+  throw new NotImplementedError("ActiveRecord::QueryLogs#rebuild_handlers is not implemented");
+}
+
+function buildHandler(name: any, handler?: any): never {
+  throw new NotImplementedError("ActiveRecord::QueryLogs#build_handler is not implemented");
+}
+
+function escapeSqlComment(content: any): never {
+  throw new NotImplementedError("ActiveRecord::QueryLogs#escape_sql_comment is not implemented");
+}
+
+function tagContent(connection: any): never {
+  throw new NotImplementedError("ActiveRecord::QueryLogs#tag_content is not implemented");
 }

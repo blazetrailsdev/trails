@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::NoTouching
  */
 
+import { NotImplementedError } from "./errors.js";
 const _noTouchingDepth = new Map<Function, number>();
 
 /**
@@ -88,4 +89,8 @@ export function applyTo<R>(klass: any, fn: () => R | Promise<R>): R | Promise<R>
     cleanup();
     throw error;
   }
+}
+
+function klasses(): never {
+  throw new NotImplementedError("ActiveRecord::NoTouching#klasses is not implemented");
 }

@@ -8,6 +8,7 @@
  * an adapter for execution, matching the codebase's mixin pattern.
  */
 
+import { NotImplementedError } from "../../errors.js";
 import type { Result } from "../../result.js";
 import { stripSqlComments } from "../sql-classification.js";
 
@@ -83,4 +84,60 @@ export async function resetIsolationLevel(
   if (previousReadUncommitted !== null) {
     await adapter.executeMutation(`PRAGMA read_uncommitted=${previousReadUncommitted}`);
   }
+}
+
+function internalBeginTransaction(mode: any, isolation: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#internal_begin_transaction is not implemented",
+  );
+}
+
+function performQuery(
+  rawConnection: any,
+  sql: any,
+  binds: any,
+  typeCastedBinds: any,
+  prepare?: any,
+  notificationPayload?: any,
+  batch?: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query is not implemented",
+  );
+}
+
+function castResult(result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#cast_result is not implemented",
+  );
+}
+
+function affectedRows(result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#affected_rows is not implemented",
+  );
+}
+
+function executeBatch(statements: any, name?: any, kwargs?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#execute_batch is not implemented",
+  );
+}
+
+function buildTruncateStatement(tableName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#build_truncate_statement is not implemented",
+  );
+}
+
+function returningColumnValues(result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#returning_column_values is not implemented",
+  );
+}
+
+function defaultInsertValue(column: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#default_insert_value is not implemented",
+  );
 }

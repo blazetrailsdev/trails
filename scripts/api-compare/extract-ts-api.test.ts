@@ -134,6 +134,18 @@ describe("extractFileLocalHelpers", () => {
     expect(helpers).toEqual([]);
   });
 
+  it("skips NotImplementedError stubs (function decls and arrow consts)", () => {
+    const helpers = helpersFromSource(`
+      function realHelper(x) { return x; }
+      function stubFn(a, b) {
+        throw new NotImplementedError("not implemented");
+      }
+      const stubArrow = (x) => { throw new NotImplementedError("nope"); };
+      const realArrow = (x) => x + 1;
+    `);
+    expect(helpers.map((h) => h.name)).toEqual(["realHelper", "realArrow"]);
+  });
+
   it("records line numbers for traceback", () => {
     const helpers = helpersFromSource(`function first() {}\nfunction second() {}\n`);
     expect(helpers[0].line).toBe(1);

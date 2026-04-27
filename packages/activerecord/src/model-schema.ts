@@ -1,3 +1,4 @@
+import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
@@ -954,3 +955,37 @@ export const ClassMethods = {
   _returningColumnsForInsert,
   loadSchemaFromAdapter,
 };
+
+function initializeLoadSchemaMonitor(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ModelSchema#initialize_load_schema_monitor is not implemented",
+  );
+}
+
+function reloadSchemaFromCache(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ModelSchema#reload_schema_from_cache is not implemented",
+  );
+}
+
+function isSchemaLoaded(): never {
+  throw new NotImplementedError("ActiveRecord::ModelSchema#schema_loaded? is not implemented");
+}
+
+function loadSchemaBang(): never {
+  throw new NotImplementedError("ActiveRecord::ModelSchema#load_schema! is not implemented");
+}
+
+function undecoratedTableName(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ModelSchema#undecorated_table_name is not implemented",
+  );
+}
+
+function computeTableName(): never {
+  throw new NotImplementedError("ActiveRecord::ModelSchema#compute_table_name is not implemented");
+}
+
+function typeForColumn(): never {
+  throw new NotImplementedError("ActiveRecord::ModelSchema#type_for_column is not implemented");
+}

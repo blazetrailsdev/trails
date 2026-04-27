@@ -18,6 +18,7 @@
  * two flows share a single wrapper implementation.
  */
 
+import { NotImplementedError } from "./errors.js";
 import { type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
@@ -469,4 +470,14 @@ export function ivLength(): number {
 /** Mirrors: ActiveRecord::Encryption.eager_load! */
 export function eagerLoadBang(): void {
   // No-op in TS — all encryption classes are statically imported.
+}
+
+function tryToDecryptWithEach(encryptedText: any, keys?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Cipher#try_to_decrypt_with_each is not implemented",
+  );
+}
+
+function cipherFor(secret: any, deterministic?: any): never {
+  throw new NotImplementedError("ActiveRecord::Encryption::Cipher#cipher_for is not implemented");
 }

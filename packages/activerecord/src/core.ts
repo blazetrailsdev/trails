@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Core
  */
 
+import { NotImplementedError } from "./errors.js";
 import { Notifications, ParameterFilter, getAsyncContext } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
@@ -588,4 +589,40 @@ export function cachedFindByStatement(
     cache.set(key, block());
   }
   return cache.get(key);
+}
+
+function initInternals(): never {
+  throw new NotImplementedError("ActiveRecord::Core#init_internals is not implemented");
+}
+
+function initializeInternalsCallback(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Core#initialize_internals_callback is not implemented",
+  );
+}
+
+function isCustomInspectMethodDefined(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Core#custom_inspect_method_defined? is not implemented",
+  );
+}
+
+function inspectWithAttributes(attributesToList: any): never {
+  throw new NotImplementedError("ActiveRecord::Core#inspect_with_attributes is not implemented");
+}
+
+function attributesForInspect(): never {
+  throw new NotImplementedError("ActiveRecord::Core#attributes_for_inspect is not implemented");
+}
+
+function allAttributesForInspect(): never {
+  throw new NotImplementedError("ActiveRecord::Core#all_attributes_for_inspect is not implemented");
+}
+
+function relation(): never {
+  throw new NotImplementedError("ActiveRecord::Core#relation is not implemented");
+}
+
+function cachedFindBy(): never {
+  throw new NotImplementedError("ActiveRecord::Core#cached_find_by is not implemented");
 }

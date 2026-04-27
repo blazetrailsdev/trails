@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting
  */
 
+import { NotImplementedError } from "../../errors.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import {
   quote as abstractQuote,
@@ -373,5 +374,41 @@ function isSqlLiteral(value: unknown): value is { value: string } {
     typeof value === "object" &&
     value.constructor?.name === "SqlLiteral" &&
     typeof (value as any).value === "string"
+  );
+}
+
+function lookupCastType(sqlType: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#lookup_cast_type is not implemented",
+  );
+}
+
+function encodeArray(arrayData: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#encode_array is not implemented",
+  );
+}
+
+function determineEncodingOfStringsInArray(value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#determine_encoding_of_strings_in_array is not implemented",
+  );
+}
+
+function typeCastArray(values: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#type_cast_array is not implemented",
+  );
+}
+
+function typeCastRangeValue(value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#type_cast_range_value is not implemented",
+  );
+}
+
+function isInfinity(value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#infinity? is not implemented",
   );
 }

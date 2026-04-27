@@ -13,6 +13,7 @@ import {
   NoDatabaseError,
   DatabaseConnectionError,
   TransactionIsolationError,
+  NotImplementedError,
 } from "../errors.js";
 import { TypeMap } from "../type/type-map.js";
 import { Date as DateType } from "../type/date.js";
@@ -1798,4 +1799,118 @@ const REFERENTIAL_ACTION_MAP: Record<string, string> = {
 
 function normalizeReferentialAction(action: string): string {
   return REFERENTIAL_ACTION_MAP[action.toLowerCase()] ?? action.toUpperCase();
+}
+
+function bindParamsLength(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#bind_params_length is not implemented",
+  );
+}
+
+function tableStructure(tableName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#table_structure is not implemented",
+  );
+}
+
+function extractValueFromDefault(default_: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#extract_value_from_default is not implemented",
+  );
+}
+
+function extractDefaultFunction(defaultValue: any, default_: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#extract_default_function is not implemented",
+  );
+}
+
+function hasDefaultFunction(defaultValue: any, default_: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#has_default_function? is not implemented",
+  );
+}
+
+function isInvalidAlterTableType(type: any, options: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#invalid_alter_table_type? is not implemented",
+  );
+}
+
+function moveTable(from: any, to: any, options?: any, block?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#move_table is not implemented",
+  );
+}
+
+function copyTable(from: any, to: any, options?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#copy_table is not implemented",
+  );
+}
+
+function copyTableIndexes(from: any, to: any, rename?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#copy_table_indexes is not implemented",
+  );
+}
+
+function copyTableContents(from: any, to: any, columns: any, rename?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#copy_table_contents is not implemented",
+  );
+}
+
+function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#translate_exception is not implemented",
+  );
+}
+
+function tableStructureWithCollation(tableName: any, basicStructure: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#table_structure_with_collation is not implemented",
+  );
+}
+
+function tableStructureSql(tableName: any, columnNames?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#table_structure_sql is not implemented",
+  );
+}
+
+function arelVisitor(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#arel_visitor is not implemented",
+  );
+}
+
+function buildStatementPool(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#build_statement_pool is not implemented",
+  );
+}
+
+function connect(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#connect is not implemented",
+  );
+}
+
+function reconnect(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#reconnect is not implemented",
+  );
+}
+
+function configureConnection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#configure_connection is not implemented",
+  );
+}
+
+function initializeTypeMap(m: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#initialize_type_map is not implemented",
+  );
 }

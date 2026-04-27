@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Tasks::DatabaseTasks
  */
 
+import { NotImplementedError } from "../errors.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { ProtectedEnvironmentError } from "../migration.js";
@@ -1098,4 +1099,98 @@ export interface DatabaseTaskHandler {
     filename: string,
     extraFlags?: string | string[] | null,
   ): Promise<void>;
+}
+
+function truncateTables(dbConfig: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#truncate_tables is not implemented",
+  );
+}
+
+function withTemporaryPool(dbConfig: any, clobber?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#with_temporary_pool is not implemented",
+  );
+}
+
+function configsFor(options?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#configs_for is not implemented",
+  );
+}
+
+function resolveConfiguration(configuration: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#resolve_configuration is not implemented",
+  );
+}
+
+function isVerbose(): never {
+  throw new NotImplementedError("ActiveRecord::Tasks::DatabaseTasks#verbose? is not implemented");
+}
+
+function databaseAdapterFor(dbConfig: any, ...arguments_: any[]): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#database_adapter_for is not implemented",
+  );
+}
+
+function classForAdapter(adapter: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#class_for_adapter is not implemented",
+  );
+}
+
+function eachCurrentConfiguration(environment: any, name?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#each_current_configuration is not implemented",
+  );
+}
+
+function eachCurrentEnvironment(environment: any, block?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#each_current_environment is not implemented",
+  );
+}
+
+function eachLocalConfiguration(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#each_local_configuration is not implemented",
+  );
+}
+
+function isLocalDatabase(dbConfig: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#local_database? is not implemented",
+  );
+}
+
+function schemaSha1(file: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#schema_sha1 is not implemented",
+  );
+}
+
+function structureDumpFlagsFor(adapter: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#structure_dump_flags_for is not implemented",
+  );
+}
+
+function structureLoadFlagsFor(adapter: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#structure_load_flags_for is not implemented",
+  );
+}
+
+function checkCurrentProtectedEnvironmentBang(dbConfig: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#check_current_protected_environment! is not implemented",
+  );
+}
+
+function initializeDatabase(dbConfig: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Tasks::DatabaseTasks#initialize_database is not implemented",
+  );
 }

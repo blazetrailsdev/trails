@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::KeyGenerator
  */
 
+import { NotImplementedError } from "../errors.js";
 import { getCrypto } from "@blazetrails/activesupport";
 import { Configurable } from "./configurable.js";
 
@@ -40,4 +41,16 @@ export class KeyGenerator {
     const derived = crypto.pbkdf2Sync(password, effectiveSalt, 2 ** 16, length, digest);
     return derived.toString("base64");
   }
+}
+
+function keyDerivationSalt(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::KeyGenerator#key_derivation_salt is not implemented",
+  );
+}
+
+function keyLength(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::KeyGenerator#key_length is not implemented",
+  );
 }

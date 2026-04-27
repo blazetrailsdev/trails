@@ -8,7 +8,7 @@ import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Notifications } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { TransactionIsolationError } from "../../errors.js";
+import { TransactionIsolationError, NotImplementedError } from "../../errors.js";
 import {
   quote,
   quoteTableName,
@@ -1320,3 +1320,150 @@ export const DatabaseStatements = {
     return cacheableQuery.call(this as never, klass, arel);
   },
 };
+
+function rawExecute(
+  sql: any,
+  name?: any,
+  binds?: any,
+  prepare?: any,
+  async?: any,
+  allowRetry?: any,
+  materializeTransactions?: any,
+  batch?: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute is not implemented",
+  );
+}
+
+function performQuery(
+  rawConnection: any,
+  sql: any,
+  binds: any,
+  typeCastedBinds: any,
+  prepare?: any,
+  notificationPayload?: any,
+  batch?: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#perform_query is not implemented",
+  );
+}
+
+function castResult(rawResult: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#cast_result is not implemented",
+  );
+}
+
+function affectedRows(rawResult: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#affected_rows is not implemented",
+  );
+}
+
+function preprocessQuery(sql: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#preprocess_query is not implemented",
+  );
+}
+
+function internalExecute(
+  sql: any,
+  name?: any,
+  binds?: any,
+  prepare?: any,
+  async?: any,
+  allowRetry?: any,
+  materializeTransactions?: any,
+  block?: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute is not implemented",
+  );
+}
+
+function executeBatch(statements: any, name?: any, kwargs?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#execute_batch is not implemented",
+  );
+}
+
+function defaultInsertValue(column: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#default_insert_value is not implemented",
+  );
+}
+
+function buildFixtureSql(fixtures: any, tableName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_fixture_sql is not implemented",
+  );
+}
+
+function buildFixtureStatements(fixtureSet: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_fixture_statements is not implemented",
+  );
+}
+
+function buildTruncateStatement(tableName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_truncate_statement is not implemented",
+  );
+}
+
+function buildTruncateStatements(tableNames: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_truncate_statements is not implemented",
+  );
+}
+
+function combineMultiStatements(totalSql: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#combine_multi_statements is not implemented",
+  );
+}
+
+function select(
+  sql: any,
+  name?: any,
+  binds?: any,
+  prepare?: any,
+  async?: any,
+  allowRetry?: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#select is not implemented",
+  );
+}
+
+function sqlForInsert(sql: any, pk: any, binds: any, returning: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#sql_for_insert is not implemented",
+  );
+}
+
+function lastInsertedId(result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#last_inserted_id is not implemented",
+  );
+}
+
+function returningColumnValues(result: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#returning_column_values is not implemented",
+  );
+}
+
+function arelFromRelation(relation: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#arel_from_relation is not implemented",
+  );
+}
+
+function extractTableRefFromInsertSql(sql: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#extract_table_ref_from_insert_sql is not implemented",
+  );
+}

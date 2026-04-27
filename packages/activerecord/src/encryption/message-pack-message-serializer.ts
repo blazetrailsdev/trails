@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 import { Message } from "./message.js";
 import { MessageSerializer } from "./message-serializer.js";
 
@@ -38,4 +39,34 @@ export class MessagePackMessageSerializer {
   isBinary(): boolean {
     return this._fallback.isBinary();
   }
+}
+
+function messageToHash(message: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::MessagePackMessageSerializer#message_to_hash is not implemented",
+  );
+}
+
+function headersToHash(headers: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::MessagePackMessageSerializer#headers_to_hash is not implemented",
+  );
+}
+
+function hashToMessage(data: any, level: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::MessagePackMessageSerializer#hash_to_message is not implemented",
+  );
+}
+
+function validateMessageDataFormat(data: any, level: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::MessagePackMessageSerializer#validate_message_data_format is not implemented",
+  );
+}
+
+function parseProperties(headers: any, level: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::MessagePackMessageSerializer#parse_properties is not implemented",
+  );
 }

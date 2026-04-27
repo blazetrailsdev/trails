@@ -6,6 +6,7 @@
  *          ActiveRecord::ConnectionAdapters::MySQL::ColumnMethods (module)
  */
 
+import { NotImplementedError } from "../../errors.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -142,4 +143,22 @@ export class Table extends AbstractTable {
   constructor(tableName: string, schema: SchemaStatementsLike) {
     super(tableName, schema);
   }
+}
+
+function validColumnDefinitionOptions(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#valid_column_definition_options is not implemented",
+  );
+}
+
+function aliasedTypes(name: any, fallback: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#aliased_types is not implemented",
+  );
+}
+
+function integerLikePrimaryKeyType(type: any, options: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#integer_like_primary_key_type is not implemented",
+  );
 }

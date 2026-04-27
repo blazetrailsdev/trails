@@ -17,6 +17,7 @@
  *     the subtype and emits `Range` instances from `castValue`/`serialize`.
  */
 
+import { NotImplementedError } from "../../../errors.js";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Range {
@@ -206,4 +207,10 @@ function inspect(value: unknown): string {
   if (typeof value === "string") return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   if (value instanceof Date) return value.toISOString();
   return String(value);
+}
+
+function unquote(value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range#unquote is not implemented",
+  );
 }

@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { Base } from "./base.js";
-import { ReadOnlyRecord, StaleObjectError } from "./errors.js";
+import { ReadOnlyRecord, StaleObjectError, NotImplementedError } from "./errors.js";
 import { UpdateManager, Nodes } from "@blazetrails/arel";
 import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 
@@ -178,3 +178,61 @@ export const ClassMethods = {
 export const InstanceMethods = {
   touch,
 };
+
+function initInternals(): never {
+  throw new NotImplementedError("ActiveRecord::Timestamp#init_internals is not implemented");
+}
+
+function _createRecord(): never {
+  throw new NotImplementedError("ActiveRecord::Timestamp#_create_record is not implemented");
+}
+
+function _updateRecord(): never {
+  throw new NotImplementedError("ActiveRecord::Timestamp#_update_record is not implemented");
+}
+
+function createOrUpdate(touch?: any, opts?: any): never {
+  throw new NotImplementedError("ActiveRecord::Timestamp#create_or_update is not implemented");
+}
+
+function recordUpdateTimestamps(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Timestamp#record_update_timestamps is not implemented",
+  );
+}
+
+function shouldRecordTimestamps(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Timestamp#should_record_timestamps? is not implemented",
+  );
+}
+
+function maxUpdatedColumnTimestamp(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Timestamp#max_updated_column_timestamp is not implemented",
+  );
+}
+
+function clearTimestampAttributes(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Timestamp#clear_timestamp_attributes is not implemented",
+  );
+}
+
+function reloadSchemaFromCache(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Timestamp#reload_schema_from_cache is not implemented",
+  );
+}
+
+function timestampAttributesForCreate(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Timestamp#timestamp_attributes_for_create is not implemented",
+  );
+}
+
+function timestampAttributesForUpdate(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Timestamp#timestamp_attributes_for_update is not implemented",
+  );
+}

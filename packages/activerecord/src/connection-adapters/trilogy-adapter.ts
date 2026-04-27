@@ -9,7 +9,12 @@
  */
 
 import { AbstractMysqlAdapter } from "./abstract-mysql-adapter.js";
-import { DatabaseConnectionError, NoDatabaseError, ConnectionNotEstablished } from "../errors.js";
+import {
+  DatabaseConnectionError,
+  NoDatabaseError,
+  ConnectionNotEstablished,
+  NotImplementedError,
+} from "../errors.js";
 
 const SSL_MODES: Record<string, number> = {
   SSL_MODE_DISABLED: 0,
@@ -71,4 +76,58 @@ export class TrilogyAdapter extends AbstractMysqlAdapter {
     }
     return new ConnectionNotEstablished(error.message);
   }
+}
+
+function isTextType(type: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TrilogyAdapter#text_type? is not implemented",
+  );
+}
+
+function errorNumber(exception: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TrilogyAdapter#error_number is not implemented",
+  );
+}
+
+function connect(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TrilogyAdapter#connect is not implemented",
+  );
+}
+
+function reconnect(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TrilogyAdapter#reconnect is not implemented",
+  );
+}
+
+function fullVersion(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TrilogyAdapter#full_version is not implemented",
+  );
+}
+
+function getFullVersion(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TrilogyAdapter#get_full_version is not implemented",
+  );
+}
+
+function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TrilogyAdapter#translate_exception is not implemented",
+  );
+}
+
+function defaultPreparedStatements(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TrilogyAdapter#default_prepared_statements is not implemented",
+  );
+}
+
+function initializeTypeMap(m: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TrilogyAdapter#initialize_type_map is not implemented",
+  );
 }

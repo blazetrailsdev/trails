@@ -5,6 +5,7 @@
  * Instance methods are this-typed functions on the module object.
  * The [included] hook registers validateAssociations onto the class.
  */
+import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import type { ValidationContextArg } from "./validations.js";
 import { CompositePrimaryKeyMismatchError } from "./associations/errors.js";
@@ -482,4 +483,118 @@ function propagateErrors(parent: Base, child: Base, assocName: string): void {
   for (const msg of errorMessages) {
     parentErrors.add("base", "invalid", { message: msg });
   }
+}
+
+function initInternals(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#init_internals is not implemented",
+  );
+}
+
+function associatedRecordsToValidateOrSave(association: any, newRecord: any, autosave: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#associated_records_to_validate_or_save is not implemented",
+  );
+}
+
+function isNestedRecordsChangedForAutosave(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#nested_records_changed_for_autosave? is not implemented",
+  );
+}
+
+function validateHasOneAssociation(reflection: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#validate_has_one_association is not implemented",
+  );
+}
+
+function validateBelongsToAssociation(reflection: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#validate_belongs_to_association is not implemented",
+  );
+}
+
+function validateCollectionAssociation(reflection: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#validate_collection_association is not implemented",
+  );
+}
+
+function isAssociationValid(association: any, record: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#association_valid? is not implemented",
+  );
+}
+
+function aroundSaveCollectionAssociation(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#around_save_collection_association is not implemented",
+  );
+}
+
+function saveCollectionAssociation(reflection: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#save_collection_association is not implemented",
+  );
+}
+
+function saveHasOneAssociation(reflection: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#save_has_one_association is not implemented",
+  );
+}
+
+function is_recordChanged(reflection: any, record: any, key: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#_record_changed? is not implemented",
+  );
+}
+
+function isAssociationForeignKeyChanged(reflection: any, record: any, key: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#association_foreign_key_changed? is not implemented",
+  );
+}
+
+function isInversePolymorphicAssociationChanged(reflection: any, record: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#inverse_polymorphic_association_changed? is not implemented",
+  );
+}
+
+function saveBelongsToAssociation(reflection: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#save_belongs_to_association is not implemented",
+  );
+}
+
+function computePrimaryKey(reflection: any, record: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#compute_primary_key is not implemented",
+  );
+}
+
+function _ensureNoDuplicateErrors(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#_ensure_no_duplicate_errors is not implemented",
+  );
+}
+
+function defineNonCyclicMethod(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#define_non_cyclic_method is not implemented",
+  );
+}
+
+function addAutosaveAssociationCallbacks(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#add_autosave_association_callbacks is not implemented",
+  );
+}
+
+function defineAutosaveValidationCallbacks(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AutosaveAssociation#define_autosave_validation_callbacks is not implemented",
+  );
 }

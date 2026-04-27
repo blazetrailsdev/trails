@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::StatementPool
  */
 
+import { NotImplementedError } from "../errors.js";
 export class StatementPool<T = unknown> {
   private _statements = new Map<string, T>();
   private _maxSize: number;
@@ -121,4 +122,10 @@ export class StatementPool<T = unknown> {
   protected dealloc(_stmt: T): void {
     // Base implementation is a no-op; adapter-specific pools override.
   }
+}
+
+function cache(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::StatementPool#cache is not implemented",
+  );
 }

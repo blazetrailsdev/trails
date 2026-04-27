@@ -1,3 +1,4 @@
+import { NotImplementedError } from "./errors.js";
 import {
   DatabaseConfig,
   type DatabaseConfigOptions,
@@ -395,3 +396,69 @@ _setDefaultEnvGetter(() => DatabaseConfigurations.defaultEnv);
 // Register the primary checker so HashConfig.isPrimary can consult the
 // current DatabaseConfigurations instance (matching Rails' global Base.configurations).
 _setPrimaryChecker((name) => _currentConfigurations?.isPrimary(name) ?? false);
+
+function envWithConfigs(env?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#env_with_configs is not implemented",
+  );
+}
+
+function buildConfigs(configs: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#build_configs is not implemented",
+  );
+}
+
+function walkConfigs(envName: any, config: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#walk_configs is not implemented",
+  );
+}
+
+function resolveSymbolConnection(name: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#resolve_symbol_connection is not implemented",
+  );
+}
+
+function buildConfigurationSentence(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#build_configuration_sentence is not implemented",
+  );
+}
+
+function buildDbConfigFromRawConfig(envName: any, name: any, config: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#build_db_config_from_raw_config is not implemented",
+  );
+}
+
+function buildDbConfigFromString(envName: any, name: any, config: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#build_db_config_from_string is not implemented",
+  );
+}
+
+function buildDbConfigFromHash(envName: any, name: any, config: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#build_db_config_from_hash is not implemented",
+  );
+}
+
+function mergeDbEnvironmentVariables(currentEnv: any, configs: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#merge_db_environment_variables is not implemented",
+  );
+}
+
+function environmentUrlConfig(env: any, name: any, config: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#environment_url_config is not implemented",
+  );
+}
+
+function environmentValueFor(name: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations#environment_value_for is not implemented",
+  );
+}

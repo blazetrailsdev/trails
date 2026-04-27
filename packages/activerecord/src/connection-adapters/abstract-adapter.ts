@@ -7,7 +7,7 @@
 import { inspectExplainOption } from "../adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
 import { type Nodes, Visitors } from "@blazetrails/arel";
-import { ReadOnlyError } from "../errors.js";
+import { ReadOnlyError, NotImplementedError } from "../errors.js";
 import { SchemaCache } from "./schema-cache.js";
 import { stripSqlComments } from "./sql-classification.js";
 import {
@@ -956,3 +956,202 @@ export class AbstractAdapter {
 
 // Rails: `include DatabaseStatements` inside the class body.
 include(AbstractAdapter, DatabaseStatements);
+
+function canPerformCaseInsensitiveComparisonFor(column: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#can_perform_case_insensitive_comparison_for? is not implemented",
+  );
+}
+
+function isReconnectCanRestoreState(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#reconnect_can_restore_state? is not implemented",
+  );
+}
+
+function withRawConnection(allowRetry?: any, materializeTransactions?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#with_raw_connection is not implemented",
+  );
+}
+
+function verifiedBang(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#verified! is not implemented",
+  );
+}
+
+function isRetryableConnectionError(exception: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#retryable_connection_error? is not implemented",
+  );
+}
+
+function invalidateTransaction(exception: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#invalidate_transaction is not implemented",
+  );
+}
+
+function isRetryableQueryError(exception: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#retryable_query_error? is not implemented",
+  );
+}
+
+function backoff(counter: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#backoff is not implemented",
+  );
+}
+
+function reconnect(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#reconnect is not implemented",
+  );
+}
+
+function anyRawConnection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#any_raw_connection is not implemented",
+  );
+}
+
+function validRawConnection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#valid_raw_connection is not implemented",
+  );
+}
+
+function extendedTypeMapKey(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#extended_type_map_key is not implemented",
+  );
+}
+
+function typeMap(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#type_map is not implemented",
+  );
+}
+
+function translateExceptionClass(nativeError: any, sql: any, binds: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#translate_exception_class is not implemented",
+  );
+}
+
+function log(
+  sql: any,
+  name?: any,
+  binds?: any,
+  typeCastedBinds?: any,
+  async?: any,
+  block?: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#log is not implemented",
+  );
+}
+
+function instrumenter(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#instrumenter is not implemented",
+  );
+}
+
+function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#translate_exception is not implemented",
+  );
+}
+
+function columnFor(tableName: any, columnName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#column_for is not implemented",
+  );
+}
+
+function columnForAttribute(attribute: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#column_for_attribute is not implemented",
+  );
+}
+
+function collector(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#collector is not implemented",
+  );
+}
+
+function arelVisitor(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#arel_visitor is not implemented",
+  );
+}
+
+function buildStatementPool(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#build_statement_pool is not implemented",
+  );
+}
+
+function buildResult(columns?: any, rows?: any, columnTypes?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#build_result is not implemented",
+  );
+}
+
+function configureConnection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#configure_connection is not implemented",
+  );
+}
+
+function attemptConfigureConnection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#attempt_configure_connection is not implemented",
+  );
+}
+
+function defaultPreparedStatements(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#default_prepared_statements is not implemented",
+  );
+}
+
+function isWarningIgnored(warning: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#warning_ignored? is not implemented",
+  );
+}
+
+function initializeTypeMap(m: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#initialize_type_map is not implemented",
+  );
+}
+
+function registerClassWithLimit(mapping: any, key: any, klass: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#register_class_with_limit is not implemented",
+  );
+}
+
+function extractScale(sqlType: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#extract_scale is not implemented",
+  );
+}
+
+function extractPrecision(sqlType: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#extract_precision is not implemented",
+  );
+}
+
+function extractLimit(sqlType: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::AbstractAdapter#extract_limit is not implemented",
+  );
+}

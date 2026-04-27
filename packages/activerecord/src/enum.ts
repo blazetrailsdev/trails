@@ -1,3 +1,4 @@
+import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import { camelize, pluralize } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
@@ -394,4 +395,65 @@ export function castEnumValue(
   if (!def) return null;
 
   return def.type.serialize(value) as number | null;
+}
+
+function name(): never {
+  throw new NotImplementedError("ActiveRecord::Enum::EnumType#name is not implemented");
+}
+
+function klass(): never {
+  throw new NotImplementedError("ActiveRecord::Enum::EnumMethods#klass is not implemented");
+}
+
+function defineEnumMethods(
+  name: any,
+  valueMethodName: any,
+  value: any,
+  scopes: any,
+  instanceMethods: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Enum::EnumMethods#define_enum_methods is not implemented",
+  );
+}
+
+function _enum(
+  name: any,
+  values: any,
+  prefix?: any,
+  suffix?: any,
+  scopes?: any,
+  instanceMethods?: any,
+  validate?: any,
+  options?: any,
+): never {
+  throw new NotImplementedError("ActiveRecord::Enum#_enum is not implemented");
+}
+
+function _enumMethodsModule(): never {
+  throw new NotImplementedError("ActiveRecord::Enum#_enum_methods_module is not implemented");
+}
+
+function assertValidEnumDefinitionValues(values: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Enum#assert_valid_enum_definition_values is not implemented",
+  );
+}
+
+function assertValidEnumOptions(options: any): never {
+  throw new NotImplementedError("ActiveRecord::Enum#assert_valid_enum_options is not implemented");
+}
+
+function detectEnumConflictBang(enumName: any, methodName: any, klassMethod?: any): never {
+  throw new NotImplementedError("ActiveRecord::Enum#detect_enum_conflict! is not implemented");
+}
+
+function raiseConflictError(enumName: any, methodName: any, type?: any, source?: any): never {
+  throw new NotImplementedError("ActiveRecord::Enum#raise_conflict_error is not implemented");
+}
+
+function detectNegativeEnumConditionsBang(methodNames: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Enum#detect_negative_enum_conditions! is not implemented",
+  );
 }

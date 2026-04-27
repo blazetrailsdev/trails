@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveRecord::ConnectionAdapters
  */
-import { AdapterNotFound } from "./errors.js";
+import { AdapterNotFound, NotImplementedError } from "./errors.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 export interface ConnectionAdapters {
@@ -102,3 +102,27 @@ export {
   CheckConstraintDefinition,
   TableDefinition,
 } from "./connection-adapters/abstract/schema-definitions.js";
+
+function defaultPrimaryKey(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters#default_primary_key is not implemented",
+  );
+}
+
+function name(): never {
+  throw new NotImplementedError("ActiveRecord::ConnectionAdapters#name is not implemented");
+}
+
+function isValidate(): never {
+  throw new NotImplementedError("ActiveRecord::ConnectionAdapters#validate? is not implemented");
+}
+
+function isExportNameOnSchemaDump(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters#export_name_on_schema_dump? is not implemented",
+  );
+}
+
+function isDefinedFor(toTable?: any, validate?: any, options?: any): never {
+  throw new NotImplementedError("ActiveRecord::ConnectionAdapters#defined_for? is not implemented");
+}

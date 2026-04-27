@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 import type { Base } from "../base.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
 
@@ -128,4 +129,46 @@ export async function updateCounters(
     return scoped.updateCounters(counters);
   }
   return 0;
+}
+
+function _createRecord(attributeNames?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Locking::Optimistic#_create_record is not implemented",
+  );
+}
+
+function _touchRow(attributeNames: any, time: any): never {
+  throw new NotImplementedError("ActiveRecord::Locking::Optimistic#_touch_row is not implemented");
+}
+
+function _updateRow(attributeNames: any, attemptedAction?: any): never {
+  throw new NotImplementedError("ActiveRecord::Locking::Optimistic#_update_row is not implemented");
+}
+
+function destroyRow(): never {
+  throw new NotImplementedError("ActiveRecord::Locking::Optimistic#destroy_row is not implemented");
+}
+
+function _lockValueForDatabase(lockingColumn: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Locking::Optimistic#_lock_value_for_database is not implemented",
+  );
+}
+
+function _clearLockingColumn(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Locking::Optimistic#_clear_locking_column is not implemented",
+  );
+}
+
+function _queryConstraintsHash(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Locking::Optimistic#_query_constraints_hash is not implemented",
+  );
+}
+
+function hookAttributeType(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Locking::Optimistic#hook_attribute_type is not implemented",
+  );
 }

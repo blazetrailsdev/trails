@@ -7,6 +7,7 @@
  * wrap this with advisory locks to prevent concurrent migrations.
  */
 
+import { NotImplementedError } from "../errors.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { ExecutionStrategy } from "./execution-strategy.js";
 import type { MigrationLike } from "./execution-strategy.js";
@@ -23,4 +24,10 @@ export class DefaultStrategy extends ExecutionStrategy {
       await migration.down(adapter);
     }
   }
+}
+
+function connection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Migration::DefaultStrategy#connection is not implemented",
+  );
 }

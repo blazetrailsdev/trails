@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
 
 export interface Coder {
@@ -93,4 +94,8 @@ export class Serialized extends ValueType {
     }
     return false;
   }
+}
+
+function encoded(value: any): never {
+  throw new NotImplementedError("ActiveRecord::Type::Serialized#encoded is not implemented");
 }

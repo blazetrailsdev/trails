@@ -8,7 +8,11 @@ import type { DatabaseAdapter } from "../../adapter.js";
 import type { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { PoolConfig } from "../pool-config.js";
 import type { ConnectionDescriptor } from "./connection-descriptor.js";
-import { ConnectionNotEstablished, ConnectionTimeoutError } from "../../errors.js";
+import {
+  ConnectionNotEstablished,
+  ConnectionTimeoutError,
+  NotImplementedError,
+} from "../../errors.js";
 import { SchemaReflection, BoundSchemaReflection } from "../schema-cache.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
@@ -902,5 +906,89 @@ function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConn
     typeof c.resetBang === "function" &&
     typeof c.transactionManager === "object" &&
     c.transactionManager !== null
+  );
+}
+
+function connectionLease(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#connection_lease is not implemented",
+  );
+}
+
+function buildAsyncExecutor(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#build_async_executor is not implemented",
+  );
+}
+
+function bulkMakeNewConnections(numNewConnsNeeded: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#bulk_make_new_connections is not implemented",
+  );
+}
+
+function withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#with_exclusively_acquired_all_connections is not implemented",
+  );
+}
+
+function attemptToCheckoutAllExistingConnections(raiseOnAcquisitionTimeout?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#attempt_to_checkout_all_existing_connections is not implemented",
+  );
+}
+
+function checkoutForExclusiveAccess(checkoutTimeout: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_for_exclusive_access is not implemented",
+  );
+}
+
+function withNewConnectionsBlocked(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#with_new_connections_blocked is not implemented",
+  );
+}
+
+function acquireConnection(checkoutTimeout: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#acquire_connection is not implemented",
+  );
+}
+
+function removeConnectionFromThreadCache(conn: any, ownerThread?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#remove_connection_from_thread_cache is not implemented",
+  );
+}
+
+function release(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#release is not implemented",
+  );
+}
+
+function tryToCheckoutNewConnection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#try_to_checkout_new_connection is not implemented",
+  );
+}
+
+function adoptConnection(conn: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#adopt_connection is not implemented",
+  );
+}
+
+function checkoutNewConnection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_new_connection is not implemented",
+  );
+}
+
+function checkoutAndVerify(c: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_and_verify is not implemented",
   );
 }

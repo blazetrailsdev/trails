@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation
  */
 
+import { NotImplementedError } from "../../errors.js";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
 import type { ReferentialAction } from "../abstract/schema-definitions.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
@@ -33,4 +34,70 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
     return sql;
   }
+}
+
+function visit_DropForeignKey(name: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_DropForeignKey is not implemented",
+  );
+}
+
+function visit_DropCheckConstraint(name: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_DropCheckConstraint is not implemented",
+  );
+}
+
+function visit_AddColumnDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_AddColumnDefinition is not implemented",
+  );
+}
+
+function visit_ChangeColumnDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_ChangeColumnDefinition is not implemented",
+  );
+}
+
+function visit_ChangeColumnDefaultDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_ChangeColumnDefaultDefinition is not implemented",
+  );
+}
+
+function visit_CreateIndexDefinition(o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_CreateIndexDefinition is not implemented",
+  );
+}
+
+function visit_IndexDefinition(o: any, create?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_IndexDefinition is not implemented",
+  );
+}
+
+function addTableOptionsBang(createSql: any, o: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#add_table_options! is not implemented",
+  );
+}
+
+function addColumnOptionsBang(sql: any, options: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#add_column_options! is not implemented",
+  );
+}
+
+function addColumnPositionBang(sql: any, options: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#add_column_position! is not implemented",
+  );
+}
+
+function indexInCreate(tableName: any, columnName: any, options: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#index_in_create is not implemented",
+  );
 }

@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
-import { ActiveRecordError, UnknownAttributeError } from "./errors.js";
+import { ActiveRecordError, UnknownAttributeError, NotImplementedError } from "./errors.js";
 import { singularize, camelize, underscore } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
 import { isMarkedForDestruction } from "./autosave-association.js";
@@ -254,4 +254,78 @@ async function processNestedAttributes(record: Base): Promise<void> {
   }
 
   (record as any)._pendingNestedAttributes = null;
+}
+
+function assignNestedAttributesForOneToOneAssociation(
+  associationName: any,
+  attributes: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#assign_nested_attributes_for_one_to_one_association is not implemented",
+  );
+}
+
+function assignNestedAttributesForCollectionAssociation(
+  associationName: any,
+  attributesCollection: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#assign_nested_attributes_for_collection_association is not implemented",
+  );
+}
+
+function checkRecordLimitBang(limit: any, attributesCollection: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#check_record_limit! is not implemented",
+  );
+}
+
+function assignToOrMarkForDestruction(record: any, attributes: any, allowDestroy: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#assign_to_or_mark_for_destruction is not implemented",
+  );
+}
+
+function hasDestroyFlag(hash: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#has_destroy_flag? is not implemented",
+  );
+}
+
+function isRejectNewRecord(associationName: any, attributes: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#reject_new_record? is not implemented",
+  );
+}
+
+function callRejectIf(associationName: any, attributes: any): never {
+  throw new NotImplementedError("ActiveRecord::NestedAttributes#call_reject_if is not implemented");
+}
+
+function isWillBeDestroyed(associationName: any, attributes: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#will_be_destroyed? is not implemented",
+  );
+}
+
+function isAllowDestroy(associationName: any): never {
+  throw new NotImplementedError("ActiveRecord::NestedAttributes#allow_destroy? is not implemented");
+}
+
+function raiseNestedAttributesRecordNotFoundBang(associationName: any, recordId: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#raise_nested_attributes_record_not_found! is not implemented",
+  );
+}
+
+function findRecordById(klass: any, records: any, id: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#find_record_by_id is not implemented",
+  );
+}
+
+function generateAssociationWriter(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::NestedAttributes#generate_association_writer is not implemented",
+  );
 }

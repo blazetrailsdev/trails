@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::DerivedSecretKeyProvider
  */
 
+import { NotImplementedError } from "../errors.js";
 import { Key } from "./key.js";
 import { KeyProvider } from "./key-provider.js";
 import { KeyGenerator } from "./key-generator.js";
@@ -18,4 +19,10 @@ export class DerivedSecretKeyProvider extends KeyProvider {
     const keys = passwordList.map((p) => new Key(generator.deriveKeyFrom(p)));
     super(keys);
   }
+}
+
+function deriveKeyFrom(password: any, using?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::DerivedSecretKeyProvider#derive_key_from is not implemented",
+  );
 }

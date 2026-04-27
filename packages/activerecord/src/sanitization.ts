@@ -6,7 +6,11 @@
 
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { quote, quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
-import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
+import {
+  PreparedStatementInvalid,
+  UnknownAttributeReference,
+  NotImplementedError,
+} from "./errors.js";
 
 /**
  * Sanitize a SQL template with bind parameters.
@@ -221,3 +225,31 @@ export const ClassMethods = {
   sanitizeSqlHashForAssignment,
   disallowRawSqlBang,
 };
+
+function replaceBindVariables(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Sanitization#replace_bind_variables is not implemented",
+  );
+}
+
+function replaceBindVariable(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Sanitization#replace_bind_variable is not implemented",
+  );
+}
+
+function replaceNamedBindVariables(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Sanitization#replace_named_bind_variables is not implemented",
+  );
+}
+
+function quoteBoundValue(): never {
+  throw new NotImplementedError("ActiveRecord::Sanitization#quote_bound_value is not implemented");
+}
+
+function raiseIfBindArityMismatch(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Sanitization#raise_if_bind_arity_mismatch is not implemented",
+  );
+}

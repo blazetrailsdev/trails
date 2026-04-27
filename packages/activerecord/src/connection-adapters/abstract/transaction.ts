@@ -1,6 +1,10 @@
 import type { DatabaseAdapter } from "../../adapter.js";
 import { Transaction as UserTransaction } from "../../transaction.js";
-import { ActiveRecordError, PreparedStatementCacheExpired } from "../../errors.js";
+import {
+  ActiveRecordError,
+  PreparedStatementCacheExpired,
+  NotImplementedError,
+} from "../../errors.js";
 import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
 
 /**
@@ -1021,4 +1025,34 @@ export class TransactionManager {
     }
     return result;
   }
+}
+
+function appendCallbacks(callbacks: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Transaction#append_callbacks is not implemented",
+  );
+}
+
+function uniqueRecords(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Transaction#unique_records is not implemented",
+  );
+}
+
+function runActionOnRecords(records: any, instancesToRunCallbacksOn: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Transaction#run_action_on_records is not implemented",
+  );
+}
+
+function prepareInstancesToRunCallbacksOn(records: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Transaction#prepare_instances_to_run_callbacks_on is not implemented",
+  );
+}
+
+function afterFailureActions(transaction: any, error: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::TransactionManager#after_failure_actions is not implemented",
+  );
 }

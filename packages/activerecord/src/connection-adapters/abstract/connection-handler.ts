@@ -12,7 +12,7 @@ import { DatabaseConfigurations } from "../../database-configurations.js";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { DatabaseAdapter } from "../../adapter.js";
-import { AdapterNotSpecified, ConnectionNotDefined } from "../../errors.js";
+import { AdapterNotSpecified, ConnectionNotDefined, NotImplementedError } from "../../errors.js";
 import type { QueryCachePool } from "./query-cache.js";
 import { Notifications } from "@blazetrails/activesupport";
 
@@ -263,4 +263,46 @@ export class ConnectionHandler {
       poolConfig.disconnect();
     }
   }
+}
+
+function connectionNameToPoolManager(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionHandler#connection_name_to_pool_manager is not implemented",
+  );
+}
+
+function getPoolManager(connectionName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionHandler#get_pool_manager is not implemented",
+  );
+}
+
+function setPoolManager(connectionDescriptor: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionHandler#set_pool_manager is not implemented",
+  );
+}
+
+function poolManagers(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionHandler#pool_managers is not implemented",
+  );
+}
+
+function disconnectPoolFromPoolManager(poolManager: any, role: any, shard: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionHandler#disconnect_pool_from_pool_manager is not implemented",
+  );
+}
+
+function resolvePoolConfig(config: any, connectionName: any, role: any, shard: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionHandler#resolve_pool_config is not implemented",
+  );
+}
+
+function determineOwnerName(ownerName: any, config: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::ConnectionHandler#determine_owner_name is not implemented",
+  );
 }

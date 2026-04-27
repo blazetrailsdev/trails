@@ -5,6 +5,7 @@
  * Mirrors: ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider
  */
 
+import { NotImplementedError } from "../errors.js";
 import { getCrypto } from "@blazetrails/activesupport";
 import { Key } from "./key.js";
 import { Encryptor } from "./encryptor.js";
@@ -51,4 +52,28 @@ export class EnvelopeEncryptionKeyProvider {
   generateRandomEncryptionKey(): string {
     return getCrypto().randomBytes(32).toString("base64");
   }
+}
+
+function encryptDataKey(randomSecret: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#encrypt_data_key is not implemented",
+  );
+}
+
+function decryptDataKey(encryptedMessage: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#decrypt_data_key is not implemented",
+  );
+}
+
+function primaryKeyProvider(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#primary_key_provider is not implemented",
+  );
+}
+
+function generateRandomSecret(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#generate_random_secret is not implemented",
+  );
 }

@@ -6,7 +6,7 @@
  * and overrides save/valid? to run validations with context awareness.
  */
 import type { ValidationContext } from "@blazetrails/activemodel";
-import { ActiveRecordError } from "./errors.js";
+import { ActiveRecordError, NotImplementedError } from "./errors.js";
 
 /**
  * Anything Rails' `valid?(context = nil)` accepts — shared between
@@ -293,3 +293,9 @@ export const ClassMethods = {
   validatesAssociated,
   validatesUniqueness,
 };
+
+function raiseValidationError(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Validations#raise_validation_error is not implemented",
+  );
+}

@@ -9,6 +9,7 @@
  *   // => { adapter: "postgresql", host: "localhost", port: 9000,
  *   //      database: "foo_test", username: "foo", password: "bar", pool: "5" }
  */
+import { NotImplementedError } from "../errors.js";
 import type { DatabaseConfigOptions } from "./database-config.js";
 
 // Scheme-to-adapter mapping (Rails' ActiveRecord.protocol_adapters).
@@ -156,4 +157,40 @@ export class ConnectionUrlResolver {
 // logged without leaking credentials embedded in connection URLs.
 function redactUrl(url: string): string {
   return url.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^@/]+@/, "$1***@");
+}
+
+function uri(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#uri is not implemented",
+  );
+}
+
+function uriParser(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#uri_parser is not implemented",
+  );
+}
+
+function queryHash(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#query_hash is not implemented",
+  );
+}
+
+function rawConfig(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#raw_config is not implemented",
+  );
+}
+
+function resolvedAdapter(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#resolved_adapter is not implemented",
+  );
+}
+
+function databaseFromPath(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#database_from_path is not implemented",
+  );
 }

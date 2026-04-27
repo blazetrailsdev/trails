@@ -8,6 +8,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast
  */
 
+import { NotImplementedError } from "../errors.js";
 interface BeforeTypeCastRecord {
   readAttributeBeforeTypeCast(name: string): unknown;
   readonly attributesBeforeTypeCast: Record<string, unknown>;
@@ -70,4 +71,22 @@ export function attributesForDatabase(record: DatabaseRecord): Record<string, un
     }
   }
   return result;
+}
+
+function attributeBeforeTypeCast(attrName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::BeforeTypeCast#attribute_before_type_cast is not implemented",
+  );
+}
+
+function attributeForDatabase(attrName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::BeforeTypeCast#attribute_for_database is not implemented",
+  );
+}
+
+function isAttributeCameFromUser(attrName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::AttributeMethods::BeforeTypeCast#attribute_came_from_user? is not implemented",
+  );
 }

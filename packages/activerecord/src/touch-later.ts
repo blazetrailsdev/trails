@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { ActiveRecordError, ReadOnlyRecord } from "./errors.js";
+import { ActiveRecordError, ReadOnlyRecord, NotImplementedError } from "./errors.js";
 import {
   touch as timestampTouch,
   timestampAttributesForUpdateInModel,
@@ -182,3 +182,13 @@ export const InstanceMethods = {
   touch,
   beforeCommittedBang,
 };
+
+function initInternals(): never {
+  throw new NotImplementedError("ActiveRecord::TouchLater#init_internals is not implemented");
+}
+
+function hasDeferTouchAttrs(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::TouchLater#has_defer_touch_attrs? is not implemented",
+  );
+}

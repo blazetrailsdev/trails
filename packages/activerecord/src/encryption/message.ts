@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Message
  */
 
+import { NotImplementedError } from "../errors.js";
 import { Properties } from "./properties.js";
 import { ForbiddenClass } from "./errors.js";
 
@@ -26,4 +27,10 @@ export class Message {
   addHeaders(props: Record<string, unknown>): void {
     this.headers.add(props);
   }
+}
+
+function validatePayloadType(payload: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::Message#validate_payload_type is not implemented",
+  );
 }

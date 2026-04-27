@@ -1,3 +1,4 @@
+import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import {
   underscore,
@@ -1840,3 +1841,45 @@ export const ClassMethods = {
   },
   _reflectOnAssociation: _reflectOnAssociationClassMethod,
 };
+
+function actualSourceReflection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Reflection::AbstractReflection#actual_source_reflection is not implemented",
+  );
+}
+
+function ensureOptionNotGivenAsClassBang(optionName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Reflection::AbstractReflection#ensure_option_not_given_as_class! is not implemented",
+  );
+}
+
+function deriveClassName(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Reflection::MacroReflection#derive_class_name is not implemented",
+  );
+}
+
+function deriveJoinTable(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Reflection::AssociationReflection#derive_join_table is not implemented",
+  );
+}
+
+function delegateReflection(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Reflection::ThroughReflection#delegate_reflection is not implemented",
+  );
+}
+
+function collectJoinReflections(seed: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Reflection::ThroughReflection#collect_join_reflections is not implemented",
+  );
+}
+
+function sourceTypeScope(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Reflection::PolymorphicReflection#source_type_scope is not implemented",
+  );
+}

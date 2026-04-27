@@ -1,6 +1,7 @@
 /**
  * Mirrors: ActiveRecord::Type::TypeMap
  */
+import { NotImplementedError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
 
 export class TypeMap {
@@ -54,4 +55,8 @@ export class TypeMap {
     if (fallback) return fallback(lookupKey);
     return new ValueType();
   }
+}
+
+function performFetch(lookupKey: any, block?: any): never {
+  throw new NotImplementedError("ActiveRecord::Type::TypeMap#perform_fetch is not implemented");
 }

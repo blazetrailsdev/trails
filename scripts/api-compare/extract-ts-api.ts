@@ -429,6 +429,11 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
  *   - `function helper(...) {}`
  *   - `const helper = (...) => {}` / `const helper = function (...) {}`
  *
+ * Helpers whose body is just `throw new NotImplementedError(...)` are
+ * skipped: they satisfy api:compare's name match but contribute no
+ * behavior, and Rails reserves NotImplementedError for abstract methods
+ * subclasses must override — they should not inflate the privates score.
+ *
  * Caller must already have ensured `node` is not exported.
  */
 export function extractFileLocalHelpers(
@@ -439,6 +444,7 @@ export function extractFileLocalHelpers(
 
   if (ts.isFunctionDeclaration(node)) {
     if (!node.name) return out;
+    if (isNotImplementedStub(node.body)) return out;
     const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
     out.push({
       name: node.name.text,
@@ -457,6 +463,7 @@ export function extractFileLocalHelpers(
     const init = decl.initializer;
     if (!init) continue;
     if (!ts.isArrowFunction(init) && !ts.isFunctionExpression(init)) continue;
+    if (isNotImplementedStub(init.body)) continue;
     const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
     out.push({
       name: decl.name.text,
@@ -469,6 +476,17 @@ export function extractFileLocalHelpers(
     });
   }
   return out;
+}
+
+export function isNotImplementedStub(body: ts.Node | undefined): boolean {
+  if (!body || !ts.isBlock(body)) return false;
+  if (body.statements.length !== 1) return false;
+  const stmt = body.statements[0];
+  if (!ts.isThrowStatement(stmt)) return false;
+  const expr = stmt.expression;
+  if (!ts.isNewExpression(expr)) return false;
+  const callee = expr.expression;
+  return ts.isIdentifier(callee) && callee.text === "NotImplementedError";
 }
 
 export function resolveRelModule(fromRel: string, spec: string): string | null {

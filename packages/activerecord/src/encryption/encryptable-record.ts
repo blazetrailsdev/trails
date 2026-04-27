@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 import { Scheme, type SchemeOptions } from "./scheme.js";
 import { LengthValidator } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
@@ -199,4 +200,124 @@ export class EncryptableRecord {
 export function getAttributeType(klass: any, name: string): unknown {
   const def = klass._attributeDefinitions?.get?.(name);
   return def?.type;
+}
+
+function encryptAttribute(
+  name: any,
+  keyProvider?: any,
+  key?: any,
+  deterministic?: any,
+  supportUnencryptedData?: any,
+  downcase?: any,
+  ignoreCase?: any,
+  previous?: any,
+  compress?: any,
+  compressor?: any,
+  contextProperties?: any,
+): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#encrypt_attribute is not implemented",
+  );
+}
+
+function preserveOriginalEncrypted(name: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#preserve_original_encrypted is not implemented",
+  );
+}
+
+function overrideAccessorsToPreserveOriginal(name: any, originalAttributeName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#override_accessors_to_preserve_original is not implemented",
+  );
+}
+
+function loadSchemaBang(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#load_schema! is not implemented",
+  );
+}
+
+function addLengthValidationForEncryptedColumns(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#add_length_validation_for_encrypted_columns is not implemented",
+  );
+}
+
+function validateColumnSize(attributeName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#validate_column_size is not implemented",
+  );
+}
+
+function isEncryptedAttribute(attributeName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute? is not implemented",
+  );
+}
+
+function ciphertextFor(attributeName: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#ciphertext_for is not implemented",
+  );
+}
+
+function encrypt(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#encrypt is not implemented",
+  );
+}
+
+function decrypt(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#decrypt is not implemented",
+  );
+}
+
+function _createRecord(attributeNames?: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#_create_record is not implemented",
+  );
+}
+
+function encryptAttributes(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#encrypt_attributes is not implemented",
+  );
+}
+
+function decryptAttributes(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#decrypt_attributes is not implemented",
+  );
+}
+
+function validateEncryptionAllowed(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#validate_encryption_allowed is not implemented",
+  );
+}
+
+function hasEncryptedAttributes(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#has_encrypted_attributes? is not implemented",
+  );
+}
+
+function buildEncryptAttributeAssignments(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#build_encrypt_attribute_assignments is not implemented",
+  );
+}
+
+function buildDecryptAttributeAssignments(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#build_decrypt_attribute_assignments is not implemented",
+  );
+}
+
+function cantModifyEncryptedAttributesWhenFrozen(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Encryption::EncryptableRecord#cant_modify_encrypted_attributes_when_frozen is not implemented",
+  );
 }

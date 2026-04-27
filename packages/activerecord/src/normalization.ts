@@ -10,6 +10,7 @@
  * Mirrors: ActiveRecord::Normalization
  */
 
+import { NotImplementedError } from "./errors.js";
 import { Model } from "@blazetrails/activemodel";
 
 /**
@@ -80,4 +81,16 @@ export function normalizeValueFor(
 
 export function normalizeAttribute(record: InstanceType<typeof Model>, name: string): void {
   return record.normalizeAttribute(name);
+}
+
+function normalize(value: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Normalization::NormalizedValueType#normalize is not implemented",
+  );
+}
+
+function normalizeChangedInPlaceAttributes(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Normalization#normalize_changed_in_place_attributes is not implemented",
+  );
 }

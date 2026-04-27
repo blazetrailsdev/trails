@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
 
 /**
@@ -62,4 +63,10 @@ export class Connection {
 
     return undefined;
   }
+}
+
+function tableName(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::TypeCaster::Connection#table_name is not implemented",
+  );
 }

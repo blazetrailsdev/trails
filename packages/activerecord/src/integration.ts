@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Integration
  */
 
+import { NotImplementedError } from "./errors.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { squish, parameterize, truncate } from "@blazetrails/activesupport";
@@ -219,4 +220,16 @@ export function collectionCacheKey(
     return Promise.resolve(rel.cacheKey(timestampColumn));
   }
   return Promise.resolve("");
+}
+
+function canUseFastCacheVersion(timestamp: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Integration#can_use_fast_cache_version? is not implemented",
+  );
+}
+
+function rawTimestampToCacheVersion(timestamp: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Integration#raw_timestamp_to_cache_version is not implemented",
+  );
 }

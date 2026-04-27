@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting
  */
 
+import { NotImplementedError } from "../../errors.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getDefaultTimezone } from "../../type/internal/timezone.js";
 
@@ -465,5 +466,17 @@ function isSqlLiteral(value: unknown): value is { value: string } {
     typeof value === "object" &&
     value.constructor?.name === "SqlLiteral" &&
     typeof (value as any).value === "string"
+  );
+}
+
+function typeCastedBinds(binds: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Quoting#type_casted_binds is not implemented",
+  );
+}
+
+function lookupCastType(sqlType: any): never {
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::Quoting#lookup_cast_type is not implemented",
   );
 }
