@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { sql } from "@blazetrails/arel";
+import { sql, Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, IrreversibleOrderError } from "./index.js";
 import { Associations, registerModel, modelRegistry } from "./associations.js";
 
@@ -290,6 +290,128 @@ describe("RelationTest", () => {
     expect(sql).toContain("INNER JOIN");
     expect(sql).toContain('"authors"');
     expect(sql).toContain('"books"."author_id"');
+  });
+
+  it("joins() preserves Arel node type — InnerJoin stays InnerJoin in _joinValues, not StringJoin", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const authors = new ArelTable("authors");
+    const node = new Nodes.InnerJoin(
+      authors,
+      new Nodes.On(new Nodes.SqlLiteral("books.author_id = authors.id")),
+    );
+    const relation = Book.joins(node);
+    const joinValues = (relation as any)._joinValues as unknown[];
+    expect(relation.toSql()).toContain("INNER JOIN");
+    expect(relation.toSql()).toContain("authors");
+    expect(joinValues).toHaveLength(1);
+    expect(joinValues[0]).toBeInstanceOf(Nodes.InnerJoin);
+    expect(joinValues[0]).not.toBeInstanceOf(Nodes.StringJoin);
+  });
+
+  it("joins() preserves insertion order across LeadingJoin and InnerJoin", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const authors = new ArelTable("authors");
+    const tags = new ArelTable("tags");
+    const leadingJoin = new Nodes.LeadingJoin(
+      authors,
+      new Nodes.On(new Nodes.SqlLiteral("books.author_id = authors.id")),
+    );
+    const innerJoin = new Nodes.InnerJoin(
+      tags,
+      new Nodes.On(new Nodes.SqlLiteral("books.tag_id = tags.id")),
+    );
+    // leadingJoin passed first → authors appears first in SQL
+    const sqlStr = Book.joins(leadingJoin, innerJoin).toSql();
+    const authorPos = sqlStr.indexOf('"authors"');
+    const tagPos = sqlStr.indexOf('"tags"');
+    expect(authorPos).toBeGreaterThan(-1);
+    expect(tagPos).toBeGreaterThan(-1);
+    expect(authorPos).toBeLessThan(tagPos);
+  });
+
+  it("joins() places LeadingJoin ahead of InnerJoin even when passed later", () => {
+    // Rails build_join_buckets routes LeadingJoin → leading_join bucket (prepended)
+    // and non-LeadingJoin → join_node bucket (appended), regardless of argument
+    // order. This matters for eager-loading where join_sources is non-empty
+    // (query_methods.rb:1856-1863, build_joins:1891-1899).
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const authors = new ArelTable("authors");
+    const tags = new ArelTable("tags");
+    const innerJoin = new Nodes.InnerJoin(
+      tags,
+      new Nodes.On(new Nodes.SqlLiteral("books.tag_id = tags.id")),
+    );
+    const leadingJoin = new Nodes.LeadingJoin(
+      authors,
+      new Nodes.On(new Nodes.SqlLiteral("books.author_id = authors.id")),
+    );
+    // leadingJoin passed second — should still appear before innerJoin in SQL
+    const sqlStr = Book.joins(innerJoin, leadingJoin).toSql();
+    const authorPos = sqlStr.indexOf('"authors"');
+    const tagPos = sqlStr.indexOf('"tags"');
+    expect(authorPos).toBeGreaterThan(-1);
+    expect(tagPos).toBeGreaterThan(-1);
+    expect(authorPos).toBeLessThan(tagPos);
+  });
+
+  it("joins() preserves order of multiple LeadingJoin nodes", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const authors = new ArelTable("authors");
+    const publishers = new ArelTable("publishers");
+    const j1 = new Nodes.LeadingJoin(
+      authors,
+      new Nodes.On(new Nodes.SqlLiteral("books.author_id = authors.id")),
+    );
+    const j2 = new Nodes.LeadingJoin(
+      publishers,
+      new Nodes.On(new Nodes.SqlLiteral("books.publisher_id = publishers.id")),
+    );
+    const sqlStr = Book.joins(j1, j2).toSql();
+    const authorPos = sqlStr.indexOf('"authors"');
+    const publisherPos = sqlStr.indexOf('"publishers"');
+    expect(authorPos).toBeGreaterThan(-1);
+    expect(publisherPos).toBeGreaterThan(-1);
+    expect(authorPos).toBeLessThan(publisherPos);
+  });
+
+  it("joins() preserves insertion order when mixing Arel nodes and string joins", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.adapter = adapter;
+      }
+    }
+    const authors = new ArelTable("authors");
+    const arelJoin = new Nodes.InnerJoin(
+      authors,
+      new Nodes.On(new Nodes.SqlLiteral("books.author_id = authors.id")),
+    );
+    const sqlStr = Book.joins(arelJoin, 'JOIN "tags" ON "books"."tag_id" = "tags"."id"').toSql();
+    const authorPos = sqlStr.indexOf('"authors"');
+    const tagPos = sqlStr.indexOf('"tags"');
+    expect(authorPos).toBeGreaterThan(-1);
+    expect(tagPos).toBeGreaterThan(-1);
+    expect(authorPos).toBeLessThan(tagPos);
   });
 
   it("string ORDER BY plain identifier qualifies with table name", () => {

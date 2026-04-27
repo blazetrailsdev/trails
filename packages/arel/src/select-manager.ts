@@ -593,6 +593,26 @@ export class SelectManager extends TreeManager {
   }
 
   /**
+   * Insert existing Arel join nodes at the front of join_sources, preserving
+   * their relative order. Mirrors the leading_join bucket in Rails' build_joins,
+   * which places LeadingJoin nodes before any alias-tracker-generated joins.
+   */
+  prependJoinNodes(...nodes: Join[]): this {
+    this.core.source.right.unshift(...nodes);
+    return this;
+  }
+
+  /**
+   * Append an existing Arel join node to join_sources.
+   *
+   * Mirrors: join_sources.concat(join_nodes) in Rails build_joins.
+   */
+  appendJoinNode(node: Join): this {
+    this.core.source.right.push(node);
+    return this;
+  }
+
+  /**
    * Factory: create an AND node.
    */
   createAnd(nodes: Node[]): And {

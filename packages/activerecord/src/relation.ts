@@ -236,7 +236,7 @@ export class Relation<T extends Base> {
     on: string;
     quoted?: boolean;
   }> = [];
-  private _rawJoins: string[] = [];
+  private _joinValues: (string | Nodes.Join)[] = [];
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
@@ -1211,9 +1211,11 @@ export class Relation<T extends Base> {
     const flatArgs = args.flatMap((a) => (Array.isArray(a) ? a : [a]));
     for (const arg of flatArgs) {
       if (!arg) continue;
-      // Arel join node (InnerJoin / OuterJoin / StringJoin etc. from joinSources).
+      // Arel join node — stored as-is to preserve type (mirrors Rails joins_values).
+      // Rails joins! uses |= (array union), deduplicating by object identity for
+      // nodes and string equality for strings. JS === matches both behaviours.
       if (arg instanceof Nodes.Join) {
-        rel._rawJoins.push(arg.toSql());
+        if (!rel._joinValues.includes(arg)) rel._joinValues.push(arg);
         continue;
       }
       const resolved = rel._resolveAssociationJoin(arg);
@@ -1223,7 +1225,7 @@ export class Relation<T extends Base> {
           rel._joinClauses.push({ type: "inner", table: j.table, on: j.on, quoted: true });
         }
       } else {
-        rel._rawJoins.push(arg);
+        if (!rel._joinValues.includes(arg)) rel._joinValues.push(arg);
       }
     }
     return rel;
@@ -1918,18 +1920,26 @@ export class Relation<T extends Base> {
     if (this._referencesValues.length === 0) return false;
     if (this._includesAssociations.length === 0) return false;
 
-    // _rawJoins are the string-form equivalent of Rails' Arel::Nodes::StringJoin.
-    // Rails' references_eager_loaded_tables? extracts table names from StringJoin
-    // nodes via tables_in_string; mirror that by passing each raw SQL string
-    // directly to tablesInString (wrapping as StringJoin for type-level parity).
+    // Rails references_eager_loaded_tables? (relation.rb) calls build_joins([]) and
+    // iterates the returned nodes: StringJoin → tables_in_string(join.left),
+    // other joins → join.left.name. Mirror that: strings become StringJoin and we
+    // extract via tablesInString; Arel nodes expose their table via left.name when
+    // available (InnerJoin/OuterJoin/LeadingJoin all have left: Table).
     const joinedTables = new Set<string>([
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
-      ...this._rawJoins.flatMap((s) => {
-        // Wrap as StringJoin (Rails' Arel::Nodes::StringJoin equivalent) and
-        // read back via instanceof to stay type-safe with no unsafe cast.
-        const join = new Nodes.StringJoin(new Nodes.SqlLiteral(s));
-        const sqlText = join.left instanceof Nodes.SqlLiteral ? join.left.value : s;
-        return this.tablesInString(sqlText);
+      ...this._joinValues.flatMap((v) => {
+        if (typeof v === "string") {
+          const join = new Nodes.StringJoin(new Nodes.SqlLiteral(v));
+          const sqlText = join.left instanceof Nodes.SqlLiteral ? join.left.value : v;
+          return this.tablesInString(sqlText);
+        }
+        if (v instanceof Nodes.StringJoin) {
+          const sqlText = v.left instanceof Nodes.SqlLiteral ? v.left.value : v.toSql();
+          return this.tablesInString(sqlText);
+        }
+        const leftName = (v.left as any)?.name;
+        if (typeof leftName === "string") return [leftName.toLowerCase()];
+        return this.tablesInString(v.toSql());
       }),
       String((this._modelClass as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
     ]);
@@ -2309,6 +2319,25 @@ export class Relation<T extends Base> {
   // interface merge + prototype assignment (see bottom of file)
 
   private _applyJoinsToManager(manager: SelectManager): void {
+    // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
+    // LeadingJoin nodes go to the leading_join bucket (prepended before any
+    // existing join_sources, including eager-load JoinDependency joins added by
+    // _buildEagerJoinManager). All other nodes — including StringJoin from raw SQL
+    // strings — go to the join_node bucket (appended after existing join_sources).
+    // This matches the stashed_eager_load / stashed_left_joins routing condition:
+    // `!LeadingJoin && (stashed_eager_load || stashed_left_joins) → join_node`.
+    const leadingJoins: Nodes.Join[] = [];
+    const joinNodes: Nodes.Join[] = [];
+    for (const v of this._joinValues) {
+      const node: Nodes.Join =
+        typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v;
+      if (node instanceof Nodes.LeadingJoin) {
+        leadingJoins.push(node);
+      } else {
+        joinNodes.push(node);
+      }
+    }
+    if (leadingJoins.length > 0) manager.prependJoinNodes(...leadingJoins);
     for (const join of this._joinClauses) {
       const tableNode = join.quoted ? new Table(join.table) : join.table;
       const onNode = new Nodes.SqlLiteral(join.on);
@@ -2318,9 +2347,7 @@ export class Relation<T extends Base> {
         manager.outerJoin(tableNode, onNode);
       }
     }
-    for (const rawJoin of this._rawJoins) {
-      manager.appendStringJoin(rawJoin);
-    }
+    for (const node of joinNodes) manager.appendJoinNode(node);
   }
 
   /**
@@ -3916,7 +3943,7 @@ export class Relation<T extends Base> {
       this._groupColumns.length === 0 &&
       this._havingClause.isEmpty() &&
       this._joinClauses.length === 0 &&
-      this._rawJoins.length === 0 &&
+      this._joinValues.length === 0 &&
       this._includesAssociations.length === 0 &&
       this._eagerLoadAssociations.length === 0 &&
       this._preloadAssociations.length === 0 &&
@@ -4171,7 +4198,7 @@ export class Relation<T extends Base> {
     this._lockValue = source._lockValue;
     this._setOperation = source._setOperation;
     this._joinClauses = [...source._joinClauses];
-    this._rawJoins = [...source._rawJoins];
+    this._joinValues = [...source._joinValues];
     this._includesAssociations = [...source._includesAssociations];
     this._preloadAssociations = [...source._preloadAssociations];
     this._eagerLoadAssociations = [...source._eagerLoadAssociations];

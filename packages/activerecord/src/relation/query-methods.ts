@@ -113,7 +113,7 @@ interface QueryMethodsHost {
   _isNone: boolean;
   _lockValue: string | null;
   _joinClauses: Array<{ type: "inner" | "left"; table: string; on: string; quoted?: boolean }>;
-  _rawJoins: string[];
+  _joinValues: (string | Nodes.Join)[];
   _includesAssociations: AssociationSpec[];
   _preloadAssociations: AssociationSpec[];
   _eagerLoadAssociations: AssociationSpec[];
@@ -583,7 +583,7 @@ function unscopeBang(
           break;
         case "joins":
           this._joinClauses = [];
-          this._rawJoins = [];
+          this._joinValues = [];
           break;
         case "leftOuterJoins":
           this._joinClauses = this._joinClauses.filter((j) => j.type !== "left");
@@ -633,16 +633,17 @@ function unscopeBang(
   return this;
 }
 
-function joinsBang(this: QueryMethodsHost, ...args: string[]): any {
+function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): any {
+  // Rails joins! uses |= (array union), deduplicating by equality/identity.
   for (const arg of args) {
-    this._rawJoins.push(arg);
+    if (!this._joinValues.includes(arg)) this._joinValues.push(arg);
   }
   return this;
 }
 
 function leftOuterJoinsBang(this: QueryMethodsHost, ...args: string[]): any {
   for (const arg of args) {
-    this._rawJoins.push(arg);
+    this._joinValues.push(arg);
   }
   return this;
 }
@@ -810,7 +811,7 @@ const STRUCTURAL_FIELDS: ReadonlyArray<[string, keyof QueryMethodsHost]> = [
   ["order", "_orderClauses"],
   ["rawOrder", "_rawOrderClauses"],
   ["joins", "_joinClauses"],
-  ["rawJoins", "_rawJoins"],
+  ["joinValues", "_joinValues"],
   ["limit", "_limitValue"],
   ["offset", "_offsetValue"],
   ["lock", "_lockValue"],
@@ -1958,18 +1959,25 @@ function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown[]> {
     join_node: [],
   };
 
-  // Convert raw SQL joins to StringJoin nodes.
-  // _joinClauses (already-resolved SQL joins) are handled directly by
-  // buildJoins via manager.join()/outerJoin() and don't go through buckets.
-  for (const raw of this._rawJoins) {
-    buckets.join_node.push(new Nodes.StringJoin(arelSql(raw) as any));
+  // Mirror Rails build_join_buckets routing (query_methods.rb:1856-1863):
+  // 1. Convert string joins to StringJoin nodes.
+  // 2. Route LeadingJoin nodes to leading_join so they appear first in join_sources.
+  // 3. Route all other explicit Arel join nodes to join_node.
+  for (const v of this._joinValues) {
+    const node: Nodes.Join =
+      typeof v === "string" ? (new Nodes.StringJoin(arelSql(v.trim()) as any) as Nodes.Join) : v;
+    if (node instanceof Nodes.LeadingJoin) {
+      buckets.leading_join.push(node);
+    } else {
+      buckets.join_node.push(node);
+    }
   }
 
   return buckets;
 }
 
 function buildJoins(this: QueryMethodsHost, arel: any): void {
-  if (this._joinClauses.length === 0 && this._rawJoins.length === 0) return;
+  if (this._joinClauses.length === 0 && this._joinValues.length === 0) return;
 
   const buckets = buildJoinBuckets.call(this);
   const leadingJoins = buckets.leading_join as unknown[];

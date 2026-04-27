@@ -73,7 +73,7 @@ export class Merger {
     const clauses: Array<{ type: string; table: string; on: string; quoted?: boolean }> =
       this.other._joinClauses ?? [];
     if (clauses.length > 0) rel._joinClauses.push(...clauses);
-    if (this.other._rawJoins?.length > 0) rel._rawJoins.push(...this.other._rawJoins);
+    if (this.other._joinValues?.length > 0) rel._joinValues.push(...this.other._joinValues);
     void Nodes.InnerJoin;
   }
 
