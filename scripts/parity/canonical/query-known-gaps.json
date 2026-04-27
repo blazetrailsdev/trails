@@ -130,5 +130,25 @@
   "ar-178": {
     "side": "trails-missing",
     "reason": "Arel ordering methods (.desc()) are missing from Extract nodes: Nodes.Extract.new(col, 'year').desc() throws '(intermediate value).desc is not a function'. Same root as ar-172 — Rails adds asc/desc to all Arel nodes via OrderPredications but Trails only has them on Attribute. Real fix: add asc() and desc() to the Arel Node base class."
+  },
+  "ar-179": {
+    "side": "diff",
+    "reason": "Float 0.0 loses its decimal point: where({ rating: 0.0 }) produces = 0 instead of = 0.0. JavaScript 0.0 === 0 so the decimal is dropped during SQL serialization. Rails serializes Ruby Float 0.0 as '0.0'. Same root as ar-173/174/176 — Real fix: SQL value serializer must emit floats with at least one decimal digit."
+  },
+  "ar-180": {
+    "side": "diff",
+    "reason": "ORDER BY Arel attribute alias over-qualified: select(col.as('p')).order('p DESC') produces ORDER BY \"books\".\"p\" DESC instead of ORDER BY p DESC. Single-char alias 'p' matches the bare-identifier regex and gets table-qualified. Same root as ar-161/162/166/167. Real fix: _applyOrderToManager must not qualify identifiers that are SELECT aliases rather than real table columns."
+  },
+  "ar-182": {
+    "side": "trails-missing",
+    "reason": "Arel Attribute#in() does not accept a Union node: where(col.in(union_node)) throws 'values.map is not a function' because the in() predicate method calls .map() on its argument, assuming an array or SelectManager, not an Arel Union node. Rails accepts any Arel::Node in not_in/in and passes it to the Arel visitor. Real fix: the in()/notIn() predicate implementation must handle Arel node arguments (Union, Intersect, etc.) by passing them through to the visitor instead of calling .map()."
+  },
+  "ar-183": {
+    "side": "trails-missing",
+    "reason": "Arel Case node fluent builder with integer .then() args: Case.new(col).when('active').then(1) throws '(intermediate value).when(...).then is not a function'. Same root as ar-155 — Case builder lacks then(). This fixture pins that the gap also manifests when .then() receives integer literals rather than string values. Real fix: same as ar-155 — add then() to the Case node builder."
+  },
+  "ar-184": {
+    "side": "diff",
+    "reason": "ORDER BY single-char aggregate alias over-qualified: order('n DESC') produces ORDER BY \"books\".\"n\" DESC instead of ORDER BY n DESC. Short alias 'n' is a bare identifier that _applyOrderToManager qualifies with the model's table name. Same root as ar-161/162/166/167/180. Confirms the fix must apply to all bare identifiers in ORDER BY string clauses, not just multi-character ones."
   }
 }
