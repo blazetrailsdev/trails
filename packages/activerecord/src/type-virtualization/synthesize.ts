@@ -114,14 +114,17 @@ function renderSchemaColumnDeclares(
  */
 function renderSchemaValueType(value: SchemaColumnValue): string {
   if (typeof value === "string") return tsTypeFor(value);
-  let ts = tsTypeFor(value.type);
+  let tsT = tsTypeFor(value.type);
   // For array columns with a known element type, render
   // `ElementTsType[]` instead of the default `unknown[]`.
+  // Wrap the element type in parens when it is a union so we emit
+  // `(A | B)[]` rather than the invalid `A | B[]`.
   if (value.type === "array" && value.arrayElementType) {
-    ts = `${tsTypeFor(value.arrayElementType)}[]`;
+    const elType = tsTypeFor(value.arrayElementType);
+    tsT = elType.includes("|") ? `(${elType})[]` : `${elType}[]`;
   }
-  if (value.null !== false) ts = `${ts} | null`;
-  return ts;
+  if (value.null !== false) tsT = tsT.includes("|") ? `(${tsT}) | null` : `${tsT} | null`;
+  return tsT;
 }
 
 function renderDeclaredMemberName(name: string): string {

@@ -93,6 +93,14 @@ class BigRecord extends Base {
   }
 }
 
+class Event extends Base {
+  static {
+    this.attribute("starts_at", "datetime");
+    this.attribute("starts_on", "date");
+    this.attribute("duration", "time");
+  }
+}
+
 describe("virtualized patterns — trails-tsc injects declares + auto-imports", () => {
   it("attributes resolve to their declared type", () => {
     const u = new User({ name: "dean", email: "d@example.com", admin: false });
@@ -163,5 +171,19 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(await profile.loadBelongsTo("author")).toEqualTypeOf<Author | null>();
     const author = new Author({ name: "dean" });
     expectTypeOf(await author.loadHasOne("profile")).toEqualTypeOf<Profile | null>();
+  });
+
+  it("Temporal attribute types: datetime → Instant | PlainDateTime, date → PlainDate, time → PlainTime", () => {
+    const e = new Event({});
+    expectTypeOf(e.starts_at).toEqualTypeOf<
+      | import("@blazetrails/activesupport/temporal").Temporal.Instant
+      | import("@blazetrails/activesupport/temporal").Temporal.PlainDateTime
+    >();
+    expectTypeOf(e.starts_on).toEqualTypeOf<
+      import("@blazetrails/activesupport/temporal").Temporal.PlainDate
+    >();
+    expectTypeOf(e.duration).toEqualTypeOf<
+      import("@blazetrails/activesupport/temporal").Temporal.PlainTime
+    >();
   });
 });

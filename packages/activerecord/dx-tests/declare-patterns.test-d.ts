@@ -177,6 +177,20 @@ class Article extends Base {
   }
 }
 
+// --- Temporal attribute typing ---
+import { Temporal } from "@blazetrails/activesupport/temporal";
+class Event extends Base {
+  declare starts_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare starts_on: Temporal.PlainDate;
+  declare duration: Temporal.PlainTime;
+
+  static {
+    this.attribute("starts_at", "datetime");
+    this.attribute("starts_on", "date");
+    this.attribute("duration", "time");
+  }
+}
+
 // --- big_integer attribute typing ---
 class BigRecord extends Base {
   declare score: bigint;
@@ -287,5 +301,12 @@ describe("declare patterns — typing runtime-attached members", () => {
     // they don't exist on the class type. Assert that:
     type HasActive = "active" extends keyof typeof Plain ? true : false;
     expectTypeOf<HasActive>().toEqualTypeOf<false>();
+  });
+
+  it("Temporal attribute types: datetime → Instant | PlainDateTime, date → PlainDate, time → PlainTime", () => {
+    const e = new Event({});
+    expectTypeOf(e.starts_at).toEqualTypeOf<Temporal.Instant | Temporal.PlainDateTime>();
+    expectTypeOf(e.starts_on).toEqualTypeOf<Temporal.PlainDate>();
+    expectTypeOf(e.duration).toEqualTypeOf<Temporal.PlainTime>();
   });
 });

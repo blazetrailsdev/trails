@@ -1,5 +1,6 @@
 dist
 build
+**/type-virtualization/fixtures/**/expected.ts
 node_modules
 .svelte-kit
 *.svelte
