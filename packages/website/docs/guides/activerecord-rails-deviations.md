@@ -414,6 +414,35 @@ Don't redeclare `id` — `Base#id` is an accessor typed as
 `PrimaryKeyValue`, and TS forbids overriding an accessor with a
 differently-typed property. Narrow at the use site: `record.id as number`.
 
+## 15. YAML fixtures: not ported
+
+Rails ships `ActiveRecord::FixtureSet` — `test/fixtures/*.yml` files
+loaded into the DB once per suite, with named-row references
+(`author: david`), label-derived deterministic IDs, and ERB
+preprocessing. The companion `ActiveRecord::TestFixtures` concern wires
+them into `ActiveSupport::TestCase` with per-test transactional
+rollback.
+
+Trails does not port any of it. The JS/TS ecosystem standardized on
+factories (`Model.create`, factory libraries) a decade ago, and Vitest
+tests use per-test setup rather than a shared transactional dataset.
+Porting the YAML loader, ERB shim, label hashing, polymorphic
+resolution, and connection-pool coordination would be a large surface
+for a feature Trails users would not adopt.
+
+Affected Rails files (skipped in `api:compare` / `test:compare` —
+see `scripts/api-compare/excluded-files.ts`):
+
+- `active_record/fixtures.rb`
+- `active_record/fixture_set/*` (file, table-rows, render-context, etc.)
+- `active_record/test_fixtures.rb`
+- `active_record/encryption/encrypted_fixtures.rb`
+
+Use factories or per-test `Model.create` calls instead. The
+transactional-rollback behavior that `TestFixtures` provides is
+covered separately by Trails' transaction support (`await transaction(...)`)
+inside test setup/teardown.
+
 ## Summary
 
 | Area                     | Rails                                   | Trails                                            |
@@ -432,6 +461,7 @@ differently-typed property. Narrow at the use site: `record.id as number`.
 | File / crypto access     | Direct stdlib                           | Pluggable adapters for browser support            |
 | Callbacks                | Ruby blocks                             | Async functions                                   |
 | Uniqueness validation    | Sync DB hit                             | Async, coordinated via `_asyncValidationPromises` |
+| Test fixtures            | YAML `test/fixtures/*.yml` + ERB        | Not ported; use factories or `Model.create`       |
 
 If something in Rails surprises you with its absence here, the most
 common cause is: "it was synchronous in Ruby and the JavaScript

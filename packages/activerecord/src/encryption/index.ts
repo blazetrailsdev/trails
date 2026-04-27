@@ -23,7 +23,6 @@ export { Configurable } from "./configurable.js";
 export { Contexts } from "./contexts.js";
 export { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 export { EncryptableRecord } from "./encryptable-record.js";
-export { EncryptedFixtures } from "./encrypted-fixtures.js";
 export { AutoFilteredParameters } from "./auto-filtered-parameters.js";
 export { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 export {

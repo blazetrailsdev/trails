@@ -70,6 +70,34 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
       "YAML column coder built on Psych. `serialize :col, coder: YAMLColumn` has " +
       "no natural JS analog; JSON is the default column coder instead.",
   },
+  {
+    pattern: "fixtures.rb",
+    testFile: "fixtures_test.rb",
+    reason:
+      "Rails-specific YAML fixtures (test/fixtures/*.yml loaded once into the DB " +
+      "with named-row references and ERB preprocessing). The JS/TS ecosystem uses " +
+      "factories or ad-hoc Model.create instead; Trails users won't ship YAML fixtures.",
+  },
+  {
+    pattern: "fixture_set",
+    testFile: "fixture_set/",
+    reason:
+      "Supporting machinery for YAML fixtures (FixtureSet file/table-row/render-context/" +
+      "model-metadata/identify). Excluded along with fixtures.rb.",
+  },
+  {
+    pattern: "test_fixtures.rb",
+    testFile: "test_fixtures_test.rb",
+    reason:
+      "Rails test concern that wires fixtures into ActiveSupport::TestCase " +
+      "(setup_fixtures, transactional rollback per test). Tied to YAML fixtures " +
+      "and the Minitest lifecycle; Vitest tests use per-test factories instead.",
+  },
+  {
+    pattern: "encryption/encrypted_fixtures.rb",
+    testFile: "encryption/encrypted_fixtures_test.rb",
+    reason: "Encrypts YAML fixture rows on load. Excluded transitively with fixtures.rb.",
+  },
 ];
 
 export function isExcluded(file: string): boolean {
