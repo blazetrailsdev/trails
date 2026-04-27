@@ -50,5 +50,25 @@
   "ar-154": {
     "side": "trails-missing",
     "reason": "group() does not accept Arel node arguments: group(new Nodes.NamedFunction(...)) throws TypeError: col.trim is not a function because the group implementation calls .trim() on each argument assuming strings. Rails accepts any Arel::Node in group() and passes it to the GROUP BY clause via the Arel visitor. Real fix: the groupBang implementation must handle Arel node arguments by calling .toSql() (or passing them directly to the Arel manager) instead of treating them as strings."
+  },
+  "ar-155": {
+    "side": "trails-missing",
+    "reason": "Arel::Nodes::Case fluent builder is incomplete: Rails supports case.when(val).then(result) chaining; Trails' Case node has when() and else() but no then() method, so building a CASE WHEN ... THEN ... expression throws '(intermediate value).when(...).then is not a function'. Real fix: add then() to the Case node builder mirroring Rails' Arel::Nodes::Case#then."
+  },
+  "ar-157": {
+    "side": "trails-missing",
+    "reason": "Arel::Nodes::Union (and Intersect) lack an as() method: Rails' Arel nodes all inherit Node#as() which wraps the node in Arel::Nodes::As; Trails' base Node class does not implement as(), so calling union.as('alias') throws 'union.as is not a function'. Real fix: add as() to the Arel Node base class to produce an As node, mirroring Rails' Arel::Nodes::Node#as."
+  },
+  "ar-158": {
+    "side": "diff",
+    "reason": "Table alias from SelectManager#as is over-quoted in Arel JOIN ON: Rails emits the alias unquoted in ON conditions (sub.\"book_id\"); Trails quotes the alias as a table name (\"sub\".\"book_id\"). Real fix: the Arel visitor's visitAs or table-alias resolution must emit the alias name without double-quoting in ON clause references."
+  },
+  "ar-159": {
+    "side": "trails-missing",
+    "reason": "Arel arithmetic nodes crash on bare number operands: Nodes.Multiplication.new(col, 2) throws 'Unknown node type: Number' because Trails' Arel visitor has no handler for plain Number values. Rails wraps bare values via Nodes.build_quoted automatically. Real fix: the Arel visitor must handle raw Number operands in arithmetic nodes as quoted literals, mirroring Rails' Arel::Visitors::ToSql arithmetic visit methods."
+  },
+  "ar-160": {
+    "side": "trails-missing",
+    "reason": "Arel aggregate nodes (Sum, Count, Avg, Max, Min) constructed directly via new Nodes.Sum([col]) crash: the Trails Arel visitor has no visitSum etc. handlers, throwing 'Unknown node type: Sum'. Rails' visitor handles these via visit_Arel_Nodes_Sum etc. Real fix: add visitor handlers for each aggregate node type in the Arel ToSql visitor."
   }
 }
