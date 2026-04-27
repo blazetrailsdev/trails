@@ -2,7 +2,7 @@ import { sql } from "@blazetrails/arel";
 import { Book } from "./models.js";
 
 const ranked = Book.select(
-  sql("books.*"),
+  sql('"books".*'),
   sql("ROW_NUMBER() OVER (PARTITION BY author_id ORDER BY pages DESC) AS rn"),
 )
   .toArel()

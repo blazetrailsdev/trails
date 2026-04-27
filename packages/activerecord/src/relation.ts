@@ -1083,7 +1083,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#from
    */
-  from(source: string | Relation<any>, subqueryName?: string): Relation<T> {
+  from(source: string | Relation<any> | Nodes.Node, subqueryName?: string): Relation<T> {
     return this._clone().fromBang(source, subqueryName);
   }
 
@@ -3300,6 +3300,11 @@ export class Relation<T extends Base> {
         // Only emit bare when the alias is a safe identifier; fall back to quoted
         // for names that would produce invalid SQL or risk injection.
         fromExpr = `(${subSql}) ${_safeAlias(name)}`;
+      } else if (raw instanceof Nodes.Node) {
+        // Arel node (e.g. SelectManager#as → Nodes.TableAlias) — call toSql()
+        // so the visitor emits correct SQL (e.g. "(SELECT ...) ranked").
+        // Rails accepts Arel::Nodes::As from relation.arel.as("alias") here.
+        fromExpr = raw.toSql();
       } else if (alias) {
         fromExpr = `${raw} ${_safeAlias(alias)}`;
       } else {

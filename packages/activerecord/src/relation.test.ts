@@ -315,6 +315,25 @@ describe("RelationTest", () => {
     expect(sql).not.toContain('"developers"."hotness"');
   });
 
+  it("from() with an Arel TableAlias node emits (SELECT …) alias subquery form", () => {
+    class Book extends Base {
+      static {
+        this.tableName = "books";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    // SelectManager#as produces a Nodes.TableAlias — mirrors Rails'
+    // `relation.arel.as("ranked")` as the from() argument.
+    const ranked = Book.select("title").toArel().as("ranked");
+    const result = Book.from(ranked).where("ranked.title IS NOT NULL").toSql();
+    expect(result).toContain("FROM (SELECT");
+    expect(result).toContain(") ranked");
+    expect(result).toContain("ranked.title IS NOT NULL");
+    // Must not produce [object Object]
+    expect(result).not.toContain("[object");
+  });
+
   it("Model.optimizerHints() delegates to all().optimizerHints()", () => {
     class Book extends Base {
       static {
