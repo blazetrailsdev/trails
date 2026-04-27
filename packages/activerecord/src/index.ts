@@ -95,6 +95,8 @@ export {
   transaction,
   savepoint,
   currentTransaction,
+  currentTransactionPublic,
+  afterAllTransactionsCommit,
   afterCommit,
   afterRollback,
   afterSaveCommit,

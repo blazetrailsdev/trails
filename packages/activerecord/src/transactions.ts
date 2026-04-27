@@ -30,6 +30,7 @@ function _afterFailureActions(
   }
 }
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
+import { Transaction as PublicTransaction } from "./transaction.js";
 import { transaction as dbTransaction } from "./connection-adapters/abstract/database-statements.js";
 
 type TransactionAction = "create" | "update" | "destroy";
@@ -74,6 +75,35 @@ let _savepointCounter = 0;
  */
 export function currentTransaction(): Transaction | null {
   return getTransactionStorage().getStore() ?? null;
+}
+
+/**
+ * Returns the current transaction as the public Transaction wrapper, or
+ * Transaction.NULL_TRANSACTION when no transaction is open.
+ *
+ * NULL_TRANSACTION fires afterCommit immediately and ignores afterRollback,
+ * matching Rails' ActiveRecord::Transaction::NULL_TRANSACTION behavior.
+ *
+ * Mirrors: ActiveRecord::Base.current_transaction
+ */
+export function currentTransactionPublic(): PublicTransaction {
+  const internalTx = currentTransaction();
+  if (!internalTx) return PublicTransaction.NULL_TRANSACTION;
+  // Use the existing userTransaction so callers get a stable identity (same
+  // object per internal transaction, consistent uuid memoization).
+  return (internalTx as any).userTransaction ?? new PublicTransaction(internalTx);
+}
+
+/**
+ * Run a callback after all currently open transactions have committed.
+ * If there is no open transaction, the callback is called immediately.
+ * Delegates through currentTransactionPublic() so NULL_TRANSACTION semantics
+ * (afterCommit runs immediately) apply consistently.
+ *
+ * Mirrors: ActiveRecord.after_all_transactions_commit
+ */
+export function afterAllTransactionsCommit(fn: () => void | Promise<void>): void | Promise<void> {
+  return currentTransactionPublic().afterCommit(fn);
 }
 
 /**

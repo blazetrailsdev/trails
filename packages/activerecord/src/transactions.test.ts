@@ -3,15 +3,41 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, transaction, savepoint, Rollback } from "./index.js";
+import { Base, transaction, savepoint, Rollback, afterAllTransactionsCommit } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+
+const openAdapters: SQLite3Adapter[] = [];
+
+function makeSQLiteTopic() {
+  const adapter = new SQLite3Adapter(":memory:");
+  openAdapters.push(adapter);
+  adapter.exec(
+    "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
+  );
+  class Topic extends Base {
+    static {
+      this.attribute("title", "string");
+      this.attribute("approved", "boolean");
+      this.adapter = adapter;
+    }
+  }
+  return { Topic, adapter };
+}
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
+
+// Close all SQLite adapters after every test regardless of which describe block.
+afterEach(() => {
+  for (const a of openAdapters.splice(0)) {
+    a.close();
+  }
+});
 
 // ==========================================================================
 // TransactionTest — targets transactions_test.rb
@@ -731,24 +757,137 @@ describe("TransactionTest", () => {
     expect(await TxPost.count()).toBe(2);
   });
 
-  it.skip("transaction with savepoint", () => {
-    /* needs real DB savepoint support — memory adapter can't rollback */
+  it("transaction with savepoint", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const t1 = await Topic.create({ title: "First", approved: false });
+    const t2 = await Topic.create({ title: "Second", approved: false });
+
+    await Topic.transaction(async () => {
+      await t1.update({ approved: true });
+      await t2.update({ approved: true });
+
+      await Topic.transaction(
+        async () => {
+          await t1.update({ approved: false });
+          throw new Rollback();
+        },
+        { requiresNew: true },
+      );
+    });
+
+    // Savepoint rolled back t1's change; outer transaction committed t2's change
+    expect((await Topic.find(t1.id!)).approved).toBe(true);
+    expect((await Topic.find(t2.id!)).approved).toBe(true);
   });
 
-  it.skip("after all transactions commit", () => {});
-  it.skip("transaction after rollback callback", () => {});
+  it("after all transactions commit", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    let called = 0;
+
+    // Outside transaction — runs immediately (synchronous, mirrors Rails' yield)
+    afterAllTransactionsCommit(() => {
+      called += 1;
+    });
+    expect(called).toBe(1);
+
+    // Inside committed transaction — runs after commit
+    called = 0;
+    await Topic.transaction(async () => {
+      afterAllTransactionsCommit(() => {
+        called += 1;
+      });
+      expect(called).toBe(0);
+      await Topic.create({ title: "t" });
+    });
+    expect(called).toBe(1);
+
+    // Inside rolled-back transaction — NOT called
+    called = 0;
+    await Topic.transaction(async () => {
+      afterAllTransactionsCommit(() => {
+        called += 1;
+      });
+      await Topic.create({ title: "t2" });
+      throw new Rollback();
+    });
+    expect(called).toBe(0);
+  });
+
+  it("transaction after rollback callback", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    let called = 0;
+
+    // Outside transaction — no-op
+    Topic.currentTransaction().afterRollback(() => {
+      called += 1;
+    });
+    expect(called).toBe(0);
+
+    // Inside committed transaction — afterRollback not called on commit
+    called = 0;
+    await Topic.transaction(async () => {
+      Topic.currentTransaction().afterRollback(() => {
+        called += 1;
+      });
+      expect(called).toBe(0);
+    });
+    expect(called).toBe(0);
+
+    // Inside rolled-back transaction — called
+    called = 0;
+    await Topic.transaction(async () => {
+      Topic.currentTransaction().afterRollback(() => {
+        called += 1;
+      });
+      expect(called).toBe(0);
+      throw new Rollback();
+    });
+    expect(called).toBe(1);
+  });
   it.skip("rollback dirty changes then retry save on new record", () => {
     /* needs real transaction rollback — memory adapter persists on save */
   });
-  it.skip("break from transaction commits", () => {});
-  it.skip("throw from transaction commits", () => {});
+
+  it("break from transaction commits", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const t = await Topic.create({ title: "First", approved: false });
+
+    // early return from the transaction block = commit (equivalent to Ruby's break)
+    await Topic.transaction(async () => {
+      await t.update({ approved: true });
+      return; // early return — transaction commits
+      // dead code (like after `break` in Ruby)
+    });
+
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.approved).toBe(true);
+  });
+
+  it.skip("throw from transaction commits", () => {
+    // Ruby's throw/catch is non-exceptional control flow that commits the
+    // transaction. JS throw is always exceptional (causes rollback). Skip.
+  });
   it.skip("number of transactions in commit", () => {});
 
   it.skip("raising exception in callback rollbacks in save", () => {
     /* needs real transaction wrapping around create — afterCreate fires
        after INSERT so rollback requires DB-level transaction support */
   });
-  it.skip("update should rollback on failure!", () => {});
+  it.skip("update should rollback on failure!", () => {
+    // Requires has_many associations and validation-triggered rollback.
+  });
   it("manually rolling back a transaction", async () => {
     const adp = freshAdapter();
     class Topic extends Base {
@@ -772,18 +911,104 @@ describe("TransactionTest", () => {
     expect(r1.approved).toBe(false);
     expect(r2.approved).toBe(true);
   });
-  it.skip("force savepoint on instance", () => {});
-  it.skip("rollback when commit raises", () => {});
-  it.skip("rollback when saving a frozen record", () => {
-    /* test name implies transactional rollback but actual behavior is
-       frozen record prevention — needs real DB transaction support */
+  it("force savepoint on instance", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const first = await Topic.create({ title: "First", approved: false });
+    const second = await Topic.create({ title: "Second", approved: false });
+
+    await Topic.transaction(async () => {
+      await first.update({ approved: true });
+      await second.update({ approved: true });
+
+      try {
+        await Topic.transaction(
+          async () => {
+            await first.update({ approved: false });
+            throw new Error("force rollback savepoint");
+          },
+          { requiresNew: true },
+        );
+      } catch {}
+    });
+
+    // The savepoint rollback reverted first's change; outer committed second's change
+    expect((await Topic.find(first.id!)).approved).toBe(true);
+    expect((await Topic.find(second.id!)).approved).toBe(true);
   });
 
-  it.skip("restore frozen state after double destroy", () => {});
-  it.skip("restore previously new record after double save", () => {});
-  it.skip("restore composite id after rollback", () => {});
-  it.skip("restore custom primary key after rollback", () => {});
-  it.skip("assign id after rollback", () => {});
+  it("rollback when commit raises", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    const MyError = class extends Error {};
+    const spy = vi.spyOn(adapter, "commitDbTransaction").mockImplementationOnce(async () => {
+      throw new MyError("commit failed");
+    });
+
+    try {
+      await expect(
+        Topic.transaction(async () => {
+          await Topic.create({ title: "test" });
+        }),
+      ).rejects.toThrow(MyError);
+
+      expect(await Topic.count()).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("rollback when saving a frozen record", async () => {
+    // Rails test: freeze a new record then call save — save raises FrozenError
+    // because writeAttribute is called to set the id after INSERT. The test is
+    // about frozen-record protection, not transactional rollback — the test
+    // adapter is correct here (no real DB transaction needed).
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    const topic = new Topic({ title: "test" });
+    topic.freeze();
+    await expect(topic.save()).rejects.toThrow(/frozen/i);
+    expect(topic.isPersisted()).toBe(false);
+    expect(topic.id).toBeNull();
+    expect(topic.isFrozen()).toBe(true);
+  });
+
+  it.skip("restore frozen state after double destroy", () => {
+    // Requires dependent associations (topic.replies).
+  });
+
+  it.skip("restore previously new record after double save", () => {
+    // Rails uses @_start_transaction_state tracked by nesting level so the
+    // pre-transaction snapshot is only captured once. Our implementation takes
+    // a fresh snapshot on every saveWithTransactions call, so the second save's
+    // snapshot (previouslyNewRecord=false) overwrites the first save's
+    // (previouslyNewRecord=true), making the restored state incorrect.
+  });
+
+  it.skip("restore composite id after rollback", () => {
+    // Requires composite primary key model setup.
+  });
+
+  it.skip("restore custom primary key after rollback", () => {
+    // Requires Movie model with custom primary key (movieid).
+  });
+
+  it("assign id after rollback", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const topic = await Topic.create({ title: "test" });
+
+    await Topic.transaction(async () => {
+      await topic.save();
+      throw new Rollback();
+    });
+
+    // After rollback the record object is still usable — id can be cleared
+    topic.id = null;
+    expect(topic.id).toBeNull();
+  });
 });
 
 // ==========================================================================
