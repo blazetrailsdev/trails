@@ -13,6 +13,11 @@ export class PolymorphicArrayValue {
   private foreignKey: string;
   private foreignType: string;
   private values: unknown[];
+  private _associatedTable: {
+    joinForeignKey: string;
+    joinForeignType?: string;
+    joinPrimaryKey(klass?: unknown): string;
+  } | null = null;
 
   constructor(foreignKey: string, foreignType: string, values: unknown[]) {
     this.foreignKey = foreignKey;
@@ -44,6 +49,32 @@ export class PolymorphicArrayValue {
       result.push(query);
     }
     return result;
+  }
+
+  private get associatedTable() {
+    return this._associatedTable;
+  }
+
+  private typeToIdsMapping(): Map<string | null, unknown[]> {
+    const result = new Map<string | null, unknown[]>();
+    for (const value of this.values) {
+      const typeName = this.klassName(value);
+      const id = this.convertToId(value);
+      if (!result.has(typeName)) result.set(typeName, []);
+      result.get(typeName)!.push(id);
+    }
+    return result;
+  }
+
+  private primaryKey(value: unknown): string {
+    return this._associatedTable?.joinPrimaryKey(this.klass(value)) ?? "id";
+  }
+
+  private klass(value: unknown): unknown {
+    if (value !== null && value !== undefined && typeof value === "object") {
+      return (value as any).constructor ?? null;
+    }
+    return null;
   }
 
   private klassName(value: unknown): string | null {

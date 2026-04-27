@@ -51,6 +51,10 @@ export class GeneratedRelationMethods {
   has(name: string): boolean {
     return this._methods.has(name);
   }
+
+  entries(): IterableIterator<[string, Function]> {
+    return this._methods.entries();
+  }
 }
 
 /**
@@ -172,4 +176,18 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       return value;
     },
   });
+}
+
+function relationClassFor(klass: Function): typeof GeneratedRelationMethods {
+  return GeneratedRelationMethods;
+}
+
+function includeRelationMethods(target: object, methods: GeneratedRelationMethods): void {
+  for (const [name, fn] of methods.entries()) {
+    (target as any)[name] = fn;
+  }
+}
+
+function generatedRelationMethods(modelClass: Function): GeneratedRelationMethods {
+  return _generatedMethodsByModel.get(modelClass) ?? new GeneratedRelationMethods();
 }

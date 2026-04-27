@@ -26,4 +26,8 @@ export class BasicObjectHandler {
     const bind = this._predicateBuilder.buildBindAttribute(attribute.name, value);
     return attribute.eq(bind);
   }
+
+  private get predicateBuilder() {
+    return this._predicateBuilder;
+  }
 }

@@ -70,3 +70,12 @@ export class QueryAttribute extends Attribute {
     return false;
   }
 }
+
+function isInfinity(value: unknown): boolean {
+  return (
+    value !== null &&
+    value !== undefined &&
+    typeof (value as any).infinite === "function" &&
+    (value as any).infinite() !== 0
+  );
+}

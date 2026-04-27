@@ -11,10 +11,18 @@
 import { Visitors, Nodes } from "@blazetrails/arel";
 
 export class WhereClause {
-  predicates: Nodes.Node[];
+  private _predicates: Nodes.Node[];
+
+  get predicates(): Nodes.Node[] {
+    return this._predicates;
+  }
+
+  set predicates(value: Nodes.Node[]) {
+    this._predicates = value;
+  }
 
   constructor(predicates: Nodes.Node[] = []) {
-    this.predicates = predicates;
+    this._predicates = predicates;
   }
 
   static empty(): WhereClause {
@@ -232,13 +240,70 @@ function unionNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
   return result;
 }
 
-export function predicatesWithWrappedSqlLiterals(predicates: Nodes.Node[]): Nodes.Node[] {
-  return predicates
-    .filter((n) => !(n instanceof Nodes.SqlLiteral && n.value === ""))
-    .map((node) => {
-      if (node instanceof Nodes.SqlLiteral) return new Nodes.Grouping(node);
-      return node;
-    });
+function predicatesWithWrappedSqlLiterals(predicates: Nodes.Node[]): Nodes.Node[] {
+  return nonEmptyPredicates(predicates).map((node) => {
+    if (node instanceof Nodes.SqlLiteral) return wrapSqlLiteral(node);
+    return node;
+  });
+}
+
+export { predicatesWithWrappedSqlLiterals as getWrappedSqlPredicates };
+
+function predicates(wc: WhereClause): Nodes.Node[] {
+  return wc.predicates;
+}
+
+function nonEmptyPredicates(predicates: Nodes.Node[]): Nodes.Node[] {
+  return predicates.filter((n) => !(n instanceof Nodes.SqlLiteral && n.value === ""));
+}
+
+function wrapSqlLiteral(node: Nodes.SqlLiteral): Nodes.Node {
+  return new Nodes.Grouping(node);
+}
+
+function extractAttribute(node: Nodes.Node): Nodes.Attribute | null {
+  let attrNode: Nodes.Attribute | null = null;
+  const fetcher = node as { fetchAttribute?: (cb: (a: Nodes.Node) => boolean) => void };
+  fetcher.fetchAttribute?.((attr: Nodes.Node) => {
+    if (!(attr instanceof Nodes.Attribute)) return true; // not an attribute — keep traversing
+    if (attrNode !== null && !attrNode.eql(attr)) {
+      attrNode = null;
+      return false; // conflict: multiple different attributes — stop
+    }
+    attrNode = attr;
+    return true; // found a match — keep traversing (Nary may have more children)
+  });
+  return attrNode;
+}
+
+function eachAttributes(
+  predicates: Nodes.Node[],
+  fn: (attr: Nodes.Attribute | Nodes.Node, node: Nodes.Node) => void,
+): void {
+  for (const node of predicates) {
+    let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
+    if (!attr && isEqualityNode(node)) {
+      const left = (node as any).left;
+      if (left && typeof (left as any).fetchAttribute === "function") attr = left;
+    }
+    if (attr) fn(attr, node);
+  }
+}
+
+function referencedColumns(predicates: Nodes.Node[]): Record<string, Nodes.Node> {
+  const hash: Record<string, Nodes.Node> = {};
+  eachAttributes(predicates, (attr, node) => {
+    const key =
+      attr instanceof Nodes.Attribute ? `${attr.relation.name}.${attr.name}` : String(attr);
+    hash[key] = node;
+  });
+  return hash;
+}
+
+function isEqualityNode(node: Nodes.Node): boolean {
+  if (node instanceof Nodes.Equality) return true;
+  if (typeof (node as any).isEquality === "function") return (node as any).isEquality();
+  return false;
 }
 
 const visitor = new Visitors.ToSql();

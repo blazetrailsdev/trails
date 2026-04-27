@@ -37,31 +37,58 @@ export function performMerge<T extends SpawnRelation<T>>(this: T, other: any): T
  */
 export function mergeBang(this: any, other: any): any {
   if (other && typeof other === "object" && "_whereClause" in other) {
-    this._whereClause = this._whereClause.merge(other._whereClause);
+    // Mirror Merger#merge field-by-field so merge() and merge!() stay aligned.
+    if (!other._whereClause.isEmpty())
+      this._whereClause = this._whereClause.merge(other._whereClause);
+    // mergeSelectValues: null vs [] is meaningful ([] = explicit clear)
+    if (other._selectColumns != null) this._selectColumns = [...other._selectColumns];
+    // mergeMultiValues
     if (other._orderClauses?.length > 0) this._orderClauses = [...other._orderClauses];
-    if (other._limitValue !== null && other._limitValue !== undefined)
-      this._limitValue = other._limitValue;
-    if (other._offsetValue !== null && other._offsetValue !== undefined)
-      this._offsetValue = other._offsetValue;
-    if (other._selectColumns) this._selectColumns = [...other._selectColumns];
-    if (other._isDistinct) this._isDistinct = true;
     if (other._groupColumns?.length > 0) this._groupColumns.push(...other._groupColumns);
-    if (other._havingClause && !other._havingClause.isEmpty()) {
-      this._havingClause = this._havingClause.merge(other._havingClause);
-    }
-    if (other._lockValue) this._lockValue = other._lockValue;
-    if (other._isReadonly) this._isReadonly = true;
-    if (other._isStrictLoading) this._isStrictLoading = true;
-    // Sticky `.none()` — kept in sync with `Merger#merge`.
-    if (other._isNone) this._isNone = true;
-    this._joinClauses.push(...(other._joinClauses ?? []));
-    this._rawJoins.push(...(other._rawJoins ?? []));
-    this._annotations.push(...(other._annotations ?? []));
+    if (other._annotations?.length > 0) this._annotations.push(...other._annotations);
     if (other._referencesValues) {
       for (const ref of other._referencesValues) {
         if (!this._referencesValues.includes(ref)) this._referencesValues.push(ref);
       }
     }
+    // mergeSingleValues
+    if (other._limitValue != null) this._limitValue = other._limitValue;
+    if (other._offsetValue != null) this._offsetValue = other._offsetValue;
+    if (other._isDistinct) this._isDistinct = true;
+    if (other._lockValue) this._lockValue = other._lockValue;
+    if (other._isReadonly) this._isReadonly = true;
+    if (other._isStrictLoading) this._isStrictLoading = true;
+    // mergeClauses
+    if (other._havingClause && !other._havingClause.isEmpty())
+      this._havingClause = this._havingClause.merge(other._havingClause);
+    if (
+      (!this._fromClause || this._fromClause.isEmpty?.()) &&
+      other._fromClause &&
+      !other._fromClause.isEmpty?.()
+    ) {
+      this._fromClause = other._fromClause;
+    }
+    // mergePreloads
+    if (other._preloadAssociations?.length > 0)
+      this._preloadAssociations = [
+        ...(this._preloadAssociations ?? []),
+        ...other._preloadAssociations,
+      ];
+    if (other._includesAssociations?.length > 0)
+      this._includesAssociations = [
+        ...(this._includesAssociations ?? []),
+        ...other._includesAssociations,
+      ];
+    if (other._eagerLoadAssociations?.length > 0)
+      this._eagerLoadAssociations = [
+        ...(this._eagerLoadAssociations ?? []),
+        ...other._eagerLoadAssociations,
+      ];
+    // mergeJoins (preserve original order — all join types in _joinClauses)
+    this._joinClauses.push(...(other._joinClauses ?? []));
+    this._rawJoins.push(...(other._rawJoins ?? []));
+    // sticky none
+    if (other._isNone) this._isNone = true;
   } else if (typeof other === "object" && other !== null) {
     const merged = new HashMerger(this, other).merge();
     if (merged && merged._whereClause) {
@@ -78,3 +105,11 @@ export const SpawnMethods = {
   merge: performMerge,
   mergeBang,
 } as const;
+
+function relationWith<T extends SpawnRelation<T>>(self: T, values: Partial<T>): T {
+  const result = self._clone();
+  for (const [key, val] of Object.entries(values as Record<string, unknown>)) {
+    (result as any)[key] = val;
+  }
+  return result;
+}

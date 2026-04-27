@@ -21,7 +21,15 @@ export interface AssociationMapping {
 }
 
 export class PredicateBuilder {
-  readonly table: Table;
+  private _table: Table;
+
+  get table(): Table {
+    return this._table;
+  }
+
+  protected set table(value: Table) {
+    this._table = value;
+  }
   private arrayHandler: ArrayHandler;
   private rangeHandler: RangeHandler;
   private basicObjectHandler: BasicObjectHandler;
@@ -31,7 +39,7 @@ export class PredicateBuilder {
   private _tableContext: any = null;
 
   constructor(table: Table) {
-    this.table = table;
+    this._table = table;
     this.arrayHandler = new ArrayHandler(this);
     this.rangeHandler = new RangeHandler((attribute, v) => {
       // Prefer the attribute's own relation typeCaster (covers joined/aliased tables)
@@ -143,6 +151,9 @@ export class PredicateBuilder {
     if (value === null || value === undefined) {
       return attribute.isNotNull();
     }
+    if (value instanceof Set) {
+      value = Array.from(value);
+    }
     if (value instanceof Range) {
       return this.rangeHandler.callNegated(attribute, value);
     }
@@ -204,10 +215,15 @@ export class PredicateBuilder {
     if (value === null || value === undefined) {
       return attribute.isNull();
     }
-    for (const [klass, handler] of this.handlers) {
-      if (value instanceof klass) {
-        return handler.call(attribute, value);
-      }
+    // Normalize Set → Array before dispatch so every code path (custom handlers,
+    // explicit Array branch, handlerFor fallback) receives an array. Rails registers
+    // Set with ArrayHandler by default (predicate_builder.rb:20).
+    if (value instanceof Set) {
+      value = Array.from(value);
+    }
+    const customHandler = this.handlers.length > 0 ? this.handlerFor(value) : null;
+    if (customHandler && customHandler !== this.basicObjectHandler) {
+      return customHandler.call(attribute, value);
     }
     if (value instanceof Range) {
       return this.rangeHandler.call(attribute, value);
@@ -399,6 +415,56 @@ export class PredicateBuilder {
     return (
       typeof value === "object" && value !== null && "_modelClass" in value && "toArel" in value
     );
+  }
+
+  protected expandFromHash(
+    attributes: Record<string, unknown>,
+    block?: (key: string) => any,
+  ): Nodes.Node[] {
+    return this.buildFromHash(attributes);
+  }
+
+  private groupingQueries(queries: Nodes.Node[][]): Nodes.Node | Nodes.Node[] {
+    if (queries.length === 1) return queries[0];
+    const ands = queries.map((q) => (q.length === 1 ? q[0] : new Nodes.And(q)));
+    return [new Nodes.Grouping(new Nodes.Or(ands))];
+  }
+
+  private convertDotNotationToHash(attributes: Record<string, unknown>): Record<string, unknown> {
+    const converted: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(attributes)) {
+      if (isPlainObject(value)) {
+        const existing = converted[key];
+        if (existing && isPlainObject(existing)) {
+          Object.assign(existing, value);
+        } else {
+          converted[key] = { ...value };
+        }
+      } else {
+        const dot = key.lastIndexOf(".");
+        if (dot !== -1) {
+          const tableName = key.slice(0, dot);
+          const colName = key.slice(dot + 1);
+          const existing = converted[tableName];
+          if (existing && isPlainObject(existing)) {
+            (existing as Record<string, unknown>)[colName] = value;
+          } else {
+            converted[tableName] = { [colName]: value };
+          }
+        } else {
+          converted[key] = value;
+        }
+      }
+    }
+    return converted;
+  }
+
+  private handlerFor(object: unknown): { call(attr: Nodes.Attribute, value: any): Nodes.Node } {
+    for (const [klass, handler] of this.handlers) {
+      if (object instanceof klass) return handler;
+    }
+    if (object instanceof Array) return this.arrayHandler;
+    return this.basicObjectHandler;
   }
 }
 

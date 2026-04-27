@@ -12,10 +12,49 @@
 export class AssociationQueryValue {
   private foreignKey: string;
   private value: unknown;
+  private _associatedTable: {
+    joinForeignKey: string;
+    joinPrimaryKey?: string;
+    joinPrimaryType?: string;
+    polymorphicNameAssociation?: string;
+  } | null = null;
 
   constructor(foreignKey: string, value: unknown) {
     this.foreignKey = foreignKey;
     this.value = value;
+  }
+
+  private get associatedTable() {
+    return this._associatedTable;
+  }
+
+  private primaryKey(): string {
+    return this._associatedTable?.joinPrimaryKey ?? "id";
+  }
+
+  private primaryType(): string | null {
+    return this._associatedTable?.joinPrimaryType ?? null;
+  }
+
+  private polymorphicName(): string | null {
+    return this._associatedTable?.polymorphicNameAssociation ?? null;
+  }
+
+  private isSelectClause(): boolean {
+    if (!this.value) return false;
+    const sv = (this.value as any).selectValues;
+    if (typeof sv === "function") return sv.call(this.value).length === 0;
+    if (Array.isArray(sv)) return sv.length === 0;
+    return false;
+  }
+
+  private isPolymorphicClause(): boolean {
+    const type = this.primaryType();
+    if (!type) return false;
+    if (this.value && typeof (this.value as any).whereValuesHash === "function") {
+      return !Object.prototype.hasOwnProperty.call((this.value as any).whereValuesHash(), type);
+    }
+    return false;
   }
 
   queries(): Record<string, unknown>[] {

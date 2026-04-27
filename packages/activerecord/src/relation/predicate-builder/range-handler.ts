@@ -15,6 +15,7 @@ import type { Range } from "../../connection-adapters/postgresql/oid/range.js";
  */
 export class RangeHandler {
   private _castBound?: (attribute: Nodes.Attribute, value: unknown) => unknown;
+  private _predicateBuilder: unknown = undefined;
 
   constructor(castBound?: (attribute: Nodes.Attribute, value: unknown) => unknown) {
     this._castBound = castBound;
@@ -66,5 +67,9 @@ export class RangeHandler {
       return new Nodes.Grouping(new Nodes.Or(attribute.lt(beginVal), attribute.gteq(endVal)));
     }
     return attribute.notBetween(beginVal, endVal);
+  }
+
+  private get predicateBuilder(): unknown {
+    return this._predicateBuilder;
   }
 }

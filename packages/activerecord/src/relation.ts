@@ -46,7 +46,10 @@ import { FinderMethods } from "./relation/finder-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { TableMetadata } from "./table-metadata.js";
-import { WhereClause, predicatesWithWrappedSqlLiterals } from "./relation/where-clause.js";
+import {
+  WhereClause,
+  getWrappedSqlPredicates as predicatesWithWrappedSqlLiterals,
+} from "./relation/where-clause.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { touchAttributesWithTime } from "./timestamp.js";
 import { ExplainRegistry } from "./explain-registry.js";
@@ -1078,7 +1081,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#unscoped — delegates to klass.unscoped.
    */
   unscoped(): Relation<T> {
-    return this._modelClass.unscoped() as Relation<T>;
+    return this._modelClass.unscoped() as unknown as Relation<T>;
   }
 
   // merge and spawn are mixed in from spawn-methods.ts
@@ -1852,15 +1855,15 @@ export class Relation<T extends Base> {
       await this._executeEagerLoad(allEager);
       if (token !== this._loadToken) return [];
       loadedRecords = this._records;
+      this.loadRecords(loadedRecords);
     } else {
       const sql = this._toSql();
       const result = await this._modelClass.adapter.selectAll(sql, `${this._modelClass.name} Load`);
       if (token !== this._loadToken) return [];
       const rows = result.toArray();
       loadedRecords = this._instrumentInstantiation(rows);
-      this._records = loadedRecords;
+      this.loadRecords(loadedRecords);
     }
-    this._loaded = true;
 
     // Apply readonly and strict_loading flags to loaded records
     if (this._isReadonly) {
@@ -3650,19 +3653,13 @@ export class Relation<T extends Base> {
   ): Promise<number> {
     if (this._isNone) return 0;
 
-    const table = this._modelClass.arelTable;
     const updates: Record<string, unknown> = {};
 
-    // Mirrors Rails' `_increment_attribute` — wrap the column in a COALESCE
-    // (treating NULL as 0) and then add/subtract the binding. Rails uses
-    // `Subtraction` for negative values and `Addition` for positive ones so
-    // the generated SQL reads `col - 3` rather than `col + -3`.
     for (const [counterName, value] of Object.entries(counters)) {
-      const unqual = new Nodes.UnqualifiedColumn(table.get(counterName));
-      const coalesced = new Nodes.NamedFunction("COALESCE", [unqual, new Nodes.Quoted(0)]);
-      const bind = new Nodes.Quoted(Math.abs(value));
-      updates[counterName] =
-        value < 0 ? new Nodes.Subtraction(coalesced, bind) : new Nodes.Addition(coalesced, bind);
+      updates[counterName] = this._incrementAttribute(
+        this._modelClass.arelTable.get(counterName),
+        value,
+      );
     }
 
     if (options?.touch) {
@@ -4201,6 +4198,88 @@ export class Relation<T extends Base> {
   _execScope(fn: (...args: unknown[]) => unknown, ...args: unknown[]): Relation<T> {
     return (fn.call(this, ...args) || this) as Relation<T>;
   }
+
+  protected loadRecords(records: T[]): void {
+    this._records = [...records];
+    this._loaded = true;
+  }
+
+  private isAlreadyInScope(registry: any): boolean {
+    return !!registry?.currentScope?.(this._modelClass, true);
+  }
+
+  private isGlobalScope(registry: any): boolean {
+    return !!registry?.globalCurrentScope?.(this._modelClass, true);
+  }
+
+  private currentScopeRestoringBlock(block?: (record: T) => void): (record: T) => void {
+    const modelClass = this._modelClass;
+    const currentScope = ScopeRegistry.currentScope(modelClass as any);
+    return (record: T) => {
+      ScopeRegistry.setCurrentScope(modelClass as any, currentScope ?? null);
+      block?.(record);
+    };
+  }
+
+  private _new(attributes: Record<string, unknown>): T {
+    return new (this._modelClass as any)(attributes) as T;
+  }
+
+  private _create(attributes: Record<string, unknown>): Promise<T> {
+    return (this._modelClass as any).create(attributes);
+  }
+
+  private _createBang(attributes: Record<string, unknown>): Promise<T> {
+    return (this._modelClass as any).createBang(attributes);
+  }
+
+  private _scoping<R>(scope: any, registry: any, fn: () => R): R {
+    const previous = registry?.currentScope?.(this._modelClass, true);
+    registry?.setCurrentScope?.(this._modelClass, scope);
+    try {
+      return fn();
+    } finally {
+      registry?.setCurrentScope?.(this._modelClass, previous);
+    }
+  }
+
+  private _substituteValues(values: [string, unknown][]): [any, any][] {
+    return values.map(([name, value]) => {
+      const attr = this._modelClass.arelTable.get(name);
+      const bind = this.predicateBuilder.buildBindAttribute(name, value);
+      return [attr, bind];
+    });
+  }
+
+  private _incrementAttribute(attribute: any, value = 1): any {
+    const unqual = new Nodes.UnqualifiedColumn(
+      typeof attribute === "string" ? this._modelClass.arelTable.get(attribute) : attribute,
+    );
+    const coalesced = new Nodes.NamedFunction("COALESCE", [unqual, new Nodes.Quoted(0)]);
+    const bind = new Nodes.Quoted(Math.abs(value));
+    return value < 0 ? new Nodes.Subtraction(coalesced, bind) : new Nodes.Addition(coalesced, bind);
+  }
+
+  private async execQueries(): Promise<T[]> {
+    const rows = await this.execMainQuery();
+    return this.instantiateRecords(rows);
+  }
+
+  private async execMainQuery(): Promise<Record<string, unknown>[]> {
+    if (this._isNone) return [];
+    const sql = this.toSql();
+    const result = await this._modelClass.adapter.execute(sql);
+    return result;
+  }
+
+  private instantiateRecords(rows: Record<string, unknown>[]): T[] {
+    if (rows.length === 0) return [];
+    return rows.map((row) => this._modelClass._instantiate(row) as T);
+  }
+
+  private skipQueryCacheIfNecessary<R>(block: () => R): R {
+    return block();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -4284,3 +4363,17 @@ applyThenable(Relation.prototype);
 // Register Relation with Base to break the circular dependency.
 _setRelationCtor(Relation as any);
 _setScopeProxyWrapper(wrapWithScopeProxy);
+
+async function computeCacheKey(
+  rel: Relation<Base>,
+  timestampColumn = "updated_at",
+): Promise<string> {
+  return rel.computeCacheKey(timestampColumn);
+}
+
+async function computeCacheVersion(
+  rel: Relation<Base>,
+  timestampColumn = "updated_at",
+): Promise<string> {
+  return rel.computeCacheVersion(timestampColumn);
+}

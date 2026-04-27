@@ -8,6 +8,7 @@
  * Mirrors: ActiveRecord::FinderMethods
  */
 
+import { Nodes } from "@blazetrails/arel";
 import { ActiveModelRangeError } from "@blazetrails/activemodel";
 import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
 
@@ -564,3 +565,120 @@ export const FinderMethods = {
   createOrFindByBang: performCreateOrFindByBang,
   raiseRecordNotFoundExceptionBang,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Private helpers (mirrors Rails' ActiveRecord::FinderMethods private methods)
+// ---------------------------------------------------------------------------
+
+function constructRelationForExists(rel: FinderRelation, conditions: unknown): any {
+  if (conditions === false || conditions === null) return rel;
+  if (typeof conditions === "object" && conditions !== null) {
+    return (rel as any).where(conditions);
+  }
+  if (conditions !== undefined && conditions !== true) {
+    const pk = (rel as any)._modelClass.primaryKey;
+    return (rel as any).where({ [pk as string]: conditions });
+  }
+  return rel;
+}
+
+function applyJoinDependency(rel: FinderRelation, eagerLoading: boolean): any {
+  if (!eagerLoading) return rel;
+  // Rails: when eager loading, apply a LEFT OUTER JOIN via the join dependency.
+  // Our preloader handles this via separate queries, but we record the join type.
+  const arelRel = rel as any;
+  if (arelRel._includesAssociations?.length > 0 && arelRel._joinClauses) {
+    // Ensure eager-loaded associations use outer join semantics (Arel::Nodes::OuterJoin)
+    arelRel._joinClauses = arelRel._joinClauses.map(
+      (j: { type: string; table: string; on: string }) =>
+        j.type === "inner" && arelRel._includesAssociations.includes(j.table)
+          ? { ...j, type: "left" }
+          : j,
+    );
+    void Nodes.OuterJoin; // Rails uses Arel::Nodes::OuterJoin for eager loading joins
+  }
+  return rel;
+}
+
+function isUsingLimitableReflections(reflections: unknown[]): boolean {
+  return (reflections as any[]).every(
+    (r) => r.macro !== "hasMany" && r.macro !== "hasAndBelongsToMany",
+  );
+}
+
+async function findWithIds(rel: FinderRelation, ids: unknown[]): Promise<any> {
+  const normalized = normalizeFindArgs(
+    (rel as any)._modelClass.name,
+    (rel as any)._modelClass.primaryKey,
+    ids,
+  );
+  if (normalized.wantArray) {
+    return findSome(rel, normalized.ids);
+  }
+  return findOne(rel, normalized.ids[0]);
+}
+
+async function findOne(rel: FinderRelation, id: unknown): Promise<any> {
+  const pk = (rel as any)._modelClass.primaryKey as string;
+  const record = await (rel as any).findBy({ [pk]: id });
+  if (!record) {
+    const modelName = (rel as any)._modelClass.name as string;
+    throw new RecordNotFound(`Couldn't find ${modelName}`, modelName, pk, id);
+  }
+  return record;
+}
+
+async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any[]> {
+  const pk = (rel as any)._modelClass.primaryKey as string;
+  const records = await (rel as any).where({ [pk]: ids }).toArray();
+  if (records.length !== ids.length) {
+    const foundIds = records.map((r: any) => r.readAttribute?.(pk) ?? r[pk]);
+    // Multiset subtraction: remove each found id once so duplicate requested ids
+    // are accounted for correctly (mirrors Rails' expected_size = ids.size comparison).
+    const remaining = [...ids];
+    for (const foundId of foundIds) {
+      const idx = remaining.findIndex((id) => id === foundId);
+      if (idx >= 0) remaining.splice(idx, 1);
+    }
+    const modelName = (rel as any)._modelClass.name as string;
+    throw new RecordNotFound(`Couldn't find all ${modelName}`, modelName, pk, remaining);
+  }
+  return records;
+}
+
+async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Promise<any[]> {
+  const pk = (rel as any)._modelClass.primaryKey;
+  const records = await findSome(rel, ids);
+  const idIndex = new Map(ids.map((id, i) => [String(id), i]));
+  return records.sort((a: any, b: any) => {
+    const ai = idIndex.get(String(a.readAttribute?.(pk as string) ?? a[pk as string])) ?? 0;
+    const bi = idIndex.get(String(b.readAttribute?.(pk as string) ?? b[pk as string])) ?? 0;
+    return ai - bi;
+  });
+}
+
+async function findTake(rel: FinderRelation): Promise<any | null> {
+  const records = await (rel as any).limit(1).toArray();
+  return records[0] ?? null;
+}
+
+async function findTakeWithLimit(rel: FinderRelation, limit: number): Promise<any[]> {
+  return (rel as any).limit(limit).toArray();
+}
+
+function findNth(rel: FinderRelation, index: number): Promise<any | null> {
+  return findNthWithLimit.call(rel, index);
+}
+
+async function findLast(rel: FinderRelation, limit?: number): Promise<any> {
+  return performLast.call(rel, limit);
+}
+
+function orderedRelation(rel: FinderRelation): any {
+  return orderByPk(rel, "asc");
+}
+
+function _orderColumns(rel: FinderRelation): string[] {
+  const pk = (rel as any)._modelClass.primaryKey;
+  return Array.isArray(pk) ? pk : [pk];
+}

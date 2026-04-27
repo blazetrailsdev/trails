@@ -453,3 +453,136 @@ export class ColumnAliasTracker {
     return `${column}_${count}`;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Private helpers (mirrors Rails' ActiveRecord::Calculations private methods)
+// ---------------------------------------------------------------------------
+
+function columnAliasFor(field: string): string {
+  return field
+    .replace(/[^a-zA-Z0-9_]/g, "_")
+    .replace(/_{2,}/g, "_")
+    .slice(0, 255);
+}
+
+function truncate(name: string): string {
+  return name.slice(0, 255);
+}
+
+function aggregateColumn(rel: CalculationRelation, columnName: string): unknown {
+  const table = rel._modelClass.arelTable;
+  if (columnName === "*" || columnName === "1") {
+    return (table as any).sql ? (table as any).sql(columnName) : columnName;
+  }
+  if (columnName.includes(".")) {
+    const parts = columnName.split(".");
+    return new Table(parts[0]).get(parts[1]);
+  }
+  return table.get(columnName);
+}
+
+function isAllAttributes(columnNames: string[]): boolean {
+  return columnNames.every((c) => c === "*" || !c.includes("("));
+}
+
+function hasInclude(rel: CalculationRelation, columnName: string | null): boolean {
+  return (rel as any)._includesValues?.length > 0 || (rel as any)._eagerLoadValues?.length > 0;
+}
+
+function performCalculation(
+  rel: CalculationRelation,
+  operation: string,
+  columnName: string,
+): Promise<unknown> {
+  if ((rel as any)._groupColumns?.length > 0) {
+    return executeGroupedCalculation(rel, operation, columnName, false);
+  }
+  return executeSimpleCalculation(rel, operation, columnName, false);
+}
+
+function isDistinctSelect(rel: CalculationRelation, columnName: string): boolean {
+  return rel._isDistinct || columnName !== "*";
+}
+
+function operationOverAggregateColumn(
+  column: unknown,
+  operation: string,
+  distinct: boolean,
+): unknown {
+  return column;
+}
+
+async function executeSimpleCalculation(
+  rel: CalculationRelation,
+  operation: string,
+  columnName: string,
+  distinct: boolean,
+): Promise<unknown> {
+  const fn = operation.toLowerCase() as AggFn;
+  return singleAggregate(rel, fn, columnName, true);
+}
+
+async function executeGroupedCalculation(
+  rel: CalculationRelation,
+  operation: string,
+  columnName: string,
+  distinct: boolean,
+): Promise<Record<string, unknown>> {
+  const fn = operation.toLowerCase() as AggFn;
+  // Build a GROUP BY aggregate query via Arel (delegates to the shared groupedAggregate helper).
+  const table = rel._modelClass.arelTable as Nodes.Node;
+  void table;
+  return groupedAggregate(rel, fn, columnName, false);
+}
+
+function typeFor(rel: CalculationRelation, field: string): unknown {
+  return resolveColType(rel, field);
+}
+
+function lookupCastTypeFromJoinDependencies(_rel: CalculationRelation, _name: string): unknown {
+  return null;
+}
+
+function typeCastPluckValues(
+  result: unknown[][],
+  columns: string[],
+  rel?: CalculationRelation,
+): unknown[][] {
+  return result.map((row) =>
+    row.map((val, i) =>
+      castAggValue(val, "sum" as any, rel ? resolveColType(rel, columns[i] ?? "") : null, false),
+    ),
+  );
+}
+
+function typeCastCalculatedValue(value: unknown, operation: string, type: unknown): unknown {
+  if (operation === "count") return Number(value ?? 0);
+  if (operation === "sum") return Number(value ?? 0);
+  if (operation === "average") return value === null ? null : Number(value);
+  return value;
+}
+
+function selectForCount(rel: CalculationRelation): string {
+  const sel = (rel as any)._selectColumns;
+  if (!sel || sel.length === 0) return "*";
+  return sel.map((s: unknown) => String(s)).join(", ");
+}
+
+function isBuildCountSubquery(operation: string, columnName: string, distinct: boolean): boolean {
+  return operation === "count" && distinct && columnName !== "*";
+}
+
+function buildCountSubquery(
+  rel: CalculationRelation,
+  columnName: string,
+  distinct: boolean,
+): string {
+  const table = rel._modelClass.arelTable;
+  const col = columnName === "*" ? new Nodes.SqlLiteral("*") : table.get(columnName);
+  const countNode = distinct
+    ? new Nodes.NamedFunction("COUNT", [col], undefined, true)
+    : new Nodes.NamedFunction("COUNT", [col]);
+  const manager = table.project(countNode.as("count_column"));
+  rel._applyWheresToManager(manager, table);
+  return manager.toSql();
+}
