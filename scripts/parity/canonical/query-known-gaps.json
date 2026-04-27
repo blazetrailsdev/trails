@@ -10,5 +10,25 @@
   "ar-65": {
     "side": "diff",
     "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) — rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
+  },
+  "ar-134": {
+    "side": "diff",
+    "reason": "joins() does not support nested hash arguments: Rails resolves joins({books: :reviews}) to two INNER JOINs via the association graph; trails falls through to a toString() on the hash object, producing 'FROM \"authors\" [object Object]'. Root cause: Relation#joins does not handle object arguments — they fall through to _rawJoins and are stringified during SQL generation. Real fix: handle object/hash arguments in Relation#joins by resolving them through the association chain (via _resolveAssociationJoin and _applyJoinsToManager) before they fall through to raw joins."
+  },
+  "ar-137": {
+    "side": "diff",
+    "reason": "withRecursive union uses UNION instead of UNION ALL: Rails emits 'UNION ALL' between the anchor and recursive term of a recursive CTE; trails emits bare 'UNION'. Real fix: only the recursive term assembled by withRecursive should use UNION ALL; keep non-recursive with({ cte: [rel1, rel2] }) array handling on plain UNION — do not change shared resolveCteEntry behavior globally."
+  },
+  "ar-138": {
+    "side": "diff",
+    "reason": "HAVING clause is dropped when a relation is used as a WHERE IN subquery: Rails emits 'WHERE id IN (SELECT author_id FROM books GROUP BY author_id HAVING COUNT(*) >= 3)'; trails drops the HAVING and emits 'WHERE id IN (SELECT author_id FROM books GROUP BY author_id)'. Root cause: the WHERE IN subquery path goes through PredicateBuilder::RelationHandler (relation-handler.ts:16) which calls relation.toArel(); Relation#toArel() does not apply the inner relation's HAVING clause. Real fix: Relation#toArel() must preserve GROUP BY and HAVING when building the subquery SelectManager."
+  },
+  "ar-139": {
+    "side": "diff",
+    "reason": "joins(:assoc).where(assoc: {col: val}) uses inconsistent table naming between the JOIN and nested-hash predicate paths: trails resolves joins(:assoc) through _resolveAssociationJoin as an unaliased join on the base table name ('INNER JOIN \"authors\" ON \"authors\".\"id\" = ...'), but the nested-hash predicate path resolves the same association through TableMetadata.associatedTable and aliases it to the association key ('author'), producing WHERE \"author\".\"name\" against a query that only joined \"authors\". Real fix: make symbolic association joins and nested-hash predicate resolution share the same table name/alias strategy so both clauses reference the same table."
+  },
+  "ar-143": {
+    "side": "trails-missing",
+    "reason": "leftOuterJoins() crashes on nested hash arguments: trails accepts an object into Relation#leftOuterJoins/leftJoins and later tries to build a LEFT OUTER JOIN with that plain object as the table operand (relation.ts:1230+), raising 'Unknown node type: Object'. Real fix: handle or reject nested-hash/object arguments in Relation#leftOuterJoins/leftJoins before _applyJoinsToManager builds Arel JOIN nodes — for example by reusing the nested-association resolution from joins() or adding early argument validation."
   }
 }
