@@ -64,6 +64,19 @@ When NOT to use this:
   Code" lines to PR descriptions.
 - Tests live next to source files as `*.test.ts`.
 - Prefer small, focused modules.
+- **PR size ceiling: 300 LOC** (additions + deletions, excluding lockfiles,
+  snapshots, and generated parity fixtures). Check before opening with
+  `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**'`.
+  Tests and fixtures count. The historical 20-method rule is a soft guide;
+  300 LOC is the hard one — review-cycle data shows PRs ≥400 LOC need 4–6
+  rounds minimum and ≥700 LOC need 13+. If a feature is larger, split via the
+  `<base>` / `<base>b` / `<base>c` pattern before opening. Splitting
+  heuristic, in order:
+  (1) impl + smoke test in `<base>`, full Rails-mirrored tests in `<base>b`;
+  (2) public surface first, privates follow; (3) one Rails source file per
+  PR when multiple are touched; (4) happy path vs edges only as a last
+  resort. The only exception is a single mechanical rename — note it in the
+  PR body.
 - Do NOT use subagents unless explicitly requested.
 - Do use worktrees for any changes; leave the default worktree for the user.
 - Open new PRs in **draft** status.
