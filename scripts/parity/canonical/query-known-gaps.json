@@ -12,8 +12,8 @@
     "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) — rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
   },
   "ar-134": {
-    "side": "diff",
-    "reason": "joins() does not support nested hash arguments: Rails resolves joins({books: :reviews}) to two INNER JOINs via the association graph; trails falls through to a toString() on the hash object, producing 'FROM \"authors\" [object Object]'. Root cause: Relation#joins does not handle object arguments — they fall through to _rawJoins and are stringified during SQL generation. Real fix: handle object/hash arguments in Relation#joins by resolving them through the association chain (via _resolveAssociationJoin and _applyJoinsToManager) before they fall through to raw joins."
+    "side": "trails-missing",
+    "reason": "joins() crashes on nested hash arguments: Rails resolves joins({books: :reviews}) to two INNER JOINs via the association graph; Trails accepts the object argument into _rawJoins and later attempts to use it as a join node during SQL generation, causing a runtime failure instead of producing a valid query. Root cause: Relation#joins does not handle object/hash arguments — they fall through to _rawJoins and fail when the SQL builder encounters a non-string join entry. Real fix: handle nested object/hash arguments in Relation#joins by resolving them through _resolveAssociationJoin and applying the resulting joins via _applyJoinsToManager."
   },
   "ar-137": {
     "side": "diff",
@@ -90,5 +90,25 @@
   "ar-165": {
     "side": "trails-missing",
     "reason": "Arel COUNT DISTINCT via Nodes.Count([col], true) not supported: throws 'Unknown node type: Count'. Pinning separately because the fix must also handle the distinct=true flag to emit COUNT(DISTINCT col). Real fix: visitCount must check the distinct flag and emit COUNT(DISTINCT ...) accordingly."
+  },
+  "ar-166": {
+    "side": "diff",
+    "reason": "ORDER BY SUM/aggregate alias over-qualified in group+having context: order('total DESC') produces ORDER BY \"books\".\"total\" DESC instead of ORDER BY total DESC. A SUM alias from a SELECT is not a real table column; same root cause as ar-161/162. Real fix: _applyOrderToManager must not qualify bare ORDER BY identifiers that are not resolvable as table columns."
+  },
+  "ar-167": {
+    "side": "diff",
+    "reason": "ORDER BY select alias over-qualified even when the alias is correctly listed in GROUP BY: order('avg_pages DESC') produces ORDER BY \"books\".\"avg_pages\" DESC instead of ORDER BY avg_pages DESC. GROUP BY correctly passes the comma-separated string through, but ORDER BY still qualifies the single-word alias. Same fix as ar-161/162/166."
+  },
+  "ar-169": {
+    "side": "diff",
+    "reason": "Arel Attribute#between with an exclusive-end Range emits BETWEEN instead of >= AND <: between(Range(100, 300, excludeEnd: true)) produces WHERE pages BETWEEN 100 AND 300 instead of WHERE pages >= 100 AND pages < 300. Rails' between uses the Range's exclude_end? flag to choose between BETWEEN (inclusive) and >= AND < (exclusive). Real fix: the between() predicate implementation must check the Range's exclude_end flag and emit >= AND < for exclusive ranges."
+  },
+  "ar-170": {
+    "side": "diff",
+    "reason": "Float values in Range lose decimal precision: where({ rating: new Range(3.5, 5.0) }) produces BETWEEN 3.5 AND 5 instead of BETWEEN 3.5 AND 5.0. JavaScript numbers don't distinguish 5 from 5.0, so the SQL literal omits the decimal. Rails serializes Ruby Float 5.0 as '5.0'. Real fix: the SQL value serializer must emit floats with at least one decimal digit (e.g. 5 → 5.0) to match Rails' Float#to_s behavior."
+  },
+  "ar-171": {
+    "side": "trails-missing",
+    "reason": "group(Arel.sql(...)) crashes: group(sql('DATE(created_at)')) throws 'col.trim is not a function' because groupBang stores Arel values in _groupColumns and groupColumnToArel later calls .trim() on each entry, assuming strings. Arel SqlLiteral (and NamedFunction, cf. ar-154) are not strings. Real fix: group/groupBang must handle Arel node arguments by passing them through to the Arel GROUP BY clause (or converting them appropriately) instead of letting non-strings reach string-only processing in groupColumnToArel."
   }
 }
