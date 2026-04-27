@@ -1,9 +1,8 @@
 /**
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion
  */
-import { NotImplementedError } from "../errors.js";
 export interface TimeZoneConversion {
-  timeZoneAwareAttributes: string[];
+  timeZoneAwareAttributes: boolean;
   skipTimeZoneConversionForAttributes: string[];
 }
 
@@ -30,26 +29,49 @@ export class TimeZoneConverter {
   }
 }
 
-function convertTimeToTimeZone(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::TimeZoneConversion::TimeZoneConverter#convert_time_to_time_zone is not implemented",
-  );
+function convertTimeToTimeZone(value: unknown): unknown {
+  if (value == null) return value;
+  if (value instanceof Date) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => convertTimeToTimeZone(v));
+  }
+  return value;
 }
 
-function setTimeZoneWithoutConversion(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::TimeZoneConversion::TimeZoneConverter#set_time_zone_without_conversion is not implemented",
-  );
+function setTimeZoneWithoutConversion(value: unknown): unknown {
+  if (value == null) return value;
+  return value;
 }
 
-function hookAttributeType(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::TimeZoneConversion#hook_attribute_type is not implemented",
-  );
+interface TimeZoneConversionHost {
+  timeZoneAwareAttributes: boolean;
+  skipTimeZoneConversionForAttributes: string[];
+  timeZoneAwareTypes: string[];
+  _hookAttributeType?(name: string, castType: unknown): unknown;
 }
 
-function isCreateTimeZoneConversionAttribute(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::TimeZoneConversion#create_time_zone_conversion_attribute? is not implemented",
+function hookAttributeType(
+  this: TimeZoneConversionHost,
+  name: string,
+  castType: { type?: string },
+): unknown {
+  if (isCreateTimeZoneConversionAttribute.call(this, name, castType)) {
+    return new TimeZoneConverter(castType as any);
+  }
+  return castType;
+}
+
+function isCreateTimeZoneConversionAttribute(
+  this: TimeZoneConversionHost,
+  name: string,
+  castType: { type?: string },
+): boolean {
+  const enabledForColumn =
+    this.timeZoneAwareAttributes && !this.skipTimeZoneConversionForAttributes.includes(name as any);
+  return (
+    enabledForColumn &&
+    (this.timeZoneAwareTypes ?? ["datetime", "time"]).includes(castType.type ?? "")
   );
 }

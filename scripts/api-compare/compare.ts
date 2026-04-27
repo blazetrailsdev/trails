@@ -273,6 +273,21 @@ export function methodInMode(m: MethodInfo, mode: CompareMode): boolean {
   return m.internal !== true;
 }
 
+/**
+ * Whether a TS method should be included in the per-file lookup index for a
+ * given mode. This is the TS-side counterpart to methodInMode (which filters
+ * the Ruby side).
+ *
+ *   public: only public TS methods — internal helpers must not satisfy Ruby
+ *           public method coverage (would inflate scores).
+ *   private: ALL TS methods — Rails private methods implemented as exported
+ *            TS functions (e.g. exported for wiring) still count as matched.
+ *   all:    ALL TS methods — full combined surface, same widening as private.
+ */
+export function tsShouldIncludeInIndex(m: MethodInfo, mode: CompareMode): boolean {
+  return mode === "public" ? !m.internal : true;
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -325,7 +340,9 @@ function main() {
 
     const tsPkg = ts.packages[pkg];
 
-    // Build per-file method index from TS: file → Set<methodName>
+    // Build per-file method index from TS: file → Set<methodName>.
+    // See tsShouldIncludeInIndex for the inclusion semantics.
+    const tsShouldInclude = (m: MethodInfo) => tsShouldIncludeInIndex(m, mode);
     const tsMethodsByFile = new Map<string, Set<string>>();
 
     if (tsPkg) {
@@ -333,8 +350,7 @@ function main() {
         const file = cls.file || "";
         const methods = tsMethodsByFile.get(file) || new Set();
         for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
-          if (!methodMatchesMode(m)) continue;
-          methods.add(m.name);
+          if (tsShouldInclude(m)) methods.add(m.name);
         }
         tsMethodsByFile.set(file, methods);
       };
@@ -347,8 +363,7 @@ function main() {
         for (const [file, fns] of Object.entries(tsPkg.fileFunctions)) {
           const methods = tsMethodsByFile.get(file) || new Set();
           for (const fn of fns) {
-            if (!methodMatchesMode(fn)) continue;
-            methods.add(fn.name);
+            if (tsShouldInclude(fn)) methods.add(fn.name);
           }
           tsMethodsByFile.set(file, methods);
         }
@@ -404,8 +419,7 @@ function main() {
 
         const methods = new Set<string>();
         for (const m of [...entity.instanceMethods, ...entity.classMethods]) {
-          if (!methodMatchesMode(m)) continue;
-          methods.add(m.name);
+          if (tsShouldInclude(m)) methods.add(m.name);
         }
 
         if (entity.superclass) {

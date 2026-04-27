@@ -8,7 +8,6 @@
  * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast
  */
 
-import { NotImplementedError } from "../errors.js";
 interface BeforeTypeCastRecord {
   readAttributeBeforeTypeCast(name: string): unknown;
   readonly attributesBeforeTypeCast: Record<string, unknown>;
@@ -73,20 +72,24 @@ export function attributesForDatabase(record: DatabaseRecord): Record<string, un
   return result;
 }
 
-function attributeBeforeTypeCast(attrName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::BeforeTypeCast#attribute_before_type_cast is not implemented",
-  );
+interface AttributeOwner {
+  _attributes: {
+    getAttribute(name: string): {
+      valueBeforeTypeCast: unknown;
+      valueForDatabase: unknown;
+      cameFromUser(): boolean;
+    };
+  };
 }
 
-function attributeForDatabase(attrName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::BeforeTypeCast#attribute_for_database is not implemented",
-  );
+function attributeBeforeTypeCast(this: AttributeOwner, attrName: string): unknown {
+  return this._attributes.getAttribute(attrName).valueBeforeTypeCast;
 }
 
-function isAttributeCameFromUser(attrName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::BeforeTypeCast#attribute_came_from_user? is not implemented",
-  );
+function attributeForDatabase(this: AttributeOwner, attrName: string): unknown {
+  return this._attributes.getAttribute(attrName).valueForDatabase;
+}
+
+function isAttributeCameFromUser(this: AttributeOwner, attrName: string): boolean {
+  return this._attributes.getAttribute(attrName).cameFromUser();
 }

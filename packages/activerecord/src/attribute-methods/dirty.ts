@@ -7,7 +7,6 @@
  * Mirrors: ActiveRecord::AttributeMethods::Dirty
  */
 
-import { NotImplementedError } from "../errors.js";
 interface DirtyRecord {
   changed: boolean;
   changedAttributes: string[];
@@ -135,38 +134,105 @@ export function attributesInDatabase(record: DirtyRecord): Record<string, unknow
   return result;
 }
 
-function initInternals(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::Dirty#init_internals is not implemented",
-  );
+interface DirtyPrivateHost {
+  _attributes: { keys(): Iterable<string> };
+  _mutationsBeforeLastSave: unknown;
+  _mutationsFromDatabase: unknown;
+  _touchAttrNames: Set<string> | null;
+  _skipDirtyTracking: boolean | null;
+  attributeChanged(name: string): boolean;
+  attributeWas(name: string): unknown;
+  clearAttributeChange(name: string): void;
+  clearAttributeChanges(names: Iterable<string>): void;
+  changesApplied(): void;
+  _readAttribute(name: string): unknown;
+  _writeAttribute(name: string, value: unknown): void;
+  _performInsert(): Promise<unknown>;
+  _performUpdate(): Promise<number>;
+  changedAttributeNamesToSave: string[];
+  constructor: {
+    attributeNames(): string[];
+    columnForAttribute(name: string): { isAutoPopulated(): boolean } | undefined;
+    partialUpdates: boolean;
+    partialInserts: boolean;
+  };
 }
 
-function _touchRow(attributeNames: any, time: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::Dirty#_touch_row is not implemented",
-  );
+function initInternals(this: DirtyPrivateHost): void {
+  this._mutationsBeforeLastSave = null;
+  this._mutationsFromDatabase = null;
+  this._touchAttrNames = null;
+  this._skipDirtyTracking = null;
 }
 
-function _updateRecord(attributeNames?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::Dirty#_update_record is not implemented",
-  );
+function _touchRow(
+  this: DirtyPrivateHost,
+  attributeNames: string[],
+  time?: Date | null,
+): Promise<number> {
+  this._touchAttrNames = new Set(attributeNames);
+  const t = time ?? new Date();
+  for (const attr of this._touchAttrNames) {
+    this._writeAttribute(attr, t);
+  }
+  const affectedRows = (this as any)._updateRow
+    ? (this as any)._updateRow(attributeNames, "touch")
+    : Promise.resolve(1);
+
+  return affectedRows.then((rows: number) => {
+    if (this._skipDirtyTracking) {
+      this.clearAttributeChanges(this._touchAttrNames!);
+    } else {
+      const restores: Array<[string, unknown]> = [];
+      for (const attrName of this._attributes.keys()) {
+        if (this._touchAttrNames!.has(attrName)) continue;
+        if (this.attributeChanged(attrName)) {
+          const current = this._readAttribute(attrName);
+          this._writeAttribute(attrName, this.attributeWas(attrName));
+          this.clearAttributeChange(attrName);
+          restores.push([attrName, current]);
+        }
+      }
+      this.changesApplied();
+      for (const [attrName, value] of restores) {
+        this._writeAttribute(attrName, value);
+      }
+    }
+    this._touchAttrNames = null;
+    this._skipDirtyTracking = null;
+    return rows;
+  });
 }
 
-function _createRecord(attributeNames?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::Dirty#_create_record is not implemented",
-  );
+function _updateRecord(this: DirtyPrivateHost, _attributeNames?: string[]): Promise<number> {
+  return this._performUpdate().then((rows) => {
+    this.changesApplied();
+    return rows;
+  });
 }
 
-function attributeNamesForPartialUpdates(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::Dirty#attribute_names_for_partial_updates is not implemented",
-  );
+function _createRecord(this: DirtyPrivateHost, _attributeNames?: string[]): Promise<unknown> {
+  return this._performInsert().then((id) => {
+    this.changesApplied();
+    return id;
+  });
 }
 
-function attributeNamesForPartialInserts(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::Dirty#attribute_names_for_partial_inserts is not implemented",
-  );
+function attributeNamesForPartialUpdates(this: DirtyPrivateHost): string[] {
+  return this.constructor.partialUpdates
+    ? this.changedAttributeNamesToSave
+    : this.constructor.attributeNames();
+}
+
+function attributeNamesForPartialInserts(this: DirtyPrivateHost): string[] {
+  if (this.constructor.partialInserts) {
+    return this.changedAttributeNamesToSave;
+  }
+  return this.constructor.attributeNames().filter((attrName) => {
+    const col = this.constructor.columnForAttribute(attrName);
+    if (col?.isAutoPopulated()) {
+      return this.attributeChanged(attrName);
+    }
+    return true;
+  });
 }

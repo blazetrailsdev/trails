@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { nameMatches, superclassesMatch, resolveTsClassForRuby, methodInMode } from "./compare.js";
+import {
+  nameMatches,
+  superclassesMatch,
+  resolveTsClassForRuby,
+  methodInMode,
+  tsShouldIncludeInIndex,
+} from "./compare.js";
 import type { ClassInfo, MethodInfo } from "./types.js";
 
 function cls(file: string, name: string, superclass?: string): ClassInfo {
@@ -205,5 +211,37 @@ describe("methodInMode", () => {
     expect(methodInMode(bare, "public")).toBe(true);
     expect(methodInMode(bare, "private")).toBe(false);
     expect(methodInMode(bare, "all")).toBe(true);
+  });
+});
+
+describe("tsShouldIncludeInIndex", () => {
+  // When --privates-only is active, a Ruby private method implemented as an
+  // exported (public) TS function must still count as matched.
+  // When default/public mode is active, internal TS methods must NOT satisfy
+  // Ruby public method coverage (would inflate scores).
+  // When --privates (all) is active, the full combined surface is shown, so
+  // internal TS methods should also be included.
+
+  const pub: MethodInfo = { name: "foo", visibility: "public", params: [] };
+  const internal: MethodInfo = {
+    name: "bar",
+    visibility: "private",
+    internal: true,
+    params: [],
+  };
+
+  it("private mode includes both public and internal TS methods", () => {
+    expect(tsShouldIncludeInIndex(pub, "private")).toBe(true);
+    expect(tsShouldIncludeInIndex(internal, "private")).toBe(true);
+  });
+
+  it("public mode excludes internal TS methods", () => {
+    expect(tsShouldIncludeInIndex(pub, "public")).toBe(true);
+    expect(tsShouldIncludeInIndex(internal, "public")).toBe(false);
+  });
+
+  it("all mode includes both public and internal TS methods (full surface)", () => {
+    expect(tsShouldIncludeInIndex(pub, "all")).toBe(true);
+    expect(tsShouldIncludeInIndex(internal, "all")).toBe(true);
   });
 });

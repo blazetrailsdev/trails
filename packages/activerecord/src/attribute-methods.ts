@@ -5,6 +5,7 @@
  */
 import { isBlank } from "@blazetrails/activesupport";
 import { resolveAliasName } from "@blazetrails/activemodel";
+import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
 // ActiveModel provides aliasAttribute and undefineAttributeMethods on Model.
 // aliasAttribute delegates via the prototype chain. defineAttributeMethods
 // is implemented here since AM doesn't expose it as a static on Model.
@@ -330,8 +331,9 @@ export function attributesForCreate(this: any, attributeNames: string[]): string
   });
 }
 
-// Re-export from shared module so callers of attribute-methods can import here.
-export { formatForInspect } from "./attribute-inspection.js";
+export function formatForInspect(this: any, attr: string, value: unknown): string {
+  return _formatForInspect.call(this, attr, value);
+}
 
 function pkAttribute(this: any, name: string): boolean {
   const pk = (this.constructor as any)?.primaryKey ?? this._primaryKey;
