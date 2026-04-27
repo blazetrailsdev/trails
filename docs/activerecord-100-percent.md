@@ -1,6 +1,6 @@
 # ActiveRecord: Road to 100%
 
-Current: **91.5% API** (2,578 / 2,819 methods). **97.1% inheritance** (204 / 210).
+Current: **96.3% API** (2,707 / 2,811 methods). **97.2% inheritance** (205 / 211).
 
 ```bash
 pnpm run api:compare -- --package activerecord
@@ -55,17 +55,14 @@ keys in reflection.
 
 Files with methods still missing. Run `api:compare --missing` to see per-method gaps.
 
-| File                    | Matched | Missing | %   |
-| ----------------------- | ------- | ------- | --- |
-| store.rb                | 7       | 5       | 58% |
-| inheritance.rb          | 8       | 4       | 67% |
-| autosave_association.rb | 6       | 3       | 67% |
-| counter_cache.rb        | 5       | 1       | 83% |
+| File     | Matched | Missing | %   |
+| -------- | ------- | ------- | --- |
+| store.rb | 8       | 4       | 67% |
 
 ## Bigger gaps (not in scope yet)
 
-| Area                | Notes                                                                             |
-| ------------------- | --------------------------------------------------------------------------------- |
-| Connection adapters | Abstract adapter / schema statements / pool / transaction still have missing bits |
-| Associations        | Builders, preloader, and join_dependency still have major gaps                    |
-| Migration           | Command recorder, schema migration                                                |
+| Area         | Notes                                                          |
+| ------------ | -------------------------------------------------------------- |
+| Associations | Builders, preloader, and join_dependency still have major gaps |
+| Migration    | Command recorder, schema migration                             |
+| Fixtures     | fixture_set/\* still mostly unimplemented                      |

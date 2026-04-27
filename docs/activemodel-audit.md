@@ -1,6 +1,6 @@
 # ActiveModel ↔ Rails audit
 
-Date: 2026-04-23
+Date: 2026-04-26
 Scope: `packages/activemodel/src/**` vs pinned Rails source at
 `scripts/api-compare/.rails-source/activemodel/lib/active_model/**`.
 
