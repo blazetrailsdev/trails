@@ -110,5 +110,25 @@
   "ar-171": {
     "side": "trails-missing",
     "reason": "group(Arel.sql(...)) crashes: group(sql('DATE(created_at)')) throws 'col.trim is not a function' because groupBang stores Arel values in _groupColumns and groupColumnToArel later calls .trim() on each entry, assuming strings. Arel SqlLiteral (and NamedFunction, cf. ar-154) are not strings. Real fix: group/groupBang must handle Arel node arguments by passing them through to the Arel GROUP BY clause (or converting them appropriately) instead of letting non-strings reach string-only processing in groupColumnToArel."
+  },
+  "ar-172": {
+    "side": "trails-missing",
+    "reason": "Arel ordering methods (.asc()/.desc()) are missing from non-Attribute node types: NamedFunction.new('LENGTH', [col]).desc throws '(intermediate value).desc is not a function'. Rails' Arel nodes include OrderPredications which adds asc/desc to all nodes; Trails only implements these on Attribute. Real fix: add asc() and desc() to the Arel Node base class (or to non-Attribute ordering node types like NamedFunction, Extract, etc.)."
+  },
+  "ar-173": {
+    "side": "diff",
+    "reason": "Float values that are whole numbers lose their decimal in IN clauses: where({ rating: [3.5, 4.0, 4.5] }) produces IN (3.5, 4, 4.5) instead of IN (3.5, 4.0, 4.5). JavaScript's 4.0 === 4 causes the decimal to be dropped when serializing to SQL. Rails serializes Ruby Float 4.0 as '4.0'. Same root as ar-170/174/176. Real fix: the SQL value serializer must format whole-number floats with a decimal point."
+  },
+  "ar-174": {
+    "side": "diff",
+    "reason": "Float values that are whole numbers lose their decimal in exclusive-Range predicates: where({ rating: new Range(3.0, 5.0, true) }) produces >= 3 AND < 5 instead of >= 3.0 AND < 5.0. Same JavaScript serialization root as ar-170/173/176. Real fix: the SQL value serializer must format whole-number floats with a decimal point."
+  },
+  "ar-176": {
+    "side": "diff",
+    "reason": "Float equality predicate loses decimal for whole-number floats: where({ rating: 4.0 }) produces = 4 instead of = 4.0. JavaScript does not distinguish 4 from 4.0, so the SQL literal omits the decimal. Rails serializes Ruby Float 4.0 as '4.0'. Same root as ar-173/174/170. Real fix: the SQL value serializer must emit floats with at least one decimal digit."
+  },
+  "ar-178": {
+    "side": "trails-missing",
+    "reason": "Arel ordering methods (.desc()) are missing from Extract nodes: Nodes.Extract.new(col, 'year').desc() throws '(intermediate value).desc is not a function'. Same root as ar-172 — Rails adds asc/desc to all Arel nodes via OrderPredications but Trails only has them on Attribute. Real fix: add asc() and desc() to the Arel Node base class."
   }
 }
