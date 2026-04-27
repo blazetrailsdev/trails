@@ -160,6 +160,16 @@ export function validOptions(): string[] {
   return ["autosave"];
 }
 
+export async function flushPendingReplaces(record: Base): Promise<void> {
+  const instances: Map<string, unknown> = (record as any)._associationInstances;
+  if (!instances?.values) return;
+  for (const assoc of instances.values()) {
+    if (typeof (assoc as any).persistReplace === "function" && (assoc as any)._pendingReplace) {
+      await (assoc as any).persistReplace();
+    }
+  }
+}
+
 export function clearAutosaveState(record: Base): void {
   const r = record as any;
   r[MARKED_FOR_DESTRUCTION] = false;

@@ -3,6 +3,7 @@ import type { AssociationDefinition } from "../associations.js";
 import { fireAssocCallbacks } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { Association } from "./association.js";
+import { RecordNotSaved, Rollback } from "../errors.js";
 
 /**
  * Base class for has_many and has_and_belongs_to_many associations.
@@ -16,8 +17,8 @@ import { Association } from "./association.js";
 export class CollectionAssociation extends Association {
   declare target: Base[];
   nestedAttributesTarget: Base[] | null = null;
-  private _replacedOrAddedTargets: Set<Base> = new Set();
   private _associationIds: unknown[] | null = null;
+  _pendingReplace: { newTarget: Base[]; originalTarget: Base[]; wasLoaded: boolean } | null = null;
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
@@ -59,37 +60,41 @@ export class CollectionAssociation extends Association {
    * Loads records by the given IDs and replaces the collection.
    */
   async idsWriter(ids: unknown[]): Promise<void> {
+    if (!this.owner.isNewRecord() && !this.isLoaded()) {
+      await this.loadTarget();
+    }
     const filteredIds = (ids ?? []).filter((id) => id != null && id !== "");
     if (filteredIds.length === 0) {
       this.replace([]);
-      return;
-    }
-    const Klass = this.klass as any;
-    const pk = Klass.primaryKey ?? "id";
+    } else {
+      const Klass = this.klass as any;
+      const pk = Klass.primaryKey ?? "id";
 
-    if (Array.isArray(pk)) {
-      const found = await Promise.all(
-        filteredIds.map(async (id) => {
-          const conditions: Record<string, unknown> = {};
-          const idParts = Array.isArray(id) ? id : [id];
-          pk.forEach((col: string, i: number) => {
-            conditions[col] = idParts[i];
-          });
-          return Klass.findBy(conditions);
-        }),
-      );
-      this.replace(found.filter((r): r is Base => r != null));
-    } else if (typeof Klass.where === "function") {
-      const records: Base[] = await Klass.where({ [pk]: filteredIds }).toArray();
-      this.replace(records);
+      if (Array.isArray(pk)) {
+        const found = await Promise.all(
+          filteredIds.map(async (id) => {
+            const conditions: Record<string, unknown> = {};
+            const idParts = Array.isArray(id) ? id : [id];
+            pk.forEach((col: string, i: number) => {
+              conditions[col] = idParts[i];
+            });
+            return Klass.findBy(conditions);
+          }),
+        );
+        this.replace(found.filter((r): r is Base => r != null));
+      } else if (typeof Klass.where === "function") {
+        const records: Base[] = await Klass.where({ [pk]: filteredIds }).toArray();
+        this.replace(records);
+      }
     }
+    await this.persistReplace();
   }
 
   override reset(): void {
     super.reset();
     this.target = [];
-    this._replacedOrAddedTargets = new Set();
     this._associationIds = null;
+    this._pendingReplace = null;
   }
 
   /**
@@ -149,7 +154,7 @@ export class CollectionAssociation extends Association {
         if (!saved) result = false;
       }
     }
-    if (!result) throw new Error("ActiveRecord::Rollback");
+    if (!result) throw new Rollback();
   }
 
   /**
@@ -254,17 +259,13 @@ export class CollectionAssociation extends Association {
    */
   replace(otherArray: Base[]): void {
     for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
+    const wasLoaded = this.isLoaded();
     const originalTarget = [...this.target];
-    // Update in-memory target immediately (synchronous) then persist async.
-    // Rails does the same: replace_common_records_in_memory runs first,
-    // then transaction { replace_records } (async) handles DB.
     replaceCommonRecordsInMemory(this, otherArray, originalTarget);
     if (this.owner.isNewRecord()) {
-      // For new owners: just set the in-memory target directly
       this.target = [...otherArray];
       this.loadedBang();
-    } else if (!arraysEqual(otherArray, originalTarget)) {
-      // Sync in-memory: remove records not in new target, add new ones
+    } else if (!wasLoaded || !arraysEqual(otherArray, originalTarget)) {
       for (const r of originalTarget) {
         if (!otherArray.includes(r)) {
           const idx = this.target.indexOf(r);
@@ -278,11 +279,44 @@ export class CollectionAssociation extends Association {
         }
       }
       this.loadedBang();
-      // Persist changes async (matches Rails: transaction { replace_records })
-      void transaction(this, async () => {
-        await replaceRecords(this, otherArray, originalTarget);
-      });
+      // Preserve the first originalTarget (what's in the DB) across multiple
+      // replace() calls before save(). Only update newTarget so the final flush
+      // diffs against the real persisted state, not an intermediate in-memory one.
+      if (this._pendingReplace) {
+        if (wasLoaded && arraysEqual(otherArray, this._pendingReplace.originalTarget)) {
+          this._pendingReplace = null; // reverted to DB state — nothing to flush
+        } else {
+          this._pendingReplace.newTarget = [...otherArray];
+        }
+      } else {
+        this._pendingReplace = { newTarget: [...otherArray], originalTarget, wasLoaded };
+      }
     }
+  }
+
+  async persistReplace(): Promise<void> {
+    const pending = this._pendingReplace;
+    if (!pending || this.owner.isNewRecord()) return;
+    // If the association wasn't loaded at assignment time, fetch the persisted
+    // baseline directly via doAsyncFindTarget to avoid the loadedBang short-circuit
+    // and without mutating this.target (mirrors Rails' load_target in replace).
+    if (!pending.wasLoaded) {
+      const dbRecords = await this.doAsyncFindTarget();
+      pending.originalTarget = Array.isArray(dbRecords) ? [...dbRecords] : [];
+    }
+    const currentTarget = this.target;
+    await transaction(this, async () => {
+      // replaceRecords diffs against assoc.target; restore originalTarget so
+      // it sees the real DB state rather than the already-updated in-memory target
+      this.target = [...pending.originalTarget];
+      try {
+        await replaceRecords(this, pending.newTarget, pending.originalTarget);
+      } finally {
+        this.target = currentTarget;
+      }
+    });
+    // Clear only after success — leave intact on error so save() retry can re-attempt
+    this._pendingReplace = null;
   }
 
   /**
@@ -682,12 +716,18 @@ async function replaceRecords(
   if (toDelete.length > 0) await assoc.delete(...toDelete);
   const toAdd = newTarget.filter((r) => !(assoc.target as Base[]).includes(r));
   if (toAdd.length > 0) {
-    const result = await assoc.concat(...toAdd);
-    if (!result) {
-      (assoc as any).target = originalTarget;
-      throw new Error(
-        `Failed to replace ${assoc.reflection.name} because one or more records could not be saved.`,
-      );
+    try {
+      await assoc.concat(...toAdd);
+    } catch (e) {
+      // Only translate validation/rollback failures; re-throw adapter/query errors as-is
+      if (e instanceof Rollback) {
+        (assoc as any).target = originalTarget;
+        throw new RecordNotSaved(
+          `Failed to replace ${assoc.reflection.name} because one or more records could not be saved.`,
+          assoc.owner,
+        );
+      }
+      throw e;
     }
   }
   return assoc.target as Base[];
@@ -712,7 +752,7 @@ function replaceOnTarget(
 ): Base | null {
   const replaced = assoc as any;
   let index = -1;
-  if (replace && replaced._replacedOrAddedTargets?.has(record)) {
+  if (replace) {
     index = (assoc.target as Base[]).indexOf(record);
   }
 
@@ -722,7 +762,6 @@ function replaceOnTarget(
   }
 
   assoc.setInverseInstance(record);
-  replaced._replacedOrAddedTargets?.add(record);
   replaced._associationIds = null;
 
   const target = assoc.target as Base[];

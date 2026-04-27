@@ -2,6 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { loadHasOne } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
+import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
 import { SingularAssociation } from "./singular-association.js";
 
@@ -13,8 +14,15 @@ import { SingularAssociation } from "./singular-association.js";
  * Mirrors: ActiveRecord::Associations::HasOneAssociation
  */
 export class HasOneAssociation extends SingularAssociation {
+  _pendingReplace: { record: Base | null; readonly previousTarget: Base | null } | null = null;
+
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
+  }
+
+  override reset(): void {
+    super.reset();
+    this._pendingReplace = null;
   }
 
   /**
@@ -92,26 +100,63 @@ export class HasOneAssociation extends SingularAssociation {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
     const assigningAnother = this.target !== record;
     if (assigningAnother || (record as any)?.hasChangesToSave?.()) {
-      const shouldSave = save && (this.owner as any).isPersisted?.();
-      void transactionIf(this, !!shouldSave, async () => {
-        if (this.target && !(this.target as any).isDestroyed?.() && assigningAnother) {
-          await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
-        }
-        if (record) {
-          this.setOwnerAttributes(record);
-          this.setInverseInstance(record);
-          if (shouldSave && typeof (record as any).save === "function") {
-            const saved = await (record as any).save();
-            if (!saved) {
-              this.nullifyOwnerAttributes(record);
-              throw new Error(`Failed to save the new associated ${this.reflection.name}.`);
-            }
+      if (record) {
+        this.setOwnerAttributes(record);
+        this.setInverseInstance(record);
+      }
+      if (save && (this.owner as any).isPersisted?.()) {
+        if (this._pendingReplace) {
+          // Only clear on a true revert: a different-record assignment being set back.
+          // Same-record (dirty) assignments must not clear even if record === previousTarget.
+          const wasAssignedAnother =
+            this._pendingReplace.previousTarget !== this._pendingReplace.record;
+          if (wasAssignedAnother && record === this._pendingReplace.previousTarget) {
+            this._pendingReplace = null;
+          } else {
+            this._pendingReplace.record = record;
           }
+        } else {
+          this._pendingReplace = { record, previousTarget: this.target };
         }
-      });
+      }
     }
     this.target = record;
     this.loadedBang();
+  }
+
+  async persistReplace(): Promise<void> {
+    const pending = this._pendingReplace;
+    if (!pending) return;
+    await transactionIf(this, true, async () => {
+      if (
+        pending.previousTarget &&
+        !(pending.previousTarget as any).isDestroyed?.() &&
+        pending.previousTarget !== pending.record
+      ) {
+        // removeTargetBang reads assoc.target; temporarily restore previousTarget
+        // so it operates on the old record, not the new one already set in replace()
+        const currentTarget = this.target;
+        this.target = pending.previousTarget;
+        try {
+          await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
+        } finally {
+          this.target = currentTarget;
+        }
+      }
+      if (pending.record && typeof (pending.record as any).save === "function") {
+        const saved = await (pending.record as any).save();
+        if (!saved) {
+          this.nullifyOwnerAttributes(pending.record);
+          if (pending.previousTarget) this.setOwnerAttributes(pending.previousTarget);
+          throw new RecordNotSaved(
+            `Failed to save the new associated ${this.reflection.name}.`,
+            pending.record,
+          );
+        }
+      }
+    });
+    // Clear only after success — leave intact on error so save() retry can re-attempt
+    this._pendingReplace = null;
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
@@ -198,6 +243,13 @@ function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<voi
   if (!target) return Promise.resolve();
   if (method === "delete") return (target as any).delete?.() ?? Promise.resolve();
   if (method === "destroy") return (target as any).destroy?.() ?? Promise.resolve();
+  if (method === "nullify") {
+    if (target.isPersisted()) {
+      (assoc as any).nullifyOwnerAttributes(target);
+      return (target as any).save?.() ?? Promise.resolve();
+    }
+    return Promise.resolve();
+  }
   return Promise.resolve();
 }
 
