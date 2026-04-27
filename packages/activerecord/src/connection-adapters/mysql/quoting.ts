@@ -8,7 +8,14 @@
  * the pattern used by the PostgreSQL and SQLite3 adapters.
  */
 
-import { quotedDate as abstractQuotedDate } from "../abstract/quoting.js";
+import {
+  quotedDate as abstractQuotedDate,
+  formatInstantForSqlMysql as formatInstantForSql,
+  formatPlainDateTimeForSqlMysql as formatPlainDateTimeForSql,
+  formatPlainDateForSql,
+  formatPlainTimeForSqlMysql as formatPlainTimeForSql,
+} from "../abstract/quoting.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export interface Quoting {
   quotedTrue(): string;
@@ -179,6 +186,11 @@ export function quote(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (value instanceof Temporal.Instant) return `'${formatInstantForSql(value)}'`;
+  if (value instanceof Temporal.PlainDateTime) return `'${formatPlainDateTimeForSql(value)}'`;
+  if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
+  if (value instanceof Temporal.PlainTime) return `'${formatPlainTimeForSql(value)}'`;
+  if (value instanceof Temporal.ZonedDateTime) return `'${formatInstantForSql(value.toInstant())}'`;
   if (value instanceof Date) return `'${quotedDate(value)}'`;
   if (value instanceof Buffer) return quotedBinary(value);
   if (typeof value === "symbol") {
@@ -221,6 +233,11 @@ export function typeCast(value: unknown): unknown {
   // Rails' `type_cast` returns `quoted_date(value)` — an unquoted
   // formatted string. EXPLAIN / log-subscriber renderers want the
   // primitive, not the Date instance.
+  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
+  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
+  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
+  if (value instanceof Temporal.PlainTime) return formatPlainTimeForSql(value);
+  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
   if (value instanceof Date) return quotedDate(value);
   throw new TypeError(`can't cast ${(value as object).constructor?.name ?? typeof value}`);
 }

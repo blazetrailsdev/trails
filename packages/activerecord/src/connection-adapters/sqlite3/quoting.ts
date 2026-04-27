@@ -4,7 +4,14 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::Quoting
  */
 
-import { quotedDate as abstractQuotedDate } from "../abstract/quoting.js";
+import {
+  quotedDate as abstractQuotedDate,
+  formatInstantForSql,
+  formatPlainDateTimeForSql,
+  formatPlainDateForSql,
+  formatPlainTimeForSql,
+} from "../abstract/quoting.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export interface Quoting {
   quotedTrue(): string;
@@ -90,6 +97,11 @@ export function quote(value: unknown): string {
     }
     return quoteString(value.description);
   }
+  if (value instanceof Temporal.Instant) return `'${formatInstantForSql(value)}'`;
+  if (value instanceof Temporal.PlainDateTime) return `'${formatPlainDateTimeForSql(value)}'`;
+  if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
+  if (value instanceof Temporal.PlainTime) return `'2000-01-01 ${formatPlainTimeForSql(value)}'`;
+  if (value instanceof Temporal.ZonedDateTime) return `'${formatInstantForSql(value.toInstant())}'`;
   if (value instanceof Date) return `'${quotedDate(value)}'`;
   if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
     return quotedBinary(value);
@@ -142,6 +154,11 @@ export function typeCast(value: unknown): unknown {
   // Rails' `type_cast` returns `quoted_date(value)` — a formatted
   // string, not the Date object itself. Callers (EXPLAIN rendering,
   // bind-value logs) want the primitive, not the Date instance.
+  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
+  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
+  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
+  if (value instanceof Temporal.PlainTime) return `2000-01-01 ${formatPlainTimeForSql(value)}`;
+  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
   if (value instanceof Date) return quotedDate(value);
   if (value instanceof Uint8Array || value instanceof ArrayBuffer) return value;
   throw new TypeError(`can't cast ${Object.prototype.toString.call(value)} to a SQLite3 type`);

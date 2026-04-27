@@ -293,12 +293,13 @@ function expandOffset(offset: string): string {
 
 /**
  * Normalize Postgres `24:00:00[.fraction]` (end-of-day sentinel) to
- * `00:00:00[.fraction]`. Temporal.PlainTime rejects hour 24; Ruby Time
- * rolls it over to midnight, which is the semantically equivalent value
- * when there is no date context.
+ * `00:00:00[.fraction]`. Only the exact sentinel is normalized; any other
+ * `24:xx:xx` value is left unchanged so `Temporal.PlainTime.from` throws —
+ * Postgres never emits those and they should not be silently corrupted.
  */
 function normalizeTime24(timeStr: string): string {
-  return timeStr.startsWith("24:") ? "00:" + timeStr.slice(3) : timeStr;
+  const match = /^24:00:00(\.\d+)?$/.exec(timeStr);
+  return match ? `00:00:00${match[1] ?? ""}` : timeStr;
 }
 
 function isZeroDate(text: string): boolean {

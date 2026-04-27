@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting
  */
 
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getDefaultTimezone } from "../../type/internal/timezone.js";
 
 /**
@@ -52,6 +53,11 @@ export function quote(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (value instanceof Temporal.Instant) return `'${formatInstantForSql(value)}'`;
+  if (value instanceof Temporal.PlainDateTime) return `'${formatPlainDateTimeForSql(value)}'`;
+  if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
+  if (value instanceof Temporal.PlainTime) return `'${formatPlainTimeForSql(value)}'`;
+  if (value instanceof Temporal.ZonedDateTime) return `'${formatInstantForSql(value.toInstant())}'`;
   if (value instanceof Date) return `'${quotedDate(value)}'`;
   if (typeof value === "symbol") {
     const desc = value.description;
@@ -80,6 +86,11 @@ export function typeCast(value: unknown): unknown {
   if (value === null || value === undefined) return value;
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;
+  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
+  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
+  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
+  if (value instanceof Temporal.PlainTime) return formatPlainTimeForSql(value);
+  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
   if (value instanceof Date) return quotedDate(value);
   throw new TypeError(`can't cast ${(value as object).constructor?.name ?? typeof value}`);
 }
@@ -236,6 +247,155 @@ export function quotedTime(value: Date): string {
     : new Date(2000, 0, 1, h, m, s, ms);
   const full = quotedDate(adjusted);
   return full.replace(/^\d{4}-\d{2}-\d{2} /, "");
+}
+
+/**
+ * Format a `Temporal.Instant` for SQL as `YYYY-MM-DD HH:MM:SS[.fffffffff]`.
+ * Respects `ActiveRecord.default_timezone` exactly as `quotedDate()` does:
+ * UTC when the setting is `"utc"`, otherwise the host system's local timezone.
+ * Preserves up to nanosecond precision; trailing zero groups are trimmed.
+ */
+export function formatInstantForSql(value: Temporal.Instant): string {
+  const tz = getDefaultTimezone() === "utc" ? "UTC" : Temporal.Now.timeZoneId();
+  return formatZonedComponents(value.toZonedDateTimeISO(tz));
+}
+
+/**
+ * Format a `Temporal.PlainDateTime` for SQL as `YYYY-MM-DD HH:MM:SS[.fffffffff]`.
+ * No timezone conversion — the value is naive by definition. Fractional digits
+ * are trimmed to the smallest non-zero 3-digit group (ms/µs/ns).
+ */
+export function formatPlainDateTimeForSql(value: Temporal.PlainDateTime): string {
+  return formatPlainComponents(value);
+}
+
+/**
+ * Format a `Temporal.PlainDate` for SQL as `YYYY-MM-DD`.
+ */
+export function formatPlainDateForSql(value: Temporal.PlainDate): string {
+  const y = padYear(value.year);
+  const m = String(value.month).padStart(2, "0");
+  const d = String(value.day).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Format a `Temporal.PlainTime` for SQL as `HH:MM:SS[.fffffffff]`.
+ * Fractional digits are trimmed to the smallest non-zero 3-digit group.
+ */
+export function formatPlainTimeForSql(value: Temporal.PlainTime): string {
+  return formatTimeComponents(
+    value.hour,
+    value.minute,
+    value.second,
+    value.millisecond,
+    value.microsecond,
+    value.nanosecond,
+  );
+}
+
+/**
+ * MySQL-safe variants of the formatters. MySQL TIME/DATETIME/TIMESTAMP support
+ * at most 6 fractional digits (microseconds); emitting 7–9 nanosecond digits
+ * in strict SQL mode causes an error rather than silent truncation.
+ */
+export function formatInstantForSqlMysql(value: Temporal.Instant): string {
+  const tz = getDefaultTimezone() === "utc" ? "UTC" : Temporal.Now.timeZoneId();
+  const zdt = value.toZonedDateTimeISO(tz);
+  return (
+    formatDatePrefix(zdt) +
+    formatTimeComponents(zdt.hour, zdt.minute, zdt.second, zdt.millisecond, zdt.microsecond, 0, 6)
+  );
+}
+
+export function formatPlainDateTimeForSqlMysql(value: Temporal.PlainDateTime): string {
+  return (
+    formatDatePrefix(value) +
+    formatTimeComponents(
+      value.hour,
+      value.minute,
+      value.second,
+      value.millisecond,
+      value.microsecond,
+      0,
+      6,
+    )
+  );
+}
+
+export function formatPlainTimeForSqlMysql(value: Temporal.PlainTime): string {
+  return formatTimeComponents(
+    value.hour,
+    value.minute,
+    value.second,
+    value.millisecond,
+    value.microsecond,
+    0,
+    6,
+  );
+}
+
+function formatDatePrefix(v: { year: number; month: number; day: number }): string {
+  return `${padYear(v.year)}-${String(v.month).padStart(2, "0")}-${String(v.day).padStart(2, "0")} `;
+}
+
+function padYear(year: number): string {
+  return String(year);
+}
+
+function formatZonedComponents(zdt: Temporal.ZonedDateTime): string {
+  return (
+    formatDatePrefix(zdt) +
+    formatTimeComponents(
+      zdt.hour,
+      zdt.minute,
+      zdt.second,
+      zdt.millisecond,
+      zdt.microsecond,
+      zdt.nanosecond,
+    )
+  );
+}
+
+function formatPlainComponents(pdt: Temporal.PlainDateTime): string {
+  const base = formatDatePrefix(pdt);
+  return (
+    base +
+    formatTimeComponents(
+      pdt.hour,
+      pdt.minute,
+      pdt.second,
+      pdt.millisecond,
+      pdt.microsecond,
+      pdt.nanosecond,
+    )
+  );
+}
+
+function formatTimeComponents(
+  h: number,
+  min: number,
+  s: number,
+  ms: number,
+  us: number,
+  ns: number,
+  maxFracDigits = 9,
+): string {
+  const hh = String(h).padStart(2, "0");
+  const mm = String(min).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  const base = `${hh}:${mm}:${ss}`;
+  // Clamp sub-second components to maxFracDigits before building the string.
+  const effectiveUs = maxFracDigits >= 6 ? us : 0;
+  const effectiveNs = maxFracDigits >= 9 ? ns : 0;
+  if (ms === 0 && effectiveUs === 0 && effectiveNs === 0) return base;
+  const frac9 =
+    String(ms).padStart(3, "0") +
+    String(effectiveUs).padStart(3, "0") +
+    String(effectiveNs).padStart(3, "0");
+  const frac =
+    effectiveNs !== 0 ? frac9 : effectiveUs !== 0 ? frac9.slice(0, 6) : frac9.slice(0, 3);
+  return `${base}.${frac.slice(0, maxFracDigits)}`;
 }
 
 /**

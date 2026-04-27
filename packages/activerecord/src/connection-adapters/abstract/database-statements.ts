@@ -7,8 +7,17 @@
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Notifications } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TransactionIsolationError } from "../../errors.js";
-import { quote, quoteTableName, quoteColumnName } from "./quoting.js";
+import {
+  quote,
+  quoteTableName,
+  quoteColumnName,
+  formatInstantForSql,
+  formatPlainDateTimeForSql,
+  formatPlainDateForSql,
+  formatPlainTimeForSql,
+} from "./quoting.js";
 import { TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
 import { isWriteQuerySql } from "../sql-classification.js";
@@ -940,11 +949,53 @@ export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
 export function withYamlFallback(value: unknown): unknown {
   if (
     Array.isArray(value) ||
-    (value !== null && typeof value === "object" && !(value instanceof Date))
+    (value !== null &&
+      typeof value === "object" &&
+      !(value instanceof Date) &&
+      !isTemporalValue(value))
   ) {
     return JSON.stringify(value);
   }
   return value;
+}
+
+/**
+ * Convert a Temporal value to its SQL wire-string form for use as a bound
+ * parameter. Drivers (pg extended protocol, mysql2 prepared, better-sqlite3)
+ * reject raw Temporal objects; this shim converts them at the bind boundary.
+ * Returns the value unchanged when it is not a Temporal type.
+ *
+ * Applied in `typeCastedBinds` (notification payloads) for now. The actual
+ * driver-bind paths (pg `client.query values`, mysql2 `conn.execute`, and
+ * better-sqlite3 `stmt.all`) should be wired as part of the adapter-specific
+ * Temporal migration work once those adapters start receiving real Temporal
+ * values from the cast layer.
+ */
+export function temporalToBindString(
+  value: unknown,
+  adapter?: "sqlite" | "postgres" | "mysql",
+): unknown {
+  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
+  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
+  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
+  if (value instanceof Temporal.PlainTime) {
+    // SQLite stores time as a datetime string with a fixed 2000-01-01 date prefix,
+    // matching quotedTime(Date) behavior in sqlite3/quoting.ts.
+    const t = formatPlainTimeForSql(value);
+    return adapter === "sqlite" ? `2000-01-01 ${t}` : t;
+  }
+  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
+  return value;
+}
+
+function isTemporalValue(value: object): boolean {
+  return (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainTime ||
+    value instanceof Temporal.ZonedDateTime
+  );
 }
 
 /**
@@ -968,10 +1019,13 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
  */
 export function typeCastedBinds(binds: unknown[] | undefined): unknown[] {
   return (binds ?? []).map((b: any) => {
+    let v: unknown;
     if (b && typeof b === "object" && typeof b.valueForDatabase === "function") {
-      return b.valueForDatabase();
+      v = b.valueForDatabase();
+    } else {
+      v = b && typeof b === "object" && "value" in b ? b.value : b;
     }
-    return b && typeof b === "object" && "value" in b ? b.value : b;
+    return temporalToBindString(v);
   });
 }
 

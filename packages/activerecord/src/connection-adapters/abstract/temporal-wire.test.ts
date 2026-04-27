@@ -153,6 +153,10 @@ describe("parsePostgresTime", () => {
   it("normalizes 24:00:00 with fractional seconds", () => {
     expect(parsePostgresTime("24:00:00.000000").toString()).toBe("00:00:00");
   });
+
+  it("does not normalize 24:01:00 — only 24:00:00 is a valid PG sentinel", () => {
+    expect(() => parsePostgresTime("24:01:00")).toThrow();
+  });
 });
 
 describe("parsePostgresTimeTz", () => {

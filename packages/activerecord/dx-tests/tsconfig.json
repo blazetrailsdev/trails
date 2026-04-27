@@ -9,7 +9,13 @@
       "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
       "@blazetrails/arel": ["../../arel/src/index.ts"],
       "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],
-      "@blazetrails/activesupport/message-verifier": ["../../activesupport/src/message-verifier.ts"]
+      "@blazetrails/activesupport/message-verifier": [
+        "../../activesupport/src/message-verifier.ts"
+      ],
+      "@blazetrails/activesupport/temporal": ["../../activesupport/src/temporal.ts"],
+      "@blazetrails/activesupport/testing/temporal-helpers": [
+        "../../activesupport/src/testing/temporal-helpers.ts"
+      ]
     }
   },
   "include": ["."]

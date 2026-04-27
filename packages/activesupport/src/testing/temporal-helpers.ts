@@ -1,6 +1,5 @@
 /**
  * Temporal test helpers. Test files use these instead of `new Date(...)`.
- * The no-native-date ESLint rule allowlists this file.
  */
 import { Temporal } from "../temporal.js";
 
