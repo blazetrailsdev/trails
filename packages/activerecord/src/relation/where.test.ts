@@ -1776,3 +1776,19 @@ describe("WhereTest Arel nodes", () => {
 // ==========================================================================
 // WhereTest — targets relation/where_test.rb (continued)
 // ==========================================================================
+describe("WhereTest", () => {
+  it("aliased attribute", () => {
+    const adapter = createTestAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+        (this as any).aliasAttribute("heading", "title");
+      }
+    }
+    const expected = Topic.where({ heading: "The First Topic" });
+    const actual = Topic.where({ title: "The First Topic" });
+    expect(expected.toSql()).toBe(actual.toSql());
+  });
+});
