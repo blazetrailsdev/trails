@@ -97,6 +97,8 @@ import {
   attributePresent as _attributePresent,
   attributeNamesList as _attributeNamesList,
   accessedFields as _accessedFields,
+  attributesForCreate as _attributesForCreate,
+  attributesForUpdate as _attributesForUpdate,
 } from "./attribute-methods.js";
 import { toKey as _toKey } from "./attribute-methods/primary-key.js";
 import { _readAttribute as _readAttributeFn } from "./attribute-methods/read.js";
@@ -2344,16 +2346,10 @@ export class Base extends Model {
     }
 
     const attrs = this._attributes.valuesForDatabase();
-    const columns: string[] = [];
-    const values: unknown[] = [];
-
-    const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
-    for (const [key, value] of Object.entries(attrs)) {
-      if (!ctor._attributeDefinitions.has(key)) continue;
-      if (pkCols.includes(key) && value === null) continue;
-      columns.push(key);
-      values.push(value);
-    }
+    // Rails: attribute_names = attributes_for_create(self.attribute_names)
+    const allNames = Object.keys(attrs).filter((k) => ctor._attributeDefinitions.has(k));
+    const columns = _attributesForCreate.call(this, allNames);
+    const values: unknown[] = columns.map((k) => attrs[k]);
 
     let sql: string;
     if (columns.length === 0) {
@@ -2396,17 +2392,16 @@ export class Base extends Model {
       this._writeAttribute("updated_at", Temporal.Now.instant());
     }
 
-    // Rails raises ReadonlyAttributeError at write time (HasReadonlyAttributes),
-    // so by the time we reach save the change set can never contain a readonly
-    // column on a persisted record. No silent-filter needed.
     const changedAttrs = { ...this.changes };
 
     if (Object.keys(changedAttrs).length === 0) return;
 
     const dbValues = this._attributes.valuesForDatabase();
-    const declaredChanges = Object.keys(changedAttrs).filter((key) =>
+    // Rails: attribute_names = attributes_for_update(attribute_names)
+    const candidateNames = Object.keys(changedAttrs).filter((key) =>
       ctor._attributeDefinitions.has(key),
     );
+    const declaredChanges = _attributesForUpdate.call(this, candidateNames);
 
     if (declaredChanges.length === 0) return;
 

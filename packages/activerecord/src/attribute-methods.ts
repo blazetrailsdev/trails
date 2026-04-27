@@ -3,7 +3,6 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods
  */
-import { NotImplementedError } from "./errors.js";
 import { isBlank } from "@blazetrails/activesupport";
 import { resolveAliasName } from "@blazetrails/activemodel";
 // ActiveModel provides aliasAttribute and undefineAttributeMethods on Model.
@@ -284,30 +283,57 @@ export function _hasAttribute(this: AttributeMethodsHost, attrName: string): boo
   return this._attributeDefinitions.has(attrName);
 }
 
-function attributesWithValues(attributeNames: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods#attributes_with_values is not implemented",
-  );
+// ---------------------------------------------------------------------------
+// Private instance helpers — mirrors ActiveRecord::AttributeMethods private block
+// ---------------------------------------------------------------------------
+
+function attributeMethod(this: any, attrName: string): boolean {
+  return this._attributes != null && this._attributes.has(attrName);
 }
 
-function attributesForUpdate(attributeNames: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods#attributes_for_update is not implemented",
-  );
+export function attributesWithValues(this: any, attributeNames: string[]): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  const attributes = this._attributes;
+  if (attributes == null) return result;
+  for (const name of attributeNames) {
+    if (attributes.has(name)) result[name] = attributes.fetchValue(name);
+  }
+  return result;
 }
 
-function attributesForCreate(attributeNames: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods#attributes_for_create is not implemented",
-  );
+export function attributesForUpdate(this: any, attributeNames: string[]): string[] {
+  const mc = this.constructor as any;
+  const colNames = new Set<string>(mc.columnNames?.() ?? []);
+  return attributeNames.filter((name) => {
+    if (!colNames.has(name)) return false;
+    if (mc._readonlyAttributes?.has?.(name)) return false;
+    if (mc._counterCacheColumns?.has?.(name)) return false;
+    // Rails: column_for_attribute(name).virtual?
+    const col = mc.columnForAttribute?.(name);
+    if (col?.virtual || col?.isVirtual?.()) return false;
+    return true;
+  });
 }
 
-function formatForInspect(name: any, value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods#format_for_inspect is not implemented",
-  );
+export function attributesForCreate(this: any, attributeNames: string[]): string[] {
+  const mc = this.constructor as any;
+  const colNames = new Set<string>(mc.columnNames?.() ?? []);
+  return attributeNames.filter((name) => {
+    if (!colNames.has(name)) return false;
+    // Rails: pk_attribute?(name) && id.nil? — check per-column PK value so
+    // composite PKs work correctly (this.id would be an array, not null).
+    if (pkAttribute.call(this, name) && this._attributes?.get?.(name) == null) return false;
+    // Rails: column_for_attribute(name).virtual?
+    const col = mc.columnForAttribute?.(name);
+    if (col?.virtual || col?.isVirtual?.()) return false;
+    return true;
+  });
 }
 
-function isPkAttribute(name: any): never {
-  throw new NotImplementedError("ActiveRecord::AttributeMethods#pk_attribute? is not implemented");
+// Re-export from shared module so callers of attribute-methods can import here.
+export { formatForInspect } from "./attribute-inspection.js";
+
+function pkAttribute(this: any, name: string): boolean {
+  const pk = (this.constructor as any)?.primaryKey ?? this._primaryKey;
+  return Array.isArray(pk) ? pk.includes(name) : name === pk;
 }

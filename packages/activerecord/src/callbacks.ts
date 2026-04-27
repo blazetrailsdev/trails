@@ -8,8 +8,8 @@
  * Mirrors: ActiveRecord::Callbacks
  */
 
-import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
+import { currentTimeFromProperTimezone, timestampAttributesForUpdateInModel } from "./timestamp.js";
 
 type ModelCtor = typeof Base;
 
@@ -219,14 +219,62 @@ function registerCallback(
   klass._callbackChain!.register(timing, event, fn, conditions);
 }
 
-function createOrUpdate(opts?: any): never {
-  throw new NotImplementedError("ActiveRecord::Callbacks#create_or_update is not implemented");
+// ---------------------------------------------------------------------------
+// Private instance helpers — mirrors ActiveRecord::Callbacks private block.
+// Rails overrides persistence methods to wrap each in _run_*_callbacks { super }.
+// createOrUpdate delegates to base.ts._createOrUpdate() which runs the full
+// callback+persistence cycle. _createRecord/_updateRecord wrap the underlying
+// persistence work directly in their respective callback chains.
+// ---------------------------------------------------------------------------
+
+function createOrUpdate(this: any): Promise<boolean> {
+  // Rails: _run_save_callbacks { super }
+  return (this._createOrUpdate as () => Promise<boolean>).call(this);
 }
 
-function _createRecord(): never {
-  throw new NotImplementedError("ActiveRecord::Callbacks#_create_record is not implemented");
+function _createRecord(this: any): Promise<boolean> {
+  // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
+  const ctor = this.constructor as any;
+  return ctor._callbackChain.runCallbacks("create", this, async () => {
+    if (!this._performInsert) throw new Error("_performInsert not implemented");
+    await this._performInsert();
+    if (this._pendingOperation) {
+      await this._pendingOperation;
+      this._pendingOperation = null;
+    }
+    this._previouslyNewRecord = true;
+    this._newRecord = false;
+    this.changesApplied();
+  });
 }
 
-function _updateRecord(): never {
-  throw new NotImplementedError("ActiveRecord::Callbacks#_update_record is not implemented");
+function _updateRecord(this: any): Promise<boolean> {
+  // Rails: _run_update_callbacks { record_update_timestamps { super } } — returns boolean.
+  // record_update_timestamps writes updated_at/updated_on when @_touch_record
+  // and should_record_timestamps? are true, then yields to the actual update.
+  const ctor = this.constructor as any;
+  return ctor._callbackChain.runCallbacks("update", this, async () => {
+    // Mirror record_update_timestamps: write timestamp columns before the update
+    // when the model has record_timestamps enabled and has changes to save.
+    // Mirror record_update_timestamps: use _skipTouch (Rails' @_touch_record flag)
+    // and the shared currentTimeFromProperTimezone() helper (Temporal.Instant).
+    const hasChanges = Object.keys(this.changes ?? {}).length > 0;
+    if (!this._skipTouch && ctor.recordTimestamps !== false && hasChanges) {
+      const time = currentTimeFromProperTimezone();
+      const updateAttrs = timestampAttributesForUpdateInModel.call(ctor);
+      for (const col of updateAttrs) {
+        if (ctor._attributeDefinitions?.has(col) && !this.willSaveChangeToAttribute?.(col)) {
+          this.writeAttribute?.(col, time);
+        }
+      }
+    }
+    if (!this._performUpdate) throw new Error("_performUpdate not implemented");
+    await this._performUpdate();
+    if (this._pendingOperation) {
+      await this._pendingOperation;
+      this._pendingOperation = null;
+    }
+    this._previouslyNewRecord = false;
+    this.changesApplied();
+  });
 }

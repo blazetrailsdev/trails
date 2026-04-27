@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::AttributeMethods::Query
  */
 
-import { NotImplementedError } from "../errors.js";
 import { BooleanType } from "@blazetrails/activemodel";
 
 const booleanType = new BooleanType();
@@ -58,7 +57,9 @@ function publicSend(obj: object, name: string): unknown {
  * Mirrors: ActiveRecord::AttributeMethods::Query#_query_attribute
  */
 export function _queryAttribute(this: RawReadable, name: string): boolean {
-  return castToBoolean(this._readAttribute(name));
+  const value = this._readAttribute(name);
+  // Rails: _query_attribute reads the value then calls query_cast_attribute
+  return castToBoolean(queryCastAttribute.call(this, name, value));
 }
 
 function castToBoolean(value: unknown): boolean {
@@ -70,8 +71,10 @@ function castToBoolean(value: unknown): boolean {
   return !!value;
 }
 
-function queryCastAttribute(attrName: any, value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::Query#query_cast_attribute is not implemented",
-  );
+// Mirrors: ActiveRecord::AttributeMethods::Query::ClassMethods private#query_cast_attribute
+function queryCastAttribute(this: any, attrName: string, value: unknown): unknown {
+  // typeForAttribute is a class method — look it up on the constructor, not the instance.
+  const type = ((this.constructor as any).typeForAttribute?.(attrName) ??
+    booleanType) as BooleanType;
+  return type.deserialize(value);
 }

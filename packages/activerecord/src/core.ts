@@ -5,10 +5,11 @@
  */
 
 import { NotImplementedError } from "./errors.js";
-import { Notifications, ParameterFilter, getAsyncContext } from "@blazetrails/activesupport";
+import { Notifications, getAsyncContext } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { argumentError } from "./relation/query-methods.js";
+import { formatForInspect } from "./attribute-inspection.js";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -32,31 +33,9 @@ export interface Core {
   freeze(): this;
 }
 
-/**
- * Placeholder used in inspect output when an attribute value is masked
- * (e.g. for filtered attributes).
- *
- * Mirrors: ActiveRecord::Core::InspectionMask
- */
-export class InspectionMask {
-  private _value: string;
-
-  constructor(value: string = "[FILTERED]") {
-    this._value = value;
-  }
-
-  toString(): string {
-    return this._value;
-  }
-
-  inspect(): string {
-    return this._value;
-  }
-
-  toJSON(): string {
-    return this._value;
-  }
-}
+// InspectionMask and inspectionFilter live in attribute-inspection.ts.
+// Re-export so existing importers of core.ts keep working.
+export { InspectionMask, inspectionFilter } from "./attribute-inspection.js";
 
 // ---------------------------------------------------------------------------
 // Instance-level behavior
@@ -77,17 +56,9 @@ interface CoreRecord {
  */
 export function inspect(this: CoreRecord): string {
   const ctor = this.constructor as { name: string };
-  const filter = inspectionFilter.call(this.constructor as CoreHost);
+  // Rails: inspect builds attribute strings via format_for_inspect (same as attribute_for_inspect)
   const attrs = Array.from(this._attributes)
-    .map(([k, v]) => {
-      if (v === null || v === undefined) return `${k}: nil`;
-      const filtered = filter.filterParam(k, v);
-      if (filtered instanceof InspectionMask) return `${k}: ${filtered}`;
-      if (filtered === null || filtered === undefined) return `${k}: nil`;
-      if (typeof filtered === "string") return `${k}: "${filtered}"`;
-      if (filtered instanceof Date) return `${k}: "${filtered.toISOString()}"`;
-      return `${k}: ${JSON.stringify(filtered)}`;
-    })
+    .map(([k, v]) => `${k}: ${formatForInspect.call(this, k, v)}`)
     .join(", ");
   return `#<${ctor.name} ${attrs}>`;
 }
@@ -99,17 +70,8 @@ export function inspect(this: CoreRecord): string {
  */
 export function attributeForInspect(this: CoreRecord, attr: string): string {
   const raw = this.readAttribute(attr);
-  if (raw === null || raw === undefined) return "nil";
-  const filter = inspectionFilter.call(this.constructor as CoreHost);
-  const value = filter.filterParam(attr, raw);
-  if (value instanceof InspectionMask) return value.toString();
-  if (value === null || value === undefined) return "nil";
-  if (typeof value === "string") {
-    if (value.length > 50) return `"${value.substring(0, 50)}..."`;
-    return `"${value}"`;
-  }
-  if (value instanceof Date) return `"${value.toISOString()}"`;
-  return JSON.stringify(value);
+  // Rails: attribute_for_inspect calls format_for_inspect(attr_name, value)
+  return formatForInspect.call(this, attr, raw);
 }
 
 /**
@@ -517,24 +479,7 @@ export function filterAttributes(
   return [];
 }
 
-const INSPECTION_MASK = new InspectionMask();
-
-/**
- * Rails: creates an ActiveSupport::ParameterFilter with an InspectionMask.
- * Delegates up the class hierarchy if no own filterAttributes are set, so
- * per-class overrides don't cache stale Base filters (hasOwnProperty guards).
- */
-export function inspectionFilter(this: CoreHost): ParameterFilter {
-  if (this._inspectionFilter) return this._inspectionFilter;
-  if (!Object.prototype.hasOwnProperty.call(this, "_filterAttributes")) {
-    const parent = parentClass(this);
-    if (parent) return inspectionFilter.call(parent);
-  }
-  this._inspectionFilter = new ParameterFilter(this._filterAttributes ?? [], {
-    mask: INSPECTION_MASK,
-  });
-  return this._inspectionFilter;
-}
+// inspectionFilter is now in attribute-inspection.ts
 
 /**
  * Rails: PredicateBuilder.new(TableMetadata.new(self, arel_table))

@@ -8,8 +8,8 @@
  * Mirrors: ActiveRecord::AttributeMethods::Read
  */
 
-import { NotImplementedError } from "../errors.js";
 import type { AttributeSet } from "@blazetrails/activemodel";
+import { AttrNames } from "@blazetrails/activemodel";
 
 /**
  * The Read module interface.
@@ -40,8 +40,13 @@ export function _readAttribute(this: AttributeHolder, name: string): unknown {
   return this._attributes.fetchValue(name) ?? null;
 }
 
-function defineMethodAttribute(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::Read#define_method_attribute is not implemented",
-  );
+// Mirrors: ActiveRecord::AttributeMethods::Read::ClassMethods private#define_method_attribute
+// Rails derives reader method metadata via defineAttributeAccessorMethod and
+// uses it while generating dynamic attribute readers. TypeScript attribute
+// access is handled statically, so we compute the same metadata for parity
+// but intentionally do not register or define anything.
+function defineMethodAttribute(canonicalName: string, _options?: unknown): void {
+  const { methodName, attrNameRef } = AttrNames.defineAttributeAccessorMethod(canonicalName, false);
+  void methodName;
+  void attrNameRef;
 }

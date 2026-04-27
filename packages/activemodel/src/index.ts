@@ -14,6 +14,7 @@ export {
   MissingAttributeError,
   AttributeMethodPattern,
   resolveAliasName,
+  AttrNames,
 } from "./attribute-methods.js";
 export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 export { assignAttributes, attributeWriterMissing, ArgumentError } from "./attribute-assignment.js";

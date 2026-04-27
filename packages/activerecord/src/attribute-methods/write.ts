@@ -9,8 +9,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::Write
  */
 
-import { NotImplementedError } from "../errors.js";
-import { Model } from "@blazetrails/activemodel";
+import { Model, AttrNames } from "@blazetrails/activemodel";
 
 /**
  * The Write module interface.
@@ -38,8 +37,13 @@ export function _writeAttribute(this: Model, name: string, value: unknown): void
   Model.prototype._writeAttribute.call(this, name, value);
 }
 
-function defineMethodAttribute(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AttributeMethods::Write#define_method_attribute= is not implemented",
-  );
+// Mirrors: ActiveRecord::AttributeMethods::Write::ClassMethods private#define_method_attribute=
+// Rails derives writer method metadata via defineAttributeAccessorMethod and
+// uses it while generating dynamic attribute writers. TypeScript attribute
+// access is handled statically, so we compute the same metadata for parity
+// but intentionally do not register or define anything.
+function defineMethodAttribute(canonicalName: string, _options?: unknown): void {
+  const { methodName, attrNameRef } = AttrNames.defineAttributeAccessorMethod(canonicalName, true);
+  void methodName;
+  void attrNameRef;
 }
