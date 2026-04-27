@@ -16,8 +16,11 @@ import {
 } from "../errors.js";
 import { TypeMap } from "../type/type-map.js";
 import { Date as DateType } from "../type/date.js";
-import { DateTime as DateTimeType } from "../type/date-time.js";
+import { DateTime as ARDateTimeType } from "../type/date-time.js";
 import { Time as TimeType } from "../type/time.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import type { DateTimeCastResult } from "@blazetrails/activemodel";
+import { defaultSqlTimezone } from "./abstract/quoting.js";
 import { Text as TextType } from "../type/text.js";
 import { Json as JsonType } from "../type/json.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
@@ -47,6 +50,28 @@ import {
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
+
+/**
+ * SQLite-specific DateTime type.
+ *
+ * better-sqlite3 returns datetime columns as TEXT. The base
+ * DateTimeType#cast returns Temporal.PlainDateTime for offset-less datetime
+ * strings. This subclass converts any PlainDateTime result to
+ * Temporal.Instant so callers get a timezone-aware value.
+ *
+ * Stored datetime strings are interpreted according to
+ * ActiveRecord.default_timezone (defaulting to UTC), matching the timezone
+ * selection used when formatting instants for SQLite.
+ */
+export class SQLiteDateTimeType extends ARDateTimeType {
+  override cast(value: unknown): DateTimeCastResult | null {
+    const result = super.cast(value);
+    if (result instanceof Temporal.PlainDateTime) {
+      return result.toZonedDateTime(defaultSqlTimezone()).toInstant();
+    }
+    return result;
+  }
+}
 
 /**
  * SQLite adapter — connects ActiveRecord to a real SQLite database.
@@ -525,9 +550,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
     map.registerType("decimal", new DecimalType());
     map.registerType("boolean", new BooleanType());
+    // Date/time types: no driver-level type-parser work needed for Temporal.
+    // better-sqlite3 returns datetime columns as TEXT strings (SQLite has no
+    // native datetime type).  SQLiteDateTimeType converts offset-less strings
+    // to Temporal.Instant using the same timezone as formatInstantForSql
+    // (default_timezone: UTC → UTC, local → host tz).  Writes go through
+    // sqlite3/quoting.ts which formats all Temporal types as :db strings.
     map.registerType("date", new DateType());
-    map.registerType("datetime", new DateTimeType());
-    map.registerType("timestamp", new DateTimeType());
+    map.registerType("datetime", new SQLiteDateTimeType());
+    map.registerType("timestamp", new SQLiteDateTimeType());
     map.registerType("time", new TimeType());
     map.registerType("blob", new BinaryType());
     map.registerType("binary", new BinaryType());

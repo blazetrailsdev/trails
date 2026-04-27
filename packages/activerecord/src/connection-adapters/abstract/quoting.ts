@@ -250,14 +250,22 @@ export function quotedTime(value: Date): string {
 }
 
 /**
+ * Return the IANA timezone string for SQL datetime serialization/deserialization,
+ * based on `ActiveRecord.default_timezone`. Shared by all instant formatters and
+ * by `SQLiteDateTimeType#cast` so both directions always agree on the timezone.
+ */
+export function defaultSqlTimezone(): string {
+  return getDefaultTimezone() === "utc" ? "UTC" : Temporal.Now.timeZoneId();
+}
+
+/**
  * Format a `Temporal.Instant` for SQL as `YYYY-MM-DD HH:MM:SS[.fffffffff]`.
  * Respects `ActiveRecord.default_timezone` exactly as `quotedDate()` does:
  * UTC when the setting is `"utc"`, otherwise the host system's local timezone.
  * Preserves up to nanosecond precision; trailing zero groups are trimmed.
  */
 export function formatInstantForSql(value: Temporal.Instant): string {
-  const tz = getDefaultTimezone() === "utc" ? "UTC" : Temporal.Now.timeZoneId();
-  return formatZonedComponents(value.toZonedDateTimeISO(tz));
+  return formatZonedComponents(value.toZonedDateTimeISO(defaultSqlTimezone()));
 }
 
 /**
@@ -300,8 +308,7 @@ export function formatPlainTimeForSql(value: Temporal.PlainTime): string {
  * in strict SQL mode causes an error rather than silent truncation.
  */
 export function formatInstantForSqlMysql(value: Temporal.Instant): string {
-  const tz = getDefaultTimezone() === "utc" ? "UTC" : Temporal.Now.timeZoneId();
-  const zdt = value.toZonedDateTimeISO(tz);
+  const zdt = value.toZonedDateTimeISO(defaultSqlTimezone());
   return (
     formatDatePrefix(zdt) +
     formatTimeComponents(zdt.hour, zdt.minute, zdt.second, zdt.millisecond, zdt.microsecond, 0, 6)
