@@ -70,5 +70,25 @@
   "ar-160": {
     "side": "trails-missing",
     "reason": "Arel aggregate nodes (Sum, Count, Avg, Max, Min) constructed directly via new Nodes.Sum([col]) crash: the Trails Arel visitor has no visitSum etc. handlers, throwing 'Unknown node type: Sum'. Rails' visitor handles these via visit_Arel_Nodes_Sum etc. Real fix: add visitor handlers for each aggregate node type in the Arel ToSql visitor."
+  },
+  "ar-161": {
+    "side": "diff",
+    "reason": "ORDER BY string alias from a SELECT expression is over-qualified: order('pub_year') on a query with EXTRACT(...) AS pub_year produces ORDER BY \"books\".\"pub_year\" ASC instead of ORDER BY pub_year. Trails' string-order path qualifies any bare identifier with the model's table name. Real fix: _applyOrderToManager must pass string ORDER BY values verbatim (as Rails does) instead of qualifying unrecognised bare identifiers."
+  },
+  "ar-162": {
+    "side": "diff",
+    "reason": "ORDER BY aggregate alias is over-qualified: order('cnt DESC') produces ORDER BY \"books\".\"cnt\" DESC instead of ORDER BY cnt DESC. Same root as ar-161 — Trails' order-qualification path treats any bare identifier as a table column. Real fix: same as ar-161."
+  },
+  "ar-163": {
+    "side": "trails-missing",
+    "reason": "Arel Nodes::Count not registered in Trails' Arel visitor: new Nodes.Count([col]) throws 'Unknown node type: Count'. Same root as ar-160 (Sum). Real fix: add visitCount to the Arel ToSql visitor."
+  },
+  "ar-164": {
+    "side": "trails-missing",
+    "reason": "Arel Nodes::Max and Nodes::Min not registered in Trails' Arel visitor: new Nodes.Max/Min([col]) throws 'Unknown node type: Max'. Same root as ar-160 (Sum). Real fix: add visitMax and visitMin to the Arel ToSql visitor."
+  },
+  "ar-165": {
+    "side": "trails-missing",
+    "reason": "Arel COUNT DISTINCT via Nodes.Count([col], true) not supported: throws 'Unknown node type: Count'. Pinning separately because the fix must also handle the distinct=true flag to emit COUNT(DISTINCT col). Real fix: visitCount must check the distinct flag and emit COUNT(DISTINCT ...) accordingly."
   }
 }
