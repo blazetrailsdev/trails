@@ -1,3 +1,4 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { EachValidator } from "../validator.js";
 import type { AnyRecord } from "../validator.js";
 import { isBlank } from "@blazetrails/activesupport";
@@ -8,10 +9,24 @@ export class ComparisonValidator extends EachValidator {
   }
 
   private compare(a: unknown, b: unknown): number {
-    if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
+    if (a instanceof Temporal.Instant && b instanceof Temporal.Instant)
+      return Temporal.Instant.compare(a, b);
+    if (a instanceof Temporal.PlainDateTime && b instanceof Temporal.PlainDateTime)
+      return Temporal.PlainDateTime.compare(a, b);
+    if (a instanceof Temporal.PlainDate && b instanceof Temporal.PlainDate)
+      return Temporal.PlainDate.compare(a, b);
+    if (a instanceof Temporal.PlainTime && b instanceof Temporal.PlainTime)
+      return Temporal.PlainTime.compare(a, b);
+    if (a instanceof Temporal.ZonedDateTime && b instanceof Temporal.ZonedDateTime)
+      return Temporal.ZonedDateTime.compare(a, b);
     if (typeof a === "number" && typeof b === "number") return a - b;
     if (typeof a === "string" && typeof b === "string") return a < b ? -1 : a > b ? 1 : 0;
-    return Number(a) - Number(b);
+    // Temporal objects throw on implicit numeric coercion — safe fallback.
+    try {
+      return Number(a) - Number(b);
+    } catch {
+      return NaN;
+    }
   }
 
   override checkValidity(): void {

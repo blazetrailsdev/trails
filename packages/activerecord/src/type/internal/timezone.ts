@@ -6,6 +6,9 @@
  */
 export interface TimezoneOptions {
   timezone?: "utc" | "local";
+  precision?: number;
+  scale?: number;
+  limit?: number;
 }
 
 let defaultTimezone: "utc" | "local" = "utc";

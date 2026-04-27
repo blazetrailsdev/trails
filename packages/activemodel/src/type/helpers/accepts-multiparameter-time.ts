@@ -1,3 +1,4 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Type } from "../value.js";
 
 /**
@@ -8,7 +9,8 @@ import { Type } from "../value.js";
  *
  * In Rails, date/time form fields are submitted as multiple parameters
  * (year, month, day, hour, minute, second). This class reassembles them
- * into a single value before delegating to the wrapped type.
+ * into a single Temporal.PlainDateTime and delegates to the wrapped type,
+ * which extracts what it needs (PlainDate, PlainTime, or PlainDateTime).
  */
 export class AcceptsMultiparameterTime {
   readonly type: Type;
@@ -68,19 +70,37 @@ export class AcceptsMultiparameterTime {
     const [year = 0, month = 1, day = 1, hour = 0, minute = 0, second = 0] = parts;
     if (year === 0 && month <= 1 && day <= 1) return null;
 
-    const date = new Date(year, month - 1, day, hour, minute, second);
-    if (
-      date.getFullYear() !== year ||
-      date.getMonth() !== month - 1 ||
-      date.getDate() !== day ||
-      date.getHours() !== hour ||
-      date.getMinutes() !== minute ||
-      date.getSeconds() !== second
-    ) {
+    try {
+      // Decompose fractional seconds into the three Temporal sub-second
+      // components (each 0-999) using integer arithmetic to avoid floating-
+      // point rounding errors. Carry 1e9 ns into wholeSecond explicitly.
+      let wholeSecond = Math.trunc(second);
+      let totalNanoseconds = Math.round((second - wholeSecond) * 1_000_000_000);
+      if (totalNanoseconds === 1_000_000_000) {
+        wholeSecond += 1;
+        totalNanoseconds = 0;
+      }
+      const millisecond = Math.trunc(totalNanoseconds / 1_000_000);
+      const microsecond = Math.trunc((totalNanoseconds % 1_000_000) / 1_000);
+      const nanosecond = totalNanoseconds % 1_000;
+      const pdt = Temporal.PlainDateTime.from(
+        {
+          year,
+          month,
+          day,
+          hour,
+          minute,
+          second: wholeSecond,
+          millisecond,
+          microsecond,
+          nanosecond,
+        },
+        { overflow: "reject" },
+      );
+      return this.type.cast(pdt);
+    } catch {
       return null;
     }
-
-    return this.type.cast(date);
   }
 }
 

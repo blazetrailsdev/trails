@@ -3,6 +3,8 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -133,7 +135,7 @@ describe("CacheKeyTest", () => {
         this.cacheVersioning = true;
       }
     }
-    const p = await Post.create({ title: "test", updated_at: new Date() });
+    const p = await Post.create({ title: "test", updated_at: Temporal.Now.instant() });
     const version = p.cacheVersion();
     expect(version).not.toBeNull();
     expect(typeof version).toBe("string");
@@ -171,7 +173,7 @@ describe("CacheKeyTest", () => {
         this.cacheVersioning = true;
       }
     }
-    const now = new Date();
+    const now = Temporal.Now.instant();
     const p = await Post.create({ title: "test", updated_at: now });
     const found = await Post.find(p.id);
     const version = found.cacheVersion();
@@ -189,20 +191,12 @@ describe("CacheKeyTest", () => {
         this.cacheVersioning = true;
       }
     }
-    const now = new Date();
+    const now = instant("2025-06-15T14:23:55.123456Z");
     const p = new Post({ title: "test", updated_at: now });
     const version = p.cacheVersion();
     expect(version).not.toBeNull();
-    // usec format: YYYYMMDDHHMMSSMMM000 (20 chars)
-    const ms = now.getUTCMilliseconds().toString().padStart(3, "0");
-    const expected =
-      now
-        .toISOString()
-        .replace(/[^0-9]/g, "")
-        .slice(0, 14) +
-      ms +
-      "000";
-    expect(version).toBe(expected);
+    // usec format: YYYYMMDDHHMMSSuuuuuu (20 chars) — with real microseconds
+    expect(version).toBe("20250615142355123456");
   });
 
   it("cache_version does call updated_at when it is assigned via a string", async () => {
@@ -217,11 +211,8 @@ describe("CacheKeyTest", () => {
     }
     const p = new Post({ title: "test", updated_at: "2025-01-01T00:00:00.000Z" });
     const version = p.cacheVersion();
-    if (p.updated_at instanceof Date) {
-      expect(version).not.toBeNull();
-    } else {
-      expect(version).toBeNull();
-    }
+    expect(version).not.toBeNull();
+    expect(version).toBe("20250101000000000000");
   });
 
   it("cache_version does call updated_at when it is assigned via a hash", () => {
@@ -234,8 +225,7 @@ describe("CacheKeyTest", () => {
         this.cacheVersioning = true;
       }
     }
-    const now = new Date(2025, 0, 1, 12, 0, 0);
-    const p = new Post({ title: "test", updated_at: now });
+    const p = new Post({ title: "test", updated_at: "2025-01-01T12:00:00Z" });
     const version = p.cacheVersion();
     expect(version).not.toBeNull();
     expect(typeof version).toBe("string");
@@ -275,7 +265,7 @@ describe("CacheKeyTest", () => {
       }
     }
     const p = await Post.create({ title: "ts" });
-    p.writeAttribute("updated_at", new Date("2023-06-15T12:00:00Z"));
+    p.writeAttribute("updated_at", "2023-06-15T12:00:00Z");
     // versioning off: cacheKeyWithVersion() == cacheKey() == tableName/id-usecTimestamp (20 chars)
     const key = p.cacheKeyWithVersion();
     expect(key).toBe(`posts/${p.id}-20230615120000000000`);
@@ -303,7 +293,7 @@ describe("CacheKeyTest", () => {
       }
     }
     const p = await Post.create({ title: "v" });
-    p.writeAttribute("updated_at", new Date("2023-01-01T00:00:00Z"));
+    p.writeAttribute("updated_at", "2023-01-01T00:00:00Z");
     const key = p.cacheKey();
     expect(key).toBe(`posts/${p.id}`);
   });
@@ -319,7 +309,7 @@ describe("CacheKeyTest", () => {
       }
     }
     const p = await Post.create({ title: "z" });
-    p.writeAttribute("updated_at", new Date("2023-01-01T10:00:00.000Z"));
+    p.writeAttribute("updated_at", "2023-01-01T10:00:00.000Z");
     const version = p.cacheVersion();
     expect(version).toBe("20230101100000000000");
   });
@@ -336,21 +326,11 @@ describe("CacheKeyTest", () => {
     }
     const p = await Post.create({ title: "gen" });
     const updatedAt = p.updated_at;
-    if (updatedAt instanceof Date) {
-      const version = p.cacheVersion();
-      expect(version).not.toBeNull();
-      const ms = updatedAt.getUTCMilliseconds().toString().padStart(3, "0");
-      const expected =
-        updatedAt
-          .toISOString()
-          .replace(/[^0-9]/g, "")
-          .slice(0, 14) +
-        ms +
-        "000";
-      expect(version).toBe(expected);
-    } else {
-      expect(p.cacheVersion()).toBeNull();
-    }
+    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
+    const version = p.cacheVersion();
+    expect(version).not.toBeNull();
+    expect(typeof version).toBe("string");
+    expect(version).toHaveLength(20);
   });
 });
 

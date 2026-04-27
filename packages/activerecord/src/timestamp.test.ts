@@ -3,6 +3,8 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 
@@ -73,7 +75,7 @@ describe("TimestampTest", () => {
   it("touching updates timestamp with given time", async () => {
     const Post = makePost();
     const post = await Post.create({ title: "test" });
-    const t = new Date("2020-01-01");
+    const t = instant("2020-01-01T00:00:00Z");
     await post.touch();
     expect(post.id).toBeDefined();
   });
@@ -331,17 +333,21 @@ describe("TimestampTest", () => {
       }
     }
 
-    const before = new Date();
+    const before = Temporal.Now.instant();
     const post = await Post.create({ title: "Hello" });
-    const after = new Date();
+    const after = Temporal.Now.instant();
 
-    const createdAt = post.created_at as Date;
-    const updatedAt = post.updated_at as Date;
-    expect(createdAt).toBeInstanceOf(Date);
-    expect(updatedAt).toBeInstanceOf(Date);
-    expect(createdAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
-    expect(createdAt.getTime()).toBeLessThanOrEqual(after.getTime());
-    expect(createdAt.getTime()).toBe(updatedAt.getTime());
+    const createdAt = post.created_at as Temporal.Instant;
+    const updatedAt = post.updated_at as Temporal.Instant;
+    expect(createdAt).toBeInstanceOf(Temporal.Instant);
+    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
+    expect((createdAt as Temporal.Instant).epochMilliseconds).toBeGreaterThanOrEqual(
+      before.epochMilliseconds,
+    );
+    expect((createdAt as Temporal.Instant).epochMilliseconds).toBeLessThanOrEqual(
+      after.epochMilliseconds,
+    );
+    expect(createdAt.epochMilliseconds).toBe((updatedAt as Temporal.Instant).epochMilliseconds);
   });
 
   it("does not overwrite explicitly set timestamps on insert", async () => {
@@ -355,11 +361,15 @@ describe("TimestampTest", () => {
       }
     }
 
-    const explicit = new Date("2020-01-01T00:00:00Z");
+    const explicit = instant("2020-01-01T00:00:00Z");
     const post = await Post.create({ title: "Old", created_at: explicit, updated_at: explicit });
 
-    expect((post.created_at as Date).toISOString()).toBe(explicit.toISOString());
-    expect((post.updated_at as Date).toISOString()).toBe(explicit.toISOString());
+    expect((post.created_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
+      explicit.toString({ smallestUnit: "second" }),
+    );
+    expect((post.updated_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
+      explicit.toString({ smallestUnit: "second" }),
+    );
   });
 
   it("saving a changed record updates its timestamp", async () => {
@@ -374,15 +384,15 @@ describe("TimestampTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalCreatedAt = post.created_at as Date;
+    const originalCreatedAt = (post.created_at as Temporal.Instant).epochMilliseconds;
 
     post.title = "Updated";
     await post.save();
 
-    const updatedAt = post.updated_at as Date;
-    expect(updatedAt).toBeInstanceOf(Date);
+    const updatedAt = post.updated_at as Temporal.Instant;
+    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
     // created_at should remain unchanged
-    expect((post.created_at as Date).getTime()).toBe(originalCreatedAt.getTime());
+    expect((post.created_at as Temporal.Instant).epochMilliseconds).toBe(originalCreatedAt);
   });
 
   it("does not touch timestamps when model has no timestamp attributes", async () => {
@@ -412,13 +422,15 @@ describe("TimestampTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.updated_at as Date;
+    const originalUpdatedAt = post.updated_at as Temporal.Instant;
 
     await post.touch();
 
-    const newUpdatedAt = post.updated_at as Date;
-    expect(newUpdatedAt).toBeInstanceOf(Date);
-    expect(newUpdatedAt.getTime()).toBeGreaterThanOrEqual(originalUpdatedAt.getTime());
+    const newUpdatedAt = post.updated_at as Temporal.Instant;
+    expect(newUpdatedAt).toBeInstanceOf(Temporal.Instant);
+    expect((newUpdatedAt as Temporal.Instant).epochMilliseconds).toBeGreaterThanOrEqual(
+      (originalUpdatedAt as Temporal.Instant).epochMilliseconds,
+    );
   });
 
   it("touching an attribute updates it", async () => {
@@ -436,8 +448,8 @@ describe("TimestampTest", () => {
     const post = await Post.create({ title: "Hello" });
     await post.touch("published_at");
 
-    expect(post.published_at).toBeInstanceOf(Date);
-    expect(post.updated_at).toBeInstanceOf(Date);
+    expect(post.published_at).toBeInstanceOf(Temporal.Instant);
+    expect(post.updated_at).toBeInstanceOf(Temporal.Instant);
   });
 
   it("touch returns false on new record", async () => {
@@ -513,9 +525,9 @@ describe("TimestampTest", () => {
     const post = await Post.create({ title: "Hello" });
     await post.touch("replied_at", "viewed_at");
 
-    expect(post.replied_at).toBeInstanceOf(Date);
-    expect(post.viewed_at).toBeInstanceOf(Date);
-    expect(post.updated_at).toBeInstanceOf(Date);
+    expect(post.replied_at).toBeInstanceOf(Temporal.Instant);
+    expect(post.viewed_at).toBeInstanceOf(Temporal.Instant);
+    expect(post.updated_at).toBeInstanceOf(Temporal.Instant);
   });
 
   it("touch on model without updated_at returns false", async () => {
@@ -609,14 +621,18 @@ describe("TimestampTest", () => {
         this.adapter = adapter;
       }
     }
-    const before = new Date();
+    const before = Temporal.Now.instant();
     const post = await Post.create({ title: "Hello" });
-    const after = new Date();
+    const after = Temporal.Now.instant();
 
-    const createdAt = post.created_at as Date;
-    expect(createdAt).toBeInstanceOf(Date);
-    expect(createdAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
-    expect(createdAt.getTime()).toBeLessThanOrEqual(after.getTime());
+    const createdAt = post.created_at as Temporal.Instant;
+    expect(createdAt).toBeInstanceOf(Temporal.Instant);
+    expect((createdAt as Temporal.Instant).epochMilliseconds).toBeGreaterThanOrEqual(
+      before.epochMilliseconds,
+    );
+    expect((createdAt as Temporal.Instant).epochMilliseconds).toBeLessThanOrEqual(
+      after.epochMilliseconds,
+    );
   });
 
   it("does not overwrite explicit timestamps on create", async () => {
@@ -628,9 +644,11 @@ describe("TimestampTest", () => {
         this.adapter = adapter;
       }
     }
-    const explicit = new Date("2020-01-01T00:00:00Z");
+    const explicit = instant("2020-01-01T00:00:00Z");
     const post = await Post.create({ title: "Old", created_at: explicit, updated_at: explicit });
-    expect((post.created_at as Date).toISOString()).toBe(explicit.toISOString());
+    expect((post.created_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
+      explicit.toString({ smallestUnit: "second" }),
+    );
   });
 
   it("updates updated_at on save", async () => {
@@ -643,14 +661,14 @@ describe("TimestampTest", () => {
       }
     }
     const post = await Post.create({ title: "Hello" });
-    const originalCreatedAt = (post.created_at as Date).getTime();
+    const originalCreatedAt = (post.created_at as Temporal.Instant).epochMilliseconds;
 
     post.title = "Updated";
     await post.save();
 
-    const updatedAt = post.updated_at as Date;
-    expect(updatedAt).toBeInstanceOf(Date);
-    expect((post.created_at as Date).getTime()).toBe(originalCreatedAt);
+    const updatedAt = post.updated_at as Temporal.Instant;
+    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
+    expect((post.created_at as Temporal.Instant).epochMilliseconds).toBe(originalCreatedAt);
   });
 
   it("created_at never overwritten on subsequent saves", async () => {
@@ -663,14 +681,14 @@ describe("TimestampTest", () => {
       }
     }
     const post = await Post.create({ title: "Hello" });
-    const original = (post.created_at as Date).getTime();
+    const original = (post.created_at as Temporal.Instant).epochMilliseconds;
 
     post.title = "v2";
     await post.save();
     post.title = "v3";
     await post.save();
 
-    expect((post.created_at as Date).getTime()).toBe(original);
+    expect((post.created_at as Temporal.Instant).epochMilliseconds).toBe(original);
   });
 
   it("touch updates updated_at", async () => {
@@ -682,9 +700,9 @@ describe("TimestampTest", () => {
       }
     }
     const post = await Post.create({ title: "Hello" });
-    const original = (post.updated_at as Date).getTime();
+    const original = (post.updated_at as Temporal.Instant).epochMilliseconds;
     await post.touch();
-    const newTime = (post.updated_at as Date).getTime();
+    const newTime = (post.updated_at as Temporal.Instant).epochMilliseconds;
     expect(newTime).toBeGreaterThanOrEqual(original);
   });
 
@@ -726,9 +744,9 @@ describe("TimestampTest", () => {
       }
     }
     const post = await Post.create({ title: "Hello" });
-    const original = (post.updated_at as Date).getTime();
+    const original = (post.updated_at as Temporal.Instant).epochMilliseconds;
     await post.updateColumn("title", "Changed");
-    expect((post.updated_at as Date).getTime()).toBe(original);
+    expect((post.updated_at as Temporal.Instant).epochMilliseconds).toBe(original);
   });
 });
 
@@ -771,32 +789,36 @@ describe("TimestampTest", () => {
 
   it("created_at and updated_at match on first save", async () => {
     const article = await Article.create({ title: "Hello" });
-    const createdAt = article.created_at as Date;
-    const updatedAt = article.updated_at as Date;
-    expect(createdAt.getTime()).toBe(updatedAt.getTime());
+    const createdAt = article.created_at as Temporal.Instant;
+    const updatedAt = article.updated_at as Temporal.Instant;
+    expect(createdAt.epochMilliseconds).toBe((updatedAt as Temporal.Instant).epochMilliseconds);
   });
 
   it("updates updated_at but not created_at on update", async () => {
     const article = await Article.create({ title: "Hello" });
-    const originalCreatedAt = (article.created_at as Date).getTime();
+    const originalCreatedAt = (article.created_at as Temporal.Instant).epochMilliseconds;
 
     article.title = "Updated";
     await article.save();
 
-    expect((article.created_at as Date).getTime()).toBe(originalCreatedAt);
-    expect(article.updated_at).toBeInstanceOf(Date);
+    expect((article.created_at as Temporal.Instant).epochMilliseconds).toBe(originalCreatedAt);
+    expect(article.updated_at).toBeInstanceOf(Temporal.Instant);
   });
 
   it("does not overwrite user-supplied created_at", async () => {
-    const custom = new Date("2000-01-01T00:00:00Z");
+    const custom = instant("2000-01-01T00:00:00Z");
     const article = await Article.create({ title: "Old", created_at: custom });
-    expect((article.created_at as Date).toISOString()).toBe(custom.toISOString());
+    expect((article.created_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
+      custom.toString({ smallestUnit: "second" }),
+    );
   });
 
   it("does not overwrite user-supplied updated_at on create", async () => {
-    const custom = new Date("2000-01-01T00:00:00Z");
+    const custom = instant("2000-01-01T00:00:00Z");
     const article = await Article.create({ title: "Old", updated_at: custom });
-    expect((article.updated_at as Date).toISOString()).toBe(custom.toISOString());
+    expect((article.updated_at as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
+      custom.toString({ smallestUnit: "second" }),
+    );
   });
 
   it("timestamps are persisted to the database", async () => {

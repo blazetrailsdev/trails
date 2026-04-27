@@ -5,6 +5,7 @@
  *          ActiveRecord::Encryption::EncryptionHelpers (assertions).
  */
 
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { createTestAdapter } from "../test-adapter.js";
 import { Base } from "../index.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -253,11 +254,17 @@ export function assertEncryptedAttribute(
 ): void {
   // Verify the attribute reads back as the expected plaintext.
   const readValue = model[attrName];
-  const valuesEqual =
-    readValue === expectedValue ||
-    (readValue instanceof Date &&
-      expectedValue instanceof Date &&
-      readValue.getTime() === expectedValue.getTime());
+  const temporalEqual =
+    (readValue instanceof Temporal.Instant &&
+      expectedValue instanceof Temporal.Instant &&
+      Temporal.Instant.compare(readValue, expectedValue) === 0) ||
+    (readValue instanceof Temporal.PlainDate &&
+      expectedValue instanceof Temporal.PlainDate &&
+      Temporal.PlainDate.compare(readValue, expectedValue) === 0) ||
+    (readValue instanceof Temporal.PlainDateTime &&
+      expectedValue instanceof Temporal.PlainDateTime &&
+      Temporal.PlainDateTime.compare(readValue, expectedValue) === 0);
+  const valuesEqual = readValue === expectedValue || temporalEqual;
   if (!valuesEqual) {
     throw new Error(
       `assertEncryptedAttribute: expected ${attrName} to equal ` +

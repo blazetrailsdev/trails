@@ -28,7 +28,7 @@ import { Json } from "./type/json.js";
 
 export { Date } from "./type/date.js";
 export { DateTime } from "./type/date-time.js";
-export { Time, TimeValue } from "./type/time.js";
+export { Time } from "./type/time.js";
 export { Text } from "./type/text.js";
 export { Json } from "./type/json.js";
 export { DecimalWithoutScale } from "./type/decimal-without-scale.js";

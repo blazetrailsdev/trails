@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Integration
  */
 
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { squish, parameterize, truncate } from "@blazetrails/activesupport";
 
@@ -18,40 +19,46 @@ interface Identifiable {
 // Timestamp formatting  (mirrors Time#to_fs)
 // ──────────────────────────────────────────────
 
+type TemporalTimestamp = Temporal.Instant | Temporal.PlainDateTime;
+
 // Mirrors: Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars)
-// JS Date has ms precision; pad the 3 sub-ms digits with zeros.
-function toFsUsec(date: Date): string {
-  const y = date.getUTCFullYear().toString().padStart(4, "0");
-  const mo = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const d = date.getUTCDate().toString().padStart(2, "0");
-  const h = date.getUTCHours().toString().padStart(2, "0");
-  const mi = date.getUTCMinutes().toString().padStart(2, "0");
-  const s = date.getUTCSeconds().toString().padStart(2, "0");
-  const ms = date.getUTCMilliseconds().toString().padStart(3, "0");
-  return `${y}${mo}${d}${h}${mi}${s}${ms}000`;
+// Temporal has microsecond precision; the last 3 digits are microseconds (not zeros).
+function toFsUsec(ts: TemporalTimestamp): string {
+  const dt =
+    ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : (ts as Temporal.PlainDateTime);
+  const y = dt.year.toString().padStart(4, "0");
+  const mo = dt.month.toString().padStart(2, "0");
+  const d = dt.day.toString().padStart(2, "0");
+  const h = dt.hour.toString().padStart(2, "0");
+  const mi = dt.minute.toString().padStart(2, "0");
+  const s = dt.second.toString().padStart(2, "0");
+  const us = (dt.millisecond * 1000 + dt.microsecond).toString().padStart(6, "0");
+  return `${y}${mo}${d}${h}${mi}${s}${us}`;
 }
 
 // Mirrors: Time#to_fs(:number) → "YYYYMMDDHHMMSS" (14 chars)
-function toFsNumber(date: Date): string {
-  const y = date.getUTCFullYear().toString().padStart(4, "0");
-  const mo = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const d = date.getUTCDate().toString().padStart(2, "0");
-  const h = date.getUTCHours().toString().padStart(2, "0");
-  const mi = date.getUTCMinutes().toString().padStart(2, "0");
-  const s = date.getUTCSeconds().toString().padStart(2, "0");
+function toFsNumber(ts: TemporalTimestamp): string {
+  const dt =
+    ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : (ts as Temporal.PlainDateTime);
+  const y = dt.year.toString().padStart(4, "0");
+  const mo = dt.month.toString().padStart(2, "0");
+  const d = dt.day.toString().padStart(2, "0");
+  const h = dt.hour.toString().padStart(2, "0");
+  const mi = dt.minute.toString().padStart(2, "0");
+  const s = dt.second.toString().padStart(2, "0");
   return `${y}${mo}${d}${h}${mi}${s}`;
 }
 
 type CacheTimestampFormat = "usec" | "number";
 
-function formatTimestamp(date: Date, format: CacheTimestampFormat | string): string {
-  if (format === "number") return toFsNumber(date);
+function formatTimestamp(ts: TemporalTimestamp, format: CacheTimestampFormat | string): string {
+  if (format === "number") return toFsNumber(ts);
   if (format !== "usec") {
     throw new Error(
       `Unknown cacheTimestampFormat: ${JSON.stringify(format)}. Supported values: "usec", "number".`,
     );
   }
-  return toFsUsec(date);
+  return toFsUsec(ts);
 }
 
 // ──────────────────────────────────────────────
@@ -80,16 +87,26 @@ export function toParam(this: Identifiable): string | null {
  *
  * Mirrors: ActiveRecord::Integration#max_updated_column_timestamp
  */
-function maxUpdatedColumnTimestamp(record: any): Date | null {
-  const candidates: Date[] = [];
+function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
+  const candidates: TemporalTimestamp[] = [];
   for (const col of ["updated_at", "updated_on"] as const) {
     if (record.hasAttribute?.(col)) {
       const val = record._readAttribute(col);
-      if (val instanceof Date) candidates.push(val);
+      if (val instanceof Temporal.Instant || val instanceof Temporal.PlainDateTime) {
+        candidates.push(val);
+      }
     }
   }
   if (candidates.length === 0) return null;
-  return candidates.reduce((a, b) => (a >= b ? a : b));
+  return candidates.reduce((a, b) => {
+    if (a instanceof Temporal.Instant && b instanceof Temporal.Instant) {
+      return Temporal.Instant.compare(a, b) >= 0 ? a : b;
+    }
+    if (a instanceof Temporal.PlainDateTime && b instanceof Temporal.PlainDateTime) {
+      return Temporal.PlainDateTime.compare(a, b) >= 0 ? a : b;
+    }
+    return a; // mixed types shouldn't occur; keep first
+  });
 }
 
 /**
@@ -134,7 +151,7 @@ export function cacheVersion(this: Identifiable): string | null {
 
   if ((this as any).hasAttribute?.("updated_at")) {
     const val = this._readAttribute("updated_at");
-    if (val instanceof Date) {
+    if (val instanceof Temporal.Instant || val instanceof Temporal.PlainDateTime) {
       const fmt: string = klass.cacheTimestampFormat ?? "usec";
       return formatTimestamp(val, fmt);
     }

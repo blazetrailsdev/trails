@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Model } from "./index.js";
 
 describe("SerializationTest", () => {
@@ -257,15 +258,22 @@ describe("SerializationTest", () => {
       expect(() => JSON.stringify(json)).not.toThrow();
     });
 
-    it("asJson coerces Date attributes to ISO 8601 strings", () => {
+    it("asJson coerces Temporal attributes to ISO 8601 strings", () => {
       class Event extends Model {
         static {
           this.attribute("startsAt", "datetime");
         }
       }
-      const e = new Event({ startsAt: new Date("2026-04-24T10:00:00Z") });
+      const e = new Event({ startsAt: "2026-04-24T10:00:00.123456Z" });
       const json = e.asJson();
-      expect(json["startsAt"]).toBe("2026-04-24T10:00:00.000Z");
+      expect(json["startsAt"]).toBe("2026-04-24T10:00:00.123456Z");
+    });
+
+    it("asJson preserves microsecond precision for Temporal.Instant", async () => {
+      const { coerceForJson } = await import("./serialization.js");
+      const i = instant("2026-04-24T10:00:00.123456Z");
+      const out = coerceForJson({ at: i }) as { at: unknown };
+      expect(out.at).toBe("2026-04-24T10:00:00.123456Z");
     });
 
     it("asJson recurses into include: arrays and nested objects", () => {
@@ -354,9 +362,13 @@ describe("SerializationTest", () => {
       expect(parsed.name).toBe("row-2");
     });
 
-    it("coerceForJson maps invalid Date to null (matches Date.prototype.toJSON)", async () => {
-      // Date.prototype.toJSON returns null for invalid dates; toISOString
-      // throws. asJson must stay JSON-safe even for garbage input.
+    it("coerceForJson maps null to null", async () => {
+      const { coerceForJson } = await import("./serialization.js");
+      const out = coerceForJson({ at: null }) as { at: unknown };
+      expect(out.at).toBe(null);
+    });
+
+    it("coerceForJson maps invalid Date to null (Date path still active during dual-typed window)", async () => {
       const { coerceForJson } = await import("./serialization.js");
       const out = coerceForJson({ at: new Date("not a date") }) as { at: unknown };
       expect(out.at).toBe(null);

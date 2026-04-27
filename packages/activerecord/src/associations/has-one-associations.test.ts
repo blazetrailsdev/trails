@@ -1,3 +1,5 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_one_associations_test.rb
  */
@@ -1067,14 +1069,13 @@ describe("HasOneAssociationsTest", () => {
     registerModel(TouchFirm);
     registerModel(TouchAccount);
 
-    const originalTime = new Date("2020-01-01");
+    const originalTime = instant("2020-01-01T00:00:00Z");
     const firm = await TouchFirm.create({ name: "Touch Corp", updated_at: originalTime });
     await TouchAccount.create({ touch_firm_id: firm.id, credit_limit: 100 });
     const reloaded = await TouchFirm.find(firm.id);
-    const updatedAt = reloaded.updated_at;
-    const updatedTime =
-      updatedAt instanceof Date ? updatedAt.getTime() : Number(new Date(String(updatedAt)));
-    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
+    const updatedAt = reloaded.updated_at as Temporal.Instant;
+    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
+    expect(updatedAt.epochMilliseconds).toBeGreaterThan(originalTime.epochMilliseconds);
   });
 
   it.skip("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", () => {
@@ -1115,8 +1116,8 @@ describe("HasOneAssociationsTest", () => {
     const afterCreate = await TouchUpdFirm.find(firm.id);
     const timeAfterCreate = afterCreate.updated_at;
     const createTime =
-      timeAfterCreate instanceof Date
-        ? timeAfterCreate.getTime()
+      timeAfterCreate instanceof Temporal.Instant
+        ? timeAfterCreate.epochMilliseconds
         : Number(new Date(String(timeAfterCreate)));
 
     // Ensure time advances so we can detect the touch
@@ -1127,8 +1128,8 @@ describe("HasOneAssociationsTest", () => {
     const afterUpdate = await TouchUpdFirm.find(firm.id);
     const timeAfterUpdate = afterUpdate.updated_at;
     const updateTime =
-      timeAfterUpdate instanceof Date
-        ? timeAfterUpdate.getTime()
+      timeAfterUpdate instanceof Temporal.Instant
+        ? timeAfterUpdate.epochMilliseconds
         : Number(new Date(String(timeAfterUpdate)));
     expect(updateTime).toBeGreaterThan(createTime);
   });
@@ -1165,8 +1166,8 @@ describe("HasOneAssociationsTest", () => {
     const afterCreate = await TouchDesFirm.find(firm.id);
     const afterCreateAt = afterCreate.updated_at;
     const afterCreateTime =
-      afterCreateAt instanceof Date
-        ? afterCreateAt.getTime()
+      afterCreateAt instanceof Temporal.Instant
+        ? afterCreateAt.epochMilliseconds
         : Number(new Date(String(afterCreateAt)));
 
     await new Promise((r) => setTimeout(r, 10));
@@ -1175,8 +1176,8 @@ describe("HasOneAssociationsTest", () => {
     const afterDestroy = await TouchDesFirm.find(firm.id);
     const afterDestroyAt = afterDestroy.updated_at;
     const afterDestroyTime =
-      afterDestroyAt instanceof Date
-        ? afterDestroyAt.getTime()
+      afterDestroyAt instanceof Temporal.Instant
+        ? afterDestroyAt.epochMilliseconds
         : Number(new Date(String(afterDestroyAt)));
     expect(afterDestroyTime).toBeGreaterThan(afterCreateTime);
   });

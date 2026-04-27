@@ -1,3 +1,4 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Model, type Type } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
 import {
@@ -2327,7 +2328,7 @@ export class Base extends Model {
 
     // Auto-populate timestamps (unless touch: false)
     if (!this._skipTouch) {
-      const now = new Date();
+      const now = Temporal.Now.instant();
       if (
         ctor._attributeDefinitions.has("created_at") &&
         this._readAttribute("created_at") === null
@@ -2392,7 +2393,7 @@ export class Base extends Model {
 
     // Auto-populate updated_at timestamp (unless touch: false)
     if (!this._skipTouch && ctor._attributeDefinitions.has("updated_at")) {
-      this._writeAttribute("updated_at", new Date());
+      this._writeAttribute("updated_at", Temporal.Now.instant());
     }
 
     // Rails raises ReadonlyAttributeError at write time (HasReadonlyAttributes),

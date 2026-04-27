@@ -6,70 +6,61 @@
  * PG-specific string forms ("infinity" / "-infinity" / "… BC" for BCE
  * dates) and type_cast_for_schema so those sentinels render as
  * `::Float::INFINITY` / `-::Float::INFINITY` in schema dumps.
+ *
+ * Full Temporal-native driver integration lands in PR 5a; this file
+ * is updated here so that `DateType#cast` returning `Temporal.PlainDate`
+ * does not break compilation.
  */
 
-import { DateType } from "@blazetrails/activemodel";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import {
+  DateType,
+  type DateCastResult,
+  DateInfinity,
+  DateNegativeInfinity,
+  type DateInfinityType,
+  type DateNegativeInfinityType,
+} from "@blazetrails/activemodel";
+import { parsePostgresDate } from "../../abstract/temporal-wire.js";
 
 export class Date extends DateType {
   override readonly name: string = "date";
 
-  /**
-   * Rails' cast_value handles:
-   *   "infinity"         → Float::INFINITY
-   *   "-infinity"        → -Float::INFINITY
-   *   "0001-01-01 BC"    → date with a biased (Rails-style) year
-   *   everything else    → super (standard date parse)
-   *
-   * Rails returns Float::INFINITY from a Date type, which is dynamic
-   * Ruby. The TS signature is `Date | null`; the infinity sentinels
-   * are cast through `as unknown as Date` so callers that accept
-   * Rails' range-bound semantics still receive them. Check with
-   * `Number.isFinite` or `typeof === 'number'` before treating as a
-   * real Date.
-   */
-  override cast(value: unknown): globalThis.Date | null {
+  override cast(value: unknown): DateCastResult | null {
     return this.castValue(value);
   }
 
   /**
-   * Rails' `cast_value` — the protected hook cast delegates to. Kept
-   * public here so subclasses (and tests) can call it directly, and so
+   * Rails' `cast_value` — the protected hook cast delegates to.
+   * Kept public so subclasses and tests can call it directly, and so
    * api:compare finds the method name that matches Rails.
    */
-  castValue(value: unknown): globalThis.Date | null {
+  castValue(
+    value: unknown,
+  ): Temporal.PlainDate | DateInfinityType | DateNegativeInfinityType | null {
     if (typeof value === "string") {
-      if (value === "infinity") return Infinity as unknown as globalThis.Date;
-      if (value === "-infinity") return -Infinity as unknown as globalThis.Date;
+      if (value === "infinity") return DateInfinity;
+      if (value === "-infinity") return DateNegativeInfinity;
       if (/ BC$/.test(value)) {
-        // Rails' cast_value rewrites "0044-03-15 BC" → "-0043-03-15"
-        // (year mapped as -year+1). JS's Date parser doesn't accept
-        // 4-digit negative years, so construct the Date manually.
-        const match = /^(\d+)-(\d{1,2})-(\d{1,2})/.exec(value);
-        if (!match) return null;
-        const year = -Number.parseInt(match[1], 10) + 1;
-        const month = Number.parseInt(match[2], 10) - 1;
-        const day = Number.parseInt(match[3], 10);
-        // Reject out-of-range components — setUTCFullYear silently
-        // normalises (month 13 → January of next year, day 32 → next
-        // month) which would turn malformed input into a valid Date.
-        if (month < 0 || month > 11 || day < 1 || day > 31) return null;
-        const d = new globalThis.Date(0);
-        d.setUTCFullYear(year, month, day);
-        d.setUTCHours(0, 0, 0, 0);
-        // Verify the constructed date matches the requested components;
-        // setUTCFullYear would have rolled over for e.g. Feb 31.
-        if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month || d.getUTCDate() !== day) {
+        try {
+          return parsePostgresDate(value);
+        } catch {
           return null;
         }
-        return d;
       }
     }
     return super.cast(value);
   }
 
+  override serialize(value: unknown): string | null {
+    if (value === DateInfinity) return "infinity";
+    if (value === DateNegativeInfinity) return "-infinity";
+    return super.serialize(value);
+  }
+
   override typeCastForSchema(value: unknown): string {
-    if (value === Infinity) return "::Float::INFINITY";
-    if (value === -Infinity) return "-::Float::INFINITY";
+    if (value === DateInfinity) return "::Float::INFINITY";
+    if (value === DateNegativeInfinity) return "-::Float::INFINITY";
     return super.typeCastForSchema(value);
   }
 }

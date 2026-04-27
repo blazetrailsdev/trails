@@ -1,3 +1,5 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = any;
 
@@ -125,8 +127,8 @@ export function serializableHash(
  *   and JS numbers lose precision above 2^53-1, so we emit a decimal
  *   string instead. Consumers that need the numeric value must parse
  *   with `BigInt(str)`.
- * - `Date` → ISO 8601 string, or `null` for invalid dates (matches
- *   `Date.prototype.toJSON`)
+ * - Temporal types → ISO 8601 string via `toJSON()`. Precision is
+ *   native (no trailing-zero truncation for JSON consumers).
  * - Plain arrays / objects → recurse
  * - Everything else → pass through (numbers, strings, booleans, null)
  *
@@ -178,10 +180,21 @@ function _coerceForJson(
   // `JSON.stringify` already drops them per spec, which correctly
   // signals "this doesn't serialize".
   if (value instanceof Date) {
-    // Invalid Date (e.g. `new Date("bad")`) throws on `toISOString`.
-    // `Date.prototype.toJSON` returns null in that case — match it so
-    // `asJson` stays JSON-safe regardless of attribute hygiene.
-    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+    // Preserve stable ISO 8601 output for any Date values still in flight
+    // during the dual-typed window (removed in PR 6). Invalid Dates must
+    // coerce like Date#toJSON (returns null) so asJson stays JSON.stringify-safe.
+    if (Number.isNaN(value.getTime())) return null;
+    return value.toISOString();
+  }
+  if (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainTime ||
+    value instanceof Temporal.ZonedDateTime
+  ) {
+    // Temporal.prototype.toJSON() emits ISO 8601 with native precision.
+    return value.toJSON();
   }
   if (Array.isArray(value)) {
     // True cycle: short-circuit to null (Rails' JSON encoder raises, but

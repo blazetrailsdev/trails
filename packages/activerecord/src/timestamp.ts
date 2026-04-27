@@ -1,3 +1,4 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { Base } from "./base.js";
 import { ReadOnlyRecord, StaleObjectError } from "./errors.js";
 import { UpdateManager, Nodes } from "@blazetrails/arel";
@@ -25,7 +26,7 @@ export async function touch(this: Base, ...names: string[]): Promise<boolean> {
   const ctor = this.constructor as typeof Base;
   if (isNoTouchingApplied(ctor)) return false;
 
-  const now = new Date();
+  const now = Temporal.Now.instant();
   const aliases: Record<string, string> = (ctor as any)._attributeAliases ?? {};
   const touchColSet = new Set<string>();
   if (ctor._attributeDefinitions.has("updated_at")) touchColSet.add("updated_at");
@@ -122,12 +123,12 @@ interface TimestampHost {
 export function touchAttributesWithTime(
   this: TimestampHost,
   ...names: string[]
-): Record<string, Date> {
+): Record<string, Temporal.Instant> {
   const time = currentTimeFromProperTimezone();
   const resolved = names.map((n) => this._attributeAliases?.[n] ?? n);
   const updateAttrs = timestampAttributesForUpdateInModel.call(this);
   const allNames = [...new Set([...updateAttrs, ...resolved])];
-  const result: Record<string, Date> = {};
+  const result: Record<string, Temporal.Instant> = {};
   for (const name of allNames) result[name] = time;
   return result;
 }
@@ -159,8 +160,8 @@ export function allTimestampAttributesInModel(this: TimestampHost): string[] {
   return this._allTimestampAttributesInModel;
 }
 
-export function currentTimeFromProperTimezone(): Date {
-  return new Date();
+export function currentTimeFromProperTimezone(): Temporal.Instant {
+  return Temporal.Now.instant();
 }
 
 /**

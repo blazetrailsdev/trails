@@ -3,6 +3,8 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, ReadonlyAttributeError } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -726,11 +728,13 @@ describe("AttributeMethodsTest", () => {
         this.adapter = adapter;
       }
     }
-    const utcDate = new Date("2024-06-15T12:00:00Z");
+    const utcDate = instant("2024-06-15T12:00:00Z");
     const e = new Event({ name: "utc", created_at: utcDate });
     const val = e.created_at;
-    expect(val).toBeInstanceOf(Date);
-    expect((val as Date).toISOString()).toBe("2024-06-15T12:00:00.000Z");
+    expect(val).toBeInstanceOf(Temporal.Instant);
+    expect((val as Temporal.Instant).toString({ smallestUnit: "second" })).toBe(
+      "2024-06-15T12:00:00Z",
+    );
   });
   it("attribute_names on a new record", () => {
     const { Post } = makeModel();
@@ -831,7 +835,7 @@ describe("AttributeMethodsTest", () => {
 
   it("write nil to time attribute", async () => {
     const Topic = makeTopic();
-    const t = new (Topic as any)({ bonus_time: new Date() });
+    const t = new (Topic as any)({ bonus_time: Temporal.Now.instant() });
     t.bonus_time = null;
     expect(t.bonus_time).toBeNull();
   });
@@ -1353,8 +1357,7 @@ describe("AttributeMethodsTest", () => {
         this.adapter = adp;
       }
     }
-    const d = new Date("2024-01-01");
-    const t = Topic.new({ published_at: d }) as any;
+    const t = Topic.new({ published_at: "2024-01-01" }) as any;
     expect(t.published_at).toBeTruthy();
   });
 
@@ -1366,8 +1369,7 @@ describe("AttributeMethodsTest", () => {
         this.adapter = adp;
       }
     }
-    const d = new Date();
-    const t = Topic.new({ updated_at: d }) as any;
+    const t = Topic.new({ updated_at: Temporal.Now.instant() }) as any;
     expect(t.updated_at).toBeTruthy();
   });
 
@@ -1403,10 +1405,8 @@ describe("AttributeMethodsTest", () => {
         this.adapter = adp;
       }
     }
-    const d = new Date("2024-06-15");
-    const t = Topic.new({ published_at: d }) as any;
-    const val = t.published_at;
-    expect(val).toBeTruthy();
+    const t = Topic.new({ published_at: "2024-06-15" }) as any;
+    expect(t.published_at).toBeInstanceOf(Temporal.PlainDate);
   });
 
   it("update array content", async () => {

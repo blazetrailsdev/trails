@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany, processDependentAssociations } from "../associations.js";
 
@@ -204,13 +205,15 @@ describe("DeleteAllTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.updated_at as Date;
+    const originalUpdatedAt = post.updated_at as Temporal.Instant;
 
     await Post.all().updateAll({ title: "Changed" });
 
     const reloaded = await Post.find(post.id);
     // updateAll should NOT auto-bump updated_at
-    expect((reloaded.updated_at as Date).getTime()).toBe(originalUpdatedAt.getTime());
+    expect((reloaded.updated_at as Temporal.Instant).epochMilliseconds).toBe(
+      originalUpdatedAt.epochMilliseconds,
+    );
   });
 
   it("deleteAll does not run callbacks", async () => {

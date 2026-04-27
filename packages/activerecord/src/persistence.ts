@@ -5,6 +5,8 @@
  * Mirrors: ActiveRecord::Persistence::ClassMethods
  */
 
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { isDateInfinity, isDateNegativeInfinity } from "@blazetrails/activemodel";
 import {
   InsertManager,
   UpdateManager,
@@ -733,7 +735,10 @@ interface UpdateColumnsRecord {
     name: string;
     primaryKey: string | string[];
     arelTable: InstanceType<typeof ArelTable>;
-    _attributeDefinitions: Map<string, { type: { cast(v: unknown): unknown } }>;
+    _attributeDefinitions: Map<
+      string,
+      { type: { cast(v: unknown): unknown; serialize?(v: unknown): unknown } }
+    >;
     _buildPkWhereNode(id: unknown): Parameters<UpdateManager["where"]>[0];
     adapter: {
       execUpdate(sql: string, name?: string, binds?: unknown[]): Promise<number>;
@@ -812,7 +817,22 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     }
     const cast = def ? def.type.cast(value) : value;
     this._attributes.set(key, cast);
-    setPairs.push([table.get(key), cast]);
+    // Pre-serialize only Temporal objects and date-infinity sentinels so the
+    // Arel quote layer receives a string. All other cast values (strings,
+    // numbers, null, booleans) are already DB-ready and must not be passed
+    // through serialize() — doing so would corrupt types whose serialize()
+    // has side effects (e.g. re-encrypting an already-encrypted value).
+    const dbValue =
+      cast instanceof Temporal.Instant ||
+      cast instanceof Temporal.PlainDateTime ||
+      cast instanceof Temporal.PlainDate ||
+      cast instanceof Temporal.PlainTime ||
+      cast instanceof Temporal.ZonedDateTime ||
+      isDateInfinity(cast) ||
+      isDateNegativeInfinity(cast)
+        ? (def?.type.serialize?.(cast) ?? cast)
+        : cast;
+    setPairs.push([table.get(key), dbValue]);
   }
 
   const um = new UpdateManager();

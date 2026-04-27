@@ -8,7 +8,7 @@ export class Date extends ActiveModelDate {
   private _timezone?: "utc" | "local";
 
   constructor(options?: TimezoneOptions) {
-    super();
+    super(options);
     this._timezone = options?.timezone;
   }
 

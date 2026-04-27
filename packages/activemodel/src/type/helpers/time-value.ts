@@ -2,43 +2,47 @@
  * TimeValue helper — shared behavior for time-based type casting.
  *
  * Mirrors: ActiveModel::Type::Helpers::TimeValue
- *
- * Provides precision handling and serialization for Date/DateTime/Time types.
  */
+import { Temporal } from "@blazetrails/activesupport/temporal";
+
 export interface TimeValue {
   serializeCastValue(value: unknown): string | null;
-  applySecondsPrecision(value: Date, precision?: number): Date;
   typeCastForSchema(value: unknown): string;
-  userInputInTimeZone(value: unknown): Date | null;
-}
-
-const DEFAULT_PRECISION = 0;
-
-export function applySecondsPrecision(value: Date, precision: number = DEFAULT_PRECISION): Date {
-  if (precision <= 0) {
-    const result = new Date(value);
-    result.setMilliseconds(0);
-    return result;
-  }
-  if (precision >= 3) return new Date(value);
-  const factor = Math.pow(10, 3 - precision);
-  const result = new Date(value);
-  result.setMilliseconds(Math.floor(result.getMilliseconds() / factor) * factor);
-  return result;
+  userInputInTimeZone(value: unknown, zone?: string): Temporal.ZonedDateTime | null;
 }
 
 export function serializeTimeValue(value: unknown): string | null {
   if (value === null || value === undefined) return null;
-  if (value instanceof Date) return value.toISOString();
+  if (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainTime ||
+    value instanceof Temporal.ZonedDateTime
+  ) {
+    return value.toJSON();
+  }
   return String(value);
 }
 
-export function userInputInTimeZone(value: unknown): Date | null {
+export function userInputInTimeZone(
+  value: unknown,
+  zone: string = "UTC",
+): Temporal.ZonedDateTime | null {
   if (value === null || value === undefined) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === "string") {
-    const parsed = new Date(value);
-    return isNaN(parsed.getTime()) ? null : parsed;
+  if (value instanceof Temporal.ZonedDateTime) return value;
+  const str = String(value).trim();
+  if (str === "") return null;
+  if (str.includes("[")) {
+    try {
+      return Temporal.ZonedDateTime.from(str);
+    } catch {
+      return null;
+    }
   }
-  return null;
+  try {
+    return Temporal.PlainDateTime.from(str.replace(" ", "T")).toZonedDateTime(zone);
+  } catch {
+    return null;
+  }
 }

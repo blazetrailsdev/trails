@@ -1,3 +1,4 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   freshAdapter,
@@ -598,6 +599,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     BookDate.attribute("name", "date"); // override cast type to date (DB stays text)
     BookDate.encrypts("name");
     const book = await BookDate.create({ name: "2024-01-01" });
-    assertEncryptedAttribute(book, "name", new Date("2024-01-01"));
+    assertEncryptedAttribute(book, "name", Temporal.PlainDate.from("2024-01-01"));
   });
 });

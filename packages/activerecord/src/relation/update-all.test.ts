@@ -1,3 +1,5 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -262,12 +264,14 @@ describe("UpdateAllTest", () => {
         this.adapter = a;
       }
     }
-    const past = new Date("2020-01-01T00:00:00Z");
+    const past = instant("2020-01-01T00:00:00Z");
     await Post.create({ title: "old", updated_at: past });
     await Post.all().touchAll();
     const p = (await Post.first()) as any;
     const updatedAt = p.updated_at;
-    expect(new Date(updatedAt).getTime()).toBeGreaterThan(past.getTime());
+    expect((updatedAt as Temporal.Instant).epochMilliseconds).toBeGreaterThan(
+      past.epochMilliseconds,
+    );
   });
 
   it.skip("touch all with custom timestamp", () => {

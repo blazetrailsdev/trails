@@ -1,17 +1,20 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import { hexdigest } from "@blazetrails/activesupport";
 
-function expectedUsec(d: Date): string {
-  const y = d.getUTCFullYear().toString().padStart(4, "0");
-  const mo = (d.getUTCMonth() + 1).toString().padStart(2, "0");
-  const day = d.getUTCDate().toString().padStart(2, "0");
-  const h = d.getUTCHours().toString().padStart(2, "0");
-  const mi = d.getUTCMinutes().toString().padStart(2, "0");
-  const s = d.getUTCSeconds().toString().padStart(2, "0");
-  const ms = d.getUTCMilliseconds().toString().padStart(3, "0");
-  return `${y}${mo}${day}${h}${mi}${s}${ms}000`;
+function expectedUsec(ts: Temporal.Instant | Temporal.PlainDateTime): string {
+  const dt = ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : ts;
+  const y = dt.year.toString().padStart(4, "0");
+  const mo = dt.month.toString().padStart(2, "0");
+  const day = dt.day.toString().padStart(2, "0");
+  const h = dt.hour.toString().padStart(2, "0");
+  const mi = dt.minute.toString().padStart(2, "0");
+  const s = dt.second.toString().padStart(2, "0");
+  const us = (dt.millisecond * 1000 + dt.microsecond).toString().padStart(6, "0");
+  return `${y}${mo}${day}${h}${mi}${s}${us}`;
 }
 
 function withCollectionCacheVersioning(klass: typeof Base, fn: () => Promise<void>): Promise<void> {
@@ -45,7 +48,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key for relation", async () => {
     const Developer = makeDeveloper();
-    const t = new Date("2024-01-15T10:00:00.000Z");
+    const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
     const key = await devs.cacheKey();
@@ -56,7 +59,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key for relation with limit", async () => {
     const Developer = makeDeveloper();
-    const t = new Date("2024-01-15T10:00:00.000Z");
+    const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
     const key = await devs.cacheKey();
@@ -66,7 +69,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key for relation with custom select and limit", async () => {
     const Developer = makeDeveloper();
-    const t = new Date("2024-01-15T10:00:00.000Z");
+    const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
     const devsWithSelect = devs.select("*");
@@ -77,7 +80,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key for loaded relation", async () => {
     const Developer = makeDeveloper();
-    const t = new Date("2024-01-15T10:00:00.000Z");
+    const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = await Developer.where({ salary: 100000 })
       .order({ updated_at: "desc" })
@@ -91,7 +94,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key for relation with table alias", async () => {
     const Developer = makeDeveloper();
-    const t = new Date("2024-01-15T10:00:00.000Z");
+    const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
     const key = await devs.cacheKey();
@@ -118,7 +121,7 @@ describe("CollectionCacheKeyTest", () => {
     await Developer.create({ name: "David", salary: 80000 });
     const devs = Developer.where({ name: "David" });
     const key1 = await devs.cacheKey();
-    await devs.updateAll({ updated_at: new Date("2025-01-01Z") }); // resets devs memos
+    await devs.updateAll({ updated_at: instant("2025-01-01T00:00:00Z") }); // resets devs memos
     expect(await devs.cacheKey()).not.toBe(key1);
   });
 
@@ -127,7 +130,7 @@ describe("CollectionCacheKeyTest", () => {
     await Developer.create({ name: "David", salary: 80000 });
     const devs = Developer.where({ name: "David" });
     const key1 = await devs.cacheKey();
-    await devs.updateAll({ updated_at: new Date("2025-06-01Z") });
+    await devs.updateAll({ updated_at: instant("2025-06-01T00:00:00Z") });
     expect(await devs.cacheKey()).not.toBe(key1);
   });
 
@@ -203,7 +206,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key with custom timestamp column", async () => {
     const Developer = makeDeveloper();
-    const t = new Date("2024-06-15T08:00:00.000Z");
+    const t = instant("2024-06-15T08:00:00.000Z");
     await Developer.create({ name: "Alice", updated_at: t });
     const key = await Developer.all().cacheKey("updated_at");
     expect(key).toContain(expectedUsec(t));
@@ -273,7 +276,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_version for relation", async () => {
     const Developer = makeDeveloper();
-    const t = new Date("2024-01-15T10:00:00.000Z");
+    const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     await withCollectionCacheVersioning(Developer, async () => {
       const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
@@ -289,7 +292,7 @@ describe("CollectionCacheKeyTest", () => {
     await withCollectionCacheVersioning(Developer, async () => {
       const devs = Developer.all();
       const v1 = await devs.cacheVersion();
-      await Developer.updateAll({ updated_at: new Date("2024-06-01T10:00:00.000Z") });
+      await Developer.updateAll({ updated_at: instant("2024-06-01T10:00:00.000Z") });
       devs.reset();
       const v2 = await devs.cacheVersion();
       expect(v1).not.toBe(v2);
@@ -298,7 +301,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key_with_version contains key and version regardless of collection_cache_versioning setting", async () => {
     const Developer = makeDeveloper();
-    const t = new Date("2024-01-15T10:00:00.000Z");
+    const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const kv1 = await Developer.all().cacheKeyWithVersion();
     expect(kv1).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);

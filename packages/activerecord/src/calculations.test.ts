@@ -1,3 +1,4 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -4824,8 +4825,8 @@ describe("CalculationsTest", () => {
     }
 
     const topic = new Topic({ written_on: "2024-01-15" });
-    // The cast value should be a Date
-    expect(topic.readAttribute("written_on")).toBeInstanceOf(Date);
+    // The cast value should be a Temporal.PlainDateTime (naive string without offset)
+    expect(topic.readAttribute("written_on")).toBeInstanceOf(Temporal.PlainDateTime);
     // The before_type_cast value should be the raw string
     expect(topic.readAttributeBeforeTypeCast("written_on")).toBe("2024-01-15");
   });

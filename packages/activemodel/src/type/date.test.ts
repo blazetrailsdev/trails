@@ -1,82 +1,26 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { plainDate } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Types } from "../index.js";
 
-/**
- * Test-only subclass that promotes Rails' private helpers to callable
- * methods so behavior can be asserted directly (e.g. new_date returns
- * nil for year 0 in a way `cast` can't reliably surface).
- */
-class TestableDateType extends Types.DateType {
-  publicFastStringToDate(value: string) {
-    return this.fastStringToDate(value);
-  }
-  publicNewDate(year: number, month: number, day: number) {
-    return this.newDate(year, month, day);
-  }
-}
-
 describe("DateTest", () => {
-  it("type cast date", () => {
-    const type = new Types.DateType();
-    const result = type.cast("2024-01-15");
-    expect(result).toBeInstanceOf(Date);
-    expect(result!.getFullYear()).toBe(2024);
-  });
-
-  it("returns correct year", () => {
-    const type = new Types.DateType();
-    const result = type.cast("2024-01-15");
-    expect(result!.getUTCFullYear()).toBe(2024);
-  });
-
-  it("fast_string_to_date matches ISO YYYY-MM-DD only", () => {
-    // Rails type/date.rb — ISO_DATE regex, fast path; everything else
-    // falls through to fallback_string_to_date.
-    const type = new TestableDateType();
-    expect(type.publicFastStringToDate("2024-06-01")).not.toBeNull();
-    expect(type.publicFastStringToDate("2024/06/01")).toBeNull();
-    expect(type.publicFastStringToDate("2024-06-01T00:00:00")).toBeNull();
-  });
-
-  it("new_date preserves literal years 1–99 (not the JS Date.UTC 1900+ hack)", () => {
-    const type = new TestableDateType();
-    expect(type.publicNewDate(1, 1, 1)!.getUTCFullYear()).toBe(1);
-    expect(type.cast("0001-01-01")!.getUTCFullYear()).toBe(1);
-    expect(type.publicNewDate(99, 12, 31)!.getUTCFullYear()).toBe(99);
-  });
-
-  it("new_date rejects year 0 and day/month overflow", () => {
-    // Mirrors Rails new_date, which returns nil when year is 0 or when
-    // Date.new raises ArgumentError.
-    const type = new TestableDateType();
-    expect(type.publicNewDate(0, 1, 1)).toBeNull();
-    expect(type.publicNewDate(2024, 13, 1)).toBeNull();
-    expect(type.publicNewDate(2024, 2, 31)).toBeNull();
-    const d = type.publicNewDate(2024, 6, 15);
-    expect(d!.getUTCFullYear()).toBe(2024);
-    expect(d!.getUTCMonth()).toBe(5);
-    expect(d!.getUTCDate()).toBe(15);
-  });
-
-  it("cast falls through to fallback parser for non-ISO strings", () => {
-    // Use an ISO-datetime form — deterministic across JS runtimes but
-    // does not match the ISO_DATE fast path (which is YYYY-MM-DD only).
-    const type = new Types.DateType();
-    const d = type.cast("2024-06-01T00:00:00Z");
-    expect(d).toBeInstanceOf(Date);
-    expect(d!.getUTCFullYear()).toBe(2024);
-  });
-});
-describe("DateType", () => {
   const type = new Types.DateType();
+
+  it("type cast date", () => {
+    const result = type.cast("2024-01-15");
+    expect(result).toBeInstanceOf(Temporal.PlainDate);
+    expect((result as Temporal.PlainDate).year).toBe(2024);
+    expect((result as Temporal.PlainDate).month).toBe(1);
+    expect((result as Temporal.PlainDate).day).toBe(15);
+  });
+
+  it("Temporal.PlainDate passthrough", () => {
+    const original = plainDate("2024-01-15");
+    expect(type.cast(original)).toBe(original);
+  });
 
   it("has name 'date'", () => {
     expect(type.name).toBe("date");
-  });
-
-  it("casts Date to Date", () => {
-    const d = new Date("2024-01-15");
-    expect(type.cast(d)).toBe(d);
   });
 
   it("casts null to null", () => {
@@ -87,17 +31,36 @@ describe("DateType", () => {
     expect(type.cast(undefined)).toBe(null);
   });
 
+  it("casts empty string to null", () => {
+    expect(type.cast("")).toBe(null);
+  });
+
   it("casts invalid string to null", () => {
     expect(type.cast("not-a-date")).toBe(null);
   });
 
-  it("deserialize delegates to cast", () => {
-    const result = type.deserialize("2024-01-15");
-    expect(result).toBeInstanceOf(Date);
+  it("serialize returns ISO date string", () => {
+    const d = plainDate("2024-01-15");
+    expect(type.serialize(d)).toBe("2024-01-15");
   });
 
-  it("serialize delegates to cast", () => {
-    const result = type.serialize("2024-01-15");
-    expect(result).toBeInstanceOf(Date);
+  it("serialize null returns null", () => {
+    expect(type.serialize(null)).toBe(null);
+  });
+
+  it("PlainDateTime input extracts date (multiparameter support)", () => {
+    const pdt = Temporal.PlainDateTime.from("2024-06-15T10:30:00");
+    const result = type.cast(pdt);
+    expect(result).toBeInstanceOf(Temporal.PlainDate);
+    expect((result as Temporal.PlainDate).toString()).toBe("2024-06-15");
+  });
+
+  it("typeCastForSchema returns quoted string for PlainDate", () => {
+    const d = plainDate("2024-01-15");
+    expect(type.typeCastForSchema(d)).toBe('"2024-01-15"');
+  });
+
+  it("typeCastForSchema returns null for null", () => {
+    expect(type.typeCastForSchema(null)).toBe("null");
   });
 });

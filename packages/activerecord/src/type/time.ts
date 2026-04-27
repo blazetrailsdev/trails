@@ -1,43 +1,22 @@
 /**
  * Mirrors: ActiveRecord::Type::Time
  *
- * Also defines Time::Value as a branded wrapper around Date (matching
- * Ruby's DelegateClass(::Time)).
+ * Wraps the ActiveModel time type with ActiveRecord timezone configuration.
+ * Values are cast by ActiveModel; this type adds timezone-aware behavior
+ * through the `timezone` option and `isUtc` accessor.
  */
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";
 import { isUtc, type TimezoneOptions } from "./internal/timezone.js";
-
-export class TimeValue extends globalThis.Date {
-  constructor(value: globalThis.Date) {
-    super(value.getTime());
-  }
-}
 
 export class Time extends ActiveModelTime {
   private _timezone?: "utc" | "local";
 
   constructor(options?: TimezoneOptions) {
-    super();
+    super(options);
     this._timezone = options?.timezone;
   }
 
   get isUtc(): boolean {
     return isUtc(this._timezone);
-  }
-
-  serialize(value: unknown): TimeValue | null {
-    const cast = super.serialize(value);
-    if (cast instanceof globalThis.Date) {
-      return new TimeValue(cast);
-    }
-    return null;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Type::Time#serialize_cast_value
-   */
-  serializeCastValue(value: globalThis.Date | null): TimeValue | null {
-    if (value == null) return null;
-    return new TimeValue(value);
   }
 }

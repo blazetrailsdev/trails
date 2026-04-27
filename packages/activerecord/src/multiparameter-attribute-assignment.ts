@@ -10,6 +10,7 @@
  * Rails source: activerecord/lib/active_record/attribute_assignment.rb
  */
 
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
 
 // Read _aggregateReflections directly to avoid a circular dependency:
@@ -172,16 +173,12 @@ function parseIntStrict(s: string | null, fieldName: string): number | null {
   return n;
 }
 
-function buildDate(year: number, month: number, day: number): Date {
-  // Use local-time constructor to avoid UTC-midnight parse issues.
-  // setFullYear preserves years 0-99 (JS maps them to 1900+1900 otherwise).
-  const d = new Date(year, month - 1, day);
-  d.setFullYear(year);
-  // Validate round-trip: JS normalises out-of-range values (e.g. month 13 → Jan+1).
-  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+function buildDate(year: number, month: number, day: number): Temporal.PlainDate {
+  try {
+    return Temporal.PlainDate.from({ year, month, day }, { overflow: "reject" });
+  } catch {
     throw new Error(`Invalid date: ${year}-${month}-${day}`);
   }
-  return d;
 }
 
 function buildDateTime(
@@ -191,20 +188,15 @@ function buildDateTime(
   hour: number,
   min: number,
   sec: number,
-): Date {
-  const d = new Date(year, month - 1, day, hour, min, sec);
-  d.setFullYear(year);
-  if (
-    d.getFullYear() !== year ||
-    d.getMonth() !== month - 1 ||
-    d.getDate() !== day ||
-    d.getHours() !== hour ||
-    d.getMinutes() !== min ||
-    d.getSeconds() !== sec
-  ) {
+): Temporal.PlainDateTime {
+  try {
+    return Temporal.PlainDateTime.from(
+      { year, month, day, hour, minute: min, second: sec },
+      { overflow: "reject" },
+    );
+  } catch {
     throw new Error(`Invalid datetime: ${year}-${month}-${day} ${hour}:${min}:${sec}`);
   }
-  return d;
 }
 
 function assembleValue(parts: unknown[], typeName: string): unknown {
@@ -257,8 +249,8 @@ function assembleValue(parts: unknown[], typeName: string): unknown {
       if (year === null || month === null || day === null) return null;
       return buildDateTime(year, month, day, hour, min, sec);
     }
-    // Only time parts: use dummy date 2000-01-01 (Rails convention)
-    return new Date(2000, 0, 1, hour, min, sec);
+    // Only time parts → PlainTime (no date context needed for time columns)
+    return Temporal.PlainTime.from({ hour, minute: min, second: sec }, { overflow: "reject" });
   }
 
   // Generic: return the first non-blank value

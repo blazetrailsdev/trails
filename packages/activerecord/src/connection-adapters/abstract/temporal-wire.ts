@@ -222,18 +222,21 @@ function parseBcTimestampTzAsInstant(withoutBc: string): Temporal.Instant {
   if (!match) throw new RangeError(`Cannot parse BC timestamptz: ${JSON.stringify(withoutBc)}`);
   const [, y, mo, d, h, mi, s, frac, rawOffset] = match;
   const { millisecond, microsecond, nanosecond } = parseFraction(frac);
-  const zdt = Temporal.ZonedDateTime.from({
-    year: bcYearToIso(Number(y)),
-    month: Number(mo),
-    day: Number(d),
-    hour: Number(h),
-    minute: Number(mi),
-    second: Number(s),
-    millisecond,
-    microsecond,
-    nanosecond,
-    timeZone: expandOffset(rawOffset),
-  });
+  const zdt = Temporal.ZonedDateTime.from(
+    {
+      year: bcYearToIso(Number(y)),
+      month: Number(mo),
+      day: Number(d),
+      hour: Number(h),
+      minute: Number(mi),
+      second: Number(s),
+      millisecond,
+      microsecond,
+      nanosecond,
+      timeZone: expandOffset(rawOffset),
+    },
+    { overflow: "reject" },
+  );
   return zdt.toInstant();
 }
 
@@ -247,17 +250,20 @@ function parseBcTimestampAsPlainDateTime(withoutBc: string): Temporal.PlainDateT
   if (!match) throw new RangeError(`Cannot parse BC timestamp: ${JSON.stringify(withoutBc)}`);
   const [, y, mo, d, h, mi, s, frac] = match;
   const { millisecond, microsecond, nanosecond } = parseFraction(frac);
-  return Temporal.PlainDateTime.from({
-    year: bcYearToIso(Number(y)),
-    month: Number(mo),
-    day: Number(d),
-    hour: Number(h),
-    minute: Number(mi),
-    second: Number(s),
-    millisecond,
-    microsecond,
-    nanosecond,
-  });
+  return Temporal.PlainDateTime.from(
+    {
+      year: bcYearToIso(Number(y)),
+      month: Number(mo),
+      day: Number(d),
+      hour: Number(h),
+      minute: Number(mi),
+      second: Number(s),
+      millisecond,
+      microsecond,
+      nanosecond,
+    },
+    { overflow: "reject" },
+  );
 }
 
 /**

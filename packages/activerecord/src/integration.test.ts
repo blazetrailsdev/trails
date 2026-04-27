@@ -1,3 +1,5 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
@@ -12,15 +14,16 @@ function withCacheVersioning(klass: typeof Base, fn: () => void) {
   }
 }
 
-function expectedUsec(d: Date): string {
-  const y = d.getUTCFullYear().toString().padStart(4, "0");
-  const mo = (d.getUTCMonth() + 1).toString().padStart(2, "0");
-  const day = d.getUTCDate().toString().padStart(2, "0");
-  const h = d.getUTCHours().toString().padStart(2, "0");
-  const mi = d.getUTCMinutes().toString().padStart(2, "0");
-  const s = d.getUTCSeconds().toString().padStart(2, "0");
-  const ms = d.getUTCMilliseconds().toString().padStart(3, "0");
-  return `${y}${mo}${day}${h}${mi}${s}${ms}000`;
+function expectedUsec(ts: Temporal.Instant | Temporal.PlainDateTime): string {
+  const dt = ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : ts;
+  const y = dt.year.toString().padStart(4, "0");
+  const mo = dt.month.toString().padStart(2, "0");
+  const day = dt.day.toString().padStart(2, "0");
+  const h = dt.hour.toString().padStart(2, "0");
+  const mi = dt.minute.toString().padStart(2, "0");
+  const s = dt.second.toString().padStart(2, "0");
+  const us = (dt.millisecond * 1000 + dt.microsecond).toString().padStart(6, "0");
+  return `${y}${mo}${day}${h}${mi}${s}${us}`;
 }
 
 describe("IntegrationTest", () => {
@@ -271,7 +274,7 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t = new Date("2024-01-15T10:00:00.000Z");
+    const t = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t);
     const key = dev.cacheKey();
@@ -287,7 +290,7 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const updatedAt = new Date("2024-01-15T10:46:00.123Z");
+    const updatedAt = instant("2024-01-15T10:46:00.123Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", updatedAt);
     expect(dev.cacheKey()).toBe(`developers/${dev.id}-${expectedUsec(updatedAt)}`);
@@ -302,7 +305,7 @@ describe("IntegrationTest", () => {
         this.cacheTimestampFormat = "number";
       }
     }
-    const updatedAt = new Date("2024-01-15T10:46:00Z");
+    const updatedAt = instant("2024-01-15T10:46:00Z");
     const dev = await CachedDeveloper.create({ name: "Dev" });
     dev.writeAttribute("updated_at", updatedAt);
     expect(dev.cacheKey()).toBe(`cached_developers/${dev.id}-20240115104600`);
@@ -316,11 +319,11 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t1 = new Date("2024-01-15T10:00:00.000Z");
+    const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t1);
     const key1 = dev.cacheKey();
-    dev.writeAttribute("updated_at", new Date("2024-01-15T10:00:01.000Z"));
+    dev.writeAttribute("updated_at", instant("2024-01-15T10:00:01.000Z"));
     expect(dev.cacheKey()).not.toBe(key1);
   });
 
@@ -347,7 +350,7 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const updatedOn = new Date("2024-03-20T08:00:00.456Z");
+    const updatedOn = instant("2024-03-20T08:00:00.456Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_on", updatedOn);
     expect(dev.cacheKey()).toBe(`developers/${dev.id}-${expectedUsec(updatedOn)}`);
@@ -362,8 +365,8 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t1 = new Date("2024-01-15T10:00:00.000Z");
-    const t2 = new Date("2024-01-15T11:00:00.000Z");
+    const t1 = instant("2024-01-15T10:00:00.000Z");
+    const t2 = instant("2024-01-15T11:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t2);
     dev.writeAttribute("updated_on", t1);
@@ -379,8 +382,8 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t1 = new Date("2024-01-15T10:00:00.000Z");
-    const t2 = new Date("2024-01-15T11:00:00.000Z");
+    const t1 = instant("2024-01-15T10:00:00.000Z");
+    const t2 = instant("2024-01-15T11:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t1);
     dev.writeAttribute("updated_on", t2);
@@ -395,11 +398,14 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t1 = new Date("2024-01-15T10:00:00.000Z");
+    const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t1);
     const key1 = dev.cacheKey();
-    dev.writeAttribute("updated_at", new Date(t1.getTime() + 1));
+    dev.writeAttribute(
+      "updated_at",
+      Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 1),
+    );
     expect(dev.cacheKey()).not.toBe(key1);
   });
 
@@ -411,7 +417,7 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t = new Date("2024-01-15T10:00:00.123Z");
+    const t = instant("2024-01-15T10:00:00.123Z");
     const dev = await Developer.create({ name: "Dev" });
     dev.writeAttribute("updated_at", t);
     expect(dev.cacheKey()).toBe(dev.cacheKey());
@@ -425,12 +431,15 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t1 = new Date("2024-01-15T10:00:00.000Z");
+    const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {
       dev.writeAttribute("updated_at", t1);
       const v1 = dev.cacheVersion();
-      dev.writeAttribute("updated_at", new Date(t1.getTime() + 1));
+      dev.writeAttribute(
+        "updated_at",
+        Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 1),
+      );
       expect(dev.cacheVersion()).not.toBe(v1);
     });
   });
@@ -443,7 +452,7 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t = new Date("2024-01-15T10:00:00.123Z");
+    const t = instant("2024-01-15T10:00:00.123Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {
       dev.writeAttribute("updated_at", t);
@@ -459,12 +468,15 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t1 = new Date("2024-01-15T10:00:00.000Z");
+    const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {
       dev.writeAttribute("updated_at", t1);
       const key1 = dev.cacheKey();
-      dev.writeAttribute("updated_at", new Date(t1.getTime() + 10000));
+      dev.writeAttribute(
+        "updated_at",
+        Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 10000),
+      );
       expect(dev.cacheKey()).toBe(key1);
     });
   });
@@ -477,12 +489,15 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t1 = new Date("2024-01-15T10:00:00.000Z");
+    const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {
       dev.writeAttribute("updated_at", t1);
       const v1 = dev.cacheVersion();
-      dev.writeAttribute("updated_at", new Date(t1.getTime() + 10000));
+      dev.writeAttribute(
+        "updated_at",
+        Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 10000),
+      );
       expect(dev.cacheVersion()).not.toBe(v1);
     });
   });
@@ -495,12 +510,15 @@ describe("IntegrationTest", () => {
         this.adapter = createTestAdapter();
       }
     }
-    const t1 = new Date("2024-01-15T10:00:00.000Z");
+    const t1 = instant("2024-01-15T10:00:00.000Z");
     const dev = await Developer.create({ name: "Dev" });
     withCacheVersioning(Developer, () => {
       dev.writeAttribute("updated_at", t1);
       const kv1 = dev.cacheKeyWithVersion();
-      dev.writeAttribute("updated_at", new Date(t1.getTime() + 10000));
+      dev.writeAttribute(
+        "updated_at",
+        Temporal.Instant.fromEpochMilliseconds(t1.epochMilliseconds + 10000),
+      );
       expect(dev.cacheKeyWithVersion()).not.toBe(kv1);
     });
   });

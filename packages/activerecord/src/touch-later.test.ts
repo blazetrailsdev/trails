@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -71,7 +72,9 @@ describe("TouchLaterTest", () => {
     expect(after).toBeDefined();
     // updated_at should have changed
     if (before && after) {
-      expect((after as Date).getTime()).toBeGreaterThanOrEqual((before as Date).getTime());
+      expect((after as Temporal.Instant).epochMilliseconds).toBeGreaterThanOrEqual(
+        (before as Temporal.Instant).epochMilliseconds,
+      );
     }
   });
 
@@ -94,8 +97,8 @@ describe("TouchLaterTest", () => {
     const inv = await Invoice.create({ amount: 100 });
     // touch updates updated_at to current time
     await inv.touch();
-    const updatedAt = inv.updated_at as Date;
-    expect(updatedAt).toBeInstanceOf(Date);
+    const updatedAt = inv.updated_at;
+    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
   });
 
   it("touch later dont hit the db", async () => {
@@ -104,12 +107,12 @@ describe("TouchLaterTest", () => {
     // surreptitiouslyTouch writes updated_at in-memory without dirty tracking.
     // Verify the in-memory value is updated synchronously (before any DB flush)
     // and that the attribute is not marked dirty.
-    const before = inv.updated_at as Date;
+    const before = inv.updated_at as Temporal.Instant;
     await inv.touchLater();
-    const afterInMemory = inv.updated_at as Date;
+    const afterInMemory = inv.updated_at as Temporal.Instant;
     expect(afterInMemory).not.toBeNull();
     // The value was written in-memory — no reload needed to observe it.
-    expect(afterInMemory.getTime()).toBeGreaterThanOrEqual(before?.getTime() ?? 0);
+    expect(afterInMemory.epochMilliseconds).toBeGreaterThanOrEqual(before?.epochMilliseconds ?? 0);
     // No dirty tracking — the attribute change was cleared by surreptitiouslyTouch.
     expect(inv.changed).toBe(false);
   });

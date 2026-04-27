@@ -9,18 +9,33 @@
  * `real_type_unless_aliased(real_type)` hook that Timestamp /
  * TimestampWithTimeZone use to report :datetime when the adapter's
  * datetime_type is aliased.
+ *
+ * Full Temporal-native driver integration lands in PR 5a; the cast
+ * and typeCastForSchema overrides here are updated so that
+ * DateTimeType returning `Temporal.Instant | Temporal.PlainDateTime`
+ * does not break compilation.
  */
 
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateTimeType } from "@blazetrails/activemodel";
+import {
+  DateInfinity,
+  DateNegativeInfinity,
+  type DateInfinityType,
+  type DateNegativeInfinityType,
+} from "@blazetrails/activemodel";
+import { parsePostgresPlainDateTime, parsePostgresInstant } from "../../abstract/temporal-wire.js";
+
+type PgDateTimeResult =
+  | Temporal.Instant
+  | Temporal.PlainDateTime
+  | DateInfinityType
+  | DateNegativeInfinityType;
 
 export class DateTime extends DateTimeType {
   override readonly name: string = "datetime";
 
-  /**
-   * See OID::Date for the Float::INFINITY return-type tradeoff — same
-   * escape hatch applies here.
-   */
-  override cast(value: unknown): globalThis.Date | null {
+  override cast(value: unknown): PgDateTimeResult | null {
     return this.castValue(value);
   }
 
@@ -28,72 +43,32 @@ export class DateTime extends DateTimeType {
    * Rails' `cast_value` — public here so subclasses can call directly
    * and api:compare matches the Rails method name.
    */
-  castValue(value: unknown): globalThis.Date | null {
+  castValue(value: unknown): PgDateTimeResult | null {
     if (typeof value === "string") {
-      if (value === "infinity") return Infinity as unknown as globalThis.Date;
-      if (value === "-infinity") return -Infinity as unknown as globalThis.Date;
+      if (value === "infinity") return DateInfinity;
+      if (value === "-infinity") return DateNegativeInfinity;
       if (/ BC$/.test(value)) {
-        // Accept: "YYYY-MM-DD BC" or "YYYY-MM-DD HH:MM:SS[.f] BC".
-        // Reject anything with a timezone suffix (e.g. "+02", "-05:30")
-        // on a BC timestamp — that's rare in PG output and supporting
-        // it correctly requires offset arithmetic we haven't needed yet.
-        const match =
-          /^(\d+)-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{1,2}):(\d{1,2}(?:\.\d+)?))?(?:\s+BC)$/.exec(
-            value,
-          );
-        if (!match) return null;
-        const year = -Number.parseInt(match[1], 10) + 1;
-        const month = Number.parseInt(match[2], 10) - 1;
-        const day = Number.parseInt(match[3], 10);
-        const hour = match[4] ? Number.parseInt(match[4], 10) : 0;
-        const minute = match[5] ? Number.parseInt(match[5], 10) : 0;
-        const second = match[6] ? Number.parseFloat(match[6]) : 0;
-        // Reject out-of-range components — setUTC* silently normalises
-        // (month 13, day 32, second 60) and would produce valid Dates
-        // for malformed input.
-        if (
-          month < 0 ||
-          month > 11 ||
-          day < 1 ||
-          day > 31 ||
-          hour < 0 ||
-          hour > 23 ||
-          minute < 0 ||
-          minute > 59 ||
-          second < 0 ||
-          second >= 60
-        ) {
+        // Has offset → treat as timestamptz (Instant); otherwise plain.
+        const hasOffset = /[-+]\d{2}(?::\d{2})?$/.test(value.slice(0, -3).trimEnd());
+        try {
+          return hasOffset ? parsePostgresInstant(value) : parsePostgresPlainDateTime(value);
+        } catch {
           return null;
         }
-        let wholeSeconds = Math.floor(second);
-        // Math.round avoids off-by-1ms drift from floating-point
-        // multiplication (e.g. 0.289 * 1000 = 288.999…). Round can
-        // also yield 1000 for inputs like 59.999999 — handle that
-        // carry explicitly rather than letting setUTCHours roll the
-        // timestamp forward.
-        let ms = Math.round((second - wholeSeconds) * 1000);
-        if (ms === 1000) {
-          ms = 0;
-          wholeSeconds += 1;
-          if (wholeSeconds >= 60) return null;
-        }
-        const d = new globalThis.Date(0);
-        d.setUTCFullYear(year, month, day);
-        d.setUTCHours(hour, minute, wholeSeconds, ms);
-        // Guard against roll-over from Feb 31 etc. even after the
-        // upper-bound check (valid high day for wrong month).
-        if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month || d.getUTCDate() !== day) {
-          return null;
-        }
-        return d;
       }
     }
     return super.cast(value);
   }
 
+  override serialize(value: unknown): string | null {
+    if (value === DateInfinity) return "infinity";
+    if (value === DateNegativeInfinity) return "-infinity";
+    return super.serialize(value);
+  }
+
   override typeCastForSchema(value: unknown): string {
-    if (value === Infinity) return "::Float::INFINITY";
-    if (value === -Infinity) return "-::Float::INFINITY";
+    if (value === DateInfinity) return "::Float::INFINITY";
+    if (value === DateNegativeInfinity) return "-::Float::INFINITY";
     return super.typeCastForSchema(value);
   }
 

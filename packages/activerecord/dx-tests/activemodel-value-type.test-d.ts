@@ -4,6 +4,7 @@ import {
   IntegerType,
   BooleanType,
   DateType,
+  type DateCastResult,
   FloatType,
   ImmutableStringType,
   StringType,
@@ -27,9 +28,9 @@ describe("ValueType<T> type parameter flows into concrete subclasses", () => {
     expectTypeOf(t.cast(0)).toEqualTypeOf<boolean | null>();
   });
 
-  it("DateType#cast narrows to Date | null", () => {
+  it("DateType#cast narrows to DateCastResult | null (PlainDate or infinity sentinels)", () => {
     const t = new DateType();
-    expectTypeOf(t.cast(0)).toEqualTypeOf<Date | null>();
+    expectTypeOf(t.cast(0)).toEqualTypeOf<DateCastResult | null>();
   });
 
   it("FloatType#cast narrows to number | null", () => {
