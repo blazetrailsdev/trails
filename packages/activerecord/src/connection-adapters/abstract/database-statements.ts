@@ -18,6 +18,7 @@ import {
   formatPlainDateForSql,
   formatPlainTimeForSql,
 } from "./quoting.js";
+import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
 import { isWriteQuerySql } from "../sql-classification.js";
@@ -975,6 +976,12 @@ export function temporalToBindString(
   value: unknown,
   adapter?: "sqlite" | "postgres" | "mysql",
 ): unknown {
+  // Postgres infinity sentinels must become the wire strings pg expects.
+  // Gated to postgres adapter only — SQLite/MySQL have no infinity concept.
+  if (adapter === "postgres") {
+    if (value === DateInfinity) return "infinity";
+    if (value === DateNegativeInfinity) return "-infinity";
+  }
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);

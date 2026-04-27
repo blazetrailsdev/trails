@@ -4,6 +4,13 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+
+function epochMs(v: unknown): number {
+  if (v instanceof Temporal.Instant) return v.epochMilliseconds;
+  if (v instanceof Temporal.PlainDateTime)
+    return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
+  throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
+}
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany, processDependentAssociations } from "../associations.js";
 
@@ -205,15 +212,13 @@ describe("DeleteAllTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = post.updated_at as Temporal.Instant;
+    const originalUpdatedAt = post.updated_at;
 
     await Post.all().updateAll({ title: "Changed" });
 
     const reloaded = await Post.find(post.id);
     // updateAll should NOT auto-bump updated_at
-    expect((reloaded.updated_at as Temporal.Instant).epochMilliseconds).toBe(
-      originalUpdatedAt.epochMilliseconds,
-    );
+    expect(epochMs(reloaded.updated_at)).toBe(epochMs(originalUpdatedAt));
   });
 
   it("deleteAll does not run callbacks", async () => {

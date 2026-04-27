@@ -17,6 +17,8 @@ export class DateType extends ValueType<DateCastResult> {
 
   cast(value: unknown): DateCastResult | null {
     if (value === null || value === undefined) return null;
+    if (value === DateInfinity) return DateInfinity;
+    if (value === DateNegativeInfinity) return DateNegativeInfinity;
     if (value instanceof Temporal.PlainDate) return value;
     // Accept PlainDateTime from multiparameter assignment — extract the date part.
     if (value instanceof Temporal.PlainDateTime) return value.toPlainDate();
@@ -40,6 +42,8 @@ export class DateType extends ValueType<DateCastResult> {
 
   serialize(value: unknown): string | null {
     const cast = this.cast(value);
+    // Sentinels are Postgres-specific; base type returns null. The Postgres
+    // OID::Date subclass overrides serialize() to emit 'infinity'/'-infinity'.
     if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return null;
     return cast.toString();
   }

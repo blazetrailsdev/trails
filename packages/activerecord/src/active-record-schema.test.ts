@@ -159,7 +159,9 @@ describe("ActiveRecordSchemaTest", () => {
     expect(rows.length).toBe(1);
     const createdAt = rows[0].created_at;
     expect(
-      createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt),
+      createdAt instanceof Date
+        ? createdAt.toISOString().slice(0, 10)
+        : String(createdAt).slice(0, 10),
     ).toBe("2023-01-01");
   });
 
@@ -213,7 +215,9 @@ describe("ActiveRecordSchemaTest", () => {
     expect(rows.length).toBe(1);
     const createdAt = rows[0].created_at;
     expect(
-      createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt),
+      createdAt instanceof Date
+        ? createdAt.toISOString().slice(0, 10)
+        : String(createdAt).slice(0, 10),
     ).toBe("2023-01-01");
   });
 });

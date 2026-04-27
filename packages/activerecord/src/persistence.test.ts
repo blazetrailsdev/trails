@@ -1,5 +1,18 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
+
+// timestamp (no tz) columns return PlainDateTime. With default_timezone=:utc
+// the stored value is UTC, so treat it as UTC to get epoch milliseconds.
+function epochMs(v: unknown): number {
+  if (v instanceof Temporal.Instant) return v.epochMilliseconds;
+  if (v instanceof Temporal.PlainDateTime)
+    return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
+  throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
+}
+// SQLite datetime → Temporal.Instant; Postgres timestamp (no tz) → Temporal.PlainDateTime
+function isTemporalDatetime(v: unknown): boolean {
+  return v instanceof Temporal.Instant || v instanceof Temporal.PlainDateTime;
+}
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -1128,8 +1141,9 @@ describe("PersistenceTest", () => {
     }
     const now = Temporal.Now.instant();
     const p = await Post.create({ title: "auto", created_at: now });
-    expect(p.created_at).toBeInstanceOf(Temporal.Instant);
-    expect(Temporal.Instant.compare(p.created_at as Temporal.Instant, now)).toBe(0);
+    expect(p.created_at).toSatisfy(isTemporalDatetime);
+    // timestamp (no tz) round-trip: compare via UTC epoch ms
+    expect(epochMs(p.created_at)).toBe(now.epochMilliseconds);
     expect(p.isPersisted()).toBe(true);
   });
 
@@ -1383,7 +1397,7 @@ describe("PersistenceTest", () => {
     const t = await Topic.create({ title: "old" });
     t.title = "new";
     await t.save();
-    expect(t.updated_at).toBeInstanceOf(Temporal.Instant);
+    expect(t.updated_at).toSatisfy(isTemporalDatetime);
   });
 
   it("save without N+1", async () => {
@@ -1468,8 +1482,8 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "test" });
-    expect(t.created_at).toBeInstanceOf(Temporal.Instant);
-    expect(t.updated_at).toBeInstanceOf(Temporal.Instant);
+    expect(t.created_at).toSatisfy(isTemporalDatetime);
+    expect(t.updated_at).toSatisfy(isTemporalDatetime);
   });
 
   it("update_attribute_vs_update_column", async () => {
@@ -1713,7 +1727,7 @@ describe("PersistenceTest", () => {
     await t.incrementBang("count", 1, { touch: "updated_at" });
     const reloaded = await Topic.find(t.id);
     expect(reloaded.count).toBe(2);
-    expect((reloaded.updated_at as Temporal.Instant).epochMilliseconds).toBeGreaterThan(
+    expect(epochMs(reloaded.updated_at)).toBeGreaterThan(
       instant("2020-01-01T00:00:00Z").epochMilliseconds,
     );
   });
@@ -2089,10 +2103,10 @@ describe("PersistenceTest", () => {
       }
     }
     const t = await Topic.create({ title: "test" });
-    const before = t.updated_at as Temporal.Instant;
+    const before = t.updated_at;
     await t.updateAttribute("title", "new");
-    const after = t.updated_at as Temporal.Instant;
-    expect(after.epochMilliseconds).toBeGreaterThanOrEqual(before.epochMilliseconds);
+    const after = t.updated_at;
+    expect(epochMs(after)).toBeGreaterThanOrEqual(epochMs(before));
   });
 
   it("update attribute!", async () => {
@@ -2119,7 +2133,7 @@ describe("PersistenceTest", () => {
     }
     const t = await Topic.create({ title: "test" });
     await t.updateAttributeBang("title", "new");
-    expect(t.updated_at).toBeInstanceOf(Temporal.Instant);
+    expect(t.updated_at).toSatisfy(isTemporalDatetime);
   });
 
   it("update column for readonly attribute", async () => {
@@ -2492,7 +2506,7 @@ describe("PersistenceTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalCreatedAt = (post.created_at as Temporal.Instant).epochMilliseconds;
+    const originalCreatedAt = epochMs(post.created_at);
 
     post.title = "Updated";
     await post.save();
@@ -2500,7 +2514,7 @@ describe("PersistenceTest", () => {
     post.title = "Updated again";
     await post.save();
 
-    expect((post.created_at as Temporal.Instant).epochMilliseconds).toBe(originalCreatedAt);
+    expect(epochMs(post.created_at)).toBe(originalCreatedAt);
   });
 
   it("updateColumn does not auto-update updated_at", async () => {
@@ -2515,12 +2529,12 @@ describe("PersistenceTest", () => {
     }
 
     const post = await Post.create({ title: "Hello" });
-    const originalUpdatedAt = (post.updated_at as Temporal.Instant).epochMilliseconds;
+    const originalUpdatedAt = epochMs(post.updated_at);
 
     await post.updateColumn("title", "Changed");
 
     // updateColumn should NOT auto-bump updated_at
-    expect((post.updated_at as Temporal.Instant).epochMilliseconds).toBe(originalUpdatedAt);
+    expect(epochMs(post.updated_at)).toBe(originalUpdatedAt);
   });
 });
 
@@ -3486,12 +3500,12 @@ describe("PersistenceTest", () => {
 
   it("touching a record updates its timestamp", async () => {
     const topic = await Topic.create({ title: "Test" });
-    const before = topic.updated_at as Temporal.Instant;
+    const before = topic.updated_at;
 
     await topic.touch();
 
-    const after = topic.updated_at as Temporal.Instant;
-    expect(after.epochMilliseconds).toBeGreaterThanOrEqual(before.epochMilliseconds);
+    const after = topic.updated_at;
+    expect(epochMs(after)).toBeGreaterThanOrEqual(epochMs(before));
   });
 
   it("touching an attribute updates it", async () => {
@@ -3499,8 +3513,8 @@ describe("PersistenceTest", () => {
 
     await topic.touch("replied_at");
 
-    expect(topic.replied_at).toBeInstanceOf(Temporal.Instant);
-    expect(topic.updated_at).toBeInstanceOf(Temporal.Instant);
+    expect(topic.replied_at).toSatisfy(isTemporalDatetime);
+    expect(topic.updated_at).toSatisfy(isTemporalDatetime);
   });
 
   it("touch does not run callbacks", async () => {
@@ -3624,7 +3638,7 @@ describe("PersistenceTest", () => {
     await user.save();
     // updated_at should be set (may or may not differ due to timing,
     // but at minimum it should be a Date)
-    expect(user.updated_at).toBeInstanceOf(Temporal.Instant);
+    expect(user.updated_at).toSatisfy(isTemporalDatetime);
   });
 });
 
@@ -3791,10 +3805,10 @@ describe("PersistenceTest", () => {
     }
 
     const user = await User.create({ name: "Alice" });
-    const before = user.updated_at as Temporal.Instant;
+    const before = user.updated_at;
     await user.touch();
-    const after = user.updated_at as Temporal.Instant;
-    expect(after.epochMilliseconds).toBeGreaterThanOrEqual(before.epochMilliseconds);
+    const after = user.updated_at;
+    expect(epochMs(after)).toBeGreaterThanOrEqual(epochMs(before));
   });
 
   // Rails: test_touch_with_specific_columns
@@ -3811,8 +3825,8 @@ describe("PersistenceTest", () => {
     const user = await User.create({ name: "Alice" });
     expect(user.last_login_at).toBeNull();
     await user.touch("last_login_at");
-    expect(user.last_login_at).toBeInstanceOf(Temporal.Instant);
-    expect(user.updated_at).toBeInstanceOf(Temporal.Instant);
+    expect(user.last_login_at).toSatisfy(isTemporalDatetime);
+    expect(user.updated_at).toSatisfy(isTemporalDatetime);
   });
 
   // Rails: test_touch_persists_to_database
@@ -3828,7 +3842,7 @@ describe("PersistenceTest", () => {
     const user = await User.create({ name: "Alice" });
     await user.touch();
     const reloaded = await User.find(user.id!);
-    expect(reloaded.updated_at).toBeInstanceOf(Temporal.Instant);
+    expect(reloaded.updated_at).toSatisfy(isTemporalDatetime);
   });
 });
 

@@ -21,12 +21,14 @@ export class ComparisonValidator extends EachValidator {
       return Temporal.ZonedDateTime.compare(a, b);
     if (typeof a === "number" && typeof b === "number") return a - b;
     if (typeof a === "string" && typeof b === "string") return a < b ? -1 : a > b ? 1 : 0;
-    // Temporal objects throw on implicit numeric coercion — safe fallback.
-    try {
-      return Number(a) - Number(b);
-    } catch {
-      return NaN;
-    }
+    // Dual-typed window: Date values still in flight compare by epoch ms.
+    if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
+    // Incomparable types (e.g. Temporal vs non-Temporal, mixed types).
+    // Rails raises ArgumentError here; we throw so callers don't silently
+    // skip validation due to NaN comparison semantics (NaN <= 0 is false).
+    throw new TypeError(
+      `Comparison of ${(a as object)?.constructor?.name ?? typeof a} with ${(b as object)?.constructor?.name ?? typeof b} failed`,
+    );
   }
 
   override checkValidity(): void {
@@ -52,9 +54,20 @@ export class ComparisonValidator extends EachValidator {
       return;
     }
 
+    const safeCompare = (a: unknown, b: unknown): number | null => {
+      try {
+        return this.compare(a, b);
+      } catch {
+        record.errors.add(attribute, "invalid", { value, message: this.options.message });
+        return null;
+      }
+    };
+
     if (this.options.greaterThan !== undefined) {
       const target = this.resolve(this.options.greaterThan, record);
-      if (this.compare(value, target) <= 0) {
+      const cmp = safeCompare(value, target);
+      if (cmp === null) return;
+      if (cmp <= 0) {
         record.errors.add(attribute, "greater_than", {
           count: target,
           value,
@@ -64,7 +77,9 @@ export class ComparisonValidator extends EachValidator {
     }
     if (this.options.greaterThanOrEqualTo !== undefined) {
       const target = this.resolve(this.options.greaterThanOrEqualTo, record);
-      if (this.compare(value, target) < 0) {
+      const cmpGte = safeCompare(value, target);
+      if (cmpGte === null) return;
+      if (cmpGte < 0) {
         record.errors.add(attribute, "greater_than_or_equal_to", {
           count: target,
           value,
@@ -74,7 +89,9 @@ export class ComparisonValidator extends EachValidator {
     }
     if (this.options.lessThan !== undefined) {
       const target = this.resolve(this.options.lessThan, record);
-      if (this.compare(value, target) >= 0) {
+      const cmpLt = safeCompare(value, target);
+      if (cmpLt === null) return;
+      if (cmpLt >= 0) {
         record.errors.add(attribute, "less_than", {
           count: target,
           value,
@@ -84,7 +101,9 @@ export class ComparisonValidator extends EachValidator {
     }
     if (this.options.lessThanOrEqualTo !== undefined) {
       const target = this.resolve(this.options.lessThanOrEqualTo, record);
-      if (this.compare(value, target) > 0) {
+      const cmpLte = safeCompare(value, target);
+      if (cmpLte === null) return;
+      if (cmpLte > 0) {
         record.errors.add(attribute, "less_than_or_equal_to", {
           count: target,
           value,
@@ -94,7 +113,9 @@ export class ComparisonValidator extends EachValidator {
     }
     if (this.options.equalTo !== undefined) {
       const target = this.resolve(this.options.equalTo, record);
-      if (this.compare(value, target) !== 0) {
+      const cmpEq = safeCompare(value, target);
+      if (cmpEq === null) return;
+      if (cmpEq !== 0) {
         record.errors.add(attribute, "equal_to", {
           count: target,
           value,
@@ -104,7 +125,9 @@ export class ComparisonValidator extends EachValidator {
     }
     if (this.options.otherThan !== undefined) {
       const target = this.resolve(this.options.otherThan, record);
-      if (this.compare(value, target) === 0) {
+      const cmpOther = safeCompare(value, target);
+      if (cmpOther === null) return;
+      if (cmpOther === 0) {
         record.errors.add(attribute, "other_than", {
           count: target,
           value,

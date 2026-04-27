@@ -3,6 +3,7 @@
  */
 import pg from "pg";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import * as Arel from "@blazetrails/arel";
 import {
@@ -415,12 +416,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("date time decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
-      expect(rows[0].val).toBeInstanceOf(Date);
+      expect(rows[0].val).toBeInstanceOf(Temporal.PlainDateTime);
     });
 
     it("date decoding", async () => {
       const rows = await adapter.execute(`SELECT DATE '2023-06-15' AS val`);
-      expect(rows[0].val).toBeInstanceOf(Date);
+      expect(rows[0].val).toBeInstanceOf(Temporal.PlainDate);
     });
 
     it("time decoding", async () => {
@@ -431,16 +432,16 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("timestamp decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
-      const d = rows[0].val as Date;
-      expect(d).toBeInstanceOf(Date);
-      expect(d.getFullYear()).toBe(2023);
+      const d = rows[0].val as Temporal.PlainDateTime;
+      expect(d).toBeInstanceOf(Temporal.PlainDateTime);
+      expect(d.year).toBe(2023);
     });
 
     it("timestamp with time zone decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMPTZ '2023-06-15 10:30:00+00' AS val`);
-      const d = rows[0].val as Date;
-      expect(d).toBeInstanceOf(Date);
-      expect(d.getFullYear()).toBe(2023);
+      const d = rows[0].val as Temporal.Instant;
+      expect(d).toBeInstanceOf(Temporal.Instant);
+      expect(d.toZonedDateTimeISO("UTC").year).toBe(2023);
     });
 
     it("interval decoding", async () => {
@@ -675,11 +676,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE TABLE "ex_dates" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
       await adapter.exec(`INSERT INTO "ex_dates" ("d") VALUES ('2023-06-15')`);
       const rows = await adapter.execute(`SELECT "d" FROM "ex_dates"`);
-      const d = rows[0].d as Date;
-      expect(d).toBeInstanceOf(Date);
-      expect(d.getFullYear()).toBe(2023);
-      expect(d.getMonth()).toBe(5);
-      expect(d.getDate()).toBe(15);
+      const d = rows[0].d as Temporal.PlainDate;
+      expect(d).toBeInstanceOf(Temporal.PlainDate);
+      expect(d.year).toBe(2023);
+      expect(d.month).toBe(6);
+      expect(d.day).toBe(15);
     });
 
     it.skip("date decoding disabled", async () => {

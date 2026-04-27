@@ -1721,9 +1721,12 @@ describe("MigrationTest", () => {
       const rows = await bulkAdapter.execute(`SELECT * FROM "bk4"`);
       expect(rows.length).toBe(1);
       const createdAt = rows[0].created_at;
-      expect(
-        createdAt instanceof Date ? createdAt.toISOString().slice(0, 10) : String(createdAt),
-      ).toBe("2023-01-01");
+      // PlainDateTime.toString() gives 'YYYY-MM-DDTHH:MM:SS'; take the date portion.
+      const dateStr =
+        createdAt instanceof Date
+          ? createdAt.toISOString().slice(0, 10)
+          : String(createdAt).slice(0, 10);
+      expect(dateStr).toBe("2023-01-01");
     });
 
     it("removing timestamps", async () => {

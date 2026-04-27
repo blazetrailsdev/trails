@@ -39,7 +39,14 @@ import {
 } from "../errors.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
-import { transactionIsolationLevels, typeCastedBinds } from "./abstract/database-statements.js";
+import {
+  transactionIsolationLevels,
+  typeCastedBinds,
+  temporalToBindString,
+} from "./abstract/database-statements.js";
+import { getTypeParser as getTemporalTypeParser } from "./postgresql/temporal-type-parsers.js";
+
+const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 import { READ_QUERY } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
 import {
@@ -241,7 +248,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (typeof config === "string") {
       this._minMessages = "warning";
       this._sessionVariables = {};
-      this._driverPool = new pg.Pool({ connectionString: config });
+      this._driverPool = new pg.Pool({
+        connectionString: config,
+        types: { getTypeParser: getTemporalTypeParser },
+      });
       return;
     }
     // Rails' database.yml merges driver connection params + adapter
@@ -294,7 +304,23 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // Freeze a shallow copy so post-construction mutation can't bypass the
     // key/value validation above and introduce un-sanitized SQL fragments.
     this._sessionVariables = Object.freeze({ ...(variables ?? {}) });
-    this._driverPool = new pg.Pool(pgConfig);
+    const userGetTypeParser = (
+      pgConfig.types as { getTypeParser?: (oid: number, format?: string) => unknown } | undefined
+    )?.getTypeParser;
+    this._driverPool = new pg.Pool({
+      ...pgConfig,
+      types: {
+        getTypeParser(oid: number, format?: string): unknown {
+          // Our Temporal parsers handle text-format for the 5 datetime OIDs.
+          // For all other OIDs, respect any user-supplied parser first, then
+          // delegate to getTemporalTypeParser which falls back to pg built-ins.
+          if (TEMPORAL_OIDS.has(oid) && (format === "text" || !format)) {
+            return getTemporalTypeParser(oid, format);
+          }
+          return userGetTypeParser?.(oid, format) ?? getTemporalTypeParser(oid, format);
+        },
+      },
+    });
   }
 
   /**
@@ -451,7 +477,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       fields: Array<{ name: string; dataTypeID: number }>;
       rows: unknown[][];
     }
-    const bindArray = binds ?? [];
+    // Convert any Temporal values to SQL strings before pg sees them.
+    // pg's extended/prepared protocol serializes parameters via its own
+    // writer which has no Temporal support.
+    const bindArray = (binds ?? []).map((v) => temporalToBindString(v, "postgres"));
     const rewritten = this.rewriteBinds(sql, bindArray);
     const payload: Record<string, unknown> = {
       sql: rewritten,
@@ -843,6 +872,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): Promise<Record<string, unknown>[]> {
     this.checkIfWriteQuery(sql);
     await this.materializeTransactions();
+    binds = binds.map((v) => temporalToBindString(v, "postgres"));
     const rewritten = this.rewriteBinds(sql, binds);
     // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
     // stores something that can be re-EXPLAIN'd on the same adapter
@@ -881,6 +911,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     this.checkIfWriteQuery(sql);
     await this.materializeTransactions();
+    binds = binds.map((v) => temporalToBindString(v, "postgres"));
     const pgSql = this.rewriteBinds(sql, binds);
     // payload.sql records the rewritten SQL — ExplainSubscriber captures
     // something that can be re-EXPLAIN'd without re-running rewriteBinds
@@ -1213,8 +1244,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // re-EXPLAIN'd. Bind values pass through to pg as the values
       // array so `EXPLAIN` with parameters doesn't error with
       // "there is no parameter $1".
-      const rewritten = this.rewriteBinds(sql, binds);
-      const result = await client.query(`${clause} ${rewritten}`, binds);
+      const pgBinds = binds.map((v) => temporalToBindString(v, "postgres"));
+      const rewritten = this.rewriteBinds(sql, pgBinds);
+      const result = await client.query(`${clause} ${rewritten}`, pgBinds);
       const printer = new ExplainPrettyPrinter();
       return printer.pp(result.rows);
     });

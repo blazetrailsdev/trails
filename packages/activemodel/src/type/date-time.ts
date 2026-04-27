@@ -18,6 +18,8 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   cast(value: unknown): DateTimeCastResult | null {
     if (value === null || value === undefined) return null;
+    if (value === DateInfinity) return DateInfinity;
+    if (value === DateNegativeInfinity) return DateNegativeInfinity;
     if (value instanceof Temporal.Instant) return value;
     if (value instanceof Temporal.PlainDateTime) return value;
     // Dual-typed window: pg driver still returns Date until PR 5a.
@@ -58,6 +60,8 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   serialize(value: unknown): string | null {
     const cast = this.cast(value);
+    // Sentinels are Postgres-specific; base type returns null. The Postgres
+    // OID::DateTime subclass overrides serialize() to emit 'infinity'/'-infinity'.
     if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return null;
     const temporal = cast as Temporal.Instant | Temporal.PlainDateTime;
     const p = this.precision ?? -1;

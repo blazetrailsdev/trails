@@ -1,5 +1,15 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
+
+function epochMs(v: unknown): number {
+  if (v instanceof Temporal.Instant) return v.epochMilliseconds;
+  if (v instanceof Temporal.PlainDateTime)
+    return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
+  throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
+}
+function isTemporalDatetime(v: unknown): boolean {
+  return v instanceof Temporal.Instant || v instanceof Temporal.PlainDateTime;
+}
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_one_associations_test.rb
  */
@@ -1073,9 +1083,9 @@ describe("HasOneAssociationsTest", () => {
     const firm = await TouchFirm.create({ name: "Touch Corp", updated_at: originalTime });
     await TouchAccount.create({ touch_firm_id: firm.id, credit_limit: 100 });
     const reloaded = await TouchFirm.find(firm.id);
-    const updatedAt = reloaded.updated_at as Temporal.Instant;
-    expect(updatedAt).toBeInstanceOf(Temporal.Instant);
-    expect(updatedAt.epochMilliseconds).toBeGreaterThan(originalTime.epochMilliseconds);
+    const updatedAt = reloaded.updated_at;
+    expect(updatedAt).toSatisfy(isTemporalDatetime);
+    expect(epochMs(updatedAt)).toBeGreaterThan(originalTime.epochMilliseconds);
   });
 
   it.skip("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", () => {
@@ -1115,10 +1125,7 @@ describe("HasOneAssociationsTest", () => {
     const acct = await TouchUpdAccount.create({ touch_upd_firm_id: firm.id, credit_limit: 100 });
     const afterCreate = await TouchUpdFirm.find(firm.id);
     const timeAfterCreate = afterCreate.updated_at;
-    const createTime =
-      timeAfterCreate instanceof Temporal.Instant
-        ? timeAfterCreate.epochMilliseconds
-        : Number(new Date(String(timeAfterCreate)));
+    const createTime = epochMs(timeAfterCreate);
 
     // Ensure time advances so we can detect the touch
     await new Promise((r) => setTimeout(r, 10));
@@ -1127,10 +1134,7 @@ describe("HasOneAssociationsTest", () => {
     await acct.save();
     const afterUpdate = await TouchUpdFirm.find(firm.id);
     const timeAfterUpdate = afterUpdate.updated_at;
-    const updateTime =
-      timeAfterUpdate instanceof Temporal.Instant
-        ? timeAfterUpdate.epochMilliseconds
-        : Number(new Date(String(timeAfterUpdate)));
+    const updateTime = epochMs(timeAfterUpdate);
     expect(updateTime).toBeGreaterThan(createTime);
   });
 
@@ -1165,20 +1169,14 @@ describe("HasOneAssociationsTest", () => {
     const acct = await TouchDesAccount.create({ touch_des_firm_id: firm.id, credit_limit: 100 });
     const afterCreate = await TouchDesFirm.find(firm.id);
     const afterCreateAt = afterCreate.updated_at;
-    const afterCreateTime =
-      afterCreateAt instanceof Temporal.Instant
-        ? afterCreateAt.epochMilliseconds
-        : Number(new Date(String(afterCreateAt)));
+    const afterCreateTime = epochMs(afterCreateAt);
 
     await new Promise((r) => setTimeout(r, 10));
 
     await acct.destroy();
     const afterDestroy = await TouchDesFirm.find(firm.id);
     const afterDestroyAt = afterDestroy.updated_at;
-    const afterDestroyTime =
-      afterDestroyAt instanceof Temporal.Instant
-        ? afterDestroyAt.epochMilliseconds
-        : Number(new Date(String(afterDestroyAt)));
+    const afterDestroyTime = epochMs(afterDestroyAt);
     expect(afterDestroyTime).toBeGreaterThan(afterCreateTime);
   });
 

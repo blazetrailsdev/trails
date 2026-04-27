@@ -2,6 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/quoting_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quoting.js";
 
@@ -73,23 +74,24 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("quote date", async () => {
       const rows = await adapter.execute("SELECT DATE '2023-01-15' AS val");
-      const val = rows[0].val;
-      expect(val).toBeInstanceOf(Date);
-      expect((val as Date).getFullYear()).toBe(2023);
+      const val = rows[0].val as Temporal.PlainDate;
+      expect(val).toBeInstanceOf(Temporal.PlainDate);
+      expect(val.year).toBe(2023);
     });
 
     it("quote time", async () => {
       const rows = await adapter.execute("SELECT TIME '14:30:00' AS val");
-      const val = rows[0].val;
-      expect(typeof val === "string" || val instanceof Date).toBe(true);
-      expect(String(val)).toContain("14:30");
+      const val = rows[0].val as Temporal.PlainTime;
+      expect(val).toBeInstanceOf(Temporal.PlainTime);
+      expect(val.hour).toBe(14);
+      expect(val.minute).toBe(30);
     });
 
     it("quote timestamp", async () => {
       const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 14:30:00' AS val");
-      const val = rows[0].val;
-      expect(val).toBeInstanceOf(Date);
-      expect((val as Date).getFullYear()).toBe(2023);
+      const val = rows[0].val as Temporal.PlainDateTime;
+      expect(val).toBeInstanceOf(Temporal.PlainDateTime);
+      expect(val.year).toBe(2023);
     });
 
     it.skip("quote range", async () => {});

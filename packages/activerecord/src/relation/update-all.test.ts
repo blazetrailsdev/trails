@@ -1,5 +1,12 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
+
+function epochMs(v: unknown): number {
+  if (v instanceof Temporal.Instant) return v.epochMilliseconds;
+  if (v instanceof Temporal.PlainDateTime)
+    return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
+  throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
+}
 /**
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
@@ -269,9 +276,7 @@ describe("UpdateAllTest", () => {
     await Post.all().touchAll();
     const p = (await Post.first()) as any;
     const updatedAt = p.updated_at;
-    expect((updatedAt as Temporal.Instant).epochMilliseconds).toBeGreaterThan(
-      past.epochMilliseconds,
-    );
+    expect(epochMs(updatedAt)).toBeGreaterThan(past.epochMilliseconds);
   });
 
   it.skip("touch all with custom timestamp", () => {
