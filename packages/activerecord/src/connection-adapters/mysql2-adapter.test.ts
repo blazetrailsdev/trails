@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import mysql from "mysql2/promise";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { Base, transaction, registerModel, loadBelongsTo, loadHasMany } from "../index.js";
 
@@ -685,6 +686,85 @@ describeIfMysql("Mysql2Adapter", () => {
       const cols = await cache.columns(adapter, "widgets");
       expect(cols?.map((c) => c.name)).toEqual(["id", "name", "owner"]);
       expect(await cache.primaryKeys(adapter, "widgets")).toBe("id");
+    });
+  });
+
+  describe("Temporal type parsers", () => {
+    beforeEach(async () => {
+      await adapter.exec("DROP TABLE IF EXISTS `temporal_test`");
+      await adapter.exec(`
+        CREATE TABLE \`temporal_test\` (
+          \`id\` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+          \`ts\` TIMESTAMP(6) NULL,
+          \`dt\` DATETIME(6) NULL,
+          \`d\` DATE NULL,
+          \`t\` TIME(6) NULL
+        )
+      `);
+    });
+
+    afterEach(async () => {
+      await adapter.exec("DROP TABLE IF EXISTS `temporal_test`");
+    });
+
+    it("round-trips TIMESTAMP(6) with microsecond precision as Temporal.Instant", async () => {
+      await adapter.exec(
+        "INSERT INTO `temporal_test` (`ts`) VALUES ('2026-04-27 14:23:55.123456')",
+      );
+      const rows = await adapter.execute("SELECT `ts` FROM `temporal_test`");
+      expect(rows[0].ts).toBeInstanceOf(Temporal.Instant);
+      expect((rows[0].ts as Temporal.Instant).epochNanoseconds % 1000000000n).toBe(123456000n);
+    });
+
+    it("round-trips DATETIME(6) with microsecond precision as Temporal.PlainDateTime", async () => {
+      await adapter.exec(
+        "INSERT INTO `temporal_test` (`dt`) VALUES ('2026-04-27 14:23:55.123456')",
+      );
+      const rows = await adapter.execute("SELECT `dt` FROM `temporal_test`");
+      expect(rows[0].dt).toBeInstanceOf(Temporal.PlainDateTime);
+      const pdt = rows[0].dt as Temporal.PlainDateTime;
+      // .123456 s → millisecond=123, microsecond=456 (sub-ms component)
+      expect(pdt.millisecond).toBe(123);
+      expect(pdt.microsecond).toBe(456);
+    });
+
+    it("returns null for zero DATETIME '0000-00-00 00:00:00'", async () => {
+      // NO_ZERO_DATE in sql_mode rejects the insert. Check first and skip if set.
+      const modeRows = await adapter.execute("SELECT @@SESSION.sql_mode AS m");
+      const sqlMode = String(modeRows[0].m ?? "");
+      if (sqlMode.includes("NO_ZERO_DATE") || sqlMode.includes("TRADITIONAL")) return;
+      await adapter.exec("INSERT INTO `temporal_test` (`dt`) VALUES ('0000-00-00 00:00:00')");
+      const rows = await adapter.execute("SELECT `dt` FROM `temporal_test`");
+      expect(rows[0].dt).toBeNull();
+    });
+
+    it("round-trips DATE as Temporal.PlainDate", async () => {
+      await adapter.exec("INSERT INTO `temporal_test` (`d`) VALUES ('2026-04-27')");
+      const rows = await adapter.execute("SELECT `d` FROM `temporal_test`");
+      expect(rows[0].d).toBeInstanceOf(Temporal.PlainDate);
+      expect((rows[0].d as Temporal.PlainDate).toString()).toBe("2026-04-27");
+    });
+
+    it("round-trips TIME(6) with microsecond precision as Temporal.PlainTime", async () => {
+      await adapter.exec("INSERT INTO `temporal_test` (`t`) VALUES ('14:23:55.123456')");
+      const rows = await adapter.execute("SELECT `t` FROM `temporal_test`");
+      expect(rows[0].t).toBeInstanceOf(Temporal.PlainTime);
+      const pt = rows[0].t as Temporal.PlainTime;
+      expect(pt.hour).toBe(14);
+      expect(pt.second).toBe(55);
+      expect(pt.millisecond).toBe(123);
+      expect(pt.microsecond).toBe(456);
+    });
+
+    it("does not affect a sibling mysql2 connection (no global registry mutation)", async () => {
+      const conn = await mysql.createConnection({ uri: MYSQL_TEST_URL });
+      try {
+        const [rows] = await conn.query<mysql.RowDataPacket[]>("SELECT NOW() AS now");
+        // A raw mysql2 connection with no dateStrings option returns Date objects.
+        expect(rows[0].now).toBeInstanceOf(Date);
+      } finally {
+        await conn.end();
+      }
     });
   });
 });

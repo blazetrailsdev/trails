@@ -192,12 +192,16 @@ describe("parsePostgresTimeTz", () => {
 describe("parseMysqlInstant", () => {
   it("treats the wire string as UTC (pinned session tz)", () => {
     const result = parseMysqlInstant("2026-04-26 14:23:55.123456");
-    expect(result.toString()).toBe("2026-04-26T14:23:55.123456Z");
+    expect(result?.toString()).toBe("2026-04-26T14:23:55.123456Z");
   });
 
   it("preserves microseconds", () => {
     const result = parseMysqlInstant("2024-01-01 00:00:00.000001");
-    expect(result.toString()).toBe("2024-01-01T00:00:00.000001Z");
+    expect(result?.toString()).toBe("2024-01-01T00:00:00.000001Z");
+  });
+
+  it("returns null for zero timestamp", () => {
+    expect(parseMysqlInstant("0000-00-00 00:00:00")).toBeNull();
   });
 });
 

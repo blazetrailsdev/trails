@@ -128,9 +128,11 @@ export function parsePostgresTimeTz(text: string): TimeTzValue {
  * Wire format: `'YYYY-MM-DD HH:MM:SS[.ffffff]'` (no offset in string;
  * semantically UTC because of the pinned session timezone).
  */
-export function parseMysqlInstant(text: string): Temporal.Instant {
-  // Treat as UTC by appending Z after normalising the separator.
-  const iso = clampFraction(text.trim().replace(" ", "T") + "Z");
+export function parseMysqlInstant(text: string): Temporal.Instant | null {
+  const trimmed = text.trim();
+  // MySQL can emit zero timestamps from legacy schemas even on TIMESTAMP columns.
+  if (isZeroDatetime(trimmed)) return null;
+  const iso = clampFraction(trimmed.replace(" ", "T") + "Z");
   return Temporal.Instant.from(iso);
 }
 
