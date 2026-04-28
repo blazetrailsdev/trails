@@ -87,6 +87,25 @@ describe("QueryAttribute", () => {
     expect(new QueryAttribute("x", 999, intType).isInfinite()).toBe(false);
   });
 
+  it("isInfinite checks valueForDatabase for serializable types", () => {
+    const expandingType = {
+      cast: (v: unknown) => v,
+      serialize: (_v: unknown) => Infinity,
+    };
+    const attr = new QueryAttribute("x", "anything", expandingType);
+    expect(attr.isInfinite()).toBe(true);
+  });
+
+  it("isInfinite handles Ruby-style duck-typed `infinite()` (nil for finite, 1/-1 for infinite)", () => {
+    const finite = { infinite: () => null };
+    const positiveInf = { infinite: () => 1 };
+    const negativeInf = { infinite: () => -1 };
+    const passthrough = { cast: (v: unknown) => v, serialize: (v: unknown) => v };
+    expect(new QueryAttribute("x", finite, passthrough).isInfinite()).toBe(false);
+    expect(new QueryAttribute("x", positiveInf, passthrough).isInfinite()).toBe(true);
+    expect(new QueryAttribute("x", negativeInf, passthrough).isInfinite()).toBe(true);
+  });
+
   it("equals compares name, value, and type", () => {
     const a = new QueryAttribute("age", "25", intType);
     const b = new QueryAttribute("age", "25", intType);

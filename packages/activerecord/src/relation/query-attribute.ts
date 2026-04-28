@@ -57,13 +57,19 @@ export class QueryAttribute extends Attribute {
     return QueryAttribute.withCastValue(this.name, value, this.type);
   }
 
+  override get valueForDatabase(): unknown {
+    return super.valueForDatabase;
+  }
+
   isNil(): boolean {
     return this.valueBeforeTypeCast === null || this.valueBeforeTypeCast === undefined;
   }
 
   isInfinite(): boolean {
-    const v = this.valueBeforeTypeCast;
-    return v === Infinity || v === -Infinity;
+    return (
+      isInfinity(this.valueBeforeTypeCast) ||
+      (this.isSerializable() && isInfinity(this.valueForDatabase))
+    );
   }
 
   isUnboundable(): boolean {
@@ -71,11 +77,14 @@ export class QueryAttribute extends Attribute {
   }
 }
 
+// private
+
 function isInfinity(value: unknown): boolean {
-  return (
-    value !== null &&
-    value !== undefined &&
-    typeof (value as any).infinite === "function" &&
-    (value as any).infinite() !== 0
-  );
+  if (value === Infinity || value === -Infinity) return true;
+  if (value === null || value === undefined) return false;
+  const fn = (value as { infinite?: unknown }).infinite;
+  if (typeof fn !== "function") return false;
+  const result = (fn as () => unknown).call(value);
+  // Mirrors Ruby truthiness for duck-typed infinite() results: only nil/false are falsy.
+  return result != null && result !== false;
 }
