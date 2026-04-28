@@ -84,9 +84,12 @@ export function mergeBang(this: any, other: any): any {
         ...(this._eagerLoadAssociations ?? []),
         ...other._eagerLoadAssociations,
       ];
-    // mergeJoins (preserve original order across both join stores: _joinClauses and _joinValues)
+    // mergeJoins (preserve original order across all join stores)
     this._joinClauses.push(...(other._joinClauses ?? []));
     this._joinValues.push(...(other._joinValues ?? []));
+    for (const v of other._leftOuterJoinsValues ?? []) {
+      if (!this._leftOuterJoinsValues.includes(v)) this._leftOuterJoinsValues.push(v);
+    }
     // sticky none
     if (other._isNone) this._isNone = true;
   } else if (typeof other === "object" && other !== null) {

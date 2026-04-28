@@ -67,21 +67,27 @@ export class Merger {
   private mergeJoins(rel: any): void {
     // Rails: joins_values and left_outer_joins_values are separate arrays, so each
     // merge helper unions its own array independently (no interleaving in Rails).
-    // In our codebase both types share _joinClauses in insertion order. Push the
-    // entire array here so the original sequence is preserved — Arel::Nodes::InnerJoin
-    // is the type used for same-model inner joins in Rails' cross-model merge path.
+    // Our codebase mirrors that split: explicit SQL joins go into _joinClauses,
+    // Arel/string join nodes into _joinValues, and named left-outer-join associations
+    // into _leftOuterJoinsValues. Each is merged independently below.
+    // Arel::Nodes::InnerJoin is the type used for same-model inner joins in Rails'
+    // cross-model merge path.
     const clauses: Array<{ type: string; table: string; on: string; quoted?: boolean }> =
       this.other._joinClauses ?? [];
     if (clauses.length > 0) rel._joinClauses.push(...clauses);
     if (this.other._joinValues?.length > 0) rel._joinValues.push(...this.other._joinValues);
+    for (const v of this.other._leftOuterJoinsValues ?? []) {
+      if (!rel._leftOuterJoinsValues.includes(v)) rel._leftOuterJoinsValues.push(v);
+    }
     void Nodes.InnerJoin;
   }
 
   private mergeOuterJoins(_rel: any): void {
-    // Our _joinClauses already contains both inner and outer joins (merged above
-    // in order). Rails' merge_outer_joins handles left_outer_joins_values, a
-    // separate array not present in our data model — Arel::Nodes::OuterJoin is
-    // the type used in Rails' cross-model outer-join path.
+    // Same-model left outer join associations are merged in mergeJoins above via
+    // _leftOuterJoinsValues. Rails' merge_outer_joins also handles a cross-model
+    // path (partitions associations, calls left_outer_joins! on a new JoinDependency)
+    // which is not yet implemented here — Arel::Nodes::OuterJoin is the join type
+    // used in that cross-model path.
     void Nodes.OuterJoin;
   }
 

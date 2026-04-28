@@ -110,7 +110,12 @@ function _addAssocJoin(
   join: { table: string; on: string },
   assocName: string,
   modelClass: any,
+  leftOuterJoinsValues?: ReadonlyArray<unknown>,
 ): void {
+  // If the association is already covered by _leftOuterJoinsValues (deferred
+  // LEFT OUTER JOIN path), skip — the join will be emitted when the manager
+  // is built, so adding a second join here would cause ambiguous column names.
+  if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return;
   const sameTableJoins = clauses.filter((j) => j.table === join.table);
   if (sameTableJoins.length > 0) {
     if (sameTableJoins.every((j) => j.on === join.on)) return; // all compatible — skip
@@ -237,6 +242,7 @@ export class Relation<T extends Base> {
     quoted?: boolean;
   }> = [];
   private _joinValues: (string | Nodes.Join)[] = [];
+  private _leftOuterJoinsValues: AssociationSpec[] = [];
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
   private _eagerLoadAssociations: AssociationSpec[] = [];
@@ -379,7 +385,14 @@ export class Relation<T extends Base> {
       }
       const cloned = rel._clone();
       for (const join of target.joins) {
-        _addAssocJoin(cloned._joinClauses, "inner", join, assocName, rel._modelClass as any);
+        _addAssocJoin(
+          cloned._joinClauses,
+          "inner",
+          join,
+          assocName,
+          rel._modelClass as any,
+          cloned._leftOuterJoinsValues,
+        );
       }
       const tgtTable = new Table(target.table);
       for (const pk of target.pks) {
@@ -410,7 +423,14 @@ export class Relation<T extends Base> {
       }
       const cloned = rel._clone();
       for (const join of target.joins) {
-        _addAssocJoin(cloned._joinClauses, "left", join, assocName, rel._modelClass as any);
+        _addAssocJoin(
+          cloned._joinClauses,
+          "left",
+          join,
+          assocName,
+          rel._modelClass as any,
+          cloned._leftOuterJoinsValues,
+        );
       }
       const tgtTable = new Table(target.table);
       for (const pk of target.pks) {
@@ -1240,24 +1260,13 @@ export class Relation<T extends Base> {
   leftJoins(table: string, on?: string): Relation<T> {
     const rel = this._clone();
     if (on) {
+      // Explicit SQL form: LEFT OUTER JOIN table ON condition — store directly.
       rel._joinClauses.push({ type: "left", table, on });
     } else {
-      const resolved = rel._resolveAssociationJoin(table);
-      if (resolved) {
-        if (Array.isArray(resolved)) {
-          for (const join of resolved) {
-            rel._joinClauses.push({ type: "left", table: join.table, on: join.on, quoted: true });
-          }
-        } else {
-          rel._joinClauses.push({
-            type: "left",
-            table: resolved.table,
-            on: resolved.on,
-            quoted: true,
-          });
-        }
-      } else {
-        rel._joinClauses.push({ type: "left", table, on: "1=1" });
+      // Association name form — mirrors Rails left_outer_joins! storing in
+      // left_outer_joins_values for deferred resolution via JoinDependency.
+      if (!rel._leftOuterJoinsValues.includes(table as AssociationSpec)) {
+        rel._leftOuterJoinsValues.push(table as AssociationSpec);
       }
     }
     return rel;
@@ -1925,8 +1934,21 @@ export class Relation<T extends Base> {
     // other joins → join.left.name. Mirror that: strings become StringJoin and we
     // extract via tablesInString; Arel nodes expose their table via left.name when
     // available (InnerJoin/OuterJoin/LeadingJoin all have left: Table).
+    // _leftOuterJoinsValues holds association names (not table names). Rails
+    // build_joins([]) processes left_outer_joins_values and extracts table names
+    // from the resulting join nodes. We resolve via _resolveAssociationJoin to
+    // get the actual table name (handles camelCase → snake_case mappings).
+    const leftOuterTables = this._leftOuterJoinsValues
+      .filter((v): v is string => typeof v === "string")
+      .flatMap((v) => {
+        const resolved = this._resolveAssociationJoin(v);
+        if (!resolved) return [v.toLowerCase()]; // fallback
+        const entries = Array.isArray(resolved) ? resolved : [resolved];
+        return entries.map((e) => e.table.toLowerCase());
+      });
     const joinedTables = new Set<string>([
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
+      ...leftOuterTables,
       ...this._joinValues.flatMap((v) => {
         if (typeof v === "string") {
           const join = new Nodes.StringJoin(new Nodes.SqlLiteral(v));
@@ -2324,10 +2346,12 @@ export class Relation<T extends Base> {
     // after), LeadingJoin goes to leading_join (prepended before). Without stashed
     // joins all nodes go to leading_join in insertion order (Rails' else branch).
     // Stashed signal: existing join_sources (set by _buildEagerJoinManager before
-    // this call) OR _eagerLoadAssociations (stashed_eager_load equivalent).
-    // _includesAssociations is NOT included — includes may resolve via preload
-    // (no joins), so counting it would incorrectly split even in the non-join path.
-    const hasStashed = manager.joinSourceCount > 0 || this._eagerLoadAssociations.length > 0;
+    // this call) OR eagerLoad (stashed_eager_load) OR leftOuterJoins associations
+    // (stashed_left_joins).
+    const hasStashed =
+      manager.joinSourceCount > 0 ||
+      this._eagerLoadAssociations.length > 0 ||
+      this._leftOuterJoinsValues.length > 0;
     const leadingJoins: Nodes.Join[] = [];
     const joinNodes: Nodes.Join[] = [];
     for (const v of this._joinValues) {
@@ -2348,6 +2372,23 @@ export class Relation<T extends Base> {
       } else {
         manager.outerJoin(tableNode, onNode);
       }
+    }
+    // Process left_outer_joins_values: resolve via JoinDependency and emit as
+    // StringJoin nodes (mirrors Rails build_join_buckets stashed_left_joins path).
+    // Exclude associations already covered by _eagerLoadAssociations OR by
+    // includes promoted to eager load (includes().references()) — both cause
+    // _buildEagerJoinManager to emit LEFT OUTER JOINs, so emitting again here
+    // would produce duplicate JOINs / ambiguous column errors.
+    const promotedIncludes = this._includesToPromoteFromReferences();
+    const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
+    const pendingLeftOuter = this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v));
+    if (pendingLeftOuter.length > 0) {
+      const jd = QueryMethodBangs.constructJoinDependency.call(
+        this as any,
+        pendingLeftOuter,
+        Nodes.OuterJoin,
+      );
+      for (const node of jd.joinConstraints([])) manager.appendJoinNode(node);
     }
     for (const node of joinNodes) manager.appendJoinNode(node);
   }
@@ -3946,6 +3987,7 @@ export class Relation<T extends Base> {
       this._havingClause.isEmpty() &&
       this._joinClauses.length === 0 &&
       this._joinValues.length === 0 &&
+      this._leftOuterJoinsValues.length === 0 &&
       this._includesAssociations.length === 0 &&
       this._eagerLoadAssociations.length === 0 &&
       this._preloadAssociations.length === 0 &&
@@ -4201,6 +4243,7 @@ export class Relation<T extends Base> {
     this._setOperation = source._setOperation;
     this._joinClauses = [...source._joinClauses];
     this._joinValues = [...source._joinValues];
+    this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];
     this._includesAssociations = [...source._includesAssociations];
     this._preloadAssociations = [...source._preloadAssociations];
     this._eagerLoadAssociations = [...source._eagerLoadAssociations];

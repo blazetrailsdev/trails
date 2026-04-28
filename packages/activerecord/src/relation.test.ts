@@ -292,6 +292,98 @@ describe("RelationTest", () => {
     expect(sql).toContain('"books"."author_id"');
   });
 
+  it("leftJoins(:assoc) stores in _leftOuterJoinsValues and generates LEFT OUTER JOIN", () => {
+    class Author extends Base {
+      static {
+        this.tableName = "authors";
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.tableName = "posts";
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("LeftJoinAuthor2", Author);
+    registerModel("LeftJoinPost2", Post);
+    Associations.hasMany.call(Author, "posts", {
+      className: "LeftJoinPost2",
+      foreignKey: "author_id",
+    });
+
+    const rel = Author.leftJoins("posts");
+    // Association name stored in _leftOuterJoinsValues, not pre-resolved to _joinClauses
+    expect((rel as any)._leftOuterJoinsValues).toContain("posts");
+    expect((rel as any)._joinClauses.some((j: any) => j.table === "posts")).toBe(false);
+    // SQL still contains LEFT OUTER JOIN
+    expect(rel.toSql()).toMatch(/LEFT OUTER JOIN/i);
+  });
+
+  it("includes().references() + leftJoins(): no duplicate LEFT OUTER JOIN in SQL", () => {
+    // Regression: includes promoted to eager load via references() causes
+    // _buildEagerJoinManager to emit the LEFT OUTER JOIN. The pendingLeftOuter
+    // filter must exclude promoted includes so leftJoins(:assoc) doesn't emit
+    // a second JOIN for the same association.
+    class Author extends Base {
+      static {
+        this.tableName = "authors";
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.tableName = "posts";
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("RefLeftAuthor", Author);
+    registerModel("RefLeftPost", Post);
+    Associations.hasMany.call(Author, "posts", {
+      className: "RefLeftPost",
+      foreignKey: "author_id",
+    });
+
+    const rel = Author.all().includes("posts").references("posts").leftJoins("posts");
+    const sqlStr = rel.toSql();
+    // "posts" table should appear only once in LEFT OUTER JOIN clauses
+    const leftJoinMatches = sqlStr.match(/LEFT OUTER JOIN/gi) ?? [];
+    expect(leftJoinMatches.length).toBe(1);
+  });
+
+  it("eagerLoad + leftJoins: buildJoinBuckets short-circuit does not drop eager stash", () => {
+    // Regression: when _joinValues and _joinClauses are empty, buildJoinBuckets
+    // short-circuits for the left-outer-only path. If _eagerLoadAssociations is
+    // also present, the short-circuit must not fire — eager stash would be skipped.
+    class Author extends Base {
+      static {
+        this.tableName = "authors";
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.tableName = "posts";
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("EagerLeftAuthor", Author);
+    registerModel("EagerLeftPost", Post);
+    Associations.hasMany.call(Author, "posts", {
+      className: "EagerLeftPost",
+      foreignKey: "author_id",
+    });
+    // Both eagerLoad and leftJoins present, no explicit _joinValues/_joinClauses
+    const rel = Author.leftJoins("posts").eagerLoad("posts");
+    expect((rel as any)._eagerLoadAssociations).toContain("posts");
+    expect((rel as any)._leftOuterJoinsValues).toContain("posts");
+    // buildJoinBuckets must not short-circuit; SQL must be non-empty (no throw)
+    expect(() => rel.toSql()).not.toThrow();
+  });
+
   it("joins() preserves Arel node type — InnerJoin stays InnerJoin in _joinValues, not StringJoin", () => {
     class Book extends Base {
       static {
