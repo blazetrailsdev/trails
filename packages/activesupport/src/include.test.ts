@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { include, extend, included, extended } from "./include.js";
+import { describe, it, expect, expectTypeOf } from "vitest";
+import { include, extend, included, extended, type Included, type Extended } from "./include.js";
 
 describe("include", () => {
   it("copies instance methods onto the prototype", () => {
@@ -198,5 +198,71 @@ describe("extend", () => {
       },
     });
     expect((User as any).findByName()).toBe("found");
+  });
+});
+
+describe("Included<>", () => {
+  // Regression for https://github.com/blazetrailsdev/trails/pull/967 —
+  // when Included<> was constrained over `Record<string, Function>`, the
+  // resulting mapped type carried a string index signature that propagated
+  // into the merging class and forced every subclass field to be
+  // function-typed. Mixing into a class with non-method fields broke.
+  it("does not introduce a string index signature into the merged type", () => {
+    const Mod = {
+      hello(this: unknown, name: string): string {
+        return `hi ${name}`;
+      },
+    };
+    type T = Included<typeof Mod>;
+    expectTypeOf<T>().toEqualTypeOf<{ hello: (name: string) => string }>();
+    // A class with non-function fields can extend the Included<> interface
+    // without TS demanding those fields conform to the function signature.
+    /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging,
+                      @typescript-eslint/no-empty-object-type */
+    interface Host extends T {}
+    class Host {
+      readonly count: number = 0;
+      readonly label: string = "";
+    }
+    const h = new Host();
+    expect(h.count).toBe(0);
+    expect(h.label).toBe("");
+    /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging,
+                     @typescript-eslint/no-empty-object-type */
+  });
+
+  it("strips the this parameter and skips non-method properties", () => {
+    const Mod = {
+      greet(this: { name: string }): string {
+        return this.name;
+      },
+      version: 1 as const,
+    };
+    type T = Included<typeof Mod>;
+    expectTypeOf<T>().toEqualTypeOf<{ greet: () => string }>();
+  });
+});
+
+describe("Extended<>", () => {
+  // Extended<> shares its implementation with Included<> via the internal
+  // CallableMethods<> helper. Mirror the Included<> regression assertions
+  // so a future divergence in either type's behavior fails its own test.
+  it("does not introduce a string index signature into the merged type", () => {
+    const Mod = {
+      connectedTo(this: unknown, role: string): number {
+        return role.length;
+      },
+    };
+    type T = Extended<typeof Mod>;
+    expectTypeOf<T>().toEqualTypeOf<{ connectedTo: (role: string) => number }>();
+  });
+
+  it("strips the this parameter and skips non-method properties", () => {
+    const Mod = {
+      establish(this: { tag: string }): void {},
+      pool: 5 as const,
+    };
+    type T = Extended<typeof Mod>;
+    expectTypeOf<T>().toEqualTypeOf<{ establish: () => void }>();
   });
 });
