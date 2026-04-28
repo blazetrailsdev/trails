@@ -394,10 +394,10 @@ jobs:
     name: Website
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
-    # Self-hosted runner can go offline (laptop closed, service crash).
-    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
-    timeout-minutes: 30
+    # Stays on hosted: SvelteKit + VitePress + typedoc build is too slow
+    # on the self-hosted box and ties up a runner slot that cheaper jobs
+    # could use. Hosted parallelism is free.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
