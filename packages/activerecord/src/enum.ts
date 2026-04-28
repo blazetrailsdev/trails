@@ -1,7 +1,6 @@
-import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
-import { camelize, pluralize } from "@blazetrails/activesupport";
-import { ValueType } from "@blazetrails/activemodel";
+import { camelize, isBlank, pluralize } from "@blazetrails/activesupport";
+import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 
 /**
  * Enum definition — maps symbolic names to integer values.
@@ -397,63 +396,156 @@ export function castEnumValue(
   return def.type.serialize(value) as number | null;
 }
 
-function name(): never {
-  throw new NotImplementedError("ActiveRecord::Enum::EnumType#name is not implemented");
-}
-
-function klass(): never {
-  throw new NotImplementedError("ActiveRecord::Enum::EnumMethods#klass is not implemented");
-}
-
-function defineEnumMethods(
-  name: any,
-  valueMethodName: any,
-  value: any,
-  scopes: any,
-  instanceMethods: any,
-): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Enum::EnumMethods#define_enum_methods is not implemented",
-  );
-}
-
-function _enum(
-  name: any,
+/**
+ * Validate enum values are non-empty array or hash with proper types.
+ * Mirrors: ActiveRecord::Enum#assert_valid_enum_definition_values (private)
+ *
+ * Accepts both strings and symbols in arrays (Rails parity). JavaScript symbols
+ * are the closest equivalent to Ruby symbols; strings are used directly.
+ */
+export function assertValidEnumDefinitionValues(
   values: any,
-  prefix?: any,
-  suffix?: any,
-  scopes?: any,
-  instanceMethods?: any,
-  validate?: any,
-  options?: any,
-): never {
-  throw new NotImplementedError("ActiveRecord::Enum#_enum is not implemented");
+): Record<string, string | number | boolean | null> | (string | symbol)[] {
+  if (Array.isArray(values)) {
+    if (values.length === 0) {
+      throw new ArgumentError("Enum values must not be empty.");
+    }
+    const allValid = values.every((v) => typeof v === "string" || typeof v === "symbol");
+    if (!allValid) {
+      throw new ArgumentError(
+        `Enum values must only contain strings or symbols, got: ${Array.from(
+          new Set(values.map((v) => typeof v)),
+        ).join(", ")}`,
+      );
+    }
+    if (
+      values.some((v) => {
+        if (typeof v === "symbol") {
+          // Reject Symbol("") / Symbol("   ") — mirror Ruby Symbol#blank?
+          const desc = v.description ?? Symbol.keyFor(v) ?? "";
+          return isBlank(desc);
+        }
+        return isBlank(v);
+      })
+    ) {
+      throw new ArgumentError("Enum values must not contain a blank name.");
+    }
+    return values;
+  }
+
+  if (isPlainHash(values)) {
+    // Use Reflect.ownKeys so symbol-keyed entries (e.g. { [Symbol('draft')]: 0 })
+    // aren't silently dropped by Object.keys; symbols are validated alongside
+    // strings to mirror Ruby Hash + Symbol semantics.
+    const keys = Reflect.ownKeys(values as object);
+    if (keys.length === 0) {
+      throw new ArgumentError("Enum values must not be empty.");
+    }
+    if (
+      keys.some((k) => {
+        if (typeof k === "symbol") {
+          const desc = k.description ?? Symbol.keyFor(k) ?? "";
+          return isBlank(desc);
+        }
+        return isBlank(k);
+      })
+    ) {
+      throw new ArgumentError("Enum values must not contain a blank name.");
+    }
+    for (const k of keys) {
+      const value = (values as Record<string | symbol, unknown>)[k as string];
+      const isFiniteNumber = typeof value === "number" && Number.isFinite(value);
+      if (
+        !(
+          typeof value === "string" ||
+          isFiniteNumber ||
+          typeof value === "boolean" ||
+          value === null
+        )
+      ) {
+        throw new ArgumentError(
+          `Enum values must be only booleans, finite numbers, strings, or null, got: ${
+            typeof value === "number" ? String(value) : typeof value
+          }`,
+        );
+      }
+    }
+    return values;
+  }
+
+  throw new ArgumentError("Enum values must be either a non-empty hash or an array.");
 }
 
-function _enumMethodsModule(): never {
-  throw new NotImplementedError("ActiveRecord::Enum#_enum_methods_module is not implemented");
+/** True for plain JS objects (Object.prototype or null proto), matching Ruby Hash semantics. */
+function isPlainHash(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
-function assertValidEnumDefinitionValues(values: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Enum#assert_valid_enum_definition_values is not implemented",
-  );
+/**
+ * Validate enum options: reject underscore-prefixed variants.
+ * Mirrors: ActiveRecord::Enum#assert_valid_enum_options (private)
+ */
+export function assertValidEnumOptions(options: unknown): void {
+  if (!options || !isPlainHash(options)) return;
+
+  // Rails: options.keys & %i[_prefix _suffix _scopes _default _instance_methods]
+  // Note: _validate is NOT in this list — it is rejected at the enum definition
+  // level, not as an option key (enum.rb:361-365).
+  const invalidKeys = ["_prefix", "_suffix", "_scopes", "_default", "_instance_methods"];
+  const found = Object.keys(options).filter((k) => invalidKeys.includes(k));
+
+  if (found.length > 0) {
+    // Rails: invalid_keys.map(&:inspect) — inspect on a Ruby symbol produces ":key"
+    throw new ArgumentError(
+      `invalid option(s): ${found.map((k) => `:${k}`).join(", ")}. Valid options are: :prefix, :suffix, :scopes, :default, :instance_methods, and :validate.`,
+    );
+  }
 }
 
-function assertValidEnumOptions(options: any): never {
-  throw new NotImplementedError("ActiveRecord::Enum#assert_valid_enum_options is not implemented");
+/** Default warn sink — overridable via setEnumWarn so hosts can route warnings. */
+let _enumWarn: (msg: string) => void = (msg) => console.warn(msg);
+
+export function setEnumWarn(fn: (msg: string) => void): void {
+  _enumWarn = fn;
 }
 
-function detectEnumConflictBang(enumName: any, methodName: any, klassMethod?: any): never {
-  throw new NotImplementedError("ActiveRecord::Enum#detect_enum_conflict! is not implemented");
+/**
+ * Warn on negative enum condition conflicts (e.g., both "notDraft" and "draft").
+ * Mirrors: ActiveRecord::Enum#detect_negative_enum_conditions! (private)
+ */
+export function detectNegativeEnumConditionsBang(methodNames: string[]): void {
+  const methodNameSet = new Set(methodNames);
+  for (const notMethod of methodNames) {
+    const normalized = normalizeNegativeEnumPositiveForm(notMethod);
+    if (!normalized) continue;
+    const { prefix, positiveForm } = normalized;
+    if (methodNameSet.has(positiveForm)) {
+      _enumWarn(
+        `Enum uses prefix '${prefix}' which conflicts with auto-generated negative scope '${notMethod}' ` +
+          `while positive form '${positiveForm}' also exists.`,
+      );
+    }
+  }
 }
 
-function raiseConflictError(enumName: any, methodName: any, type?: any, source?: any): never {
-  throw new NotImplementedError("ActiveRecord::Enum#raise_conflict_error is not implemented");
-}
-
-function detectNegativeEnumConditionsBang(methodNames: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Enum#detect_negative_enum_conditions! is not implemented",
-  );
+function normalizeNegativeEnumPositiveForm(
+  methodName: string,
+): { prefix: "not" | "not_"; positiveForm: string } | null {
+  if (methodName.startsWith("not_")) {
+    const rest = methodName.substring(4);
+    if (rest.length === 0) return null;
+    return { prefix: "not_", positiveForm: rest.charAt(0).toLowerCase() + rest.slice(1) };
+  }
+  // Match camelCase generated form: "notDraft" — next char must be uppercase
+  // (so unrelated identifiers like "notebook" / "notify" don't get treated
+  // as negative scopes for "ebook" / "ify").
+  if (methodName.startsWith("not") && methodName.length > 3) {
+    const next = methodName.charAt(3);
+    if (next !== next.toUpperCase() || next === next.toLowerCase()) return null;
+    const rest = methodName.substring(3);
+    return { prefix: "not", positiveForm: rest.charAt(0).toLowerCase() + rest.slice(1) };
+  }
+  return null;
 }
