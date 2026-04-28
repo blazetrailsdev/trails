@@ -1252,21 +1252,27 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Add a LEFT OUTER JOIN. Accepts an association name or a table name
-   * with an ON condition.
+   * Add a LEFT OUTER JOIN. Accepts:
+   * - A string association name: `leftJoins("posts")`
+   * - A hash spec for nested associations: `leftJoins({ posts: "comments" })`
+   * - An array of the above: `leftJoins(["posts", "comments"])`
+   * - A raw table name with an explicit ON clause: `leftJoins("posts", "posts.author_id = authors.id")`
    *
    * Mirrors: ActiveRecord::Relation#left_joins
    */
-  leftJoins(table: string, on?: string): Relation<T> {
+  leftJoins(table: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
     const rel = this._clone();
     if (on) {
-      // Explicit SQL form: LEFT OUTER JOIN table ON condition — store directly.
+      // Explicit SQL form: LEFT OUTER JOIN table ON condition — only valid for strings.
+      if (typeof table !== "string")
+        throw argumentError("leftJoins(table, on) requires a string table name");
       rel._joinClauses.push({ type: "left", table, on });
     } else {
-      // Association name form — mirrors Rails left_outer_joins! storing in
+      // Association name/spec form — mirrors Rails left_outer_joins! storing in
       // left_outer_joins_values for deferred resolution via JoinDependency.
-      if (!rel._leftOuterJoinsValues.includes(table as AssociationSpec)) {
-        rel._leftOuterJoinsValues.push(table as AssociationSpec);
+      const specs = Array.isArray(table) ? table : [table];
+      for (const spec of specs) {
+        if (!rel._leftOuterJoinsValues.includes(spec)) rel._leftOuterJoinsValues.push(spec);
       }
     }
     return rel;
@@ -1277,7 +1283,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#left_outer_joins
    */
-  leftOuterJoins(table?: string, on?: string): Relation<T> {
+  leftOuterJoins(table?: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
     if (!table) return this._clone();
     return this.leftJoins(table, on);
   }

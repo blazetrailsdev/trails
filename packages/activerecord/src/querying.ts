@@ -8,6 +8,7 @@
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
+import type { AssociationSpec } from "./relation/query-methods.js";
 import { sanitizeSql } from "./sanitization.js";
 
 /**
@@ -218,7 +219,7 @@ export function optimizerHints<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#left_joins */
 export function leftJoins<T extends typeof Base>(
   this: T,
-  table: string,
+  table: AssociationSpec | AssociationSpec[],
   on?: string,
 ): Relation<InstanceType<T>> {
   return this.all().leftJoins(table, on);
@@ -227,7 +228,7 @@ export function leftJoins<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#left_outer_joins */
 export function leftOuterJoins<T extends typeof Base>(
   this: T,
-  table?: string,
+  table?: AssociationSpec | AssociationSpec[],
   on?: string,
 ): Relation<InstanceType<T>> {
   return this.all().leftOuterJoins(table, on);
