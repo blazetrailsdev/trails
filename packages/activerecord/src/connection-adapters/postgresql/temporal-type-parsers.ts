@@ -14,7 +14,7 @@
 import pg from "pg";
 import {
   parsePostgresInstant,
-  parsePostgresPlainDateTime,
+  parsePostgresTimestampAsInstant,
   parsePostgresDate,
   parsePostgresTime,
   parsePostgresTimeTz,
@@ -32,7 +32,7 @@ type PgParser = (value: string | Buffer) => unknown;
 
 const TEMPORAL_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgParser>([
   [OID_TIMESTAMPTZ, (v) => parsePostgresInstant(v as string)],
-  [OID_TIMESTAMP, (v) => parsePostgresPlainDateTime(v as string)],
+  [OID_TIMESTAMP, (v) => parsePostgresTimestampAsInstant(v as string)],
   [OID_DATE, (v) => parsePostgresDate(v as string)],
   [OID_TIME, (v) => parsePostgresTime(v as string)],
   [OID_TIMETZ, (v) => parsePostgresTimeTz(v as string)],

@@ -20,13 +20,12 @@ interface Identifiable {
 // Timestamp formatting  (mirrors Time#to_fs)
 // ──────────────────────────────────────────────
 
-type TemporalTimestamp = Temporal.Instant | Temporal.PlainDateTime;
+type TemporalTimestamp = Temporal.Instant;
 
 // Mirrors: Time#to_fs(:usec) → "YYYYMMDDHHMMSSuuuuuu" (20 chars)
 // Temporal has microsecond precision; the last 3 digits are microseconds (not zeros).
 function toFsUsec(ts: TemporalTimestamp): string {
-  const dt =
-    ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : (ts as Temporal.PlainDateTime);
+  const dt = ts.toZonedDateTimeISO("UTC");
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
   const d = dt.day.toString().padStart(2, "0");
@@ -39,8 +38,7 @@ function toFsUsec(ts: TemporalTimestamp): string {
 
 // Mirrors: Time#to_fs(:number) → "YYYYMMDDHHMMSS" (14 chars)
 function toFsNumber(ts: TemporalTimestamp): string {
-  const dt =
-    ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : (ts as Temporal.PlainDateTime);
+  const dt = ts.toZonedDateTimeISO("UTC");
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
   const d = dt.day.toString().padStart(2, "0");
@@ -93,21 +91,13 @@ function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
   for (const col of ["updated_at", "updated_on"] as const) {
     if (record.hasAttribute?.(col)) {
       const val = record._readAttribute(col);
-      if (val instanceof Temporal.Instant || val instanceof Temporal.PlainDateTime) {
+      if (val instanceof Temporal.Instant) {
         candidates.push(val);
       }
     }
   }
   if (candidates.length === 0) return null;
-  return candidates.reduce((a, b) => {
-    if (a instanceof Temporal.Instant && b instanceof Temporal.Instant) {
-      return Temporal.Instant.compare(a, b) >= 0 ? a : b;
-    }
-    if (a instanceof Temporal.PlainDateTime && b instanceof Temporal.PlainDateTime) {
-      return Temporal.PlainDateTime.compare(a, b) >= 0 ? a : b;
-    }
-    return a; // mixed types shouldn't occur; keep first
-  });
+  return candidates.reduce((a, b) => (Temporal.Instant.compare(a, b) >= 0 ? a : b));
 }
 
 /**
@@ -152,7 +142,7 @@ export function cacheVersion(this: Identifiable): string | null {
 
   if ((this as any).hasAttribute?.("updated_at")) {
     const val = this._readAttribute("updated_at");
-    if (val instanceof Temporal.Instant || val instanceof Temporal.PlainDateTime) {
+    if (val instanceof Temporal.Instant) {
       const fmt: string = klass.cacheTimestampFormat ?? "usec";
       return formatTimestamp(val, fmt);
     }

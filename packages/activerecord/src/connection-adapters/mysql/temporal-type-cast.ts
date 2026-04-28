@@ -22,7 +22,7 @@
 import mysql from "mysql2/promise";
 import {
   parseMysqlInstant,
-  parseMysqlPlainDateTime,
+  parseMysqlDatetimeAsInstant,
   parseMysqlDate,
   parseMysqlTime,
 } from "../abstract/temporal-wire.js";
@@ -48,7 +48,7 @@ export function temporalTypeCast(field: Field, next: NextFn): unknown {
     case "DATETIME2": {
       const raw = field.string();
       if (raw === null) return null;
-      return parseMysqlPlainDateTime(raw);
+      return parseMysqlDatetimeAsInstant(raw);
     }
     case "DATE":
     case "NEWDATE": {

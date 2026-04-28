@@ -11,6 +11,8 @@ export interface TimezoneOptions {
   limit?: number;
 }
 
+import { setDefaultTimezone as setActiveModelTimezone } from "@blazetrails/activemodel";
+
 let defaultTimezone: "utc" | "local" = "utc";
 
 export function getDefaultTimezone(): "utc" | "local" {
@@ -19,6 +21,9 @@ export function getDefaultTimezone(): "utc" | "local" {
 
 export function setDefaultTimezone(tz: "utc" | "local"): void {
   defaultTimezone = tz;
+  // Keep ActiveModel's parallel setting in lockstep so that DateTimeType.cast
+  // in activemodel honors the same configuration when called from activerecord.
+  setActiveModelTimezone(tz);
 }
 
 export function isUtc(timezone?: "utc" | "local"): boolean {

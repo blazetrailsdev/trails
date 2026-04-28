@@ -25,11 +25,12 @@ describe("PostgreSQL::OID::DateTime", () => {
   });
 
   it("rewrites BC-era timestamps with a biased year", () => {
-    const result = type.castValue("0044-03-15 12:00:00 BC");
-    expect(result).toBeInstanceOf(Temporal.PlainDateTime);
-    expect((result as Temporal.PlainDateTime).year).toBe(-43);
-    expect((result as Temporal.PlainDateTime).month).toBe(3);
-    expect((result as Temporal.PlainDateTime).day).toBe(15);
+    const result = type.castValue("0044-03-15 12:00:00 BC") as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    const zdt = result.toZonedDateTimeISO("UTC");
+    expect(zdt.year).toBe(-43);
+    expect(zdt.month).toBe(3);
+    expect(zdt.day).toBe(15);
   });
 
   it("type_cast_for_schema renders infinity sentinels", () => {
@@ -45,11 +46,11 @@ describe("PostgreSQL::OID::DateTime", () => {
   });
 
   it("preserves microsecond precision in BC timestamps", () => {
-    const result = type.castValue("0044-03-15 12:00:00.123456 BC");
-    expect(result).toBeInstanceOf(Temporal.PlainDateTime);
-    const pdt = result as Temporal.PlainDateTime;
-    expect(pdt.millisecond).toBe(123);
-    expect(pdt.microsecond).toBe(456);
+    const result = type.castValue("0044-03-15 12:00:00.123456 BC") as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    const zdt = result.toZonedDateTimeISO("UTC");
+    expect(zdt.millisecond).toBe(123);
+    expect(zdt.microsecond).toBe(456);
   });
 });
 

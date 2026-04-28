@@ -5,13 +5,14 @@ import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
+import { isUtc } from "./helpers/timezone.js";
 import { ValueType } from "./value.js";
 
-export type DateTimeCastResult =
-  | Temporal.Instant
-  | Temporal.PlainDateTime
-  | DateInfinityType
-  | DateNegativeInfinityType;
+function configuredTimezone(): string {
+  return isUtc() ? "UTC" : Temporal.Now.timeZoneId();
+}
+
+export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 
 export class DateTimeType extends ValueType<DateTimeCastResult> {
   readonly name: string = "datetime";
@@ -21,13 +22,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     if (value === DateInfinity) return DateInfinity;
     if (value === DateNegativeInfinity) return DateNegativeInfinity;
     if (value instanceof Temporal.Instant) return value;
-    if (value instanceof Temporal.PlainDateTime) return value;
-    // Dual-typed window: pg driver still returns Date until PR 5a.
-    if (value instanceof Date) {
-      return Number.isNaN(value.getTime())
-        ? null
-        : Temporal.Instant.fromEpochMilliseconds(value.getTime());
-    }
     const str = String(value).trim();
     if (str === "") return null;
     return this.parseString(str);
@@ -52,7 +46,13 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
       }
     }
     try {
-      return Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" });
+      // No offset — interpret in the default timezone configured via
+      // ActiveModel's helpers/timezone module (UTC by default, host-system
+      // local when set to "local"). ActiveRecord wires its own
+      // default_timezone setter into ActiveModel's so they stay in sync.
+      return Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
+        .toZonedDateTime(configuredTimezone())
+        .toInstant();
     } catch {
       return null;
     }
@@ -63,7 +63,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     // Sentinels are Postgres-specific; base type returns null. The Postgres
     // OID::DateTime subclass overrides serialize() to emit 'infinity'/'-infinity'.
     if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return null;
-    const temporal = cast as Temporal.Instant | Temporal.PlainDateTime;
+    const temporal = cast as Temporal.Instant;
     const p = this.precision ?? -1;
     const digits = (Number.isInteger(p) && p >= 0 && p <= 9 ? p : 6) as
       | 0
@@ -79,7 +79,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return temporal.toString({ fractionalSecondDigits: digits });
   }
 
-  serializeCastValue(value: Temporal.Instant | Temporal.PlainDateTime | null): string | null {
+  serializeCastValue(value: DateTimeCastResult | null): string | null {
     return this.serialize(value);
   }
 

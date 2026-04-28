@@ -39,12 +39,12 @@ describe("temporalTypeCast", () => {
   });
 
   describe("DATETIME", () => {
-    it("parses DATETIME to Temporal.PlainDateTime", () => {
+    it("parses DATETIME to Temporal.Instant (UTC)", () => {
       const result = temporalTypeCast(field("DATETIME", "2026-04-27 14:23:55.123456"), next);
-      expect(result).toBeInstanceOf(Temporal.PlainDateTime);
-      // .123456 s → millisecond=123, microsecond=456 (sub-ms component)
-      expect((result as Temporal.PlainDateTime).millisecond).toBe(123);
-      expect((result as Temporal.PlainDateTime).microsecond).toBe(456);
+      expect(result).toBeInstanceOf(Temporal.Instant);
+      const zdt = (result as Temporal.Instant).toZonedDateTimeISO("UTC");
+      expect(zdt.millisecond).toBe(123);
+      expect(zdt.microsecond).toBe(456);
     });
 
     it("returns null for zero-date", () => {
@@ -53,7 +53,7 @@ describe("temporalTypeCast", () => {
 
     it("handles DATETIME2 (binary protocol fractional variant)", () => {
       const result = temporalTypeCast(field("DATETIME2", "2026-04-27 00:00:00"), next);
-      expect(result).toBeInstanceOf(Temporal.PlainDateTime);
+      expect(result).toBeInstanceOf(Temporal.Instant);
     });
 
     it("returns null for NULL", () => {

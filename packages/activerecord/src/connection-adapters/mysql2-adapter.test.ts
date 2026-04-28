@@ -716,16 +716,16 @@ describeIfMysql("Mysql2Adapter", () => {
       expect((rows[0].ts as Temporal.Instant).epochNanoseconds % 1000000000n).toBe(123456000n);
     });
 
-    it("round-trips DATETIME(6) with microsecond precision as Temporal.PlainDateTime", async () => {
+    it("round-trips DATETIME(6) with microsecond precision as Temporal.Instant", async () => {
       await adapter.exec(
         "INSERT INTO `temporal_test` (`dt`) VALUES ('2026-04-27 14:23:55.123456')",
       );
       const rows = await adapter.execute("SELECT `dt` FROM `temporal_test`");
-      expect(rows[0].dt).toBeInstanceOf(Temporal.PlainDateTime);
-      const pdt = rows[0].dt as Temporal.PlainDateTime;
+      expect(rows[0].dt).toBeInstanceOf(Temporal.Instant);
+      const zdt = (rows[0].dt as Temporal.Instant).toZonedDateTimeISO("UTC");
       // .123456 s → millisecond=123, microsecond=456 (sub-ms component)
-      expect(pdt.millisecond).toBe(123);
-      expect(pdt.microsecond).toBe(456);
+      expect(zdt.millisecond).toBe(123);
+      expect(zdt.microsecond).toBe(456);
     });
 
     it("returns null for zero DATETIME '0000-00-00 00:00:00'", async () => {

@@ -4825,8 +4825,8 @@ describe("CalculationsTest", () => {
     }
 
     const topic = new Topic({ written_on: "2024-01-15" });
-    // The cast value should be a Temporal.PlainDateTime (naive string without offset)
-    expect(topic.readAttribute("written_on")).toBeInstanceOf(Temporal.PlainDateTime);
+    // The cast value should be a Temporal.Instant (naive string treated as UTC)
+    expect(topic.readAttribute("written_on")).toBeInstanceOf(Temporal.Instant);
     // The before_type_cast value should be the raw string
     expect(topic.readAttributeBeforeTypeCast("written_on")).toBe("2024-01-15");
   });

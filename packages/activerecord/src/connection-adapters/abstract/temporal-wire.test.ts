@@ -1,18 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   parsePostgresInstant,
-  parsePostgresPlainDateTime,
+  parsePostgresTimestampAsInstant,
   parsePostgresDate,
   parsePostgresTime,
   parsePostgresTimeTz,
   parseMysqlInstant,
-  parseMysqlPlainDateTime,
+  parseMysqlDatetimeAsInstant,
   parseMysqlDate,
   parseMysqlTime,
   DateInfinity,
   DateNegativeInfinity,
 } from "./temporal-wire.js";
+import { formatInstantForSql } from "./quoting.js";
+import { getDefaultTimezone, setDefaultTimezone } from "../../type/internal/timezone.js";
 
 describe("parsePostgresInstant", () => {
   it("parses a timestamptz with space separator and two-digit offset", () => {
@@ -78,39 +80,47 @@ describe("parsePostgresInstant", () => {
   });
 });
 
-describe("parsePostgresPlainDateTime", () => {
-  it("parses a timestamp with space separator", () => {
-    const result = parsePostgresPlainDateTime("2026-04-26 14:23:55.123456");
-    expect(result.toString()).toBe("2026-04-26T14:23:55.123456");
+describe("parsePostgresTimestampAsInstant", () => {
+  it("parses a timestamp with space separator as UTC Instant", () => {
+    const result = parsePostgresTimestampAsInstant(
+      "2026-04-26 14:23:55.123456",
+    ) as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect(result.toString()).toBe("2026-04-26T14:23:55.123456Z");
   });
 
   it("preserves microseconds", () => {
-    const result = parsePostgresPlainDateTime("2024-12-31 23:59:59.999999");
-    expect(result.toString()).toBe("2024-12-31T23:59:59.999999");
+    const result = parsePostgresTimestampAsInstant(
+      "2024-12-31 23:59:59.999999",
+    ) as Temporal.Instant;
+    expect(result.toString()).toBe("2024-12-31T23:59:59.999999Z");
   });
 
   it("returns DateInfinity for 'infinity'", () => {
-    expect(parsePostgresPlainDateTime("infinity")).toBe(DateInfinity);
+    expect(parsePostgresTimestampAsInstant("infinity")).toBe(DateInfinity);
   });
 
   it("returns DateNegativeInfinity for '-infinity'", () => {
-    expect(parsePostgresPlainDateTime("-infinity")).toBe(DateNegativeInfinity);
+    expect(parsePostgresTimestampAsInstant("-infinity")).toBe(DateNegativeInfinity);
   });
 
-  it("parses a BC datetime", () => {
-    const result = parsePostgresPlainDateTime("0044-03-15 12:00:00 BC") as Temporal.PlainDateTime;
-    expect(result.year).toBe(-43);
-    expect(result.month).toBe(3);
-    expect(result.day).toBe(15);
+  it("parses a BC datetime as UTC Instant", () => {
+    const result = parsePostgresTimestampAsInstant("0044-03-15 12:00:00 BC") as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    const zdt = result.toZonedDateTimeISO("UTC");
+    expect(zdt.year).toBe(-43);
+    expect(zdt.month).toBe(3);
+    expect(zdt.day).toBe(15);
   });
 
   it("parses a BC datetime with microseconds", () => {
-    const result = parsePostgresPlainDateTime(
+    const result = parsePostgresTimestampAsInstant(
       "0044-03-15 12:00:00.000456 BC",
-    ) as Temporal.PlainDateTime;
-    expect(result.millisecond).toBe(0);
-    expect(result.microsecond).toBe(456);
-    expect(result.nanosecond).toBe(0);
+    ) as Temporal.Instant;
+    const zdt = result.toZonedDateTimeISO("UTC");
+    expect(zdt.millisecond).toBe(0);
+    expect(zdt.microsecond).toBe(456);
+    expect(zdt.nanosecond).toBe(0);
   });
 });
 
@@ -205,18 +215,19 @@ describe("parseMysqlInstant", () => {
   });
 });
 
-describe("parseMysqlPlainDateTime", () => {
-  it("parses a DATETIME string", () => {
-    const result = parseMysqlPlainDateTime("2026-04-26 14:23:55.123456");
-    expect(result?.toString()).toBe("2026-04-26T14:23:55.123456");
+describe("parseMysqlDatetimeAsInstant", () => {
+  it("parses a DATETIME string as UTC Instant", () => {
+    const result = parseMysqlDatetimeAsInstant("2026-04-26 14:23:55.123456") as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect(result.toString()).toBe("2026-04-26T14:23:55.123456Z");
   });
 
   it("returns null for zero-date", () => {
-    expect(parseMysqlPlainDateTime("0000-00-00 00:00:00")).toBeNull();
+    expect(parseMysqlDatetimeAsInstant("0000-00-00 00:00:00")).toBeNull();
   });
 
   it("returns null for zero-date with fractional seconds (DATETIME(6))", () => {
-    expect(parseMysqlPlainDateTime("0000-00-00 00:00:00.000000")).toBeNull();
+    expect(parseMysqlDatetimeAsInstant("0000-00-00 00:00:00.000000")).toBeNull();
   });
 });
 
@@ -240,5 +251,46 @@ describe("parseMysqlTime", () => {
   it("parses midnight", () => {
     const result = parseMysqlTime("00:00:00");
     expect(result.toString()).toBe("00:00:00");
+  });
+});
+
+describe("naive parsers honor ActiveRecord.default_timezone", () => {
+  let saved: "utc" | "local";
+
+  beforeEach(() => {
+    saved = getDefaultTimezone();
+  });
+  afterEach(() => {
+    setDefaultTimezone(saved);
+  });
+
+  it("Postgres timestamp parses as UTC when default_timezone=utc", () => {
+    setDefaultTimezone("utc");
+    const result = parsePostgresTimestampAsInstant("2026-04-26 14:23:55") as Temporal.Instant;
+    expect(result.toString()).toBe("2026-04-26T14:23:55Z");
+  });
+
+  it("MySQL DATETIME parses as UTC when default_timezone=utc", () => {
+    setDefaultTimezone("utc");
+    const result = parseMysqlDatetimeAsInstant("2026-04-26 14:23:55") as Temporal.Instant;
+    expect(result.toString()).toBe("2026-04-26T14:23:55Z");
+  });
+
+  it("naive parsers + formatInstantForSql round-trip symmetrically under default_timezone=local", () => {
+    setDefaultTimezone("local");
+    // Pick a wall-clock that is unambiguous in any timezone.
+    const wireString = "2026-06-15 12:00:00";
+    const parsed = parsePostgresTimestampAsInstant(wireString) as Temporal.Instant;
+    expect(parsed).toBeInstanceOf(Temporal.Instant);
+    // Symmetry: formatting the parsed instant under the same default_timezone
+    // setting must yield the original wire string.
+    expect(formatInstantForSql(parsed)).toBe(wireString);
+  });
+
+  it("MySQL DATETIME round-trips symmetrically with formatInstantForSql under local", () => {
+    setDefaultTimezone("local");
+    const wireString = "2026-06-15 12:00:00";
+    const parsed = parseMysqlDatetimeAsInstant(wireString) as Temporal.Instant;
+    expect(formatInstantForSql(parsed)).toBe(wireString);
   });
 });

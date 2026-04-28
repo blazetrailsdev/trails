@@ -824,7 +824,6 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     // has side effects (e.g. re-encrypting an already-encrypted value).
     const dbValue =
       cast instanceof Temporal.Instant ||
-      cast instanceof Temporal.PlainDateTime ||
       cast instanceof Temporal.PlainDate ||
       cast instanceof Temporal.PlainTime ||
       cast instanceof Temporal.ZonedDateTime ||

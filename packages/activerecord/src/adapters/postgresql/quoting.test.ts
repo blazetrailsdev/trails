@@ -89,9 +89,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("quote timestamp", async () => {
       const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 14:30:00' AS val");
-      const val = rows[0].val as Temporal.PlainDateTime;
-      expect(val).toBeInstanceOf(Temporal.PlainDateTime);
-      expect(val.year).toBe(2023);
+      const val = rows[0].val as Temporal.Instant;
+      expect(val).toBeInstanceOf(Temporal.Instant);
+      expect(val.toZonedDateTimeISO("UTC").year).toBe(2023);
     });
 
     it.skip("quote range", async () => {});

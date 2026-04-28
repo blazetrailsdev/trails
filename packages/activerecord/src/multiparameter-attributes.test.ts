@@ -7,6 +7,8 @@ import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
+
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
@@ -166,14 +168,14 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "0",
     });
-    const dt = (topic as any).written_on as Temporal.PlainDateTime;
-    expect(dt).toBeInstanceOf(Temporal.PlainDateTime);
-    expect(dt.year).toBe(2004);
-    expect(dt.month).toBe(6);
-    expect(dt.day).toBe(24);
-    expect(dt.hour).toBe(16);
-    expect(dt.minute).toBe(24);
-    expect(dt.second).toBe(0);
+    const dt = (topic as any).written_on as Temporal.Instant;
+    expect(dt).toBeInstanceOf(Temporal.Instant);
+    expect(utc(dt).year).toBe(2004);
+    expect(utc(dt).month).toBe(6);
+    expect(utc(dt).day).toBe(24);
+    expect(utc(dt).hour).toBe(16);
+    expect(utc(dt).minute).toBe(24);
+    expect(utc(dt).second).toBe(0);
   });
 
   it("multiparameter attributes on time with no date", () => {
@@ -191,10 +193,10 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "16",
       "written_on(5i)": "24",
     });
-    const dt = (topic as any).written_on as Temporal.PlainDateTime;
-    expect(dt).toBeInstanceOf(Temporal.PlainDateTime);
-    expect(dt.hour).toBe(16);
-    expect(dt.minute).toBe(24);
+    const dt = (topic as any).written_on as Temporal.Instant;
+    expect(dt).toBeInstanceOf(Temporal.Instant);
+    expect(utc(dt).hour).toBe(16);
+    expect(utc(dt).minute).toBe(24);
   });
 
   it("multiparameter attributes on time with invalid time params", () => {
@@ -231,9 +233,9 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "0",
     });
-    const dt = (topic as any).written_on as Temporal.PlainDateTime;
-    expect(dt).toBeInstanceOf(Temporal.PlainDateTime);
-    expect(dt.year).toBe(1850);
+    const dt = (topic as any).written_on as Temporal.Instant;
+    expect(dt).toBeInstanceOf(Temporal.Instant);
+    expect(utc(dt).year).toBe(1850);
   });
 
   it("multiparameter attributes on time will raise on big time if missing date parts", () => {
@@ -278,9 +280,9 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(3i)": "24",
       "written_on(5i)": "24",
     });
-    const dt = (topic as any).written_on as Temporal.PlainDateTime;
-    expect(dt.year).toBe(2004);
-    expect(dt.hour).toBe(0);
+    const dt = (topic as any).written_on as Temporal.Instant;
+    expect(utc(dt).year).toBe(2004);
+    expect(utc(dt).hour).toBe(0);
   });
 
   it("multiparameter attributes on time will ignore hour if blank", () => {
@@ -298,9 +300,9 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "",
       "written_on(5i)": "24",
     });
-    const dt = (topic as any).written_on as Temporal.PlainDateTime;
-    expect(dt.year).toBe(2004);
-    expect(dt.hour).toBe(0);
+    const dt = (topic as any).written_on as Temporal.Instant;
+    expect(utc(dt).year).toBe(2004);
+    expect(utc(dt).hour).toBe(0);
   });
 
   it("multiparameter attributes on time will ignore date if empty", () => {
@@ -380,10 +382,10 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(2i)": "1",
       "written_on(3i)": "1",
     };
-    const dt = (topic as any).written_on as Temporal.PlainDateTime;
-    expect(dt.year).toBe(2004);
-    expect(dt.hour).toBe(13);
-    expect(dt.minute).toBe(30);
+    const dt = (topic as any).written_on as Temporal.Instant;
+    expect(utc(dt).year).toBe(2004);
+    expect(utc(dt).hour).toBe(13);
+    expect(utc(dt).minute).toBe(30);
   });
 
   it("multiparameter attributes on time with empty seconds", () => {
@@ -402,10 +404,10 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "",
     });
-    const dt = (topic as any).written_on as Temporal.PlainDateTime;
-    expect(dt.year).toBe(2004);
-    expect(dt.hour).toBe(16);
-    expect(dt.second).toBe(0);
+    const dt = (topic as any).written_on as Temporal.Instant;
+    expect(utc(dt).year).toBe(2004);
+    expect(utc(dt).hour).toBe(16);
+    expect(utc(dt).second).toBe(0);
   });
 
   it("multiparameter attributes setting date attribute", () => {
@@ -470,8 +472,8 @@ describe("MultiParameterAttributeTest", () => {
     });
     const d = (topic as any).last_read as Temporal.PlainDate;
     expect(d.year).toBe(2004);
-    const dt = (topic as any).written_on as Temporal.PlainDateTime;
-    expect(dt.hour).toBe(16);
+    const dt = (topic as any).written_on as Temporal.Instant;
+    expect(utc(dt).hour).toBe(16);
   });
 
   it("create with multiparameter attributes setting date and time attribute", () => {
@@ -491,9 +493,9 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(5i)": "24",
       "written_on(6i)": "0",
     });
-    const dt = (topic as any).written_on as Temporal.PlainDateTime;
-    expect(dt.year).toBe(2004);
-    expect(dt.hour).toBe(16);
+    const dt = (topic as any).written_on as Temporal.Instant;
+    expect(utc(dt).year).toBe(2004);
+    expect(utc(dt).hour).toBe(16);
   });
 
   it("multiparameter attributes setting time but not date on date field", () => {

@@ -10,10 +10,7 @@
  * TimestampWithTimeZone use to report :datetime when the adapter's
  * datetime_type is aliased.
  *
- * Full Temporal-native driver integration lands in PR 5a; the cast
- * and typeCastForSchema overrides here are updated so that
- * DateTimeType returning `Temporal.Instant | Temporal.PlainDateTime`
- * does not break compilation.
+ * Returns Temporal.Instant for all datetime values (treating naive timestamps as UTC).
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -24,13 +21,12 @@ import {
   type DateInfinityType,
   type DateNegativeInfinityType,
 } from "@blazetrails/activemodel";
-import { parsePostgresPlainDateTime, parsePostgresInstant } from "../../abstract/temporal-wire.js";
+import {
+  parsePostgresTimestampAsInstant,
+  parsePostgresInstant,
+} from "../../abstract/temporal-wire.js";
 
-type PgDateTimeResult =
-  | Temporal.Instant
-  | Temporal.PlainDateTime
-  | DateInfinityType
-  | DateNegativeInfinityType;
+type PgDateTimeResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 
 export class DateTime extends DateTimeType {
   override readonly name: string = "datetime";
@@ -48,10 +44,13 @@ export class DateTime extends DateTimeType {
       if (value === "infinity") return DateInfinity;
       if (value === "-infinity") return DateNegativeInfinity;
       if (/ BC$/.test(value)) {
-        // Has offset → treat as timestamptz (Instant); otherwise plain.
-        const hasOffset = /[-+]\d{2}(?::\d{2})?$/.test(value.slice(0, -3).trimEnd());
         try {
-          return hasOffset ? parsePostgresInstant(value) : parsePostgresPlainDateTime(value);
+          // BC dates may have offset (timestamptz) or not (timestamp). Both
+          // return Instant — parsePostgresTimestampAsInstant interprets naive
+          // values in defaultSqlTimezone() (UTC by default, host-local when
+          // ActiveRecord.default_timezone === "local").
+          const hasOffset = /[-+]\d{2}(?::\d{2})?$/.test(value.slice(0, -3).trimEnd());
+          return hasOffset ? parsePostgresInstant(value) : parsePostgresTimestampAsInstant(value);
         } catch {
           return null;
         }

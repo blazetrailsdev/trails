@@ -15,6 +15,7 @@ import { RecordNotSaved, RecordNotUnique } from "./errors.js";
 import { disallowRawSqlBang } from "./sanitization.js";
 import {
   columnNameMatcher as abstractColumnNameMatcher,
+  defaultSqlTimezone,
   formatInstantForSql,
 } from "./connection-adapters/abstract/quoting.js";
 import { modelRegistry } from "./associations.js";
@@ -86,11 +87,8 @@ export type LoadedRelation<R> = Omit<R, "then">;
  * - Throw if a join to the same table with a *different* ON clause exists —
  *   that would require aliasing which is not supported.
  */
-function formatCacheTimestamp(
-  ts: Temporal.Instant | Temporal.PlainDateTime,
-  format: "usec" | "number" | string,
-): string {
-  const dt = ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : ts;
+function formatCacheTimestamp(ts: Temporal.Instant, format: "usec" | "number" | string): string {
+  const dt = ts.toZonedDateTimeISO("UTC");
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
   const d = dt.day.toString().padStart(2, "0");
@@ -2295,7 +2293,6 @@ export class Relation<T extends Base> {
     if (value instanceof Temporal.ZonedDateTime) return value.toInstant().toString();
     if (
       value instanceof Temporal.Instant ||
-      value instanceof Temporal.PlainDateTime ||
       value instanceof Temporal.PlainDate ||
       value instanceof Temporal.PlainTime
     ) {
@@ -4121,10 +4118,6 @@ export class Relation<T extends Base> {
             const valI = toInstant(val);
             const maxI = toInstant(max);
             if (valI && maxI) return Temporal.Instant.compare(valI, maxI) > 0 ? valI : maxI;
-            if (val instanceof Temporal.PlainDateTime && max instanceof Temporal.PlainDateTime) {
-              return Temporal.PlainDateTime.compare(val, max) > 0 ? val : max;
-            }
-            // Mixed or unknown types — keep max rather than risking Temporal throwing on >.
             return max;
           }, null);
       }
@@ -4196,8 +4189,8 @@ export class Relation<T extends Base> {
     }
 
     if (timestamp != null) {
-      let ts: Temporal.Instant | Temporal.PlainDateTime | null = null;
-      if (timestamp instanceof Temporal.Instant || timestamp instanceof Temporal.PlainDateTime) {
+      let ts: Temporal.Instant | null = null;
+      if (timestamp instanceof Temporal.Instant) {
         ts = timestamp;
       } else if (timestamp instanceof Date && !Number.isNaN((timestamp as Date).getTime())) {
         ts = Temporal.Instant.fromEpochMilliseconds((timestamp as Date).getTime());
@@ -4205,7 +4198,9 @@ export class Relation<T extends Base> {
         ts = Temporal.Instant.fromEpochMilliseconds(timestamp as number);
       } else if (typeof timestamp === "string") {
         try {
-          // Normalize: space → T, short offset ±HH → ±HH:MM (Postgres wire quirk)
+          // Normalize: space → T, short offset ±HH → ±HH:MM (Postgres wire quirk).
+          // Naive strings interpreted in defaultSqlTimezone() — UTC by default,
+          // host-system local when ActiveRecord.default_timezone === "local".
           const normalized = timestamp
             .trim()
             .replace(" ", "T")
@@ -4213,7 +4208,9 @@ export class Relation<T extends Base> {
           const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(normalized);
           ts = hasOffset
             ? Temporal.Instant.from(normalized)
-            : Temporal.PlainDateTime.from(normalized);
+            : Temporal.PlainDateTime.from(normalized)
+                .toZonedDateTime(defaultSqlTimezone())
+                .toInstant();
         } catch {
           ts = null;
         }

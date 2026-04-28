@@ -22,12 +22,12 @@ describe("DateTimeTest", () => {
     );
   });
 
-  it("string without offset produces PlainDateTime", () => {
-    const result = type.cast("2024-01-15T10:30:00");
-    expect(result).toBeInstanceOf(Temporal.PlainDateTime);
-    const pdt = result as Temporal.PlainDateTime;
-    expect(pdt.hour).toBe(10);
-    expect(pdt.minute).toBe(30);
+  it("string without offset produces Instant (treated as UTC)", () => {
+    const result = type.cast("2024-01-15T10:30:00") as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    const zdt = result.toZonedDateTimeISO("UTC");
+    expect(zdt.hour).toBe(10);
+    expect(zdt.minute).toBe(30);
   });
 
   it("Postgres wire format (space separator, short offset) produces Instant", () => {
@@ -37,11 +37,10 @@ describe("DateTimeTest", () => {
     expect(i.toString({ smallestUnit: "microsecond" })).toBe("2026-04-26T14:23:55.123456Z");
   });
 
-  it("Postgres naive wire format produces PlainDateTime", () => {
-    const result = type.cast("2026-04-26 14:23:55.123456");
-    expect(result).toBeInstanceOf(Temporal.PlainDateTime);
-    const pdt = result as Temporal.PlainDateTime;
-    expect(pdt.microsecond).toBe(456);
+  it("Postgres naive wire format produces Instant (treated as UTC)", () => {
+    const result = type.cast("2026-04-26 14:23:55.123456") as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect(result.toZonedDateTimeISO("UTC").microsecond).toBe(456);
   });
 
   it("microsecond precision is preserved through cast", () => {
@@ -57,9 +56,11 @@ describe("DateTimeTest", () => {
     expect(type.cast(original)).toBe(original);
   });
 
-  it("Temporal.PlainDateTime passthrough", () => {
-    const original = plainDateTime("2026-04-26T14:23:55.123456");
-    expect(type.cast(original)).toBe(original);
+  it("Temporal.PlainDateTime is converted to Instant (treated as UTC)", () => {
+    const pdt = plainDateTime("2026-04-26T14:23:55.123456");
+    const result = type.cast(pdt) as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect(result.toZonedDateTimeISO("UTC").microsecond).toBe(456);
   });
 
   it("has name 'datetime'", () => {
@@ -87,9 +88,9 @@ describe("DateTimeTest", () => {
     expect(type.serialize(i)).toBe("2026-04-26T14:23:55.123456Z");
   });
 
-  it("serialize returns microsecond ISO string for PlainDateTime", () => {
+  it("serialize returns UTC ISO string for PlainDateTime (cast to Instant first)", () => {
     const pdt = plainDateTime("2026-04-26T14:23:55.123456");
-    expect(type.serialize(pdt)).toBe("2026-04-26T14:23:55.123456");
+    expect(type.serialize(pdt)).toBe("2026-04-26T14:23:55.123456Z");
   });
 
   it("serialize null returns null", () => {
@@ -102,8 +103,9 @@ describe("DateTimeTest", () => {
     expect(t.serialize(i)).toBe("2026-04-26T14:23:55.123Z");
   });
 
-  it("PlainDateTime input from multiparameter is accepted", () => {
+  it("PlainDateTime input is converted to Instant (multiparameter support)", () => {
     const pdt = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
-    expect(type.cast(pdt)).toBe(pdt);
+    const result = type.cast(pdt);
+    expect(result).toBeInstanceOf(Temporal.Instant);
   });
 });

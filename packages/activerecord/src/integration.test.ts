@@ -14,8 +14,8 @@ function withCacheVersioning(klass: typeof Base, fn: () => void) {
   }
 }
 
-function expectedUsec(ts: Temporal.Instant | Temporal.PlainDateTime): string {
-  const dt = ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : ts;
+function expectedUsec(ts: Temporal.Instant): string {
+  const dt = ts.toZonedDateTimeISO("UTC");
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
   const day = dt.day.toString().padStart(2, "0");

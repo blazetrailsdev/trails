@@ -5,8 +5,10 @@
  * a value — space separator instead of T, two-digit offsets, BC suffix,
  * infinity sentinels, zero-dates.
  *
- * All functions are pure (no I/O, no side effects) so they can be unit-
- * tested directly without a live database.
+ * Naive timestamp parsers (no offset in the wire format) interpret values
+ * in `defaultSqlTimezone()` — UTC by default, host-system local when
+ * `ActiveRecord.default_timezone === "local"`. This is the only non-pure
+ * dependency; everything else is pure and unit-testable without a live DB.
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -16,8 +18,18 @@ import {
   type DateInfinityType,
   type DateNegativeInfinityType,
 } from "@blazetrails/activemodel";
+import { defaultSqlTimezone } from "./quoting.js";
 
 export { DateInfinity, DateNegativeInfinity };
+
+/**
+ * Convert a naive ISO datetime string (no offset) to a `Temporal.Instant`,
+ * interpreting it in the configured SQL timezone (UTC by default, host-system
+ * local when `ActiveRecord.default_timezone === "local"`).
+ */
+function naiveIsoToInstant(iso: string): Temporal.Instant {
+  return Temporal.PlainDateTime.from(iso).toZonedDateTime(defaultSqlTimezone()).toInstant();
+}
 
 export type TimeTzValue = { time: Temporal.PlainTime; offset: string };
 
@@ -43,20 +55,24 @@ export function parsePostgresInstant(
 }
 
 /**
- * Parse a Postgres `timestamp` wire string to `Temporal.PlainDateTime`.
+ * Parse a Postgres `timestamp` (without tz) wire string to `Temporal.Instant`.
  *
  * Wire format: `'YYYY-MM-DD HH:MM:SS[.ffffff]'` (no offset).
- * or the sentinels `'infinity'` / `'-infinity'`.
+ * The naive value is interpreted in `ActiveRecord.default_timezone` (UTC by
+ * default, host-system local when set to `:local`) and converted to a
+ * `Temporal.Instant`. Symmetric with `formatInstantForSql` in quoting, which
+ * uses the same `defaultSqlTimezone()` for writes — so reads and writes
+ * round-trip cleanly under either configuration.
  */
-export function parsePostgresPlainDateTime(
+export function parsePostgresTimestampAsInstant(
   text: string,
-): Temporal.PlainDateTime | DateInfinityType | DateNegativeInfinityType {
+): Temporal.Instant | DateInfinityType | DateNegativeInfinityType {
   const trimmed = text.trim();
   if (trimmed === "infinity") return DateInfinity;
   if (trimmed === "-infinity") return DateNegativeInfinity;
   const { iso, bc } = extractBcSuffix(trimmed);
-  if (bc) return parseBcTimestampAsPlainDateTime(iso);
-  return Temporal.PlainDateTime.from(clampFraction(iso.replace(" ", "T")));
+  if (bc) return parseBcTimestampAsInstant(iso);
+  return naiveIsoToInstant(clampFraction(iso.replace(" ", "T")));
 }
 
 /**
@@ -137,15 +153,18 @@ export function parseMysqlInstant(text: string): Temporal.Instant | null {
 }
 
 /**
- * Parse a MySQL `DATETIME` wire string to `Temporal.PlainDateTime`.
+ * Parse a MySQL `DATETIME` wire string to `Temporal.Instant`.
  *
  * Wire format: `'YYYY-MM-DD HH:MM:SS[.ffffff]'` (naive, no timezone).
- * Zero-date `'0000-00-00 00:00:00'` returns `null`.
+ * `DATETIME` is timezone-naive in MySQL — the value is interpreted in
+ * `ActiveRecord.default_timezone` (UTC by default, host-system local when
+ * set to `:local`), matching the convention used by `formatInstantForSql`
+ * on the write path. Zero-date `'0000-00-00 00:00:00'` returns `null`.
  */
-export function parseMysqlPlainDateTime(text: string): Temporal.PlainDateTime | null {
+export function parseMysqlDatetimeAsInstant(text: string): Temporal.Instant | null {
   const trimmed = text.trim();
   if (isZeroDatetime(trimmed)) return null;
-  return Temporal.PlainDateTime.from(clampFraction(trimmed.replace(" ", "T")));
+  return naiveIsoToInstant(clampFraction(trimmed.replace(" ", "T")));
 }
 
 /**
@@ -243,16 +262,18 @@ function parseBcTimestampTzAsInstant(withoutBc: string): Temporal.Instant {
 }
 
 /**
- * Parse a BC-suffixed Postgres `timestamp` string to `Temporal.PlainDateTime`.
+ * Parse a BC-suffixed Postgres `timestamp` string to `Temporal.Instant`,
+ * interpreting the naive value in `defaultSqlTimezone()` (UTC by default,
+ * host-system local when `ActiveRecord.default_timezone === "local"`).
  * Input has already had " BC" stripped.
  */
-function parseBcTimestampAsPlainDateTime(withoutBc: string): Temporal.PlainDateTime {
+function parseBcTimestampAsInstant(withoutBc: string): Temporal.Instant {
   // e.g. "0044-03-15 12:00:00.123456" or "0044-03-15 12:00:00"
   const match = /^(\d+)-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(withoutBc);
   if (!match) throw new RangeError(`Cannot parse BC timestamp: ${JSON.stringify(withoutBc)}`);
   const [, y, mo, d, h, mi, s, frac] = match;
   const { millisecond, microsecond, nanosecond } = parseFraction(frac);
-  return Temporal.PlainDateTime.from(
+  return Temporal.ZonedDateTime.from(
     {
       year: bcYearToIso(Number(y)),
       month: Number(mo),
@@ -263,9 +284,10 @@ function parseBcTimestampAsPlainDateTime(withoutBc: string): Temporal.PlainDateT
       millisecond,
       microsecond,
       nanosecond,
+      timeZone: defaultSqlTimezone(),
     },
     { overflow: "reject" },
-  );
+  ).toInstant();
 }
 
 /**

@@ -51,10 +51,10 @@ describe("getTypeParser — timestamptz (OID 1184)", () => {
 });
 
 describe("getTypeParser — timestamp (OID 1114)", () => {
-  it("returns a Temporal.PlainDateTime", () => {
-    const result = parse(OID_TIMESTAMP, "2026-04-26 14:23:55.123456");
-    expect(result).toBeInstanceOf(Temporal.PlainDateTime);
-    expect((result as Temporal.PlainDateTime).toString()).toBe("2026-04-26T14:23:55.123456");
+  it("returns a Temporal.Instant (UTC)", () => {
+    const result = parse(OID_TIMESTAMP, "2026-04-26 14:23:55.123456") as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect(result.toString()).toBe("2026-04-26T14:23:55.123456Z");
   });
 
   it("returns DateInfinity for 'infinity'", () => {
