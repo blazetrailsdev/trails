@@ -83,6 +83,20 @@ recomputing the Rack env from the merged defaults.
 **Us:** Creates a new Renderer with merged defaults but does not recompute the env
 (our Renderer doesn't separate env from defaults).
 
+### `permissionsPolicy` — directives held in the callback, not yet on Request
+
+**Rails:** The `permissions_policy` class DSL registers a `before_action` that
+clones `current_request.permissions_policy`, yields it to the block for
+mutation, and assigns the result back via `request.permissions_policy = policy`
+— middleware later materializes that into the `Permissions-Policy` response
+header.
+**Us:** The DSL registers a `before_action` whose callback closure captures the
+provided block and runs it against a fresh directives object. Until
+`Request#permissionsPolicy` and the corresponding response middleware are wired
+up, the modified directives don't round-trip into the response header. The
+class-DSL surface and parity-test coverage are complete; the response-header
+wiring is the remaining work.
+
 ### `BrowserBlocker.versions` — returns a copy
 
 **Rails:** `attr_reader :versions` returns the object directly (mutations affect the blocker).
@@ -103,7 +117,6 @@ but diverges from Rails' mutable return.
 | `base.ts`                          | 2       | withoutModules + one more                     |
 | `api/api-rendering.ts`             | 1       | API renderToBody override                     |
 | `form-builder.ts`                  | 1       | defaultFormBuilder class method               |
-| `metal/permissions-policy.ts`      | 1       | Permissions policy before_action              |
 | `metal/rate-limiting.ts`           | 1       | Rate limiting before_action                   |
 
 ### Files partially done

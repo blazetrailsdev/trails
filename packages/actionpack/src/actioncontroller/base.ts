@@ -15,6 +15,7 @@ import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract
 import { LookupContext } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../actiondispatch/routing/route-helpers.js";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
+import { permissionsPolicy } from "./metal/permissions-policy.js";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -353,6 +354,14 @@ export class Base extends Metal {
       return false;
     }, callbackOptions);
   }
+
+  // --- Permissions Policy ---
+
+  /**
+   * Override the globally configured Permissions-Policy on a per-action basis.
+   * Mirrors Rails `permissions_policy` class DSL.
+   */
+  static permissionsPolicy = permissionsPolicy;
 
   // --- Rescue ---
 
