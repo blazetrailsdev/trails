@@ -6,20 +6,14 @@ import { ActiveSupportJSON } from "@blazetrails/activesupport";
  *
  * Mirrors: ActiveRecord::Coders::JSON
  */
-export const JSON = {
-  /**
-   * Mirrors: ActiveRecord::Coders::JSON.dump
-   */
-  dump(obj: unknown): string {
+export class JSON {
+  static dump(obj: unknown): string {
     return ActiveSupportJSON.encode(obj);
-  },
+  }
 
-  /**
-   * Mirrors: ActiveRecord::Coders::JSON.load
-   */
-  load(json: unknown): unknown {
+  static load(json: unknown): unknown {
     if (json == null || json === "") return null;
     if (typeof json !== "string") return json;
     return ActiveSupportJSON.decode(json);
-  },
-};
+  }
+}
