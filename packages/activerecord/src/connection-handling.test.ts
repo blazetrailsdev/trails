@@ -335,4 +335,70 @@ describe("ConnectionHandlingTest", () => {
     const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
     expect(Klass).toBe(SQLite3Adapter);
   });
+
+  // Mirrors Rails: `ActiveRecord::Base.establish_connection` with no args
+  // reads from `Base.configurations` (the in-memory registry), not from
+  // disk. Required so callers that mutate `configurations` in place (e.g.
+  // `TestDatabases.create_and_load_schema`) actually reconnect to the
+  // mutated config rather than picking up the original from
+  // config/database.*.
+  it("autoConnect honors an in-memory DatabaseConfigurations registry", async () => {
+    const { DatabaseConfigurations } = await import("./database-configurations.js");
+    const { HashConfig } = await import("./database-configurations/hash-config.js");
+    const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
+
+    // _currentConfigurations is a module-level singleton that the
+    // DatabaseConfigurations constructor mutates as a side effect.
+    // Snapshot it so test ordering can't pin the wrong registry.
+    const priorCurrent = (DatabaseConfigurations as any).current;
+    try {
+      const inMemory = new DatabaseConfigurations([
+        new HashConfig(env, "primary", { adapter: "sqlite3", database: ":memory:" }),
+      ]);
+
+      class InMemoryModel extends Base {}
+      (InMemoryModel as any).configurations = inMemory;
+
+      await InMemoryModel.establishConnection();
+      const Klass = await InMemoryModel.adapterClass();
+      const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+      expect(Klass).toBe(SQLite3Adapter);
+    } finally {
+      (DatabaseConfigurations as any).current = priorCurrent;
+    }
+  });
+
+  // Regression: a UrlConfig whose `_database` has been mutated in place
+  // (TestDatabases.create_and_load_schema's parallel-worker pattern)
+  // must reconnect to the mutated database, not the original URL. Rails
+  // resolves from configuration_hash, not the raw URL.
+  it("autoConnect reconnects via mutated configuration.database for UrlConfig", async () => {
+    const { DatabaseConfigurations } = await import("./database-configurations.js");
+    const { UrlConfig } = await import("./database-configurations/url-config.js");
+    const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
+
+    const priorCurrent = (DatabaseConfigurations as any).current;
+    try {
+      const url = new UrlConfig(env, "primary", "sqlite3:db/foo.sqlite3");
+      url._database = "db/foo-2.sqlite3"; // mimic worker-suffix mutation
+      const inMemory = new DatabaseConfigurations([url]);
+
+      class WorkerModel extends Base {}
+      (WorkerModel as any).configurations = inMemory;
+
+      await WorkerModel.establishConnection();
+      // The connection pool's resolved dbConfig must point at the
+      // mutated database, not the original URL path. This is the
+      // actual reconnect-target observation Copilot review #3 asked
+      // for — without the URL-skip in autoConnect, this would surface
+      // the original "db/foo.sqlite3" instead.
+      const pool = WorkerModel.connectionPool();
+      expect(pool.dbConfig.database).toBe("db/foo-2.sqlite3");
+      const Klass = await WorkerModel.adapterClass();
+      const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+      expect(Klass).toBe(SQLite3Adapter);
+    } finally {
+      (DatabaseConfigurations as any).current = priorCurrent;
+    }
+  });
 });

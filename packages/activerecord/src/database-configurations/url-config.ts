@@ -21,6 +21,39 @@ export class UrlConfig extends HashConfig {
     super(envName, name, { ...configuration, ...buildUrlHash(url) });
     this.url = url;
   }
+
+  // Mirrors Rails' UrlConfig — when the configuration hash doesn't carry an
+  // explicit `database`, fall back to parsing the URL's path. Necessary for
+  // URL-only sqlite configs (`{ adapter: "sqlite3", url: "db/test.sqlite3" }`)
+  // where buildUrlHash leaves `configuration.database` undefined: callers
+  // like TestDatabases.create_and_load_schema rely on `db_config.database`.
+  override get database(): string | undefined {
+    const explicit = super.database;
+    if (explicit !== undefined) return explicit;
+    return databaseFromUrl(this.url);
+  }
+}
+
+function databaseFromUrl(url: string): string | undefined {
+  if (!url) return undefined;
+  // Mirror buildUrlHash: Windows drive-letter paths (e.g. `C:/db.sqlite3`)
+  // are valid WHATWG URLs (`protocol: "c:"`) but they're filesystem
+  // paths, not URIs. URL parsing would silently drop the drive letter.
+  if (/^[A-Za-z]:[\\/]/.test(url)) return url;
+  try {
+    const parsed = new URL(url);
+    // Mirrors Rails: the database name is only ever derived from the URL
+    // path, never the host. URLs like `postgres://localhost` (no path)
+    // legitimately have no database name — falling back to `host` would
+    // silently mask a misconfiguration and route reconnects/creation at
+    // a database called "localhost".
+    const path = parsed.pathname.replace(/^\//, "");
+    return path || undefined;
+  } catch {
+    // Bare filesystem paths and `:memory:` aren't parseable URLs but are
+    // the database name themselves.
+    return url;
+  }
 }
 
 // Mirrors: UrlConfig#build_url_hash
