@@ -9,24 +9,39 @@
 
 import { Metal } from "./metal.js";
 
+interface RoutesLike {
+  defaultEnv?: Record<string, unknown>;
+}
+
 export class Renderer {
   private _controller: unknown;
   private _defaults: Record<string, unknown>;
+  private _env: Record<string, unknown>;
   private _lastStatus: number = 200;
   private _lastContentType: string = "text/html; charset=utf-8";
 
-  constructor(controller: unknown, defaults: Record<string, unknown> = {}) {
+  constructor(
+    controller: unknown,
+    env: Record<string, unknown> | null | undefined,
+    defaults: Record<string, unknown> = {},
+  ) {
     this._controller = controller;
     this._defaults = defaults;
+    this._env = Renderer.normalizeEnv(defaults);
+    if (env) Object.assign(this._env, Renderer.normalizeEnv(env));
   }
 
-  static for(controller: unknown, defaults: Record<string, unknown> = {}): Renderer {
-    return new Renderer(controller, defaults);
+  static for(
+    controller: unknown,
+    env: Record<string, unknown> | null = null,
+    defaults: Record<string, unknown> = {},
+  ): Renderer {
+    return new Renderer(controller, env, defaults);
   }
 
-  /** Derive a new Renderer with updated env (Rails: Renderer#new). */
-  new(env: Record<string, unknown> = {}): Renderer {
-    return new Renderer(this._controller, { ...this._defaults, ...env });
+  /** Derive a new Renderer with the given Rack env (Rails: Renderer#new). */
+  new(env: Record<string, unknown> | null = null): Renderer {
+    return new Renderer(this._controller, env, this._defaults);
   }
 
   render(options: Record<string, unknown> = {}): string {
@@ -73,12 +88,32 @@ export class Renderer {
     return this._controller;
   }
 
+  /** The normalized Rack env that would be passed to a request. */
+  get env(): Record<string, unknown> {
+    return this.envForRequest();
+  }
+
   withDefaults(defaults: Record<string, unknown>): Renderer {
-    return new Renderer(this._controller, { ...this._defaults, ...defaults });
+    return new Renderer(this._controller, this._env, { ...this._defaults, ...defaults });
   }
 
   renderToString(options: Record<string, unknown> = {}): string {
     return this.render(options);
+  }
+
+  /**
+   * Build the Rack env for a request. Mirrors Rails:
+   *   env_for_request: if @env has HTTP_HOST or controller has no routes,
+   *   return a copy of @env; otherwise merge @env on top of the routes'
+   *   default_env so explicit overrides win.
+   */
+  private envForRequest(): Record<string, unknown> {
+    const routes = (this._controller as { _routes?: RoutesLike | null } | null | undefined)
+      ?._routes;
+    if ("HTTP_HOST" in this._env || !routes) {
+      return { ...this._env };
+    }
+    return { ...(routes.defaultEnv ?? {}), ...this._env };
   }
 
   private static RACK_KEY_TRANSLATION: Record<string, string> = {
