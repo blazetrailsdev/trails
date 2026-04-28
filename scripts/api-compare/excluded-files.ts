@@ -98,6 +98,26 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
     testFile: "encryption/encrypted_fixtures_test.rb",
     reason: "Encrypts YAML fixture rows on load. Excluded transitively with fixtures.rb.",
   },
+  {
+    pattern: "destroy_association_async_job.rb",
+    reason:
+      "ActiveJob subclass that backs `dependent: :destroy_async`. Trails has not " +
+      "ported ActiveJob; async destroy is out of scope until a job framework lands.",
+  },
+  {
+    pattern: "dynamic_matchers.rb",
+    reason:
+      "Ruby `method_missing` magic that synthesizes `find_by_<attr>` / `find_or_*_by_<attr>` " +
+      "at call time. No TS analog — Proxy-based dispatch can't infer attribute lists at " +
+      "compile time, and `findBy({ ... })` already covers the use case idiomatically.",
+  },
+  {
+    pattern: "railties/controller_runtime.rb",
+    reason:
+      "Railties ActionController integration that logs DB runtime per request. " +
+      "Trails has not ported Railties / ActionController; reintroduce when a web " +
+      "framework integration lands.",
+  },
 ];
 
 export function isExcluded(file: string): boolean {
