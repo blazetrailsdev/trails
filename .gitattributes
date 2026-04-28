@@ -1,2 +1,6 @@
 # Multipart fixture files contain CRLF line endings that must be preserved exactly.
 packages/rack/test/multipart/* binary
+
+# Shell scripts must keep LF endings even on Windows checkouts; CRLF makes
+# them unparseable by /usr/bin/env in Linux containers.
+*.sh text eol=lf

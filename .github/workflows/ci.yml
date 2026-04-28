@@ -16,6 +16,12 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
+# Cancel superseded runs on PR pushes; keep main/schedule runs intact so
+# post-merge sweeps and timing reports aren't lost.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Preflight that sets `docs_only=true` when every changed path is under
   # top-level `docs/`. Downstream jobs gate on this via `if:` so they're
@@ -33,6 +39,11 @@ jobs:
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
       parity_mysql: ${{ steps.filter.outputs.parity_mysql }}
+      # Pure-Node jobs route to self-hosted only for trusted actor + same
+      # repo. Fork PRs and any other actor fall back to ubuntu-latest, so
+      # untrusted code never executes on the self-hosted box. Consumers:
+      # `runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}`.
+      runner: ${{ steps.runner.outputs.value }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,12 +110,60 @@ jobs:
               echo "parity_mysql=false"    >> "$GITHUB_OUTPUT"
               ;;
           esac
+      - id: runner
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+          # Newline-separated allowlist; vars.SELF_HOSTED_ACTORS overrides
+          # the default. Set repo-level via:
+          #   gh variable set SELF_HOSTED_ACTORS --body $'deanmarano'
+          ALLOWLIST: ${{ vars.SELF_HOSTED_ACTORS || 'deanmarano' }}
+        run: |
+          set -euo pipefail
+          # Trust gate: pure-node jobs land on self-hosted iff
+          #   1. the relevant principal is in ALLOWLIST, AND
+          #   2. the code being executed is from this repo (no fork code).
+          # The "principal" depends on event type:
+          #   - pull_request*: the PR author. github.actor on a `labeled`
+          #     event is the labeler (a maintainer labeling a fork PR
+          #     would otherwise pin fork code to self-hosted).
+          #   - push/schedule/workflow_dispatch: github.actor (the pusher
+          #     or dispatcher). HEAD_REPO is empty here; same-repo by
+          #     construction.
+          case "$EVENT" in
+            pull_request|pull_request_target)
+              principal="$PR_AUTHOR"
+              same_repo=$([ "$HEAD_REPO" = "$REPO" ] && echo true || echo false)
+              ;;
+            *)
+              principal="$ACTOR"
+              same_repo=true
+              ;;
+          esac
+          allowed=false
+          while IFS= read -r u; do
+            [ -z "$u" ] && continue
+            [ "$u" = "$principal" ] && { allowed=true; break; }
+          done <<< "$ALLOWLIST"
+          if [ "$allowed" = "true" ] && [ "$same_repo" = "true" ]; then
+            echo 'value=["self-hosted","Linux","X64"]' >> "$GITHUB_OUTPUT"
+            echo "→ self-hosted (event=$EVENT principal=$principal)"
+          else
+            echo 'value="ubuntu-latest"' >> "$GITHUB_OUTPUT"
+            echo "→ ubuntu-latest (event=$EVENT principal=$principal allowed=$allowed same_repo=$same_repo)"
+          fi
 
   build-and-typecheck:
     name: Build & Type Check
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    # Self-hosted runner can go offline (laptop closed, service crash).
+    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -121,7 +180,10 @@ jobs:
     name: Lint
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    # Self-hosted runner can go offline (laptop closed, service crash).
+    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -135,7 +197,12 @@ jobs:
       - run: pnpm lint
   prettier:
     name: Prettier
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    # Self-hosted runner can go offline (laptop closed, service crash).
+    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -152,7 +219,10 @@ jobs:
     name: Guides Code Type Check
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    # Self-hosted runner can go offline (laptop closed, service crash).
+    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -170,7 +240,10 @@ jobs:
     name: DX Type Tests
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    # Self-hosted runner can go offline (laptop closed, service crash).
+    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -187,7 +260,10 @@ jobs:
     name: Virtualized DX Type Tests
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    # Self-hosted runner can go offline (laptop closed, service crash).
+    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -204,7 +280,10 @@ jobs:
     name: Unit Tests
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    # Self-hosted runner can go offline (laptop closed, service crash).
+    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -315,7 +394,10 @@ jobs:
     name: Website
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    # Self-hosted runner can go offline (laptop closed, service crash).
+    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -630,16 +712,90 @@ jobs:
       - query-parity-trails
       - query-parity-diff
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
     steps:
-      - name: Fail if any required job failed or was cancelled
+      - name: Fail if any required job failed, was cancelled, or unexpectedly skipped
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
+          PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
+          PARITY_MYSQL: ${{ needs.changes.outputs.parity_mysql }}
         run: |
+          set -euo pipefail
           echo "$NEEDS_JSON"
+          # Hard failures: failure or cancelled.
           bad=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | .key')
           if [ -n "$bad" ]; then
             echo "Failed/cancelled jobs:"
             echo "$bad"
             exit 1
           fi
+          # Allow-list jobs that may legitimately skip, conditioned on the
+          # gate that produced the skip. Anything else skipping means a gate
+          # mis-evaluated and downstream silently passed.
+          unexpected=0
+          # Docs-only legitimately skips every gated downstream.
+          if [ "$DOCS_ONLY" = "true" ]; then
+            echo "docs_only=true — all downstream skips are expected."
+          else
+            any_parity=false
+            for v in "$PARITY_SQLITE" "$PARITY_POSTGRES" "$PARITY_MYSQL"; do
+              [ "$v" = "true" ] && any_parity=true
+            done
+            while read -r job result; do
+              [ "$result" = "skipped" ] || continue
+              case "$job" in
+                changes|ci) continue ;;
+                schema-parity-rails|schema-parity-trails|schema-parity-diff|\
+                query-parity-frozen-at|query-parity-rails|query-parity-trails|query-parity-diff)
+                  # Parity skip is legitimate when no parity gate is on.
+                  [ "$any_parity" = "false" ] && continue
+                  ;;
+              esac
+              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
+              unexpected=1
+            done < <(echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
+          fi
+          [ "$unexpected" -eq 0 ] || exit 1
           echo "All jobs passed or were intentionally skipped."
+
+      # Informational only — never fails the run. Captures peer-job
+      # durations from the same workflow run; CI's own duration is excluded
+      # because it isn't final at the time of this query.
+      - name: Job timing report
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          {
+            echo "### Job durations (longest first)"
+            echo ""
+            echo "| Job | Status | Duration |"
+            echo "|-----|--------|----------|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if ! gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs" > /tmp/jobs.json; then
+            echo "_(timing report unavailable: gh api failed)_" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          jq -r '
+            .jobs[]
+            | select(.name != "CI")
+            | select(.started_at != null and .completed_at != null)
+            | [
+                ((.completed_at | fromdateiso8601) - (.started_at | fromdateiso8601)),
+                .name,
+                (.conclusion // "running")
+              ]
+            | @tsv
+          ' /tmp/jobs.json \
+            | sort -rn \
+            | awk -F'\t' '{
+                s=$1; m=int(s/60); r=s-m*60;
+                printf("| %s | %s | %dm%02ds |\n", $2, $3, m, r)
+              }' >> "$GITHUB_STEP_SUMMARY"
