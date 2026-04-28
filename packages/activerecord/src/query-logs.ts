@@ -7,7 +7,7 @@
  * controller, action, etc.) to help trace queries back to application code.
  */
 
-import { ConfigurationError, NotImplementedError } from "./errors.js";
+import { ConfigurationError } from "./errors.js";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
 
@@ -38,6 +38,7 @@ export class GetKeyHandler {
  */
 export class QueryLogs {
   private _tags: TagDefinition[] = [];
+  private _tagsFormatter: "legacy" | "sqlcommenter" = "legacy";
   private _formatter: QueryLogsFormatter = LegacyFormatter;
   private _prependComment = false;
   private _cacheEnabled = false;
@@ -51,6 +52,14 @@ export class QueryLogs {
 
   get tags(): TagDefinition[] {
     return this._tags;
+  }
+
+  /**
+   * Get the current tags formatter type ("legacy" or "sqlcommenter").
+   * Mirrors: ActiveRecord::QueryLogs.tags_formatter
+   */
+  get tagsFormatter(): "legacy" | "sqlcommenter" {
+    return this._tagsFormatter;
   }
 
   set tags(tags: TagDefinition[]) {
@@ -91,8 +100,10 @@ export class QueryLogs {
 
   set formatter(format: "legacy" | "sqlcommenter" | QueryLogsFormatter) {
     if (format === "legacy") {
+      this._tagsFormatter = "legacy";
       this._formatter = LegacyFormatter;
     } else if (format === "sqlcommenter") {
+      this._tagsFormatter = "sqlcommenter";
       this._formatter = SQLCommenter;
     } else if (
       format !== null &&
@@ -103,7 +114,16 @@ export class QueryLogs {
       // Accept anything with the right call shape — an instance, a
       // const object, or a class / function with static `format` /
       // `join` (matches how Rails' singleton-class formatters are
-      // invoked: `MyFormatter.format(k, v)`).
+      // invoked: `MyFormatter.format(k, v)`). Detect the known
+      // built-ins so `tagsFormatter` stays accurate when the caller
+      // passes the class value directly (`logs.formatter = SQLCommenter`).
+      if (format === SQLCommenter) {
+        this._tagsFormatter = "sqlcommenter";
+      } else if (format === LegacyFormatter) {
+        this._tagsFormatter = "legacy";
+      } else {
+        this._tagsFormatter = "legacy"; // unknown custom formatter
+      }
       this._formatter = format as QueryLogsFormatter;
     } else {
       // Describe the bad value without dumping a full function body
@@ -240,33 +260,26 @@ export class QueryLogs {
   private uncachedComment(): string | null {
     const content = this.tagContent();
     if (!content) return null;
-    return `/*${escapeComment(content)}*/`;
+    return `/*${this.escapeSqlComment(content)}*/`;
+  }
+
+  // private
+
+  private escapeSqlComment(content: string): string {
+    // Mirrors: ActiveRecord::QueryLogs#escape_sql_comment
+    return escapeComment(content);
   }
 }
 
-/**
- * Sanitize a string for safe inclusion in a SQL comment.
- * Mirrors: ActiveRecord::QueryLogs.escape_sql_comment
- */
+// Sanitize a string for safe inclusion in a SQL comment by neutralising
+// any internal "*/" and "/*" sequences (turns them into "* /" / "/ *").
+//
+// Partial port of ActiveRecord::QueryLogs#escape_sql_comment
+// (query_logs.rb:219-228). Rails additionally strips a leading
+// `\A\s*/\*\+?\s?` and a trailing `\s?\*/\s*\Z` before escaping; trails
+// intentionally omits that strip so bare-marker inputs round-trip
+// through escape rather than collapsing to an empty string — the
+// existing "escaping bad comments" test cases encode that.
 export function escapeComment(content: string): string {
-  let s = content;
-  // Replace comment markers to prevent SQL comment injection
-  s = s.replace(/\*\//g, "* /").replace(/\/\*/g, "/ *");
-  return s;
-}
-
-function rebuildHandlers(): never {
-  throw new NotImplementedError("ActiveRecord::QueryLogs#rebuild_handlers is not implemented");
-}
-
-function buildHandler(name: any, handler?: any): never {
-  throw new NotImplementedError("ActiveRecord::QueryLogs#build_handler is not implemented");
-}
-
-function escapeSqlComment(content: any): never {
-  throw new NotImplementedError("ActiveRecord::QueryLogs#escape_sql_comment is not implemented");
-}
-
-function tagContent(connection: any): never {
-  throw new NotImplementedError("ActiveRecord::QueryLogs#tag_content is not implemented");
+  return String(content).replace(/\*\//g, "* /").replace(/\/\*/g, "/ *");
 }

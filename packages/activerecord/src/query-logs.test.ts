@@ -245,6 +245,48 @@ describe("QueryLogs.formatter =", () => {
   });
 });
 
+describe("QueryLogs.tagsFormatter", () => {
+  it("defaults to legacy", () => {
+    expect(new QueryLogs().tagsFormatter).toBe("legacy");
+  });
+
+  it("tracks formatter = 'sqlcommenter'", () => {
+    const logs = new QueryLogs();
+    logs.formatter = "sqlcommenter";
+    expect(logs.tagsFormatter).toBe("sqlcommenter");
+  });
+
+  it("tracks formatter = 'legacy'", () => {
+    const logs = new QueryLogs();
+    logs.formatter = "sqlcommenter";
+    logs.formatter = "legacy";
+    expect(logs.tagsFormatter).toBe("legacy");
+  });
+
+  it("tracks formatter = SQLCommenter (class value)", () => {
+    const logs = new QueryLogs();
+    logs.formatter = SQLCommenter;
+    expect(logs.tagsFormatter).toBe("sqlcommenter");
+  });
+
+  it("tracks formatter = LegacyFormatter (class value)", () => {
+    const logs = new QueryLogs();
+    logs.formatter = SQLCommenter;
+    logs.formatter = LegacyFormatter;
+    expect(logs.tagsFormatter).toBe("legacy");
+  });
+
+  it("falls back to 'legacy' for unknown custom formatters", () => {
+    const logs = new QueryLogs();
+    logs.formatter = SQLCommenter;
+    logs.formatter = {
+      format: (k: string, v: unknown) => `${k}=${v}`,
+      join: (pairs: string[]) => pairs.join(";"),
+    };
+    expect(logs.tagsFormatter).toBe("legacy");
+  });
+});
+
 describe("SQLCommenter", () => {
   it("formats as OpenTelemetry key='value' with URL-encoding", () => {
     expect(SQLCommenter.format("app", "My App")).toBe("app='My%20App'");
