@@ -47,6 +47,7 @@ export { DirtyTracker } from "./dirty.js";
 export { CallbackChain } from "./callbacks.js";
 export type { CallbackConditions } from "./callbacks.js";
 export { serializableHash } from "./serialization.js";
+export type { SerializeOptions } from "./serialization.js";
 export { Type } from "./type/value.js";
 export { typeRegistry } from "./type/registry.js";
 

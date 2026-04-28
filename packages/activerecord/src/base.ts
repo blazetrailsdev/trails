@@ -91,6 +91,7 @@ import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import * as Translation from "./translation.js";
 import * as Sanitization from "./sanitization.js";
+import * as Serialization from "./serialization.js";
 import * as Querying from "./querying.js";
 import { include, extend, type Included, type ParameterFilter } from "@blazetrails/activesupport";
 import {
@@ -2974,6 +2975,8 @@ include(Base, {
   cacheKey: _cacheKey,
   cacheKeyWithVersion: _cacheKeyWithVersion,
   cacheVersion: _cacheVersion,
+  // Serialization
+  serializableHash: Serialization.serializableHash,
   // AttributeMethods
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,
@@ -2997,6 +3000,9 @@ include(Base, {
   readAttributeForValidation: _Validations.readAttributeForValidation,
   validate: _Validations.validate,
   customValidationContext: _Validations.customValidationContext,
+});
+include(Base, {
+  attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
 });
 
 // Register Model's super methods for the Validations module.

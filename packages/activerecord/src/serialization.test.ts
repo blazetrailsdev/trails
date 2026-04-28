@@ -88,6 +88,64 @@ describe("SerializationTest", () => {
   it.skip("find records by serialized attributes through join", () => {
     /* needs associations + serialized columns */
   });
+
+  // Mirrors ActiveRecord::Serialization#serializable_hash — when a model
+  // declares an inheritance column (STI), serializableHash must exclude
+  // it without callers having to pass `except`.
+  it("excludes the inheritance column from serializable_hash for STI models", () => {
+    class Vehicle extends Base {}
+    Vehicle._tableName = "vehicles";
+    Vehicle.attribute("id", "integer");
+    Vehicle.attribute("name", "string");
+    Vehicle.attribute("type", "string");
+    Vehicle.inheritanceColumn = "type";
+    Vehicle.adapter = adapter;
+
+    const car = new Vehicle({ id: 1, name: "Camry", type: "Car" });
+    const hash = car.serializableHash();
+    expect(hash).toMatchObject({ id: 1, name: "Camry" });
+    expect(hash).not.toHaveProperty("type");
+  });
+
+  // Mirrors Rails' `private def attribute_names_for_serialization;
+  // attribute_names; end` hook — overriding it must actually affect
+  // serializableHash output.
+  it("respects an overridden attributeNamesForSerialization", () => {
+    class SecretModel extends Base {
+      attributeNamesForSerialization() {
+        // Only expose "name"; hide other attributes from serialization.
+        return ["name"];
+      }
+    }
+    SecretModel._tableName = "secrets";
+    SecretModel.attribute("id", "integer");
+    SecretModel.attribute("name", "string");
+    SecretModel.attribute("ssn", "string");
+    SecretModel.adapter = adapter;
+
+    const s = new SecretModel({ id: 1, name: "Visible", ssn: "111-22-3333" });
+    const hash = s.serializableHash();
+    expect(hash).toMatchObject({ name: "Visible" });
+    expect(hash).not.toHaveProperty("ssn");
+    expect(hash).not.toHaveProperty("id");
+  });
+
+  it("does not duplicate the inheritance column when caller already passes it in except", () => {
+    class Vehicle extends Base {}
+    Vehicle._tableName = "vehicles";
+    Vehicle.attribute("id", "integer");
+    Vehicle.attribute("name", "string");
+    Vehicle.attribute("type", "string");
+    Vehicle.inheritanceColumn = "type";
+    Vehicle.adapter = adapter;
+
+    const car = new Vehicle({ id: 1, name: "Camry", type: "Car" });
+    // Caller redundantly excludes "type" — final except list should still
+    // be deduped (Ruby's `|=` set-union semantics).
+    const hash = car.serializableHash({ except: ["type"] });
+    expect(hash).not.toHaveProperty("type");
+    expect(hash).toMatchObject({ id: 1, name: "Camry" });
+  });
 });
 
 describe("toXml() on Base", () => {

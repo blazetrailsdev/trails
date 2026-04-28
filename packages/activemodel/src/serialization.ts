@@ -31,10 +31,19 @@ export function serializableHash(
   record: AnyRecord,
   options: SerializeOptions = {},
 ): Record<string, unknown> {
-  // Get keys without materializing all values
+  // Models can override `attributeNamesForSerialization` to scope which
+  // attributes appear (Rails' private `attribute_names_for_serialization`
+  // hook). When absent, fall back to the underlying attribute store.
   const attrStore = record._attributes;
   let keys: string[];
-  if (attrStore && typeof attrStore.keys === "function" && !(attrStore instanceof Map)) {
+  if (
+    typeof (record as { attributeNamesForSerialization?: () => string[] })
+      .attributeNamesForSerialization === "function"
+  ) {
+    keys = (
+      record as { attributeNamesForSerialization: () => string[] }
+    ).attributeNamesForSerialization();
+  } else if (attrStore && typeof attrStore.keys === "function" && !(attrStore instanceof Map)) {
     keys = attrStore.keys();
   } else if (attrStore instanceof Map) {
     keys = Array.from(attrStore.keys());
