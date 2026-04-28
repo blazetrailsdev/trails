@@ -374,6 +374,30 @@ describe("sanitizeSql", () => {
   });
 
   describe("private helpers (replace_bind_variables, quote_bound_value, etc)", () => {
+    it("sanitize sql array handles %s format string", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("name='%s' and group_id='%s'", "foo'bar", 4);
+      expect(result).toBe("name='foo''bar' and group_id='4'");
+    });
+
+    it("sanitize sql array %s format raises on arity mismatch", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      expect(() => Post.sanitizeSqlArray("name='%s' and id='%s'", "foo")).toThrow(
+        /wrong number of bind variables/,
+      );
+    });
+
+    it("sanitize sql array %s format coerces nullish to empty string", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      expect(Post.sanitizeSqlArray("name='%s'", null)).toBe("name=''");
+    });
+
     it("handles named bind variables with simple strings", () => {
       class Post extends Base {
         static _tableName = "posts";
@@ -475,6 +499,24 @@ describe("sanitizeSql", () => {
       expect(result).toContain("1");
       expect(result).toContain("2");
       expect(result).toContain("3");
+    });
+
+    it("handles Sets as bind values", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("id IN (?)", new Set([1, 2, 3]));
+      expect(result).toContain("1");
+      expect(result).toContain("2");
+      expect(result).toContain("3");
+    });
+
+    it("handles empty Sets as bind values", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("id IN (?)", new Set());
+      expect(result).toContain("NULL");
     });
   });
 });

@@ -5,7 +5,13 @@
  */
 
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import { quote, quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
+import {
+  quote,
+  quoteIdentifier,
+  quoteTableName,
+  quoteString,
+  castBoundValue,
+} from "./connection-adapters/abstract/quoting.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
 
 /**
@@ -28,6 +34,15 @@ export function sanitizeSqlArray(template: string, ...binds: unknown[]): string 
 
   if (statement === "") {
     return statement;
+  }
+
+  // %s format string support (e.g., "name='%s' and id='%s'") — Rails:
+  //   statement % values.collect { |v| connection.quote_string(v.to_s) }
+  const formatStringCount = (statement.match(/%s/g) ?? []).length;
+  if (formatStringCount > 0) {
+    raiseIfBindArityMismatch(statement, formatStringCount, binds.length);
+    const values = [...binds];
+    return statement.replace(/%s/g, () => quoteString(String(values.shift() ?? "")));
   }
 
   return statement;
@@ -281,24 +296,38 @@ function replaceNamedBindVariables(statement: string, bindVars: Record<string, u
 
 /**
  * Quote a single value for use in SQL.
- * Handles arrays (converts to comma-separated quoted values),
+ * Handles arrays and Sets (converts to comma-separated quoted values),
  * objects with `id_for_database` method, and primitive values.
  *
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#quote_bound_value
  */
 function quoteBoundValue(value: unknown): string {
   if (hasIdForDatabase(value)) {
-    return quote(value.idForDatabase());
+    const cast = castBoundValue(value.idForDatabase());
+    return quote(cast);
   }
 
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      return quote(null);
+  // Handle collections recognized by isEnumerable (Array and Set only).
+  // Rails uses respond_to?(:map) and !acts_like?(:string), but this
+  // implementation intentionally limits support to those two collection
+  // types and does not expand arbitrary iterables (Buffer/Map/etc).
+  if (isEnumerable(value)) {
+    const values = Array.from(value as Iterable<unknown>);
+    if (values.length === 0) {
+      const cast = castBoundValue(null);
+      return quote(cast);
     }
-    return value.map((v) => (hasIdForDatabase(v) ? quote(v.idForDatabase()) : quote(v))).join(",");
+    return values
+      .map((v) => {
+        const idVal = hasIdForDatabase(v) ? v.idForDatabase() : v;
+        const cast = castBoundValue(idVal);
+        return quote(cast);
+      })
+      .join(",");
   }
 
-  return quote(value);
+  const cast = castBoundValue(value);
+  return quote(cast);
 }
 
 function hasIdForDatabase(value: unknown): value is { idForDatabase(): unknown } {
@@ -306,8 +335,21 @@ function hasIdForDatabase(value: unknown): value is { idForDatabase(): unknown }
     typeof value === "object" &&
     value !== null &&
     !Array.isArray(value) &&
+    !(value instanceof Set) &&
     typeof (value as { idForDatabase?: unknown }).idForDatabase === "function"
   );
+}
+
+/**
+ * Check if a value is enumerable (Array or Set).
+ * Rails uses respond_to?(:map) and !acts_like?(:string) which includes
+ * Array, Range, Set, and other Enumerable types. JS approximation:
+ * accepts only Array and Set so we don't accidentally expand strings,
+ * Buffers, Maps, or arbitrary iterables that aren't collections of
+ * scalar bind values.
+ */
+function isEnumerable(value: unknown): value is Iterable<unknown> {
+  return Array.isArray(value) || value instanceof Set;
 }
 
 /** True for plain JS objects (Object.prototype or null proto), matching Ruby Hash semantics. */
