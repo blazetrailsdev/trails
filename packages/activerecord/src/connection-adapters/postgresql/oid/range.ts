@@ -19,6 +19,7 @@
 
 import { NotImplementedError } from "../../../errors.js";
 import { ValueType } from "@blazetrails/activemodel";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export class Range {
   readonly begin: unknown;
@@ -205,7 +206,12 @@ function infiniteFloatRangeCovers(value: unknown): boolean {
 function inspect(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "string") return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Temporal.Instant) return value.toString();
+  if (value instanceof Temporal.PlainDateTime) return value.toString();
+  if (value instanceof Temporal.PlainDate) return value.toString();
+  if (value instanceof Temporal.PlainTime) return value.toString();
+  if (value instanceof Date)
+    throw new TypeError("Range inspect: JS Date is not accepted — use a Temporal type");
   return String(value);
 }
 

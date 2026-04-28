@@ -5,7 +5,6 @@
  */
 
 import {
-  quotedDate as abstractQuotedDate,
   formatInstantForSql,
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
@@ -18,8 +17,6 @@ export interface Quoting {
   unquotedTrue(): number;
   quotedFalse(): string;
   unquotedFalse(): number;
-  quotedDate(date: Date): string;
-  quotedTimeUtc(date: Date): string;
   quoteTableName(name: string): string;
   quoteColumnName(name: string): string;
   quoteString(value: string): string;
@@ -39,32 +36,6 @@ export function quotedFalse(): string {
 
 export function unquotedFalse(): number {
   return 0;
-}
-
-/**
- * SQLite stores datetimes as `YYYY-MM-DD HH:MM:SS[.microseconds]`
- * TEXT, so `quoted_date` returns the unquoted `:db` form (Rails'
- * default) — fractional seconds only appear when milliseconds > 0.
- * `quote()` wraps the result with single quotes; callers reaching
- * for `quotedDate` directly get the raw string.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_date
- */
-export function quotedDate(date: Date): string {
-  return abstractQuotedDate(date);
-}
-
-/**
- * Time-only portion of `quotedDate` — the `HH:MM:SS[.microseconds]`
- * tail after the leading `YYYY-MM-DD` / space separator. Unquoted;
- * callers add their own single quotes.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_time
- */
-export function quotedTimeUtc(date: Date): string {
-  const full = quotedDate(date);
-  const sep = full.indexOf(" ");
-  return sep === -1 ? full : full.slice(sep + 1);
 }
 
 export function quoteTableName(name: string): string {
@@ -102,7 +73,10 @@ export function quote(value: unknown): string {
   if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
   if (value instanceof Temporal.PlainTime) return `'2000-01-01 ${formatPlainTimeForSql(value)}'`;
   if (value instanceof Temporal.ZonedDateTime) return `'${formatInstantForSql(value.toInstant())}'`;
-  if (value instanceof Date) return `'${quotedDate(value)}'`;
+  if (value instanceof Date)
+    throw new TypeError(
+      "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
+    );
   if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
     return quotedBinary(value);
   }
@@ -114,13 +88,6 @@ export function quote(value: unknown): string {
 
 export function quoteTableNameForAssignment(_table: string, attr: string): string {
   return quoteColumnName(attr);
-}
-
-export function quotedTime(value: Date): string {
-  const h = String(value.getUTCHours()).padStart(2, "0");
-  const m = String(value.getUTCMinutes()).padStart(2, "0");
-  const s = String(value.getUTCSeconds()).padStart(2, "0");
-  return `'2000-01-01 ${h}:${m}:${s}'`;
 }
 
 export function quotedBinary(value: Uint8Array | ArrayBuffer): string {
@@ -151,15 +118,16 @@ export function typeCast(value: unknown): unknown {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "string" || typeof value === "bigint") return value;
   if (typeof value === "symbol") return value.description ?? null;
-  // Rails' `type_cast` returns `quoted_date(value)` — a formatted
-  // string, not the Date object itself. Callers (EXPLAIN rendering,
-  // bind-value logs) want the primitive, not the Date instance.
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
+  // PlainTime is stored with a 2000-01-01 date prefix so SQLite can round-trip it.
   if (value instanceof Temporal.PlainTime) return `2000-01-01 ${formatPlainTimeForSql(value)}`;
   if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
-  if (value instanceof Date) return quotedDate(value);
+  if (value instanceof Date)
+    throw new TypeError(
+      "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
+    );
   if (value instanceof Uint8Array || value instanceof ArrayBuffer) return value;
   throw new TypeError(`can't cast ${Object.prototype.toString.call(value)} to a SQLite3 type`);
 }

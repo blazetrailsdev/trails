@@ -59,7 +59,10 @@ export function quote(value: unknown): string {
   if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
   if (value instanceof Temporal.PlainTime) return `'${formatPlainTimeForSql(value)}'`;
   if (value instanceof Temporal.ZonedDateTime) return `'${formatInstantForSql(value.toInstant())}'`;
-  if (value instanceof Date) return `'${quotedDate(value)}'`;
+  if (value instanceof Date)
+    throw new TypeError(
+      "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
+    );
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
@@ -92,7 +95,10 @@ export function typeCast(value: unknown): unknown {
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
   if (value instanceof Temporal.PlainTime) return formatPlainTimeForSql(value);
   if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
-  if (value instanceof Date) return quotedDate(value);
+  if (value instanceof Date)
+    throw new TypeError(
+      "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
+    );
   throw new TypeError(`can't cast ${(value as object).constructor?.name ?? typeof value}`);
 }
 
@@ -206,51 +212,6 @@ export function unquotedFalse(): boolean {
 }
 
 /**
- * Format a date/time value for SQL. Includes microseconds if available.
- * Respects ActiveRecord.default_timezone (:utc or :local).
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_date
- */
-export function quotedDate(value: Date): string {
-  const pad = (n: number, width = 2) => String(n).padStart(width, "0");
-  const useUtc = getDefaultTimezone() === "utc";
-
-  const y = useUtc ? value.getUTCFullYear() : value.getFullYear();
-  const m = pad(useUtc ? value.getUTCMonth() + 1 : value.getMonth() + 1);
-  const d = pad(useUtc ? value.getUTCDate() : value.getDate());
-  const hh = pad(useUtc ? value.getUTCHours() : value.getHours());
-  const mm = pad(useUtc ? value.getUTCMinutes() : value.getMinutes());
-  const ss = pad(useUtc ? value.getUTCSeconds() : value.getSeconds());
-  const ms = useUtc ? value.getUTCMilliseconds() : value.getMilliseconds();
-
-  let result = `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
-  if (ms > 0) {
-    result += "." + pad(ms * 1000, 6);
-  }
-  return result;
-}
-
-/**
- * Format a time value for SQL (time portion only).
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_time
- */
-export function quotedTime(value: Date): string {
-  const useUtc = getDefaultTimezone() === "utc";
-  const h = useUtc ? value.getUTCHours() : value.getHours();
-  const m = useUtc ? value.getUTCMinutes() : value.getMinutes();
-  const s = useUtc ? value.getUTCSeconds() : value.getSeconds();
-  const ms = useUtc ? value.getUTCMilliseconds() : value.getMilliseconds();
-
-  // Build a date at 2000-01-01 with the time components, then format via quotedDate
-  const adjusted = useUtc
-    ? new Date(Date.UTC(2000, 0, 1, h, m, s, ms))
-    : new Date(2000, 0, 1, h, m, s, ms);
-  const full = quotedDate(adjusted);
-  return full.replace(/^\d{4}-\d{2}-\d{2} /, "");
-}
-
-/**
  * Return the IANA timezone string for SQL datetime serialization/deserialization,
  * based on `ActiveRecord.default_timezone`. Shared by all instant formatters and
  * by `SQLiteDateTimeType#cast` so both directions always agree on the timezone.
@@ -261,7 +222,7 @@ export function defaultSqlTimezone(): string {
 
 /**
  * Format a `Temporal.Instant` for SQL as `YYYY-MM-DD HH:MM:SS[.fffffffff]`.
- * Respects `ActiveRecord.default_timezone` exactly as `quotedDate()` does:
+ * Respects `ActiveRecord.default_timezone`:
  * UTC when the setting is `"utc"`, otherwise the host system's local timezone.
  * Preserves up to nanosecond precision; trailing zero groups are trimmed.
  */

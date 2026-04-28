@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   quote,
-  quotedDate,
-  quotedTimeUtc,
   typeCast,
   quotedBinary,
   unquoteIdentifier,
@@ -27,14 +25,8 @@ describe("MySQL quoting — quote", () => {
     expect(quote(BigInt("9007199254740993"))).toBe("9007199254740993");
   });
 
-  it("renders Date values as the full datetime (YYYY-MM-DD HH:MM:SS…), not date-only", () => {
-    // JS `Date` always carries a time component. Matches Rails' MySQL
-    // adapter treating JS datetimes as full timestamps rather than
-    // dropping the time to the `quotedDate` form.
-    const d = new Date(Date.UTC(2026, 0, 2, 12, 34, 56));
-    const out = quote(d);
-    expect(out).toMatch(/^'2026-01-02 12:34:56/);
-    expect(out.endsWith("'")).toBe(true);
+  it("throws on Date — Date is no longer accepted", () => {
+    expect(() => quote(new Date())).toThrow(TypeError);
   });
 
   it("quotes strings with MySQL-specific escapes (\\n, \\0, \\Z, \\\\)", () => {
@@ -65,34 +57,8 @@ describe("MySQL quoting — typeCast", () => {
     expect(quote(Buffer.from([0xca, 0xfe]))).toBe("x'cafe'");
   });
 
-  it("returns Date as the full unquoted datetime string (no surrounding quotes)", () => {
-    // typeCast's contract: unquoted primitive suitable as a bind
-    // value. It's `quote()`'s job to add the surrounding quotes.
-    const d = new Date(Date.UTC(2026, 0, 2, 12, 34, 56));
-    const out = typeCast(d) as string;
-    expect(out.startsWith("'")).toBe(false);
-    expect(out.endsWith("'")).toBe(false);
-    expect(out).toMatch(/^2026-01-02 12:34:56/);
-  });
-});
-
-describe("MySQL quoting — quotedDate / quotedTimeUtc", () => {
-  it("quotedDate returns the unquoted :db form (Rails quoted_date)", () => {
-    const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
-    const out = quotedDate(d);
-    expect(out).toBe("2026-04-18 12:34:56");
-    expect(out.startsWith("'")).toBe(false);
-    expect(out).not.toMatch(/\.000$/);
-  });
-
-  it("quotedDate includes .microseconds when ms > 0", () => {
-    const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56, 250));
-    expect(quotedDate(d)).toMatch(/^2026-04-18 12:34:56\.\d{6}$/);
-  });
-
-  it("quotedTimeUtc returns the time-only tail", () => {
-    const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
-    expect(quotedTimeUtc(d)).toBe("12:34:56");
+  it("throws on Date — Date is no longer accepted", () => {
+    expect(() => typeCast(new Date())).toThrow(TypeError);
   });
 });
 

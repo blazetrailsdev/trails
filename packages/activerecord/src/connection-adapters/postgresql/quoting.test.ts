@@ -13,9 +13,7 @@ import {
   quote,
   quoteDefaultExpression,
   quotedBinary,
-  quotedDate,
   quotedFalse,
-  quotedTimeUtc,
   quotedTrue,
   quoteSchemaName,
   quoteTableNameForAssignment,
@@ -139,24 +137,14 @@ describe("PostgreSQL quoting", () => {
     });
   });
 
-  describe("quotedDate / quotedTimeUtc", () => {
-    it("quotedDate returns the unquoted :db form (Rails quoted_date)", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
-      const out = quotedDate(d);
-      expect(out).toBe("2026-04-18 12:34:56");
-      expect(out.startsWith("'")).toBe(false);
-      expect(out).not.toMatch(/\.000$/);
-    });
+  it("quote(new Date()) throws — Date is no longer accepted", () => {
+    expect(() => quote(new Date())).toThrow(TypeError);
+    expect(() => quote(new Date())).toThrow(/Temporal/);
+  });
 
-    it("quotedDate includes .microseconds when ms > 0", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56, 123));
-      expect(quotedDate(d)).toMatch(/^2026-04-18 12:34:56\.\d{6}$/);
-    });
-
-    it("quotedTimeUtc returns the time-only tail of quotedDate", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
-      expect(quotedTimeUtc(d)).toBe("12:34:56");
-    });
+  it("typeCast(new Date()) throws — Date is no longer accepted", () => {
+    expect(() => typeCast(new Date())).toThrow(TypeError);
+    expect(() => typeCast(new Date())).toThrow(/Temporal/);
   });
 });
 

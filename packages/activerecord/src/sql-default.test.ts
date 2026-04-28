@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { quote, quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import { Nodes } from "@blazetrails/arel";
 
@@ -34,7 +35,7 @@ describe("quote", () => {
   });
 
   it("quotes dates as ISO 8601 strings", () => {
-    const d = new Date("2026-04-01T12:00:00Z");
+    const d = Temporal.Instant.from("2026-04-01T12:00:00Z");
     expect(quote(d)).toBe("'2026-04-01 12:00:00'");
   });
 

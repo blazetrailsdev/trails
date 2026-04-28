@@ -8,9 +8,6 @@ import {
   columnNameWithOrderMatcher,
   quote,
   quotedBinary,
-  quotedDate,
-  quotedTime,
-  quotedTimeUtc,
   quoteDefaultExpression,
   typeCast,
 } from "./quoting.js";
@@ -178,13 +175,6 @@ describe("SQLite3::Quoting", () => {
     });
   });
 
-  describe("quotedTime", () => {
-    it("formats with 2000-01-01 date prefix", () => {
-      const d = new Date(Date.UTC(2024, 5, 15, 14, 30, 45));
-      expect(quotedTime(d)).toBe("'2000-01-01 14:30:45'");
-    });
-  });
-
   describe("quoteDefaultExpression", () => {
     it("returns empty string for undefined", () => {
       expect(quoteDefaultExpression(undefined)).toBe("");
@@ -227,62 +217,14 @@ describe("SQLite3::Quoting", () => {
       expect(() => typeCast({})).toThrow(TypeError);
     });
 
-    it("formats Date as the unquoted :db form (no surrounding quotes, no trailing .000)", () => {
-      // typeCast's contract is to return an **unquoted** primitive;
-      // `quote()` adds the surrounding single quotes. Delegates to
-      // `abstract/quoting.ts:quotedDate` so fractional seconds show
-      // up only when ms > 0 (Rails' `:db` behavior) rather than
-      // always `.000` like `toISOString`.
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
-      const out = typeCast(d) as string;
-      expect(out.startsWith("'")).toBe(false);
-      expect(out.endsWith("'")).toBe(false);
-      expect(out).toBe("2026-04-18 12:34:56");
-      expect(out).not.toMatch(/\.000$/);
-    });
-
-    it("includes microseconds on Date when milliseconds are non-zero", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56, 123));
-      const out = typeCast(d) as string;
-      expect(out).toMatch(/^2026-04-18 12:34:56\.\d{6}$/);
+    it("throws on Date — Date is no longer accepted", () => {
+      expect(() => typeCast(new Date())).toThrow(TypeError);
     });
   });
 
   describe("quote(Date)", () => {
-    it("wraps the :db form with single quotes (consistent with typeCast)", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
-      expect(quote(d)).toBe("'2026-04-18 12:34:56'");
-    });
-
-    it("includes microseconds on Date when milliseconds are non-zero", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56, 123));
-      expect(quote(d)).toMatch(/^'2026-04-18 12:34:56\.\d{6}'$/);
-    });
-  });
-
-  describe("quotedDate / quotedTimeUtc", () => {
-    it("quotedDate returns the unquoted :db form (Rails quoted_date)", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
-      const out = quotedDate(d);
-      expect(out).toBe("2026-04-18 12:34:56");
-      expect(out.startsWith("'")).toBe(false);
-      expect(out.endsWith("'")).toBe(false);
-      expect(out).not.toMatch(/\.000$/);
-    });
-
-    it("quotedDate includes .microseconds when ms > 0", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56, 123));
-      expect(quotedDate(d)).toMatch(/^2026-04-18 12:34:56\.\d{6}$/);
-    });
-
-    it("quotedTimeUtc returns the time-only tail of quotedDate", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56));
-      expect(quotedTimeUtc(d)).toBe("12:34:56");
-    });
-
-    it("quotedTimeUtc carries the microseconds suffix too", () => {
-      const d = new Date(Date.UTC(2026, 3, 18, 12, 34, 56, 123));
-      expect(quotedTimeUtc(d)).toMatch(/^12:34:56\.\d{6}$/);
+    it("throws — Date is no longer accepted", () => {
+      expect(() => quote(new Date())).toThrow(TypeError);
     });
   });
 

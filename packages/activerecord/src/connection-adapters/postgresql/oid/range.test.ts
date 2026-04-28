@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Range, RangeType } from "./range.js";
 
 const integerSubtype = {
@@ -93,5 +94,35 @@ describe("PostgreSQL::OID::Range", () => {
 
     expect(type.isForceEquality(new Range(1, 10))).toBe(true);
     expect(type.isForceEquality([1, 10])).toBe(false);
+  });
+
+  describe("typeCastForSchema / inspect()", () => {
+    const passthroughSubtype = {
+      cast: (v: unknown) => v,
+      serialize: (v: unknown) => v,
+      deserialize: (v: unknown) => v,
+    };
+
+    it("formats a value as a string via String()", () => {
+      const type = new RangeType(passthroughSubtype, "int4range");
+      // inspect() falls through to String(value) for non-primitive, non-Temporal objects.
+      expect(typeof type.typeCastForSchema(new Range(1, 10))).toBe("string");
+    });
+
+    it("formats a Temporal.Instant value via inspect()", () => {
+      const type = new RangeType(passthroughSubtype, "tstzrange");
+      const instant = Temporal.Instant.from("2026-04-28T00:00:00Z");
+      // inspect() is called with the Instant directly when passed as the
+      // top-level value to typeCastForSchema.
+      expect(type.typeCastForSchema(instant)).toContain("2026-04-28");
+    });
+
+    it("throws on Date passed directly to typeCastForSchema / inspect()", () => {
+      const type = new RangeType(passthroughSubtype, "tsrange");
+      // inspect() receives the Date directly here (not as a Range bound),
+      // exercising the Date guard added in this PR.
+      expect(() => type.typeCastForSchema(new Date())).toThrow(TypeError);
+      expect(() => type.typeCastForSchema(new Date())).toThrow(/Temporal/);
+    });
   });
 });

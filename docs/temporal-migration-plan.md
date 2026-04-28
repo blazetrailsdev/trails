@@ -474,7 +474,7 @@ it first to prove the cast layer end-to-end before touching `pg` /
   `pg.Client` unaffected.
 - **Blocked by:** PR 3a.
 
-### PR 5b — MySQL driver path: `dateStrings` + `typeCast` + pinned tz
+### ~~PR 5b — MySQL driver path: `dateStrings` + `typeCast` + pinned tz~~ ✓ merged #930
 
 - **Files (new):**
   - `…/connection-adapters/mysql/temporal-type-cast.ts` — `typeCast`
@@ -493,7 +493,7 @@ it first to prove the cast layer end-to-end before touching `pg` /
   `trilogy` adapters; zero-date handling matches Rails.
 - **Blocked by:** PR 3a.
 
-### PR 6 — Close the dual-typed window
+### ~~PR 6 — Close the dual-typed window~~ ✓ open #939
 
 PRs 4, 5a, 5b have removed every caller that passes `Date` into the
 formatters. This PR deletes the `Date` overload from PR 2.

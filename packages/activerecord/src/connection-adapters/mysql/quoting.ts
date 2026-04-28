@@ -9,7 +9,6 @@
  */
 
 import {
-  quotedDate as abstractQuotedDate,
   formatInstantForSqlMysql as formatInstantForSql,
   formatPlainDateTimeForSqlMysql as formatPlainDateTimeForSql,
   formatPlainDateForSql,
@@ -22,8 +21,6 @@ export interface Quoting {
   unquotedTrue(): number;
   quotedFalse(): string;
   unquotedFalse(): number;
-  quotedDate(date: Date): string;
-  quotedTimeUtc(date: Date): string;
   quoteTableName(name: string): string;
   quoteColumnName(name: string): string;
   quoteString(value: string): string;
@@ -44,29 +41,6 @@ export function quotedFalse(): string {
 
 export function unquotedFalse(): number {
   return 0;
-}
-
-/**
- * MySQL's DATETIME/TIMESTAMP literal format matches Rails' `:db`
- * form: unquoted `YYYY-MM-DD HH:MM:SS[.microseconds]`. Fractional
- * seconds only appear when milliseconds > 0. `quote()` wraps the
- * result with single quotes.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_date
- */
-export function quotedDate(date: Date): string {
-  return abstractQuotedDate(date);
-}
-
-/**
- * Time-only portion of `quotedDate`. Unquoted.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_time
- */
-export function quotedTimeUtc(date: Date): string {
-  const full = quotedDate(date);
-  const sep = full.indexOf(" ");
-  return sep === -1 ? full : full.slice(sep + 1);
 }
 
 export function quoteTableName(name: string): string {
@@ -191,7 +165,10 @@ export function quote(value: unknown): string {
   if (value instanceof Temporal.PlainDate) return `'${formatPlainDateForSql(value)}'`;
   if (value instanceof Temporal.PlainTime) return `'${formatPlainTimeForSql(value)}'`;
   if (value instanceof Temporal.ZonedDateTime) return `'${formatInstantForSql(value.toInstant())}'`;
-  if (value instanceof Date) return `'${quotedDate(value)}'`;
+  if (value instanceof Date)
+    throw new TypeError(
+      "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
+    );
   if (value instanceof Buffer) return quotedBinary(value);
   if (typeof value === "symbol") {
     const desc = value.description;
@@ -216,10 +193,10 @@ export function typecastForDatabase(value: unknown): unknown {
 
 /**
  * Cast a value to the primitive form MySQL drivers expect for binds.
- * Booleans become 1/0, Dates are rendered as an **unquoted**
- * `YYYY-MM-DD HH:MM:SS` string (Rails' `value.to_formatted_s(:db)`
- * form — it's `quote()`'s job to add the surrounding single quotes,
- * not `typeCast`'s), strings and numbers pass through unchanged.
+ * Booleans become 1/0; Temporal types are formatted as unquoted
+ * `YYYY-MM-DD HH:MM:SS[.ffffff]` strings (it's `quote()`'s job to
+ * add surrounding single quotes); strings and numbers pass through.
+ * JS Date is not accepted — use a Temporal type instead.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#type_cast
  */
@@ -230,14 +207,14 @@ export function typeCast(value: unknown): unknown {
   if (value === null || value === undefined) return value;
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;
-  // Rails' `type_cast` returns `quoted_date(value)` — an unquoted
-  // formatted string. EXPLAIN / log-subscriber renderers want the
-  // primitive, not the Date instance.
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
   if (value instanceof Temporal.PlainTime) return formatPlainTimeForSql(value);
   if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
-  if (value instanceof Date) return quotedDate(value);
+  if (value instanceof Date)
+    throw new TypeError(
+      "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
+    );
   throw new TypeError(`can't cast ${(value as object).constructor?.name ?? typeof value}`);
 }

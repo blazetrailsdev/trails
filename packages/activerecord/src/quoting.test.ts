@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   quote,
   quoteString,
@@ -9,8 +10,8 @@ import {
   unquotedTrue,
   quotedFalse,
   unquotedFalse,
-  quotedDate,
-  quotedTime,
+  formatInstantForSql,
+  formatPlainTimeForSql,
   quotedBinary,
   typeCast,
   castBoundValue,
@@ -36,21 +37,18 @@ describe("QuotingTest", () => {
   });
 
   it("quoted date", () => {
-    const d = new Date("2026-04-07T00:00:00Z");
-    const result = quotedDate(d);
-    expect(result).toBe("2026-04-07 00:00:00");
+    const d = Temporal.PlainDateTime.from("2026-04-07T00:00:00");
+    expect(formatInstantForSql(d.toZonedDateTime("UTC").toInstant())).toBe("2026-04-07 00:00:00");
   });
 
   it("quoted timestamp utc", () => {
-    const t = new Date("2026-04-07T15:30:00Z");
-    const result = quotedDate(t);
-    expect(result).toBe("2026-04-07 15:30:00");
+    const t = Temporal.Instant.from("2026-04-07T15:30:00Z");
+    expect(formatInstantForSql(t)).toBe("2026-04-07 15:30:00");
   });
 
   it("quoted time utc", () => {
-    const t = new Date("2026-04-07T15:30:45Z");
-    const result = quotedTime(t);
-    expect(result).toBe("15:30:45");
+    const t = Temporal.PlainTime.from("15:30:45");
+    expect(formatPlainTimeForSql(t)).toBe("15:30:45");
   });
 
   it("quote nil", () => {
@@ -89,6 +87,11 @@ describe("QuotingTest", () => {
   it("quote object instance", () => {
     const object = {};
     expect(() => quote(object)).toThrow(TypeError);
+  });
+
+  it("quote(new Date()) throws with Temporal guidance", () => {
+    expect(() => quote(new Date())).toThrow(TypeError);
+    expect(() => quote(new Date())).toThrow(/Temporal/);
   });
 
   it("quote column name", () => {
@@ -133,7 +136,10 @@ describe("TypeCastingTest", () => {
     expect(() => typeCast({})).toThrow(TypeError);
   });
 
-  it.skip("type cast date", () => {});
+  it("type cast date", () => {
+    expect(() => typeCast(new Date())).toThrow(TypeError);
+    expect(() => typeCast(new Date())).toThrow(/Temporal/);
+  });
   it.skip("type cast time", () => {});
   it.skip("type cast duration should raise error", () => {});
 });
@@ -181,13 +187,13 @@ describe("QuoteBooleanTest", () => {
   });
 
   it("quoted date includes microseconds when present", () => {
-    const d = new Date("2026-04-07T15:30:45.123Z");
-    expect(quotedDate(d)).toBe("2026-04-07 15:30:45.123000");
+    const t = Temporal.Instant.from("2026-04-07T15:30:45.123456Z");
+    expect(formatInstantForSql(t)).toBe("2026-04-07 15:30:45.123456");
   });
 
   it("quoted time extracts time portion", () => {
-    const d = new Date("2026-04-07T08:15:30Z");
-    expect(quotedTime(d)).toBe("08:15:30");
+    const t = Temporal.PlainTime.from("08:15:30");
+    expect(formatPlainTimeForSql(t)).toBe("08:15:30");
   });
 
   it.skip("quote returns frozen string", () => {});

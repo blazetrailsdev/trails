@@ -966,11 +966,9 @@ export function withYamlFallback(value: unknown): unknown {
  * reject raw Temporal objects; this shim converts them at the bind boundary.
  * Returns the value unchanged when it is not a Temporal type.
  *
- * Applied in `typeCastedBinds` (notification payloads) for now. The actual
- * driver-bind paths (pg `client.query values`, mysql2 `conn.execute`, and
- * better-sqlite3 `stmt.all`) should be wired as part of the adapter-specific
- * Temporal migration work once those adapters start receiving real Temporal
- * values from the cast layer.
+ * Called directly by the PostgreSQL adapter bind paths (with adapter="postgres"
+ * for infinity sentinel handling) and indirectly by all adapters via
+ * `typeCastedBinds` (notification payloads, no adapter arg).
  */
 export function temporalToBindString(
   value: unknown,
@@ -986,8 +984,8 @@ export function temporalToBindString(
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
   if (value instanceof Temporal.PlainTime) {
-    // SQLite stores time as a datetime string with a fixed 2000-01-01 date prefix,
-    // matching quotedTime(Date) behavior in sqlite3/quoting.ts.
+    // SQLite stores time with a fixed 2000-01-01 date prefix so it can be
+    // read back as a datetime string by the cast layer.
     const t = formatPlainTimeForSql(value);
     return adapter === "sqlite" ? `2000-01-01 ${t}` : t;
   }
