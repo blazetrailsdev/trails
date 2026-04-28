@@ -565,7 +565,7 @@ export async function save<T extends SaveRecord>(
 
   // Mirrors: ActiveRecord::Transactions#save
   try {
-    return await withTransactionReturningStatus(self, () => self._createOrUpdate());
+    return await withTransactionReturningStatus(self, () => self.createOrUpdate());
   } finally {
     self._skipTouch = false;
   }

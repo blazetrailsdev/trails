@@ -227,12 +227,15 @@ function registerCallback(
 // persistence work directly in their respective callback chains.
 // ---------------------------------------------------------------------------
 
-function createOrUpdate(this: any): Promise<boolean> {
-  // Rails: _run_save_callbacks { super }
+export function createOrUpdate(this: any): Promise<boolean> {
+  // Rails: Callbacks#create_or_update wraps super in _run_save_callbacks.
+  // In trails, save's before/after callback chain runs inside _createOrUpdate
+  // (base.ts: runBefore("save") → dispatch create/update → runAfter("save")),
+  // so this wrapper just delegates and the callback ordering still matches.
   return (this._createOrUpdate as () => Promise<boolean>).call(this);
 }
 
-function _createRecord(this: any): Promise<boolean> {
+export function _createRecord(this: any): Promise<boolean> {
   // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
   const ctor = this.constructor as any;
   return ctor._callbackChain.runCallbacks("create", this, async () => {
@@ -248,7 +251,7 @@ function _createRecord(this: any): Promise<boolean> {
   });
 }
 
-function _updateRecord(this: any): Promise<boolean> {
+export function _updateRecord(this: any): Promise<boolean> {
   // Rails: _run_update_callbacks { record_update_timestamps { super } } — returns boolean.
   // record_update_timestamps writes updated_at/updated_on when @_touch_record
   // and should_record_timestamps? are true, then yields to the actual update.
@@ -259,7 +262,8 @@ function _updateRecord(this: any): Promise<boolean> {
     // Mirror record_update_timestamps: use _skipTouch (Rails' @_touch_record flag)
     // and the shared currentTimeFromProperTimezone() helper (Temporal.Instant).
     const hasChanges = Object.keys(this.changes ?? {}).length > 0;
-    if (!this._skipTouch && ctor.recordTimestamps !== false && hasChanges) {
+    const wroteTimestamps = !this._skipTouch && ctor.recordTimestamps !== false && hasChanges;
+    if (wroteTimestamps) {
       const time = currentTimeFromProperTimezone();
       const updateAttrs = timestampAttributesForUpdateInModel.call(ctor);
       for (const col of updateAttrs) {
@@ -269,7 +273,21 @@ function _updateRecord(this: any): Promise<boolean> {
       }
     }
     if (!this._performUpdate) throw new Error("_performUpdate not implemented");
-    await this._performUpdate();
+    // _performUpdate also auto-touches updated_at; skip its inner write when:
+    //   - the outer wrapper just handled timestamps, OR
+    //   - recordTimestamps is disabled, OR
+    //   - there are no dirty changes (Rails no-op — don't auto-touch and don't
+    //     desync updated_at vs updated_on by writing inside the inner layer).
+    // Rails: Timestamp#_update_record writes once via record_update_timestamps;
+    // super does not.
+    const previousSkipTouch = this._skipTouch;
+    const skipInnerTouch = wroteTimestamps || ctor.recordTimestamps === false || !hasChanges;
+    if (skipInnerTouch) this._skipTouch = true;
+    try {
+      await this._performUpdate();
+    } finally {
+      this._skipTouch = previousSkipTouch;
+    }
     if (this._pendingOperation) {
       await this._pendingOperation;
       this._pendingOperation = null;

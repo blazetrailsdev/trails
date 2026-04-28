@@ -1722,6 +1722,70 @@ describe("CallbacksTest", () => {
     expect(await Protected.count()).toBe(1);
   });
 
+  // Regression — _updateRecord (the Rails-style wrapper) must keep updated_at
+  // and updated_on in sync when both columns exist. Prior to the _skipTouch
+  // toggle, the inner _performUpdate would re-write updated_at after the
+  // outer wrapper, leaving updated_on pinned to the original timestamp.
+  it("update_record keeps updated_at and updated_on in sync", async () => {
+    class Item extends Base {
+      static {
+        this._tableName = "items";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.attribute("updated_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const item = await Item.create({ name: "first" });
+    item.name = "second";
+    await (item as any)._updateRecord();
+    const updatedAt = (item as any).updated_at;
+    const updatedOn = (item as any).updated_on;
+    expect(updatedAt).toBeDefined();
+    expect(updatedOn).toBeDefined();
+    expect(String(updatedAt)).toEqual(String(updatedOn));
+  });
+
+  // Regression — _updateRecord must respect recordTimestamps=false on both
+  // the outer wrapper and the inner _performUpdate auto-touch.
+  it("update_record respects recordTimestamps=false", async () => {
+    class Item extends Base {
+      static {
+        this._tableName = "no_ts_items";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+        (this as any).recordTimestamps = false;
+      }
+    }
+    const item = await Item.create({ name: "first" });
+    const before = (item as any).updated_at;
+    item.name = "second";
+    await (item as any)._updateRecord();
+    expect(String((item as any).updated_at)).toEqual(String(before));
+  });
+
+  // Regression — _updateRecord must not auto-touch updated_at when the record
+  // has no dirty changes (Rails no-op).
+  it("update_record does not touch updated_at when there are no changes", async () => {
+    class Item extends Base {
+      static {
+        this._tableName = "no_change_items";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const item = await Item.create({ name: "first" });
+    const before = (item as any).updated_at;
+    // Don't mutate name — no changes.
+    await (item as any)._updateRecord();
+    expect(String((item as any).updated_at)).toEqual(String(before));
+  });
+
   // Rails: test "halt callback chain with false"
   it("before save throwing abort", async () => {
     class Immutable extends Base {

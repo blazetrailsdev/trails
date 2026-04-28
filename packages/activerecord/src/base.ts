@@ -69,6 +69,11 @@ import { Association as AssociationInstance } from "./associations/association.j
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import * as ConnectionHandling from "./connection-handling.js";
 import * as ModelSchema from "./model-schema.js";
+import {
+  createOrUpdate as callbacksCreateOrUpdate,
+  _createRecord as callbacksCreateRecord,
+  _updateRecord as callbacksUpdateRecord,
+} from "./callbacks.js";
 // Lazy-loaded to avoid pulling node:crypto into browser bundles
 let _signedIdModule: typeof import("./signed-id.js") | null = null;
 let _signedIdModulePromise: Promise<typeof import("./signed-id.js")> | null = null;
@@ -3012,6 +3017,19 @@ include(Base, {
 include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
 });
+
+for (const [name, fn] of [
+  ["createOrUpdate", callbacksCreateOrUpdate],
+  ["_createRecord", callbacksCreateRecord],
+  ["_updateRecord", callbacksUpdateRecord],
+] as const) {
+  Object.defineProperty(Base.prototype, name, {
+    value: fn,
+    configurable: true,
+    writable: true,
+    enumerable: false,
+  });
+}
 
 // Register Model's super methods for the Validations module.
 // Breaks the recursion on isValid (Base.isValid → validations.isValid → Model.isValid)
