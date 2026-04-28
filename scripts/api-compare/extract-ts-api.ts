@@ -51,8 +51,6 @@ interface PendingReExport {
 
 function extractPackage(pkgName: string, srcDir: string): PackageInfo {
   const files = getAllTsFiles(srcDir);
-  const info: PackageInfo = { classes: {}, modules: {}, fileFunctions: {} };
-  const pendingReExports: PendingReExport[] = [];
 
   // Create a TypeScript program
   const dirName = PACKAGE_DIR_OVERRIDES[pkgName] ?? pkgName;
@@ -80,6 +78,17 @@ function extractPackage(pkgName: string, srcDir: string): PackageInfo {
   }
 
   const program = ts.createProgram(files, compilerOptions);
+  return extractFromProgram(program, srcDir);
+}
+
+/**
+ * Walk `program`'s source files and produce a PackageInfo. Split out
+ * from `extractPackage` so tests can drive it with synthetic in-memory
+ * programs without needing a real package directory + tsconfig.
+ */
+export function extractFromProgram(program: ts.Program, srcDir: string): PackageInfo {
+  const info: PackageInfo = { classes: {}, modules: {}, fileFunctions: {} };
+  const pendingReExports: PendingReExport[] = [];
   const checker = program.getTypeChecker();
 
   for (const sourceFile of program.getSourceFiles()) {
