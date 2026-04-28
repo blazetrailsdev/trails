@@ -12,11 +12,19 @@
  *
  * Usage:
  *   npx tsx scripts/api-compare/compare.ts [--package activerecord] [--missing] [--files] [--incomplete]
+ *
+ * Each host class's expected method set is expanded with the instance
+ * methods of every module it `include`s (and class methods of modules it
+ * `extend`s), recursively. This catches mixin wiring gaps where the
+ * mixin's methods live in a sibling TS file but aren't actually reachable
+ * on the host — e.g. arel #814: `Predications` methods existed in
+ * `predications.ts` but `NodeExpression` didn't mix them in, so
+ * `(node).eq(...)` failed at runtime despite a "100%" compare result.
  */
 
 import * as fs from "fs";
 import * as path from "path";
-import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 import { OUTPUT_DIR, packageSrcDir } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import { isExcluded } from "./excluded-files.js";
@@ -286,6 +294,58 @@ export function methodInMode(m: MethodInfo, mode: CompareMode): boolean {
  */
 export function tsShouldIncludeInIndex(m: MethodInfo, mode: CompareMode): boolean {
   return mode === "public" ? !m.internal : true;
+}
+
+/**
+ * Flatten `include`/`extend`-reachable methods onto a host entity.
+ *
+ * Ruby's `include Mod` flattens Mod's instance methods onto the including
+ * class's lookup chain; `extend Mod` flattens them as singleton (class)
+ * methods. The api-compare manifest records each entity's *own* declared
+ * methods only, so without this expansion `Base.includes = ["Querying"]`
+ * doesn't surface `Querying`'s methods as part of `Base`'s expected TS
+ * surface — and a Rails class can pass api-compare with the mixin's
+ * methods living in some other TS file but never reachable on the host.
+ *
+ * Only the host's *own* `extend` lands as class methods. Ruby `extend`
+ * affects only the receiver's singleton class and does not propagate
+ * through `include` chains, so a module's `extend X` (e.g. `module M;
+ * extend ActiveSupport::Concern; end`) does NOT give `X`'s methods to
+ * a class that does `include M`. (Rails' "class methods via include"
+ * pattern is ASC's nested `ClassMethods` submodule, which compare.ts
+ * folds into the parent module before this helper runs.) Nested
+ * `include` chains do propagate, so a module that includes another
+ * module contributes those chained methods to the host as instance
+ * methods (or class methods if the host got them via `extend`).
+ *
+ * Cycles are guarded by `visited`. Modules outside the package are
+ * silently skipped — stdlib like `Comparable`/`Enumerable` falls through.
+ */
+export function flattenIncludedMethodInfos(
+  entity: ClassInfo,
+  rubyPkg: PackageInfo,
+  moduleFqnByShort: Map<string, string[]>,
+): { instance: MethodInfo[]; klass: MethodInfo[] } {
+  const instance: MethodInfo[] = [...entity.instanceMethods];
+  const klass: MethodInfo[] = [...entity.classMethods];
+  const visited = new Set<string>();
+
+  const walk = (incName: string, asClassMethods: boolean): void => {
+    const fqns = moduleFqnByShort.get(incName) ?? [incName];
+    for (const fqn of fqns) {
+      if (visited.has(fqn)) continue;
+      visited.add(fqn);
+      const mod = rubyPkg.modules[fqn] as unknown as ClassInfo | undefined;
+      if (!mod) continue;
+      const sink = asClassMethods ? klass : instance;
+      for (const m of mod.instanceMethods) sink.push(m);
+      for (const inc of mod.includes ?? []) walk(inc, asClassMethods);
+    }
+  };
+
+  for (const inc of entity.includes ?? []) walk(inc, false);
+  for (const ext of entity.extends ?? []) walk(ext, true);
+  return { instance, klass };
 }
 
 // ---------------------------------------------------------------------------
@@ -631,7 +691,8 @@ function main() {
       // (e.g., 8 subclasses in binary.rb each override `invert`). Count once.
       const seen = new Map<string, { rubyName: string; rubyModule: string }>();
       for (const item of items) {
-        const rubyMethods = [...item.info.instanceMethods, ...item.info.classMethods];
+        const f = flattenIncludedMethodInfos(item.info, rubyPkg, moduleFqnByShort);
+        const rubyMethods = [...f.instance, ...f.klass];
         for (const rm of rubyMethods) {
           if (!methodMatchesMode(rm)) continue;
           const tsCandidates = rubyMethodToTs(rm.name);

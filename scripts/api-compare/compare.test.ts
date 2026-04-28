@@ -5,8 +5,9 @@ import {
   resolveTsClassForRuby,
   methodInMode,
   tsShouldIncludeInIndex,
+  flattenIncludedMethodInfos,
 } from "./compare.js";
-import type { ClassInfo, MethodInfo } from "./types.js";
+import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
 function cls(file: string, name: string, superclass?: string): ClassInfo {
   return {
@@ -243,5 +244,159 @@ describe("tsShouldIncludeInIndex", () => {
   it("all mode includes both public and internal TS methods (full surface)", () => {
     expect(tsShouldIncludeInIndex(pub, "all")).toBe(true);
     expect(tsShouldIncludeInIndex(internal, "all")).toBe(true);
+  });
+});
+
+describe("flattenIncludedMethodInfos", () => {
+  function im(name: string): MethodInfo {
+    return { name, visibility: "public", params: [] };
+  }
+  function mod(name: string, instance: string[], includes: string[] = []): ClassInfo {
+    return {
+      name,
+      file: `${name.toLowerCase()}.rb`,
+      includes,
+      extends: [],
+      instanceMethods: instance.map(im),
+      classMethods: [],
+    };
+  }
+
+  it("flattens included module instance methods onto the host", () => {
+    // Mirrors arel #814: NodeExpression includes Predications + Math.
+    // Without flattening, NodeExpression's expected surface is empty
+    // and the wiring gap goes undetected.
+    const predications = mod("Predications", ["eq", "gt", "lt"]);
+    const math = mod("Math", ["add", "subtract"]);
+    const host: ClassInfo = {
+      name: "NodeExpression",
+      file: "arel/nodes/node_expression.rb",
+      includes: ["Predications", "Math"],
+      extends: [],
+      instanceMethods: [im("hash")],
+      classMethods: [],
+    };
+    const pkg: PackageInfo = {
+      classes: { "Arel::Nodes::NodeExpression": host },
+      modules: { "Arel::Predications": predications, "Arel::Math": math },
+    };
+    const byShort = new Map([
+      ["Predications", ["Arel::Predications"]],
+      ["Math", ["Arel::Math"]],
+    ]);
+    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    expect(f.instance.map((m) => m.name).sort()).toEqual(
+      ["add", "eq", "gt", "hash", "lt", "subtract"].sort(),
+    );
+    expect(f.klass).toEqual([]);
+  });
+
+  it("routes `extend` modules' instance methods as class methods on the host", () => {
+    const enums = mod("Enum", ["values", "lookup"]);
+    const host: ClassInfo = {
+      name: "Base",
+      file: "base.rb",
+      includes: [],
+      extends: ["Enum"],
+      instanceMethods: [],
+      classMethods: [im("inherited")],
+    };
+    const pkg: PackageInfo = {
+      classes: { Base: host },
+      modules: { Enum: enums },
+    };
+    const byShort = new Map([["Enum", ["Enum"]]]);
+    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    expect(f.instance.map((m) => m.name)).toEqual([]);
+    expect(f.klass.map((m) => m.name).sort()).toEqual(["inherited", "lookup", "values"]);
+  });
+
+  it("recurses through nested module includes", () => {
+    // Predications includes Constants → Constants's methods reach the host.
+    const constants = mod("Constants", ["null", "true_value"]);
+    const predications = mod("Predications", ["eq"], ["Constants"]);
+    const host: ClassInfo = {
+      name: "Attribute",
+      file: "arel/attribute.rb",
+      includes: ["Predications"],
+      extends: [],
+      instanceMethods: [],
+      classMethods: [],
+    };
+    const pkg: PackageInfo = {
+      classes: {},
+      modules: { "Arel::Predications": predications, "Arel::Constants": constants },
+    };
+    const byShort = new Map([
+      ["Predications", ["Arel::Predications"]],
+      ["Constants", ["Arel::Constants"]],
+    ]);
+    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    expect(f.instance.map((m) => m.name).sort()).toEqual(["eq", "null", "true_value"]);
+  });
+
+  it("does not propagate a module's own `extend` through `include` chains", () => {
+    // Ruby `extend X` affects only the receiver's singleton class. A
+    // module that does `extend ActiveSupport::Concern` does NOT donate
+    // Concern's methods to a class that does `include` the module.
+    // (Rails' "class methods via include" pattern is ASC's nested
+    // ClassMethods submodule, folded in by compare.ts upstream.)
+    const concern = mod("Concern", ["append_features", "included"]);
+    const myConcern = mod("MyConcern", ["instance_helper"]);
+    myConcern.extends = ["Concern"];
+    const host: ClassInfo = {
+      name: "Host",
+      file: "host.rb",
+      includes: ["MyConcern"],
+      extends: [],
+      instanceMethods: [],
+      classMethods: [],
+    };
+    const pkg: PackageInfo = {
+      classes: {},
+      modules: { Concern: concern, MyConcern: myConcern },
+    };
+    const byShort = new Map([
+      ["Concern", ["Concern"]],
+      ["MyConcern", ["MyConcern"]],
+    ]);
+    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    expect(f.instance.map((m) => m.name).sort()).toEqual(["instance_helper"]);
+    expect(f.klass).toEqual([]);
+  });
+
+  it("skips modules outside the package without erroring", () => {
+    // Comparable, Enumerable etc. live in stdlib — not in our manifest.
+    const host: ClassInfo = {
+      name: "Range",
+      file: "range.rb",
+      includes: ["Comparable", "Enumerable"],
+      extends: [],
+      instanceMethods: [im("first")],
+      classMethods: [],
+    };
+    const pkg: PackageInfo = { classes: {}, modules: {} };
+    const f = flattenIncludedMethodInfos(host, pkg, new Map());
+    expect(f.instance.map((m) => m.name)).toEqual(["first"]);
+  });
+
+  it("guards against include cycles between modules", () => {
+    const a = mod("A", ["a1"], ["B"]);
+    const b = mod("B", ["b1"], ["A"]);
+    const host: ClassInfo = {
+      name: "Host",
+      file: "host.rb",
+      includes: ["A"],
+      extends: [],
+      instanceMethods: [im("h1")],
+      classMethods: [],
+    };
+    const pkg: PackageInfo = { classes: {}, modules: { A: a, B: b } };
+    const byShort = new Map([
+      ["A", ["A"]],
+      ["B", ["B"]],
+    ]);
+    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    expect(f.instance.map((m) => m.name).sort()).toEqual(["a1", "b1", "h1"]);
   });
 });
