@@ -1260,12 +1260,16 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#left_joins
    */
+  leftJoins(table: string, on: string): Relation<T>;
+  leftJoins(table: AssociationSpec | AssociationSpec[]): Relation<T>;
   leftJoins(table: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
     const rel = this._clone();
-    if (on) {
+    if (on !== undefined) {
       // Explicit SQL form: LEFT OUTER JOIN table ON condition — only valid for strings.
       if (typeof table !== "string")
         throw argumentError("leftJoins(table, on) requires a string table name");
+      if (typeof on !== "string" || !on.trim())
+        throw argumentError("leftJoins(table, on) requires a non-empty string ON condition");
       rel._joinClauses.push({ type: "left", table, on });
     } else {
       // Association name/spec form — mirrors Rails left_outer_joins! storing in
@@ -1283,9 +1287,17 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#left_outer_joins
    */
+  leftOuterJoins(): Relation<T>;
+  leftOuterJoins(table: string, on: string): Relation<T>;
+  leftOuterJoins(table: AssociationSpec | AssociationSpec[]): Relation<T>;
   leftOuterJoins(table?: AssociationSpec | AssociationSpec[], on?: string): Relation<T> {
-    if (!table) return this._clone();
-    return this.leftJoins(table, on);
+    if (table === undefined) return this._clone();
+    if (on !== undefined) {
+      if (typeof table !== "string")
+        throw argumentError("leftOuterJoins(table, on) requires a string table name");
+      return this.leftJoins(table, on);
+    }
+    return this.leftJoins(table);
   }
 
   /**
