@@ -1,25 +1,29 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
-const repoRoot = process.cwd();
 const tscPath = path.join(
-  repoRoot,
+  process.cwd(),
   "node_modules",
   ".bin",
   process.platform === "win32" ? "tsc.cmd" : "tsc",
 );
 
-const projects = [
-  "packages/activesupport/tsconfig.json",
-  "packages/arel/tsconfig.json",
-  "packages/activemodel/tsconfig.json",
-  "packages/activerecord/tsconfig.json",
-  "packages/rack/tsconfig.json",
-  "packages/actionpack/tsconfig.json",
-  "packages/trailties/tsconfig.json",
-];
+// `tsc --build` is project-references-aware (each tsconfig.json under
+// `packages/*` uses `composite: true` with `references` to upstream
+// packages). Per-project `tsc -p ... --noEmit` cannot resolve those
+// references, so it fails on a fresh clone where `dist/` is empty —
+// the very state every pre-commit hook starts in. `--build` populates
+// dist/ on the first run (~60s cold) and is incremental thereafter
+// (<1s warm via .tsbuildinfo), matching what CI's `pnpm build` does
+// before its typecheck step.
+const result = spawnSync(tscPath, ["--build"], { stdio: "inherit" });
 
-for (const project of projects) {
-  const result = spawnSync(tscPath, ["-p", project, "--noEmit"], { stdio: "inherit" });
-  if (result.status !== 0) process.exit(result.status ?? 1);
+if (result.error) {
+  console.error("✗ Failed to start TypeScript compiler.");
+  console.error(`  tsc: ${tscPath}`);
+  console.error(`  cwd: ${process.cwd()}`);
+  console.error(`  ${result.error.name}: ${result.error.message}`);
+  process.exit(1);
 }
+
+process.exit(result.status ?? 1);
