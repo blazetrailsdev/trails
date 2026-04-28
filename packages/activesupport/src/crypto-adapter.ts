@@ -44,7 +44,46 @@ export interface CryptoAdapter {
     keylen: number,
     digest: string,
   ): Buffer;
+  /**
+   * Async PBKDF2 — when implemented, runs on a threadpool so hot
+   * per-request paths don't block the event loop. **Optional**: callers
+   * should go through `pbkdf2Async(adapter, ...)` below, which falls
+   * back to wrapping `pbkdf2Sync` in `Promise.resolve` for adapters that
+   * don't ship an async implementation. Marking this optional keeps
+   * downstream custom adapters source-compatible.
+   */
+  pbkdf2?(
+    password: string | Uint8Array,
+    salt: string | Uint8Array,
+    iterations: number,
+    keylen: number,
+    digest: string,
+  ): Promise<Buffer>;
   timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
+}
+
+/**
+ * Use the adapter's async `pbkdf2` when available, otherwise wrap the
+ * sync implementation. Lets call sites prefer the threadpool path
+ * without breaking adapters that only implement `pbkdf2Sync`.
+ */
+export function pbkdf2Async(
+  adapter: CryptoAdapter,
+  password: string | Uint8Array,
+  salt: string | Uint8Array,
+  iterations: number,
+  keylen: number,
+  digest: string,
+): Promise<Buffer> {
+  if (typeof adapter.pbkdf2 === "function") {
+    return adapter.pbkdf2(password, salt, iterations, keylen, digest);
+  }
+  // Defer the sync call so a synchronous throw becomes a Promise
+  // rejection — keeps the function's async contract intact for `.catch`
+  // callers regardless of how the underlying adapter behaves.
+  return Promise.resolve().then(() =>
+    adapter.pbkdf2Sync(password, salt, iterations, keylen, digest),
+  );
 }
 
 export interface HashAdapter {
@@ -101,6 +140,14 @@ function wrapNodeCrypto(nodeCrypto: typeof import("node:crypto")): CryptoAdapter
     },
     pbkdf2Sync(password, salt, iterations, keylen, digest): Buffer {
       return nodeCrypto.pbkdf2Sync(password, salt, iterations, keylen, digest);
+    },
+    pbkdf2(password, salt, iterations, keylen, digest): Promise<Buffer> {
+      return new Promise((resolve, reject) => {
+        nodeCrypto.pbkdf2(password, salt, iterations, keylen, digest, (err, key) => {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
     },
     timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
       return nodeCrypto.timingSafeEqual(a, b);

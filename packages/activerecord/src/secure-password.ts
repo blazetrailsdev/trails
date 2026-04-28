@@ -1,4 +1,5 @@
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto, camelize, pbkdf2Async } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { generatesTokenFor } from "./token-for.js";
 
@@ -45,18 +46,23 @@ function verifyPassword(password: string, digest: string): boolean {
  */
 export function hasSecurePassword(
   modelClass: typeof Base,
-  options: { validations?: boolean; resetToken?: boolean } = {},
+  attributeOrOptions: string | { validations?: boolean; resetToken?: boolean } = {},
+  maybeOptions: { validations?: boolean; resetToken?: boolean } = {},
 ): void {
+  // Mirrors Rails: `has_secure_password(attribute = :password, validations: true, reset_token: true)`
+  const attribute = typeof attributeOrOptions === "string" ? attributeOrOptions : "password";
+  const options = typeof attributeOrOptions === "string" ? maybeOptions : attributeOrOptions;
+  const isDefaultAttribute = attribute === "password";
   const runValidations = options.validations !== false;
-  const attribute = "password";
   const digestAttr = `${attribute}_digest`;
 
   // Store the raw password temporarily for hashing during save
-  const passwordKey = Symbol("password");
-  const confirmationKey = Symbol("password_confirmation");
+  const passwordKey = Symbol(`${attribute}`);
+  const confirmationKey = Symbol(`${attribute}_confirmation`);
 
-  // password setter/getter
-  Object.defineProperty(modelClass.prototype, "password", {
+  // Define setter/getter for the configured secure-password attribute
+  // (e.g. password / recovery_password).
+  Object.defineProperty(modelClass.prototype, attribute, {
     get: function () {
       return (this as any)[passwordKey] ?? null;
     },
@@ -66,19 +72,36 @@ export function hasSecurePassword(
     configurable: true,
   });
 
-  // password_confirmation setter/getter
-  Object.defineProperty(modelClass.prototype, "passwordConfirmation", {
-    get: function () {
-      return (this as any)[confirmationKey] ?? null;
-    },
-    set: function (value: string | null) {
-      (this as any)[confirmationKey] = value;
-    },
-    configurable: true,
-  });
+  // password_confirmation setter/getter — only for the default attribute,
+  // matching the surface most apps rely on. Per-attribute confirmation is
+  // a separable follow-up.
+  if (isDefaultAttribute) {
+    Object.defineProperty(modelClass.prototype, "passwordConfirmation", {
+      get: function () {
+        return (this as any)[confirmationKey] ?? null;
+      },
+      set: function (value: string | null) {
+        (this as any)[confirmationKey] = value;
+      },
+      configurable: true,
+    });
 
-  // authenticate method
-  Object.defineProperty(modelClass.prototype, "authenticate", {
+    // `authenticate` (no suffix) is a Rails convenience for the default attribute.
+    Object.defineProperty(modelClass.prototype, "authenticate", {
+      value: function (this: Base, password: string): Base | false {
+        const digest = this._readAttribute(digestAttr);
+        if (!digest) return false;
+        return verifyPassword(password, digest as string) ? this : false;
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  // authenticate${Attribute} method (for authenticate_by to call)
+  // e.g., authenticatePassword, authenticateRecoveryPassword
+  const authenticateMethodName = `authenticate${camelize(attribute)}`;
+  Object.defineProperty(modelClass.prototype, authenticateMethodName, {
     value: function (this: Base, password: string): Base | false {
       const digest = this._readAttribute(digestAttr);
       if (!digest) return false;
@@ -87,6 +110,17 @@ export function hasSecurePassword(
     writable: true,
     configurable: true,
   });
+
+  // Static authenticateBy — attached once per class (Rails: ClassMethods
+  // module included once). Skip if already defined so multiple
+  // hasSecurePassword calls don't redundantly redefine the same function.
+  if (!(modelClass as any).authenticateBy) {
+    Object.defineProperty(modelClass, "authenticateBy", {
+      value: authenticateBy,
+      writable: true,
+      configurable: true,
+    });
+  }
 
   // Hook into save to hash the password. Use writeAttribute (not
   // _attributes.set) so the dirty tracker marks the column changed and
@@ -108,8 +142,10 @@ export function hasSecurePassword(
     }
   });
 
-  // Add validations
-  if (runValidations) {
+  // Add validations (only wired for the default `password` attribute today;
+  // per-attribute validations would mean parameterizing the `errors.add`
+  // keys and message — separable from authenticate_by parity).
+  if (runValidations && isDefaultAttribute) {
     modelClass.validate(function (record: any) {
       const rawPassword = record[passwordKey];
       const isNew = record.isNewRecord();
@@ -192,6 +228,145 @@ export function hasSecurePassword(
       writable: true,
       configurable: true,
     });
+  }
+}
+
+/**
+ * Authenticates a record by finding it via non-password attributes,
+ * then verifying password attributes. Returns the record on success,
+ * null if authentication fails.
+ *
+ * Mirrors: ActiveRecord::SecurePassword.authenticate_by
+ *
+ * Given a set of attributes, finds a record using the non-password
+ * attributes, and then authenticates that record using the password
+ * attributes. Returns the record if authentication succeeds; otherwise,
+ * returns null.
+ *
+ * When password attributes are valid non-empty strings, authenticateBy
+ * cryptographically digests them even if no matching record is found.
+ * That mitigates timing-based enumeration attacks where an attacker can
+ * determine if a passworded record exists even without knowing the
+ * password. Invalid password inputs (nil, empty string, non-string) are
+ * still short-circuited to `null` without hashing — they're not valid
+ * Rails password values and the timing-attack channel only exists for
+ * legitimate inputs.
+ *
+ * Raises an ArgumentError if the set of attributes doesn't contain at
+ * least one password and one non-password attribute.
+ */
+export async function authenticateBy(
+  this: typeof Base,
+  attributes: Record<string, unknown> | { toH(): Record<string, unknown> },
+): Promise<Base | null> {
+  // Reject non-objects up front so a stray null/undefined produces a
+  // clear error instead of "Cannot read properties of null (reading
+  // 'toH')" deep in the call chain.
+  if (attributes === null || typeof attributes !== "object") {
+    throw new ArgumentError(
+      "authenticateBy expects an object of attributes (or one with a toH() method)",
+    );
+  }
+  // Convert to a plain object if the input has a `toH()` method
+  // (trails' camelCase analog of Rails' `to_h`). trails is camelCase-only
+  // — callers passing Ruby/Rails-shaped values must translate to `toH()`
+  // at the boundary.
+  const attrs =
+    typeof (attributes as { toH?: unknown }).toH === "function"
+      ? (attributes as { toH(): Record<string, unknown> }).toH()
+      : (attributes as Record<string, unknown>);
+
+  const passwordEntries: Array<[string, unknown]> = [];
+  const identifierEntries: Array<[string, unknown]> = [];
+
+  for (const [name, value] of Object.entries(attrs)) {
+    // Check if this is a password attribute (the _digest variant exists but name doesn't)
+    const digestName = `${name}_digest`;
+    if (!(this as any).hasAttribute?.(name) && (this as any).hasAttribute?.(digestName)) {
+      passwordEntries.push([name, value]);
+    } else {
+      identifierEntries.push([name, value]);
+    }
+  }
+
+  if (passwordEntries.length === 0) {
+    throw new ArgumentError("One or more password arguments are required");
+  }
+  if (identifierEntries.length === 0) {
+    throw new ArgumentError("One or more finder arguments are required");
+  }
+
+  // Short-circuit: if any password is nil, empty, or not a string,
+  // return null immediately. Intentional divergence from Rails:
+  // Ruby's `to_s` coerces silently, but in TS a non-string value
+  // (object, number) reaching PBKDF2 either throws or silently
+  // stringifies to garbage like `[object Object]`. Treating it as
+  // auth failure is safer than coercing.
+  for (const [, value] of passwordEntries) {
+    if (typeof value !== "string" || value === "") {
+      return null;
+    }
+  }
+
+  // Strip `undefined` identifier values before hitting findBy. trails'
+  // PredicateBuilder treats `undefined` the same as `null` and emits
+  // `IS NULL`, so a caller destructuring a missing field could otherwise
+  // authenticate a record whose identifier is actually NULL. Re-check
+  // the "at least one finder arg" invariant after filtering.
+  const definedIdentifierEntries = identifierEntries.filter(([, v]) => v !== undefined);
+  if (definedIdentifierEntries.length === 0) {
+    throw new ArgumentError("One or more finder arguments are required");
+  }
+
+  const passwords = Object.fromEntries(passwordEntries);
+  const identifiers = Object.fromEntries(definedIdentifierEntries);
+
+  const record = await (this as any).findBy(identifiers);
+  if (record) {
+    // Authenticate every password attribute without early-exit. Mirrors
+    // Rails: `record.public_send(:"authenticate_#{name}", value)` — if
+    // the method doesn't exist, Ruby raises NoMethodError. Throwing here
+    // matches that semantic and avoids a timing-attack channel where a
+    // misconfigured model (digest column without hasSecurePassword)
+    // silently shortcuts out of the hash work that the not-found path
+    // always performs. Likewise, accumulate `allAuthenticated` rather
+    // than `break`-ing on the first wrong password so multi-password
+    // models spend the same hash-work whether the first or last password
+    // is wrong (Rails uses `count == size` for the same reason).
+    let allAuthenticated = true;
+    for (const [name] of passwordEntries) {
+      const value = passwords[name] as string;
+      const methodName = `authenticate${camelize(name)}`;
+      const authenticateMethod = (record as any)[methodName];
+      if (typeof authenticateMethod !== "function") {
+        throw new TypeError(
+          `${(this as typeof Base).name}#${methodName} is not defined — ` +
+            `did you call hasSecurePassword(model, "${name}")?`,
+        );
+      }
+      if (!authenticateMethod.call(record, value)) {
+        allAuthenticated = false;
+        // Don't break — keep going so the hash work is independent
+        // of which (or how many) passwords are wrong.
+      }
+    }
+    return allAuthenticated ? record : null;
+  } else {
+    // Even if no record is found, hash the supplied passwords so the
+    // not-found path takes comparable time to a successful authenticate.
+    // Use `pbkdf2Async` here (rather than the sync hashPassword used by
+    // the password setter) to prefer the threadpool path when the
+    // crypto adapter supports it — important under login load and when
+    // this path is the most-frequent caller. Adapters without an async
+    // `pbkdf2` fall back to `pbkdf2Sync` wrapped in a deferred promise.
+    const crypto = getCrypto();
+    const salt = crypto.randomBytes(SALT_LENGTH);
+    for (const [name] of passwordEntries) {
+      const value = passwords[name] as string;
+      // Result discarded — we only care about the elapsed CPU time.
+      await pbkdf2Async(crypto, value, salt, ITERATIONS, KEY_LENGTH, "sha256");
+    }
+    return null;
   }
 }
 
