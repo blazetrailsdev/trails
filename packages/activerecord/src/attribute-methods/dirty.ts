@@ -7,6 +7,8 @@
  * Mirrors: ActiveRecord::AttributeMethods::Dirty
  */
 
+import { Temporal } from "@blazetrails/activesupport/temporal";
+
 interface DirtyRecord {
   changed: boolean;
   changedAttributes: string[];
@@ -168,10 +170,10 @@ function initInternals(this: DirtyPrivateHost): void {
 function _touchRow(
   this: DirtyPrivateHost,
   attributeNames: string[],
-  time?: Date | null,
+  time?: Temporal.Instant | null,
 ): Promise<number> {
   this._touchAttrNames = new Set(attributeNames);
-  const t = time ?? new Date();
+  const t = time ?? Temporal.Now.instant();
   for (const attr of this._touchAttrNames) {
     this._writeAttribute(attr, t);
   }

@@ -1130,8 +1130,12 @@ function _deleteRow(this: PersistencePrivateHost): Promise<number> {
   return _deleteRecord.call(this.constructor as any, _queryConstraintsHash.call(this));
 }
 
-function _touchRow(this: any, attributeNames: string[], time?: Date | null): Promise<number> {
-  const t = time ?? new Date();
+function _touchRow(
+  this: any,
+  attributeNames: string[],
+  time?: Temporal.Instant | null,
+): Promise<number> {
+  const t = time ?? Temporal.Now.instant();
   for (const attr of attributeNames) {
     this._writeAttribute(attr, t);
   }

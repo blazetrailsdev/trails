@@ -272,7 +272,8 @@ describe("InsertAllTest", () => {
         this.adapter = adapter;
       }
     }
-    const ts = new Date("2023-06-15T12:00:00Z");
+    const { Temporal } = await import("@blazetrails/activesupport/temporal");
+    const ts = Temporal.Instant.from("2023-06-15T12:00:00Z");
     const count = await Post.insertAll([{ title: "Timestamped", created_at: ts, updated_at: ts }]);
     expect(count).toBeGreaterThanOrEqual(1);
     const all = await Post.all().toArray();

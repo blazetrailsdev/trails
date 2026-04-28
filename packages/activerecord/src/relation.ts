@@ -13,7 +13,10 @@ import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
 import { RecordNotSaved, RecordNotUnique } from "./errors.js";
 import { disallowRawSqlBang } from "./sanitization.js";
-import { columnNameMatcher as abstractColumnNameMatcher } from "./connection-adapters/abstract/quoting.js";
+import {
+  columnNameMatcher as abstractColumnNameMatcher,
+  formatInstantForSql,
+} from "./connection-adapters/abstract/quoting.js";
 import { modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
@@ -2727,15 +2730,16 @@ export class Relation<T extends Base> {
   async touchAll(...names: string[]): Promise<number> {
     if (this._isNone) return 0;
 
-    const now = new Date();
+    const now = Temporal.Now.instant();
+    const nowSql = `'${formatInstantForSql(now)}'`;
     const updates: Record<string, unknown> = {};
 
     // Always touch updated_at if defined on the model
     if (this._modelClass._attributeDefinitions.has("updated_at")) {
-      updates.updated_at = `'${now.toISOString()}'`;
+      updates.updated_at = nowSql;
     }
     for (const name of names) {
-      updates[name] = `'${now.toISOString()}'`;
+      updates[name] = nowSql;
     }
 
     if (Object.keys(updates).length === 0) return 0;

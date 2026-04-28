@@ -1,3 +1,4 @@
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { NotImplementedError } from "./errors.js";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { SerializeCastValue } from "@blazetrails/activemodel";
@@ -128,7 +129,7 @@ export class InsertAll {
   }
 
   mapKeyWithValue<T>(fn: (key: string, value: unknown) => T): T[][] {
-    const now = this.recordTimestamps() ? new Date() : undefined;
+    const now = this.recordTimestamps() ? Temporal.Now.instant() : undefined;
     const keysList = [...this.keysIncludingTimestamps()];
     return this.inserts.map((row) => {
       const merged = { ...this._scopeAttributes, ...row };

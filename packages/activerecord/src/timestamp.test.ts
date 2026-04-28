@@ -350,6 +350,28 @@ describe("TimestampTest", () => {
     expect(createdAt.epochMilliseconds).toBe((updatedAt as Temporal.Instant).epochMilliseconds);
   });
 
+  it("created_at round-trips through the database as Temporal.Instant", async () => {
+    const adapter = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const post = await Post.create({ title: "Round-trip" });
+    const reloaded = await Post.find(post.id!);
+    const isTemporalDatetime = (v: unknown) =>
+      v instanceof Temporal.Instant || v instanceof Temporal.PlainDateTime;
+    expect(isTemporalDatetime(reloaded.created_at)).toBe(true);
+    const toMs = (v: unknown) =>
+      v instanceof Temporal.Instant
+        ? v.epochMilliseconds
+        : (v as Temporal.PlainDateTime).toZonedDateTime("UTC").toInstant().epochMilliseconds;
+    expect(toMs(reloaded.created_at)).toBe(toMs(post.created_at));
+  });
+
   it("does not overwrite explicitly set timestamps on insert", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
