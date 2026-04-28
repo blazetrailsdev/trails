@@ -120,7 +120,11 @@ import {
   noTouching as _noTouchingBlock,
   isAppliedTo as _isNoTouchingApplied,
 } from "./no-touching.js";
-import { suppress as _suppressBlock, isSuppressed as _isSuppressed } from "./suppressor.js";
+import {
+  suppress as _suppressBlock,
+  isSuppressed as _isSuppressed,
+  registry as _suppressorRegistry,
+} from "./suppressor.js";
 import {
   inspect as _inspect,
   attributeForInspect as _attributeForInspect,
@@ -1169,6 +1173,10 @@ export class Base extends Model {
 
   static get isSuppressed(): boolean {
     return _isSuppressed(this);
+  }
+
+  static get registry(): Record<string, true | undefined> {
+    return _suppressorRegistry();
   }
 
   // --- Reflection::ClassMethods (wired via extend() after class body) ---
