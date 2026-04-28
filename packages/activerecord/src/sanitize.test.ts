@@ -372,4 +372,109 @@ describe("sanitizeSql", () => {
     // disallow_raw_sql! rejects non-column-ish input
     expect(() => Post.disallowRawSqlBang(["DROP TABLE users"])).toThrow(/Dangerous query method/);
   });
+
+  describe("private helpers (replace_bind_variables, quote_bound_value, etc)", () => {
+    it("handles named bind variables with simple strings", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("title = :title AND author = :author", {
+        title: "Hello",
+        author: "World",
+      });
+      expect(result).toBe("title = 'Hello' AND author = 'World'");
+    });
+
+    it("handles named bind variables with numbers", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("id = :id AND status = :status", {
+        id: 42,
+        status: "active",
+      });
+      expect(result).toBe("id = 42 AND status = 'active'");
+    });
+
+    it("handles mixed types in named bind variables", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray(
+        "deleted_at IS :deleted AND age > :age AND active = :active",
+        {
+          deleted: null,
+          age: 18,
+          active: true,
+        },
+      );
+      expect(result).toContain("IS NULL");
+      expect(result).toContain("age > 18");
+      expect(result).toContain("active = TRUE");
+    });
+
+    it("escapes single quotes in named bind variables", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("title = :title", { title: "It's a title" });
+      expect(result).toBe("title = 'It''s a title'");
+    });
+
+    it("handles PostgreSQL type casts in named bind variable patterns", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("created_at::date = :date", { date: "2024-01-01" });
+      expect(result).toContain("::");
+      expect(result).toContain("'2024-01-01'");
+    });
+
+    it("handles escaped colons in named bind variable patterns", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("TO_TIMESTAMP(:date, 'YYYY/MM/DD HH12\\:MI\\:SS')", {
+        date: "2024-01-01",
+      });
+      expect(result).toContain("'2024-01-01'");
+      expect(result).toContain("HH12:MI:SS");
+    });
+
+    it("raises on missing named bind variable", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      expect(() =>
+        Post.sanitizeSqlArray("title = :title AND author = :author", { title: "Hello" }),
+      ).toThrow(/missing value for :author/);
+    });
+
+    it("raises on mismatched positional bind variable count", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      expect(() => Post.sanitizeSqlArray("title = ? AND author = ?", "hello")).toThrow(
+        /wrong number of bind variables \(1 for 2\)/,
+      );
+    });
+
+    it("handles empty arrays as bind values", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("id IN (?)", []);
+      expect(result).toContain("NULL");
+    });
+
+    it("handles arrays as bind values", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      const result = Post.sanitizeSqlArray("id IN (?)", [1, 2, 3]);
+      expect(result).toContain("1");
+      expect(result).toContain("2");
+      expect(result).toContain("3");
+    });
+  });
 });

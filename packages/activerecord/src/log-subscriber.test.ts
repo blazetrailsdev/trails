@@ -83,9 +83,9 @@ class TestDebugLogSubscriber extends LogSubscriber {
     return (this.constructor as typeof LogSubscriber).logger;
   }
 
-  protected override _debugSql(message: string): boolean {
+  protected override debugSql(message: string): boolean {
     this.debugs.push(message);
-    return super._debugSql(message);
+    return super.debugSql(message);
   }
 }
 
@@ -281,12 +281,12 @@ describe("LogSubscriberTest", () => {
 
   it("verbose query with ignored callstack", () => {
     setVerboseQueryLogs(true);
-    const original = (subscriber as any)._querySourceLocation;
-    (subscriber as any)._querySourceLocation = () => null;
+    const original = (subscriber as any).querySourceLocation;
+    (subscriber as any).querySourceLocation = () => null;
     subscriber.sql(makeEvent({ sql: "hi mom!" }));
     expect(mockLogger.logged("debug").length).toBe(1);
     expect(mockLogger.logged("debug")[mockLogger.logged("debug").length - 1]).not.toMatch(/↳/);
-    (subscriber as any)._querySourceLocation = original;
+    (subscriber as any).querySourceLocation = original;
   });
 
   it("verbose query logs disabled by default", () => {
