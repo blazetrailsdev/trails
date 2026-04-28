@@ -6,7 +6,33 @@
 
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
-import { NameError, SubclassNotFound, NotImplementedError } from "./errors.js";
+import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
+import { Nodes } from "@blazetrails/arel";
+import { camelize, isPresent, underscore } from "@blazetrails/activesupport";
+
+/**
+ * Helper: cast inheritance column value through its attribute type.
+ * Rails: type_for_attribute(inheritCol).cast(value)
+ */
+function castInheritanceColumnValue(
+  modelClass: typeof Base,
+  inheritCol: string,
+  value: unknown,
+): unknown {
+  // Rails: type_for_attribute(inheritCol).cast(value) — handles non-string
+  // inputs (numbers/booleans) by coercing through the column's type.
+  // Falls back to Base._castAttributeValue (string-only) for compatibility.
+  const attrType = modelClass.typeForAttribute(inheritCol) as {
+    cast(value: unknown): unknown;
+  } | null;
+  const casted = attrType
+    ? attrType.cast(value)
+    : modelClass._castAttributeValue(inheritCol, value);
+  if (casted == null) return casted;
+  // Normalize to a primitive string (handles String wrapper objects) so
+  // findStiClass downstream can match against modelRegistry keys.
+  return typeof casted === "string" ? casted : String(casted);
+}
 
 /**
  * Resolve a type name string to a model class.
@@ -292,38 +318,149 @@ export function polymorphicClassFor(_modelClass: typeof Base, name: string): typ
   return klass;
 }
 
-function initializeInternalsCallback(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Inheritance#initialize_internals_callback is not implemented",
-  );
+/**
+ * Sets the inheritance column to the proper STI class name if needed.
+ *
+ * Mirrors: ActiveRecord::Inheritance#initialize_internals_callback. In Rails
+ * this is wired into the initialization callback chain via `super`. The
+ * trails port currently exposes it as a parity helper; integrating it into
+ * Base's init flow is a follow-up.
+ *
+ * @internal Private method.
+ */
+export function initializeInternalsCallback(this: Base): void {
+  ensureProperType.call(this);
 }
 
-function ensureProperType(): never {
-  throw new NotImplementedError("ActiveRecord::Inheritance#ensure_proper_type is not implemented");
+/**
+ * Sets the attribute used for single table inheritance to this class name
+ * if this is not the Base descendant.
+ *
+ * Mirrors: ActiveRecord::Inheritance#ensure_proper_type
+ * @internal Private method, ensures STI type column is set correctly.
+ */
+export function ensureProperType(this: Base): void {
+  const klass = this.constructor as typeof Base;
+  if (!isFinderNeedsTypeCondition(klass)) return;
+  const inheritCol = getInheritanceColumn(klass);
+  if (!inheritCol) return;
+  // Only write when the column is a declared attribute — otherwise the value
+  // wouldn't persist or serialize correctly. Mirrors usingSingleTableInheritance.
+  if (!(klass as any)._attributeDefinitions?.has(inheritCol)) return;
+  (this as any)._writeAttribute(inheritCol, stiName(klass));
 }
 
-function setBaseClass(): never {
-  throw new NotImplementedError("ActiveRecord::Inheritance#set_base_class is not implemented");
+/**
+ * Called by instantiate to decide which class to use for a new record instance.
+ * For single-table inheritance, we check the record for a type column
+ * and return the corresponding class.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#discriminate_class_for_record
+ * @internal Private method, used by persistence to route instantiate() through STI subclasses.
+ */
+export function discriminateClassForRecord(
+  modelClass: typeof Base,
+  record: Record<string, unknown>,
+): typeof Base {
+  if (usingSingleTableInheritance(modelClass, record)) {
+    const inheritCol = getInheritanceColumn(modelClass);
+    if (inheritCol) {
+      // Rails: subclass = base_class.type_for_attribute(inheritCol).cast(record[inheritCol])
+      const castValue = castInheritanceColumnValue(modelClass, inheritCol, record[inheritCol]);
+      return findStiClass(modelClass, castValue as string);
+    }
+  }
+  return modelClass;
 }
 
-function discriminateClassForRecord(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Inheritance#discriminate_class_for_record is not implemented",
-  );
+/**
+ * Check if a record has a non-empty inheritance column value and STI is enabled.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#using_single_table_inheritance?
+ */
+function usingSingleTableInheritance(
+  modelClass: typeof Base,
+  record: Record<string, unknown>,
+): boolean {
+  const inheritCol = getInheritanceColumn(modelClass);
+  if (!inheritCol) return false;
+  // Rails: record[inheritance_column].present? && has_attribute?(inheritance_column)
+  if (!isPresent(record[inheritCol])) return false;
+  // Check that the inheritance column is a declared attribute on this model
+  return (modelClass as any)._attributeDefinitions?.has(inheritCol) ?? false;
 }
 
-function isUsingSingleTableInheritance(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Inheritance#using_single_table_inheritance? is not implemented",
-  );
+/**
+ * Build a WHERE condition that scopes queries to this class and its descendants' type values.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#type_condition
+ * @internal Private method, used internally for STI type filtering in queries.
+ */
+export function typeCondition(modelClass: typeof Base, arelTable?: any): any {
+  const inheritCol = getInheritanceColumn(modelClass);
+  if (!inheritCol) {
+    // If no inheritance column, return a truthy predicate that matches everything
+    return new Nodes.True();
+  }
+
+  const table = arelTable || (modelClass as any).arelTable;
+  if (!table) throw new ActiveRecordError("Cannot build type condition without arel table");
+
+  const stiColumn = typeof table.get === "function" ? table.get(inheritCol) : table[inheritCol];
+  const stiNames = ([modelClass] as (typeof Base)[])
+    .concat(descendants(modelClass))
+    .map((klass) => stiName(klass));
+
+  // Use predicate builder to create an IN clause
+  const predicateBuilder = (modelClass as any).predicateBuilder;
+  if (predicateBuilder && predicateBuilder.build) {
+    return predicateBuilder.build(stiColumn, stiNames);
+  }
+
+  // Fallback: manually build IN predicate
+  return stiColumn.in(stiNames);
 }
 
-function typeCondition(): never {
-  throw new NotImplementedError("ActiveRecord::Inheritance#type_condition is not implemented");
-}
+/**
+ * Detect the subclass from the inheritance column of attrs.
+ * If the inheritance column value is not self or a valid subclass,
+ * raises ActiveRecord::SubclassNotFound.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#subclass_from_attributes
+ * @internal Private method, used by Model.new() to dispatch to subclass constructors.
+ */
+export function subclassFromAttributes(
+  modelClass: typeof Base,
+  attrs: Record<string, unknown> | null | undefined,
+): typeof Base | null {
+  if (!attrs) return null;
 
-function subclassFromAttributes(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Inheritance#subclass_from_attributes is not implemented",
-  );
+  // Convert to plain object via toH (Ruby Hash) or toObject (TS hash-like)
+  let attrsHash = attrs as Record<string, unknown>;
+  if (typeof (attrs as any).toH === "function") {
+    attrsHash = (attrs as any).toH();
+  } else if (typeof (attrs as any).toObject === "function") {
+    attrsHash = (attrs as any).toObject();
+  }
+
+  if (!attrsHash || typeof attrsHash !== "object") return null;
+
+  const inheritCol = getInheritanceColumn(modelClass);
+  if (!inheritCol) return null;
+
+  // Try the column as-given, plus snake_case and camelCase variants so attrs
+  // from form params or JS-style camelCase callers both resolve. Use ?? to
+  // preserve falsy-but-present values like 0 (Rails: 0.present? is true).
+  const camelCol = camelize(inheritCol, false);
+  const snakeCol = underscore(inheritCol);
+  const subclassValue =
+    attrsHash[inheritCol] ?? attrsHash[snakeCol] ?? attrsHash[camelCol] ?? undefined;
+
+  if (isPresent(subclassValue)) {
+    // Rails: cast the value through the inheritance column's type
+    const castValue = castInheritanceColumnValue(modelClass, inheritCol, subclassValue);
+    return findStiClass(modelClass, castValue as string);
+  }
+
+  return null;
 }
