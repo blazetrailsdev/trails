@@ -348,4 +348,65 @@ describe("JsonSerializationTest", () => {
     expect(json.name).toBe("Konata");
     expect(json.age).toBe(16);
   });
+
+  it("from_json unwraps via first-value semantics on multi-key wrappers (Rails hash.values.first)", () => {
+    // Rails json.rb:147 — `hash = hash.values.first if include_root`,
+    // ignoring the configured root key and the wrapper's other keys.
+    class Multi extends Model {
+      static {
+        this.attribute("name", "string");
+        this.includeRootInJson = "person";
+      }
+    }
+    try {
+      const m = new Multi({}).fromJson('{"first":{"name":"Carol"},"person":{"name":"Dan"}}');
+      // First key "first" wins, regardless of the configured "person" root.
+      expect(m.readAttribute("name")).toBe("Carol");
+    } finally {
+      Multi.includeRootInJson = false;
+    }
+  });
+
+  it("from_json rejects non-object JSON with shape-accurate diagnostics", () => {
+    class P extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    expect(() => new P({}).fromJson("42")).toThrow(/got number/);
+    expect(() => new P({}).fromJson("[1,2]")).toThrow(/got array/);
+    expect(() => new P({}).fromJson("null")).toThrow(/got null/);
+  });
+
+  it("from_json rejects non-object root payload after unwrap", () => {
+    class P extends Model {
+      static {
+        this.attribute("name", "string");
+        this.includeRootInJson = true;
+      }
+    }
+    try {
+      expect(() => new P({}).fromJson('{"p":42}')).toThrow(/root payload must be.*got number/);
+    } finally {
+      P.includeRootInJson = false;
+    }
+  });
+
+  it("from_json defaults includeRoot to includeRootInJson when no second arg passed", () => {
+    // Rails json.rb:144 — `def from_json(json, include_root = include_root_in_json)`.
+    // When the class sets includeRootInJson = true, callers can pass a wrapped
+    // JSON payload without an explicit second arg.
+    class Wrapped extends Model {
+      static {
+        this.attribute("name", "string");
+        this.includeRootInJson = true;
+      }
+    }
+    try {
+      const w = new Wrapped({}).fromJson('{"wrapped":{"name":"Alice"}}');
+      expect(w.readAttribute("name")).toBe("Alice");
+    } finally {
+      Wrapped.includeRootInJson = false;
+    }
+  });
 });

@@ -1754,14 +1754,39 @@ export class Model {
   /**
    * Deserialize a JSON string into this model's attributes.
    *
-   * Mirrors: ActiveModel::Serializers::JSON#from_json
+   * Mirrors: ActiveModel::Serializers::JSON#from_json (json.rb:144-149)
+   *
+   *   def from_json(json, include_root = include_root_in_json)
+   *     hash = ActiveSupport::JSON.decode(json)
+   *     hash = hash.values.first if include_root
+   *     self.attributes = hash
+   *     self
+   *   end
+   *
+   * `includeRoot` defaults to the class-level `includeRootInJson`
+   * (matching Rails); when truthy, unwrap unconditionally via
+   * first-value semantics regardless of the configured root key. Empty
+   * strings are truthy here per Ruby semantics — only `false`/`null`
+   * skip the unwrap.
    */
-  fromJson(json: string, includeRoot = false): this {
-    let attrs = JSON.parse(json);
-    if (includeRoot && typeof attrs === "object") {
-      const keys = Object.keys(attrs);
-      if (keys.length === 1) {
-        attrs = attrs[keys[0]];
+  fromJson(json: string, includeRoot?: boolean | string): this {
+    const ctor = this.constructor as typeof Model;
+    const root = includeRoot ?? ctor.includeRootInJson;
+    let attrs: unknown = JSON.parse(json);
+    // Rails calls hash.values.first / self.attributes = hash on the
+    // decoded payload — both raise NoMethodError if the input is not a
+    // Hash. Surface the same failure mode loudly with shape-accurate
+    // diagnostics, matching JSONSerializer.fromJson (serializers/json.ts).
+    const shapeOf = (v: unknown) => (v === null ? "null" : Array.isArray(v) ? "array" : typeof v);
+    const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+      typeof v === "object" && v !== null && !Array.isArray(v);
+    if (!isPlainObject(attrs)) {
+      throw new TypeError(`fromJson expected a JSON object, got ${shapeOf(attrs)}`);
+    }
+    if (root !== false && root != null) {
+      attrs = Object.values(attrs)[0];
+      if (!isPlainObject(attrs)) {
+        throw new TypeError(`fromJson root payload must be a JSON object, got ${shapeOf(attrs)}`);
       }
     }
     for (const [key, value] of Object.entries(attrs)) {
