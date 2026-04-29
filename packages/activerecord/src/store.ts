@@ -9,6 +9,25 @@ import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 const _storedAttributes = new WeakMap<typeof Base, Record<string, string[]>>();
 
 /**
+ * Tracks the set of accessor method names defined via store() on each class.
+ * Mirrors Rails' @_store_accessors_module which is a Module where store
+ * accessor methods live. In TS we track the accessor names instead of a
+ * real module (JS has no include mechanism).
+ */
+const _storeAccessorsModules = new WeakMap<typeof Base, Set<string>>();
+
+/**
+ * Returns (creating if needed) the store-accessor module for a model class.
+ * Mirrors: ActiveRecord::Store::ClassMethods#_store_accessors_module
+ */
+export function storeAccessorsModule(modelClass: typeof Base): Set<string> {
+  if (!_storeAccessorsModules.has(modelClass)) {
+    _storeAccessorsModules.set(modelClass, new Set());
+  }
+  return _storeAccessorsModules.get(modelClass)!;
+}
+
+/**
  * Returns the stored attributes registry for a model class.
  */
 export function storedAttributes(modelClass: typeof Base): Record<string, string[]> {
@@ -177,6 +196,10 @@ export function store(
     // Capture `modelClass` at definition time so subclass instances still resolve
     // the correct accessor even when `record.constructor` differs from the declaring class.
     // Mirrors Rails: accessor closures delegate through read/write_store_attribute.
+    // Register the accessor name on the _store_accessors_module.
+    // Mirrors Rails: _store_accessors_module.module_eval { define_method ... }
+    storeAccessorsModule(modelClass).add(accessorName);
+
     const declaringClass = modelClass;
     Object.defineProperty(modelClass.prototype, accessorName, {
       get: function (this: Base) {

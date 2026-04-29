@@ -831,3 +831,89 @@ describe("store private helpers — tested through public accessor API", () => {
     expect((post as any).color).toBe("red");
   });
 });
+
+describe("storeAccessorsModule", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = createTestAdapter();
+  });
+
+  it("contains accessor names registered by store()", async () => {
+    const { storeAccessorsModule } = await import("./store.js");
+    class User extends Base {
+      static {
+        this._tableName = "users";
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(User);
+    store(User, "settings", { accessors: ["theme", "language"] });
+    const names = storeAccessorsModule(User);
+    expect(names.has("theme")).toBe(true);
+    expect(names.has("language")).toBe(true);
+  });
+
+  it("includes prefixed accessor names", async () => {
+    const { storeAccessorsModule } = await import("./store.js");
+    class Post extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("prefs", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Post);
+    store(Post, "prefs", { accessors: ["color"], prefix: "ui" });
+    const names = storeAccessorsModule(Post);
+    expect(names.has("ui_color")).toBe(true);
+    expect(names.has("color")).toBe(false);
+  });
+
+  it("each class has an independent registry (no cross-class contamination)", async () => {
+    const { storeAccessorsModule } = await import("./store.js");
+    class A extends Base {
+      static {
+        this._tableName = "as";
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
+    }
+    class B extends Base {
+      static {
+        this._tableName = "bs";
+        this.attribute("data", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(A);
+    registerModel(B);
+    store(A, "data", { accessors: ["foo"] });
+    store(B, "data", { accessors: ["bar"] });
+    expect(storeAccessorsModule(A).has("foo")).toBe(true);
+    expect(storeAccessorsModule(A).has("bar")).toBe(false);
+    expect(storeAccessorsModule(B).has("bar")).toBe(true);
+    expect(storeAccessorsModule(B).has("foo")).toBe(false);
+  });
+
+  it("subclass gets its own registry independent of parent", async () => {
+    const { storeAccessorsModule } = await import("./store.js");
+    class Parent extends Base {
+      static {
+        this._tableName = "parents";
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Child extends Parent {}
+    registerModel(Parent);
+    registerModel(Child);
+    store(Parent, "settings", { accessors: ["theme"] });
+    store(Child, "settings", { accessors: ["mode"] });
+    // Parent does not get Child's accessors
+    expect(storeAccessorsModule(Parent).has("mode")).toBe(false);
+    // Child does not inherit Parent's module (independent registry)
+    expect(storeAccessorsModule(Child).has("theme")).toBe(false);
+    expect(storeAccessorsModule(Child).has("mode")).toBe(true);
+  });
+});
