@@ -102,7 +102,11 @@ export default defineConfig(
 
   // ── rails-private-jsdoc (per-package rollout; widen as packages adopt) ──
   {
-    files: ["packages/arel/src/**/*.ts", "packages/activesupport/src/**/*.ts"],
+    files: [
+      "packages/arel/src/**/*.ts",
+      "packages/activesupport/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+    ],
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-private-jsdoc": "error",

@@ -47,6 +47,8 @@ interface ClusivityHost {
  *
  * Memoized so a Proc passed as `:in` / `:within` is captured once
  * per validator instance, matching Rails' `||=` semantics.
+ *
+ * @internal
  */
 export function delimiter(this: ClusivityHost): unknown {
   // Rails `@delimiter ||= ...` recomputes only when the cached value
@@ -87,6 +89,8 @@ export function delimiter(this: ClusivityHost): unknown {
  * TS has no first-class Range; iterables are treated uniformly as
  * `include?`. If a Range-like type lands later, the cover-vs-include
  * branch slots in here.
+ *
+ * @internal
  */
 export function inclusionMethod(_enumerable: unknown): "include?" | "cover?" {
   return "include?";
@@ -106,6 +110,8 @@ export function inclusionMethod(_enumerable: unknown): "include?" | "cover?" {
  * `resolve_value` resolves Procs and Symbol-method references; a string
  * option treated as a method name only if the record responds to it
  * (resolve-value.ts).
+ *
+ * @internal
  */
 export function isInclude(this: ClusivityHost, record: unknown, value: unknown): boolean {
   // Route through `this.delimiter()` / `this.inclusionMethod(...)` so

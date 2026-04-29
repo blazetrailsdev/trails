@@ -44,6 +44,7 @@ class PendingType implements PendingModification {
     readonly type: Type,
   ) {}
 
+  /** @internal */
   applyTo(attributeSet: AttributeSet): void {
     const existing = attributeSet.getAttribute(this.name);
     attributeSet.set(this.name, existing.withType(this.type));
@@ -56,6 +57,7 @@ class PendingDefault implements PendingModification {
     readonly default_: unknown,
   ) {}
 
+  /** @internal */
   applyTo(attributeSet: AttributeSet): void {
     const existing = attributeSet.getAttribute(this.name);
     attributeSet.set(this.name, existing.withUserDefault(this.default_));
@@ -68,6 +70,7 @@ class PendingDecorator implements PendingModification {
     readonly decorator: (name: string, type: Type) => Type,
   ) {}
 
+  /** @internal */
   applyTo(attributeSet: AttributeSet): void {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
@@ -112,6 +115,8 @@ export function registerWithSuperclass(cls: AnyAttributeHost): void {
  *
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#reset_default_attributes
  * which calls reset_default_attributes! then recurses via subclasses.each.
+ *
+ * @internal
  */
 export function resetDefaultAttributes(cls: AnyAttributeHost): void {
   cls._cachedDefaultAttributes = null;
@@ -143,6 +148,8 @@ function collectPendingModifications(cls: AnyAttributeHost): PendingModification
 
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#apply_pending_attribute_modifications
+ *
+ * @internal
  */
 export function applyPendingAttributeModifications(
   cls: AnyAttributeHost,

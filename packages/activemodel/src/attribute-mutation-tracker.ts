@@ -1,6 +1,7 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { AttributeSet } from "./attribute-set.js";
 
+/** @internal */
 function cloneValue(value: unknown): unknown {
   if (value === null || typeof value !== "object") return value;
   // Date is mutable — clone it to protect dirty tracking during the dual-typed window.

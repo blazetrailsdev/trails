@@ -142,6 +142,8 @@ export class NumericalityValidator extends EachValidator {
  *
  * Rounds to scale decimal places, then truncates to precision significant
  * digits. This matches Ruby's BigDecimal(float.round(scale), precision).
+ *
+ * @internal
  */
 function parseAsNumber(num: number, precision: number, scale?: number): number {
   let result = num;

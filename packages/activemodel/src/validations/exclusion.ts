@@ -32,7 +32,9 @@ export class ExclusionValidator extends EachValidator {
   // available during super() / EachValidator's constructor-time
   // checkValidity() call.
   declare resolveValue: typeof resolveValue;
+  /** @internal */
   declare delimiter: typeof delimiter;
+  /** @internal */
   declare inclusionMethod: typeof inclusionMethod;
   declare isInclude: typeof isInclude;
 

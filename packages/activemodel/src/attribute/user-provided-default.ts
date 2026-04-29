@@ -15,6 +15,7 @@ import { Type } from "../type/value.js";
  * read from the base class — all access goes through our override.
  */
 export class UserProvidedDefault extends FromUser {
+  /** @internal */
   readonly userProvidedValue: unknown;
   private _memoizedVBTC: unknown;
   private _hasMemoizedVBTC: boolean = false;

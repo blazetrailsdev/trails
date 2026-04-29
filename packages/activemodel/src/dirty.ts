@@ -102,6 +102,7 @@ export class DirtyTracker {
     return change ? change[0] : resolveValue(this._originalAttributes.get(name));
   }
 
+  /** @internal */
   attributeChange(name: string): [unknown, unknown] | undefined {
     return this._changedAttributes.get(name);
   }
@@ -145,6 +146,8 @@ export class DirtyTracker {
    *
    * Mirrors: ActiveModel::Dirty#mutations_from_database
    * (activemodel/lib/active_model/dirty.rb + attribute_mutation_tracker.rb).
+   *
+   * @internal
    */
   get mutationsFromDatabase(): Record<string, [unknown, unknown]> {
     return this.changes;
@@ -155,6 +158,8 @@ export class DirtyTracker {
    * Lives until the next save.
    *
    * Mirrors: ActiveModel::Dirty#mutations_before_last_save
+   *
+   * @internal
    */
   get mutationsBeforeLastSave(): Record<string, [unknown, unknown]> {
     return this.previousChanges;
@@ -170,6 +175,8 @@ export class DirtyTracker {
    * re-snapshotting (while preserving `_previousChanges` from the last save).
    *
    * Mirrors: ActiveModel::Dirty#forget_attribute_assignments
+   *
+   * @internal
    */
   forgetAttributeAssignments(
     attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
@@ -187,6 +194,8 @@ export class DirtyTracker {
    *
    * Mirrors: ActiveModel::Dirty#clear_attribute_change
    * -> `mutation_tracker.forget_change(name)`.
+   *
+   * @internal
    */
   clearAttributeChange(
     attributes:

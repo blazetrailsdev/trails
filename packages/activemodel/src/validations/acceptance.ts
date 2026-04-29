@@ -8,6 +8,7 @@ import type { AnyRecord } from "../validator.js";
  * Mirrors: ActiveModel::Validations::AcceptanceValidator::LazilyDefineAttributes
  */
 export class LazilyDefineAttributes {
+  /** @internal */
   readonly attributes: readonly string[];
 
   constructor(attributes: string[]) {

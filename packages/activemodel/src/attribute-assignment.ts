@@ -5,6 +5,7 @@ interface PermittedAttributes {
   permitted?(): boolean;
 }
 
+/** @internal */
 function sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown> {
   const attrs = attributes as Record<string, unknown> & PermittedAttributes;
   if (typeof attrs.permitted === "function") {

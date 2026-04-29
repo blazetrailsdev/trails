@@ -33,7 +33,9 @@ export class InclusionValidator extends EachValidator {
   // checkValidity() call. Class fields don't initialize until AFTER
   // super() returns.
   declare resolveValue: typeof resolveValue;
+  /** @internal */
   declare delimiter: typeof delimiter;
+  /** @internal */
   declare inclusionMethod: typeof inclusionMethod;
   declare isInclude: typeof isInclude;
 
