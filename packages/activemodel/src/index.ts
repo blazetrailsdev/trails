@@ -30,6 +30,8 @@ export {
   resetDefaultAttributes,
   registerWithSuperclass,
 } from "./attribute-registration.js";
+export { Attributes } from "./attributes.js";
+export type { AttributeDefinition } from "./attributes.js";
 export { Attribute, FromDatabase, FromUser, WithCastValue } from "./attribute.js";
 export { UserProvidedDefault } from "./attribute/user-provided-default.js";
 export { AttributeSet } from "./attribute-set.js";

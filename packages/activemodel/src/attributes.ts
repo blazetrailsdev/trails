@@ -32,16 +32,6 @@ export interface AttributeDefinition {
   source?: "user" | "schema";
 }
 
-/**
- * Attributes module contract.
- *
- * Mirrors: ActiveModel::Attributes
- */
-export interface Attributes {
-  readonly attributes: Record<string, unknown>;
-  attributeNames(): string[];
-}
-
 // ---------------------------------------------------------------------------
 // Class methods — Mirrors: ActiveModel::Attributes::ClassMethods
 // ---------------------------------------------------------------------------
@@ -222,4 +212,47 @@ export function buildDefaultAttributes(defs: Map<string, AttributeDefinition>): 
  */
 export function attributes(attrs: AttributeSet): Record<string, unknown> {
   return attrs.toHash();
+}
+
+/**
+ * Concrete mixin host for `ActiveModel::Attributes`. Rails ships
+ * `Attributes` as a module included into a model; in TS this class is
+ * the canonical instance-side surface. `Model` composes the same
+ * behavior into its own constructor for ergonomic subclassing without
+ * forcing inheritance from `Attributes`, but any lighter-weight host
+ * that wants the bare attribute machinery can extend this class
+ * directly.
+ *
+ * Mirrors: ActiveModel::Attributes (instance side, attributes.rb:31-160)
+ */
+export class Attributes {
+  _attributes: AttributeSet;
+
+  /**
+   * Mirrors: attributes.rb:106-109
+   *   def initialize(*) # :nodoc:
+   *     @attributes = self.class._default_attributes.deep_dup
+   *     super
+   *   end
+   *
+   * The rest parameter mirrors Rails' `(*)` splat: subclasses can
+   * forward arbitrary arguments via `super(...args)` even though this
+   * base ignores them.
+   */
+  constructor(..._args: unknown[]) {
+    const ctor = this.constructor as { _defaultAttributes?(): AttributeSet };
+    this._attributes = ctor._defaultAttributes
+      ? ctor._defaultAttributes().deepDup()
+      : new AttributeSet();
+  }
+
+  /** Mirrors: attributes.rb:131-133 — `def attributes; @attributes.to_hash; end` */
+  get attributes(): Record<string, unknown> {
+    return this._attributes.toHash();
+  }
+
+  /** Mirrors: attributes.rb:146-148 — `def attribute_names; @attributes.keys; end` */
+  attributeNames(): string[] {
+    return this._attributes.keys();
+  }
 }
