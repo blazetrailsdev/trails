@@ -4,21 +4,15 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Node, NodeVisitor } from "./nodes/node.js";
 import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
-import { StringJoin } from "./nodes/string-join.js";
 import type { Join } from "./nodes/binary.js";
-import { On } from "./nodes/unary.js";
 import { TableAlias } from "./nodes/table-alias.js";
-import { True } from "./nodes/true.js";
-import { False } from "./nodes/false.js";
-import { And } from "./nodes/and.js";
-import { Grouping } from "./nodes/grouping.js";
-import { NamedFunction } from "./nodes/named-function.js";
 
 /**
  * Table — represents a database table.
  *
  * Mirrors: Arel::Table
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Table extends Node {
   static engine: unknown = null;
 
@@ -108,34 +102,6 @@ export class Table extends Node {
   createJoin(to: Node | string, constraint?: Node | string | null, klass?: typeof InnerJoin): Join {
     const JoinClass = klass && typeof klass === "function" ? klass : InnerJoin;
     return new JoinClass(to as Node, (constraint ?? null) as Node | null);
-  }
-
-  /**
-   * Factory: create a StringJoin node.
-   *
-   * Mirrors: Arel::Table#create_string_join
-   */
-  createStringJoin(to: string | Node): StringJoin {
-    const node = typeof to === "string" ? new SqlLiteral(to) : to;
-    return new StringJoin(node, null);
-  }
-
-  /**
-   * Factory: create an On node.
-   *
-   * Mirrors: Arel::Table#create_on
-   */
-  createOn(expr: Node): On {
-    return new On(expr);
-  }
-
-  /**
-   * Factory: create a TableAlias node.
-   *
-   * Mirrors: Arel::Table#create_table_alias
-   */
-  createTableAlias(relation: Node, name: string): TableAlias {
-    return new TableAlias(relation, name);
   }
 
   /**
@@ -242,70 +208,16 @@ export class Table extends Node {
     return new TableAlias(this, aliasName);
   }
 
-  /**
-   * Factory: create a TRUE node.
-   *
-   * Mirrors: Arel::FactoryMethods#create_true
-   */
-  createTrue(): True {
-    return new True();
-  }
-
-  /**
-   * Factory: create a FALSE node.
-   *
-   * Mirrors: Arel::FactoryMethods#create_false
-   */
-  createFalse(): False {
-    return new False();
-  }
-
-  /**
-   * Factory: create an AND node.
-   *
-   * Mirrors: Arel::FactoryMethods#create_and
-   */
-  createAnd(nodes: Node[]): And {
-    return new And(nodes);
-  }
-
-  /**
-   * Factory: create a Grouping node.
-   *
-   * Mirrors: Arel::FactoryMethods#grouping
-   */
-  grouping(expr: Node): Grouping {
-    return new Grouping(expr);
-  }
-
-  /**
-   * Factory: LOWER function.
-   *
-   * Mirrors: Arel::FactoryMethods#lower
-   */
-  lower(column: Node): NamedFunction {
-    return new NamedFunction("LOWER", [column]);
-  }
-
-  /**
-   * Factory: COALESCE function.
-   *
-   * Mirrors: Arel::FactoryMethods#coalesce
-   */
-  coalesce(...args: Node[]): NamedFunction {
-    return new NamedFunction("COALESCE", args);
-  }
-
-  /**
-   * Factory: CAST function.
-   *
-   * Mirrors: Arel::FactoryMethods#cast
-   */
-  cast(expr: Node, type: string): NamedFunction {
-    return new NamedFunction("CAST", [new SqlLiteral(`${expr} AS ${type}`)]);
-  }
-
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
 }
+
+// Surface the inherited FactoryMethods on table.ts so api:compare
+// matches them against table.rb (Rails Arel's `Table` includes
+// FactoryMethods directly, expecting the methods to belong here).
+type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
+   @typescript-eslint/no-unsafe-declaration-merging */
+export interface Table extends _FactoryMethodsModule {}

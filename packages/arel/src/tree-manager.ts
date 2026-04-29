@@ -58,6 +58,7 @@ export class StatementMethods {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class TreeManager {
   abstract readonly ast: Node;
 
@@ -76,3 +77,12 @@ export abstract class TreeManager {
     return this.ast.toSql();
   }
 }
+
+// Methods supplied by the FactoryMethods mixin (runtime wiring in ./index.ts).
+// See node.ts for why this uses the explicit `FactoryMethodsModule` interface
+// rather than `Included<typeof FactoryMethods>`.
+type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
+   @typescript-eslint/no-unsafe-declaration-merging */
+export interface TreeManager extends _FactoryMethodsModule {}

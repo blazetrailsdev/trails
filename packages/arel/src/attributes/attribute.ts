@@ -459,14 +459,6 @@ export class Attribute extends Node {
     return new NamedFunction("FLOOR", [this]);
   }
 
-  // -- Type casting --
-
-  cast(asType: string): NamedFunction {
-    return new NamedFunction("CAST", [
-      new SqlLiteral(`${this.relation.name}.${this.name} AS ${asType}`),
-    ]);
-  }
-
   // -- Extract --
 
   extract(field: string): Extract {

@@ -24,11 +24,8 @@ import { DeleteManager } from "./delete-manager.js";
 import type { UpdateValues } from "./crud.js";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
-import { True } from "./nodes/true.js";
-import { False } from "./nodes/false.js";
 import { And } from "./nodes/and.js";
 import { Grouping } from "./nodes/grouping.js";
-import { NamedFunction } from "./nodes/named-function.js";
 import { JoinSource } from "./nodes/join-source.js";
 import { InsertManager } from "./insert-manager.js";
 
@@ -37,6 +34,7 @@ import { InsertManager } from "./insert-manager.js";
  *
  * Mirrors: Arel::SelectManager
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SelectManager extends TreeManager {
   readonly ast: SelectStatement;
 
@@ -529,31 +527,12 @@ export class SelectManager extends TreeManager {
   }
 
   // -- FactoryMethods (via TreeManager) --
+  // createTrue/createFalse/createTableAlias/createStringJoin/createAnd/
+  // createOn/grouping/lower/coalesce/cast are mixed in from
+  // Arel::FactoryMethods (see ./factory-methods.ts and the include() call
+  // in ./index.ts). createJoin is overridden below because Rails' Arel
+  // wraps the constraint in an `On` node when sourced from a SelectManager.
 
-  /**
-   * Factory: create a TRUE node.
-   */
-  createTrue(): True {
-    return new True();
-  }
-
-  /**
-   * Factory: create a FALSE node.
-   */
-  createFalse(): False {
-    return new False();
-  }
-
-  /**
-   * Factory: create a TableAlias node.
-   */
-  createTableAlias(relation: Node, name: string): TableAlias {
-    return new TableAlias(relation, name);
-  }
-
-  /**
-   * Factory: create a join node.
-   */
   private static readonly defaultJoinConstructor = InnerJoin;
 
   private static isJoinConstructor(
@@ -564,7 +543,7 @@ export class SelectManager extends TreeManager {
 
   createJoin(
     to: Node,
-    constraint?: Node,
+    constraint?: Node | null,
     klass?: new (left: Node, right: Node | null) => Join,
   ): Join {
     const JoinKlass =
@@ -572,14 +551,6 @@ export class SelectManager extends TreeManager {
         ? klass
         : SelectManager.defaultJoinConstructor;
     return new JoinKlass(to, constraint ? new On(constraint) : null);
-  }
-
-  /**
-   * Factory: create a StringJoin node.
-   */
-  createStringJoin(to: string | Node): StringJoin {
-    const node = typeof to === "string" ? new SqlLiteral(to) : to;
-    return new StringJoin(node, null);
   }
 
   /**
@@ -615,46 +586,12 @@ export class SelectManager extends TreeManager {
     this.core.source.right.push(node);
     return this;
   }
-
-  /**
-   * Factory: create an AND node.
-   */
-  createAnd(nodes: Node[]): And {
-    return new And(nodes);
-  }
-
-  /**
-   * Factory: create an On node.
-   */
-  createOn(expr: Node): On {
-    return new On(expr);
-  }
-
-  /**
-   * Factory: create a Grouping node.
-   */
-  grouping(expr: Node): Grouping {
-    return new Grouping(expr);
-  }
-
-  /**
-   * Factory: LOWER function.
-   */
-  lower(column: Node): NamedFunction {
-    return new NamedFunction("LOWER", [column]);
-  }
-
-  /**
-   * Factory: COALESCE function.
-   */
-  coalesce(...args: Node[]): NamedFunction {
-    return new NamedFunction("COALESCE", args);
-  }
-
-  /**
-   * Factory: CAST function.
-   */
-  cast(expr: Node, type: string): NamedFunction {
-    return new NamedFunction("CAST", [new SqlLiteral(`${expr} AS ${type}`)]);
-  }
 }
+
+// Surface the inherited FactoryMethods on select-manager.ts so api:compare
+// matches them against select_manager.rb.
+type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
+   @typescript-eslint/no-unsafe-declaration-merging */
+export interface SelectManager extends _FactoryMethodsModule {}

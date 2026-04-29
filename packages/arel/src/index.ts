@@ -6,7 +6,8 @@ export { SelectManager } from "./select-manager.js";
 export { InsertManager } from "./insert-manager.js";
 export { UpdateManager } from "./update-manager.js";
 export { DeleteManager } from "./delete-manager.js";
-export { TreeManager } from "./tree-manager.js";
+import { TreeManager } from "./tree-manager.js";
+export { TreeManager };
 export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 export { quoteArrayLiteral } from "./quote-array.js";
 
@@ -34,13 +35,23 @@ _registerCteFactory((name, relation) => new Cte(name, relation));
 // the mixin modules transitively import those files via their target-node
 // imports, creating a module-load cycle.
 import { include } from "@blazetrails/activesupport";
+import { Node } from "./nodes/node.js";
 import { NodeExpression } from "./nodes/node-expression.js";
 import { InfixOperation } from "./nodes/infix-operation.js";
 import { Predications } from "./predications.js";
 import { Math as MathMixin } from "./math.js";
+import { FactoryMethods } from "./factory-methods.js";
 /* eslint-disable @typescript-eslint/no-explicit-any -- abstract class coercion for include() */
+const _Node = Node as unknown as new (...args: any[]) => Node;
 const _NodeExpression = NodeExpression as unknown as new (...args: any[]) => NodeExpression;
+const _TreeManager = TreeManager as unknown as new (...args: any[]) => TreeManager;
 /* eslint-enable @typescript-eslint/no-explicit-any */
+// The cast matches include()'s runtime constraint. FactoryMethods is
+// typed as the explicit FactoryMethodsModule interface (no index
+// signature) to break the Node ↔ FactoryMethods type cycle.
+type RuntimeModule = Record<string, (...args: unknown[]) => unknown>;
+include(_Node, FactoryMethods as unknown as RuntimeModule);
+include(_TreeManager, FactoryMethods as unknown as RuntimeModule);
 include(_NodeExpression, Predications);
 include(_NodeExpression, MathMixin);
 include(InfixOperation, Predications);

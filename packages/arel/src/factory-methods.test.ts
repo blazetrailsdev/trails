@@ -52,6 +52,10 @@ describe("TestFactoryMethods", () => {
     const fn = users.cast(users.get("age"), "VARCHAR");
     expect(fn).toBeInstanceOf(Nodes.NamedFunction);
     expect(fn.name).toBe("CAST");
+    // Mirrors Rails: `cast` builds NamedFunction("CAST", [name.as(type)]),
+    // not a string-interpolated SqlLiteral. The compiled SQL must reference
+    // the column properly rather than "[object Object] AS VARCHAR".
+    expect(new Visitors.ToSql().compile(fn)).toBe('CAST("users"."age" AS VARCHAR)');
   });
 
   it("create true", () => {
@@ -64,5 +68,23 @@ describe("TestFactoryMethods", () => {
     const f = users.createFalse();
     expect(f).toBeInstanceOf(Nodes.False);
     expect(new Visitors.ToSql().compile(f)).toBe("FALSE");
+  });
+
+  // Regression: verifies the include(Node, FactoryMethods) call in index.ts
+  // actually attached methods to Node.prototype. If that wiring is dropped,
+  // an arbitrary Node subclass (Equality below) silently loses the API.
+  describe("FactoryMethods is mixed into every Node subclass", () => {
+    const eq = users.get("id").eq(1);
+    it("createTrue available on Equality", () => {
+      expect(eq.createTrue()).toBeInstanceOf(Nodes.True);
+    });
+    it("grouping available on Equality", () => {
+      expect(eq.grouping(eq)).toBeInstanceOf(Nodes.Grouping);
+    });
+    it("createAnd available on Equality", () => {
+      const and = eq.createAnd([eq, eq]);
+      expect(and).toBeInstanceOf(Nodes.And);
+      expect(and.children.length).toBe(2);
+    });
   });
 });

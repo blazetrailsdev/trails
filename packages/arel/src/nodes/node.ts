@@ -1,8 +1,11 @@
 /**
  * Base class for all AST nodes in Arel.
  *
- * Mirrors: Arel::Nodes::Node
+ * Mirrors: Arel::Nodes::Node — which `include`s Arel::FactoryMethods.
+ * Runtime mixin wiring lives in ../index.ts to avoid a module-load cycle
+ * (factory-methods.ts imports concrete node subclasses).
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class Node {
   abstract accept<T>(visitor: NodeVisitor<T>): T;
 
@@ -166,3 +169,16 @@ function stableSerialize(value: unknown, seen: WeakSet<object> = new WeakSet()):
 
   return String(value);
 }
+
+// Methods supplied by the FactoryMethods mixin (runtime wiring in ../index.ts).
+// The aliased import keeps this type-only — pulling factory-methods.ts into
+// the static import graph here would create a module-load cycle, since it
+// imports concrete Node subclasses. The explicit `FactoryMethodsModule`
+// interface (vs. `Included<typeof FactoryMethods>`) is required: under
+// composite/declaration emit, the cycle Node ↔ FactoryMethods would force
+// tsc to fall back to a structural shape with a string index signature.
+type _FactoryMethodsModule = import("../factory-methods.js").FactoryMethodsModule;
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
+   @typescript-eslint/no-unsafe-declaration-merging */
+export interface Node extends _FactoryMethodsModule {}
