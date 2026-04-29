@@ -8,7 +8,7 @@ import { ToSql } from "./to-sql.js";
  * Mirrors: Arel::Visitors::SQLite
  */
 export class SQLite extends ToSql {
-  protected override visitSelectStatement(node: Nodes.SelectStatement): SQLString {
+  protected override visitArelNodesSelectStatement(node: Nodes.SelectStatement): SQLString {
     if (node.with) {
       this.visit(node.with);
       this.collector.append(" ");
@@ -21,7 +21,7 @@ export class SQLite extends ToSql {
 
     if (node.orders.length > 0) {
       this.collector.append(" ORDER BY ");
-      this.visitArray(node.orders, ", ");
+      this.injectJoin(node.orders, ", ");
     }
 
     if (node.limit) {
@@ -39,9 +39,7 @@ export class SQLite extends ToSql {
 
     // SQLite does not support locking; ignore lock clause entirely.
 
-    if (node.comment) {
-      this.visit(node.comment);
-    }
+    this.maybeVisit(node.comment ?? null);
 
     return this.collector;
   }
@@ -51,12 +49,12 @@ export class SQLite extends ToSql {
     return this.collector;
   }
 
-  protected override visitTrue(_node: Nodes.True): SQLString {
+  protected override visitArelNodesTrue(_node: Nodes.True): SQLString {
     this.collector.append("1");
     return this.collector;
   }
 
-  protected override visitFalse(_node: Nodes.False): SQLString {
+  protected override visitArelNodesFalse(_node: Nodes.False): SQLString {
     this.collector.append("0");
     return this.collector;
   }

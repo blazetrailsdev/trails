@@ -1076,4 +1076,109 @@ describe("the to_sql visitor", () => {
       expect(new Visitors.ToSql().compile(node)).toContain("IS NOT NULL");
     });
   });
+
+  // Mirrors Rails' to_sql.rb private helpers (sanitize_as_sql_comment,
+  // quote_table_name, quote_column_name).
+  describe("Rails-mirrored private helpers", () => {
+    type ToSqlInternals = {
+      sanitizeAsSqlComment(value: string | Nodes.SqlLiteral): string;
+      quoteTableName(name: string | Nodes.SqlLiteral): string;
+      quoteColumnName(name: string | Nodes.SqlLiteral): string;
+    };
+    const make = (): ToSqlInternals => new Visitors.ToSql() as unknown as ToSqlInternals;
+
+    it("sanitizeAsSqlComment passes through SqlLiteral values", () => {
+      const literal = new Nodes.SqlLiteral("/* raw */");
+      expect(make().sanitizeAsSqlComment(literal)).toBe("/* raw */");
+    });
+
+    it("sanitizeAsSqlComment strips comment delimiters and newlines", () => {
+      const v = make();
+      expect(v.sanitizeAsSqlComment("a /* boom */ b")).toBe("a boom b");
+      expect(v.sanitizeAsSqlComment("multi\nline")).toBe("multi line");
+      expect(v.sanitizeAsSqlComment("trailing */")).toBe("trailing");
+    });
+
+    it("quoteTableName / quoteColumnName double-quote bare names and pass through SqlLiteral", () => {
+      const v = make();
+      expect(v.quoteTableName("users")).toBe('"users"');
+      expect(v.quoteColumnName("name")).toBe('"name"');
+      expect(v.quoteTableName('weird"name')).toBe('"weird""name"');
+      expect(v.quoteTableName(new Nodes.SqlLiteral("users"))).toBe("users");
+    });
+
+    it("visitTable and visitAttribute now route through quoteTableName / quoteColumnName", () => {
+      // A table name with a double-quote in it would have crashed pre-PR
+      // because the inline replace was string-only; quoteTableName escapes it.
+      const weird = new Table('we"ird');
+      const sql = new Visitors.ToSql().compile(weird.get('co"l').eq(1));
+      expect(sql).toBe('"we""ird"."co""l" = 1');
+    });
+
+    it("collectNodesFor prefixes the spacer and joins with the connector", () => {
+      const tbl = new Table("users");
+      // Verify via SelectCore: Rails' WHERE collapses on " AND ".
+      const sql = tbl
+        .where(tbl.get("a").eq(1))
+        .where(tbl.get("b").eq(2))
+        .project(tbl.get("a"))
+        .toSql();
+      expect(sql).toContain('WHERE "users"."a" = 1 AND "users"."b" = 2');
+    });
+
+    it("collectNodesFor is a no-op when the list is empty", () => {
+      // SELECT with no projections / no WHERE should not emit those
+      // clauses at all (no stray spacer).
+      const sql = new Table("users").project().toSql();
+      expect(sql).toBe('SELECT FROM "users"');
+      expect(sql).not.toContain("WHERE");
+      expect(sql).not.toContain("GROUP BY");
+    });
+  });
+
+  describe("Nodes::OptimizerHints (visit)", () => {
+    it("emits /*+ HINT */ for an OptimizerHints node with array expr", () => {
+      const node = new Nodes.OptimizerHints(["IDX(t1)", "MAX_EXEC_TIME(1000)"]);
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toBe(" /*+ IDX(t1) MAX_EXEC_TIME(1000) */");
+    });
+
+    it("strips embedded comment delimiters from each hint (Rails parity)", () => {
+      // Mirrors Rails: sanitize_as_sql_comment removes /* and */ so a hint
+      // can't escape the surrounding comment block. The literal SQL inside
+      // is preserved as comment text — it's still inside /*+ ... */.
+      const node = new Nodes.OptimizerHints(["A */ DROP /*"]);
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toBe(" /*+ A DROP */");
+      expect(sql.match(/\*\//g)?.length).toBe(1);
+    });
+
+    it("accepts SqlLiteral hints (passes through unchanged)", () => {
+      const node = new Nodes.OptimizerHints([new Nodes.SqlLiteral("FORCE INDEX (t)")]);
+      expect(new Visitors.ToSql().compile(node)).toBe(" /*+ FORCE INDEX (t) */");
+    });
+  });
+
+  describe("Nodes::Comment placement", () => {
+    it("emits exactly one space before each comment in SelectCore (no double space)", () => {
+      // Regression: visit_Arel_Nodes_Comment used to prepend its own leading
+      // space, and SelectCore also called maybeVisit() which adds another.
+      // The visitor now leaves the leading space to the caller.
+      const tbl = new Table("users");
+      const sql = tbl.project(tbl.get("id")).comment("hi", "bye").toSql();
+      expect(sql).toBe('SELECT "users"."id" FROM "users" /* hi */ /* bye */');
+      expect(sql).not.toContain("  /*");
+    });
+  });
+
+  describe("schema-qualified table identifier", () => {
+    it("quotes each segment of a schema.table name in SELECT and column refs", () => {
+      const tbl = new Table("schema.table");
+      const sql = tbl.project(tbl.get("col")).toSql();
+      // Both the FROM clause and the qualified column reference should
+      // emit "schema"."table" — not "schema.table" (which would be a
+      // single identifier and reference a different relation).
+      expect(sql).toBe('SELECT "schema"."table"."col" FROM "schema"."table"');
+    });
+  });
 });

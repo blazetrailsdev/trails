@@ -80,5 +80,19 @@ export class GroupingSet extends GroupingElement {
 }
 
 export class Group extends Unary {}
-export class OptimizerHints extends Unary {}
+/**
+ * Rails' `Arel::Nodes::OptimizerHints` stores `[hint1, hint2, ...]` and the
+ * visitor iterates them. The Unary base types `expr` as
+ * `Node | string | number | null` — TS won't let us widen `expr` to an array
+ * via `declare`, so the hints live in their own typed field and `expr` is
+ * left as `null` (consistent with the declared base type).
+ */
+export class OptimizerHints extends Unary {
+  readonly hints: ReadonlyArray<string | import("./sql-literal.js").SqlLiteral>;
+
+  constructor(hints: ReadonlyArray<string | import("./sql-literal.js").SqlLiteral>) {
+    super(null);
+    this.hints = hints;
+  }
+}
 export class RollUp extends Rollup {}

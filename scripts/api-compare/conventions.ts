@@ -10,7 +10,11 @@ export function snakeToCamel(name: string): string {
   const match = name.match(/^(_+)/);
   const prefix = match ? match[1] : "";
   const rest = name.slice(prefix.length);
-  return prefix + rest.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase());
+  // Match `_` followed by any letter or digit so Ruby names containing
+  // capitalized segments (e.g. `visit_Arel_Nodes_SelectStatement`)
+  // collapse cleanly to camelCase TS form (`visitArelNodesSelectStatement`)
+  // — matching project style instead of leaking literal snake_case identifiers.
+  return prefix + rest.replace(/_([a-zA-Z0-9])/g, (_, ch: string) => ch.toUpperCase());
 }
 
 /** Ruby file path → expected TS file path (kebab-case, .ts extension) */
