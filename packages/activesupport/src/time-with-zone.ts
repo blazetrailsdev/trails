@@ -5,10 +5,11 @@
  * Mirrors the Rails API: https://api.rubyonrails.org/classes/ActiveSupport/TimeWithZone.html
  */
 
-import { TimeZone, getLocalComponents } from "./values/time-zone.js";
+import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { getZone } from "./time-zone-config.js";
+import { Temporal } from "./temporal.js";
 
 /**
  * Options for the change() method.
@@ -84,14 +85,19 @@ function daysInMonth(year: number, month: number): number {
 }
 
 export class TimeWithZone {
-  /** The underlying UTC instant */
-  private readonly _utc: Date;
+  /** The underlying zoned instant */
+  private readonly _zoned: Temporal.ZonedDateTime;
   /** The timezone */
   private readonly _timeZone: TimeZone;
+  /** Cached Date snapshot for legacy method bodies and TimeZone helpers. */
+  private readonly _utc: Date;
 
   constructor(utcTime: Date, timeZone: TimeZone) {
-    this._utc = new Date(utcTime.getTime());
+    this._zoned = Temporal.Instant.fromEpochMilliseconds(utcTime.getTime()).toZonedDateTimeISO(
+      timeZone.tzinfo,
+    );
     this._timeZone = timeZone;
+    this._utc = new Date(this._zoned.epochMilliseconds);
   }
 
   // ---------------------------------------------------------------------------
@@ -169,7 +175,16 @@ export class TimeWithZone {
     second: number;
     millisecond: number;
   } {
-    return getLocalComponents(this._timeZone.tzinfo, this._utc);
+    const z = this._zoned;
+    return {
+      year: z.year,
+      month: z.month,
+      day: z.day,
+      hour: z.hour,
+      minute: z.minute,
+      second: z.second,
+      millisecond: z.millisecond,
+    };
   }
 
   get year(): number {
