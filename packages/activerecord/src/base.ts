@@ -25,6 +25,7 @@ import {
   primaryAbstractClass,
   stiClassFor,
   polymorphicClassFor,
+  initializeInternalsCallback as inheritanceInitializeInternalsCallback,
 } from "./inheritance.js";
 import {
   NotImplementedError,
@@ -2144,12 +2145,46 @@ export class Base extends Model {
       executeMultiparameterAssignment(this as any, multiparams);
       // Re-snapshot so mp attrs are part of the initial clean state.
       (this as any)._dirty.snapshot((this as any)._attributes);
-      // Now fire after_initialize with all attrs assembled.
       if (!wasSuppressed) {
+        // Fire initialize_internals_callback after attribute assignment and
+        // before after_initialize. Scope attribute precedence is already handled
+        // by _mergeCurrentScopeAttrs in the class-level new/create methods, so
+        // only the inheritance callback (STI type column) is called here.
+        inheritanceInitializeInternalsCallback.call(this as any);
+        // Re-snapshot so the STI type write is part of the initial clean state.
+        (this as any)._dirty.snapshot((this as any)._attributes);
         ctor._callbackChain.runAfter("initialize", this, { strict: "sync" } as any);
       }
     } else {
-      super(attrs);
+      // For the regular (non-multiparameter) path, mirror the multiparameter
+      // pattern: suppress after_initialize during super() so we can call
+      // initialize_internals_callback first, then fire after_initialize.
+      // This matches Rails' Core#initialize order:
+      //   init_internals → initialize_internals_callback → super → after_initialize
+      const ctor2 = new.target as typeof Base;
+      const suppressor2 = ctor2 as typeof ctor2 & { _suppressInitializeCallback?: boolean };
+      const hadOwn2 = Object.prototype.hasOwnProperty.call(
+        suppressor2,
+        "_suppressInitializeCallback",
+      );
+      const wasSuppressed2 = suppressor2._suppressInitializeCallback;
+      suppressor2._suppressInitializeCallback = true;
+      try {
+        super(attrs);
+      } finally {
+        if (hadOwn2) {
+          suppressor2._suppressInitializeCallback = wasSuppressed2;
+        } else {
+          delete (suppressor2 as { _suppressInitializeCallback?: boolean })
+            ._suppressInitializeCallback;
+        }
+      }
+      if (!wasSuppressed2) {
+        inheritanceInitializeInternalsCallback.call(this as any);
+        // Re-snapshot so the STI type write is part of the initial clean state.
+        (this as any)._dirty.snapshot((this as any)._attributes);
+        ctor2._callbackChain.runAfter("initialize", this, { strict: "sync" } as any);
+      }
     }
   }
 

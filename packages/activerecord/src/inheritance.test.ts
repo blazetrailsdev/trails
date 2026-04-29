@@ -2072,3 +2072,41 @@ describe("ensureProperType / initializeInternalsCallback", () => {
     expect((car as any).readAttribute("type")).toBe("Car");
   });
 });
+
+describe("Base constructor wires initializeInternalsCallback", () => {
+  it("new STI subclass instance auto-sets the type column", async () => {
+    const { enableSti } = await import("./inheritance.js");
+    class Vehicle extends Base {
+      static {
+        this._tableName = "vehicles";
+        this.attribute("type", "string");
+      }
+    }
+    enableSti(Vehicle);
+    class Car extends Vehicle {}
+
+    const car = new Car({});
+    // type column should be set immediately on construction — no save needed
+    expect(car.readAttribute("type")).toBe("Car");
+  });
+
+  it("_instantiate (DB hydration) does NOT fire initializeInternalsCallback", async () => {
+    const { enableSti } = await import("./inheritance.js");
+    const adapter = createTestAdapter();
+    class Vehicle extends Base {
+      static {
+        this._tableName = "vehicles";
+        this.attribute("id", "integer");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
+    }
+    enableSti(Vehicle);
+
+    // Use type: "Vehicle" so STI discrimination routes back to Vehicle itself —
+    // no subclass lookup, so no SubclassNotFound. The value should be preserved
+    // as-is from the DB row, not overwritten by initializeInternalsCallback.
+    const record = Vehicle._instantiate({ id: 1, type: "Vehicle" }) as any;
+    expect(record.readAttribute("type")).toBe("Vehicle");
+  });
+});
