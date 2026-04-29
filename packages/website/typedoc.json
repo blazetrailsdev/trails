@@ -14,7 +14,7 @@
   "readme": "none",
   "githubPages": false,
   "excludeInternal": true,
-  "outputFileStrategy": "modules",
+  "outputFileStrategy": "members",
   "expandObjects": true,
   "parametersFormat": "table",
   "enumMembersFormat": "table",
