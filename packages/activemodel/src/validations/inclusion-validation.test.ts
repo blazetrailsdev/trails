@@ -80,13 +80,16 @@ describe("InclusionValidationTest", () => {
   });
 
   it("validates inclusion of with allow nil", () => {
+    // Mirrors Rails inclusion_validation_test.rb:100-106 — allow_nil: true
+    // skips nil; non-nil values still validate against the set.
     class Person extends Model {
       static {
         this.attribute("karma", "string");
-        this.validates("karma", { inclusion: { in: ["ow", "ar"] } });
+        this.validates("karma", { inclusion: { in: ["ow", "ar"], allowNil: true } });
       }
     }
     expect(new Person({}).isValid()).toBe(true);
+    expect(new Person({ karma: "nope" }).isValid()).toBe(false);
   });
 
   it("validates inclusion of with formatted message", () => {
