@@ -50,8 +50,18 @@ export function registerBuildQuoted(fn: (other: unknown, ctx: unknown) => Node):
 // this file's static import graph (they transitively depend on node
 // classes that extend NodeExpression), while still giving TypeScript the
 // method-surface signatures via declaration merging.
+// AliasPredication / OrderPredications use their explicit module interfaces
+// (method-syntax) so subclasses like Function/Grouping/UnaryOperation that
+// override `as`/`asc`/`desc` with method declarations don't trip the
+// property-vs-method override error.
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
+type _Expressions = import("../expressions.js").ExpressionsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface NodeExpression
   extends
     Included<typeof import("../predications.js").Predications>,
-    Included<typeof import("../math.js").Math> {}
+    Included<typeof import("../math.js").Math>,
+    _Expressions,
+    _AliasPredication,
+    _OrderPredications {}

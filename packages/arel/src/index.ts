@@ -38,24 +38,51 @@ import { include } from "@blazetrails/activesupport";
 import { Node } from "./nodes/node.js";
 import { NodeExpression } from "./nodes/node-expression.js";
 import { InfixOperation } from "./nodes/infix-operation.js";
+import { Function as FunctionNode } from "./nodes/function.js";
 import { Predications } from "./predications.js";
 import { Math as MathMixin } from "./math.js";
 import { FactoryMethods } from "./factory-methods.js";
+import { Expressions } from "./expressions.js";
+import { AliasPredication } from "./alias-predication.js";
+import { OrderPredications } from "./order-predications.js";
+import { FilterPredications } from "./filter-predications.js";
+import { WindowPredications } from "./window-predications.js";
 /* eslint-disable @typescript-eslint/no-explicit-any -- abstract class coercion for include() */
 const _Node = Node as unknown as new (...args: any[]) => Node;
 const _NodeExpression = NodeExpression as unknown as new (...args: any[]) => NodeExpression;
 const _TreeManager = TreeManager as unknown as new (...args: any[]) => TreeManager;
+const _SqlLiteral = SqlLiteral as unknown as new (...args: any[]) => SqlLiteral;
 /* eslint-enable @typescript-eslint/no-explicit-any */
-// The cast matches include()'s runtime constraint. FactoryMethods is
-// typed as the explicit FactoryMethodsModule interface (no index
-// signature) to break the Node ↔ FactoryMethods type cycle.
+// Modules typed as explicit module interfaces (no string index sig) need
+// a cast to satisfy include()'s runtime constraint. The cast is type-only
+// and runtime semantics are unchanged — include() iterates Object.keys.
 type RuntimeModule = Record<string, (...args: unknown[]) => unknown>;
-include(_Node, FactoryMethods as unknown as RuntimeModule);
-include(_TreeManager, FactoryMethods as unknown as RuntimeModule);
+const asRuntime = <T>(m: T): RuntimeModule => m as unknown as RuntimeModule;
+include(_Node, asRuntime(FactoryMethods));
+include(_TreeManager, asRuntime(FactoryMethods));
+// Mirrors Rails: Arel::Nodes::NodeExpression includes Expressions,
+// Predications, AliasPredication, OrderPredications, Math.
 include(_NodeExpression, Predications);
 include(_NodeExpression, MathMixin);
+include(_NodeExpression, asRuntime(Expressions));
+include(_NodeExpression, asRuntime(AliasPredication));
+include(_NodeExpression, asRuntime(OrderPredications));
+// InfixOperation extends Binary (not NodeExpression) but includes the
+// same surface in Rails.
 include(InfixOperation, Predications);
 include(InfixOperation, MathMixin);
+include(InfixOperation, asRuntime(Expressions));
+include(InfixOperation, asRuntime(AliasPredication));
+include(InfixOperation, asRuntime(OrderPredications));
+// SqlLiteral < String in Rails; includes Expressions, Predications,
+// AliasPredication, OrderPredications.
+include(_SqlLiteral, Predications);
+include(_SqlLiteral, asRuntime(Expressions));
+include(_SqlLiteral, asRuntime(AliasPredication));
+include(_SqlLiteral, asRuntime(OrderPredications));
+// Function includes WindowPredications and FilterPredications.
+include(FunctionNode, asRuntime(WindowPredications));
+include(FunctionNode, asRuntime(FilterPredications));
 
 /**
  * Arel.sql() — escape hatch for raw SQL.

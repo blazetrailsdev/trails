@@ -24,12 +24,16 @@ export class Case extends NodeExpression {
     this.default = defaultValue ? new Else(defaultValue) : null;
   }
 
-  when(condition: Node | unknown, result?: Node | unknown): this {
+  // Property-form override (vs. `when(...) {}`): Predications.when is
+  // mixed into NodeExpression as a property via Included<>, and Case
+  // overrides with self-mutating semantics (Rails: builds When clauses
+  // on this.conditions, returns self).
+  when = (condition: Node | unknown, result?: Node | unknown): this => {
     const whenNode = buildQuoted(condition);
     const thenNode = buildQuoted(result === undefined ? null : result);
     this.conditions.push(new When(whenNode, thenNode));
     return this;
-  }
+  };
 
   else(result: Node | unknown): this {
     this.default = new Else(buildQuoted(result === undefined ? null : result));

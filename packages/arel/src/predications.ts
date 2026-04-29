@@ -20,6 +20,8 @@ import { Or } from "./nodes/or.js";
 import { Not } from "./nodes/unary.js";
 import { Grouping } from "./nodes/grouping.js";
 import { True } from "./nodes/true.js";
+import { Case } from "./nodes/case.js";
+import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 
 /**
  * Host contract for the Predications mixin.
@@ -299,5 +301,20 @@ export const Predications = {
   },
   notInAll(this: PredicationHost & { notIn(o: unknown[]): Node }, others: unknown[][]): Grouping {
     return groupedAll(others.map((o) => this.notIn(o)));
+  },
+  when(this: PredicationHost, right: unknown): Case {
+    return new Case(this as unknown as Node).when(this.quotedNode(right));
+  },
+  concat(this: Node, other: Node): Concat {
+    return new Concat(this, other);
+  },
+  contains(this: PredicationHost, other: unknown): Contains {
+    return new Contains(this as unknown as Node, this.quotedNode(other));
+  },
+  overlaps(this: PredicationHost, other: unknown): Overlaps {
+    return new Overlaps(this as unknown as Node, this.quotedNode(other));
+  },
+  quotedArray(this: PredicationHost, others: unknown[]): Node[] {
+    return others.map((v) => this.quotedNode(v));
   },
 };

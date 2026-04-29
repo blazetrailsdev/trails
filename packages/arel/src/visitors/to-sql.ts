@@ -182,6 +182,11 @@ export class ToSql implements NodeVisitor<SQLString> {
     // Functions
     if (node instanceof Nodes.NamedFunction) return this.visitNamedFunction(node);
     if (node instanceof Nodes.Exists) return this.visitExists(node);
+    if (node instanceof Nodes.Count) return this.visitAggregate(node, "COUNT");
+    if (node instanceof Nodes.Sum) return this.visitAggregate(node, "SUM");
+    if (node instanceof Nodes.Max) return this.visitAggregate(node, "MAX");
+    if (node instanceof Nodes.Min) return this.visitAggregate(node, "MIN");
+    if (node instanceof Nodes.Avg) return this.visitAggregate(node, "AVG");
 
     // Advanced grouping
     if (node instanceof Nodes.Cube) return this.visitCube(node);
@@ -835,6 +840,19 @@ export class ToSql implements NodeVisitor<SQLString> {
     this.collector.retryable = false;
     this.collector.append(node.name);
     this.collector.append("(");
+    if (node.distinct) this.collector.append("DISTINCT ");
+    this.visitArray(node.expressions, ", ");
+    this.collector.append(")");
+    if (node.alias) {
+      this.collector.append(" AS ");
+      this.visit(node.alias);
+    }
+    return this.collector;
+  }
+
+  private visitAggregate(node: Nodes.Function, name: string): SQLString {
+    this.collector.retryable = false;
+    this.collector.append(`${name}(`);
     if (node.distinct) this.collector.append("DISTINCT ");
     this.visitArray(node.expressions, ", ");
     this.collector.append(")");

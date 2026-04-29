@@ -138,8 +138,15 @@ export class Overlaps extends InfixOperation {
 // Inline `typeof import(...)` keeps the mixin modules out of this file's
 // static import graph (math.ts imports InfixOperation for its class
 // references; a static reverse import would cycle).
+// See node-expression.ts for why these use the explicit module interfaces.
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
+type _Expressions = import("../expressions.js").ExpressionsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface InfixOperation
   extends
     Included<typeof import("../predications.js").Predications>,
-    Included<typeof import("../math.js").Math> {}
+    Included<typeof import("../math.js").Math>,
+    _Expressions,
+    _AliasPredication,
+    _OrderPredications {}

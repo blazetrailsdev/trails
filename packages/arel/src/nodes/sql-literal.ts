@@ -1,11 +1,16 @@
+import type { Included } from "@blazetrails/activesupport";
 import { Node, NodeVisitor } from "./node.js";
 import { Fragments } from "./fragments.js";
+import { buildQuoted } from "./casted.js";
 
 /**
  * SqlLiteral — a raw SQL string passed through unescaped.
  *
- * Mirrors: Arel::Nodes::SqlLiteral
+ * Mirrors: Arel::Nodes::SqlLiteral. Rails extends `String` and includes
+ * Expressions, Predications, AliasPredication, OrderPredications. The
+ * runtime mixin wiring lives in ../index.ts to avoid module-load cycles.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SqlLiteral extends Node {
   readonly value: string;
   retryableFlag = false;
@@ -26,6 +31,12 @@ export class SqlLiteral extends Node {
     return undefined;
   }
 
+  // Required by the Predications mixin (mirrors Rails' private
+  // Predications#quoted_node, which calls `Nodes.build_quoted(other, self)`).
+  quotedNode(other: unknown): Node {
+    return other instanceof Node ? other : buildQuoted(other, this);
+  }
+
   join(other: Node): Fragments {
     return new Fragments([this, other]);
   }
@@ -40,3 +51,14 @@ export class SqlLiteral extends Node {
     return visitor.visit(this);
   }
 }
+
+type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
+type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
+type _Expressions = import("../expressions.js").ExpressionsModule;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface SqlLiteral
+  extends
+    Included<typeof import("../predications.js").Predications>,
+    _Expressions,
+    _AliasPredication,
+    _OrderPredications {}
