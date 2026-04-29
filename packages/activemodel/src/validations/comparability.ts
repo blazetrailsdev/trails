@@ -3,20 +3,37 @@
  *
  * Mirrors: ActiveModel::Validations::Comparability
  *
- * In Rails, Comparability is included by ComparisonValidator and
- * NumericalityValidator. It provides error_options which builds
- * the error message interpolation hash with the comparison target.
+ * Included by ComparisonValidator and NumericalityValidator. Provides
+ * COMPARE_CHECKS (the comparison option keys) and error_options which
+ * builds the i18n interpolation hash by stripping comparison keys from
+ * the validator's options and merging in :count + :value.
  */
-import { resolveValue } from "./resolve-value.js";
+
+export const COMPARE_CHECKS = [
+  "greaterThan",
+  "greaterThanOrEqualTo",
+  "equalTo",
+  "lessThan",
+  "lessThanOrEqualTo",
+  "otherThan",
+] as const;
 
 export interface Comparability {
-  errorOptions(optionValue: unknown, record: unknown, value?: unknown): Record<string, unknown>;
+  errorOptions(value: unknown, optionValue: unknown): Record<string, unknown>;
 }
 
 export function errorOptions(
+  this: { options: Record<string, unknown> },
+  value: unknown,
   optionValue: unknown,
-  record: unknown,
-  value?: unknown,
 ): Record<string, unknown> {
-  return { count: resolveValue(record, optionValue), value };
+  const rest: Record<string, unknown> = {};
+  for (const key of Object.keys(this.options)) {
+    if (!(COMPARE_CHECKS as readonly string[]).includes(key)) {
+      rest[key] = this.options[key];
+    }
+  }
+  rest.count = optionValue;
+  rest.value = value;
+  return rest;
 }

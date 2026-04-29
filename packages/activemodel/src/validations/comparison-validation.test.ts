@@ -30,10 +30,9 @@ describe("ComparisonValidationTest", () => {
     class Person extends Model {
       static {
         this.attribute("age", "integer");
-        this.validates("age", { comparison: { greaterThan: 0 } });
+        this.validates("age", { comparison: { greaterThan: 0, allowBlank: true } });
       }
     }
-    // null/undefined values are skipped by comparison validator
     const p = new Person();
     expect(p.isValid()).toBe(true);
   });
@@ -225,7 +224,7 @@ describe("ComparisonValidationTest", () => {
     class Item extends Model {
       static {
         this.attribute("quantity", "integer");
-        this.validates("quantity", { comparison: { greaterThan: 0 } });
+        this.validates("quantity", { comparison: { greaterThan: 0, allowNil: true } });
       }
     }
     expect(new Item({}).isValid()).toBe(true);
@@ -505,7 +504,7 @@ describe("ComparisonValidator", () => {
     class Item extends Model {
       static {
         this.attribute("quantity", "integer");
-        this.validates("quantity", { comparison: { greaterThan: 0 } });
+        this.validates("quantity", { comparison: { greaterThan: 0, allowNil: true } });
       }
     }
     expect(new Item({}).isValid()).toBe(true);

@@ -1,7 +1,10 @@
 import { EachValidator } from "../validator.js";
 import type { AnyRecord } from "../validator.js";
+import { resolveValue } from "./resolve-value.js";
 
 export class LengthValidator extends EachValidator {
+  resolveValue = resolveValue;
+
   override checkValidity(): void {
     if (
       this.options.minimum === undefined &&

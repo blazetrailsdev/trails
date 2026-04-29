@@ -1,8 +1,11 @@
 import { EachValidator } from "../validator.js";
 import type { AnyRecord } from "../validator.js";
 import { isExcluded, checkClusivityValidity } from "./clusivity.js";
+import { resolveValue } from "./resolve-value.js";
 
 export class ExclusionValidator extends EachValidator {
+  resolveValue = resolveValue;
+
   override checkValidity(): void {
     checkClusivityValidity(this.options);
   }

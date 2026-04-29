@@ -7,8 +7,13 @@
  * and ExclusionValidator. It provides check_validity! which ensures
  * the :in option is an enumerable, and the include?/exclude? membership test.
  */
+import { resolveValue } from "./resolve-value.js";
+
+export { resolveValue };
+
 export interface Clusivity {
   checkValidity(): void;
+  resolveValue(record: unknown, value: unknown): unknown;
 }
 
 export function checkValidityBang(options: { in?: unknown; within?: unknown }): void {

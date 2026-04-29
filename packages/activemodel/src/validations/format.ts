@@ -1,7 +1,10 @@
 import { EachValidator } from "../validator.js";
 import type { AnyRecord } from "../validator.js";
+import { resolveValue } from "./resolve-value.js";
 
 export class FormatValidator extends EachValidator {
+  resolveValue = resolveValue;
+
   private resolveRegexp(opt: RegExp | ((record: AnyRecord) => RegExp), record: AnyRecord): RegExp {
     const re = typeof opt === "function" ? opt(record) : opt;
     if (re.multiline) {

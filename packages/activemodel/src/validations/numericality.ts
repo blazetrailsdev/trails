@@ -1,19 +1,31 @@
 import { EachValidator } from "../validator.js";
 import type { AnyRecord } from "../validator.js";
 import { isBlank } from "@blazetrails/activesupport";
+import { errorOptions } from "./comparability.js";
+import { resolveValue } from "./resolve-value.js";
 
 type NumericValue = number | ((record: AnyRecord) => number) | string;
 
 export class NumericalityValidator extends EachValidator {
+  resolveValue = resolveValue;
+  errorOptions = errorOptions;
+
   private resolveNumeric(val: NumericValue | undefined, record: AnyRecord): number | undefined {
     if (val === undefined) return undefined;
-    if (typeof val === "function") return val(record);
-    if (typeof val === "string") {
-      const method = (record as AnyRecord)[val];
-      if (typeof method === "function") return method.call(record);
-      return Number(method);
+    const resolved = this.resolveValue(record, val);
+    if (resolved === undefined || resolved === null) return undefined;
+    // Rails parse_as_number → Kernel.Float raises ArgumentError on
+    // non-numeric input (numericality.rb:81-84). Number("") / Number("  ")
+    // coerce to 0 in JS, which would silently accept clearly non-numeric
+    // values, so reject empty/whitespace strings explicitly before coercion.
+    if (typeof resolved === "string" && resolved.trim() === "") {
+      throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
     }
-    return val;
+    const numeric = typeof resolved === "number" ? resolved : Number(resolved);
+    if (!Number.isFinite(numeric)) {
+      throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
+    }
+    return numeric;
   }
 
   override checkValidity(): void {
