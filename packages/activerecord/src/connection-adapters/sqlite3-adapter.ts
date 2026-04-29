@@ -130,7 +130,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private static _isMemoryFilename(filename: string): boolean {
     if (filename === ":memory:") return true;
     if (!filename.startsWith("file:")) return false;
-    return filename.startsWith("file::memory:") || filename.includes("mode=memory");
+    if (filename.startsWith("file::memory:")) return true;
+    // Parse query string so a path containing the text "mode=memory" isn't
+    // misclassified (e.g. file:/tmp/mode=memory.db). Mirrors SQLiteDatabaseTasks.
+    const q = filename.indexOf("?");
+    if (q === -1) return false;
+    return new URLSearchParams(filename.slice(q + 1)).get("mode") === "memory";
   }
 
   // Rails' `statement_limit` database.yml key. SQLite has a single

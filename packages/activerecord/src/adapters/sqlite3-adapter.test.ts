@@ -573,3 +573,31 @@ describe("SqliteAdapter", () => {
     });
   });
 });
+
+describe("SQLite3Adapter._isMemoryFilename", () => {
+  // Access the private static via `as any` — avoids opening any real DB connection.
+  const isMemoryFilename = (SQLite3Adapter as any)._isMemoryFilename.bind(SQLite3Adapter) as (
+    filename: string,
+  ) => boolean;
+
+  it("treats :memory: as in-memory", () => {
+    expect(isMemoryFilename(":memory:")).toBe(true);
+  });
+
+  it("treats file::memory: URI as in-memory", () => {
+    expect(isMemoryFilename("file::memory:?cache=shared")).toBe(true);
+  });
+
+  it("treats file:?mode=memory URI as in-memory", () => {
+    expect(isMemoryFilename("file:memdb1?mode=memory&cache=shared")).toBe(true);
+  });
+
+  it("does NOT treat a path containing mode=memory text as in-memory", () => {
+    // file:/tmp/mode=memory.db has the text but not as a query param
+    expect(isMemoryFilename("file:/tmp/mode=memory.db")).toBe(false);
+  });
+
+  it("treats a regular file path as on-disk", () => {
+    expect(isMemoryFilename("/tmp/test.db")).toBe(false);
+  });
+});
