@@ -160,3 +160,26 @@ describe("ActiveModelI18nTests", () => {
     expect(Child.humanAttributeName("first_name")).toBe("First name");
   });
 });
+
+describe("raise_on_missing_translations accessor", () => {
+  // Mirrors the singleton attr_accessor :raise_on_missing_translations
+  // from translation.rb:25 — reachable through the host modules that
+  // include/extend Translation in Rails (api.rb, validations.rb).
+  it("toggles the shared singleton via Translation, API, and Validations", async () => {
+    const translation = await import("./translation.js");
+    const api = await import("./api.js");
+    const validations = await import("./validations.js");
+    const original = translation.raiseOnMissingTranslations();
+    try {
+      api.raiseOnMissingTranslations(true);
+      expect(translation.raiseOnMissingTranslations()).toBe(true);
+      expect(validations.raiseOnMissingTranslations()).toBe(true);
+
+      validations.raiseOnMissingTranslations(false);
+      expect(api.raiseOnMissingTranslations()).toBe(false);
+      expect(translation.raiseOnMissingTranslations()).toBe(false);
+    } finally {
+      translation.raiseOnMissingTranslations(original);
+    }
+  });
+});

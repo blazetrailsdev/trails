@@ -2,6 +2,17 @@ import type { Errors } from "./errors.js";
 import type { ConditionalOptions } from "./validator.js";
 import { I18n } from "./i18n.js";
 
+import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
+
+/**
+ * Rails: ActiveModel::Validations extends Translation (validations.rb:43),
+ * so the singleton accessor surfaces on Validations directly. Mirror that
+ * here so callers can read/write via `Validations.raiseOnMissingTranslations(...)`.
+ */
+export function raiseOnMissingTranslations(value?: boolean): boolean {
+  return translationRaise(value);
+}
+
 /**
  * Validations mixin contract — provides the validation lifecycle.
  *

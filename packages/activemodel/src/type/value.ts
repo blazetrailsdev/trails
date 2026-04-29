@@ -37,6 +37,75 @@ export abstract class Type<T = unknown> {
     return value;
   }
 
+  /**
+   * Mirrors: ActiveModel::Type::SerializeCastValue#itself_if_serialize_cast_value_compatible
+   * (serialize_cast_value.rb:36-38)
+   *
+   *   def itself_if_serialize_cast_value_compatible
+   *     self if self.class.serialize_cast_value_compatible?
+   *   end
+   *
+   * Returns `this` when the type's serialize path can short-circuit
+   * through serialize_cast_value (i.e. the subclass has overridden
+   * serialize_cast_value at the same level or above its `serialize`
+   * override). Returns null otherwise. Callers can use this predicate
+   * to choose the cast-value fast-path via `serializeCastValue(...)`
+   * instead of a redundant `serialize(...)` call. Rails wires that
+   * dispatcher at `serialize_cast_value.rb:25-33`; trails callers do
+   * the same check inline against this method's truthiness.
+   */
+  itselfIfSerializeCastValueCompatible(): this | null {
+    return (
+      this.constructor as unknown as { serializeCastValueCompatible(): boolean }
+    ).serializeCastValueCompatible()
+      ? this
+      : null;
+  }
+
+  /**
+   * Mirrors: ActiveModel::Type::SerializeCastValue::ClassMethods#serialize_cast_value_compatible?
+   * (serialize_cast_value.rb:9-12). Result is memoized on the class:
+   *
+   *   return @serialize_cast_value_compatible if defined?(@serialize_cast_value_compatible)
+   *
+   * Walks the prototype chain to compare ancestor depth of `serialize`
+   * vs `serializeCastValue` — compatible when serializeCastValue is
+   * defined at or above serialize.
+   */
+  static serializeCastValueCompatible(this: { _serializeCastValueCompatible?: boolean }): boolean {
+    // Per-class memoization: JS static properties are inherited, so a
+    // subclass that overrides serialize/serializeCastValue would otherwise
+    // reuse a parent's cached result. Only treat the cache as set when it
+    // is an own property of THIS constructor — Rails caches in @ivars on
+    // the class object itself for the same reason (serialize_cast_value.rb:9-12).
+    if (Object.hasOwn(this, "_serializeCastValueCompatible")) {
+      return this._serializeCastValueCompatible as boolean;
+    }
+    let proto: object | null = (this as unknown as { prototype: object }).prototype;
+    let serializeDepth = -1;
+    let castDepth = -1;
+    let depth = 0;
+    while (proto && proto !== Object.prototype) {
+      if (serializeDepth < 0 && Object.prototype.hasOwnProperty.call(proto, "serialize")) {
+        serializeDepth = depth;
+      }
+      if (castDepth < 0 && Object.prototype.hasOwnProperty.call(proto, "serializeCastValue")) {
+        castDepth = depth;
+      }
+      proto = Object.getPrototypeOf(proto);
+      depth++;
+    }
+    const result = castDepth >= 0 && serializeDepth >= 0 && castDepth <= serializeDepth;
+    // Define as own property so subclasses don't read this through the
+    // static prototype chain.
+    Object.defineProperty(this, "_serializeCastValueCompatible", {
+      value: result,
+      writable: true,
+      configurable: true,
+    });
+    return result;
+  }
+
   isSerializable(_value: unknown): boolean {
     return true;
   }

@@ -13,3 +13,15 @@
 export interface API {
   isPersisted(): boolean;
 }
+
+import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
+
+/**
+ * Rails: ActiveModel::API includes Validations, which extends Translation,
+ * so `API.raise_on_missing_translations` reaches the Translation singleton
+ * accessor (translation.rb:25). Surface the same accessor here so callers
+ * can read/write it via `API.raiseOnMissingTranslations(...)`.
+ */
+export function raiseOnMissingTranslations(value?: boolean): boolean {
+  return translationRaise(value);
+}
