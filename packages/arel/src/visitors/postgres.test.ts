@@ -167,7 +167,8 @@ describe("PostgresTest", () => {
     it("should know how to generate parenthesis when supplied with many Dimensions", () => {
       const mgr = users.project(star).group(new Nodes.Cube([users.get("id"), users.get("name")]));
       const sql = new Visitors.PostgreSQL().compile(mgr.ast);
-      expect(sql).toContain('CUBE("users"."id", "users"."name")');
+      // Rails Postgres formats grouping elements with spaces inside parens.
+      expect(sql).toContain('CUBE( "users"."id", "users"."name" )');
     });
 
     it("should know how to visit with array arguments", () => {
@@ -350,5 +351,58 @@ describe("PostgresTest", () => {
       const sql = new Visitors.PostgreSQL().compile(node);
       expect(sql).toContain("'{\"O''Reilly\"}'");
     });
+  });
+});
+
+// Audit follow-up: Postgres dialect overrides for grouping-element
+// formatting (spaces inside parens), Cube/Rollup/GroupingSet wrapping,
+// Lateral parens-only-when-needed, and explicit IsDistinctFrom
+// overrides (behaviorally identical to base, kept for fidelity).
+describe("PostgreSQL dialect overrides (audit follow-up)", () => {
+  const users = new Table("users");
+  const compile = (n: Nodes.Node): string => new Visitors.PostgreSQL().compile(n);
+
+  it("GroupingElement renders with spaces inside parens", () => {
+    const ge = new Nodes.GroupingElement([users.get("a"), users.get("b")]);
+    expect(compile(ge)).toBe('( "users"."a", "users"."b" )');
+  });
+
+  it("Cube emits `CUBE( … )` with spaces", () => {
+    const c = new Nodes.Cube([users.get("a"), users.get("b")]);
+    expect(compile(c)).toBe('CUBE( "users"."a", "users"."b" )');
+  });
+
+  it("Rollup emits `ROLLUP( … )` with spaces", () => {
+    const r = new Nodes.Rollup([users.get("a"), users.get("b")]);
+    expect(compile(r)).toBe('ROLLUP( "users"."a", "users"."b" )');
+  });
+
+  it("GroupingSet emits `GROUPING SETS( … )` with spaces", () => {
+    const g = new Nodes.GroupingSet([users.get("a"), users.get("b")]);
+    expect(compile(g)).toBe('GROUPING SETS( "users"."a", "users"."b" )');
+  });
+
+  it("Lateral does not double-wrap an inner Grouping", () => {
+    // Inner is already a Grouping (renders its own parens), so the
+    // PostgreSQL visitor should not add another set — Rails Postgres
+    // uses a `grouping_parentheses` helper that wraps only when the
+    // inner isn't a Grouping.
+    const inner = new Nodes.Grouping(new Nodes.SqlLiteral("SELECT 1"));
+    expect(compile(new Nodes.Lateral(inner))).toBe("LATERAL (SELECT 1)");
+  });
+
+  it("Lateral wraps a non-Grouping inner expression in parens", () => {
+    const inner = new Nodes.SqlLiteral("SELECT 1");
+    expect(compile(new Nodes.Lateral(inner))).toBe("LATERAL (SELECT 1)");
+  });
+
+  it("IsNotDistinctFrom uses standard SQL keyword on Postgres", () => {
+    const node = users.get("a").isNotDistinctFrom(users.get("b"));
+    expect(compile(node)).toBe('"users"."a" IS NOT DISTINCT FROM "users"."b"');
+  });
+
+  it("IsDistinctFrom uses standard SQL keyword on Postgres", () => {
+    const node = users.get("a").isDistinctFrom(users.get("b"));
+    expect(compile(node)).toBe('"users"."a" IS DISTINCT FROM "users"."b"');
   });
 });

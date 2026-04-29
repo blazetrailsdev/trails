@@ -1128,7 +1128,7 @@ export class ToSql implements NodeVisitor<SQLString> {
 
   // -- Advanced grouping --
 
-  private visitCube(node: Nodes.Cube): SQLString {
+  protected visitCube(node: Nodes.Cube): SQLString {
     this.collector.append("CUBE(");
     const exprs = node.expressions;
     for (let i = 0; i < exprs.length; i++) {
@@ -1139,7 +1139,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitRollup(node: Nodes.Rollup): SQLString {
+  protected visitRollup(node: Nodes.Rollup): SQLString {
     this.collector.append("ROLLUP(");
     const exprs = node.expressions;
     for (let i = 0; i < exprs.length; i++) {
@@ -1150,7 +1150,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitGroupingElement(node: Nodes.GroupingElement): SQLString {
+  protected visitGroupingElement(node: Nodes.GroupingElement): SQLString {
     this.collector.append("(");
     const exprs = node.expressions;
     for (let i = 0; i < exprs.length; i++) {
@@ -1161,7 +1161,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitGroupingSet(node: Nodes.GroupingSet): SQLString {
+  protected visitGroupingSet(node: Nodes.GroupingSet): SQLString {
     this.collector.append("GROUPING SETS(");
     const exprs = node.expressions;
     for (let i = 0; i < exprs.length; i++) {
@@ -1180,7 +1180,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitLateral(node: Nodes.Lateral): SQLString {
+  protected visitLateral(node: Nodes.Lateral): SQLString {
     this.collector.append("LATERAL (");
     this.visit(node.subquery);
     this.collector.append(")");
