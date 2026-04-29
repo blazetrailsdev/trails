@@ -248,23 +248,23 @@ export class TimeWithZone {
   // Conversions
   // ---------------------------------------------------------------------------
 
-  /** Returns the UTC time as a Date */
-  utc(): Date {
-    return new Date(this._utc.getTime());
+  /** Returns the UTC instant. */
+  utc(): Temporal.Instant {
+    return this._zoned.toInstant();
   }
 
   /** Alias for utc() */
-  getutc(): Date {
+  getutc(): Temporal.Instant {
     return this.utc();
   }
 
   /** Alias for utc() */
-  getgm(): Date {
+  getgm(): Temporal.Instant {
     return this.utc();
   }
 
   /** Alias for utc() */
-  gmtime(): Date {
+  gmtime(): Temporal.Instant {
     return this.utc();
   }
 
@@ -291,8 +291,8 @@ export class TimeWithZone {
     return new Date(l.year, l.month - 1, l.day);
   }
 
-  /** Returns the UTC Date */
-  toTime(): Date {
+  /** Returns the UTC instant. */
+  toTime(): Temporal.Instant {
     return this.utc();
   }
 
@@ -547,16 +547,20 @@ export class TimeWithZone {
   }
 
   /**
-   * Subtract seconds, Duration, or another TimeWithZone/Date (returns seconds difference).
+   * Subtract seconds, Duration, or another TimeWithZone/Date/Temporal.Instant
+   * (returns seconds difference).
    */
   minus(interval: number | Duration): TimeWithZone;
-  minus(other: TimeWithZone | Date): number;
-  minus(arg: number | Duration | TimeWithZone | Date): TimeWithZone | number {
+  minus(other: TimeWithZone | Date | Temporal.Instant): number;
+  minus(arg: number | Duration | TimeWithZone | Date | Temporal.Instant): TimeWithZone | number {
     if (arg instanceof TimeWithZone) {
       return (this._utc.getTime() - arg._utc.getTime()) / 1000;
     }
     if (arg instanceof Date) {
       return (this._utc.getTime() - arg.getTime()) / 1000;
+    }
+    if (arg instanceof Temporal.Instant) {
+      return (this._utc.getTime() - arg.epochMilliseconds) / 1000;
     }
     if (arg instanceof Duration) {
       return this.plus(arg.negate());
@@ -674,10 +678,15 @@ export class TimeWithZone {
   // ---------------------------------------------------------------------------
 
   /**
-   * Compare to another TimeWithZone or Date. Returns -1, 0, or 1.
+   * Compare to another TimeWithZone, Date, or Temporal.Instant. Returns -1, 0, or 1.
    */
-  compareTo(other: TimeWithZone | Date): number {
-    const otherMs = other instanceof TimeWithZone ? other._utc.getTime() : other.getTime();
+  compareTo(other: TimeWithZone | Date | Temporal.Instant): number {
+    const otherMs =
+      other instanceof TimeWithZone
+        ? other._utc.getTime()
+        : other instanceof Temporal.Instant
+          ? other.epochMilliseconds
+          : other.getTime();
     const thisMs = this._utc.getTime();
     if (thisMs < otherMs) return -1;
     if (thisMs > otherMs) return 1;
@@ -688,13 +697,13 @@ export class TimeWithZone {
    * Equality — two TimeWithZone instances are equal if they represent the same
    * moment in time, regardless of timezone.
    */
-  equals(other: TimeWithZone | Date): boolean {
+  equals(other: TimeWithZone | Date | Temporal.Instant): boolean {
     return this.compareTo(other) === 0;
   }
 
   /**
    * Equality based on UTC instant. Two times representing the same moment
-   * are eql regardless of timezone. Also accepts Date.
+   * are eql regardless of timezone. Also accepts Date or Temporal.Instant.
    */
   eql(other: unknown): boolean {
     if (other instanceof TimeWithZone) {
@@ -703,13 +712,19 @@ export class TimeWithZone {
     if (other instanceof Date) {
       return this._utc.getTime() === other.getTime();
     }
+    if (other instanceof Temporal.Instant) {
+      return this._utc.getTime() === other.epochMilliseconds;
+    }
     return false;
   }
 
   /**
    * Check if time falls between min and max (inclusive).
    */
-  between(min: TimeWithZone | Date, max: TimeWithZone | Date): boolean {
+  between(
+    min: TimeWithZone | Date | Temporal.Instant,
+    max: TimeWithZone | Date | Temporal.Instant,
+  ): boolean {
     return this.compareTo(min) >= 0 && this.compareTo(max) <= 0;
   }
 
@@ -747,12 +762,12 @@ export class TimeWithZone {
   }
 
   /** Returns true if this time is before the given time */
-  isBefore(other: TimeWithZone | Date): boolean {
+  isBefore(other: TimeWithZone | Date | Temporal.Instant): boolean {
     return this.compareTo(other) < 0;
   }
 
   /** Returns true if this time is after the given time */
-  isAfter(other: TimeWithZone | Date): boolean {
+  isAfter(other: TimeWithZone | Date | Temporal.Instant): boolean {
     return this.compareTo(other) > 0;
   }
 

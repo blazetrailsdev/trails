@@ -4,6 +4,7 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { travelTo } from "../testing-helpers.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
+import { Temporal } from "../temporal.js";
 import {
   getZone,
   setZone,
@@ -34,8 +35,8 @@ describe("TimeWithZoneTest", () => {
 
   it("utc", () => {
     const twz = maketwz();
-    expect(twz.utc().getTime()).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
-    expect(twz.utc()).toBeInstanceOf(Date);
+    expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
+    expect(twz.utc()).toBeInstanceOf(Temporal.Instant);
   });
 
   it("time", () => {
@@ -53,7 +54,7 @@ describe("TimeWithZoneTest", () => {
       const twz = maketwz();
       const result = twz.inTimeZone();
       expect(result.timeZone.name).toBe("Alaska");
-      expect(result.utc().getTime()).toBe(twz.utc().getTime());
+      expect(result.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
     });
   });
 
@@ -62,7 +63,7 @@ describe("TimeWithZoneTest", () => {
     const alaska = TimeZone.find("Alaska");
     const result = twz.inTimeZone("Alaska");
     expect(result.timeZone.name).toBe(alaska.name);
-    expect(result.utc().getTime()).toBe(twz.utc().getTime());
+    expect(result.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
   });
 
   it("in time zone with new zone equal to old zone does not create new object", () => {
@@ -79,7 +80,7 @@ describe("TimeWithZoneTest", () => {
     // 2014-10-26 01:00:00 Moscow time was ambiguous due to DST change
     const moscow = TimeZone.find("Moscow");
     const twz = moscow.local(2014, 10, 26, 1, 0, 0);
-    expect(twz.utc().getTime()).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
+    expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 
   it("localtime", () => {
@@ -588,7 +589,7 @@ describe("TimeWithZoneTest", () => {
 
   it("local to utc conversion with far future datetime", () => {
     const twz = eastern.local(2049, 12, 31, 19, 0, 0);
-    const utcMs = twz.utc().getTime();
+    const utcMs = twz.utc().epochMilliseconds;
     expect(utcMs).toBe(Date.UTC(2050, 0, 1, 0, 0, 0));
   });
 
@@ -863,32 +864,32 @@ describe("TimeWithZoneTest", () => {
   it("to time with preserve timezone using zone", () => {
     const twz = maketwz();
     const time = twz.utc();
-    expect(time).toBeInstanceOf(Date);
-    expect(time.getTime()).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
+    expect(time).toBeInstanceOf(Temporal.Instant);
+    expect(time.epochMilliseconds).toBe(Date.UTC(2000, 0, 1, 0, 0, 0));
   });
 
   it("to time with preserve timezone using offset", () => {
     const twz = maketwz();
     const time = twz.utc();
-    expect(time.getTime()).toBe(twz.getTime());
+    expect(time.epochMilliseconds).toBe(twz.getTime());
   });
 
   it("to time with preserve timezone using true", () => {
     const twz = maketwz();
     const time = twz.utc();
-    expect(time.getTime()).toBe(Date.UTC(2000, 0, 1));
+    expect(time.epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
   });
 
   it("to time without preserve timezone", () => {
     const twz = maketwz();
     const time = twz.utc();
-    expect(time).toBeInstanceOf(Date);
+    expect(time).toBeInstanceOf(Temporal.Instant);
   });
 
   it("to time without preserve timezone configured", () => {
     const twz = maketwz();
     const time = twz.utc();
-    expect(time.getTime()).toBe(Date.UTC(2000, 0, 1));
+    expect(time.epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
   });
 
   it("method missing with time return value", () => {
@@ -903,7 +904,7 @@ describe("TimeWithZoneTest", () => {
   it("marshal dump and load", () => {
     const twz = maketwz();
     const json = JSON.stringify({
-      utc: twz.utc().toISOString(),
+      utc: twz.utc().toString(),
       timeZone: twz.timeZone.name,
     });
     const parsed = JSON.parse(json);
@@ -911,7 +912,7 @@ describe("TimeWithZoneTest", () => {
       instantFromDate(new Date(parsed.utc)),
       TimeZone.find(parsed.timeZone),
     );
-    expect(restored.utc().getTime()).toBe(twz.utc().getTime());
+    expect(restored.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
     expect(restored.timeZone.name).toBe(twz.timeZone.name);
     expect(restored.inspect()).toBe(twz.inspect());
   });
@@ -919,7 +920,7 @@ describe("TimeWithZoneTest", () => {
   it("marshal dump and load with tzinfo identifier", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0))), eastern);
     const json = JSON.stringify({
-      utc: twz.utc().toISOString(),
+      utc: twz.utc().toString(),
       timeZone: twz.timeZone.tzinfo,
     });
     const parsed = JSON.parse(json);
@@ -927,7 +928,7 @@ describe("TimeWithZoneTest", () => {
       instantFromDate(new Date(parsed.utc)),
       TimeZone.find(parsed.timeZone),
     );
-    expect(restored.utc().getTime()).toBe(twz.utc().getTime());
+    expect(restored.utc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
     expect(restored.inspect()).toBe(twz.inspect());
   });
 
@@ -1001,7 +1002,7 @@ describe("TimeWithZoneTest", () => {
 
   it("instance created with local time returns correct utc time", () => {
     const twz = eastern.local(1999, 12, 31, 19);
-    expect(twz.utc().getTime()).toBe(Date.UTC(2000, 0, 1));
+    expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
   });
 
   it("instance created with local time enforces spring dst rules", () => {
@@ -1307,7 +1308,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
       instantFromDate(time),
       TimeZone.find("Eastern Time (US & Canada)"),
     );
-    expect(twz.utc().getTime()).toBe(time.getTime());
+    expect(twz.utc().epochMilliseconds).toBe(time.getTime());
     // Original Date should not be modified
     expect(time.getTime()).toBe(Date.UTC(2000, 6, 1));
   });
@@ -1389,6 +1390,6 @@ describe("TimeWithZoneMethodsForString", () => {
     const moscow = TimeZone.find("Moscow");
     const twz = moscow.local(2014, 10, 26, 1, 0, 0);
     // Should resolve to the UTC equivalent
-    expect(twz.utc().getTime()).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
+    expect(twz.utc().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 });

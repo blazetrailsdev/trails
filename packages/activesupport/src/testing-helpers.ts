@@ -4,16 +4,18 @@
  */
 
 import { setFrozenTime, setTimeOffset, currentTime as _currentTime } from "./time-travel.js";
+import { Temporal } from "./temporal.js";
 
 // ── Time Travel ───────────────────────────────────────────────────────────────
 
 /**
- * travelTo — sets the current time to the given Date.
+ * travelTo — sets the current time to the given Date or Temporal.Instant.
  * Use travelBack() to restore.
  */
-export function travelTo(time: Date, fn?: () => void): void {
-  setFrozenTime(new Date(time));
-  setTimeOffset(time.getTime() - Date.now());
+export function travelTo(time: Date | Temporal.Instant, fn?: () => void): void {
+  const ms = time instanceof Date ? time.getTime() : time.epochMilliseconds;
+  setFrozenTime(new Date(ms));
+  setTimeOffset(ms - Date.now());
   if (fn) {
     try {
       fn();

@@ -3,6 +3,7 @@ import { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { instantFromDate } from "./testing/temporal-helpers.js";
+import { Temporal } from "./temporal.js";
 
 describe("TimeWithZoneTest", () => {
   let eastern: TimeZone;
@@ -120,16 +121,17 @@ describe("TimeWithZoneTest", () => {
   it("utc() returns a Date in UTC", () => {
     const twz = eastern.local(2024, 1, 15, 10, 30, 0);
     const utc = twz.utc();
-    expect(utc).toBeInstanceOf(Date);
-    expect(utc.getUTCHours()).toBe(15); // 10 EST + 5 = 15 UTC
-    expect(utc.getUTCMinutes()).toBe(30);
+    expect(utc).toBeInstanceOf(Temporal.Instant);
+    const z = utc.toZonedDateTimeISO("UTC");
+    expect(z.hour).toBe(15); // 10 EST + 5 = 15 UTC
+    expect(z.minute).toBe(30);
   });
 
   it("getutc() and getgm() are aliases", () => {
     const twz = eastern.local(2024, 1, 15, 10, 0, 0);
-    expect(twz.getutc().getTime()).toBe(twz.utc().getTime());
-    expect(twz.getgm().getTime()).toBe(twz.utc().getTime());
-    expect(twz.gmtime().getTime()).toBe(twz.utc().getTime());
+    expect(twz.getutc().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
+    expect(twz.getgm().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
+    expect(twz.gmtime().epochMilliseconds).toBe(twz.utc().epochMilliseconds);
   });
 
   it("toI() returns unix timestamp", () => {
@@ -163,7 +165,7 @@ describe("TimeWithZoneTest", () => {
 
     // Same moment, different local time
     expect(pstTime.hour).toBe(9); // 12 EST = 9 PST
-    expect(pstTime.utc().getTime()).toBe(estTime.utc().getTime());
+    expect(pstTime.utc().epochMilliseconds).toBe(estTime.utc().epochMilliseconds);
   });
 
   it("inTimeZone() accepts a TimeZone object", () => {
@@ -600,10 +602,10 @@ describe("TimeWithZoneTest", () => {
   it("handles year boundary crossing", () => {
     // Dec 31 23:00 EST = Jan 1 04:00 UTC
     const twz = eastern.local(2024, 12, 31, 23, 0, 0);
-    const utc = twz.utc();
-    expect(utc.getUTCFullYear()).toBe(2025);
-    expect(utc.getUTCMonth()).toBe(0);
-    expect(utc.getUTCDate()).toBe(1);
+    const z = twz.utc().toZonedDateTimeISO("UTC");
+    expect(z.year).toBe(2025);
+    expect(z.month).toBe(1);
+    expect(z.day).toBe(1);
   });
 
   it("handles leap year February 29", () => {
@@ -824,8 +826,7 @@ describe("TimeWithZoneTest", () => {
     expect(twz.dst()).toBe(false); // Hawaii doesn't observe DST
 
     // UTC should be 10 hours ahead
-    const utc = twz.utc();
-    expect(utc.getUTCHours()).toBe(10);
+    expect(twz.utc().toZonedDateTimeISO("UTC").hour).toBe(10);
   });
 
   it("Alaska timezone basic operations", () => {
@@ -846,10 +847,10 @@ describe("TimeWithZoneTest", () => {
     const back_to_eastern = hawaii_twz.inTimeZone(eastern);
 
     // All should represent the same UTC instant
-    expect(eastern_twz.utc().getTime()).toBe(utcTime.getTime());
-    expect(pacific_twz.utc().getTime()).toBe(utcTime.getTime());
-    expect(hawaii_twz.utc().getTime()).toBe(utcTime.getTime());
-    expect(back_to_eastern.utc().getTime()).toBe(utcTime.getTime());
+    expect(eastern_twz.utc().epochMilliseconds).toBe(utcTime.getTime());
+    expect(pacific_twz.utc().epochMilliseconds).toBe(utcTime.getTime());
+    expect(hawaii_twz.utc().epochMilliseconds).toBe(utcTime.getTime());
+    expect(back_to_eastern.utc().epochMilliseconds).toBe(utcTime.getTime());
 
     // Local hours should differ
     expect(eastern_twz.hour).toBe(8); // EDT
