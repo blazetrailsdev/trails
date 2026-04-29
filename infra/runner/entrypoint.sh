@@ -66,6 +66,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Clear stale config from a prior unclean exit (host reboot, OOM, SIGKILL).
+# Without this, a leftover `.runner` from the previous boot makes config.sh
+# refuse with "Cannot configure the runner because it is already configured"
+# and the container crash-loops forever (exit 1 → restart → same error).
+# The orphan GitHub-side record (if any) is reaped by the EXIT trap's
+# cleanup-by-name lookup, or by the next ephemeral cycle that reuses the host.
+if [ -f .runner ]; then
+  echo "→ Removing stale .runner from prior unclean exit"
+  rm -f .runner .credentials .credentials_rsaparams .path .env
+fi
+
 echo "→ Registering runner: name=$RUNNER_NAME labels=$RUNNER_LABELS"
 ./config.sh \
   --url "https://github.com/$GH_REPO" \
