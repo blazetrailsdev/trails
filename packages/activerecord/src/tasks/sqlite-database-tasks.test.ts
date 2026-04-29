@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import * as activesupport from "@blazetrails/activesupport";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -141,5 +142,72 @@ describe("SQLiteDatabaseTasks", () => {
     } finally {
       await (loadedAdapter as unknown as { close(): Promise<void> }).close();
     }
+  });
+});
+
+describe("SQLiteDatabaseTasks in-memory URI variants", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const assertNoFsWrites = () => {
+    const fsObj = activesupport.getFs();
+    const mkdirSpy = vi.spyOn(fsObj, "mkdirSync").mockImplementation(() => undefined);
+    const writeSpy = vi.spyOn(fsObj, "writeFileSync").mockImplementation(() => undefined as any);
+    const unlinkSpy = vi.spyOn(fsObj, "unlinkSync").mockImplementation(() => undefined);
+    return { mkdirSpy, writeSpy, unlinkSpy };
+  };
+
+  it("test_db_create_is_noop_for_file_memory_uri", async () => {
+    const { mkdirSpy, writeSpy } = assertNoFsWrites();
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "file::memory:?cache=shared",
+    });
+    await expect(new SQLiteDatabaseTasks(config).create()).resolves.toBeUndefined();
+    expect(mkdirSpy).not.toHaveBeenCalled();
+    expect(writeSpy).not.toHaveBeenCalled();
+  });
+
+  it("test_db_drop_is_noop_for_file_memory_uri", async () => {
+    const { unlinkSpy } = assertNoFsWrites();
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "file::memory:?cache=shared",
+    });
+    await expect(new SQLiteDatabaseTasks(config).drop()).resolves.toBeUndefined();
+    expect(unlinkSpy).not.toHaveBeenCalled();
+  });
+
+  it("test_db_create_is_noop_for_canonical_memory", async () => {
+    const { mkdirSpy, writeSpy } = assertNoFsWrites();
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: ":memory:",
+    });
+    await expect(new SQLiteDatabaseTasks(config).create()).resolves.toBeUndefined();
+    expect(mkdirSpy).not.toHaveBeenCalled();
+    expect(writeSpy).not.toHaveBeenCalled();
+  });
+
+  it("test_db_create_is_noop_for_named_file_memory_uri", async () => {
+    const { mkdirSpy, writeSpy } = assertNoFsWrites();
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "file:memdb1?mode=memory&cache=shared",
+    });
+    await expect(new SQLiteDatabaseTasks(config).create()).resolves.toBeUndefined();
+    expect(mkdirSpy).not.toHaveBeenCalled();
+    expect(writeSpy).not.toHaveBeenCalled();
+  });
+
+  it("test_db_drop_is_noop_for_named_file_memory_uri", async () => {
+    const { unlinkSpy } = assertNoFsWrites();
+    const config = new HashConfig("development", "primary", {
+      adapter: "sqlite3",
+      database: "file:memdb1?mode=memory&cache=shared",
+    });
+    await expect(new SQLiteDatabaseTasks(config).drop()).resolves.toBeUndefined();
+    expect(unlinkSpy).not.toHaveBeenCalled();
   });
 });

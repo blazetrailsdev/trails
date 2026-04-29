@@ -15,6 +15,25 @@ import type { DatabaseConfig } from "../database-configurations/database-config.
 import { DatabaseTasks } from "./database-tasks.js";
 import { NoDatabaseError, DatabaseAlreadyExists, NotImplementedError } from "../errors.js";
 
+/**
+ * True for SQLite in-memory database names per the SQLite URI spec
+ * (https://www.sqlite.org/inmemorydb.html): `:memory:`, `file::memory:?...`,
+ * and named in-memory URIs whose query string contains a real `mode=memory`
+ * parameter (e.g. `file:memdb1?mode=memory&cache=shared`).
+ *
+ * Uses `URLSearchParams` rather than substring matching so paths that happen
+ * to contain the text `mode=memory` are not misclassified. `SQLite3Adapter`
+ * currently uses a broader substring check — aligning it is a follow-up.
+ */
+function isInMemoryDatabase(name: string): boolean {
+  if (name === ":memory:") return true;
+  if (!name.startsWith("file:")) return false;
+  if (name.startsWith("file::memory:")) return true;
+  const q = name.indexOf("?");
+  if (q === -1) return false;
+  return new URLSearchParams(name.slice(q + 1)).get("mode") === "memory";
+}
+
 export class SQLiteDatabaseTasks {
   private readonly dbConfig: DatabaseConfig;
   private readonly root: string;
@@ -32,10 +51,11 @@ export class SQLiteDatabaseTasks {
     const fs = getFs();
     const path = getPath();
     const dbPath = this.resolveDbPath();
-    if (dbPath !== ":memory:" && fs.existsSync(dbPath)) {
+    const inMemory = isInMemoryDatabase(dbPath);
+    if (!inMemory && fs.existsSync(dbPath)) {
       throw new DatabaseAlreadyExists(`Database '${dbPath}' already exists`);
     }
-    if (dbPath !== ":memory:") {
+    if (!inMemory) {
       fs.mkdirSync(path.dirname(dbPath), { recursive: true });
       fs.writeFileSync(dbPath, "");
     }
@@ -44,7 +64,7 @@ export class SQLiteDatabaseTasks {
   async drop(): Promise<void> {
     const fs = getFs();
     const dbPath = this.resolveDbPath();
-    if (dbPath === ":memory:") return;
+    if (isInMemoryDatabase(dbPath)) return;
     try {
       fs.unlinkSync(dbPath);
     } catch (error: unknown) {
@@ -265,7 +285,7 @@ export class SQLiteDatabaseTasks {
     // Per PathAdapter contract, a missing isAbsolute means the adapter
     // doesn't model relative/absolute distinctions (e.g. a VFS) — treat
     // every path as already absolute.
-    if (database === ":memory:") return database;
+    if (isInMemoryDatabase(database)) return database;
     if (!path.isAbsolute || path.isAbsolute(database)) return database;
     return path.join(this.root, database);
   }
