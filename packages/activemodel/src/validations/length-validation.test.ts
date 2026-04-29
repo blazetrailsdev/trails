@@ -487,4 +487,37 @@ describe("LengthValidationTest", () => {
     expect(new Person({ title: "12345" }).isValid()).toBe(true);
     expect(new Person({ title: "1234" }).isValid()).toBe(false);
   });
+
+  it("validates length of with proc", () => {
+    // Rails length.rb:55 — `check_value = resolve_value(record, check_value)`.
+    // A Proc receives the record and returns the limit per-instance.
+    class Person extends Model {
+      static {
+        this.attribute("title", "string");
+        this.attribute("limit", "integer");
+        this.validates("title", {
+          length: { maximum: (r: Person) => r.readAttribute("limit") as number },
+        });
+      }
+    }
+    expect(new Person({ title: "abc", limit: 5 }).isValid()).toBe(true);
+    expect(new Person({ title: "abcdef", limit: 5 }).isValid()).toBe(false);
+  });
+
+  it("validates length of with symbol method name", () => {
+    // Rails: a Symbol resolves via record.send(:method_name). In TS a
+    // string option that names a method on the record is resolved the
+    // same way (resolve-value.ts).
+    class Person extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { length: { minimum: "minLength" } });
+      }
+      minLength(): number {
+        return 3;
+      }
+    }
+    expect(new Person({ title: "abc" }).isValid()).toBe(true);
+    expect(new Person({ title: "ab" }).isValid()).toBe(false);
+  });
 });
