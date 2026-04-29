@@ -28,6 +28,7 @@ const CGI_VARIABLES = new Set([
   "SERVER_SOFTWARE",
 ]);
 
+/** @internal */
 function envName(key: string): string {
   const str = String(key);
   if (str.includes(".")) return str;

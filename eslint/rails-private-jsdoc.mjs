@@ -204,6 +204,21 @@ const rule = {
         if (node.accessibility === "private" || node.accessibility === "protected") return;
         check(context, node, node.key.name);
       },
+      // Interface members. TypeDoc documents these independently from
+      // the concrete class implementation, so they need their own
+      // `@internal` tag. Deliberately not matching TSTypeLiteral —
+      // those appear in parameter type positions (e.g.
+      // `fn(opts: { actionPath?: string })`) where the property
+      // signatures aren't documented surface, and tagging them would
+      // splice JSDoc into the middle of a function signature.
+      "TSInterfaceBody > TSMethodSignature"(node) {
+        if (node.key?.type !== "Identifier") return;
+        check(context, node, node.key.name);
+      },
+      "TSInterfaceBody > TSPropertySignature"(node) {
+        if (node.key?.type !== "Identifier") return;
+        check(context, node, node.key.name);
+      },
     };
   },
 };

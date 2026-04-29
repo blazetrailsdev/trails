@@ -82,6 +82,7 @@ function levenshteinDistance(a: string, b: string): number {
   return dp[m][n];
 }
 
+/** @internal */
 function isPermittedScalar(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   const t = typeof value;
@@ -123,6 +124,7 @@ export class Parameters {
 
   // --- Permit / require ---
 
+  /** @internal */
   get permitted(): boolean {
     return this._permitted;
   }

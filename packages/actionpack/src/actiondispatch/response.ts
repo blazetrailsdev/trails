@@ -129,6 +129,7 @@ export class Response {
 
   // --- Cookies ---
 
+  /** @internal */
   setCookie(name: string, value: string | CookieOptions): void {
     if (typeof value === "string") {
       this._cookies.set(name, { value });

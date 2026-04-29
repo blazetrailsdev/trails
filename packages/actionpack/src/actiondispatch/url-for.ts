@@ -85,6 +85,7 @@ export function urlFor(options: UrlOptions = {}): string {
   return `${protocol}://${userInfo}${hostStr}${portStr}${scriptName}${path}`;
 }
 
+/** @internal */
 function normalizeProtocol(proto: string): string {
   return proto.replace(/:\/\/$/, "").replace(/:$/, "");
 }

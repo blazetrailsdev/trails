@@ -63,6 +63,8 @@ export class LookupContext {
 
   /**
    * Find a template across all resolvers.
+   *
+   * @internal
    */
   findTemplate(name: string, prefix: string, format: string): Template | null {
     const extensions = TemplateHandlerRegistry.extensions;
@@ -84,6 +86,8 @@ export class LookupContext {
 
   /**
    * Find a layout template.
+   *
+   * @internal
    */
   findLayout(name: string, format: string): Template | null {
     const extensions = TemplateHandlerRegistry.extensions;

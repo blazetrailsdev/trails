@@ -105,6 +105,7 @@ const METHOD_TO_TAG_NAME: Record<string, string> = {
   animate_transform: "animateTransform",
 };
 
+/** @internal */
 function ensureValidHtml5TagName(name: string): void {
   if (!/^[a-zA-Z][a-zA-Z0-9\-:.]*$/.test(name)) {
     throw new ArgumentError(`Invalid HTML5 tag name: ${JSON.stringify(name)}`);
@@ -124,6 +125,8 @@ function dasherize(str: string): string {
 
 /**
  * buildTagValues — constructs a flat array of CSS class values from mixed inputs.
+ *
+ * @internal
  */
 export function buildTagValues(...args: unknown[]): string[] {
   const tagValues: string[] = [];
@@ -236,6 +239,7 @@ function tagOption(key: string, value: unknown, escape: boolean): string {
   return `${key}="${strValue}"`;
 }
 
+/** @internal */
 function prefixTagOption(prefix: string, key: string, value: unknown, escape: boolean): string {
   const dasherizedKey = `${prefix}-${dasherize(String(key))}`;
   if (typeof value === "string" || value instanceof SafeBuffer || typeof value === "symbol") {

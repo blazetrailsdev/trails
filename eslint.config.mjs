@@ -106,6 +106,8 @@ export default defineConfig(
       "packages/arel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
+      "packages/actionpack/src/**/*.ts",
+      "packages/actionview/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {

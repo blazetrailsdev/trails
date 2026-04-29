@@ -3,8 +3,10 @@
  */
 
 export class MimeType {
+  /** @internal */
   readonly string: string;
   readonly symbol: string;
+  /** @internal */
   readonly synonyms: string[];
 
   private static registry: Map<string, MimeType> = new Map();

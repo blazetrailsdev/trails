@@ -139,6 +139,8 @@ export function clearEtaggers(): void {
  * via `this` and dispatching with `etagger.call(this, options)`. Callers
  * (e.g. `freshWhen`) bind `this` to the controller; tests bind to a stub or
  * leave it `undefined`.
+ *
+ * @internal
  */
 export function combineEtags(
   this: unknown,

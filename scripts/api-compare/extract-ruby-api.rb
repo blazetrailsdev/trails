@@ -156,6 +156,18 @@ class ApiExtractor
 
     rel_path = Pathname.new(filepath).relative_path_from(Pathname.new(package_root)).to_s
 
+    # `# :doc:` is Rails' RDoc directive that documents an otherwise-private
+    # method as public API (e.g. controller hooks like `cookies`,
+    # `verify_authenticity_token`). Collect the names so process_def can
+    # override Ruby visibility — without this, RDoc-public-but-Ruby-private
+    # methods land in the privates manifest and falsely hide real public
+    # surface from website docs / api:compare.
+    @current_doc_methods = Set.new
+    source.each_line do |line|
+      next unless line =~ /^\s*def\s+(?:self\.)?([\w_!?=]+).*#\s*:doc:/
+      @current_doc_methods << $1
+    end
+
     @current_file = rel_path
     walk(sexp)
 
@@ -314,6 +326,7 @@ class ApiExtractor
 
     params = extract_params(find_params(node))
     vis = current_visibility
+    vis = :public if @current_doc_methods&.include?(name)
 
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
@@ -352,6 +365,7 @@ class ApiExtractor
 
     params = extract_params(find_params_defs(node))
     vis = current_visibility
+    vis = :public if @current_doc_methods&.include?(name)
 
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]

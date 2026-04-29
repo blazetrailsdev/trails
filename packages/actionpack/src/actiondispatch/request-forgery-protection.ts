@@ -253,7 +253,12 @@ export class RequestForgeryProtection {
     return this.paramName;
   }
 
-  /** Get the header name for the CSRF token. */
+  /**
+   * Get the header name for the CSRF token. Public CSRF accessor — distinct
+   * from `ActionDispatch::ContentSecurityPolicy::Middleware#header_name`
+   * (the package-global heuristic conflates them).
+   */
+  // eslint-disable-next-line blazetrails/rails-private-jsdoc
   get headerName(): string {
     return CSRF_TOKEN_HEADER;
   }

@@ -10,6 +10,7 @@ export interface RedirectResult {
   body: string;
 }
 
+/** @internal */
 export function redirectTo(
   url: string | URL | null | undefined,
   options: { status?: number } = {},

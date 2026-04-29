@@ -40,6 +40,8 @@ export interface TemplateResolver {
   /**
    * Find a layout template.
    * Default implementation delegates to find() with "layouts" prefix.
+   *
+   * @internal
    */
   findLayout?(name: string, format: string, extensions: string[]): Template | null;
 }
@@ -95,6 +97,7 @@ export class FileSystemResolver implements TemplateResolver {
     return null;
   }
 
+  /** @internal */
   findLayout(name: string, format: string, extensions: string[]): Template | null {
     const template = this.find(name, "layouts", format, extensions);
     if (template) {
@@ -193,6 +196,7 @@ export class InMemoryResolver implements TemplateResolver {
     return null;
   }
 
+  /** @internal */
   findLayout(name: string, format: string, extensions: string[]): Template | null {
     const template = this.find(name, "layouts", format, extensions);
     if (template) {

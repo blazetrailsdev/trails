@@ -31,6 +31,7 @@ import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
  * role Rails' private `quoted_node` method plays inside Predications.
  */
 export interface PredicationHost {
+  /** @internal */
   quotedNode(other: unknown): Node;
 }
 

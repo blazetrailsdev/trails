@@ -73,6 +73,7 @@ export abstract class Node {
  * Visitor interface for the Node hierarchy.
  */
 export interface NodeVisitor<T> {
+  /** @internal */
   visit(node: Node): T;
 }
 
