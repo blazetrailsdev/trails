@@ -3,6 +3,9 @@
  *
  * Provides fresh_when, stale?, expires_in, expires_now, http_cache_forever, no_store.
  * @see https://api.rubyonrails.org/classes/ActionController/ConditionalGet.html
+ *
+ * @boundary-file: parses RFC 7231 `If-Modified-Since` / `Last-Modified` header
+ *   strings via JS `Date.parse` semantics for the freshness comparison.
  */
 
 import { getCrypto } from "@blazetrails/activesupport";

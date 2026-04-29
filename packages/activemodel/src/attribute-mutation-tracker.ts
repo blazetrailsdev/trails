@@ -4,7 +4,8 @@ import { AttributeSet } from "./attribute-set.js";
 /** @internal */
 function cloneValue(value: unknown): unknown {
   if (value === null || typeof value !== "object") return value;
-  // Date is mutable — clone it to protect dirty tracking during the dual-typed window.
+  // boundary: Date is mutable — clone to protect dirty tracking when a legacy
+  // caller hands in a Date attribute value. Temporal types are immutable.
   if (value instanceof Date) return new Date(value.getTime());
   // Temporal types are immutable — no clone needed
   if (

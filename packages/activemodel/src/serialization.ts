@@ -188,10 +188,10 @@ function _coerceForJson(
   // its description would misrepresent its role. Leave symbols alone;
   // `JSON.stringify` already drops them per spec, which correctly
   // signals "this doesn't serialize".
+  // boundary: defensive ISO 8601 emission for any Date attribute value supplied
+  // by a custom (non-Temporal-cast) type. Invalid Dates coerce to null like
+  // Date#toJSON does, keeping asJson safe for downstream JSON.stringify.
   if (value instanceof Date) {
-    // Preserve stable ISO 8601 output for any Date values still in flight
-    // during the dual-typed window (removed in PR 6). Invalid Dates must
-    // coerce like Date#toJSON (returns null) so asJson stays JSON.stringify-safe.
     if (Number.isNaN(value.getTime())) return null;
     return value.toISOString();
   }

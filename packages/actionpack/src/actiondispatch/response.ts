@@ -141,6 +141,7 @@ export class Response {
   deleteCookie(name: string, options: Partial<CookieOptions> = {}): void {
     this._cookies.set(name, {
       value: "",
+      // boundary: epoch-zero Date is the standard delete-cookie sentinel.
       expires: new Date(0),
       ...options,
     });

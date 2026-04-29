@@ -413,8 +413,9 @@ export class Base extends Metal {
       this.setHeader("etag", etag);
     }
     if (options.lastModified) {
-      // Realm-safe Date check: instanceof breaks across realms (vm/iframe)
-      // for both Date and Temporal.Instant. Use the brand string instead.
+      // boundary: Realm-safe Date check (instanceof breaks across vm/iframe
+      // realms). Last-Modified is RFC 7231 — emit via Date#toUTCString,
+      // bridging a Temporal.Instant input through epoch ms.
       const isDate = Object.prototype.toString.call(options.lastModified) === "[object Date]";
       const lm = isDate
         ? (options.lastModified as Date)
@@ -579,6 +580,8 @@ export class Base extends Metal {
       return ifNoneMatch === etag;
     }
     if (ifModifiedSince && lastModified) {
+      // boundary: HTTP If-Modified-Since / Last-Modified are RFC 7231 date
+      // strings; parse via Date.parse semantics for comparison.
       return new Date(ifModifiedSince) >= new Date(lastModified);
     }
     return false;

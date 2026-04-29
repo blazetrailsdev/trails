@@ -10,6 +10,7 @@ export function quoteArrayLiteral(arr: unknown[]): string {
     if (Array.isArray(v)) return quoteArrayLiteral(v);
     if (typeof v === "number") return String(v);
     if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+    // boundary: defensive Date quoting for caller-supplied array literals.
     if (v instanceof Date) {
       return `"${v.toISOString()}"`;
     }

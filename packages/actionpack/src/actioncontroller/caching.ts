@@ -29,6 +29,7 @@ function stableStringify(obj: unknown): string {
     return json === undefined ? String(obj) : json;
   }
   if (Array.isArray(obj)) return `[${obj.map(stableStringify).join(",")}]`;
+  // boundary: stable cache-key stringification handles legacy Date values.
   if (obj instanceof Date) return JSON.stringify(obj.toISOString());
 
   const record = obj as Record<string, unknown>;

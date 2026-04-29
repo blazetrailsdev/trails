@@ -42,6 +42,7 @@ export class ComparisonValidator extends EachValidator {
       return Temporal.ZonedDateTime.compare(a, b);
     if (typeof a === "number" && typeof b === "number") return a - b;
     if (typeof a === "string" && typeof b === "string") return a < b ? -1 : a > b ? 1 : 0;
+    // boundary: comparison validator accepts Date pairs by Rails parity.
     if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
     // Match Rails ArgumentError format from value.public_send(op, other):
     //   "comparison of Integer with String failed"

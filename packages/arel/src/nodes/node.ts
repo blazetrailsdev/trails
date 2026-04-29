@@ -139,6 +139,7 @@ function stableSerialize(value: unknown, seen: WeakSet<object> = new WeakSet()):
   if (t === "symbol") return "symbol";
   if (t === "function") return "function";
 
+  // boundary: Arel inspect output recognizes legacy Date values.
   if (value instanceof Date) return `Date(${value.toISOString()})`;
 
   if (typeof value === "object") {

@@ -1828,6 +1828,8 @@ export class Model {
       } else if (
         typeof value === "object" &&
         !Array.isArray(value) &&
+        // boundary: exclude Date and Temporal types from the plain-object
+        // branch so they hit dedicated serialization arms below.
         !(value instanceof Date) &&
         !(value instanceof Temporal.Instant) &&
         !(value instanceof Temporal.PlainDateTime) &&
@@ -1836,8 +1838,8 @@ export class Model {
         !(value instanceof Temporal.ZonedDateTime)
       ) {
         xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ")}${indent}</${tag}>\n`;
+        // boundary: legacy Date values serialize as ISO 8601 dateTime XML.
       } else if (value instanceof Date) {
-        // Dual-typed window: Date values still serialize as ISO 8601 dateTime.
         xml += `${indent}<${tag} type="dateTime">${Number.isNaN(value.getTime()) ? "" : value.toISOString()}</${tag}>\n`;
       } else if (Array.isArray(value)) {
         xml += `${indent}<${tag} type="array">\n`;

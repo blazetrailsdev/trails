@@ -22,7 +22,8 @@ export class DateType extends ValueType<DateCastResult> {
     if (value instanceof Temporal.PlainDate) return value;
     // Accept PlainDateTime from multiparameter assignment — extract the date part.
     if (value instanceof Temporal.PlainDateTime) return value.toPlainDate();
-    // Dual-typed window: pg driver still returns Date until PR 5a.
+    // boundary: cast accepts Date input from legacy callers / custom types
+    // and bridges into Temporal.PlainDate via the UTC calendar components.
     if (value instanceof Date) {
       if (Number.isNaN(value.getTime())) return null;
       return Temporal.PlainDate.from({
