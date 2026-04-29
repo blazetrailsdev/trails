@@ -3384,3 +3384,134 @@ describe("quoteSqlValue", () => {
 // ==========================================================================
 // BasicsTest — targets base_test.rb (continued)
 // ==========================================================================
+
+describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => {
+  let adapter: ReturnType<typeof createTestAdapter>;
+  beforeEach(() => {
+    adapter = createTestAdapter();
+  });
+
+  function makeModel() {
+    class User extends Base {
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("role", "string");
+        this.attribute("status", "string");
+        this.adapter = adapter;
+      }
+    }
+    return User;
+  }
+
+  it("applies current-scope attributes to new instances", async () => {
+    const User = makeModel();
+    const rel = User.where({ role: "admin" });
+    await User.scoping(rel, async () => {
+      const u = new User({});
+      expect(u.readAttribute("role")).toBe("admin");
+    });
+  });
+
+  it("explicit constructor attrs take precedence over scope attrs", async () => {
+    const User = makeModel();
+    const rel = User.where({ role: "admin" });
+    await User.scoping(rel, async () => {
+      const u = new User({ role: "guest" });
+      expect(u.readAttribute("role")).toBe("guest");
+    });
+  });
+
+  it("scope attrs fill in keys not provided explicitly", async () => {
+    const User = makeModel();
+    const rel = User.where({ role: "admin", status: "active" });
+    await User.scoping(rel, async () => {
+      const u = new User({ role: "guest" }); // only role is explicit
+      expect(u.readAttribute("role")).toBe("guest"); // explicit wins
+      expect(u.readAttribute("status")).toBe("active"); // scope fills in
+    });
+  });
+
+  it("no scope → no change to constructor attrs", async () => {
+    const User = makeModel();
+    const u = new User({ role: "user" });
+    expect(u.readAttribute("role")).toBe("user");
+  });
+});
+
+describe("_applyScopeAttributes — multiparameter path", () => {
+  let adapter: ReturnType<typeof createTestAdapter>;
+  beforeEach(() => {
+    adapter = createTestAdapter();
+  });
+
+  it("scope attrs applied in multiparameter constructor path", async () => {
+    class Event extends Base {
+      static {
+        this._tableName = "events";
+        this.attribute("id", "integer");
+        this.attribute("role", "string");
+        this.attribute("starts_on", "date");
+        this.adapter = adapter;
+      }
+    }
+    const rel = Event.where({ role: "organizer" });
+    await Event.scoping(rel, async () => {
+      // Use multiparameter date keys — triggers the multiparameter constructor path
+      const e = new Event({ "starts_on(1i)": "2024", "starts_on(2i)": "6", "starts_on(3i)": "15" });
+      // Scope attr should be applied (role was not in the explicit multiparams)
+      expect(e.readAttribute("role")).toBe("organizer");
+    });
+  });
+
+  it("explicit multiparameter attrs take precedence over scope attrs with same key", async () => {
+    class Event extends Base {
+      static {
+        this._tableName = "events";
+        this.attribute("id", "integer");
+        this.attribute("role", "string");
+        this.attribute("starts_on", "date");
+        this.adapter = adapter;
+      }
+    }
+    const rel = Event.where({ role: "organizer" });
+    await Event.scoping(rel, async () => {
+      // role is provided explicitly (non-multiparameter key alongside multiparameter keys)
+      const e = new Event({
+        "starts_on(1i)": "2024",
+        "starts_on(2i)": "6",
+        "starts_on(3i)": "15",
+        role: "guest",
+      });
+      expect(e.readAttribute("role")).toBe("guest"); // explicit wins
+    });
+  });
+});
+
+describe("_applyScopeAttributes — STI type column wins over scope", () => {
+  let adapter: ReturnType<typeof createTestAdapter>;
+  beforeEach(() => {
+    adapter = createTestAdapter();
+  });
+
+  it("STI type column is not overwritten by a scope that sets type", async () => {
+    class Vehicle extends Base {
+      static {
+        this._tableName = "vehicles";
+        this.attribute("id", "integer");
+        this.attribute("type", "string");
+        this.adapter = adapter;
+      }
+    }
+    const { enableSti } = await import("./inheritance.js");
+    enableSti(Vehicle);
+    class Car extends Vehicle {}
+
+    // Scope includes type: "Vehicle" — but new Car() should still have type: "Car"
+    const rel = Vehicle.where({ type: "Vehicle" });
+    await Vehicle.scoping(rel, async () => {
+      const car = new Car({});
+      expect(car.readAttribute("type")).toBe("Car");
+    });
+  });
+});

@@ -147,7 +147,7 @@ import * as _EnumModule from "./enum.js";
 import * as _Reflection from "./reflection.js";
 import * as _AssocInstance from "./associations/instance-methods.js";
 import { argumentError } from "./relation/query-methods.js";
-import { ScopeRegistry } from "./scoping.js";
+import { ScopeRegistry, scopeAttributes } from "./scoping.js";
 import {
   transaction as _transaction,
   currentTransactionPublic as _currentTransactionPublic,
@@ -399,6 +399,36 @@ async function performClassUpdate(
  *
  * Mirrors: ActiveRecord::Base
  */
+
+/**
+ * Apply current-scope attributes to a new record instance, skipping any key
+ * that was already explicitly provided in `explicitAttrs`.
+ *
+ * Rails calls populate_with_current_scope_attributes BEFORE super (so explicit
+ * attrs overwrite scope attrs). In TS we call it after super, so we invert:
+ * only write scope attrs for keys NOT in the explicit set.
+ */
+function _applyScopeAttributes(
+  ctor: typeof Base,
+  record: InstanceType<typeof Base>,
+  explicitKeys: Set<string>,
+): void {
+  const scope = (ctor as any).currentScope;
+  if (!scope) return;
+  const attrs = scopeAttributes.call(ctor as any);
+  if (!attrs || Object.keys(attrs).length === 0) return;
+  const toApply: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (!explicitKeys.has(k)) {
+      toApply[k] = v;
+    }
+  }
+  if (Object.keys(toApply).length > 0) {
+    // assignAttributes is always mixed into Base instances; call directly.
+    (record as any).assignAttributes(toApply);
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   // --- Translation mixin (wired via extend() after class) ---
@@ -2146,12 +2176,18 @@ export class Base extends Model {
       // Re-snapshot so mp attrs are part of the initial clean state.
       (this as any)._dirty.snapshot((this as any)._attributes);
       if (!wasSuppressed) {
-        // Fire initialize_internals_callback after attribute assignment and
-        // before after_initialize. Scope attribute precedence is already handled
-        // by _mergeCurrentScopeAttrs in the class-level new/create methods, so
-        // only the inheritance callback (STI type column) is called here.
+        // Mirrors Rails' initialize_internals_callback chain order:
+        //   populate_with_current_scope_attributes (scoping) → ensure_proper_type (STI)
+        // Guard on currentScope before allocating the Set — the no-scope case is the hot path.
+        if ((ctor as any).currentScope) {
+          _applyScopeAttributes(
+            ctor,
+            this as any,
+            new Set([...Object.keys(multiparams), ...Object.keys(regular)]),
+          );
+        }
         inheritanceInitializeInternalsCallback.call(this as any);
-        // Re-snapshot so the STI type write is part of the initial clean state.
+        // Re-snapshot so internals writes are part of the initial clean state.
         (this as any)._dirty.snapshot((this as any)._attributes);
         ctor._callbackChain.runAfter("initialize", this, { strict: "sync" } as any);
       }
@@ -2180,8 +2216,14 @@ export class Base extends Model {
         }
       }
       if (!wasSuppressed2) {
+        // Mirrors Rails' initialize_internals_callback chain order:
+        //   populate_with_current_scope_attributes (scoping) → ensure_proper_type (STI)
+        // Guard on currentScope before allocating the Set — the no-scope case is the hot path.
+        if ((ctor2 as any).currentScope) {
+          _applyScopeAttributes(ctor2, this as any, new Set(Object.keys(attrs)));
+        }
         inheritanceInitializeInternalsCallback.call(this as any);
-        // Re-snapshot so the STI type write is part of the initial clean state.
+        // Re-snapshot so internals writes are part of the initial clean state.
         (this as any)._dirty.snapshot((this as any)._attributes);
         ctor2._callbackChain.runAfter("initialize", this, { strict: "sync" } as any);
       }
