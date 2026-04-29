@@ -1,4 +1,4 @@
-import { getCrypto, camelize, pbkdf2Async } from "@blazetrails/activesupport";
+import { getCrypto, camelize, humanize, isBlank, pbkdf2Async } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { generatesTokenFor } from "./token-for.js";
@@ -56,37 +56,94 @@ export function hasSecurePassword(
   const runValidations = options.validations !== false;
   const digestAttr = `${attribute}_digest`;
 
-  // Store the raw password temporarily for hashing during save
+  // Store the raw password, confirmation, and challenge temporarily.
+  // Cleared only when a non-empty password is hashed in beforeSave.
   const passwordKey = Symbol(`${attribute}`);
   const confirmationKey = Symbol(`${attribute}_confirmation`);
+  const challengeKey = Symbol(`${attribute}_challenge`);
+
+  // lowerCamelCase base for property names (e.g. "recovery_password" → "recoveryPassword").
+  // Uses camelize(..., "lower") for correct acronym handling (e.g. "api_key" → "apiKey").
+  const camelBase = camelize(attribute, "lower");
 
   // Define setter/getter for the configured secure-password attribute
   // (e.g. password / recovery_password).
+  // Mirrors: attr_reader + define_method("#{attribute}=") in InstanceMethodsOnActivation
   Object.defineProperty(modelClass.prototype, attribute, {
     get: function () {
       return (this as any)[passwordKey] ?? null;
     },
     set: function (value: string | null) {
-      (this as any)[passwordKey] = value;
+      // Normalize non-string non-nil values to string to match Ruby's implicit to_s.
+      const normalized =
+        value === null || value === undefined
+          ? value
+          : typeof value === "string"
+            ? value
+            : String(value);
+      (this as any)[passwordKey] = normalized;
+      // Rails: nil assignment clears the digest immediately
+      // (active_model/secure_password.rb InstanceMethodsOnActivation)
+      if (normalized === null || normalized === undefined) {
+        this.writeAttribute(digestAttr, null);
+      }
     },
     configurable: true,
   });
 
-  // password_confirmation setter/getter — only for the default attribute,
-  // matching the surface most apps rely on. Per-attribute confirmation is
-  // a separable follow-up.
-  if (isDefaultAttribute) {
-    Object.defineProperty(modelClass.prototype, "passwordConfirmation", {
-      get: function () {
-        return (this as any)[confirmationKey] ?? null;
-      },
-      set: function (value: string | null) {
-        (this as any)[confirmationKey] = value;
-      },
-      configurable: true,
-    });
+  // {attribute}_confirmation — Rails: attr_accessor :"#{attribute}_confirmation"
+  const confirmationProp = `${camelBase}Confirmation`;
+  Object.defineProperty(modelClass.prototype, confirmationProp, {
+    get: function () {
+      return (this as any)[confirmationKey] ?? null;
+    },
+    set: function (value: string | null) {
+      (this as any)[confirmationKey] = value;
+    },
+    configurable: true,
+  });
 
+  // {attribute}_challenge — Rails: attr_accessor :"#{attribute}_challenge"
+  // Used to verify the current password before changing it.
+  const challengeProp = `${camelBase}Challenge`;
+  Object.defineProperty(modelClass.prototype, challengeProp, {
+    get: function () {
+      return (this as any)[challengeKey] ?? null;
+    },
+    set: function (value: string | null) {
+      // Rails uses present? to gate challenge validation — normalize blank to null.
+      // Check isBlank BEFORE coercion so non-string blanks (false, [], {}) are
+      // caught as blank rather than stringified to non-blank ("false", "[object Object]").
+      if (value === null || value === undefined || isBlank(value as unknown as string)) {
+        (this as any)[challengeKey] = null;
+        return;
+      }
+      const coerced = typeof value === "string" ? value : String(value);
+      (this as any)[challengeKey] = coerced;
+    },
+    configurable: true,
+  });
+
+  // {attribute}_salt — returns the salt portion of the stored digest.
+  // Mirrors: define_method("#{attribute}_salt") in InstanceMethodsOnActivation
+  const saltProp = `${camelBase}Salt`;
+  Object.defineProperty(modelClass.prototype, saltProp, {
+    get: function (this: Base) {
+      const digest = this._readAttribute(digestAttr);
+      if (!digest || typeof digest !== "string") return null;
+      const colonIdx = digest.indexOf(":");
+      if (colonIdx === -1) return null; // no separator — malformed
+      const saltHex = digest.slice(0, colonIdx);
+      const hashHex = digest.slice(colonIdx + 1);
+      if (!saltHex || !hashHex) return null; // empty salt or empty hash — malformed
+      return saltHex;
+    },
+    configurable: true,
+  });
+
+  if (isDefaultAttribute) {
     // `authenticate` (no suffix) is a Rails convenience for the default attribute.
+    // Mirrors: alias_method :authenticate, :authenticate_password
     Object.defineProperty(modelClass.prototype, "authenticate", {
       value: function (this: Base, password: string): Base | false {
         const digest = this._readAttribute(digestAttr);
@@ -128,39 +185,74 @@ export function hasSecurePassword(
   // invalidation to round-trip through the DB.
   modelClass.beforeSave(function (record: Base) {
     const rawPassword = (record as any)[passwordKey];
-    // Rails `password=` setter skips hashing for empty strings
-    // (active_model/secure_password.rb) — an empty password is not a
-    // valid password, so we leave the existing digest untouched.
+    // Rails `password=` setter skips hashing only for nil and empty string
+    // (`elsif !unencrypted_password.empty?` in InstanceMethodsOnActivation) —
+    // whitespace-only passwords ARE hashed in Rails.
     if (rawPassword != null && rawPassword !== "") {
       const digest = hashPassword(rawPassword);
       record.writeAttribute(digestAttr, digest);
-      // Clear the raw password after hashing so subsequent saves don't
-      // rehash with a new random salt (changing the digest on every save
-      // would invalidate outstanding password-reset tokens).
+      // Clear the raw password, confirmation, and challenge after hashing
+      // so subsequent saves don't rehash with a new random salt.
       (record as any)[passwordKey] = null;
       (record as any)[confirmationKey] = null;
+      (record as any)[challengeKey] = null;
     }
   });
 
-  // Add validations (only wired for the default `password` attribute today;
-  // per-attribute validations would mean parameterizing the `errors.add`
-  // keys and message — separable from authenticate_by parity).
-  if (runValidations && isDefaultAttribute) {
+  // Add validations — mirrors Rails' validates_presence_of, validates_confirmation_of,
+  // and challenge validation in has_secure_password.
+  if (runValidations) {
     modelClass.validate(function (record: any) {
+      // Compute inside the callback so it reflects the runtime I18n locale.
+      const attrLabel =
+        typeof (record.constructor as any).humanAttributeName === "function"
+          ? (record.constructor as any).humanAttributeName(attribute)
+          : humanize(attribute);
       const rawPassword = record[passwordKey];
-      const isNew = record.isNewRecord();
+      // Mirrors Rails: `!empty?` for hashing/presence; `allow_blank: true` for confirmation.
+      const rawPasswordNotEmpty = rawPassword != null && rawPassword !== "";
+      const rawPasswordPresent = rawPassword != null && !isBlank(rawPassword);
 
-      // Password must be present on create or when explicitly set
-      if (isNew && (rawPassword === null || rawPassword === undefined || rawPassword === "")) {
-        record.errors.add("password", "blank");
+      // Presence: mirrors `record.errors.add(attribute, :blank) unless digest.present?`
+      // In Rails, password= immediately sets the digest (BCrypt). In trails,
+      // hashing defers to beforeSave, so we also check the in-flight raw password
+      // to avoid false :blank errors before the first save.
+      if (!record._readAttribute(digestAttr) && !rawPasswordNotEmpty) {
+        record.errors.add(attribute, "blank");
       }
 
-      // Password confirmation must match if provided
+      // Confirmation: mirrors `validates_confirmation_of attribute, allow_blank: true`
       const confirmation = record[confirmationKey];
-      if (confirmation !== null && confirmation !== undefined && rawPassword !== confirmation) {
-        record.errors.add("password_confirmation", "confirmation", {
-          message: "doesn't match Password",
+      if (
+        rawPasswordPresent &&
+        confirmation !== null &&
+        confirmation !== undefined &&
+        rawPassword !== confirmation
+      ) {
+        // Rails keys the error to the underscored `#{attribute}_confirmation`
+        // so humanAttributeName and i18n lookups work correctly.
+        record.errors.add(`${attribute}_confirmation`, "confirmation", {
+          attribute: attrLabel,
         });
+      }
+
+      // Challenge: verify current password against the pre-change digest.
+      // Mirrors Rails' `#{attribute}_digest_was` via attributeWas — the
+      // value before the current unsaved change, not before the last save.
+      const challenge = record[challengeKey];
+      if (challenge !== null && challenge !== undefined) {
+        const digestWas =
+          typeof record.attributeWas === "function"
+            ? record.attributeWas(digestAttr)
+            : record._readAttribute(digestAttr);
+        if (
+          !digestWas ||
+          typeof digestWas !== "string" ||
+          !verifyPassword(String(challenge), digestWas)
+        ) {
+          // Rails keys to `#{attribute}_challenge` (snake_case) for i18n parity.
+          record.errors.add(`${attribute}_challenge`, "invalid");
+        }
       }
     });
   }

@@ -475,3 +475,169 @@ describe("SecurePasswordTest", () => {
     expect(notFound).toBeNull();
   });
 });
+
+describe("hasSecurePassword — per-attribute confirmation, challenge, and salt", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = freshAdapter();
+  });
+
+  const makeModel = () => {
+    class User extends Base {
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("email", "string");
+        this.attribute("recovery_password_digest", "string");
+      }
+    }
+    hasSecurePassword(User, "recovery_password", { validations: true });
+    User.adapter = adapter;
+    return User;
+  };
+
+  it("defines recoveryPasswordConfirmation getter/setter", () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recoveryPasswordConfirmation = "secret";
+    expect((u as any).recoveryPasswordConfirmation).toBe("secret");
+  });
+
+  it("defines recoveryPasswordChallenge getter/setter", () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recoveryPasswordChallenge = "old";
+    expect((u as any).recoveryPasswordChallenge).toBe("old");
+  });
+
+  it("defines recoveryPasswordSalt getter returning null when no digest", () => {
+    const User = makeModel();
+    const u = new User({});
+    expect((u as any).recoveryPasswordSalt).toBeNull();
+  });
+
+  it("recoveryPasswordSalt returns salt after password is set", async () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recovery_password = "secret123";
+    await u.save({ validate: false });
+    expect((u as any).recoveryPasswordSalt).toMatch(/^[0-9a-f]+$/);
+  });
+
+  it("recoveryPasswordSalt returns null for malformed digest (no separator)", () => {
+    const User = makeModel();
+    const u = new User({});
+    u.writeAttribute("recovery_password_digest", "noseparator");
+    expect((u as any).recoveryPasswordSalt).toBeNull();
+  });
+
+  it("recoveryPasswordSalt returns null for malformed digest (empty salt)", () => {
+    const User = makeModel();
+    const u = new User({});
+    u.writeAttribute("recovery_password_digest", ":hashonly");
+    expect((u as any).recoveryPasswordSalt).toBeNull();
+  });
+
+  it("recoveryPasswordSalt returns null for malformed digest (empty hash)", () => {
+    const User = makeModel();
+    const u = new User({});
+    u.writeAttribute("recovery_password_digest", "saltonly:");
+    expect((u as any).recoveryPasswordSalt).toBeNull();
+  });
+
+  it("validates recovery_password_confirmation mismatch", async () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recovery_password = "secret123";
+    (u as any).recoveryPasswordConfirmation = "different";
+    const valid = await u.validate();
+    expect(valid).toBe(false);
+    // Error keyed to recovery_password_confirmation (Rails snake_case parity)
+    expect((u as any).errors.messages["recovery_password_confirmation"]).toBeDefined();
+  });
+
+  it("passes validation when confirmation matches", async () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recovery_password = "secret123";
+    (u as any).recoveryPasswordConfirmation = "secret123";
+    const valid = await u.validate();
+    expect(valid).toBe(true);
+  });
+
+  it("challenge validation rejects wrong current password", async () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recovery_password = "original";
+    await u.save({ validate: false });
+
+    // Now change with wrong challenge
+    (u as any).recovery_password = "newpassword";
+    (u as any).recoveryPasswordChallenge = "wrongpassword";
+    const valid = await u.validate();
+    expect(valid).toBe(false);
+    // Error keyed to recovery_password_challenge (Rails snake_case parity)
+    expect((u as any).errors.messages["recovery_password_challenge"]).toBeDefined();
+  });
+
+  it("challenge validation passes with correct current password", async () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recovery_password = "original";
+    await u.save({ validate: false });
+
+    (u as any).recovery_password = "newpassword";
+    (u as any).recoveryPasswordChallenge = "original";
+    const valid = await u.validate();
+    expect(valid).toBe(true);
+  });
+
+  it("nil assignment clears the digest immediately", async () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recovery_password = "secret123";
+    await u.save({ validate: false });
+    expect(u._readAttribute("recovery_password_digest")).toBeTruthy();
+
+    (u as any).recovery_password = null;
+    expect(u._readAttribute("recovery_password_digest")).toBeNull();
+    await u.save({ validate: false });
+    expect(u._readAttribute("recovery_password_digest")).toBeNull();
+  });
+
+  it("blank challenge is treated as absent and does not trigger challenge validation", async () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recovery_password = "original";
+    await u.save({ validate: false });
+
+    // Blank challenge should normalize to null — no validation error
+    (u as any).recovery_password = "newpassword";
+    (u as any).recoveryPasswordChallenge = "   ";
+    expect((u as any).recoveryPasswordChallenge).toBeNull();
+    const valid = await u.validate();
+    expect(valid).toBe(true);
+    expect((u as any).errors.messages["recovery_password_challenge"]).toBeUndefined();
+  });
+
+  it("challenge validation checks current digest after multiple saves", async () => {
+    const User = makeModel();
+    const u = new User({});
+    (u as any).recovery_password = "first";
+    await u.save({ validate: false });
+
+    // Second save — update password
+    (u as any).recovery_password = "second";
+    await u.save({ validate: false });
+
+    // Now challenge must match "second", not "first"
+    (u as any).recovery_password = "third";
+    (u as any).recoveryPasswordChallenge = "first"; // old — should fail
+    expect(await u.validate()).toBe(false);
+
+    (u as any).errors.clear?.();
+    (u as any).recovery_password = "third";
+    (u as any).recoveryPasswordChallenge = "second"; // current — should pass
+    expect(await u.validate()).toBe(true);
+  });
+});
