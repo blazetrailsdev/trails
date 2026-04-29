@@ -32,6 +32,8 @@ export class TimeZoneConverter {
 /** @internal */
 function convertTimeToTimeZone(value: unknown): unknown {
   if (value == null) return value;
+  // boundary: legacy callers may still hand in JS Date for time-zone-aware
+  // attributes; pass through unchanged (the typed cast layer handles Temporal).
   if (value instanceof Date) {
     return value;
   }

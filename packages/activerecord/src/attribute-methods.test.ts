@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, ReadonlyAttributeError } from "./index.js";
+import { formatForInspect } from "./attribute-inspection.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -375,6 +376,18 @@ describe("AttributeMethodsTest", () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "inspect_date" });
     expect(p.id).toBeDefined();
+  });
+
+  it("formatForInspect renders a valid Date as a quoted ISO string", () => {
+    class M extends Base {}
+    const out = formatForInspect.call(new M(), "x", new Date("2026-04-15T12:00:00.000Z"));
+    expect(out).toBe('"2026-04-15T12:00:00.000Z"');
+  });
+
+  it("formatForInspect renders an invalid Date as quoted 'Invalid Date'", () => {
+    class M extends Base {}
+    const out = formatForInspect.call(new M(), "x", new Date(NaN));
+    expect(out).toBe('"Invalid Date"');
   });
   it("attribute_for_inspect with a long array", async () => {
     const { Post } = makeModel();

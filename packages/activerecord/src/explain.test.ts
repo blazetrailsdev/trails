@@ -241,6 +241,20 @@ describe("ExplainTest", () => {
     expect(plan.length).toBeGreaterThan(0);
   });
 
+  it("normalizes Date binds — invalid Dates render as 'Invalid Date'", () => {
+    // _normalizeExplainBindValue is reached directly only when a caller bypasses
+    // the adapter typeCast (which rejects raw Date post-PR-6); the branch still
+    // exists as a defensive boundary handler for legacy / test code paths.
+    const { Post } = makeModel();
+    const rel = Post.all() as unknown as {
+      _normalizeExplainBindValue: (v: unknown) => unknown;
+    };
+    expect(rel._normalizeExplainBindValue(new Date("2026-04-15T12:00:00.000Z"))).toBe(
+      "2026-04-15T12:00:00.000Z",
+    );
+    expect(rel._normalizeExplainBindValue(new Date(NaN))).toBe("Invalid Date");
+  });
+
   it("renders binary binds as '<N bytes of binary data>' (Rails parity)", async () => {
     // Rails' `render_bind` special-cases binary-typed attrs:
     //   "<#{attr.value_for_database.to_s.bytesize} bytes of binary data>"

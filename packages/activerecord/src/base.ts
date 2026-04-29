@@ -170,7 +170,13 @@ export function quoteSqlValue(v: unknown, asArray = false): string {
   if (v === null || v === undefined) return "NULL";
   if (typeof v === "number" || typeof v === "bigint") return String(v);
   if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-  if (v instanceof Date) return `'${v.toISOString()}'`;
+  // boundary: defensive SQL literal quoting fallback for legacy callers.
+  // Invalid (NaN) Date short-circuits to SQL NULL — toISOString() would throw
+  // a RangeError, and the generic object fallthrough would JSON-stringify it
+  // to the misleading string 'null'.
+  if (v instanceof Date) {
+    return Number.isNaN(v.getTime()) ? "NULL" : `'${v.toISOString()}'`;
+  }
   if (asArray && Array.isArray(v)) {
     const arrayLiteral = quoteArrayLiteral(v);
     return `'${arrayLiteral.replace(/'/g, "''")}'`;

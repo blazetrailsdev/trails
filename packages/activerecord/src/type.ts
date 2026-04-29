@@ -133,7 +133,7 @@ export function currentAdapterName(getBase?: () => { adapter?: unknown }): strin
 // Override ActiveModel's type registry with AR-specific types so that
 // Model.attribute() calls resolve to timezone-aware Date/DateTime/Time,
 // AR's Text, Json, etc.
-typeRegistry.register("date", () => new Date());
+typeRegistry.register("date", () => new Date()); // boundary: AR Type::Date class, not JS Date
 typeRegistry.register("datetime", () => new DateTime());
 typeRegistry.register("time", () => new Time());
 typeRegistry.register("text", () => new Text());

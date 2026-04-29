@@ -3371,6 +3371,14 @@ describe("quoteSqlValue", () => {
     expect(quoteSqlValue(null)).toBe("NULL");
     expect(quoteSqlValue(undefined)).toBe("NULL");
   });
+
+  it("emits ISO-quoted literal for a valid Date", () => {
+    expect(quoteSqlValue(new Date("2026-04-15T12:00:00.000Z"))).toBe("'2026-04-15T12:00:00.000Z'");
+  });
+
+  it("emits NULL for an invalid Date (NaN)", () => {
+    expect(quoteSqlValue(new Date(NaN))).toBe("NULL");
+  });
 });
 
 // ==========================================================================
