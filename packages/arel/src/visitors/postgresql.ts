@@ -10,7 +10,7 @@ import { quoteArrayLiteral } from "../quote-array.js";
  * Mirrors: Arel::Visitors::PostgreSQL
  */
 export class PostgreSQL extends ToSql {
-  protected override visitDistinctOn(node: Nodes.DistinctOn): SQLString {
+  protected override visitArelNodesDistinctOn(node: Nodes.DistinctOn): SQLString {
     this.collector.append("DISTINCT ON (");
     if (node.expr instanceof Node) {
       this.visit(node.expr);
@@ -21,7 +21,7 @@ export class PostgreSQL extends ToSql {
     return this.collector;
   }
 
-  protected override visitMatches(node: Nodes.Matches): SQLString {
+  protected override visitArelNodesMatches(node: Nodes.Matches): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(node.caseSensitive ? " LIKE " : " ILIKE ");
     this.visitNodeOrValue(node.right);
@@ -31,7 +31,7 @@ export class PostgreSQL extends ToSql {
     return this.collector;
   }
 
-  protected override visitDoesNotMatch(node: Nodes.DoesNotMatch): SQLString {
+  protected override visitArelNodesDoesNotMatch(node: Nodes.DoesNotMatch): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(node.caseSensitive ? " NOT LIKE " : " NOT ILIKE ");
     this.visitNodeOrValue(node.right);
@@ -41,11 +41,11 @@ export class PostgreSQL extends ToSql {
     return this.collector;
   }
 
-  protected override visitRegexp(node: Nodes.Regexp): SQLString {
+  protected override visitArelNodesRegexp(node: Nodes.Regexp): SQLString {
     return this.visitBinaryOp(node, node.caseSensitive ? "~" : "~*");
   }
 
-  protected override visitNotRegexp(node: Nodes.NotRegexp): SQLString {
+  protected override visitArelNodesNotRegexp(node: Nodes.NotRegexp): SQLString {
     return this.visitBinaryOp(node, node.caseSensitive ? "!~" : "!~*");
   }
 
@@ -107,14 +107,14 @@ export class PostgreSQL extends ToSql {
   // Postgres natively supports `IS [NOT] DISTINCT FROM`. Behaviorally
   // identical to the base ToSql visitor; the explicit override mirrors
   // Rails' Postgres visitor for fidelity (no behavior change).
-  protected override visitIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
+  protected override visitArelNodesIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(" IS NOT DISTINCT FROM ");
     this.visitNodeOrValue(node.right);
     return this.collector;
   }
 
-  protected override visitIsDistinctFrom(node: Nodes.IsDistinctFrom): SQLString {
+  protected override visitArelNodesIsDistinctFrom(node: Nodes.IsDistinctFrom): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(" IS DISTINCT FROM ");
     this.visitNodeOrValue(node.right);
@@ -153,7 +153,7 @@ export class PostgreSQLWithBinds extends PostgreSQL {
     return this.collector;
   }
 
-  protected override visitBindParam(node: Nodes.BindParam): SQLString {
+  protected override visitArelNodesBindParam(node: Nodes.BindParam): SQLString {
     if (this._extractBinds) {
       this.bindIndex += 1;
       const value = node.value !== undefined ? node.value : node;

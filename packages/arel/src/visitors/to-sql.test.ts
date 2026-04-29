@@ -1181,4 +1181,22 @@ describe("the to_sql visitor", () => {
       expect(sql).toBe('SELECT "schema"."table"."col" FROM "schema"."table"');
     });
   });
+
+  describe("identifier-escape consistency (helper-routed quoting)", () => {
+    // Regression: four sites used to interpolate `"${name}"` directly,
+    // bypassing quoteColumnName / quoteTableName and silently producing
+    // invalid SQL on identifiers containing a literal double-quote.
+    it("UPDATE SET column quotes embedded double-quotes", () => {
+      const tbl = new Table('tab"le');
+      const mgr = new UpdateManager().table(tbl).set([[tbl.get('co"l'), 1]]);
+      expect(mgr.toSql()).toContain('"co""l" = 1');
+    });
+
+    it("CTE name escapes embedded double-quotes", () => {
+      const inner = new Table("users");
+      const cte = new Nodes.Cte('w"in', new SelectManager(inner).project(inner.get("a")).ast);
+      const sql = new Visitors.ToSql().compile(cte);
+      expect(sql).toContain('"w""in" AS');
+    });
+  });
 });
