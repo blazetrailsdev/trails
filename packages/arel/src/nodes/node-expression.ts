@@ -27,6 +27,8 @@ export abstract class NodeExpression extends Node {
    *
    * Mirrors: Arel::Predications#quoted_node (private), which calls
    * Nodes.build_quoted(other, self).
+   *
+   * @internal
    */
   quotedNode(other: unknown): Node {
     if (other instanceof Node) return other;

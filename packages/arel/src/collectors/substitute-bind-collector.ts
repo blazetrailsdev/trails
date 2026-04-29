@@ -10,6 +10,7 @@ type Quoter = {
  * Mirrors: Arel::Collectors::SubstituteBinds
  */
 export class SubstituteBindCollector {
+  /** @internal */
   readonly quoter: Quoter;
   readonly collector: SQLString;
 

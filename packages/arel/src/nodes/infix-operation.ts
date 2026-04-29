@@ -28,6 +28,8 @@ export class InfixOperation extends Binary {
   /**
    * Mirrors: Arel::Predications#quoted_node. No type-cast context on an
    * InfixOperation — fall through to a plain Quoted wrap.
+   *
+   * @internal
    */
   quotedNode(other: unknown): Node {
     return buildQuoted(other, this);

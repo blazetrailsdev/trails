@@ -454,6 +454,11 @@ jobs:
         run: pnpm exec tsx scripts/api-compare/compare.ts --privates
       - name: Dependency lint
         run: pnpm exec tsx scripts/api-compare/lint-deps.ts
+      - name: Rails-private JSDoc lint
+        # Needs rails-api.json (extracted above) to enforce
+        # blazetrails/rails-private-jsdoc. The standalone Lint job has
+        # no Ruby and intentionally no-ops this rule.
+        run: pnpm exec tsx scripts/build-rails-privates-manifest.ts && pnpm exec eslint packages/arel/src
       - name: Test comparison
         run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts
 

@@ -33,6 +33,7 @@ export class SqlLiteral extends Node {
 
   // Required by the Predications mixin (mirrors Rails' private
   // Predications#quoted_node, which calls `Nodes.build_quoted(other, self)`).
+  /** @internal */
   quotedNode(other: unknown): Node {
     return other instanceof Node ? other : buildQuoted(other, this);
   }

@@ -6,6 +6,7 @@ import tseslint from "typescript-eslint";
 import unusedImports from "eslint-plugin-unused-imports";
 import vitest from "@vitest/eslint-plugin";
 import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
+import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
 
 export default defineConfig(
   {
@@ -81,10 +82,24 @@ export default defineConfig(
       "packages/activerecord/src/connection-handling.ts",
     ],
     plugins: {
-      blazetrails: { rules: { "no-node-builtins": noNodeBuiltins } },
+      blazetrails: {
+        rules: {
+          "no-node-builtins": noNodeBuiltins,
+          "rails-private-jsdoc": railsPrivateJsdoc,
+        },
+      },
     },
     rules: {
       "blazetrails/no-node-builtins": "error",
+    },
+  },
+
+  // ── rails-private-jsdoc (per-package rollout; widen as packages adopt) ──
+  {
+    files: ["packages/arel/src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/rails-private-jsdoc": "error",
     },
   },
 

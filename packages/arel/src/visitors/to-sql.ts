@@ -84,6 +84,7 @@ export class ToSql implements NodeVisitor<SQLString> {
     return [sqlCollector.value, binds];
   }
 
+  /** @internal */
   visit(node: Node): SQLString {
     if (node instanceof Nodes.SelectStatement) return this.visitSelectStatement(node);
     if (node instanceof Nodes.SelectCore) return this.visitSelectCore(node);

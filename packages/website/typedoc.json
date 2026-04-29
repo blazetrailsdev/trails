@@ -13,6 +13,7 @@
   "plugin": ["typedoc-plugin-markdown"],
   "readme": "none",
   "githubPages": false,
+  "excludeInternal": true,
   "outputFileStrategy": "modules",
   "expandObjects": true,
   "parametersFormat": "table",

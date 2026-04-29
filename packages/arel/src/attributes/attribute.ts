@@ -119,6 +119,8 @@ export class Attribute extends Node {
    * so the visitor can apply column-level type-casting; ActiveModel
    * attribute instances become BindParam so they extract as binds; raw
    * Nodes are passed through.
+   *
+   * @internal
    */
   quotedNode(value: unknown): Node {
     if (value instanceof Node) return value;
