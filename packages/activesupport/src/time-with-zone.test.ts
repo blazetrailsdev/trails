@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
+import { instantFromDate } from "./testing/temporal-helpers.js";
 
 describe("TimeWithZoneTest", () => {
   let eastern: TimeZone;
@@ -53,7 +54,7 @@ describe("TimeWithZoneTest", () => {
   it("returns correct local components", () => {
     // 2024-01-15 15:30:45 UTC
     const utcDate = new Date(Date.UTC(2024, 0, 15, 15, 30, 45, 123));
-    const twz = new TimeWithZone(utcDate, eastern);
+    const twz = new TimeWithZone(instantFromDate(utcDate), eastern);
 
     // EST is UTC-5
     expect(twz.year).toBe(2024);
@@ -68,7 +69,7 @@ describe("TimeWithZoneTest", () => {
   it("handles day boundary crossing", () => {
     // 2024-01-16 03:00:00 UTC -> 2024-01-15 22:00:00 EST
     const utcDate = new Date(Date.UTC(2024, 0, 16, 3, 0, 0));
-    const twz = new TimeWithZone(utcDate, eastern);
+    const twz = new TimeWithZone(instantFromDate(utcDate), eastern);
 
     expect(twz.day).toBe(15);
     expect(twz.hour).toBe(22);
@@ -133,7 +134,7 @@ describe("TimeWithZoneTest", () => {
 
   it("toI() returns unix timestamp", () => {
     const utcDate = new Date(Date.UTC(2024, 0, 15, 0, 0, 0));
-    const twz = new TimeWithZone(utcDate, eastern);
+    const twz = new TimeWithZone(instantFromDate(utcDate), eastern);
     expect(twz.toI()).toBe(Math.floor(utcDate.getTime() / 1000));
   });
 
@@ -144,7 +145,7 @@ describe("TimeWithZoneTest", () => {
 
   it("toF() returns float timestamp", () => {
     const utcDate = new Date(Date.UTC(2024, 0, 15, 0, 0, 0, 500));
-    const twz = new TimeWithZone(utcDate, utcZone);
+    const twz = new TimeWithZone(instantFromDate(utcDate), utcZone);
     expect(twz.toF()).toBeCloseTo(utcDate.getTime() / 1000, 3);
   });
 
@@ -584,7 +585,7 @@ describe("TimeWithZoneTest", () => {
 
   it("getTime() returns milliseconds", () => {
     const utcDate = new Date(Date.UTC(2024, 0, 15, 0, 0, 0));
-    const twz = new TimeWithZone(utcDate, eastern);
+    const twz = new TimeWithZone(instantFromDate(utcDate), eastern);
     expect(twz.getTime()).toBe(utcDate.getTime());
   });
 
@@ -618,11 +619,11 @@ describe("TimeWithZoneTest", () => {
   // ---------------------------------------------------------------------------
   // ---------------------------------------------------------------------------
   // Tests ported from time_with_zone_test.rb (formerly "Rails parity: TimeWithZoneTest")
-  // Each test creates its own twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern)
+  // Each test creates its own twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern)
   // Local: 1999-12-31 19:00:00 EST (-05:00)
   // ---------------------------------------------------------------------------
   it("usec returns 0 when no fractional", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     expect(twz.usec).toBe(0);
   });
 
@@ -664,7 +665,7 @@ describe("TimeWithZoneTest", () => {
   // ---------------------------------------------------------------------------
 
   it("change year", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.change({ year: 2001 });
     expect(result.year).toBe(2001);
     expect(result.month).toBe(12);
@@ -673,7 +674,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("change month", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.change({ month: 3 });
     expect(result.month).toBe(3);
     expect(result.day).toBe(31);
@@ -681,7 +682,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("change month clamps day (Feb has fewer days)", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.change({ month: 2 });
     expect(result.month).toBe(2);
     // 1999 is not a leap year, Feb has 28 days; original day is 31 -> clamped
@@ -691,14 +692,14 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("change day", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.change({ day: 15 });
     expect(result.day).toBe(15);
     expect(result.hour).toBe(19);
   });
 
   it("change hour resets min and sec", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.change({ hour: 6 });
     expect(result.hour).toBe(6);
     expect(result.min).toBe(0);
@@ -706,7 +707,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("change min keeps hour", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.change({ min: 15 });
     expect(result.hour).toBe(19);
     expect(result.min).toBe(15);
@@ -714,7 +715,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("change sec", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.change({ sec: 30 });
     expect(result.hour).toBe(19);
     expect(result.min).toBe(0);
@@ -726,7 +727,7 @@ describe("TimeWithZoneTest", () => {
   // ---------------------------------------------------------------------------
 
   it("advance years", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.advance({ years: 2 });
     expect(result.year).toBe(2001);
     expect(result.month).toBe(12);
@@ -735,7 +736,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance months", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.advance({ months: 3 });
     expect(result.month).toBe(3);
     expect(result.day).toBe(31);
@@ -743,7 +744,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance days", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.advance({ days: 4 });
     expect(result.month).toBe(1);
     expect(result.day).toBe(4);
@@ -751,7 +752,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance hours", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.advance({ hours: 6 });
     expect(result.day).toBe(1);
     expect(result.hour).toBe(1);
@@ -760,14 +761,14 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance minutes", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.advance({ minutes: 15 });
     expect(result.hour).toBe(19);
     expect(result.min).toBe(15);
   });
 
   it("advance seconds", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.advance({ seconds: 30 });
     expect(result.hour).toBe(19);
     expect(result.min).toBe(0);
@@ -779,27 +780,27 @@ describe("TimeWithZoneTest", () => {
   // ---------------------------------------------------------------------------
 
   it("to fs rfc822", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     expect(twz.toFs("rfc822")).toBe(twz.rfc2822());
   });
 
   it("to fs rfc2822", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     expect(twz.toFs("rfc2822")).toBe(twz.rfc2822());
   });
 
   it("to fs iso8601", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     expect(twz.toFs("iso8601")).toBe(twz.xmlschema());
   });
 
   it("strftime with composite format", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     expect(twz.strftime("%Y-%m-%d %H:%M:%S %Z %z")).toBe("1999-12-31 19:00:00 EST -0500");
   });
 
   it("JSON serialization uses ISO 8601 with 3 fraction digits", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const json = JSON.stringify({ time: twz });
     expect(JSON.parse(json).time).toBe(twz.asJson());
   });
@@ -838,7 +839,7 @@ describe("TimeWithZoneTest", () => {
 
   it("converting between multiple timezones preserves the instant", () => {
     const utcTime = new Date(Date.UTC(2024, 6, 15, 12, 0, 0));
-    const eastern_twz = new TimeWithZone(utcTime, eastern);
+    const eastern_twz = new TimeWithZone(instantFromDate(utcTime), eastern);
     const pacific_twz = eastern_twz.inTimeZone(pacific);
     const hawaii = TimeZone.find("Hawaii");
     const hawaii_twz = pacific_twz.inTimeZone(hawaii);
@@ -861,7 +862,7 @@ describe("TimeWithZoneTest", () => {
   // ---------------------------------------------------------------------------
   it("calculates seconds since midnight correctly", () => {
     // 1999-12-31 19:00:00 EST = 19 * 3600 seconds since midnight
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const expectedSeconds = 19 * 3600;
     const actualSeconds = twz.hour * 3600 + twz.min * 60 + twz.sec;
     expect(actualSeconds).toBe(expectedSeconds);
@@ -871,7 +872,7 @@ describe("TimeWithZoneTest", () => {
   // Duration arithmetic with Duration class (from time_with_zone_test.rb)
   // ---------------------------------------------------------------------------
   it("plus Duration.days(5)", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.plus(Duration.days(5));
     expect(result.day).toBe(5);
     expect(result.month).toBe(1);
@@ -880,7 +881,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("minus Duration.days(5)", () => {
-    const twz = new TimeWithZone(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)), eastern);
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.minus(Duration.days(5));
     expect(result.day).toBe(26);
     expect(result.month).toBe(12);

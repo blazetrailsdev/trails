@@ -9,7 +9,7 @@ import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { getZone } from "./time-zone-config.js";
-import { Temporal } from "./temporal.js";
+import { Temporal, instantFrom } from "./temporal.js";
 
 /**
  * Options for the change() method.
@@ -92,10 +92,8 @@ export class TimeWithZone {
   /** Cached Date snapshot for legacy method bodies and TimeZone helpers. */
   private readonly _utc: Date;
 
-  constructor(utcTime: Date, timeZone: TimeZone) {
-    this._zoned = Temporal.Instant.fromEpochMilliseconds(utcTime.getTime()).toZonedDateTimeISO(
-      timeZone.tzinfo,
-    );
+  constructor(instant: Temporal.Instant, timeZone: TimeZone) {
+    this._zoned = instant.toZonedDateTimeISO(timeZone.tzinfo);
     this._timeZone = timeZone;
     this._utc = new Date(this._zoned.epochMilliseconds);
   }
@@ -322,7 +320,7 @@ export class TimeWithZone {
     }
     const tz = typeof zone === "string" ? TimeZone.find(zone) : zone;
     if (tz.tzinfo === this._timeZone.tzinfo) return this;
-    return new TimeWithZone(this._utc, tz);
+    return new TimeWithZone(this._zoned.toInstant(), tz);
   }
 
   // ---------------------------------------------------------------------------
@@ -531,7 +529,10 @@ export class TimeWithZone {
       }
       // Fixed duration — advance from UTC
       const ms = interval.inSeconds() * 1000;
-      return new TimeWithZone(new Date(this._utc.getTime() + ms), this._timeZone);
+      return new TimeWithZone(
+        Temporal.Instant.fromEpochMilliseconds(Math.trunc(this._utc.getTime() + ms)),
+        this._timeZone,
+      );
     }
     if (typeof interval !== "number") {
       const desc =
@@ -539,7 +540,10 @@ export class TimeWithZone {
       throw new TypeError(`no implicit conversion of ${desc} into number`);
     }
     // Number of seconds
-    return new TimeWithZone(new Date(this._utc.getTime() + interval * 1000), this._timeZone);
+    return new TimeWithZone(
+      Temporal.Instant.fromEpochMilliseconds(Math.trunc(this._utc.getTime() + interval * 1000)),
+      this._timeZone,
+    );
   }
 
   /**
@@ -626,7 +630,10 @@ export class TimeWithZone {
     if (options.seconds) ms += options.seconds * 1000;
 
     if (ms !== 0) {
-      return new TimeWithZone(new Date(newLocal._utc.getTime() + ms), this._timeZone);
+      return new TimeWithZone(
+        Temporal.Instant.fromEpochMilliseconds(Math.trunc(newLocal._utc.getTime() + ms)),
+        this._timeZone,
+      );
     }
 
     return newLocal;
@@ -719,12 +726,12 @@ export class TimeWithZone {
   }
 
   isToday(): boolean {
-    const now = new TimeWithZone(currentTime(), this._timeZone);
+    const now = new TimeWithZone(instantFrom(currentTime()), this._timeZone);
     return this.year === now.year && this.month === now.month && this.day === now.day;
   }
 
   isTomorrow(): boolean {
-    const now = new TimeWithZone(currentTime(), this._timeZone);
+    const now = new TimeWithZone(instantFrom(currentTime()), this._timeZone);
     const tomorrow = now.advance({ days: 1 });
     return (
       this.year === tomorrow.year && this.month === tomorrow.month && this.day === tomorrow.day
@@ -732,7 +739,7 @@ export class TimeWithZone {
   }
 
   isYesterday(): boolean {
-    const now = new TimeWithZone(currentTime(), this._timeZone);
+    const now = new TimeWithZone(instantFrom(currentTime()), this._timeZone);
     const yesterday = now.advance({ days: -1 });
     return (
       this.year === yesterday.year && this.month === yesterday.month && this.day === yesterday.day
@@ -853,7 +860,10 @@ export class TimeWithZone {
     const ms = this._utc.getTime();
     const precisionMs = precision * 1000;
     const rounded = Math.round(ms / precisionMs) * precisionMs;
-    return new TimeWithZone(new Date(rounded), this._timeZone);
+    return new TimeWithZone(
+      Temporal.Instant.fromEpochMilliseconds(Math.trunc(rounded)),
+      this._timeZone,
+    );
   }
 
   // ---------------------------------------------------------------------------

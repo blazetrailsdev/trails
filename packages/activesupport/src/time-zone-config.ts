@@ -9,6 +9,7 @@
 import { TimeZone } from "./values/time-zone.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
+import { instantFrom } from "./temporal.js";
 
 // NOTE: Zone state is stored in module-level variables, mirroring Rails'
 // thread-local Time.zone. This is process-wide and NOT safe for concurrent
@@ -144,7 +145,7 @@ export function findZoneBang(zone: unknown): TimeZone | null | false {
 export function current(): TimeWithZone | Date {
   const zone = getZone();
   if (zone) {
-    return new TimeWithZone(currentTime(), zone);
+    return new TimeWithZone(instantFrom(currentTime()), zone);
   }
   return currentTime();
 }

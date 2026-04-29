@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { TimeZone } from "./values/time-zone.js";
 import { TimeWithZone } from "./time-with-zone.js";
+import { instantFromDate } from "./testing/temporal-helpers.js";
 
 describe("TimeZoneTest", () => {
   // ---------------------------------------------------------------------------
@@ -9,7 +10,7 @@ describe("TimeZoneTest", () => {
   it("utc to local", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
     const utcDate = new Date(Date.UTC(2000, 0, 1, 0, 0, 0));
-    const twz = new TimeWithZone(utcDate, zone);
+    const twz = new TimeWithZone(instantFromDate(utcDate), zone);
     expect(twz.year).toBe(1999);
     expect(twz.month).toBe(12);
     expect(twz.day).toBe(31);
@@ -21,7 +22,7 @@ describe("TimeZoneTest", () => {
   it("utc to local with fractional seconds", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
     const utcDate = new Date(Date.UTC(2000, 0, 1, 0, 0, 0, 500));
-    const twz = new TimeWithZone(utcDate, zone);
+    const twz = new TimeWithZone(instantFromDate(utcDate), zone);
     expect(twz.msec).toBe(500);
     expect(twz.hour).toBe(19);
   });
