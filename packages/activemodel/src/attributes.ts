@@ -2,6 +2,7 @@ import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
+import { attributeMissing } from "./attribute-methods.js";
 import {
   pushPendingType,
   pushPendingDefault,
@@ -164,9 +165,21 @@ function defineDirtyAttributeMethods(prototype: object, attrName: string): void 
     if (Object.prototype.hasOwnProperty.call(prototype, methodName)) continue;
     if (methodName in prototype) continue; // inherited; user/framework took it
     Object.defineProperty(prototype, methodName, {
-      value: function (this: Record<string, unknown>, ...args: unknown[]) {
-        const fn = (this as unknown as Record<string, (...a: unknown[]) => unknown>)[target];
-        return fn.call(this, attrName, ...args);
+      // Route through attribute_missing(match, ...) so subclasses can
+      // intercept the entire generated cascade by overriding a single
+      // method (Rails attribute_methods.rb:520-522). The match shape
+      // mirrors Rails' AttributeMethodMatch — proxyTarget names the
+      // generic handler; attrName is the bound attribute.
+      value: function (
+        this: {
+          attributeMissing(
+            match: { proxyTarget: string; attrName: string },
+            ...a: unknown[]
+          ): unknown;
+        },
+        ...args: unknown[]
+      ) {
+        return this.attributeMissing({ proxyTarget: target, attrName: attrName }, ...args);
       },
       writable: true,
       configurable: true,
@@ -254,5 +267,15 @@ export class Attributes {
   /** Mirrors: attributes.rb:146-148 — `def attribute_names; @attributes.keys; end` */
   attributeNames(): string[] {
     return this._attributes.keys();
+  }
+
+  /**
+   * Mirrors: attribute_methods.rb:520-522 — `attribute_missing(match, ...)`
+   * surfaces on Attributes via `include AttributeMethods`. Defined as a
+   * prototype method (not a class field) so subclass overrides take
+   * effect — class fields would shadow them.
+   */
+  attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown {
+    return attributeMissing.call(this as unknown as Record<string, unknown>, match, ...args);
   }
 }

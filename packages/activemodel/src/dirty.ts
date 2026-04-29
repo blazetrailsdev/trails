@@ -1,4 +1,5 @@
 import { AttributeSet } from "./attribute-set.js";
+import { attributeMissing as attributeMissingDispatch } from "./attribute-methods.js";
 
 /**
  * Dirty mixin contract — tracks attribute changes on a model.
@@ -265,5 +266,18 @@ export class DirtyTracker {
       const original = resolveValue(this._originalAttributes.get(name));
       attributes.set(name, original);
     }
+  }
+
+  /**
+   * Mirrors: attribute_methods.rb:520-522 — surfaces on Dirty via
+   * `include AttributeMethods`. Defined as a prototype method (not a
+   * class field) so subclass overrides take effect.
+   */
+  attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown {
+    return attributeMissingDispatch.call(
+      this as unknown as Record<string, unknown>,
+      match,
+      ...args,
+    );
   }
 }
