@@ -4,6 +4,8 @@ import { Bind } from "../collectors/bind.js";
 import { Composite } from "../collectors/composite.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
+import { Visitor, type NodeCtor } from "./visitor.js";
+import { UnsupportedVisitError, NotImplementedError } from "../errors.js";
 
 /**
  * Resolve a bind's database value. QueryAttribute exposes
@@ -18,26 +20,12 @@ export function resolveValueForDatabase(value: unknown): unknown {
   return typeof v === "function" ? (v as () => unknown).call(value) : v;
 }
 
-export class UnsupportedVisitError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "UnsupportedVisitError";
-  }
-}
-
-export class NotImplementedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NotImplementedError";
-  }
-}
-
 /**
  * ToSql visitor — walks the AST and produces SQL strings.
  *
  * Mirrors: Arel::Visitors::ToSql
  */
-export class ToSql implements NodeVisitor<SQLString> {
+export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   protected collector!: SQLString;
   private _inUpdateSet = false;
   protected _extractBinds = false;
@@ -84,136 +72,166 @@ export class ToSql implements NodeVisitor<SQLString> {
     return [sqlCollector.value, binds];
   }
 
-  /** @internal */
+  /**
+   * Rails passes the collector as a second arg through the visit chain;
+   * we route SQL through `this.collector` instance state instead, so the
+   * base's collector argument is unused here by design.
+   *
+   * @internal
+   */
   visit(node: Node): SQLString {
-    if (node instanceof Nodes.SelectStatement) return this.visitSelectStatement(node);
-    if (node instanceof Nodes.SelectCore) return this.visitSelectCore(node);
-    if (node instanceof Nodes.InsertStatement) return this.visitInsertStatement(node);
-    if (node instanceof Nodes.UpdateStatement) return this.visitUpdateStatement(node);
-    if (node instanceof Nodes.DeleteStatement) return this.visitDeleteStatement(node);
+    return super.visit(node) as SQLString;
+  }
 
+  // Per-class dispatch wrappers for shared helpers — mirrors Rails' per-method
+  // form (each operator/aggregate has its own visit method).
+  protected visitGreaterThan(node: Nodes.GreaterThan): SQLString {
+    return this.visitBinaryOp(node, ">");
+  }
+  protected visitGreaterThanOrEqual(node: Nodes.GreaterThanOrEqual): SQLString {
+    return this.visitBinaryOp(node, ">=");
+  }
+  protected visitLessThan(node: Nodes.LessThan): SQLString {
+    return this.visitBinaryOp(node, "<");
+  }
+  protected visitLessThanOrEqual(node: Nodes.LessThanOrEqual): SQLString {
+    return this.visitBinaryOp(node, "<=");
+  }
+  protected visitCount(node: Nodes.Count): SQLString {
+    return this.visitAggregate(node, "COUNT");
+  }
+  protected visitSum(node: Nodes.Sum): SQLString {
+    return this.visitAggregate(node, "SUM");
+  }
+  protected visitMax(node: Nodes.Max): SQLString {
+    return this.visitAggregate(node, "MAX");
+  }
+  protected visitMin(node: Nodes.Min): SQLString {
+    return this.visitAggregate(node, "MIN");
+  }
+  protected visitAvg(node: Nodes.Avg): SQLString {
+    return this.visitAggregate(node, "AVG");
+  }
+
+  static {
+    const d = ToSql.dispatchCache();
+    // Runtime guard: TS `keyof T` only exposes public members, and the
+    // visit methods are mostly protected, so we can't constrain `m` at
+    // compile time. Asserting here catches typos/renames the next time
+    // the static block runs (i.e. as soon as the file is imported).
+    const reg = (ctor: NodeCtor, m: string) => {
+      if (typeof (ToSql.prototype as unknown as Record<string, unknown>)[m] !== "function") {
+        throw new Error(`ToSql dispatch: method '${m}' is not defined on the prototype`);
+      }
+      d.set(ctor, m);
+    };
+    // Statements
+    reg(Nodes.SelectStatement, "visitSelectStatement");
+    reg(Nodes.SelectCore, "visitSelectCore");
+    reg(Nodes.InsertStatement, "visitInsertStatement");
+    reg(Nodes.UpdateStatement, "visitUpdateStatement");
+    reg(Nodes.DeleteStatement, "visitDeleteStatement");
     // Set operations
-    if (node instanceof Nodes.UnionAll) return this.visitUnionAll(node);
-    if (node instanceof Nodes.Union) return this.visitUnion(node);
-    if (node instanceof Nodes.Intersect) return this.visitIntersect(node);
-    if (node instanceof Nodes.Except) return this.visitExcept(node);
-
+    reg(Nodes.UnionAll, "visitUnionAll");
+    reg(Nodes.Union, "visitUnion");
+    reg(Nodes.Intersect, "visitIntersect");
+    reg(Nodes.Except, "visitExcept");
     // CTE
-    if (node instanceof Nodes.WithRecursive) return this.visitWithRecursive(node);
-    if (node instanceof Nodes.With) return this.visitWith(node);
-    if (node instanceof Nodes.TableAlias) return this.visitTableAlias(node);
-
+    reg(Nodes.WithRecursive, "visitWithRecursive");
+    reg(Nodes.With, "visitWith");
+    reg(Nodes.TableAlias, "visitTableAlias");
+    reg(Nodes.Cte, "visitCte");
     // Joins
-    if (node instanceof Nodes.JoinSource) return this.visitJoinSource(node);
-    if (node instanceof Nodes.InnerJoin) return this.visitInnerJoin(node);
-    if (node instanceof Nodes.OuterJoin) return this.visitOuterJoin(node);
-    if (node instanceof Nodes.RightOuterJoin) return this.visitRightOuterJoin(node);
-    if (node instanceof Nodes.FullOuterJoin) return this.visitFullOuterJoin(node);
-    if (node instanceof Nodes.CrossJoin) return this.visitCrossJoin(node);
-    if (node instanceof Nodes.StringJoin) return this.visitStringJoin(node);
-    if (node instanceof Nodes.On) return this.visitOn(node);
-
-    // Predicates (must check specific subclasses before Binary)
-    if (node instanceof Nodes.Equality) return this.visitEquality(node);
-    if (node instanceof Nodes.NotEqual) return this.visitNotEqual(node);
-    if (node instanceof Nodes.GreaterThan) return this.visitBinaryOp(node, ">");
-    if (node instanceof Nodes.GreaterThanOrEqual) return this.visitBinaryOp(node, ">=");
-    if (node instanceof Nodes.LessThan) return this.visitBinaryOp(node, "<");
-    if (node instanceof Nodes.LessThanOrEqual) return this.visitBinaryOp(node, "<=");
-    if (node instanceof Nodes.Matches) return this.visitMatches(node);
-    if (node instanceof Nodes.DoesNotMatch) return this.visitDoesNotMatch(node);
-    if (node instanceof Nodes.In) return this.visitIn(node);
-    if (node instanceof Nodes.NotIn) return this.visitNotIn(node);
-    if (node instanceof Nodes.Between) return this.visitBetween(node);
-    if (node instanceof Nodes.Regexp) return this.visitRegexp(node);
-    if (node instanceof Nodes.NotRegexp) return this.visitNotRegexp(node);
-    if (node instanceof Nodes.IsDistinctFrom) return this.visitIsDistinctFrom(node);
-    if (node instanceof Nodes.IsNotDistinctFrom) return this.visitIsNotDistinctFrom(node);
-    if (node instanceof Nodes.Assignment) return this.visitAssignment(node);
-    if (node instanceof Nodes.As) return this.visitAs(node);
-
+    reg(Nodes.JoinSource, "visitJoinSource");
+    reg(Nodes.InnerJoin, "visitInnerJoin");
+    reg(Nodes.OuterJoin, "visitOuterJoin");
+    reg(Nodes.RightOuterJoin, "visitRightOuterJoin");
+    reg(Nodes.FullOuterJoin, "visitFullOuterJoin");
+    reg(Nodes.CrossJoin, "visitCrossJoin");
+    reg(Nodes.StringJoin, "visitStringJoin");
+    reg(Nodes.On, "visitOn");
+    // Predicates
+    reg(Nodes.Equality, "visitEquality");
+    reg(Nodes.NotEqual, "visitNotEqual");
+    reg(Nodes.GreaterThan, "visitGreaterThan");
+    reg(Nodes.GreaterThanOrEqual, "visitGreaterThanOrEqual");
+    reg(Nodes.LessThan, "visitLessThan");
+    reg(Nodes.LessThanOrEqual, "visitLessThanOrEqual");
+    reg(Nodes.Matches, "visitMatches");
+    reg(Nodes.DoesNotMatch, "visitDoesNotMatch");
+    reg(Nodes.In, "visitIn");
+    reg(Nodes.NotIn, "visitNotIn");
+    reg(Nodes.Between, "visitBetween");
+    reg(Nodes.Regexp, "visitRegexp");
+    reg(Nodes.NotRegexp, "visitNotRegexp");
+    reg(Nodes.IsDistinctFrom, "visitIsDistinctFrom");
+    reg(Nodes.IsNotDistinctFrom, "visitIsNotDistinctFrom");
+    reg(Nodes.Assignment, "visitAssignment");
+    reg(Nodes.As, "visitAs");
     // Unary
-    if (node instanceof Nodes.Ascending) return this.visitAscending(node);
-    if (node instanceof Nodes.Descending) return this.visitDescending(node);
-    if (node instanceof Nodes.Offset) return this.visitOffset(node);
-    if (node instanceof Nodes.Limit) return this.visitLimit(node);
-    if (node instanceof Nodes.Top) return this.visitTop(node);
-    if (node instanceof Nodes.Lock) return this.visitLock(node);
-    if (node instanceof Nodes.DistinctOn) return this.visitDistinctOn(node);
-    if (node instanceof Nodes.Bin) return this.visitBin(node);
-
+    reg(Nodes.Ascending, "visitAscending");
+    reg(Nodes.Descending, "visitDescending");
+    reg(Nodes.Offset, "visitOffset");
+    reg(Nodes.Limit, "visitLimit");
+    reg(Nodes.Top, "visitTop");
+    reg(Nodes.Lock, "visitLock");
+    reg(Nodes.DistinctOn, "visitDistinctOn");
+    reg(Nodes.Bin, "visitBin");
+    reg(Nodes.NullsFirst, "visitNullsFirst");
+    reg(Nodes.NullsLast, "visitNullsLast");
+    reg(Nodes.UnaryOperation, "visitUnaryOperation");
     // Boolean
-    if (node instanceof Nodes.And) return this.visitAnd(node);
-    if (node instanceof Nodes.Or) return this.visitOr(node);
-    if (node instanceof Nodes.Not) return this.visitNot(node);
-    if (node instanceof Nodes.Grouping) return this.visitGrouping(node);
-
+    reg(Nodes.And, "visitAnd");
+    reg(Nodes.Or, "visitOr");
+    reg(Nodes.Not, "visitNot");
+    reg(Nodes.Grouping, "visitGrouping");
     // Window
-    if (node instanceof Nodes.Over) return this.visitOver(node);
-    if (node instanceof Nodes.NamedWindow) return this.visitNamedWindow(node);
-    if (node instanceof Nodes.Window) return this.visitWindow(node);
-    if (node instanceof Nodes.Rows) return this.visitRows(node);
-    if (node instanceof Nodes.Range) return this.visitRange(node);
-    if (node instanceof Nodes.Preceding) return this.visitPreceding(node);
-    if (node instanceof Nodes.Following) return this.visitFollowing(node);
-    if (node instanceof Nodes.CurrentRow) return this.visitCurrentRow(node);
-
-    // Nulls ordering (must be before generic Unary)
-    if (node instanceof Nodes.NullsFirst) return this.visitNullsFirst(node);
-    if (node instanceof Nodes.NullsLast) return this.visitNullsLast(node);
-
-    // CTE node
-    if (node instanceof Nodes.Cte) return this.visitCte(node);
-
-    // UnaryOperation (must be before InfixOperation check)
-    if (node instanceof Nodes.UnaryOperation) return this.visitUnaryOperation(node);
-
-    // Filter
-    if (node instanceof Nodes.Filter) return this.visitFilter(node);
-
-    // Case / Extract / InfixOperation
-    if (node instanceof Nodes.Case) return this.visitCase(node);
-    if (node instanceof Nodes.Extract) return this.visitExtract(node);
-    if (node instanceof Nodes.Concat) return this.visitConcat(node);
-    if (node instanceof Nodes.InfixOperation) return this.visitInfixOperation(node);
-    if (node instanceof Nodes.BoundSqlLiteral) return this.visitBoundSqlLiteral(node);
-    if (node instanceof Nodes.BindParam) return this.visitBindParam(node);
-    if (node instanceof Nodes.Fragments) return this.visitFragments(node);
-
+    reg(Nodes.Over, "visitOver");
+    reg(Nodes.NamedWindow, "visitNamedWindow");
+    reg(Nodes.Window, "visitWindow");
+    reg(Nodes.Rows, "visitRows");
+    reg(Nodes.Range, "visitRange");
+    reg(Nodes.Preceding, "visitPreceding");
+    reg(Nodes.Following, "visitFollowing");
+    reg(Nodes.CurrentRow, "visitCurrentRow");
+    // Filter / Case / Extract / Infix
+    reg(Nodes.Filter, "visitFilter");
+    reg(Nodes.Case, "visitCase");
+    reg(Nodes.Extract, "visitExtract");
+    reg(Nodes.Concat, "visitConcat");
+    reg(Nodes.InfixOperation, "visitInfixOperation");
+    reg(Nodes.BoundSqlLiteral, "visitBoundSqlLiteral");
+    reg(Nodes.BindParam, "visitBindParam");
+    reg(Nodes.Fragments, "visitFragments");
     // Functions
-    if (node instanceof Nodes.NamedFunction) return this.visitNamedFunction(node);
-    if (node instanceof Nodes.Exists) return this.visitExists(node);
-    if (node instanceof Nodes.Count) return this.visitAggregate(node, "COUNT");
-    if (node instanceof Nodes.Sum) return this.visitAggregate(node, "SUM");
-    if (node instanceof Nodes.Max) return this.visitAggregate(node, "MAX");
-    if (node instanceof Nodes.Min) return this.visitAggregate(node, "MIN");
-    if (node instanceof Nodes.Avg) return this.visitAggregate(node, "AVG");
-
+    reg(Nodes.NamedFunction, "visitNamedFunction");
+    reg(Nodes.Exists, "visitExists");
+    reg(Nodes.Count, "visitCount");
+    reg(Nodes.Sum, "visitSum");
+    reg(Nodes.Max, "visitMax");
+    reg(Nodes.Min, "visitMin");
+    reg(Nodes.Avg, "visitAvg");
     // Advanced grouping
-    if (node instanceof Nodes.Cube) return this.visitCube(node);
-    if (node instanceof Nodes.Rollup) return this.visitRollup(node);
-    if (node instanceof Nodes.GroupingSet) return this.visitGroupingSet(node);
-    if (node instanceof Nodes.Group) return this.visitGroup(node);
-    if (node instanceof Nodes.GroupingElement) return this.visitGroupingElement(node);
-    if (node instanceof Nodes.Lateral) return this.visitLateral(node);
-    if (node instanceof Nodes.Comment) return this.visitComment(node);
-    if (node instanceof Nodes.HomogeneousIn) return this.visitHomogeneousIn(node);
-
+    reg(Nodes.Cube, "visitCube");
+    reg(Nodes.Rollup, "visitRollup");
+    reg(Nodes.GroupingSet, "visitGroupingSet");
+    reg(Nodes.Group, "visitGroup");
+    reg(Nodes.GroupingElement, "visitGroupingElement");
+    reg(Nodes.Lateral, "visitLateral");
+    reg(Nodes.Comment, "visitComment");
+    reg(Nodes.HomogeneousIn, "visitHomogeneousIn");
     // Boolean literals
-    if (node instanceof Nodes.True) return this.visitTrue(node);
-    if (node instanceof Nodes.False) return this.visitFalse(node);
-
+    reg(Nodes.True, "visitTrue");
+    reg(Nodes.False, "visitFalse");
     // Leaf nodes
-    if (node instanceof Nodes.Distinct) return this.visitDistinct(node);
-    if (node instanceof Nodes.SqlLiteral) return this.visitSqlLiteral(node);
-    if (node instanceof Nodes.Quoted) return this.visitQuoted(node);
-    if (node instanceof Nodes.Casted) return this.visitCasted(node);
-    if (node instanceof Nodes.UnqualifiedColumn) return this.visitUnqualifiedColumn(node);
-    if (node instanceof Nodes.Attribute) return this.visitAttribute(node);
-    if (node instanceof Nodes.ValuesList) return this.visitValuesList(node);
-    if (node instanceof Table) return this.visitTable(node);
-
-    throw new UnsupportedVisitError(`Unknown node type: ${node.constructor.name}`);
+    reg(Nodes.Distinct, "visitDistinct");
+    reg(Nodes.SqlLiteral, "visitSqlLiteral");
+    reg(Nodes.Quoted, "visitQuoted");
+    reg(Nodes.Casted, "visitCasted");
+    reg(Nodes.UnqualifiedColumn, "visitUnqualifiedColumn");
+    reg(Nodes.Attribute, "visitAttribute");
+    reg(Nodes.ValuesList, "visitValuesList");
+    reg(Table, "visitTable");
   }
 
   // -- Statements --
