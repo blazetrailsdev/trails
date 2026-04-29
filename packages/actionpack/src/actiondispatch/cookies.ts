@@ -5,6 +5,16 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+
+/** Cookie expiry — accept either a Date or a Temporal.Instant from AR/AM. */
+export type CookieExpires = Date | Temporal.Instant;
+
+function toUTCString(expires: CookieExpires): string {
+  return expires instanceof Temporal.Instant
+    ? new Date(expires.epochMilliseconds).toUTCString()
+    : expires.toUTCString();
+}
 
 export interface CookieJarOptions {
   secret?: string;
@@ -15,14 +25,14 @@ export interface CookieJarOptions {
   httpOnly?: boolean;
   domain?: string;
   path?: string;
-  expires?: Date;
+  expires?: CookieExpires;
 }
 
 export interface SetCookieOptions {
   value: string;
   path?: string;
   domain?: string;
-  expires?: Date;
+  expires?: CookieExpires;
   maxAge?: number;
   secure?: boolean;
   httpOnly?: boolean;
@@ -307,7 +317,7 @@ function formatSetCookie(name: string, opts: SetCookieOptions, defaults: CookieJ
   const path = opts.path ?? defaults.path ?? "/";
   header += `; path=${path}`;
   if (opts.domain ?? defaults.domain) header += `; domain=${opts.domain ?? defaults.domain}`;
-  if (opts.expires) header += `; expires=${opts.expires.toUTCString()}`;
+  if (opts.expires) header += `; expires=${toUTCString(opts.expires)}`;
   if (opts.maxAge !== undefined) header += `; max-age=${opts.maxAge}`;
   if (opts.secure ?? defaults.secure) header += "; secure";
   if (opts.httpOnly ?? defaults.httpOnly) header += "; HttpOnly";

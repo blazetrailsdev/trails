@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { CookieJar } from "../cookies.js";
 
 describe("CookieJarTest", () => {
@@ -133,6 +134,15 @@ describe("CookiesTest", () => {
     jar.set("user_name", { value: "david", expires });
     const headers = jar.getSetCookieHeaders();
     expect(headers[0]).toContain("expires=");
+  });
+
+  it("setting cookie expires from a Temporal.Instant", () => {
+    const jar = new CookieJar();
+    // Pin to a known instant so the rendered RFC 7231 string is deterministic.
+    const instant = Temporal.Instant.from("2030-04-15T12:00:00Z");
+    jar.set("user_name", { value: "david", expires: instant });
+    const headers = jar.getSetCookieHeaders();
+    expect(headers[0]).toContain("expires=Mon, 15 Apr 2030 12:00:00 GMT");
   });
 
   it("setting cookie for fourteen days with symbols", () => {
