@@ -15,10 +15,16 @@ describe("FormatValidationTest", () => {
   });
 
   it("validates format of without lambda without arguments", () => {
+    // JS regex has no \A/\z analogues for Ruby's start-of-string /
+    // end-of-string anchors. JS ^/$ default to start/end of input
+    // (line anchors only with the `m` flag), but Rails inspects regex
+    // *source* for ^/$ regardless and forces opt-in via multiline: true
+    // — the security check is about the developer's intent, not the
+    // regex engine's flag state (format.rb:42, regexp_using_multiline_anchors?).
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.validates("name", { format: { with: /^[a-z]+$/ } });
+        this.validates("name", { format: { with: /^[a-z]+$/, multiline: true } });
       }
     }
     expect(new Person({ name: "alice" }).isValid()).toBe(true);
@@ -37,25 +43,29 @@ describe("FormatValidationTest", () => {
   });
 
   it("validates format of when with isnt a regexp should raise error", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { format: { with: "not a regexp" as any } });
+    // Rails check_validity! runs at validator construction, so the
+    // throw fires when `validates(...)` is called — match that timing.
+    expect(() => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { format: { with: "not a regexp" as any } });
+        }
       }
-    }
-    const p = new Person({ name: "test" });
-    expect(() => p.isValid()).toThrow();
+      void Person;
+    }).toThrow(/regular expression or a proc or lambda must be supplied as :with/);
   });
 
   it("validates format of when not isnt a regexp should raise error", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { format: { without: "not a regexp" as any } });
+    expect(() => {
+      class Person extends Model {
+        static {
+          this.attribute("name", "string");
+          this.validates("name", { format: { without: "not a regexp" as any } });
+        }
       }
-    }
-    const p = new Person({ name: "test" });
-    expect(() => p.isValid()).toThrow();
+      void Person;
+    }).toThrow(/regular expression or a proc or lambda must be supplied as :without/);
   });
 
   it("validates format of without lambda", () => {
@@ -74,7 +84,7 @@ describe("FormatValidationTest", () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
-        this.validates("title", { format: { with: /^[A-Z]/ } });
+        this.validates("title", { format: { with: /^[A-Z]/, multiline: true } });
       }
     }
     expect(new Person({ title: "Hello" }).isValid()).toBe(true);
@@ -97,7 +107,7 @@ describe("FormatValidationTest", () => {
       static {
         this.attribute("title", "string");
         this.validates("title", {
-          format: { with: /^[A-Z]/, message: "must start with uppercase" },
+          format: { with: /^[A-Z]/, multiline: true, message: "must start with uppercase" },
         });
       }
     }
@@ -110,7 +120,9 @@ describe("FormatValidationTest", () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
-        this.validates("title", { format: { with: /^[A-Z]/, allowBlank: true } });
+        this.validates("title", {
+          format: { with: /^[A-Z]/, multiline: true, allowBlank: true },
+        });
       }
     }
     expect(new Person({ title: "" }).isValid()).toBe(true);
@@ -122,7 +134,7 @@ describe("FormatValidationTest", () => {
     class Person extends Model {
       static {
         this.attribute("value", "string");
-        this.validates("value", { format: { with: /^\d+$/ } });
+        this.validates("value", { format: { with: /^\d+$/, multiline: true } });
       }
     }
     expect(new Person({ value: "123" }).isValid()).toBe(true);
@@ -208,5 +220,22 @@ describe("format with 'without' option", () => {
     const n = new NoNumbers({ name: "dean123" });
     expect(n.isValid()).toBe(false);
     expect(n.errors.get("name")).toContain("is invalid");
+  });
+
+  it("validate format does not mutate regex lastIndex across calls (g flag)", () => {
+    // Rails regexp.match? is stateless. JS RegExp#test mutates lastIndex
+    // for /g and /y regexes — a shared regex would alternate
+    // pass/fail. Pin the stateless behavior here.
+    const sharedRe = /\d+/g;
+    class P extends Model {
+      static {
+        this.attribute("code", "string");
+        this.validates("code", { format: { with: sharedRe } });
+      }
+    }
+    expect(new P({ code: "abc123" }).isValid()).toBe(true);
+    expect(new P({ code: "abc123" }).isValid()).toBe(true);
+    expect(new P({ code: "abc123" }).isValid()).toBe(true);
+    expect(sharedRe.lastIndex).toBe(0);
   });
 });

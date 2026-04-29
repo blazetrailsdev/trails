@@ -265,7 +265,7 @@ describe("ValidationsTest", () => {
       static {
         this.attribute("email", "string");
         this.validates("email", {
-          format: { with: /^[^@\s]+@[^@\s]+\.[^@\s]+$/ },
+          format: { with: /^[^@\s]+@[^@\s]+\.[^@\s]+$/, multiline: true },
         });
       }
     }
@@ -1688,7 +1688,7 @@ describe("Validations", () => {
     class Email extends Model {
       static {
         this.attribute("email", "string");
-        this.validates("email", { format: { with: /^[^@]+@[^@]+$/ } });
+        this.validates("email", { format: { with: /^[^@]+@[^@]+$/, multiline: true } });
       }
     }
 
@@ -1703,7 +1703,17 @@ describe("Validations", () => {
     });
 
     it("skips null", () => {
-      expect(new Email({}).isValid()).toBe(true);
+      // Rails format validator does NOT auto-skip nil — opt in via
+      // allow_nil: true (matches EachValidator's allow_nil dispatch).
+      class NilSkippingEmail extends Model {
+        static {
+          this.attribute("email", "string");
+          this.validates("email", {
+            format: { with: /^[^@]+@[^@]+$/, multiline: true, allowNil: true },
+          });
+        }
+      }
+      expect(new NilSkippingEmail({}).isValid()).toBe(true);
     });
   });
 
