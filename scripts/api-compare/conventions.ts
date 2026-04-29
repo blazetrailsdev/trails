@@ -10,11 +10,13 @@ export function snakeToCamel(name: string): string {
   const match = name.match(/^(_+)/);
   const prefix = match ? match[1] : "";
   const rest = name.slice(prefix.length);
-  // Match `_` followed by any letter or digit so Ruby names containing
-  // capitalized segments (e.g. `visit_Arel_Nodes_SelectStatement`)
-  // collapse cleanly to camelCase TS form (`visitArelNodesSelectStatement`)
-  // — matching project style instead of leaking literal snake_case identifiers.
-  return prefix + rest.replace(/_([a-zA-Z0-9])/g, (_, ch: string) => ch.toUpperCase());
+  // Match runs of `_` followed by any letter or digit so Ruby names with
+  // capitalized segments (e.g. `visit_Arel_Nodes_SelectStatement`) OR
+  // doubled underscores (Ruby's private-alias-target convention, e.g.
+  // `visit__regexp`, `visit__no_edges`) collapse to the same camelCase
+  // shape — `visit_Arel_Nodes_X → visitArelNodesX`,
+  // `visit__regexp → visitRegexp`, `visit__no_edges → visitNoEdges`.
+  return prefix + rest.replace(/_+([a-zA-Z0-9])/g, (_, ch: string) => ch.toUpperCase());
 }
 
 /** Ruby file path → expected TS file path (kebab-case, .ts extension) */
