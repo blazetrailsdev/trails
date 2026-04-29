@@ -91,6 +91,8 @@ export class Logger {
     if (severity < this.level) return true;
     const msg = message != null ? String(message) : (progname ?? this.progname);
     const severityName = (LEVEL_NAMES[severity] ?? "unknown").toUpperCase();
+    // boundary: Logger#formatter receives a Date timestamp by Rails parity
+    // (Ruby Logger::Formatter#call(severity, time, progname, msg) — time is a Time).
     const line = this.formatter
       ? this.formatter(severityName, new Date(), this.progname, msg)
       : `${msg}\n`;

@@ -1,3 +1,9 @@
+/**
+ * @boundary-file: subscriber group implementations may time their callbacks
+ *   with either JS `Date` values or monotonic numeric timestamps, depending on
+ *   the timing source. The public `Event.time`/`end` contract remains
+ *   Date-typed for Rails parity — see notifications/instrumenter.ts.
+ */
 import { Event } from "./instrumenter.js";
 
 export class InstrumentationSubscriberError extends Error {

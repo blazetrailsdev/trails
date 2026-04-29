@@ -2,6 +2,11 @@
  * ActiveSupport::TimeZone — mirrors the Rails API.
  *
  * Uses the built-in Intl API for timezone data, wrapping IANA timezone names.
+ *
+ * @boundary-file: `Intl.DateTimeFormat#formatToParts` requires a JS `Date`
+ *   input, so this file traffics in `Date` for offset/abbrev/DST lookups and
+ *   for the `local`-to-UTC ambiguity search. The Temporal-aware public surface
+ *   lives on `TimeWithZone`; this module is its calculation backend.
  */
 
 import { TimeWithZone } from "../time-with-zone.js";

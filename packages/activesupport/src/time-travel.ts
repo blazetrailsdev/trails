@@ -4,6 +4,11 @@
  *
  * Separated from testing-helpers so production code doesn't need to import
  * test assertion utilities.
+ *
+ * @boundary-file: `currentTime()` returns a JS `Date` because most consumers
+ *   (legacy Rails-port code in `time-ext`, `duration`, etc.) are Date-typed.
+ *   Callers that want Temporal use `Temporal.Now.instant()` directly or bridge
+ *   via `instantFrom(currentTime())`.
  */
 
 let _frozenTime: Date | null = null;

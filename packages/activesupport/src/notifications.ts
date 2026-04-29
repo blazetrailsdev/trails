@@ -5,6 +5,9 @@
  *   const sub = Notifications.subscribe("sql.active_record", (event) => { ... });
  *   Notifications.instrument("sql.active_record", { sql: "SELECT 1" }, () => { ... });
  *   Notifications.unsubscribe(sub);
+ *
+ * @boundary-file: emits `Event` instances whose `time`/`end` fields are
+ *   JS `Date` by Rails parity (see `notifications/instrumenter.ts`).
  */
 
 import { Event } from "./notifications/instrumenter.js";

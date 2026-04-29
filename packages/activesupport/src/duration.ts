@@ -1,5 +1,10 @@
 /**
  * ActiveSupport::Duration — mirrors the Rails API as closely as possible.
+ *
+ * @boundary-file: This file's public API is Date-typed by Rails parity
+ *   (`since`/`ago`/`from_now`/`until`/`after`/`before` all take and return
+ *   `Time`-like values, which JS expresses as `Date`). The Temporal flip lives
+ *   on `TimeWithZone` instead.
  */
 
 export type DurationParts = {

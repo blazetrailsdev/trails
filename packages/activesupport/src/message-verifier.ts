@@ -61,6 +61,7 @@ export class MessageVerifier {
     if (options.expiresAt) {
       payload._expiresAt = options.expiresAt.toISOString();
     } else if (options.expiresIn !== undefined) {
+      // boundary: ISO timestamp serialized into the signed payload.
       payload._expiresAt = new Date(Date.now() + options.expiresIn * 1000).toISOString();
     }
 
@@ -100,6 +101,7 @@ export class MessageVerifier {
 
       const payload = parsed as Record<string, unknown>;
 
+      // boundary: parse the embedded ISO timestamp and compare to wall clock.
       if (payload._expiresAt && new Date(payload._expiresAt as string) < new Date()) {
         throw new InvalidSignature("Expired message");
       }

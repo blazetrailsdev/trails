@@ -1,5 +1,9 @@
 /**
  * Range utility functions mirroring ActiveSupport's Range extensions.
+ *
+ * @boundary-file: Date-aware range comparators (`overlap`, `cover`, `each`)
+ *   coerce `Date` ↔ epoch number for ordering since Rails' `Range#include?`
+ *   accepts any `<=>`-comparable value. Temporal-typed ranges live elsewhere.
  */
 
 export interface Range<T> {

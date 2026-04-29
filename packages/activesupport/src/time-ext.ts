@@ -2,7 +2,10 @@
  * Time/Date extension functions following Rails' ActiveSupport::CoreExt::Time
  * and ActiveSupport::CoreExt::Date patterns.
  *
- * All functions operate on JavaScript Date objects (local time).
+ * @boundary-file: All functions operate on JavaScript `Date` objects by Rails
+ *   parity — the file mirrors `core_ext/time` / `core_ext/date`, both of which
+ *   are Ruby Time/Date-typed in Rails. Temporal-typed equivalents live on
+ *   `TimeWithZone` (instant, plain date/time) and `Duration`.
  */
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
