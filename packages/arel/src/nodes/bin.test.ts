@@ -26,8 +26,9 @@ describe("TestBin", () => {
   });
 
   it("mysql to sql", () => {
+    // Rails MySQL: visit_Arel_Nodes_Bin emits `CAST(... AS BINARY)`.
     const node = new Nodes.Bin(new Nodes.SqlLiteral("zomg"));
     const sql = new Visitors.MySQL().compile(node);
-    expect(sql).toBe("BINARY zomg");
+    expect(sql).toBe("CAST(zomg AS BINARY)");
   });
 });

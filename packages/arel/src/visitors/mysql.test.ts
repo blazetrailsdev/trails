@@ -147,35 +147,31 @@ describe("MysqlTest", () => {
     });
   });
 
+  // MySQL renders IS [NOT] DISTINCT FROM via the `<=>` null-safe equality
+  // operator (Rails arel/visitors/mysql.rb). The standard
+  // `IS [NOT] DISTINCT FROM` form is only supported on MySQL 8.0.14+;
+  // the operator form works on every supported MySQL version.
   describe("Nodes::IsNotDistinctFrom", () => {
     it("should handle column names on both sides", () => {
       const node = users.get("id").isNotDistinctFrom(posts.get("user_id"));
-      const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
-      expect(sql).toContain('"users"."id"');
-      expect(sql).toContain('"posts"."user_id"');
+      expect(new Visitors.MySQL().compile(node)).toBe('"users"."id" <=> "posts"."user_id"');
     });
 
     it("should handle nil", () => {
       const node = users.get("name").isNotDistinctFrom(null);
-      const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
-      expect(sql).toContain('"users"."name"');
-      expect(sql).toContain("NULL");
+      expect(new Visitors.MySQL().compile(node)).toBe('"users"."name" <=> NULL');
     });
 
     it("should construct a valid generic SQL statement", () => {
       const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
-      const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toContain("IS NOT DISTINCT FROM");
+      expect(new Visitors.MySQL().compile(node)).toBe('"users"."name" <=> 1');
     });
   });
 
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle column names on both sides", () => {
       const node = users.get("id").isDistinctFrom(posts.get("user_id"));
-      const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toContain("IS DISTINCT FROM");
+      expect(new Visitors.MySQL().compile(node)).toBe('NOT "users"."id" <=> "posts"."user_id"');
     });
   });
 
@@ -193,5 +189,73 @@ describe("MysqlTest", () => {
       const sql = new Visitors.MySQL().compile(stmt.ast);
       expect(sql).not.toContain("NOT MATERIALIZED");
     });
+  });
+});
+
+// Audit follow-up: verify the MySQL dialect overrides land on the
+// previously-missing visit methods (Bin / UnqualifiedColumn /
+// IsDistinctFrom / IsNotDistinctFrom / Regexp / NotRegexp / Cte).
+describe("MySQL dialect overrides (audit follow-up)", () => {
+  const users = new Table("users");
+  const compile = (n: Nodes.Node): string => new Visitors.MySQL().compile(n);
+
+  it("Bin uses CAST(... AS BINARY) (mirrors Rails)", () => {
+    expect(compile(new Nodes.Bin(users.get("name")))).toBe('CAST("users"."name" AS BINARY)');
+  });
+
+  it("UnqualifiedColumn delegates to its inner expression", () => {
+    expect(compile(new Nodes.UnqualifiedColumn(users.get("name")))).toBe('"users"."name"');
+  });
+
+  it("UnqualifiedColumn renders an UPDATE SET assignment without dialect drift", () => {
+    // The override exists so `UPDATE t SET col = col + 1` works on
+    // MySQL — the LHS of the assignment must compile cleanly through
+    // the inner Attribute. Regression coverage: any future change to
+    // visitUnqualifiedColumn that throws or short-circuits would
+    // break this end-to-end shape.
+    const lhs = new Nodes.UnqualifiedColumn(users.get("counter"));
+    const sql = compile(new Nodes.Assignment(lhs, new Nodes.SqlLiteral("1")));
+    expect(sql).toContain('"users"."counter"');
+    expect(sql).toContain("=");
+    expect(sql).toContain("1");
+  });
+
+  it("IsNotDistinctFrom uses MySQL `<=>` operator", () => {
+    const node = new Nodes.IsNotDistinctFrom(users.get("a"), users.get("b"));
+    expect(compile(node)).toBe('"users"."a" <=> "users"."b"');
+  });
+
+  it("IsNotDistinctFrom handles NULL on the right (Rails: `<=> NULL`)", () => {
+    const node = users.get("name").isNotDistinctFrom(null);
+    expect(compile(node)).toBe('"users"."name" <=> NULL');
+  });
+
+  it("IsDistinctFrom uses MySQL `NOT ... <=>` operator", () => {
+    const node = new Nodes.IsDistinctFrom(users.get("a"), users.get("b"));
+    expect(compile(node)).toBe('NOT "users"."a" <=> "users"."b"');
+  });
+
+  it("IsDistinctFrom handles NULL on the right (Rails: `NOT … <=> NULL`)", () => {
+    const node = users.get("name").isDistinctFrom(null);
+    expect(compile(node)).toBe('NOT "users"."name" <=> NULL');
+  });
+
+  it("Regexp uses MySQL REGEXP keyword (not Postgres `~`)", () => {
+    const node = new Nodes.Regexp(users.get("name"), new Nodes.SqlLiteral("'^a'"));
+    expect(compile(node)).toBe('"users"."name" REGEXP \'^a\'');
+  });
+
+  it("NotRegexp uses MySQL NOT REGEXP keyword", () => {
+    const node = new Nodes.NotRegexp(users.get("name"), new Nodes.SqlLiteral("'^a'"));
+    expect(compile(node)).toBe('"users"."name" NOT REGEXP \'^a\'');
+  });
+
+  it("Cte uses backtick-quoted identifiers (not double quotes)", () => {
+    const inner = new SelectManager(users).project(users.get("id"));
+    const cte = new Nodes.Cte("recent", inner.ast);
+    expect(compile(cte)).toMatch(/^`recent` AS \(/);
+    // Embedded backticks must be doubled.
+    const weird = new Nodes.Cte("we`ird", inner.ast);
+    expect(compile(weird)).toMatch(/^`we``ird` AS \(/);
   });
 });
