@@ -7,6 +7,10 @@ export {
   fsAdapterConfig,
 } from "./fs-adapter.js";
 export type { FsAdapter, FsStatResult, FsDirent, PathAdapter } from "./fs-adapter.js";
+// Note: glob is intentionally kept as a subpath import
+// (`@blazetrails/activesupport/glob`) so browser bundles that don't need
+// it don't pull tinyglobby's Node-only transitive deps. Mirrors the
+// pattern used by message-verifier, digest, etc.
 
 export {
   registerCryptoAdapter,

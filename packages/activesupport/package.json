@@ -38,6 +38,10 @@
       "types": "./dist/gzip.d.ts",
       "default": "./dist/gzip.js"
     },
+    "./glob": {
+      "types": "./dist/glob.d.ts",
+      "default": "./dist/glob.js"
+    },
     "./temporal": {
       "types": "./dist/temporal.d.ts",
       "default": "./dist/temporal.js"
@@ -68,6 +72,7 @@
   "license": "MIT",
   "dependencies": {
     "@js-temporal/polyfill": "^0.5.1",
+    "tinyglobby": "^0.2.16",
     "yaml": "^2.8.3"
   }
 }

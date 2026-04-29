@@ -12,6 +12,10 @@ export default defineConfig({
         __dirname,
         "packages/activesupport/src/temporal.ts",
       ),
+      "@blazetrails/activesupport/glob": path.resolve(
+        __dirname,
+        "packages/activesupport/src/glob.ts",
+      ),
       "@blazetrails/activesupport/testing/temporal-helpers": path.resolve(
         __dirname,
         "packages/activesupport/src/testing/temporal-helpers.ts",
