@@ -5,6 +5,7 @@
 
 import { Inflections } from "./inflector/inflections.js";
 
+/** @internal */
 function applyInflections(word: string, rules: { rule: RegExp; replacement: string }[]): string {
   if (!word || word.length === 0) return word;
 

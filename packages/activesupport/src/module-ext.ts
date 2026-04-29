@@ -172,6 +172,8 @@ export const cattrAccessor = mattrAccessor;
 /**
  * configAccessor — defines inheritable configuration accessors (config_accessor in Rails).
  * Works like mattrAccessor but uses a separate config hash namespace.
+ *
+ * @internal
  */
 export function configAccessor(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
   mattrAccessor(target, ...namesAndOptions);

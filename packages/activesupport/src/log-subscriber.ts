@@ -124,6 +124,8 @@ export class LogSubscriber extends Subscriber {
   /**
    * Register a log-level gate for a method. When the logger level is above
    * the gate, events for that method are silenced.
+   *
+   * @internal
    */
   static subscribeLogLevel(method: string, level: string): void {
     const check = this.LEVEL_CHECKS[level];

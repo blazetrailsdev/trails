@@ -346,7 +346,11 @@ export class Duration {
     return new Duration({ seconds: value });
   }
 
-  /** Sum an array of durations. Mirrors Enumerable#sum for durations. */
+  /**
+   * Sum an array of durations. Mirrors Enumerable#sum for durations.
+   *
+   * @internal
+   */
   static sum(durations: Duration[]): Duration {
     return durations.reduce((acc, d) => acc.plus(d), new Duration());
   }

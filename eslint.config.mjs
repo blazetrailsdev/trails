@@ -81,6 +81,15 @@ export default defineConfig(
       "packages/activerecord/src/encryption/context.ts",
       "packages/activerecord/src/connection-handling.ts",
     ],
+    rules: {
+      "blazetrails/no-node-builtins": "error",
+    },
+  },
+
+  // ── blazetrails plugin (shared by no-node-builtins + rails-private-jsdoc) ──
+  // Registered without a `files` restriction so any block below can
+  // reference its rules without re-declaring the plugin.
+  {
     plugins: {
       blazetrails: {
         rules: {
@@ -89,14 +98,11 @@ export default defineConfig(
         },
       },
     },
-    rules: {
-      "blazetrails/no-node-builtins": "error",
-    },
   },
 
   // ── rails-private-jsdoc (per-package rollout; widen as packages adopt) ──
   {
-    files: ["packages/arel/src/**/*.ts"],
+    files: ["packages/arel/src/**/*.ts", "packages/activesupport/src/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-private-jsdoc": "error",

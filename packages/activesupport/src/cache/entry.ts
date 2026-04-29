@@ -4,6 +4,7 @@ export interface CacheEntry {
   accessedAt: number;
 }
 
+/** @internal */
 export function namespaceKey(key: string, namespace?: string): string {
   return namespace ? `${namespace}:${key}` : key;
 }

@@ -71,6 +71,8 @@ export interface CallRecord {
 /**
  * assertCalled — asserts that a method on an object was called during fn execution.
  * Returns call records.
+ *
+ * @internal
  */
 export function assertCalled<T extends object>(
   object: T,
@@ -117,6 +119,8 @@ export function assertCalled<T extends object>(
 
 /**
  * assertNotCalled — asserts that a method on an object was NOT called during fn execution.
+ *
+ * @internal
  */
 export function assertNotCalled<T extends object>(
   object: T,
@@ -128,6 +132,8 @@ export function assertNotCalled<T extends object>(
 
 /**
  * assertCalledOnInstanceOf — asserts that a method was called on instances of a class.
+ *
+ * @internal
  */
 export function assertCalledOnInstanceOf<T>(
   klass: new (...args: any[]) => T,
@@ -163,6 +169,8 @@ export function assertCalledOnInstanceOf<T>(
 
 /**
  * assertNotCalledOnInstanceOf — asserts a method was NOT called on any instance of a class.
+ *
+ * @internal
  */
 export function assertNotCalledOnInstanceOf<T>(
   klass: new (...args: any[]) => T,

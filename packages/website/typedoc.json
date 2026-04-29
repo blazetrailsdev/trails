@@ -19,6 +19,7 @@
   "parametersFormat": "table",
   "enumMembersFormat": "table",
   "packageOptions": {
-    "entryPoints": ["src/index.ts"]
+    "entryPoints": ["src/index.ts"],
+    "excludeInternal": true
   }
 }

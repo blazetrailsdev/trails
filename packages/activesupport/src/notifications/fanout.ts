@@ -13,6 +13,7 @@ export class InstrumentationSubscriberError extends Error {
   }
 }
 
+/** @internal */
 function iterateGuardingExceptions<T>(collection: T[], fn: (item: T) => void): void {
   let exceptions: Error[] | null = null;
 
