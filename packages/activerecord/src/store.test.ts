@@ -776,3 +776,58 @@ describe("StoreTest", () => {
     expect((reloaded as any).color).toBe("green");
   });
 });
+
+describe("store private helpers — tested through public accessor API", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(() => {
+    adapter = createTestAdapter();
+  });
+
+  it("store accessor reads via readStoreAttribute (public get behavior)", () => {
+    class User extends Base {
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(User);
+    store(User, "settings", { accessors: ["theme"] });
+    const user = new User({ settings: JSON.stringify({ theme: "dark" }) });
+    expect((user as any).theme).toBe("dark");
+  });
+
+  it("store accessor writes via writeStoreAttribute (public set behavior)", () => {
+    class User extends Base {
+      static {
+        this._tableName = "users";
+        this.attribute("id", "integer");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(User);
+    store(User, "settings", { accessors: ["theme"] });
+    const user = new User({});
+    (user as any).theme = "light";
+    expect((user as any).theme).toBe("light");
+  });
+
+  it("store accessor delegates through readStoreAttribute/writeStoreAttribute pipeline", () => {
+    class Post extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Post);
+    store(Post, "settings", { accessors: ["color"] });
+    const post = new Post({ settings: JSON.stringify({ color: "blue" }) });
+    expect((post as any).color).toBe("blue");
+    (post as any).color = "red";
+    expect((post as any).color).toBe("red");
+  });
+});

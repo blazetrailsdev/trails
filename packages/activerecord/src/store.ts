@@ -1,4 +1,4 @@
-import { NotImplementedError } from "./errors.js";
+import { ConfigurationError } from "./errors.js";
 import type { Base } from "./base.js";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 
@@ -174,12 +174,16 @@ export function store(
       accessorName = `${accessorName}_${suf}`;
     }
 
+    // Capture `modelClass` at definition time so subclass instances still resolve
+    // the correct accessor even when `record.constructor` differs from the declaring class.
+    // Mirrors Rails: accessor closures delegate through read/write_store_attribute.
+    const declaringClass = modelClass;
     Object.defineProperty(modelClass.prototype, accessorName, {
       get: function (this: Base) {
-        return IndifferentHashAccessor.read(this, attribute, accessor);
+        return readStoreAttribute(this, attribute, accessor, declaringClass);
       },
       set: function (this: Base, value: unknown) {
-        IndifferentHashAccessor.write(this, attribute, accessor, value);
+        writeStoreAttribute(this, attribute, accessor, value, declaringClass);
       },
       configurable: true,
     });
@@ -193,22 +197,83 @@ export function store(
  */
 export const storeAccessor = store;
 
-/** @internal */
-function asRegularHash(obj: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Store::IndifferentCoder#as_regular_hash is not implemented",
-  );
+/**
+ * Returns the HashAccessor class for a given store attribute column.
+ * Raises ConfigurationError if the column is not a declared store.
+ *
+ * Mirrors: ActiveRecord::Store#store_accessor_for (private)
+ *
+ * @internal
+ */
+function storeAccessorFor(modelClass: typeof Base, storeAttribute: string): typeof HashAccessor {
+  const attrs = storedAttributes(modelClass);
+  if (!attrs || !Object.prototype.hasOwnProperty.call(attrs, storeAttribute)) {
+    throw new ConfigurationError(
+      `the column '${storeAttribute}' has not been configured as a store. ` +
+        `Please make sure the column is declared via store() or use a structured column type.`,
+    );
+  }
+  // Prefer the accessor class configured on the attribute type (e.g. hstore →
+  // StringKeyedHashAccessor). Guard: only use the result if it has read/write
+  // methods (some types implement accessor() but return null).
+  // Mirrors Rails: type_for_attribute(attr).accessor.
+  const type = (modelClass as any).typeForAttribute?.(storeAttribute);
+  if (type && typeof (type as any).accessor === "function") {
+    const accessor = (type as any).accessor();
+    if (accessor && typeof accessor.read === "function" && typeof accessor.write === "function") {
+      return accessor as typeof HashAccessor;
+    }
+  }
+  return IndifferentHashAccessor;
 }
 
-function readStoreAttribute(storeAttribute: any, key: any): never {
-  throw new NotImplementedError("ActiveRecord::Store#read_store_attribute is not implemented");
+/**
+ * Reads a single key from a store attribute.
+ *
+ * Mirrors: ActiveRecord::Store#read_store_attribute (private)
+ */
+function readStoreAttribute(
+  record: Base,
+  storeAttribute: string,
+  key: string,
+  declaringClass?: typeof Base,
+): unknown {
+  // Use the declaring class (where store() was called) so subclass instances
+  // resolve the correct accessor even when record.constructor differs from the parent.
+  const modelClass = declaringClass ?? (record.constructor as typeof Base);
+  const accessor = storeAccessorFor(modelClass, storeAttribute);
+  return accessor.read(record, storeAttribute, key);
 }
 
-function writeStoreAttribute(storeAttribute: any, key: any, value: any): never {
-  throw new NotImplementedError("ActiveRecord::Store#write_store_attribute is not implemented");
+/**
+ * Writes a single key to a store attribute.
+ *
+ * Mirrors: ActiveRecord::Store#write_store_attribute (private)
+ */
+function writeStoreAttribute(
+  record: Base,
+  storeAttribute: string,
+  key: string,
+  value: unknown,
+  declaringClass?: typeof Base,
+): void {
+  const modelClass = declaringClass ?? (record.constructor as typeof Base);
+  const accessor = storeAccessorFor(modelClass, storeAttribute);
+  accessor.write(record, storeAttribute, key, value);
 }
 
-/** @internal */
-function storeAccessorFor(storeAttribute: any): never {
-  throw new NotImplementedError("ActiveRecord::Store#store_accessor_for is not implemented");
+/**
+ * Converts a HashWithIndifferentAccess to a plain object.
+ *
+ * Mirrors: ActiveRecord::Store::IndifferentCoder#as_regular_hash (private)
+ *
+ * @internal
+ */
+function asRegularHash(
+  obj: Record<string, unknown> | HashWithIndifferentAccess<unknown>,
+): Record<string, unknown> {
+  // HashWithIndifferentAccess stores entries internally, so object spread
+  // does not produce the stored key/value pairs — use toHash() to get a plain copy.
+  if (obj instanceof HashWithIndifferentAccess) return obj.toHash();
+  return { ...obj };
 }
