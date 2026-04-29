@@ -109,6 +109,7 @@ export class HashConfig extends DatabaseConfig {
   }
 }
 
+/** @internal */
 function schemaFileType(format: any): never {
   throw new NotImplementedError(
     "ActiveRecord::DatabaseConfigurations::HashConfig#schema_file_type is not implemented",

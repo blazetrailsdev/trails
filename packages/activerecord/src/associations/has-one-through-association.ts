@@ -11,6 +11,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 }
 
+/** @internal */
 async function createThroughRecord(
   assoc: HasOneThroughAssociation,
   record: Base | null,

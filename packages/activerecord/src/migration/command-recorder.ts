@@ -6,11 +6,15 @@
 
 import { NotImplementedError } from "../errors.js";
 export interface StraightReversions {
+  /** @internal */
   invertCreateTable(args: unknown[]): unknown[];
+  /** @internal */
   invertDropTable(args: unknown[]): unknown[];
   invertAddColumn(args: unknown[]): unknown[];
+  /** @internal */
   invertRemoveColumn(args: unknown[]): unknown[];
   invertAddIndex(args: unknown[]): unknown[];
+  /** @internal */
   invertRemoveIndex(args: unknown[]): unknown[];
   invertAddTimestamps(args: unknown[]): unknown[];
   invertRemoveTimestamps(args: unknown[]): unknown[];
@@ -163,144 +167,168 @@ export class CommandRecorder {
   }
 }
 
+/** @internal */
 function invertTransaction(args: any, block?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_transaction is not implemented",
   );
 }
 
+/** @internal */
 function invertCreateTable(args: any, block?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_create_table is not implemented",
   );
 }
 
+/** @internal */
 function invertDropTable(args: any, block?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_drop_table is not implemented",
   );
 }
 
+/** @internal */
 function invertRenameTable(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_rename_table is not implemented",
   );
 }
 
+/** @internal */
 function invertRemoveColumn(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_remove_column is not implemented",
   );
 }
 
+/** @internal */
 function invertRemoveColumns(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_remove_columns is not implemented",
   );
 }
 
+/** @internal */
 function invertRenameIndex(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_rename_index is not implemented",
   );
 }
 
+/** @internal */
 function invertRenameColumn(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_rename_column is not implemented",
   );
 }
 
+/** @internal */
 function invertRemoveIndex(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_remove_index is not implemented",
   );
 }
 
+/** @internal */
 function invertChangeColumnDefault(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_change_column_default is not implemented",
   );
 }
 
+/** @internal */
 function invertChangeColumnNull(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_change_column_null is not implemented",
   );
 }
 
+/** @internal */
 function invertAddForeignKey(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_add_foreign_key is not implemented",
   );
 }
 
+/** @internal */
 function invertRemoveForeignKey(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_remove_foreign_key is not implemented",
   );
 }
 
+/** @internal */
 function invertChangeColumnComment(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_change_column_comment is not implemented",
   );
 }
 
+/** @internal */
 function invertChangeTableComment(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_change_table_comment is not implemented",
   );
 }
 
+/** @internal */
 function invertAddCheckConstraint(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_add_check_constraint is not implemented",
   );
 }
 
+/** @internal */
 function invertRemoveCheckConstraint(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_remove_check_constraint is not implemented",
   );
 }
 
+/** @internal */
 function invertRemoveExclusionConstraint(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_remove_exclusion_constraint is not implemented",
   );
 }
 
+/** @internal */
 function invertAddUniqueConstraint(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_add_unique_constraint is not implemented",
   );
 }
 
+/** @internal */
 function invertRemoveUniqueConstraint(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_remove_unique_constraint is not implemented",
   );
 }
 
+/** @internal */
 function invertDropEnum(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_drop_enum is not implemented",
   );
 }
 
+/** @internal */
 function invertRenameEnum(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_rename_enum is not implemented",
   );
 }
 
+/** @internal */
 function invertRenameEnumValue(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_rename_enum_value is not implemented",
   );
 }
 
+/** @internal */
 function invertDropVirtualTable(args: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CommandRecorder#invert_drop_virtual_table is not implemented",

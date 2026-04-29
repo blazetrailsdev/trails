@@ -45,6 +45,7 @@ export function _readAttribute(this: AttributeHolder, name: string): unknown {
 // uses it while generating dynamic attribute readers. TypeScript attribute
 // access is handled statically, so we compute the same metadata for parity
 // but intentionally do not register or define anything.
+/** @internal */
 function defineMethodAttribute(canonicalName: string, _options?: unknown): void {
   const { methodName, attrNameRef } = AttrNames.defineAttributeAccessorMethod(canonicalName, false);
   void methodName;

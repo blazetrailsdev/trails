@@ -41,30 +41,35 @@ export class MessagePackMessageSerializer {
   }
 }
 
+/** @internal */
 function messageToHash(message: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessagePackMessageSerializer#message_to_hash is not implemented",
   );
 }
 
+/** @internal */
 function headersToHash(headers: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessagePackMessageSerializer#headers_to_hash is not implemented",
   );
 }
 
+/** @internal */
 function hashToMessage(data: any, level: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessagePackMessageSerializer#hash_to_message is not implemented",
   );
 }
 
+/** @internal */
 function validateMessageDataFormat(data: any, level: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessagePackMessageSerializer#validate_message_data_format is not implemented",
   );
 }
 
+/** @internal */
 function parseProperties(headers: any, level: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessagePackMessageSerializer#parse_properties is not implemented",

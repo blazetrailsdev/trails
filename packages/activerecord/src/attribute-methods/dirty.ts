@@ -144,9 +144,11 @@ interface DirtyPrivateHost {
   _skipDirtyTracking: boolean | null;
   attributeChanged(name: string): boolean;
   attributeWas(name: string): unknown;
+  /** @internal */
   clearAttributeChange(name: string): void;
   clearAttributeChanges(names: Iterable<string>): void;
   changesApplied(): void;
+  /** @internal */
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, value: unknown): void;
   _performInsert(): Promise<unknown>;
@@ -160,6 +162,7 @@ interface DirtyPrivateHost {
   };
 }
 
+/** @internal */
 function initInternals(this: DirtyPrivateHost): void {
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
@@ -167,6 +170,7 @@ function initInternals(this: DirtyPrivateHost): void {
   this._skipDirtyTracking = null;
 }
 
+/** @internal */
 function _touchRow(
   this: DirtyPrivateHost,
   attributeNames: string[],
@@ -206,6 +210,7 @@ function _touchRow(
   });
 }
 
+/** @internal */
 function _updateRecord(this: DirtyPrivateHost, _attributeNames?: string[]): Promise<number> {
   return this._performUpdate().then((rows) => {
     this.changesApplied();
@@ -213,6 +218,7 @@ function _updateRecord(this: DirtyPrivateHost, _attributeNames?: string[]): Prom
   });
 }
 
+/** @internal */
 function _createRecord(this: DirtyPrivateHost, _attributeNames?: string[]): Promise<unknown> {
   return this._performInsert().then((id) => {
     this.changesApplied();
@@ -220,12 +226,14 @@ function _createRecord(this: DirtyPrivateHost, _attributeNames?: string[]): Prom
   });
 }
 
+/** @internal */
 function attributeNamesForPartialUpdates(this: DirtyPrivateHost): string[] {
   return this.constructor.partialUpdates
     ? this.changedAttributeNamesToSave
     : this.constructor.attributeNames();
 }
 
+/** @internal */
 function attributeNamesForPartialInserts(this: DirtyPrivateHost): string[] {
   if (this.constructor.partialInserts) {
     return this.changedAttributeNamesToSave;

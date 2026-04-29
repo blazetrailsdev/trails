@@ -124,6 +124,7 @@ export class StatementPool<T = unknown> {
   }
 }
 
+/** @internal */
 function cache(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::StatementPool#cache is not implemented",

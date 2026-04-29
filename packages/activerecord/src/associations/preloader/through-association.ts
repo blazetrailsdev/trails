@@ -312,42 +312,52 @@ export class ThroughAssociation extends Association {
   }
 }
 
+/** @internal */
 function isDataAvailable(assoc: ThroughAssociation): boolean {
   return (assoc as any)._dataAvailable();
 }
 
+/** @internal */
 function sourcePreloaders(assoc: ThroughAssociation): unknown[] {
   return (assoc as any)._sourcePreloaders ?? [];
 }
 
+/** @internal */
 function middleRecords(assoc: ThroughAssociation): unknown[] {
   return (assoc as any)._getMiddleRecords?.() ?? [];
 }
 
+/** @internal */
 function throughPreloaders(assoc: ThroughAssociation): unknown[] {
   return (assoc as any)._throughPreloaders ?? [];
 }
 
+/** @internal */
 function throughReflection(assoc: ThroughAssociation): unknown {
   return (assoc as any)._throughReflection;
 }
 
+/** @internal */
 function sourceReflection(assoc: ThroughAssociation): unknown {
   return (assoc as any)._sourceReflection;
 }
 
+/** @internal */
 function sourceRecordsByOwner(assoc: ThroughAssociation): Map<unknown, unknown[]> {
   return (assoc as any)._sourceRecordsByOwner ?? new Map();
 }
 
+/** @internal */
 function throughRecordsByOwner(assoc: ThroughAssociation): Map<unknown, unknown[]> {
   return (assoc as any)._throughRecordsByOwner ?? new Map();
 }
 
+/** @internal */
 function preloadIndex(assoc: ThroughAssociation): Map<unknown, number> {
   return (assoc as any)._preloadIndex ?? new Map();
 }
 
+/** @internal */
 function throughScope(assoc: ThroughAssociation): unknown {
   return (assoc as any)._buildThroughScope?.() ?? null;
 }

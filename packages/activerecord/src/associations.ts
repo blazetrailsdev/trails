@@ -2184,16 +2184,19 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
   }
 }
 
+/** @internal */
 function initInternals(): never {
   throw new NotImplementedError("ActiveRecord::Associations#init_internals is not implemented");
 }
 
+/** @internal */
 function associationInstanceGet(name: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Associations#association_instance_get is not implemented",
   );
 }
 
+/** @internal */
 function associationInstanceSet(name: any, association: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Associations#association_instance_set is not implemented",

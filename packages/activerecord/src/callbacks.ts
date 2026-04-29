@@ -227,6 +227,7 @@ function registerCallback(
 // persistence work directly in their respective callback chains.
 // ---------------------------------------------------------------------------
 
+/** @internal */
 export function createOrUpdate(this: any): Promise<boolean> {
   // Rails: Callbacks#create_or_update wraps super in _run_save_callbacks.
   // In trails, save's before/after callback chain runs inside _createOrUpdate
@@ -235,6 +236,7 @@ export function createOrUpdate(this: any): Promise<boolean> {
   return (this._createOrUpdate as () => Promise<boolean>).call(this);
 }
 
+/** @internal */
 export function _createRecord(this: any): Promise<boolean> {
   // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
   const ctor = this.constructor as any;
@@ -251,6 +253,7 @@ export function _createRecord(this: any): Promise<boolean> {
   });
 }
 
+/** @internal */
 export function _updateRecord(this: any): Promise<boolean> {
   // Rails: _run_update_callbacks { record_update_timestamps { super } } — returns boolean.
   // record_update_timestamps writes updated_at/updated_on when @_touch_record

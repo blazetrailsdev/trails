@@ -41,10 +41,12 @@ export async function execExplain(
   return (modelClass as any).all()._execExplain(queries, options);
 }
 
+/** @internal */
 function renderBind(connection: any, attr: any): never {
   throw new NotImplementedError("ActiveRecord::Explain#render_bind is not implemented");
 }
 
+/** @internal */
 function buildExplainClause(connection: any, options?: any): never {
   throw new NotImplementedError("ActiveRecord::Explain#build_explain_clause is not implemented");
 }

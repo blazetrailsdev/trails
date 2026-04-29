@@ -13,10 +13,12 @@ import { Visitors, Nodes } from "@blazetrails/arel";
 export class WhereClause {
   private _predicates: Nodes.Node[];
 
+  /** @internal */
   get predicates(): Nodes.Node[] {
     return this._predicates;
   }
 
+  /** @internal */
   set predicates(value: Nodes.Node[]) {
     this._predicates = value;
   }
@@ -143,6 +145,7 @@ export class WhereClause {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/** @internal */
 function invertPredicate(node: Nodes.Node): Nodes.Node {
   return node.invert();
 }
@@ -177,6 +180,7 @@ function fetchAttributeNode(node: Nodes.Node): Nodes.Attribute | null {
   return null;
 }
 
+/** @internal */
 function equalities(predicates: Nodes.Node[], equalityOnly: boolean): Nodes.Node[] {
   const result: Nodes.Node[] = [];
   for (const node of predicates) {
@@ -192,6 +196,7 @@ function equalities(predicates: Nodes.Node[], equalityOnly: boolean): Nodes.Node
   return result;
 }
 
+/** @internal */
 function extractNodeValue(node: unknown): unknown {
   if (node instanceof Nodes.Quoted) return node.value;
   if (node instanceof Nodes.Casted) return node.valueForDatabase();
@@ -206,6 +211,7 @@ function extractNodeValue(node: unknown): unknown {
   return node;
 }
 
+/** @internal */
 function exceptPredicates(
   predicates: Nodes.Node[],
   columns: (string | Nodes.Attribute | Nodes.Node)[],
@@ -240,6 +246,7 @@ function unionNodes(a: Nodes.Node[], b: Nodes.Node[]): Nodes.Node[] {
   return result;
 }
 
+/** @internal */
 function predicatesWithWrappedSqlLiterals(predicates: Nodes.Node[]): Nodes.Node[] {
   return nonEmptyPredicates(predicates).map((node) => {
     if (node instanceof Nodes.SqlLiteral) return wrapSqlLiteral(node);
@@ -249,18 +256,22 @@ function predicatesWithWrappedSqlLiterals(predicates: Nodes.Node[]): Nodes.Node[
 
 export { predicatesWithWrappedSqlLiterals as getWrappedSqlPredicates };
 
+/** @internal */
 function predicates(wc: WhereClause): Nodes.Node[] {
   return wc.predicates;
 }
 
+/** @internal */
 function nonEmptyPredicates(predicates: Nodes.Node[]): Nodes.Node[] {
   return predicates.filter((n) => !(n instanceof Nodes.SqlLiteral && n.value === ""));
 }
 
+/** @internal */
 function wrapSqlLiteral(node: Nodes.SqlLiteral): Nodes.Node {
   return new Nodes.Grouping(node);
 }
 
+/** @internal */
 function extractAttribute(node: Nodes.Node): Nodes.Attribute | null {
   let attrNode: Nodes.Attribute | null = null;
   const fetcher = node as { fetchAttribute?: (cb: (a: Nodes.Node) => boolean) => void };
@@ -276,6 +287,7 @@ function extractAttribute(node: Nodes.Node): Nodes.Attribute | null {
   return attrNode;
 }
 
+/** @internal */
 function eachAttributes(
   predicates: Nodes.Node[],
   fn: (attr: Nodes.Attribute | Nodes.Node, node: Nodes.Node) => void,
@@ -290,6 +302,7 @@ function eachAttributes(
   }
 }
 
+/** @internal */
 function referencedColumns(predicates: Nodes.Node[]): Record<string, Nodes.Node> {
   const hash: Record<string, Nodes.Node> = {};
   eachAttributes(predicates, (attr, node) => {
@@ -300,6 +313,7 @@ function referencedColumns(predicates: Nodes.Node[]): Record<string, Nodes.Node>
   return hash;
 }
 
+/** @internal */
 function isEqualityNode(node: Nodes.Node): boolean {
   if (node instanceof Nodes.Equality) return true;
   if (typeof (node as any).isEquality === "function") return (node as any).isEquality();

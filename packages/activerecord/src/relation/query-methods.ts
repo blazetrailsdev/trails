@@ -657,6 +657,7 @@ function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]):
   return this;
 }
 
+/** @internal */
 function buildWhereClause(
   this: QueryMethodsHost,
   opts: unknown,
@@ -833,6 +834,7 @@ const STRUCTURAL_FIELDS: ReadonlyArray<[string, keyof QueryMethodsHost]> = [
   ["createWith", "_createWithAttrs"],
 ];
 
+/** @internal */
 function structurallyIncompatibleValuesFor(
   self: QueryMethodsHost,
   other: QueryMethodsHost,
@@ -1224,17 +1226,20 @@ function constructJoinDependency(
 // Non-exported so the extractor marks them internal: true.
 // ---------------------------------------------------------------------------
 
+/** @internal */
 function asyncBang(this: QueryMethodsHost): QueryMethodsHost {
   (this as any)._async = true;
   return this;
 }
 
+/** @internal */
 function async(this: QueryMethodsHost): QueryMethodsHost {
   const rel = (this as any).spawn();
   rel._async = true;
   return rel;
 }
 
+/** @internal */
 function assertModifiableBang(this: QueryMethodsHost): void {
   if ((this as any)._loaded) {
     throw new ActiveRecordError("can't modify a loaded relation");
@@ -1249,6 +1254,7 @@ function isBlankArgument(value: unknown): boolean {
   return false;
 }
 
+/** @internal */
 function checkIfMethodHasArgumentsBang(
   this: QueryMethodsHost,
   methodName: string,
@@ -1265,6 +1271,7 @@ function checkIfMethodHasArgumentsBang(
   }
 }
 
+/** @internal */
 function flattenedArgs(args: unknown[]): unknown[] {
   return args.flatMap((e) => {
     if (Array.isArray(e)) return flattenedArgs(e);
@@ -1276,6 +1283,7 @@ function flattenedArgs(args: unknown[]): unknown[] {
 
 const VALID_DIRECTIONS = new Set(["asc", "desc"]);
 
+/** @internal */
 function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
   for (const arg of args) {
     if (!isPlainObject(arg)) continue;
@@ -1289,6 +1297,7 @@ function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
   }
 }
 
+/** @internal */
 function processWithArgs(this: QueryMethodsHost, args: unknown[]): Record<string, unknown>[] {
   return args.flatMap((arg) => {
     if (!isPlainObject(arg)) {
@@ -1306,10 +1315,12 @@ function processWithArgs(this: QueryMethodsHost, args: unknown[]): Record<string
   });
 }
 
+/** @internal */
 function buildCastValue(name: string, value: unknown): Attribute {
   return Attribute.withCastValue(name, value, new ValueType());
 }
 
+/** @internal */
 function buildNamedBoundSqlLiteral(
   this: QueryMethodsHost,
   statement: string,
@@ -1330,6 +1341,7 @@ function buildNamedBoundSqlLiteral(
   }
 }
 
+/** @internal */
 function buildBoundSqlLiteral(
   this: QueryMethodsHost,
   statement: string,
@@ -1348,6 +1360,7 @@ function buildBoundSqlLiteral(
   }
 }
 
+/** @internal */
 function buildSubquery(
   this: QueryMethodsHost,
   subqueryAlias: string,
@@ -1371,6 +1384,7 @@ function buildSubquery(
   return sm;
 }
 
+/** @internal */
 function isDoesNotSupportReverse(order: string): boolean {
   const plain = String(order);
   if (
@@ -1382,6 +1396,7 @@ function isDoesNotSupportReverse(order: string): boolean {
   return /\bnulls\s+(?:first|last)\b/i.test(plain);
 }
 
+/** @internal */
 function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown[] {
   if (orderQuery.length === 0) {
     const pk = (this as any)._modelClass?.primaryKey;
@@ -1431,6 +1446,7 @@ function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown
   });
 }
 
+/** @internal */
 function extractTableNameFrom(orderTerm: string): string | null {
   const match = orderTerm.match(/^\W?(\w+)\W?\./);
   return match ? match[1] : null;
@@ -1444,6 +1460,7 @@ function symbolToName(s: symbol): string {
   return name;
 }
 
+/** @internal */
 function columnReferences(orderArgs: unknown[]): string[] {
   const refs: string[] = [];
   for (const arg of orderArgs) {
@@ -1471,6 +1488,7 @@ function columnReferences(orderArgs: unknown[]): string[] {
   return refs;
 }
 
+/** @internal */
 function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
   return orderArgs.map((arg) => (this as any)._modelClass?.sanitizeSqlForOrder?.(arg) ?? arg);
 }
@@ -1494,6 +1512,7 @@ function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbo
   return result;
 }
 
+/** @internal */
 function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
   // disallowRawSqlBang skips symbols — resolve symbol names to strings first
   // so their descriptions are validated against the column-name matcher.
@@ -1569,6 +1588,7 @@ function buildOrderNode(clause: unknown): unknown {
   throw argumentError(`Unsupported order clause type: ${Object.prototype.toString.call(clause)}`);
 }
 
+/** @internal */
 function buildOrder(this: QueryMethodsHost, arel: any): void {
   const orders = ((this as any)._orderClauses ?? [])
     .filter((o: unknown) => o !== null && o !== undefined && o !== "")
@@ -1576,6 +1596,7 @@ function buildOrder(this: QueryMethodsHost, arel: any): void {
   if (orders.length > 0) arel.order?.(...orders);
 }
 
+/** @internal */
 function buildCaseForValuePosition(
   this: QueryMethodsHost,
   column: unknown,
@@ -1591,6 +1612,7 @@ function buildCaseForValuePosition(
   return new Nodes.Ascending(node);
 }
 
+/** @internal */
 function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]): unknown[] {
   const builder = (this as any).predicateBuilder;
   return attrs.flatMap((attr) => {
@@ -1699,6 +1721,7 @@ function safeQuoteColumnName(modelClass: any, name: string): string {
   }
 }
 
+/** @internal */
 function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
   const table: any = (this as any)._modelClass?.arelTable;
   if (!table) return false;
@@ -1711,6 +1734,7 @@ function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
   return new RegExp(`(?:^|(?<!FROM)\\s)(?:\\b${name}\\b|${quoted})(?!\\.)`, "i").test(fromStr);
 }
 
+/** @internal */
 function arelColumn(
   this: QueryMethodsHost,
   field: string | symbol,
@@ -1737,6 +1761,7 @@ function arelColumn(
   return arelSql(quoted);
 }
 
+/** @internal */
 function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
   return columns.flatMap((field) => {
     if (field instanceof Nodes.Node) return [field]; // Arel nodes pass through directly
@@ -1749,6 +1774,7 @@ function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
   });
 }
 
+/** @internal */
 function arelColumnWithTable(
   this: QueryMethodsHost,
   tableName: string,
@@ -1776,6 +1802,7 @@ function arelColumnWithTable(
   return arelSql(`${quotedTable}.${colStr}`);
 }
 
+/** @internal */
 function arelColumnsFromHash(this: QueryMethodsHost, fields: Record<string, unknown>): unknown[] {
   return Reflect.ownKeys(fields).flatMap((key) => {
     const columns = (fields as Record<string | symbol, unknown>)[key];
@@ -1790,6 +1817,7 @@ function arelColumnsFromHash(this: QueryMethodsHost, fields: Record<string, unkn
   });
 }
 
+/** @internal */
 function orderColumn(this: QueryMethodsHost, field: string): unknown {
   const modelClass: any = (this as any)._modelClass;
   const table: any = modelClass?.arelTable;
@@ -1802,6 +1830,7 @@ function orderColumn(this: QueryMethodsHost, field: string): unknown {
   });
 }
 
+/** @internal */
 function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): unknown[] {
   return fields.flatMap((field) => {
     if (isPlainObject(field))
@@ -1816,6 +1845,7 @@ function nodeAs(attr: unknown, quotedAlias: string): unknown {
   return arelSql(`${attrSql} AS ${quotedAlias}`);
 }
 
+/** @internal */
 function arelColumnAliasesFromHash(
   this: QueryMethodsHost,
   fields: Record<string | symbol, unknown>,
@@ -1845,6 +1875,7 @@ function arelColumnAliasesFromHash(
   });
 }
 
+/** @internal */
 function buildFrom(this: QueryMethodsHost): unknown {
   const fromClause = (this as any)._fromClause;
   const opts = fromClause?.value;
@@ -1860,6 +1891,7 @@ function buildFrom(this: QueryMethodsHost): unknown {
   return opts;
 }
 
+/** @internal */
 function buildSelect(this: QueryMethodsHost, arel: any): void {
   const selectCols = (this as any)._selectColumns;
   if (selectCols && selectCols.length > 0) {
@@ -1881,6 +1913,7 @@ function buildSelect(this: QueryMethodsHost, arel: any): void {
   arel.project(table ? table.star : arelSql("*"));
 }
 
+/** @internal */
 function buildWithExpressionFromValue(this: QueryMethodsHost, value: unknown): unknown {
   if (value instanceof Nodes.SqlLiteral) return new Nodes.Grouping(value as any);
   // Always return the AST node so Cte.relation receives a Node, not a SelectManager.
@@ -1900,6 +1933,7 @@ function buildWithExpressionFromValue(this: QueryMethodsHost, value: unknown): u
   throw argumentError(`Unsupported argument type: \`${String(value)}\` ${typeof value}`);
 }
 
+/** @internal */
 function buildWithValueFromHash(this: QueryMethodsHost, hash: Record<string, unknown>): unknown[] {
   return Reflect.ownKeys(hash).map((key) => {
     const name = typeof key === "symbol" ? symbolToName(key) : key;
@@ -1918,6 +1952,7 @@ function buildWithValueFromHash(this: QueryMethodsHost, hash: Record<string, unk
 // right model. Our PredicateBuilder#buildFromHash doesn't yet accept that
 // callback. These helpers exist for private-API parity; they are not yet wired
 // through the current buildArel() → buildJoins() path.
+/** @internal */
 function lookupTableKlassFromJoinDependencies(this: QueryMethodsHost, tableName: string): unknown {
   let found: unknown = null;
   eachJoinDependencies.call(this, undefined, (join: any) => {
@@ -1926,6 +1961,7 @@ function lookupTableKlassFromJoinDependencies(this: QueryMethodsHost, tableName:
   return found;
 }
 
+/** @internal */
 function eachJoinDependencies(
   this: QueryMethodsHost,
   joinDependencies: JoinDependency[] | undefined,
@@ -1937,6 +1973,7 @@ function eachJoinDependencies(
   }
 }
 
+/** @internal */
 function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
   // Mirror Rails build_join_dependencies (query_methods.rb:1735-1745):
   // joins | left_outer_joins | eager_load | includes association specs.
@@ -1967,6 +2004,7 @@ function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
   return stashedJoins;
 }
 
+/** @internal */
 function buildArel(this: QueryMethodsHost, _connection?: unknown, _aliases?: unknown): any {
   const mc = (this as any)._modelClass;
   const table: any = mc?.arelTable;
@@ -2004,6 +2042,7 @@ function buildArel(this: QueryMethodsHost, _connection?: unknown, _aliases?: unk
   return arel;
 }
 
+/** @internal */
 function selectNamedJoins(
   this: QueryMethodsHost,
   joinNames: unknown[],
@@ -2031,6 +2070,7 @@ function selectNamedJoins(
   return selectAssociationList.call(this, associations, stashedJoins, block);
 }
 
+/** @internal */
 function selectAssociationList(
   this: QueryMethodsHost,
   associations: unknown[],
@@ -2055,6 +2095,7 @@ function selectAssociationList(
   return result;
 }
 
+/** @internal */
 function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown[]> {
   const buckets: Record<string, unknown[]> = {
     leading_join: [],
@@ -2129,6 +2170,7 @@ function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown[]> {
   return buckets;
 }
 
+/** @internal */
 function buildJoins(this: QueryMethodsHost, arel: any): void {
   const hasEagerAssocs =
     this._eagerLoadAssociations.length > 0 || this._leftOuterJoinsValues.length > 0;
@@ -2172,6 +2214,7 @@ function buildJoins(this: QueryMethodsHost, arel: any): void {
   for (const node of joinNodes) arel.source.right.push(node);
 }
 
+/** @internal */
 function buildWith(this: QueryMethodsHost, arel: any): void {
   if (!this._ctes || this._ctes.length === 0) return;
 
@@ -2185,6 +2228,7 @@ function buildWith(this: QueryMethodsHost, arel: any): void {
   }
 }
 
+/** @internal */
 function buildWithJoinNode(
   this: QueryMethodsHost,
   name: string,

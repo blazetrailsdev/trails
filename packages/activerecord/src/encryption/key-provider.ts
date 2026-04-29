@@ -29,6 +29,7 @@ export class KeyProvider {
   }
 }
 
+/** @internal */
 function keysGroupedById(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::KeyProvider#keys_grouped_by_id is not implemented",

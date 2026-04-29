@@ -11,6 +11,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 }
 
+/** @internal */
 function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Base | null {
   const throughName = assoc.reflection.options.through as string | undefined;
   if (!throughName) return null;
@@ -20,12 +21,14 @@ function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Bas
   return typeof throughAssoc.build === "function" ? throughAssoc.build(attrs) : null;
 }
 
+/** @internal */
 function throughScope(assoc: HasManyThroughAssociation): unknown {
   // through_scope is set externally by the association's concat/insert path.
   // Return the memoized scope if it was set; otherwise null.
   return (assoc as any)._throughScope ?? null;
 }
 
+/** @internal */
 function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string, unknown> {
   // Extract WHERE conditions from the through scope for the through model's table.
   const throughName = assoc.reflection.options.through as string | undefined;
@@ -45,6 +48,7 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
   return attrs;
 }
 
+/** @internal */
 function saveThroughRecord(assoc: HasManyThroughAssociation, record: Base): Promise<boolean> {
   // Find and save the first unsaved through record for this target.
   const records = throughRecordsFor(assoc, record);
@@ -56,6 +60,7 @@ function saveThroughRecord(assoc: HasManyThroughAssociation, record: Base): Prom
   return Promise.resolve(true);
 }
 
+/** @internal */
 function removeRecords(
   assoc: HasManyThroughAssociation,
   _existingRecords: Base[],
@@ -65,6 +70,7 @@ function removeRecords(
   return (assoc as any).delete?.(...records) ?? Promise.resolve();
 }
 
+/** @internal */
 function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation): boolean {
   const throughRefl = assoc.reflection.options.through;
   if (!throughRefl) return false;
@@ -75,10 +81,12 @@ function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation)
   return !!(assoc.owner as any).readAttribute?.(fk as string);
 }
 
+/** @internal */
 function isUpdateThroughCounter(assoc: HasManyThroughAssociation, method: string): boolean {
   return method !== "destroy" && (assoc as any)._isUpdateThroughCounter?.(method) !== false;
 }
 
+/** @internal */
 function deleteOrNullifyAllRecords(
   assoc: HasManyThroughAssociation,
   method: string,
@@ -86,6 +94,7 @@ function deleteOrNullifyAllRecords(
   return (assoc as any).deleteAll?.(method) ?? Promise.resolve();
 }
 
+/** @internal */
 function deleteRecords(
   assoc: HasManyThroughAssociation,
   records: Base[],
@@ -94,14 +103,17 @@ function deleteRecords(
   return (assoc as any).delete?.(...records) ?? Promise.resolve();
 }
 
+/** @internal */
 function difference(_assoc: HasManyThroughAssociation, a: Base[], b: Base[]): Base[] {
   return a.filter((r) => !b.includes(r));
 }
 
+/** @internal */
 function intersection(_assoc: HasManyThroughAssociation, a: Base[], b: Base[]): Base[] {
   return a.filter((r) => b.includes(r));
 }
 
+/** @internal */
 function markOccurrence(
   _assoc: HasManyThroughAssociation,
   distribution: Map<Base, number>,
@@ -115,12 +127,14 @@ function markOccurrence(
   return false;
 }
 
+/** @internal */
 function distribution(_assoc: HasManyThroughAssociation, array: Base[]): Map<Base, number> {
   const result = new Map<Base, number>();
   for (const r of array) result.set(r, (result.get(r) ?? 0) + 1);
   return result;
 }
 
+/** @internal */
 function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base[] {
   const throughName = assoc.reflection.options.through as string | undefined;
   if (!throughName) return [];
@@ -146,6 +160,7 @@ function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base
   );
 }
 
+/** @internal */
 function deleteThroughRecords(assoc: HasManyThroughAssociation, records: Base[]): Promise<void> {
   // Mirrors Rails delete_through_records: remove through join-model records.
   const throughName = assoc.reflection.options.through as string | undefined;

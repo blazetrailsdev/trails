@@ -1980,6 +1980,8 @@ export class Model {
    * Return the current validation context.
    *
    * Mirrors: ActiveModel::Validations#validation_context
+   *
+   * @internal
    */
   get validationContext(): string | string[] | null {
     return this._validationContext;

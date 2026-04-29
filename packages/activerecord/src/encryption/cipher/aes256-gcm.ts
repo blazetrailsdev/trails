@@ -126,12 +126,14 @@ export class Cipher {
   }
 }
 
+/** @internal */
 function generateIv(cipher: any, clearText: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Cipher::Aes256Gcm#generate_iv is not implemented",
   );
 }
 
+/** @internal */
 function generateDeterministicIv(clearText: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Cipher::Aes256Gcm#generate_deterministic_iv is not implemented",

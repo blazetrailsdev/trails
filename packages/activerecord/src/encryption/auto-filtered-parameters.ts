@@ -23,6 +23,7 @@ export class AutoFilteredParameters {
     this._collecting = false;
   }
 
+  /** @internal */
   attributeWasDeclared(klass: any, attribute: string): void {
     if (!Configurable.config.addToFilterParameters) return;
     if (Configurable.config.excludeFromFilterParameters.includes(attribute)) return;
@@ -57,30 +58,35 @@ export class AutoFilteredParameters {
   }
 }
 
+/** @internal */
 function app(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::AutoFilteredParameters#app is not implemented",
   );
 }
 
+/** @internal */
 function installCollectingHook(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::AutoFilteredParameters#install_collecting_hook is not implemented",
   );
 }
 
+/** @internal */
 function attributeWasDeclared(klass: any, attribute: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::AutoFilteredParameters#attribute_was_declared is not implemented",
   );
 }
 
+/** @internal */
 function isCollecting(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::AutoFilteredParameters#collecting? is not implemented",
   );
 }
 
+/** @internal */
 function isExcludedFromFilterParameters(filterParameter: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::AutoFilteredParameters#excluded_from_filter_parameters? is not implemented",

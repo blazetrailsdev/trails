@@ -336,6 +336,7 @@ export function checkIntegerRange(value: bigint | number): void {
   }
 }
 
+/** @internal */
 function encodeRange(value: Range): string {
   const lower = value.begin == null || value.begin === -Infinity ? "" : String(value.begin);
   const upper = value.end == null || value.end === Infinity ? "" : String(value.end);
@@ -351,36 +352,42 @@ function isSqlLiteral(value: unknown): value is { value: string } {
   );
 }
 
+/** @internal */
 function lookupCastType(sqlType: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#lookup_cast_type is not implemented",
   );
 }
 
+/** @internal */
 function encodeArray(arrayData: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#encode_array is not implemented",
   );
 }
 
+/** @internal */
 function determineEncodingOfStringsInArray(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#determine_encoding_of_strings_in_array is not implemented",
   );
 }
 
+/** @internal */
 function typeCastArray(values: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#type_cast_array is not implemented",
   );
 }
 
+/** @internal */
 function typeCastRangeValue(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#type_cast_range_value is not implemented",
   );
 }
 
+/** @internal */
 function isInfinity(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#infinity? is not implemented",

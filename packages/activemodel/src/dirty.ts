@@ -24,7 +24,9 @@ export interface Dirty {
   clearChangesInformation(): void;
   clearAttributeChanges(attributes: string[]): void;
   attributeChangedInPlace(name: string): boolean;
+  /** @internal */
   forgetAttributeAssignments(): void;
+  /** @internal */
   clearAttributeChange(name: string): void;
 }
 

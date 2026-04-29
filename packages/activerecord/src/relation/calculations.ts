@@ -458,6 +458,7 @@ export class ColumnAliasTracker {
 // Private helpers (mirrors Rails' ActiveRecord::Calculations private methods)
 // ---------------------------------------------------------------------------
 
+/** @internal */
 function columnAliasFor(field: string): string {
   return field
     .replace(/[^a-zA-Z0-9_]/g, "_")
@@ -465,10 +466,12 @@ function columnAliasFor(field: string): string {
     .slice(0, 255);
 }
 
+/** @internal */
 function truncate(name: string): string {
   return name.slice(0, 255);
 }
 
+/** @internal */
 function aggregateColumn(rel: CalculationRelation, columnName: string): unknown {
   const table = rel._modelClass.arelTable;
   if (columnName === "*" || columnName === "1") {
@@ -481,14 +484,17 @@ function aggregateColumn(rel: CalculationRelation, columnName: string): unknown 
   return table.get(columnName);
 }
 
+/** @internal */
 function isAllAttributes(columnNames: string[]): boolean {
   return columnNames.every((c) => c === "*" || !c.includes("("));
 }
 
+/** @internal */
 function hasInclude(rel: CalculationRelation, columnName: string | null): boolean {
   return (rel as any)._includesValues?.length > 0 || (rel as any)._eagerLoadValues?.length > 0;
 }
 
+/** @internal */
 function performCalculation(
   rel: CalculationRelation,
   operation: string,
@@ -500,10 +506,12 @@ function performCalculation(
   return executeSimpleCalculation(rel, operation, columnName, false);
 }
 
+/** @internal */
 function isDistinctSelect(rel: CalculationRelation, columnName: string): boolean {
   return rel._isDistinct || columnName !== "*";
 }
 
+/** @internal */
 function operationOverAggregateColumn(
   column: unknown,
   operation: string,
@@ -512,6 +520,7 @@ function operationOverAggregateColumn(
   return column;
 }
 
+/** @internal */
 async function executeSimpleCalculation(
   rel: CalculationRelation,
   operation: string,
@@ -522,6 +531,7 @@ async function executeSimpleCalculation(
   return singleAggregate(rel, fn, columnName, true);
 }
 
+/** @internal */
 async function executeGroupedCalculation(
   rel: CalculationRelation,
   operation: string,
@@ -535,14 +545,17 @@ async function executeGroupedCalculation(
   return groupedAggregate(rel, fn, columnName, false);
 }
 
+/** @internal */
 function typeFor(rel: CalculationRelation, field: string): unknown {
   return resolveColType(rel, field);
 }
 
+/** @internal */
 function lookupCastTypeFromJoinDependencies(_rel: CalculationRelation, _name: string): unknown {
   return null;
 }
 
+/** @internal */
 function typeCastPluckValues(
   result: unknown[][],
   columns: string[],
@@ -555,6 +568,7 @@ function typeCastPluckValues(
   );
 }
 
+/** @internal */
 function typeCastCalculatedValue(value: unknown, operation: string, type: unknown): unknown {
   if (operation === "count") return Number(value ?? 0);
   if (operation === "sum") return Number(value ?? 0);
@@ -562,16 +576,19 @@ function typeCastCalculatedValue(value: unknown, operation: string, type: unknow
   return value;
 }
 
+/** @internal */
 function selectForCount(rel: CalculationRelation): string {
   const sel = (rel as any)._selectColumns;
   if (!sel || sel.length === 0) return "*";
   return sel.map((s: unknown) => String(s)).join(", ");
 }
 
+/** @internal */
 function isBuildCountSubquery(operation: string, columnName: string, distinct: boolean): boolean {
   return operation === "count" && distinct && columnName !== "*";
 }
 
+/** @internal */
 function buildCountSubquery(
   rel: CalculationRelation,
   columnName: string,

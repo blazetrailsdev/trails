@@ -650,6 +650,7 @@ export class CollectionAssociation extends Association {
   }
 }
 
+/** @internal */
 function transaction(assoc: CollectionAssociation, block: () => Promise<void>): Promise<void> {
   // Rails: reflection.klass.transaction(&block) — uses the reflection's klass, not assoc.klass
   const klass = (assoc.reflection as any).klass ?? assoc.klass;
@@ -659,6 +660,7 @@ function transaction(assoc: CollectionAssociation, block: () => Promise<void>): 
   return block();
 }
 
+/** @internal */
 async function insertRecord(
   assoc: CollectionAssociation,
   record: Base,
@@ -682,6 +684,7 @@ async function insertRecord(
   return record;
 }
 
+/** @internal */
 async function removeRecords(
   assoc: CollectionAssociation,
   existingRecords: Base[],
@@ -702,10 +705,12 @@ async function removeRecords(
   for (const record of records) callback(assoc, "afterRemove", record);
 }
 
+/** @internal */
 function deleteRecords(assoc: CollectionAssociation, records: Base[], method: string): void {
   throw new Error(`deleteRecords must be implemented by ${assoc.constructor.name}`);
 }
 
+/** @internal */
 async function replaceRecords(
   assoc: CollectionAssociation,
   newTarget: Base[],
@@ -733,6 +738,7 @@ async function replaceRecords(
   return assoc.target as Base[];
 }
 
+/** @internal */
 function replaceCommonRecordsInMemory(
   assoc: CollectionAssociation,
   newTarget: Base[],
@@ -744,6 +750,7 @@ function replaceCommonRecordsInMemory(
   }
 }
 
+/** @internal */
 function replaceOnTarget(
   assoc: CollectionAssociation,
   record: Base,
@@ -778,12 +785,14 @@ function replaceOnTarget(
   return record;
 }
 
+/** @internal */
 function callback(assoc: CollectionAssociation, method: string, record: Base): void {
   for (const cb of callbacksFor(assoc, method)) {
     if (typeof cb === "function") cb(method, assoc.owner, record);
   }
 }
 
+/** @internal */
 function callbacksFor(assoc: CollectionAssociation, callbackName: string): unknown[] {
   const fullName = `${callbackName}For${assoc.reflection.name.charAt(0).toUpperCase()}${assoc.reflection.name.slice(1)}`;
   const owner = assoc.owner.constructor as any;
@@ -791,6 +800,7 @@ function callbacksFor(assoc: CollectionAssociation, callbackName: string): unkno
   return [];
 }
 
+/** @internal */
 function isIncludeInMemory(assoc: CollectionAssociation, record: Base): boolean {
   // For through reflections, also check through the source chain.
   const refl = assoc.reflection as any;

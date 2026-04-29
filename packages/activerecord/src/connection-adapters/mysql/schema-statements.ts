@@ -78,96 +78,112 @@ export interface SchemaStatements {
   schemaCreation(): unknown;
 }
 
+/** @internal */
 function isRowFormatDynamicByDefault(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#row_format_dynamic_by_default? is not implemented",
   );
 }
 
+/** @internal */
 function defaultRowFormat(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#default_row_format is not implemented",
   );
 }
 
+/** @internal */
 function validPrimaryKeyOptions(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#valid_primary_key_options is not implemented",
   );
 }
 
+/** @internal */
 function createTableDefinition(name: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#create_table_definition is not implemented",
   );
 }
 
+/** @internal */
 function defaultType(tableName: any, fieldName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#default_type is not implemented",
   );
 }
 
+/** @internal */
 function newColumnFromField(tableName: any, field: any, Definitions: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#new_column_from_field is not implemented",
   );
 }
 
+/** @internal */
 function fetchTypeMetadata(sqlType: any, extra?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#fetch_type_metadata is not implemented",
   );
 }
 
+/** @internal */
 function extractForeignKeyAction(specifier: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#extract_foreign_key_action is not implemented",
   );
 }
 
+/** @internal */
 function addIndexLength(quotedColumns: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#add_index_length is not implemented",
   );
 }
 
+/** @internal */
 function addOptionsForIndexColumns(quotedColumns: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#add_options_for_index_columns is not implemented",
   );
 }
 
+/** @internal */
 function dataSourceSql(name?: any, type?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#data_source_sql is not implemented",
   );
 }
 
+/** @internal */
 function quotedScope(name?: any, type?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#quoted_scope is not implemented",
   );
 }
 
+/** @internal */
 function extractSchemaQualifiedName(string: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#extract_schema_qualified_name is not implemented",
   );
 }
 
+/** @internal */
 function typeWithSizeToSql(type: any, size: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#type_with_size_to_sql is not implemented",
   );
 }
 
+/** @internal */
 function limitToSize(limit: any, type: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#limit_to_size is not implemented",
   );
 }
 
+/** @internal */
 function integerToSql(limit: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#integer_to_sql is not implemented",

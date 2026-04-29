@@ -62,6 +62,7 @@ function databaseFromUrl(url: string): string | undefined {
 // scheme (e.g. SQLite ":memory:" or a bare filesystem path) are also passed
 // through — they're not URLs at all, and Rails' URI parser accepts them as
 // opaque but our JS URL parser doesn't.
+/** @internal */
 function buildUrlHash(url: string): DatabaseConfigOptions {
   if (
     !url ||
@@ -78,6 +79,7 @@ function buildUrlHash(url: string): DatabaseConfigOptions {
   return new ConnectionUrlResolver(url).toHash();
 }
 
+/** @internal */
 function toBooleanBang(configurationHash: any, key: any): never {
   throw new NotImplementedError(
     "ActiveRecord::DatabaseConfigurations::UrlConfig#to_boolean! is not implemented",

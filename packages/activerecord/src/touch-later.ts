@@ -141,6 +141,7 @@ export async function beforeCommittedBang(this: Base): Promise<void> {
 // Private helpers
 // ---------------------------------------------------------------------------
 
+/** @internal */
 function surreptitiouslyTouch(record: Base, attrNames: string[], time: Date): void {
   for (const attr of attrNames) {
     (record as any).writeAttribute(attr, time);
@@ -154,6 +155,7 @@ function surreptitiouslyTouch(record: Base, attrNames: string[], time: Date): vo
   }
 }
 
+/** @internal */
 async function touchDeferredAttributes(record: Base): Promise<void> {
   const self = record as any;
   const deferredAttrs = self._deferTouchAttrs as string[];
@@ -183,10 +185,12 @@ export const InstanceMethods = {
   beforeCommittedBang,
 };
 
+/** @internal */
 function initInternals(): never {
   throw new NotImplementedError("ActiveRecord::TouchLater#init_internals is not implemented");
 }
 
+/** @internal */
 function hasDeferTouchAttrs(): never {
   throw new NotImplementedError(
     "ActiveRecord::TouchLater#has_defer_touch_attrs? is not implemented",

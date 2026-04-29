@@ -120,54 +120,63 @@ export function schemaCreation(): SchemaCreation {
   return new SchemaCreation("sqlite");
 }
 
+/** @internal */
 function validTableDefinitionOptions(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#valid_table_definition_options is not implemented",
   );
 }
 
+/** @internal */
 function createTableDefinition(name: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#create_table_definition is not implemented",
   );
 }
 
+/** @internal */
 function validateIndexLengthBang(tableName: any, newName: any, internal?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#validate_index_length! is not implemented",
   );
 }
 
+/** @internal */
 function newColumnFromField(tableName: any, field: any, definitions: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#new_column_from_field is not implemented",
   );
 }
 
+/** @internal */
 function isIsColumnTheRowid(field: any, columnDefinitions: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#is_column_the_rowid? is not implemented",
   );
 }
 
+/** @internal */
 function dataSourceSql(name?: any, type?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#data_source_sql is not implemented",
   );
 }
 
+/** @internal */
 function quotedScope(name?: any, type?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#quoted_scope is not implemented",
   );
 }
 
+/** @internal */
 function assertValidDeferrable(deferrable: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#assert_valid_deferrable is not implemented",
   );
 }
 
+/** @internal */
 function extractGeneratedType(field: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#extract_generated_type is not implemented",

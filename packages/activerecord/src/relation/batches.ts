@@ -12,6 +12,7 @@ export class Batches {
   static readonly DEFAULT_BATCH_SIZE = 1000;
 }
 
+/** @internal */
 function ensureValidOptionsForBatchingBang(
   cursor: string | string[],
   start: unknown,
@@ -39,6 +40,7 @@ function ensureValidOptionsForBatchingBang(
   }
 }
 
+/** @internal */
 function applyLimits(
   relation: any,
   cursor: string | string[],
@@ -55,6 +57,7 @@ function applyLimits(
   return relation;
 }
 
+/** @internal */
 function applyStartLimit(
   relation: any,
   cursor: string | string[],
@@ -65,6 +68,7 @@ function applyStartLimit(
   return batchCondition(relation, cursor, start, operators);
 }
 
+/** @internal */
 function applyFinishLimit(
   relation: any,
   cursor: string | string[],
@@ -75,6 +79,7 @@ function applyFinishLimit(
   return batchCondition(relation, cursor, finish, operators);
 }
 
+/** @internal */
 function batchCondition(
   relation: any,
   cursor: string | string[],
@@ -94,6 +99,7 @@ function batchCondition(
   return relation.where(new Nodes.Grouping(new Nodes.And(conditions)));
 }
 
+/** @internal */
 function buildBatchOrders(
   cursor: string | string[],
   order: "asc" | "desc" | ("asc" | "desc")[] | undefined,
@@ -103,12 +109,14 @@ function buildBatchOrders(
   return cursorArr.map((col, i) => [col, orderArr[i] ?? "asc"]);
 }
 
+/** @internal */
 function actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
   if (errorOnIgnore) {
     throw new Error(Batches.ORDER_IGNORE_MESSAGE);
   }
 }
 
+/** @internal */
 function batchOnLoadedRelation(opts: {
   relation: any;
   start: unknown;
@@ -136,11 +144,13 @@ function batchOnLoadedRelation(opts: {
   return result;
 }
 
+/** @internal */
 function recordCursorValues(record: any, cursor: string | string[]): unknown[] {
   const cols = Array.isArray(cursor) ? cursor : [cursor];
   return cols.map((c) => record.readAttribute?.(c) ?? record[c]);
 }
 
+/** @internal */
 function compareValuesForOrder(
   values1: unknown[],
   values2: unknown[],
@@ -156,6 +166,7 @@ function compareValuesForOrder(
   return 0;
 }
 
+/** @internal */
 async function batchOnUnloadedRelation(opts: {
   relation: any;
   start: unknown;

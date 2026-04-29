@@ -256,6 +256,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
   (record as any)._pendingNestedAttributes = null;
 }
 
+/** @internal */
 function assignNestedAttributesForOneToOneAssociation(
   associationName: any,
   attributes: any,
@@ -265,6 +266,7 @@ function assignNestedAttributesForOneToOneAssociation(
   );
 }
 
+/** @internal */
 function assignNestedAttributesForCollectionAssociation(
   associationName: any,
   attributesCollection: any,
@@ -274,56 +276,66 @@ function assignNestedAttributesForCollectionAssociation(
   );
 }
 
+/** @internal */
 function checkRecordLimitBang(limit: any, attributesCollection: any): never {
   throw new NotImplementedError(
     "ActiveRecord::NestedAttributes#check_record_limit! is not implemented",
   );
 }
 
+/** @internal */
 function assignToOrMarkForDestruction(record: any, attributes: any, allowDestroy: any): never {
   throw new NotImplementedError(
     "ActiveRecord::NestedAttributes#assign_to_or_mark_for_destruction is not implemented",
   );
 }
 
+/** @internal */
 function hasDestroyFlag(hash: any): never {
   throw new NotImplementedError(
     "ActiveRecord::NestedAttributes#has_destroy_flag? is not implemented",
   );
 }
 
+/** @internal */
 function isRejectNewRecord(associationName: any, attributes: any): never {
   throw new NotImplementedError(
     "ActiveRecord::NestedAttributes#reject_new_record? is not implemented",
   );
 }
 
+/** @internal */
 function callRejectIf(associationName: any, attributes: any): never {
   throw new NotImplementedError("ActiveRecord::NestedAttributes#call_reject_if is not implemented");
 }
 
+/** @internal */
 function isWillBeDestroyed(associationName: any, attributes: any): never {
   throw new NotImplementedError(
     "ActiveRecord::NestedAttributes#will_be_destroyed? is not implemented",
   );
 }
 
+/** @internal */
 function isAllowDestroy(associationName: any): never {
   throw new NotImplementedError("ActiveRecord::NestedAttributes#allow_destroy? is not implemented");
 }
 
+/** @internal */
 function raiseNestedAttributesRecordNotFoundBang(associationName: any, recordId: any): never {
   throw new NotImplementedError(
     "ActiveRecord::NestedAttributes#raise_nested_attributes_record_not_found! is not implemented",
   );
 }
 
+/** @internal */
 function findRecordById(klass: any, records: any, id: any): never {
   throw new NotImplementedError(
     "ActiveRecord::NestedAttributes#find_record_by_id is not implemented",
   );
 }
 
+/** @internal */
 function generateAssociationWriter(): never {
   throw new NotImplementedError(
     "ActiveRecord::NestedAttributes#generate_association_writer is not implemented",

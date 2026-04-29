@@ -124,6 +124,7 @@ export function adapterNameFrom(model: { adapter?: unknown }): string {
 
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.
 // When Base wires setCurrentAdapterResolver(), it reads the real connection adapter.
+/** @internal */
 export function currentAdapterName(getBase?: () => { adapter?: unknown }): string {
   if (getBase) return adapterNameFrom(getBase());
   return _currentAdapterResolver?.() ?? "sqlite";

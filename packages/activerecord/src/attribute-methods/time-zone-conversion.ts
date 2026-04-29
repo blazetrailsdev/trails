@@ -29,6 +29,7 @@ export class TimeZoneConverter {
   }
 }
 
+/** @internal */
 function convertTimeToTimeZone(value: unknown): unknown {
   if (value == null) return value;
   if (value instanceof Date) {
@@ -40,6 +41,7 @@ function convertTimeToTimeZone(value: unknown): unknown {
   return value;
 }
 
+/** @internal */
 function setTimeZoneWithoutConversion(value: unknown): unknown {
   if (value == null) return value;
   return value;
@@ -52,6 +54,7 @@ interface TimeZoneConversionHost {
   _hookAttributeType?(name: string, castType: unknown): unknown;
 }
 
+/** @internal */
 function hookAttributeType(
   this: TimeZoneConversionHost,
   name: string,
@@ -63,6 +66,7 @@ function hookAttributeType(
   return castType;
 }
 
+/** @internal */
 function isCreateTimeZoneConversionAttribute(
   this: TimeZoneConversionHost,
   name: string,

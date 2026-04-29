@@ -202,6 +202,8 @@ export class QueryLogs {
   /**
    * Build the tag content string from current tags and context.
    * Mirrors: ActiveRecord::QueryLogs.tag_content
+   *
+   * @internal
    */
   tagContent(): string | null {
     const pairs: string[] = [];
@@ -245,6 +247,8 @@ export class QueryLogs {
   /**
    * Build the full SQL comment from tags.
    * Mirrors: ActiveRecord::QueryLogs.comment
+   *
+   * @internal
    */
   comment(): string | null {
     if (this._cacheEnabled && this._cachedComment !== undefined) {

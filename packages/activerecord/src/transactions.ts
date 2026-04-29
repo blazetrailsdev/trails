@@ -409,6 +409,7 @@ interface TransactionRecordSnapshot {
   previouslyNewRecord: boolean;
 }
 
+/** @internal */
 function rememberTransactionRecordState(record: Base): TransactionRecordSnapshot {
   const r = record as any;
   return {
@@ -426,6 +427,8 @@ function rememberTransactionRecordState(record: Base): TransactionRecordSnapshot
  * transaction and are needed by trigger_transactional_callbacks?.
  *
  * Mirrors: ActiveRecord::Transactions#restore_transaction_record_state
+ *
+ * @internal
  */
 function restoreTransactionRecordState(record: Base, snapshot: TransactionRecordSnapshot): void {
   const r = record as any;
@@ -552,21 +555,25 @@ export function isTriggerTransactionalCallbacks(record: Base): boolean {
 // ---------------------------------------------------------------------------
 
 // Mirrors: attr_reader :_committed_already_called
+/** @internal */
 function _committedAlreadyCalled(record: Base): boolean | null {
   return (record as any)._committedAlreadyCalled ?? null;
 }
 
 // Mirrors: attr_reader :_trigger_update_callback
+/** @internal */
 function _triggerUpdateCallback(record: Base): boolean | null {
   return (record as any)._triggerUpdateCallback ?? null;
 }
 
 // Mirrors: attr_reader :_trigger_destroy_callback
+/** @internal */
 function _triggerDestroyCallback(record: Base): boolean | null {
   return (record as any)._triggerDestroyCallback ?? null;
 }
 
 // Mirrors: ActiveRecord::Transactions#init_internals
+/** @internal */
 function initInternals(record: Base): void {
   const r = record as any;
   r._startTransactionState = null;
@@ -575,6 +582,7 @@ function initInternals(record: Base): void {
 }
 
 // Mirrors: ActiveRecord::Transactions#clear_transaction_record_state
+/** @internal */
 function clearTransactionRecordState(record: Base): void {
   const r = record as any;
   if (!r._startTransactionState) return;
@@ -583,6 +591,7 @@ function clearTransactionRecordState(record: Base): void {
 }
 
 // Mirrors: ActiveRecord::Transactions#transaction_include_any_action?
+/** @internal */
 function isTransactionIncludeAnyAction(record: Base, actions: string[]): boolean {
   const r = record as any;
   return actions.some((action) => {
@@ -602,6 +611,7 @@ function isTransactionIncludeAnyAction(record: Base, actions: string[]): boolean
 }
 
 // Mirrors: ActiveRecord::Transactions#add_to_transaction
+/** @internal */
 async function addToTransaction(record: Base, ensureFinalize = true): Promise<void> {
   const ctor = record.constructor as any;
   if (typeof ctor.withConnection === "function") {
@@ -612,6 +622,7 @@ async function addToTransaction(record: Base, ensureFinalize = true): Promise<vo
 }
 
 // Mirrors: ActiveRecord::Transactions#has_transactional_callbacks?
+/** @internal */
 function hasTransactionalCallbacks(record: Base): boolean {
   const ctor = record.constructor as any;
   const chain = ctor._callbackChain;
@@ -627,6 +638,7 @@ function hasTransactionalCallbacks(record: Base): boolean {
 // ---------------------------------------------------------------------------
 
 // Mirrors: ActiveRecord::Transactions::ClassMethods#prepend_option
+/** @internal */
 function prependOption(this: unknown): Record<string, unknown> {
   return {};
 }
@@ -634,6 +646,7 @@ function prependOption(this: unknown): Record<string, unknown> {
 const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
 
 // Mirrors: ActiveRecord::Transactions::ClassMethods#set_options_for_callbacks!
+/** @internal */
 function setOptionsForCallbacksBang(
   args: unknown[],
   enforcedOptions: Record<string, unknown> = {},
@@ -660,6 +673,7 @@ function setOptionsForCallbacksBang(
 }
 
 // Mirrors: ActiveRecord::Transactions::ClassMethods#assert_valid_transaction_action
+/** @internal */
 function assertValidTransactionAction(actions: string[]): void {
   const invalid = actions.filter((a) => !VALID_TRANSACTION_ACTIONS.has(a));
   if (invalid.length > 0) {

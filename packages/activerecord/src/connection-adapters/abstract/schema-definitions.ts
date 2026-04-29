@@ -348,6 +348,7 @@ export interface ColumnMethods {
  */
 export class ReferenceDefinition {
   readonly name: string;
+  /** @internal */
   readonly polymorphic: boolean;
   readonly index: boolean;
   readonly foreignKey: boolean;
@@ -511,6 +512,7 @@ export class TableDefinition {
     return this.columns.filter((c) => c.options.primaryKey).map((c) => c.name);
   }
 
+  /** @internal */
   aliasedTypes(name: string, fallback: string): string {
     return name === "bigint" ? "integer" : fallback;
   }
@@ -585,6 +587,7 @@ export class TableDefinition {
     );
   }
 
+  /** @internal */
   static defineColumnMethods(...columnTypes: string[]): void {
     // In Rails, this dynamically defines type-specific column methods.
     // In TypeScript, these are defined statically on the class.
@@ -895,6 +898,7 @@ export class Table {
     private _schema: SchemaStatementsLike,
   ) {}
 
+  /** @internal */
   aliasedTypes(_name: string, fallback: string): string {
     return fallback;
   }
@@ -1162,12 +1166,14 @@ export interface SchemaStatementsLike {
   primaryKey?(tableName: string): Promise<string | null>;
 }
 
+/** @internal */
 function conciseOptions(options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::IndexDefinition#concise_options is not implemented",
   );
 }
 
+/** @internal */
 function polymorphic(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#polymorphic is not implemented",
@@ -1198,102 +1204,119 @@ function options(): never {
   );
 }
 
+/** @internal */
 function asOptions(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#as_options is not implemented",
   );
 }
 
+/** @internal */
 function conditionalOptions(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#conditional_options is not implemented",
   );
 }
 
+/** @internal */
 function polymorphicOptions(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#polymorphic_options is not implemented",
   );
 }
 
+/** @internal */
 function polymorphicIndexName(tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#polymorphic_index_name is not implemented",
   );
 }
 
+/** @internal */
 function indexOptions(tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#index_options is not implemented",
   );
 }
 
+/** @internal */
 function foreignKeyOptions(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#foreign_key_options is not implemented",
   );
 }
 
+/** @internal */
 function columnName(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#column_name is not implemented",
   );
 }
 
+/** @internal */
 function columnNames(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#column_names is not implemented",
   );
 }
 
+/** @internal */
 function foreignTableName(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ReferenceDefinition#foreign_table_name is not implemented",
   );
 }
 
+/** @internal */
 function validColumnDefinitionOptions(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TableDefinition#valid_column_definition_options is not implemented",
   );
 }
 
+/** @internal */
 function createColumnDefinition(name: any, type: any, options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TableDefinition#create_column_definition is not implemented",
   );
 }
 
+/** @internal */
 function aliasedTypes(name: any, fallback: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TableDefinition#aliased_types is not implemented",
   );
 }
 
+/** @internal */
 function isIntegerLikePrimaryKey(type: any, options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TableDefinition#integer_like_primary_key? is not implemented",
   );
 }
 
+/** @internal */
 function integerLikePrimaryKeyType(type: any, options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TableDefinition#integer_like_primary_key_type is not implemented",
   );
 }
 
+/** @internal */
 function raiseOnDuplicateColumn(name: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TableDefinition#raise_on_duplicate_column is not implemented",
   );
 }
 
+/** @internal */
 function raiseOnIfExistOptions(options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Table#raise_on_if_exist_options is not implemented",
   );
 }
 
+/** @internal */
 function defineColumnMethods(...columnTypes: any[]): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ColumnMethods#define_column_methods is not implemented",

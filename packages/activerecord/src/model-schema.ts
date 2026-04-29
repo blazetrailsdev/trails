@@ -956,36 +956,43 @@ export const ClassMethods = {
   loadSchemaFromAdapter,
 };
 
+/** @internal */
 function initializeLoadSchemaMonitor(): never {
   throw new NotImplementedError(
     "ActiveRecord::ModelSchema#initialize_load_schema_monitor is not implemented",
   );
 }
 
+/** @internal */
 function reloadSchemaFromCache(): never {
   throw new NotImplementedError(
     "ActiveRecord::ModelSchema#reload_schema_from_cache is not implemented",
   );
 }
 
+/** @internal */
 function isSchemaLoaded(): never {
   throw new NotImplementedError("ActiveRecord::ModelSchema#schema_loaded? is not implemented");
 }
 
+/** @internal */
 function loadSchemaBang(): never {
   throw new NotImplementedError("ActiveRecord::ModelSchema#load_schema! is not implemented");
 }
 
+/** @internal */
 function undecoratedTableName(): never {
   throw new NotImplementedError(
     "ActiveRecord::ModelSchema#undecorated_table_name is not implemented",
   );
 }
 
+/** @internal */
 function computeTableName(): never {
   throw new NotImplementedError("ActiveRecord::ModelSchema#compute_table_name is not implemented");
 }
 
+/** @internal */
 function typeForColumn(): never {
   throw new NotImplementedError("ActiveRecord::ModelSchema#type_for_column is not implemented");
 }

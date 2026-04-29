@@ -20,18 +20,21 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 }
 
+/** @internal */
 function visit_ForeignKeyDefinition(o: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaCreation#visit_ForeignKeyDefinition is not implemented",
   );
 }
 
+/** @internal */
 function supportsIndexUsing(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaCreation#supports_index_using? is not implemented",
   );
 }
 
+/** @internal */
 function addColumnOptionsBang(sql: any, options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaCreation#add_column_options! is not implemented",

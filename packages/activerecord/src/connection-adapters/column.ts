@@ -171,6 +171,7 @@ export class NullColumn extends Column {
   }
 }
 
+/** @internal */
 function deduplicated(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Column#deduplicated is not implemented",

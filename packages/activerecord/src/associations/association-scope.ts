@@ -743,15 +743,18 @@ function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
 }
 
 // Private helpers (mirrors Rails' private methods in AssociationScope)
+/** @internal */
 function valueTransformation(scope: AssociationScope): ValueTransformation {
   return (scope as any)._valueTransformation;
 }
 
+/** @internal */
 function join(table: unknown, constraint: unknown): unknown {
   // Mirrors Rails: Arel::Nodes::LeadingJoin.new(table, Arel::Nodes::On.new(constraint))
   return new Nodes.LeadingJoin(table as any, new Nodes.On(constraint as any));
 }
 
+/** @internal */
 function lastChainScope(
   scope: AssociationScope,
   currentScope: unknown,
@@ -762,10 +765,12 @@ function lastChainScope(
   return (scope as any)._lastChainScope(currentScope, reflection, owner, klass);
 }
 
+/** @internal */
 function transformValue(scope: AssociationScope, value: unknown): unknown {
   return (scope as any)._transformValue(value);
 }
 
+/** @internal */
 function nextChainScope(
   scope: AssociationScope,
   currentScope: unknown,
@@ -775,6 +780,7 @@ function nextChainScope(
   return (scope as any)._nextChainScope(currentScope, reflection, nextReflection);
 }
 
+/** @internal */
 function getChain(
   scope: AssociationScope,
   reflection: unknown,
@@ -785,6 +791,7 @@ function getChain(
   return (scope as any)._getChain(reflection, association, tracker);
 }
 
+/** @internal */
 function addConstraints(
   scope: AssociationScope,
   currentScope: unknown,
@@ -795,6 +802,7 @@ function addConstraints(
   return (scope as any)._addConstraints(currentScope, owner, chain);
 }
 
+/** @internal */
 function applyScope(
   scope: AssociationScope,
   currentScope: unknown,
@@ -805,6 +813,7 @@ function applyScope(
   return (scope as any)._applyScope(currentScope, table, key, value);
 }
 
+/** @internal */
 function evalScope(
   scope: AssociationScope,
   reflection: unknown,

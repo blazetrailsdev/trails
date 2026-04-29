@@ -9,6 +9,7 @@ import type { Relation } from "../relation.js";
  * Mirrors: ActiveRecord::Scoping::Default
  */
 export class Default {
+  /** @internal */
   static buildDefaultScope(modelClass: any, buildRelation: () => any): any {
     let rel = buildRelation();
     const defaultScopeFn = modelClass._defaultScope;
@@ -95,28 +96,33 @@ export function isDefaultScopes(
   return scopes.length > 0;
 }
 
+/** @internal */
 function buildDefaultScope(): never {
   throw new NotImplementedError(
     "ActiveRecord::Scoping::Default#build_default_scope is not implemented",
   );
 }
 
+/** @internal */
 function isExecuteScope(): never {
   throw new NotImplementedError("ActiveRecord::Scoping::Default#execute_scope? is not implemented");
 }
 
+/** @internal */
 function isIgnoreDefaultScope(): never {
   throw new NotImplementedError(
     "ActiveRecord::Scoping::Default#ignore_default_scope? is not implemented",
   );
 }
 
+/** @internal */
 function ignoreDefaultScope(): never {
   throw new NotImplementedError(
     "ActiveRecord::Scoping::Default#ignore_default_scope= is not implemented",
   );
 }
 
+/** @internal */
 function evaluateDefaultScope(): never {
   throw new NotImplementedError(
     "ActiveRecord::Scoping::Default#evaluate_default_scope is not implemented",

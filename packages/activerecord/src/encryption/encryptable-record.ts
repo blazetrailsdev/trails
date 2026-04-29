@@ -42,6 +42,8 @@ function getSha1KeyProvider(
  * Filters config.previousSchemes to those compatible with the given scheme
  * and merges each one so per-attribute settings (deterministic, downcase)
  * are preserved in the fallback scheme.
+ *
+ * @internal
  */
 export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
   const config = Configurable.config;
@@ -66,6 +68,8 @@ export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
  * Mirrors Rails' EncryptableRecord#scheme_for.
  * Builds the scheme with global previous schemes prepended to any
  * per-attribute previousSchemes declared in options.
+ *
+ * @internal
  */
 function schemeFor(options: SchemeOptions): Scheme {
   const { previousSchemes: localPrevious = [], ...rest } = options;
@@ -152,6 +156,7 @@ export class EncryptableRecord {
     }
   }
 
+  /** @internal */
   static validateColumnSize(modelClass: any, attribute: string): void {
     if (typeof modelClass.validatesLengthOf !== "function") return;
     const limit = (modelClass._attributeDefinitions?.get(attribute) as any)?.limit;
@@ -168,6 +173,7 @@ export class EncryptableRecord {
     }
   }
 
+  /** @internal */
   static hasEncryptedAttributes(modelClass: any): boolean {
     return (modelClass._encryptedAttributes?.size ?? 0) > 0;
   }
@@ -202,6 +208,7 @@ export function getAttributeType(klass: any, name: string): unknown {
   return def?.type;
 }
 
+/** @internal */
 function encryptAttribute(
   name: any,
   keyProvider?: any,
@@ -220,102 +227,119 @@ function encryptAttribute(
   );
 }
 
+/** @internal */
 function preserveOriginalEncrypted(name: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#preserve_original_encrypted is not implemented",
   );
 }
 
+/** @internal */
 function overrideAccessorsToPreserveOriginal(name: any, originalAttributeName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#override_accessors_to_preserve_original is not implemented",
   );
 }
 
+/** @internal */
 function loadSchemaBang(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#load_schema! is not implemented",
   );
 }
 
+/** @internal */
 function addLengthValidationForEncryptedColumns(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#add_length_validation_for_encrypted_columns is not implemented",
   );
 }
 
+/** @internal */
 function validateColumnSize(attributeName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#validate_column_size is not implemented",
   );
 }
 
+/** @internal */
 function isEncryptedAttribute(attributeName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute? is not implemented",
   );
 }
 
+/** @internal */
 function ciphertextFor(attributeName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#ciphertext_for is not implemented",
   );
 }
 
+/** @internal */
 function encrypt(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#encrypt is not implemented",
   );
 }
 
+/** @internal */
 function decrypt(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#decrypt is not implemented",
   );
 }
 
+/** @internal */
 function _createRecord(attributeNames?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#_create_record is not implemented",
   );
 }
 
+/** @internal */
 function encryptAttributes(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#encrypt_attributes is not implemented",
   );
 }
 
+/** @internal */
 function decryptAttributes(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#decrypt_attributes is not implemented",
   );
 }
 
+/** @internal */
 function validateEncryptionAllowed(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#validate_encryption_allowed is not implemented",
   );
 }
 
+/** @internal */
 function hasEncryptedAttributes(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#has_encrypted_attributes? is not implemented",
   );
 }
 
+/** @internal */
 function buildEncryptAttributeAssignments(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#build_encrypt_attribute_assignments is not implemented",
   );
 }
 
+/** @internal */
 function buildDecryptAttributeAssignments(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#build_decrypt_attribute_assignments is not implemented",
   );
 }
 
+/** @internal */
 function cantModifyEncryptedAttributesWhenFrozen(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptableRecord#cant_modify_encrypted_attributes_when_frozen is not implemented",

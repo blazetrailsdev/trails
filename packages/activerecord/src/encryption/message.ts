@@ -29,6 +29,7 @@ export class Message {
   }
 }
 
+/** @internal */
 function validatePayloadType(payload: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Message#validate_payload_type is not implemented",

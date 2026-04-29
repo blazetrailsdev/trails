@@ -407,6 +407,7 @@ function removeStackEntry(entry: object): void {
   if (index !== -1) stack.splice(index, 1);
 }
 
+/** @internal */
 function withRoleAndShard<T>(
   this: typeof Base,
   role: string | undefined,
@@ -435,6 +436,7 @@ function withRoleAndShard<T>(
   return withCleanup(result, () => removeStackEntry(entry));
 }
 
+/** @internal */
 function appendToConnectedToStack(entry: {
   role?: string;
   shard?: string;
@@ -777,6 +779,7 @@ export const ClassMethods = {
 // overrides like register("mysql2", ...) aren't shadowed by normalization.
 _setAdapterClassResolver(async (adapterName) => _loadAdapter(adapterName));
 
+/** @internal */
 function resolveConfigForConnection(configOrEnv: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionHandling#resolve_config_for_connection is not implemented",

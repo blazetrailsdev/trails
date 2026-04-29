@@ -30,10 +30,15 @@ export interface DatabaseStatementsHost {
   preparedStatements?: boolean;
   execute?(sql: string, name?: string | null): Promise<unknown>;
   selectAll?(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  /** @internal */
   internalExecute?(sql: string, name?: string, binds?: unknown[]): Promise<unknown>;
+  /** @internal */
   rawExecute?(sql: string, name?: string, binds?: unknown[]): Promise<unknown>;
+  /** @internal */
   castResult?(rawResult: unknown): Result;
+  /** @internal */
   affectedRows?(rawResult: unknown): number;
+  /** @internal */
   lastInsertedId?(result: Result): unknown;
   isWriteQuery?(sql: string): boolean;
   currentTransaction?(): {
@@ -44,6 +49,7 @@ export interface DatabaseStatementsHost {
   };
   withinNewTransaction?<T>(opts: unknown, fn: (tx?: unknown) => Promise<T> | T): Promise<T>;
   disableReferentialIntegrity?(fn: () => Promise<void>): Promise<void>;
+  /** @internal */
   executeBatch?(statements: string[], name?: string): Promise<void>;
   beginDbTransaction?(): Promise<void>;
   beginIsolatedDbTransaction?(isolation: string): Promise<void>;
@@ -100,6 +106,8 @@ export function toSql(
  * Falls back to the node's own `toSql()` for standalone usage.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#to_sql_and_binds
+ *
+ * @internal
  */
 export function toSqlAndBinds(
   this: DatabaseStatementsHost | void,
@@ -1159,6 +1167,7 @@ function normalizeResult(result: unknown): Result {
   return new Result([], []);
 }
 
+/** @internal */
 function singleValueFromRows(rows: unknown[][]): unknown {
   const row = rows[0];
   return row ? row[0] : undefined;
@@ -1319,6 +1328,7 @@ export const DatabaseStatements = {
   },
 };
 
+/** @internal */
 function rawExecute(
   sql: any,
   name?: any,
@@ -1334,6 +1344,7 @@ function rawExecute(
   );
 }
 
+/** @internal */
 function performQuery(
   rawConnection: any,
   sql: any,
@@ -1348,24 +1359,28 @@ function performQuery(
   );
 }
 
+/** @internal */
 function castResult(rawResult: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#cast_result is not implemented",
   );
 }
 
+/** @internal */
 function affectedRows(rawResult: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#affected_rows is not implemented",
   );
 }
 
+/** @internal */
 function preprocessQuery(sql: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#preprocess_query is not implemented",
   );
 }
 
+/** @internal */
 function internalExecute(
   sql: any,
   name?: any,
@@ -1381,48 +1396,56 @@ function internalExecute(
   );
 }
 
+/** @internal */
 function executeBatch(statements: any, name?: any, kwargs?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#execute_batch is not implemented",
   );
 }
 
+/** @internal */
 function defaultInsertValue(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#default_insert_value is not implemented",
   );
 }
 
+/** @internal */
 function buildFixtureSql(fixtures: any, tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_fixture_sql is not implemented",
   );
 }
 
+/** @internal */
 function buildFixtureStatements(fixtureSet: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_fixture_statements is not implemented",
   );
 }
 
+/** @internal */
 function buildTruncateStatement(tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_truncate_statement is not implemented",
   );
 }
 
+/** @internal */
 function buildTruncateStatements(tableNames: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_truncate_statements is not implemented",
   );
 }
 
+/** @internal */
 function combineMultiStatements(totalSql: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#combine_multi_statements is not implemented",
   );
 }
 
+/** @internal */
 function select(
   sql: any,
   name?: any,
@@ -1436,30 +1459,35 @@ function select(
   );
 }
 
+/** @internal */
 function sqlForInsert(sql: any, pk: any, binds: any, returning: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#sql_for_insert is not implemented",
   );
 }
 
+/** @internal */
 function lastInsertedId(result: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#last_inserted_id is not implemented",
   );
 }
 
+/** @internal */
 function returningColumnValues(result: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#returning_column_values is not implemented",
   );
 }
 
+/** @internal */
 function arelFromRelation(relation: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#arel_from_relation is not implemented",
   );
 }
 
+/** @internal */
 function extractTableRefFromInsertSql(sql: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#extract_table_ref_from_insert_sql is not implemented",

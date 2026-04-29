@@ -57,24 +57,28 @@ export class ExplainPrettyPrinter {
   }
 }
 
+/** @internal */
 function computeColumnWidths(result: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#compute_column_widths is not implemented",
   );
 }
 
+/** @internal */
 function buildSeparator(widths: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#build_separator is not implemented",
   );
 }
 
+/** @internal */
 function buildCells(items: any, widths: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#build_cells is not implemented",
   );
 }
 
+/** @internal */
 function buildFooter(nrows: any, elapsed: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#build_footer is not implemented",

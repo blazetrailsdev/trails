@@ -42,6 +42,7 @@ export function _writeAttribute(this: Model, name: string, value: unknown): void
 // uses it while generating dynamic attribute writers. TypeScript attribute
 // access is handled statically, so we compute the same metadata for parity
 // but intentionally do not register or define anything.
+/** @internal */
 function defineMethodAttribute(canonicalName: string, _options?: unknown): void {
   const { methodName, attrNameRef } = AttrNames.defineAttributeAccessorMethod(canonicalName, true);
   void methodName;

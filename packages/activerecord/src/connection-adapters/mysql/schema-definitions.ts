@@ -145,18 +145,21 @@ export class Table extends AbstractTable {
   }
 }
 
+/** @internal */
 function validColumnDefinitionOptions(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#valid_column_definition_options is not implemented",
   );
 }
 
+/** @internal */
 function aliasedTypes(name: any, fallback: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#aliased_types is not implemented",
   );
 }
 
+/** @internal */
 function integerLikePrimaryKeyType(type: any, options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#integer_like_primary_key_type is not implemented",

@@ -536,38 +536,46 @@ export function cachedFindByStatement(
   return cache.get(key);
 }
 
+/** @internal */
 function initInternals(): never {
   throw new NotImplementedError("ActiveRecord::Core#init_internals is not implemented");
 }
 
+/** @internal */
 function initializeInternalsCallback(): never {
   throw new NotImplementedError(
     "ActiveRecord::Core#initialize_internals_callback is not implemented",
   );
 }
 
+/** @internal */
 function isCustomInspectMethodDefined(): never {
   throw new NotImplementedError(
     "ActiveRecord::Core#custom_inspect_method_defined? is not implemented",
   );
 }
 
+/** @internal */
 function inspectWithAttributes(attributesToList: any): never {
   throw new NotImplementedError("ActiveRecord::Core#inspect_with_attributes is not implemented");
 }
 
+/** @internal */
 function attributesForInspect(): never {
   throw new NotImplementedError("ActiveRecord::Core#attributes_for_inspect is not implemented");
 }
 
+/** @internal */
 function allAttributesForInspect(): never {
   throw new NotImplementedError("ActiveRecord::Core#all_attributes_for_inspect is not implemented");
 }
 
+/** @internal */
 function relation(): never {
   throw new NotImplementedError("ActiveRecord::Core#relation is not implemented");
 }
 
+/** @internal */
 function cachedFindBy(): never {
   throw new NotImplementedError("ActiveRecord::Core#cached_find_by is not implemented");
 }

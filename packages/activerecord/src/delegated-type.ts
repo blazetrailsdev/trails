@@ -138,6 +138,7 @@ export function getDelegatedTypeConfig(
   return (modelClass as any)._delegatedTypes?.get(role);
 }
 
+/** @internal */
 function defineDelegatedTypeMethods(role: any, types?: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::DelegatedType#define_delegated_type_methods is not implemented",

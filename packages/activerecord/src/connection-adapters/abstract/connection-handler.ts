@@ -43,6 +43,8 @@ export class ConnectionHandler {
    * PoolConfig.connectionDescriptor= can call primaryClassQ() on them.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler#determine_owner_name
+   *
+   * @internal
    */
   determineOwnerName(owner: string | ConnectionOwner): ConnectionDescriptor | ConnectionOwner {
     if (typeof owner === "string") {
@@ -265,42 +267,49 @@ export class ConnectionHandler {
   }
 }
 
+/** @internal */
 function connectionNameToPoolManager(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionHandler#connection_name_to_pool_manager is not implemented",
   );
 }
 
+/** @internal */
 function getPoolManager(connectionName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionHandler#get_pool_manager is not implemented",
   );
 }
 
+/** @internal */
 function setPoolManager(connectionDescriptor: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionHandler#set_pool_manager is not implemented",
   );
 }
 
+/** @internal */
 function poolManagers(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionHandler#pool_managers is not implemented",
   );
 }
 
+/** @internal */
 function disconnectPoolFromPoolManager(poolManager: any, role: any, shard: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionHandler#disconnect_pool_from_pool_manager is not implemented",
   );
 }
 
+/** @internal */
 function resolvePoolConfig(config: any, connectionName: any, role: any, shard: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionHandler#resolve_pool_config is not implemented",
   );
 }
 
+/** @internal */
 function determineOwnerName(ownerName: any, config: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionHandler#determine_owner_name is not implemented",

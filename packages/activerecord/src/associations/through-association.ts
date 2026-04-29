@@ -8,6 +8,7 @@ import type { Base } from "../base.js";
  * Mirrors: ActiveRecord::Associations::ThroughAssociation
  */
 
+/** @internal */
 function transaction(
   assoc: { owner: Base; reflection: any },
   block: () => Promise<void>,
@@ -22,6 +23,7 @@ function transaction(
   return block();
 }
 
+/** @internal */
 function throughReflection(assoc: { owner: Base; reflection: any }): unknown {
   let refl = assoc.reflection.throughReflection?.();
   if (!refl) {
@@ -33,6 +35,7 @@ function throughReflection(assoc: { owner: Base; reflection: any }): unknown {
   return refl;
 }
 
+/** @internal */
 function throughAssociation(assoc: { owner: Base; reflection: any }): unknown {
   // Rails: @through_association ||= owner.association(through_reflection.name)
   const tr = throughReflection(assoc) as any;
@@ -40,6 +43,7 @@ function throughAssociation(assoc: { owner: Base; reflection: any }): unknown {
   return (assoc.owner as any).association?.(tr.name);
 }
 
+/** @internal */
 function constructJoinAttributes(
   assoc: { owner: Base; reflection: any },
   ...records: Base[]
@@ -81,6 +85,7 @@ function constructJoinAttributes(
   return joinAttributes;
 }
 
+/** @internal */
 function ensureMutable(assoc: { owner: Base; reflection: any }): void {
   const sourceRefl = assoc.reflection.sourceReflection?.() as any;
   if (sourceRefl && sourceRefl.macro !== "belongsTo") {
@@ -91,6 +96,7 @@ function ensureMutable(assoc: { owner: Base; reflection: any }): void {
   }
 }
 
+/** @internal */
 function ensureNotNested(assoc: { owner: Base; reflection: any }): void {
   if (assoc.reflection.options.through) {
     const throughRefl = (assoc.owner.constructor as any)._reflectOnAssociation?.(
@@ -102,6 +108,7 @@ function ensureNotNested(assoc: { owner: Base; reflection: any }): void {
   }
 }
 
+/** @internal */
 function staleState(assoc: { owner: Base; reflection: any }): unknown[] | null {
   const tr = throughReflection(assoc) as any;
   if (!tr?.isBelongsTo?.()) return null;
@@ -116,6 +123,7 @@ function staleState(assoc: { owner: Base; reflection: any }): unknown[] | null {
   return vals.length > 0 ? vals : null;
 }
 
+/** @internal */
 function foreignKeyPresent(assoc: { owner: Base; reflection: any }): boolean {
   const tr = throughReflection(assoc) as any;
   if (!tr?.isBelongsTo?.()) return false;

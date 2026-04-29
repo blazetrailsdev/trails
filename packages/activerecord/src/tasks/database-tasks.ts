@@ -467,6 +467,7 @@ export class DatabaseTasks {
     }
   }
 
+  /** @internal */
   static configsFor(environment: string): DatabaseConfig[] {
     if (!this.databaseConfiguration) return [];
     return this.databaseConfiguration.configsFor({ envName: environment });
@@ -477,6 +478,7 @@ export class DatabaseTasks {
     return trimmed || this.env;
   }
 
+  /** @internal */
   static eachLocalConfiguration(): DatabaseConfig[] {
     if (!this.databaseConfiguration) return [];
     return this.databaseConfiguration.configurations.filter((c) => {
@@ -1013,6 +1015,7 @@ export class DatabaseTasks {
     }
   }
 
+  /** @internal */
   static async truncateTables(config: DatabaseConfig): Promise<void> {
     const handler = this._resolveTaskOrThrow(this._adapterFor(config));
     if (handler.truncateAll) {
@@ -1101,94 +1104,110 @@ export interface DatabaseTaskHandler {
   ): Promise<void>;
 }
 
+/** @internal */
 function truncateTables(dbConfig: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#truncate_tables is not implemented",
   );
 }
 
+/** @internal */
 function withTemporaryPool(dbConfig: any, clobber?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#with_temporary_pool is not implemented",
   );
 }
 
+/** @internal */
 function configsFor(options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#configs_for is not implemented",
   );
 }
 
+/** @internal */
 function resolveConfiguration(configuration: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#resolve_configuration is not implemented",
   );
 }
 
+/** @internal */
 function isVerbose(): never {
   throw new NotImplementedError("ActiveRecord::Tasks::DatabaseTasks#verbose? is not implemented");
 }
 
+/** @internal */
 function databaseAdapterFor(dbConfig: any, ...arguments_: any[]): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#database_adapter_for is not implemented",
   );
 }
 
+/** @internal */
 function classForAdapter(adapter: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#class_for_adapter is not implemented",
   );
 }
 
+/** @internal */
 function eachCurrentConfiguration(environment: any, name?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#each_current_configuration is not implemented",
   );
 }
 
+/** @internal */
 function eachCurrentEnvironment(environment: any, block?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#each_current_environment is not implemented",
   );
 }
 
+/** @internal */
 function eachLocalConfiguration(): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#each_local_configuration is not implemented",
   );
 }
 
+/** @internal */
 function isLocalDatabase(dbConfig: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#local_database? is not implemented",
   );
 }
 
+/** @internal */
 function schemaSha1(file: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#schema_sha1 is not implemented",
   );
 }
 
+/** @internal */
 function structureDumpFlagsFor(adapter: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#structure_dump_flags_for is not implemented",
   );
 }
 
+/** @internal */
 function structureLoadFlagsFor(adapter: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#structure_load_flags_for is not implemented",
   );
 }
 
+/** @internal */
 function checkCurrentProtectedEnvironmentBang(dbConfig: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#check_current_protected_environment! is not implemented",
   );
 }
 
+/** @internal */
 function initializeDatabase(dbConfig: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Tasks::DatabaseTasks#initialize_database is not implemented",

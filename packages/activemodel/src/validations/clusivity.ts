@@ -26,15 +26,20 @@ export const ERROR_MESSAGE =
 export interface Clusivity {
   checkValidity(): void;
   resolveValue(record: unknown, value: unknown): unknown;
+  /** @internal */
   delimiter(): unknown;
+  /** @internal */
   inclusionMethod(enumerable: unknown): "include?" | "cover?";
+  /** @internal */
   isInclude(record: unknown, value: unknown): boolean;
 }
 
 interface ClusivityHost {
   options: Record<string, unknown>;
   resolveValue(record: unknown, value: unknown): unknown;
+  /** @internal */
   delimiter(): unknown;
+  /** @internal */
   inclusionMethod(enumerable: unknown): "include?" | "cover?";
   _delimiterCache?: unknown;
 }

@@ -54,24 +54,28 @@ export class EnvelopeEncryptionKeyProvider {
   }
 }
 
+/** @internal */
 function encryptDataKey(randomSecret: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#encrypt_data_key is not implemented",
   );
 }
 
+/** @internal */
 function decryptDataKey(encryptedMessage: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#decrypt_data_key is not implemented",
   );
 }
 
+/** @internal */
 function primaryKeyProvider(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#primary_key_provider is not implemented",
   );
 }
 
+/** @internal */
 function generateRandomSecret(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#generate_random_secret is not implemented",

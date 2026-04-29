@@ -14,8 +14,10 @@ export class TypeConflictError extends Error {
 }
 
 export class Registration {
+  /** @internal */
   readonly name: string;
   protected _block: (...args: unknown[]) => Type;
+  /** @internal */
   readonly adapter?: string;
   protected _override: boolean | null;
 
@@ -156,30 +158,36 @@ export class AdapterSpecificRegistry {
   }
 }
 
+/** @internal */
 function registrations(): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::AdapterSpecificRegistry#registrations is not implemented",
   );
 }
 
+/** @internal */
 function findRegistration(symbol: any, args?: any[], kwargs?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::AdapterSpecificRegistry#find_registration is not implemented",
   );
 }
 
+/** @internal */
 function name(): never {
   throw new NotImplementedError("ActiveRecord::Type::Registration#name is not implemented");
 }
 
+/** @internal */
 function block(): never {
   throw new NotImplementedError("ActiveRecord::Type::Registration#block is not implemented");
 }
 
+/** @internal */
 function adapter(): never {
   throw new NotImplementedError("ActiveRecord::Type::Registration#adapter is not implemented");
 }
 
+/** @internal */
 function override(): never {
   throw new NotImplementedError("ActiveRecord::Type::Registration#override is not implemented");
 }
@@ -188,48 +196,56 @@ function priority(): never {
   throw new NotImplementedError("ActiveRecord::Type::Registration#priority is not implemented");
 }
 
+/** @internal */
 function priorityExceptAdapter(): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::Registration#priority_except_adapter is not implemented",
   );
 }
 
+/** @internal */
 function isMatchesAdapter(adapter?: any, opts?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::Registration#matches_adapter? is not implemented",
   );
 }
 
+/** @internal */
 function isConflictsWith(other: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::Registration#conflicts_with? is not implemented",
   );
 }
 
+/** @internal */
 function isSamePriorityExceptAdapter(other: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::Registration#same_priority_except_adapter? is not implemented",
   );
 }
 
+/** @internal */
 function hasAdapterConflict(other: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::Registration#has_adapter_conflict? is not implemented",
   );
 }
 
+/** @internal */
 function options(): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::DecorationRegistration#options is not implemented",
   );
 }
 
+/** @internal */
 function klass(): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::DecorationRegistration#klass is not implemented",
   );
 }
 
+/** @internal */
 function isMatchesOptions(kwargs?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Type::DecorationRegistration#matches_options? is not implemented",

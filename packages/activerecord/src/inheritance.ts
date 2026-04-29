@@ -39,6 +39,8 @@ function castInheritanceColumnValue(
  * Used by STI to look up subclasses by their type column value.
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#compute_type
+ *
+ * @internal
  */
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
   const klass = modelRegistry.get(typeName);
@@ -181,6 +183,8 @@ export function getStiBase(modelClass: typeof Base): typeof Base {
  * Throws SubclassNotFound if the type is invalid or not a subclass.
  *
  * Mirrors: ActiveRecord::Inheritance.find_sti_class
+ *
+ * @internal
  */
 export function findStiClass(baseClass: typeof Base, typeName: string): typeof Base {
   const klass = modelRegistry.get(typeName);
@@ -377,6 +381,8 @@ export function discriminateClassForRecord(
  * Check if a record has a non-empty inheritance column value and STI is enabled.
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#using_single_table_inheritance?
+ *
+ * @internal
  */
 function usingSingleTableInheritance(
   modelClass: typeof Base,

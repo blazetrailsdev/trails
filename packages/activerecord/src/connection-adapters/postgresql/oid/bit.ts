@@ -7,6 +7,7 @@
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Data {
+  /** @internal */
   readonly value: string;
 
   constructor(value: string) {

@@ -1049,54 +1049,63 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 }
 
+/** @internal */
 function isTextType(type: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#text_type? is not implemented",
   );
 }
 
+/** @internal */
 function connect(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#connect is not implemented",
   );
 }
 
+/** @internal */
 function reconnect(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#reconnect is not implemented",
   );
 }
 
+/** @internal */
 function configureConnection(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#configure_connection is not implemented",
   );
 }
 
+/** @internal */
 function fullVersion(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#full_version is not implemented",
   );
 }
 
+/** @internal */
 function getFullVersion(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#get_full_version is not implemented",
   );
 }
 
+/** @internal */
 function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#translate_exception is not implemented",
   );
 }
 
+/** @internal */
 function defaultPreparedStatements(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#default_prepared_statements is not implemented",
   );
 }
 
+/** @internal */
 function initializeTypeMap(m: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#initialize_type_map is not implemented",

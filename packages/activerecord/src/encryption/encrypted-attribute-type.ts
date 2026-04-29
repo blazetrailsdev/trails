@@ -293,96 +293,112 @@ function isAdditionalValue(value: unknown): boolean {
   );
 }
 
+/** @internal */
 function previousSchemesIncludingCleanText(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#previous_schemes_including_clean_text is not implemented",
   );
 }
 
+/** @internal */
 function previousTypesWithoutCleanText(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#previous_types_without_clean_text is not implemented",
   );
 }
 
+/** @internal */
 function buildPreviousTypesFor(schemes: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#build_previous_types_for is not implemented",
   );
 }
 
+/** @internal */
 function isPreviousType(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#previous_type? is not implemented",
   );
 }
 
+/** @internal */
 function decryptAsText(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#decrypt_as_text is not implemented",
   );
 }
 
+/** @internal */
 function tryToDeserializeWithPreviousEncryptedTypes(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#try_to_deserialize_with_previous_encrypted_types is not implemented",
   );
 }
 
+/** @internal */
 function handleDeserializeError(error: any, value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#handle_deserialize_error is not implemented",
   );
 }
 
+/** @internal */
 function isSerializeWithOldest(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#serialize_with_oldest? is not implemented",
   );
 }
 
+/** @internal */
 function serializeWithOldest(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#serialize_with_oldest is not implemented",
   );
 }
 
+/** @internal */
 function serializeWithCurrent(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#serialize_with_current is not implemented",
   );
 }
 
+/** @internal */
 function encryptAsText(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#encrypt_as_text is not implemented",
   );
 }
 
+/** @internal */
 function encryptor(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#encryptor is not implemented",
   );
 }
 
+/** @internal */
 function encryptionOptions(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#encryption_options is not implemented",
   );
 }
 
+/** @internal */
 function cleanTextScheme(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#clean_text_scheme is not implemented",
   );
 }
 
+/** @internal */
 function textToDatabaseType(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#text_to_database_type is not implemented",
   );
 }
 
+/** @internal */
 function databaseTypeToText(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::EncryptedAttributeType#database_type_to_text is not implemented",

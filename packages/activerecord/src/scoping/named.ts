@@ -90,6 +90,7 @@ export const ClassMethods = {
   defaultExtensions,
 };
 
+/** @internal */
 function singletonMethodAdded(): never {
   throw new NotImplementedError(
     "ActiveRecord::Scoping::Named#singleton_method_added is not implemented",

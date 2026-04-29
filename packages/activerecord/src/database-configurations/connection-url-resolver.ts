@@ -159,36 +159,42 @@ function redactUrl(url: string): string {
   return url.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^@/]+@/, "$1***@");
 }
 
+/** @internal */
 function uri(): never {
   throw new NotImplementedError(
     "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#uri is not implemented",
   );
 }
 
+/** @internal */
 function uriParser(): never {
   throw new NotImplementedError(
     "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#uri_parser is not implemented",
   );
 }
 
+/** @internal */
 function queryHash(): never {
   throw new NotImplementedError(
     "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#query_hash is not implemented",
   );
 }
 
+/** @internal */
 function rawConfig(): never {
   throw new NotImplementedError(
     "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#raw_config is not implemented",
   );
 }
 
+/** @internal */
 function resolvedAdapter(): never {
   throw new NotImplementedError(
     "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#resolved_adapter is not implemented",
   );
 }
 
+/** @internal */
 function databaseFromPath(): never {
   throw new NotImplementedError(
     "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#database_from_path is not implemented",

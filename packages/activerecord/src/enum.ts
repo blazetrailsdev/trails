@@ -147,6 +147,7 @@ export function defineEnum(
  * Mirrors: ActiveRecord::Enum::EnumType
  */
 export class EnumType extends ValueType<string> {
+  /** @internal */
   override readonly name: string;
   private _mapping: ReadonlyMap<string, number | string>;
   private _reverseMapping: ReadonlyMap<number | string, string>;
@@ -402,6 +403,8 @@ export function castEnumValue(
  *
  * Accepts both strings and symbols in arrays (Rails parity). JavaScript symbols
  * are the closest equivalent to Ruby symbols; strings are used directly.
+ *
+ * @internal
  */
 export function assertValidEnumDefinitionValues(
   values: any,
@@ -486,6 +489,8 @@ function isPlainHash(value: unknown): boolean {
 /**
  * Validate enum options: reject underscore-prefixed variants.
  * Mirrors: ActiveRecord::Enum#assert_valid_enum_options (private)
+ *
+ * @internal
  */
 export function assertValidEnumOptions(options: unknown): void {
   if (!options || !isPlainHash(options)) return;
@@ -514,6 +519,8 @@ export function setEnumWarn(fn: (msg: string) => void): void {
 /**
  * Warn on negative enum condition conflicts (e.g., both "notDraft" and "draft").
  * Mirrors: ActiveRecord::Enum#detect_negative_enum_conditions! (private)
+ *
+ * @internal
  */
 export function detectNegativeEnumConditionsBang(methodNames: string[]): void {
   const methodNameSet = new Set(methodNames);

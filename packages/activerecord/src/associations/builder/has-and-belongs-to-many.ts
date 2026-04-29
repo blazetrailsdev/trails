@@ -220,14 +220,17 @@ export class HasAndBelongsToMany {
   }
 }
 
+/** @internal */
 function middleOptions(builder: HasAndBelongsToMany, joinModel: unknown): Record<string, unknown> {
   return (builder as any)._middleOptions?.(joinModel) ?? {};
 }
 
+/** @internal */
 function tableName(builder: HasAndBelongsToMany): string {
   return (builder as any)._tableName?.() ?? "";
 }
 
+/** @internal */
 function belongsToOptions(
   builder: HasAndBelongsToMany,
   options: Record<string, unknown>,

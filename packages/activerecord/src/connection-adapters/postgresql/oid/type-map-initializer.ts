@@ -14,6 +14,7 @@ export interface TypeMap {
     oid: number | string,
     type: unknown | ((oid: number | string, ...args: unknown[]) => unknown),
   ): void;
+  /** @internal */
   aliasType(oid: number | string, targetOid: number | string): void;
   lookup?(oid: number | string, ...args: unknown[]): unknown;
   has?(oid: number | string): boolean;

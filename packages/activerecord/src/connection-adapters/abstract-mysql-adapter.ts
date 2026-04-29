@@ -541,6 +541,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return super.caseSensitiveComparison(attribute, value);
   }
 
+  /** @internal */
   canPerformCaseInsensitiveComparisonFor(column: { collation?: string | null }): boolean {
     return column.collation != null && column.collation.endsWith("_ci");
   }
@@ -937,144 +938,168 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
   }
 }
 
+/** @internal */
 function canPerformCaseInsensitiveComparisonFor(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#can_perform_case_insensitive_comparison_for? is not implemented",
   );
 }
 
+/** @internal */
 function stripWhitespaceCharacters(expression: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#strip_whitespace_characters is not implemented",
   );
 }
 
+/** @internal */
 function extendedTypeMapKey(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#extended_type_map_key is not implemented",
   );
 }
 
+/** @internal */
 function handleWarnings(sql: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#handle_warnings is not implemented",
   );
 }
 
+/** @internal */
 function isWarningIgnored(warning: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#warning_ignored? is not implemented",
   );
 }
 
+/** @internal */
 function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#translate_exception is not implemented",
   );
 }
 
+/** @internal */
 function changeColumnForAlter(tableName: any, columnName: any, type: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#change_column_for_alter is not implemented",
   );
 }
 
+/** @internal */
 function renameColumnForAlter(tableName: any, columnName: any, newColumnName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#rename_column_for_alter is not implemented",
   );
 }
 
+/** @internal */
 function addIndexForAlter(tableName: any, columnName: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#add_index_for_alter is not implemented",
   );
 }
 
+/** @internal */
 function removeIndexForAlter(tableName: any, columnName?: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#remove_index_for_alter is not implemented",
   );
 }
 
+/** @internal */
 function supportsInsertRawAliasSyntax(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#supports_insert_raw_alias_syntax? is not implemented",
   );
 }
 
+/** @internal */
 function supportsRenameIndex(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#supports_rename_index? is not implemented",
   );
 }
 
+/** @internal */
 function supportsRenameColumn(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#supports_rename_column? is not implemented",
   );
 }
 
+/** @internal */
 function configureConnection(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#configure_connection is not implemented",
   );
 }
 
+/** @internal */
 function columnDefinitions(tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#column_definitions is not implemented",
   );
 }
 
+/** @internal */
 function createTableInfo(tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#create_table_info is not implemented",
   );
 }
 
+/** @internal */
 function arelVisitor(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#arel_visitor is not implemented",
   );
 }
 
+/** @internal */
 function buildStatementPool(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#build_statement_pool is not implemented",
   );
 }
 
+/** @internal */
 function mismatchedForeignKeyDetails(message?: any, sql?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#mismatched_foreign_key_details is not implemented",
   );
 }
 
+/** @internal */
 function mismatchedForeignKey(message: any, sql?: any, binds?: any, connectionPool?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#mismatched_foreign_key is not implemented",
   );
 }
 
+/** @internal */
 function versionString(fullVersionString: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#version_string is not implemented",
   );
 }
 
+/** @internal */
 function initializeTypeMap(m: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#initialize_type_map is not implemented",
   );
 }
 
+/** @internal */
 function registerIntegerType(mapping: any, key: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#register_integer_type is not implemented",
   );
 }
 
+/** @internal */
 function extractPrecision(sqlType: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#extract_precision is not implemented",

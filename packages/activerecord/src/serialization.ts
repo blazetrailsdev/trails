@@ -39,6 +39,8 @@ export function serializableHash(this: Base, options?: SerializeOptions): Record
  * The base implementation just delegates to the attribute_names method.
  *
  * Mirrors: ActiveRecord::Serialization.private#attribute_names_for_serialization
+ *
+ * @internal
  */
 export function attributeNamesForSerialization(this: Base): string[] {
   return this.attributeNames();

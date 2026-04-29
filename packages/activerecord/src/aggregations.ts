@@ -19,6 +19,7 @@ export function getAggregationCache(record: Base): Map<string, unknown> {
   return self._aggregationCache as Map<string, unknown>;
 }
 
+/** @internal */
 export function clearAggregationCache(record: Base): void {
   const self = record as any;
   if (self._aggregationCache && record.isPersisted()) {
@@ -147,14 +148,17 @@ export const InstanceMethods = {
   reload,
 };
 
+/** @internal */
 function initInternals(): never {
   throw new NotImplementedError("ActiveRecord::Aggregations#init_internals is not implemented");
 }
 
+/** @internal */
 function readerMethod(): never {
   throw new NotImplementedError("ActiveRecord::Aggregations#reader_method is not implemented");
 }
 
+/** @internal */
 function writerMethod(): never {
   throw new NotImplementedError("ActiveRecord::Aggregations#writer_method is not implemented");
 }

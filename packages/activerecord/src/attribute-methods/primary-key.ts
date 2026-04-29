@@ -149,6 +149,7 @@ export function getPrimaryKey(
 }
 
 // Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods private#attribute_method?
+/** @internal */
 function attributeMethod(this: any, attrName: string): boolean {
   const pk = this.primaryKey;
   return Array.isArray(pk) ? pk.includes(attrName) : attrName === pk;

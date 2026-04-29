@@ -115,6 +115,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     this.debugSql(message);
   }
 
+  /** @internal */
   override get logger(): Logger | null {
     // Rails: `def logger; ActiveRecord::Base.logger; end`
     // Returns Base.logger directly — null means logging disabled.

@@ -2186,6 +2186,7 @@ _setCollectionProxyCtor(
   CollectionProxy as unknown as Parameters<typeof _setCollectionProxyCtor>[0],
 );
 
+/** @internal */
 function findNthWithLimit(
   proxy: CollectionProxy<any>,
   index: number,
@@ -2201,6 +2202,7 @@ function findNthWithLimit(
   return (proxy as any).limit(limit).offset(index).toArray();
 }
 
+/** @internal */
 function findNthFromLast(proxy: CollectionProxy<any>, index: number): Promise<any> {
   const records = (proxy as any)._association?.target;
   if (Array.isArray(records)) {
@@ -2218,14 +2220,17 @@ function findNthFromLast(proxy: CollectionProxy<any>, index: number): Promise<an
     .then((r: any[]) => r[0] ?? null);
 }
 
+/** @internal */
 function isNullScope(proxy: CollectionProxy<any>): boolean {
   return !!(proxy as any)._association?.isNullScope?.();
 }
 
+/** @internal */
 function isFindFromTarget(proxy: CollectionProxy<any>): boolean {
   return !!(proxy as any)._association?.isFindFromTarget?.();
 }
 
+/** @internal */
 function execQueries(proxy: CollectionProxy<any>): Promise<any[]> {
   return proxy.loadTarget() as Promise<any[]>;
 }

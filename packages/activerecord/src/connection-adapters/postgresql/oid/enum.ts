@@ -23,6 +23,7 @@ export class Enum extends ValueType<string> {
   }
 }
 
+/** @internal */
 function castValue(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Enum#cast_value is not implemented",

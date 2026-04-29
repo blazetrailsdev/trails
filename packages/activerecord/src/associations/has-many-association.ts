@@ -97,10 +97,12 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 }
 
+/** @internal */
 function countRecords(assoc: HasManyAssociation): Promise<number> {
   return (assoc as any).scope?.()?.count?.() ?? Promise.resolve(0);
 }
 
+/** @internal */
 async function updateCounter(assoc: HasManyAssociation, difference: number): Promise<void> {
   const counterCol = assoc.reflection.options.counterCache;
   if (!counterCol) return;
@@ -115,6 +117,7 @@ async function updateCounter(assoc: HasManyAssociation, difference: number): Pro
   }
 }
 
+/** @internal */
 function updateCounterInMemory(assoc: HasManyAssociation, difference: number): void {
   const counterCol = assoc.reflection.options.counterCache;
   if (counterCol) {
@@ -124,11 +127,13 @@ function updateCounterInMemory(assoc: HasManyAssociation, difference: number): v
   }
 }
 
+/** @internal */
 function deleteCount(_assoc: HasManyAssociation, method: string, scope: any): Promise<number> {
   if (method === "deleteAll") return scope.deleteAll?.() ?? Promise.resolve(0);
   return scope.updateAll?.() ?? Promise.resolve(0);
 }
 
+/** @internal */
 async function deleteOrNullifyAllRecords(assoc: HasManyAssociation, method: string): Promise<void> {
   // Rails: count = delete_count(method, scope); update_counter(-count)
   const scope = (assoc as any).scope?.();
@@ -136,10 +141,12 @@ async function deleteOrNullifyAllRecords(assoc: HasManyAssociation, method: stri
   if (count > 0) await updateCounter(assoc, -count);
 }
 
+/** @internal */
 function deleteRecords(assoc: HasManyAssociation, records: Base[], method: string): Promise<void> {
   return (assoc as any).delete?.(...records) ?? Promise.resolve();
 }
 
+/** @internal */
 function updateCounterIfSuccess(
   assoc: HasManyAssociation,
   savedSuccessfully: boolean,
@@ -149,10 +156,12 @@ function updateCounterIfSuccess(
   return savedSuccessfully;
 }
 
+/** @internal */
 function difference(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] {
   return a.filter((r) => !b.includes(r));
 }
 
+/** @internal */
 function intersection(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] {
   return a.filter((r) => b.includes(r));
 }

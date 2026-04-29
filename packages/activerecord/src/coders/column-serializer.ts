@@ -90,6 +90,7 @@ export class ColumnSerializer {
     }
   }
 
+  /** @internal */
   checkArityOfConstructor(): void {
     if (this._objectClass === (Object as unknown)) return;
     // Mirrors Rails: catch ArgumentError from object_class.new with no args.
@@ -106,6 +107,7 @@ export class ColumnSerializer {
   }
 }
 
+/** @internal */
 function checkArityOfConstructor(): never {
   throw new NotImplementedError(
     "ActiveRecord::Coders::ColumnSerializer#check_arity_of_constructor is not implemented",

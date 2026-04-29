@@ -50,6 +50,7 @@ export class LegacyPoint extends ValueType<[number, number]> {
   }
 }
 
+/** @internal */
 function numberForPoint(number: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::LegacyPoint#number_for_point is not implemented",

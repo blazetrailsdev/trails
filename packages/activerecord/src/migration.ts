@@ -208,6 +208,8 @@ export abstract class Migration {
 
   /**
    * Override to define the forward migration.
+   *
+   * @internal
    */
   async up(): Promise<void> {
     // Default: run change() in forward direction
@@ -217,6 +219,8 @@ export abstract class Migration {
   /**
    * Override to define the rollback migration.
    * Default: run change() in reverse direction.
+   *
+   * @internal
    */
   async down(): Promise<void> {
     await this._runChange("down");
@@ -1516,6 +1520,8 @@ export class Migrator {
    * Run all pending migrations up to the target version (or all if no target).
    *
    * Mirrors: ActiveRecord::Migrator.up
+   *
+   * @internal
    */
   async up(targetVersion?: number | string | null): Promise<void> {
     await this._withAdvisoryLock(async () => {
@@ -1528,6 +1534,8 @@ export class Migrator {
    * Revert all applied migrations down to the target version.
    *
    * Mirrors: ActiveRecord::Migrator.down
+   *
+   * @internal
    */
   async down(targetVersion?: number | string | null): Promise<void> {
     await this._withAdvisoryLock(async () => {
@@ -2152,6 +2160,7 @@ export class CheckPending {
   }
 }
 
+/** @internal */
 function detailedMigrationMessage(pendingMigrations: any): never {
   throw new NotImplementedError(
     "ActiveRecord::PendingMigrationError#detailed_migration_message is not implemented",
@@ -2164,28 +2173,34 @@ function connectionPool(): never {
   );
 }
 
+/** @internal */
 function executeBlock(): never {
   throw new NotImplementedError("ActiveRecord::Migration#execute_block is not implemented");
 }
 
+/** @internal */
 function formatArguments(arguments_: any): never {
   throw new NotImplementedError("ActiveRecord::Migration#format_arguments is not implemented");
 }
 
+/** @internal */
 function isInternalOption(optionName: any): never {
   throw new NotImplementedError("ActiveRecord::Migration#internal_option? is not implemented");
 }
 
+/** @internal */
 function commandRecorder(): never {
   throw new NotImplementedError("ActiveRecord::Migration#command_recorder is not implemented");
 }
 
+/** @internal */
 function isAnySchemaNeedsUpdate(): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration#any_schema_needs_update? is not implemented",
   );
 }
 
+/** @internal */
 function dbConfigsInCurrentEnv(): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration#db_configs_in_current_env is not implemented",
@@ -2196,14 +2211,17 @@ function pendingMigrations(): never {
   throw new NotImplementedError("ActiveRecord::Migration#pending_migrations is not implemented");
 }
 
+/** @internal */
 function env(): never {
   throw new NotImplementedError("ActiveRecord::Migration#env is not implemented");
 }
 
+/** @internal */
 function loadSchemaBang(): never {
   throw new NotImplementedError("ActiveRecord::Migration#load_schema! is not implemented");
 }
 
+/** @internal */
 function buildWatcher(block?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::CheckPending#build_watcher is not implemented",
@@ -2214,98 +2232,119 @@ function connection(): never {
   throw new NotImplementedError("ActiveRecord::MigrationContext#connection is not implemented");
 }
 
+/** @internal */
 function migrationFiles(): never {
   throw new NotImplementedError(
     "ActiveRecord::MigrationContext#migration_files is not implemented",
   );
 }
 
+/** @internal */
 function parseMigrationFilename(filename: any): never {
   throw new NotImplementedError(
     "ActiveRecord::MigrationContext#parse_migration_filename is not implemented",
   );
 }
 
+/** @internal */
 function isValidateTimestamp(): never {
   throw new NotImplementedError(
     "ActiveRecord::MigrationContext#validate_timestamp? is not implemented",
   );
 }
 
+/** @internal */
 function isValidMigrationTimestamp(version: any): never {
   throw new NotImplementedError(
     "ActiveRecord::MigrationContext#valid_migration_timestamp? is not implemented",
   );
 }
 
+/** @internal */
 function move(direction: any, steps: any): never {
   throw new NotImplementedError("ActiveRecord::MigrationContext#move is not implemented");
 }
 
+/** @internal */
 function runWithoutLock(): never {
   throw new NotImplementedError("ActiveRecord::Migrator#run_without_lock is not implemented");
 }
 
+/** @internal */
 function migrateWithoutLock(): never {
   throw new NotImplementedError("ActiveRecord::Migrator#migrate_without_lock is not implemented");
 }
 
+/** @internal */
 function recordEnvironment(): never {
   throw new NotImplementedError("ActiveRecord::Migrator#record_environment is not implemented");
 }
 
+/** @internal */
 function isRan(migration: any): never {
   throw new NotImplementedError("ActiveRecord::Migrator#ran? is not implemented");
 }
 
+/** @internal */
 function isInvalidTarget(): never {
   throw new NotImplementedError("ActiveRecord::Migrator#invalid_target? is not implemented");
 }
 
+/** @internal */
 function executeMigrationInTransaction(migration: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migrator#execute_migration_in_transaction is not implemented",
   );
 }
 
+/** @internal */
 function finish(): never {
   throw new NotImplementedError("ActiveRecord::Migrator#finish is not implemented");
 }
 
+/** @internal */
 function validate(migrations: any): never {
   throw new NotImplementedError("ActiveRecord::Migrator#validate is not implemented");
 }
 
+/** @internal */
 function recordVersionStateAfterMigrating(version: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Migrator#record_version_state_after_migrating is not implemented",
   );
 }
 
+/** @internal */
 function isUp(): never {
   throw new NotImplementedError("ActiveRecord::Migrator#up? is not implemented");
 }
 
+/** @internal */
 function isDown(): never {
   throw new NotImplementedError("ActiveRecord::Migrator#down? is not implemented");
 }
 
+/** @internal */
 function ddlTransaction(migration: any, block?: any): never {
   throw new NotImplementedError("ActiveRecord::Migrator#ddl_transaction is not implemented");
 }
 
+/** @internal */
 function isUseTransaction(migration: any): never {
   throw new NotImplementedError("ActiveRecord::Migrator#use_transaction? is not implemented");
 }
 
+/** @internal */
 function isUseAdvisoryLock(): never {
   throw new NotImplementedError("ActiveRecord::Migrator#use_advisory_lock? is not implemented");
 }
 
+/** @internal */
 function withAdvisoryLock(): never {
   throw new NotImplementedError("ActiveRecord::Migrator#with_advisory_lock is not implemented");
 }
 
+/** @internal */
 function generateMigratorAdvisoryLockId(): never {
   throw new NotImplementedError(
     "ActiveRecord::Migrator#generate_migrator_advisory_lock_id is not implemented",

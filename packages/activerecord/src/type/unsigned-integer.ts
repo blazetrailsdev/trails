@@ -27,10 +27,12 @@ export class UnsignedInteger extends IntegerType {
   }
 }
 
+/** @internal */
 function maxValue(): never {
   throw new NotImplementedError("ActiveRecord::Type::UnsignedInteger#max_value is not implemented");
 }
 
+/** @internal */
 function minValue(): never {
   throw new NotImplementedError("ActiveRecord::Type::UnsignedInteger#min_value is not implemented");
 }

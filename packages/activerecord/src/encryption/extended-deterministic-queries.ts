@@ -284,12 +284,14 @@ export class ExtendedEncryptableType {
   }
 }
 
+/** @internal */
 function process(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::ExtendedDeterministicQueries::AdditionalValue#process is not implemented",
   );
 }
 
+/** @internal */
 function additionalValuesFor(value: any, type: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery#additional_values_for is not implemented",

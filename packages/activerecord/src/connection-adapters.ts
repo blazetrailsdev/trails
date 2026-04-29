@@ -103,6 +103,7 @@ export {
   TableDefinition,
 } from "./connection-adapters/abstract/schema-definitions.js";
 
+/** @internal */
 function defaultPrimaryKey(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters#default_primary_key is not implemented",

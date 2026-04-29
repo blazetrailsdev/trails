@@ -740,20 +740,24 @@ export class JoinDependency {
   }
 }
 
+/** @internal */
 function joinRoot(dep: JoinDependency): unknown {
   return (dep as any)._nodes?.[0] ?? null;
 }
 
+/** @internal */
 function joinType(_dep: JoinDependency): string {
   return "LEFT OUTER JOIN";
 }
 
+/** @internal */
 function aliasTracker(dep: JoinDependency): unknown {
   // _aliasCache is defined on JoinDependency (Map<JoinNode|null, Map<string,string>>).
   // Rails' alias_tracker is an AliasTracker instance; ours is the equivalent map.
   return (dep as any)._aliasCache ?? null;
 }
 
+/** @internal */
 function makeJoinConstraints(dep: JoinDependency, _root: unknown, _type: string): Nodes.Node[] {
   // Rails: maps each child of join_root into join constraints via make_constraints.
   // Our implementation stores pre-built JOIN SQL in _nodes; return as Arel literals.
@@ -762,6 +766,7 @@ function makeJoinConstraints(dep: JoinDependency, _root: unknown, _type: string)
   return (nodes ?? []).map((n) => arelSql(n.joinSql));
 }
 
+/** @internal */
 function makeConstraints(
   dep: JoinDependency,
   _parent: unknown,
@@ -778,6 +783,7 @@ function makeConstraints(
   return matching.map((n) => arelSql(n.joinSql));
 }
 
+/** @internal */
 function walk(dep: JoinDependency, _left: unknown, _right: unknown, _type: string): Nodes.Node[] {
   // Rails: merges two JoinAssociation subtrees reusing existing table aliases.
   // Our flat _nodes structure doesn't have a tree to walk; return all join SQLs.
@@ -786,6 +792,7 @@ function walk(dep: JoinDependency, _left: unknown, _right: unknown, _type: strin
   return (nodes ?? []).map((n) => arelSql(n.joinSql));
 }
 
+/** @internal */
 function findReflection(_dep: JoinDependency, klass: unknown, name: string): unknown {
   const found = (klass as any)?._reflectOnAssociation?.(name) ?? null;
   if (!found) {
@@ -796,6 +803,7 @@ function findReflection(_dep: JoinDependency, klass: unknown, name: string): unk
   return found;
 }
 
+/** @internal */
 function build(_dep: JoinDependency, _associations: unknown, _baseKlass: unknown): unknown[] {
   // Rails: recursively builds JoinAssociation tree from an association name hash.
   // Our JoinDependency uses addEagerLoadFor; return node metadata for reflection.

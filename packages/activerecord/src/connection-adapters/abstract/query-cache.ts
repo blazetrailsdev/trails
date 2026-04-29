@@ -402,36 +402,42 @@ export function dirtiesQueryCache(
   }
 }
 
+/** @internal */
 function checkVersion(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::QueryCache::Store#check_version is not implemented",
   );
 }
 
+/** @internal */
 function unsetQueryCacheBang(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::QueryCache#unset_query_cache! is not implemented",
   );
 }
 
+/** @internal */
 function lookupSqlCache(sql: any, name: any, binds: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::QueryCache#lookup_sql_cache is not implemented",
   );
 }
 
+/** @internal */
 function cacheSql(sql: any, name: any, binds: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::QueryCache#cache_sql is not implemented",
   );
 }
 
+/** @internal */
 function cacheNotificationInfoResult(sql: any, name: any, binds: any, result: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::QueryCache#cache_notification_info_result is not implemented",
   );
 }
 
+/** @internal */
 function cacheNotificationInfo(sql: any, name: any, binds: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::QueryCache#cache_notification_info is not implemented",

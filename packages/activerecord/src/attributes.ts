@@ -178,22 +178,26 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
   return cacheHost._cachedDefaultAttributes;
 }
 
+/** @internal */
 function reloadSchemaFromCache(): never {
   throw new NotImplementedError(
     "ActiveRecord::Attributes#reload_schema_from_cache is not implemented",
   );
 }
 
+/** @internal */
 function defineDefaultAttribute(): never {
   throw new NotImplementedError(
     "ActiveRecord::Attributes#define_default_attribute is not implemented",
   );
 }
 
+/** @internal */
 function resolveTypeName(): never {
   throw new NotImplementedError("ActiveRecord::Attributes#resolve_type_name is not implemented");
 }
 
+/** @internal */
 function typeForColumn(): never {
   throw new NotImplementedError("ActiveRecord::Attributes#type_for_column is not implemented");
 }

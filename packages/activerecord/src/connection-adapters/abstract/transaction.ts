@@ -543,6 +543,7 @@ export class Transaction {
     return true;
   }
 
+  /** @internal */
   appendCallbacks(callbacks: TransactionCallback[]): void {
     if (!this._callbacks) this._callbacks = [];
     this._callbacks.push(...callbacks);
@@ -1027,30 +1028,35 @@ export class TransactionManager {
   }
 }
 
+/** @internal */
 function appendCallbacks(callbacks: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Transaction#append_callbacks is not implemented",
   );
 }
 
+/** @internal */
 function uniqueRecords(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Transaction#unique_records is not implemented",
   );
 }
 
+/** @internal */
 function runActionOnRecords(records: any, instancesToRunCallbacksOn: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Transaction#run_action_on_records is not implemented",
   );
 }
 
+/** @internal */
 function prepareInstancesToRunCallbacksOn(records: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Transaction#prepare_instances_to_run_callbacks_on is not implemented",
   );
 }
 
+/** @internal */
 function afterFailureActions(transaction: any, error: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TransactionManager#after_failure_actions is not implemented",

@@ -909,54 +909,63 @@ function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConn
   );
 }
 
+/** @internal */
 function connectionLease(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#connection_lease is not implemented",
   );
 }
 
+/** @internal */
 function buildAsyncExecutor(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#build_async_executor is not implemented",
   );
 }
 
+/** @internal */
 function bulkMakeNewConnections(numNewConnsNeeded: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#bulk_make_new_connections is not implemented",
   );
 }
 
+/** @internal */
 function withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#with_exclusively_acquired_all_connections is not implemented",
   );
 }
 
+/** @internal */
 function attemptToCheckoutAllExistingConnections(raiseOnAcquisitionTimeout?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#attempt_to_checkout_all_existing_connections is not implemented",
   );
 }
 
+/** @internal */
 function checkoutForExclusiveAccess(checkoutTimeout: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_for_exclusive_access is not implemented",
   );
 }
 
+/** @internal */
 function withNewConnectionsBlocked(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#with_new_connections_blocked is not implemented",
   );
 }
 
+/** @internal */
 function acquireConnection(checkoutTimeout: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#acquire_connection is not implemented",
   );
 }
 
+/** @internal */
 function removeConnectionFromThreadCache(conn: any, ownerThread?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#remove_connection_from_thread_cache is not implemented",
@@ -969,24 +978,28 @@ function release(): never {
   );
 }
 
+/** @internal */
 function tryToCheckoutNewConnection(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#try_to_checkout_new_connection is not implemented",
   );
 }
 
+/** @internal */
 function adoptConnection(conn: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#adopt_connection is not implemented",
   );
 }
 
+/** @internal */
 function checkoutNewConnection(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_new_connection is not implemented",
   );
 }
 
+/** @internal */
 function checkoutAndVerify(c: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_and_verify is not implemented",

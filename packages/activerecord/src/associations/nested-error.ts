@@ -27,6 +27,7 @@ interface InnerErrorLike {
  * Mirrors: ActiveRecord::Associations::NestedError
  */
 export class NestedError extends ActiveModelNestedError {
+  /** @internal */
   readonly association: AssociationLike;
 
   constructor(association: AssociationLike, innerError: InnerErrorLike) {
@@ -58,14 +59,17 @@ export class NestedError extends ActiveModelNestedError {
   }
 }
 
+/** @internal */
 function association(err: NestedError): NestedError["association"] {
   return err.association;
 }
 
+/** @internal */
 function indexErrorsSetting(err: NestedError): boolean | "nestedAttributesOrder" {
   return (err.association as any).options?.indexErrors ?? false;
 }
 
+/** @internal */
 function index(err: NestedError, innerError: { base?: unknown }): number | undefined {
   const records = orderedRecords(err);
   if (!records || !innerError.base) return undefined;
@@ -73,6 +77,7 @@ function index(err: NestedError, innerError: { base?: unknown }): number | undef
   return idx >= 0 ? idx : undefined;
 }
 
+/** @internal */
 function orderedRecords(err: NestedError): unknown[] | null {
   const setting = indexErrorsSetting(err);
   const assoc = err.association;

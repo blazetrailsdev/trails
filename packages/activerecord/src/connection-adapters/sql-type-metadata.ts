@@ -67,6 +67,7 @@ export interface SqlTypeMetadataJSON {
   scale: number | null;
 }
 
+/** @internal */
 function deduplicated(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SqlTypeMetadata#deduplicated is not implemented",

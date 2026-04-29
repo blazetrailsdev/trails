@@ -179,58 +179,69 @@ export const InstanceMethods = {
   touch,
 };
 
+/** @internal */
 function initInternals(): never {
   throw new NotImplementedError("ActiveRecord::Timestamp#init_internals is not implemented");
 }
 
+/** @internal */
 function _createRecord(): never {
   throw new NotImplementedError("ActiveRecord::Timestamp#_create_record is not implemented");
 }
 
+/** @internal */
 function _updateRecord(): never {
   throw new NotImplementedError("ActiveRecord::Timestamp#_update_record is not implemented");
 }
 
+/** @internal */
 function createOrUpdate(touch?: any, opts?: any): never {
   throw new NotImplementedError("ActiveRecord::Timestamp#create_or_update is not implemented");
 }
 
+/** @internal */
 function recordUpdateTimestamps(): never {
   throw new NotImplementedError(
     "ActiveRecord::Timestamp#record_update_timestamps is not implemented",
   );
 }
 
+/** @internal */
 function shouldRecordTimestamps(): never {
   throw new NotImplementedError(
     "ActiveRecord::Timestamp#should_record_timestamps? is not implemented",
   );
 }
 
+/** @internal */
 function maxUpdatedColumnTimestamp(): never {
   throw new NotImplementedError(
     "ActiveRecord::Timestamp#max_updated_column_timestamp is not implemented",
   );
 }
 
+/** @internal */
 function clearTimestampAttributes(): never {
   throw new NotImplementedError(
     "ActiveRecord::Timestamp#clear_timestamp_attributes is not implemented",
   );
 }
 
+/** @internal */
 function reloadSchemaFromCache(): never {
   throw new NotImplementedError(
     "ActiveRecord::Timestamp#reload_schema_from_cache is not implemented",
   );
 }
 
+/** @internal */
 function timestampAttributesForCreate(): never {
   throw new NotImplementedError(
     "ActiveRecord::Timestamp#timestamp_attributes_for_create is not implemented",
   );
 }
 
+/** @internal */
 function timestampAttributesForUpdate(): never {
   throw new NotImplementedError(
     "ActiveRecord::Timestamp#timestamp_attributes_for_update is not implemented",

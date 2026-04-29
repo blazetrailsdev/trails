@@ -17,9 +17,12 @@ const original = hadExisting ? fs.readFileSync(MANIFEST_PATH, "utf8") : null;
 const fixture = {
   files: {
     "packages/activerecord/src/inheritance.ts": ["computeType"],
-  },
-  packageGlobals: {
-    activerecord: ["computeType"],
+    // base.ts also lists computeType — the manifest builder adds it via
+    // include-graph resolution (Rails Base extends Inheritance::ClassMethods
+    // through the Concern `included` hook). The rule itself just does a
+    // file-scoped lookup; `include resolution` lives entirely in the manifest
+    // builder.
+    "packages/activerecord/src/base.ts": ["computeType"],
   },
 };
 fs.writeFileSync(MANIFEST_PATH, JSON.stringify(fixture, null, 2));

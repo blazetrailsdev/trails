@@ -22,6 +22,7 @@ export class Time extends ActiveModelTime {
   }
 }
 
+/** @internal */
 function castValue(value: any): never {
   throw new NotImplementedError("ActiveRecord::Type::Time#cast_value is not implemented");
 }

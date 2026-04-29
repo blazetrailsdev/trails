@@ -118,42 +118,49 @@ export class UniquenessValidator extends EachValidator {
   }
 }
 
+/** @internal */
 function findFinderClassFor(record: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations::UniquenessValidator#find_finder_class_for is not implemented",
   );
 }
 
+/** @internal */
 function isValidationNeeded(klass: any, record: any, attribute: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations::UniquenessValidator#validation_needed? is not implemented",
   );
 }
 
+/** @internal */
 function isCoveredByUniqueIndex(klass: any, record: any, attribute: any, scope: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations::UniquenessValidator#covered_by_unique_index? is not implemented",
   );
 }
 
+/** @internal */
 function resolveAttributes(record: any, attributes: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations::UniquenessValidator#resolve_attributes is not implemented",
   );
 }
 
+/** @internal */
 function buildRelation(klass: any, attribute: any, value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations::UniquenessValidator#build_relation is not implemented",
   );
 }
 
+/** @internal */
 function scopeRelation(record: any, relation: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations::UniquenessValidator#scope_relation is not implemented",
   );
 }
 
+/** @internal */
 function mapEnumAttribute(klass: any, attribute: any, value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations::UniquenessValidator#map_enum_attribute is not implemented",

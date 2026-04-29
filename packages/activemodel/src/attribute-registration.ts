@@ -35,6 +35,7 @@ type AnyAttributeHost = any;
 // ---------------------------------------------------------------------------
 
 interface PendingModification {
+  /** @internal */
   applyTo(attributeSet: AttributeSet): void;
 }
 

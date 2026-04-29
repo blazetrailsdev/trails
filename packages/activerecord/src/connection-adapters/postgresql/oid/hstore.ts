@@ -131,6 +131,8 @@ export function serializeHstore(obj: Record<string, string | null>): string {
  *   nil             → NULL
  *   ""              → "" (empty quoted string)
  *   "foo"           → quoted, with backslashes and double-quotes escaped
+ *
+ * @internal
  */
 function escapeHstore(value: string | null | undefined): string {
   if (value == null) return "NULL";

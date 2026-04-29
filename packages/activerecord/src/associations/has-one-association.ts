@@ -238,6 +238,7 @@ export class HasOneAssociation extends SingularAssociation {
   }
 }
 
+/** @internal */
 function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<void> {
   const target = assoc.target as Base | null;
   if (!target) return Promise.resolve();
@@ -253,6 +254,7 @@ function removeTargetBang(assoc: HasOneAssociation, method: string): Promise<voi
   return Promise.resolve();
 }
 
+/** @internal */
 function transactionIf(
   assoc: HasOneAssociation,
   condition: boolean,

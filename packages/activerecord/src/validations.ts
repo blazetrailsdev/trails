@@ -134,6 +134,8 @@ export function customValidationContext(this: any): boolean {
 
 /**
  * Mirrors: ActiveRecord::Validations (private) #default_validation_context
+ *
+ * @internal
  */
 export function defaultValidationContext(this: any): string {
   return this.isNewRecord?.() || this._newRecord ? "create" : "update";
@@ -141,6 +143,8 @@ export function defaultValidationContext(this: any): string {
 
 /**
  * Mirrors: ActiveRecord::Validations (private) #perform_validations
+ *
+ * @internal
  */
 export function performValidations(
   this: any,
@@ -294,6 +298,7 @@ export const ClassMethods = {
   validatesUniqueness,
 };
 
+/** @internal */
 function raiseValidationError(): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations#raise_validation_error is not implemented",

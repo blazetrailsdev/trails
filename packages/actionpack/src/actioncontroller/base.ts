@@ -374,7 +374,11 @@ export class Base extends Metal {
     (this as any)._rescueHandlers.push({ errorClass, handler });
   }
 
-  /** Process action with rescue handling and async template rendering. */
+  /**
+   * Process action with rescue handling and async template rendering.
+   *
+   * @internal
+   */
   async processAction(action: string): Promise<void> {
     try {
       await super.processAction(action);

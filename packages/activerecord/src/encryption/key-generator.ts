@@ -43,12 +43,14 @@ export class KeyGenerator {
   }
 }
 
+/** @internal */
 function keyDerivationSalt(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::KeyGenerator#key_derivation_salt is not implemented",
   );
 }
 
+/** @internal */
 function keyLength(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::KeyGenerator#key_length is not implemented",

@@ -372,11 +372,13 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 }
 
+/** @internal */
 function isRequireCounterUpdate(assoc: BelongsToAssociation): boolean {
   const col = (assoc as any).counterCacheColumn?.();
   return !!(col && assoc.owner.isPersisted());
 }
 
+/** @internal */
 function primaryKey(assoc: BelongsToAssociation, klass: unknown): string | string[] {
   // Rails: reflection.association_primary_key(klass)
   const refl = assoc.reflection as any;

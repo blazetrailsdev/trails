@@ -96,6 +96,7 @@ export class Serialized extends ValueType {
   }
 }
 
+/** @internal */
 function encoded(value: any): never {
   throw new NotImplementedError("ActiveRecord::Type::Serialized#encoded is not implemented");
 }

@@ -26,6 +26,7 @@ export class DefaultStrategy extends ExecutionStrategy {
   }
 }
 
+/** @internal */
 function connection(): never {
   throw new NotImplementedError(
     "ActiveRecord::Migration::DefaultStrategy#connection is not implemented",

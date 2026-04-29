@@ -36,6 +36,7 @@ export class ExclusionValidator extends EachValidator {
   declare delimiter: typeof delimiter;
   /** @internal */
   declare inclusionMethod: typeof inclusionMethod;
+  /** @internal */
   declare isInclude: typeof isInclude;
 
   override checkValidity(): void {

@@ -319,10 +319,12 @@ export class Branch {
   }
 }
 
+/** @internal */
 function buildChildren(branch: Branch, children: unknown): Branch[] {
   return ((branch as any)._buildChildren?.(children) as Branch[] | undefined) ?? [];
 }
 
+/** @internal */
 function preloaderFor(branch: Branch, reflection: unknown): unknown {
   return (branch as any)._preloaderFor?.(reflection) ?? null;
 }

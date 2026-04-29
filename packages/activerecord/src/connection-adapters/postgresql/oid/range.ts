@@ -37,6 +37,7 @@ export interface RangeSubtype {
   cast(value: unknown): unknown;
   serialize(value: unknown): unknown;
   deserialize(value: unknown): unknown;
+  /** @internal */
   infinity?(options?: { negative?: boolean }): unknown;
 }
 
@@ -183,6 +184,7 @@ export function unquoteRangeBound(value: string): string {
   return value;
 }
 
+/** @internal */
 function sanitizeBounds(from: unknown, to: unknown): [unknown, unknown] {
   return [
     from === -Infinity && !infiniteFloatRangeCovers(to) ? null : from,
@@ -190,6 +192,7 @@ function sanitizeBounds(from: unknown, to: unknown): [unknown, unknown] {
   ];
 }
 
+/** @internal */
 function isInfinity(value: unknown): boolean {
   return value === Infinity || value === -Infinity;
 }
@@ -215,6 +218,7 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
+/** @internal */
 function unquote(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range#unquote is not implemented",

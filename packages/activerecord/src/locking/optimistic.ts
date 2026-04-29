@@ -131,42 +131,50 @@ export async function updateCounters(
   return 0;
 }
 
+/** @internal */
 function _createRecord(attributeNames?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Locking::Optimistic#_create_record is not implemented",
   );
 }
 
+/** @internal */
 function _touchRow(attributeNames: any, time: any): never {
   throw new NotImplementedError("ActiveRecord::Locking::Optimistic#_touch_row is not implemented");
 }
 
+/** @internal */
 function _updateRow(attributeNames: any, attemptedAction?: any): never {
   throw new NotImplementedError("ActiveRecord::Locking::Optimistic#_update_row is not implemented");
 }
 
+/** @internal */
 function destroyRow(): never {
   throw new NotImplementedError("ActiveRecord::Locking::Optimistic#destroy_row is not implemented");
 }
 
+/** @internal */
 function _lockValueForDatabase(lockingColumn: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Locking::Optimistic#_lock_value_for_database is not implemented",
   );
 }
 
+/** @internal */
 function _clearLockingColumn(): never {
   throw new NotImplementedError(
     "ActiveRecord::Locking::Optimistic#_clear_locking_column is not implemented",
   );
 }
 
+/** @internal */
 function _queryConstraintsHash(): never {
   throw new NotImplementedError(
     "ActiveRecord::Locking::Optimistic#_query_constraints_hash is not implemented",
   );
 }
 
+/** @internal */
 function hookAttributeType(): never {
   throw new NotImplementedError(
     "ActiveRecord::Locking::Optimistic#hook_attribute_type is not implemented",

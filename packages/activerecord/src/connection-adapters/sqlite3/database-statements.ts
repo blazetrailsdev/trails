@@ -86,12 +86,14 @@ export async function resetIsolationLevel(
   }
 }
 
+/** @internal */
 function internalBeginTransaction(mode: any, isolation: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#internal_begin_transaction is not implemented",
   );
 }
 
+/** @internal */
 function performQuery(
   rawConnection: any,
   sql: any,
@@ -106,36 +108,42 @@ function performQuery(
   );
 }
 
+/** @internal */
 function castResult(result: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#cast_result is not implemented",
   );
 }
 
+/** @internal */
 function affectedRows(result: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#affected_rows is not implemented",
   );
 }
 
+/** @internal */
 function executeBatch(statements: any, name?: any, kwargs?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#execute_batch is not implemented",
   );
 }
 
+/** @internal */
 function buildTruncateStatement(tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#build_truncate_statement is not implemented",
   );
 }
 
+/** @internal */
 function returningColumnValues(result: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#returning_column_values is not implemented",
   );
 }
 
+/** @internal */
 function defaultInsertValue(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#default_insert_value is not implemented",

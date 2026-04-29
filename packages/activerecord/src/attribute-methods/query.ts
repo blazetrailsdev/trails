@@ -72,6 +72,7 @@ function castToBoolean(value: unknown): boolean {
 }
 
 // Mirrors: ActiveRecord::AttributeMethods::Query::ClassMethods private#query_cast_attribute
+/** @internal */
 function queryCastAttribute(this: any, attrName: string, value: unknown): unknown {
   // typeForAttribute is a class method — look it up on the constructor, not the instance.
   const type = ((this.constructor as any).typeForAttribute?.(attrName) ??

@@ -4068,6 +4068,7 @@ export class Relation<T extends Base> {
     return this._cacheKeys.get(timestampColumn)!;
   }
 
+  /** @internal */
   async computeCacheKey(timestampColumn = "updated_at"): Promise<string> {
     const key = `${this._modelClass.tableName}/query-${hexdigest(this.toSql())}`;
     if (this._modelClass.collectionCacheVersioning) {
@@ -4094,6 +4095,7 @@ export class Relation<T extends Base> {
     return this._cacheVersions.get(timestampColumn)!;
   }
 
+  /** @internal */
   async computeCacheVersion(timestampColumn = "updated_at"): Promise<string> {
     let size = 0;
     let timestamp: unknown = null;
@@ -4455,6 +4457,7 @@ applyThenable(Relation.prototype);
 _setRelationCtor(Relation as any);
 _setScopeProxyWrapper(wrapWithScopeProxy);
 
+/** @internal */
 async function computeCacheKey(
   rel: Relation<Base>,
   timestampColumn = "updated_at",
@@ -4462,6 +4465,7 @@ async function computeCacheKey(
   return rel.computeCacheKey(timestampColumn);
 }
 
+/** @internal */
 async function computeCacheVersion(
   rel: Relation<Base>,
   timestampColumn = "updated_at",

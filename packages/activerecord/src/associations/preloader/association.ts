@@ -13,7 +13,9 @@ type AssociationLikeReflection = AssociationReflection | ThroughReflection;
  */
 export class Association {
   readonly klass: typeof Base;
+  /** @internal */
   readonly owners: Base[];
+  /** @internal */
   readonly reflection: AssociationLikeReflection;
   private _preloadScope: any;
   private _reflectionScope: any;
@@ -416,6 +418,7 @@ export class LoaderQuery {
  * Mirrors: ActiveRecord::Associations::Preloader::Association::LoaderRecords
  */
 export class LoaderRecords {
+  /** @internal */
   readonly loaders: Association[];
   readonly loaderQuery: LoaderQuery;
 
@@ -450,50 +453,62 @@ export class LoaderRecords {
 }
 
 // Private helpers mirroring Rails' PreloaderAssociation private methods
+/** @internal */
 function owners(assoc: Association): Base[] {
   return assoc.owners;
 }
 
+/** @internal */
 function reflection(assoc: Association): unknown {
   return assoc.reflection;
 }
 
+/** @internal */
 function preloadScope(assoc: Association): unknown {
   return (assoc as any)._preloadScope;
 }
 
+/** @internal */
 function model(assoc: Association): unknown {
   return (assoc as any)._model;
 }
 
+/** @internal */
 function ownerKeyName(assoc: Association): string | string[] {
   return (assoc as any)._ownerKeyName;
 }
 
+/** @internal */
 function associateRecordsToOwner(assoc: Association, owner: Base, records: Base[]): void {
   (assoc as any)._associateRecordsToOwner(owner, records);
 }
 
+/** @internal */
 function isKeyConversionRequired(assoc: Association): boolean {
   return (assoc as any)._isKeyConversionRequired();
 }
 
+/** @internal */
 function deriveKey(assoc: Association, record: Base, key: string | string[]): unknown {
   return (assoc as any)._deriveKey(record, key);
 }
 
+/** @internal */
 function convertKey(assoc: Association, key: unknown): unknown {
   return (assoc as any)._convertKey(key);
 }
 
+/** @internal */
 function associationKeyType(assoc: Association): string {
   return (assoc as any)._associationKeyType?.() ?? "string";
 }
 
+/** @internal */
 function ownerKeyType(assoc: Association): string {
   return (assoc as any)._ownerKeyType?.() ?? "string";
 }
 
+/** @internal */
 function reflectionScope(assoc: Association): unknown {
   // Rails: reflection.join_scopes(klass.arel_table, klass.predicate_builder, klass).inject(&:merge!)
   // Our implementation memoizes this as _reflectionScope; the arel_table is accessed internally.
@@ -502,10 +517,12 @@ function reflectionScope(assoc: Association): unknown {
   return (assoc as any)._reflectionScope;
 }
 
+/** @internal */
 function buildScope(assoc: Association): unknown {
   return (assoc as any)._buildScope();
 }
 
+/** @internal */
 function cascadeStrictLoading(assoc: Association, scope: unknown): unknown {
   const ps = (assoc as any)._preloadScope;
   return ps?.strictLoadingValue ? (scope as any).strictLoading?.() : scope;

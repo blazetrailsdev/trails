@@ -26,7 +26,7 @@ let manifestCache = null;
 function loadManifest() {
   if (manifestCache) return manifestCache;
   if (!fs.existsSync(MANIFEST_PATH)) {
-    manifestCache = { files: {}, packageGlobals: {} };
+    manifestCache = { files: {} };
     return manifestCache;
   }
   manifestCache = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
@@ -50,21 +50,6 @@ function repoRoot() {
 
 function relFromRepoRoot(filename) {
   return path.relative(repoRoot(), filename).split(path.sep).join("/");
-}
-
-function packageOf(rel) {
-  // packages/<pkg>/... → package id used in manifest.packageGlobals.
-  // actionpack hosts both actioncontroller and actiondispatch as
-  // sub-namespaces; actionview is its own top-level package.
-  // packages/rack is a separate Rack implementation (not Rails'
-  // actiondispatch) and has no rails-api counterpart, so it's left
-  // out of package-global matching.
-  const m = rel.match(/^packages\/([^/]+)\/src(?:\/([^/]+))?\//);
-  if (!m) return null;
-  if (m[1] === "actionpack") {
-    return m[2] === "actiondispatch" ? "actiondispatch" : "actioncontroller";
-  }
-  return m[1];
 }
 
 function jsdocHasInternal(node, sourceCode) {
@@ -150,11 +135,7 @@ function check(context, node, name) {
   const rel = relFromRepoRoot(filename);
   const manifest = loadManifest();
   const fileNames = manifest.files?.[rel];
-  const pkg = packageOf(rel);
-  const globalNames = pkg ? manifest.packageGlobals?.[pkg] : null;
-  const matched =
-    (fileNames && fileNames.includes(name)) || (globalNames && globalNames.includes(name));
-  if (!matched) return;
+  if (!fileNames || !fileNames.includes(name)) return;
 
   const sourceCode = context.sourceCode ?? context.getSourceCode();
   const { tag, comment } = jsdocHasInternal(target, sourceCode);
@@ -204,18 +185,19 @@ const rule = {
         if (node.accessibility === "private" || node.accessibility === "protected") return;
         check(context, node, node.key.name);
       },
-      // Interface members. TypeDoc documents these independently from
-      // the concrete class implementation, so they need their own
-      // `@internal` tag. Deliberately not matching TSTypeLiteral —
-      // those appear in parameter type positions (e.g.
-      // `fn(opts: { actionPath?: string })`) where the property
-      // signatures aren't documented surface, and tagging them would
-      // splice JSDoc into the middle of a function signature.
+      // Interface methods. TypeDoc documents these independently from
+      // the concrete class implementation, so polymorphic-dispatch
+      // contracts (e.g. TemplateResolver.findLayout?) need their own
+      // `@internal` tag.
+      //
+      // Deliberately NOT matching TSPropertySignature: most interface
+      // properties whose name collides with a Rails-private accessor
+      // are user-facing config options (e.g. `delimiter` on
+      // NumberHelperOptions, `logger` on DebugExceptionsOptions),
+      // not internal accessors. Tagging them via autofix would hide
+      // real public surface. Use a manual `/** @internal */` if the
+      // collision is genuine.
       "TSInterfaceBody > TSMethodSignature"(node) {
-        if (node.key?.type !== "Identifier") return;
-        check(context, node, node.key.name);
-      },
-      "TSInterfaceBody > TSPropertySignature"(node) {
         if (node.key?.type !== "Identifier") return;
         check(context, node, node.key.name);
       },

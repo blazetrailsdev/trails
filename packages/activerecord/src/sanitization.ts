@@ -246,6 +246,8 @@ export const ClassMethods = {
  * Called by sanitizeSqlArray when positional binds are present.
  *
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#replace_bind_variables
+ *
+ * @internal
  */
 function replaceBindVariables(statement: string, values: unknown[]): string {
   raiseIfBindArityMismatch(statement, statement.match(/\?/g)?.length ?? 0, values.length);
@@ -260,6 +262,8 @@ function replaceBindVariables(statement: string, values: unknown[]): string {
  * Handles Relation objects (converts to SQL) and complex values (arrays, etc).
  *
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#replace_bind_variable
+ *
+ * @internal
  */
 function replaceBindVariable(value: unknown): string {
   return quoteBoundValue(value);
@@ -270,6 +274,8 @@ function replaceBindVariable(value: unknown): string {
  * Handles PostgreSQL type casts (`::`) and escaped colons.
  *
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#replace_named_bind_variables
+ *
+ * @internal
  */
 function replaceNamedBindVariables(statement: string, bindVars: Record<string, unknown>): string {
   let result = statement;
@@ -300,6 +306,8 @@ function replaceNamedBindVariables(statement: string, bindVars: Record<string, u
  * objects with `id_for_database` method, and primitive values.
  *
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#quote_bound_value
+ *
+ * @internal
  */
 function quoteBoundValue(value: unknown): string {
   if (hasIdForDatabase(value)) {
@@ -363,6 +371,8 @@ function isPlainHash(value: unknown): boolean {
  * Validate that the number of bind variables matches the number of placeholders.
  *
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#raise_if_bind_arity_mismatch
+ *
+ * @internal
  */
 function raiseIfBindArityMismatch(statement: string, expected: number, provided: number): void {
   if (expected !== provided) {

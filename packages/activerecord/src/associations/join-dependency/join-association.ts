@@ -205,6 +205,7 @@ function nodeReferencesTable(node: Nodes.Node, tableName: string): boolean {
   return found;
 }
 
+/** @internal */
 function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | null {
   // Rails: if StringJoin, prepend constraints to left; otherwise combine via Arel::Nodes::And.
   // Arel join node fields are readonly — return a new join with updated On constraint.

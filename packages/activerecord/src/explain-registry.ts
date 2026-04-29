@@ -108,6 +108,7 @@ export class ExplainRegistry {
   }
 }
 
+/** @internal */
 function instance(): never {
   throw new NotImplementedError("ActiveRecord::ExplainRegistry#instance is not implemented");
 }

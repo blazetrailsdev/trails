@@ -1416,192 +1416,224 @@ export class SchemaStatements {
   }
 }
 
+/** @internal */
 function generateIndexName(tableName: any, column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#generate_index_name is not implemented",
   );
 }
 
+/** @internal */
 function validateChangeColumnNullArgumentBang(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#validate_change_column_null_argument! is not implemented",
   );
 }
 
+/** @internal */
 function columnOptionsKeys(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#column_options_keys is not implemented",
   );
 }
 
+/** @internal */
 function addIndexSortOrder(quotedColumns: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#add_index_sort_order is not implemented",
   );
 }
 
+/** @internal */
 function optionsForIndexColumns(options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#options_for_index_columns is not implemented",
   );
 }
 
+/** @internal */
 function addOptionsForIndexColumns(quotedColumns: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#add_options_for_index_columns is not implemented",
   );
 }
 
+/** @internal */
 function indexNameForRemove(tableName: any, columnName: any, options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#index_name_for_remove is not implemented",
   );
 }
 
+/** @internal */
 function renameTableIndexes(tableName: any, newName: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#rename_table_indexes is not implemented",
   );
 }
 
+/** @internal */
 function renameColumnIndexes(tableName: any, columnName: any, newColumnName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#rename_column_indexes is not implemented",
   );
 }
 
+/** @internal */
 function createTableDefinition(name: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#create_table_definition is not implemented",
   );
 }
 
+/** @internal */
 function createAlterTable(name: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#create_alter_table is not implemented",
   );
 }
 
+/** @internal */
 function validateCreateTableOptionsBang(options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#validate_create_table_options! is not implemented",
   );
 }
 
+/** @internal */
 function fetchTypeMetadata(sqlType: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#fetch_type_metadata is not implemented",
   );
 }
 
+/** @internal */
 function indexColumnNames(columnNames: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#index_column_names is not implemented",
   );
 }
 
+/** @internal */
 function indexNameOptions(columnNames: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#index_name_options is not implemented",
   );
 }
 
+/** @internal */
 function isExpressionColumnName(columnName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#expression_column_name? is not implemented",
   );
 }
 
+/** @internal */
 function stripTableNamePrefixAndSuffix(tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#strip_table_name_prefix_and_suffix is not implemented",
   );
 }
 
+/** @internal */
 function foreignKeyName(tableName: any, options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_key_name is not implemented",
   );
 }
 
+/** @internal */
 function foreignKeyFor(fromTable: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_key_for is not implemented",
   );
 }
 
+/** @internal */
 function foreignKeyForBang(fromTable: any, toTable?: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_key_for! is not implemented",
   );
 }
 
+/** @internal */
 function extractForeignKeyAction(specifier: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#extract_foreign_key_action is not implemented",
   );
 }
 
+/** @internal */
 function isForeignKeysEnabled(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_keys_enabled? is not implemented",
   );
 }
 
+/** @internal */
 function checkConstraintName(tableName: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#check_constraint_name is not implemented",
   );
 }
 
+/** @internal */
 function checkConstraintFor(tableName: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#check_constraint_for is not implemented",
   );
 }
 
+/** @internal */
 function checkConstraintForBang(tableName: any, expression?: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#check_constraint_for! is not implemented",
   );
 }
 
+/** @internal */
 function validateIndexLengthBang(tableName: any, newName: any, internal?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#validate_index_length! is not implemented",
   );
 }
 
+/** @internal */
 function validateTableLengthBang(tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#validate_table_length! is not implemented",
   );
 }
 
+/** @internal */
 function extractNewDefaultValue(defaultOrChanges: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#extract_new_default_value is not implemented",
   );
 }
 
+/** @internal */
 function canRemoveIndexByName(columnName: any, options: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#can_remove_index_by_name? is not implemented",
   );
 }
 
+/** @internal */
 function referenceNameForTable(tableName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#reference_name_for_table is not implemented",
   );
 }
 
+/** @internal */
 function addColumnForAlter(tableName: any, columnName: any, type: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#add_column_for_alter is not implemented",
   );
 }
 
+/** @internal */
 function changeColumnDefaultForAlter(
   tableName: any,
   columnName: any,
@@ -1612,48 +1644,56 @@ function changeColumnDefaultForAlter(
   );
 }
 
+/** @internal */
 function renameColumnSql(tableName: any, columnName: any, newColumnName: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#rename_column_sql is not implemented",
   );
 }
 
+/** @internal */
 function removeColumnForAlter(tableName: any, columnName: any, type?: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#remove_column_for_alter is not implemented",
   );
 }
 
+/** @internal */
 function removeColumnsForAlter(tableName: any, columnNames?: any[], options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#remove_columns_for_alter is not implemented",
   );
 }
 
+/** @internal */
 function addTimestampsForAlter(tableName: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#add_timestamps_for_alter is not implemented",
   );
 }
 
+/** @internal */
 function removeTimestampsForAlter(tableName: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#remove_timestamps_for_alter is not implemented",
   );
 }
 
+/** @internal */
 function insertVersionsSql(versions: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#insert_versions_sql is not implemented",
   );
 }
 
+/** @internal */
 function dataSourceSql(name?: any, type?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#data_source_sql is not implemented",
   );
 }
 
+/** @internal */
 function quotedScope(name?: any, type?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaStatements#quoted_scope is not implemented",

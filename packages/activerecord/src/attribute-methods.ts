@@ -292,6 +292,7 @@ function attributeMethod(this: any, attrName: string): boolean {
   return this._attributes != null && this._attributes.has(attrName);
 }
 
+/** @internal */
 export function attributesWithValues(this: any, attributeNames: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   const attributes = this._attributes;
@@ -302,6 +303,7 @@ export function attributesWithValues(this: any, attributeNames: string[]): Recor
   return result;
 }
 
+/** @internal */
 export function attributesForUpdate(this: any, attributeNames: string[]): string[] {
   const mc = this.constructor as any;
   const colNames = new Set<string>(mc.columnNames?.() ?? []);
@@ -316,6 +318,7 @@ export function attributesForUpdate(this: any, attributeNames: string[]): string
   });
 }
 
+/** @internal */
 export function attributesForCreate(this: any, attributeNames: string[]): string[] {
   const mc = this.constructor as any;
   const colNames = new Set<string>(mc.columnNames?.() ?? []);
@@ -331,10 +334,12 @@ export function attributesForCreate(this: any, attributeNames: string[]): string
   });
 }
 
+/** @internal */
 export function formatForInspect(this: any, attr: string, value: unknown): string {
   return _formatForInspect.call(this, attr, value);
 }
 
+/** @internal */
 function pkAttribute(this: any, name: string): boolean {
   const pk = (this.constructor as any)?.primaryKey ?? this._primaryKey;
   return Array.isArray(pk) ? pk.includes(name) : name === pk;

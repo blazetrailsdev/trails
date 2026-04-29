@@ -329,6 +329,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
   }
 }
 
+/** @internal */
 function lastScopeChain(
   scope: DisableJoinsAssociationScope,
   reverseChain: unknown[],
@@ -337,6 +338,7 @@ function lastScopeChain(
   return (scope as any)._lastScopeChain(reverseChain, owner);
 }
 
+/** @internal */
 function addConstraints(
   scope: DisableJoinsAssociationScope,
   reflection: unknown,

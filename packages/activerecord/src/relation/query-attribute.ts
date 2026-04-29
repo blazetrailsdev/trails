@@ -79,6 +79,7 @@ export class QueryAttribute extends Attribute {
 
 // private
 
+/** @internal */
 function isInfinity(value: unknown): boolean {
   if (value === Infinity || value === -Infinity) return true;
   if (value === null || value === undefined) return false;

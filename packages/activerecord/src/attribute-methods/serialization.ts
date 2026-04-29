@@ -59,6 +59,7 @@ export class ColumnSerializer {
 
 type CoderLike = { dump(v: unknown): string; load(v: unknown): unknown };
 
+/** @internal */
 function buildColumnSerializer(
   attrName: string,
   coder: unknown,
@@ -79,6 +80,7 @@ function buildColumnSerializer(
   return resolvedCoder;
 }
 
+/** @internal */
 function isTypeIncompatibleWithSerialize(
   castType: unknown,
   coder: unknown,

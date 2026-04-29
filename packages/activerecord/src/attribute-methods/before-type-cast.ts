@@ -82,14 +82,17 @@ interface AttributeOwner {
   };
 }
 
+/** @internal */
 function attributeBeforeTypeCast(this: AttributeOwner, attrName: string): unknown {
   return this._attributes.getAttribute(attrName).valueBeforeTypeCast;
 }
 
+/** @internal */
 function attributeForDatabase(this: AttributeOwner, attrName: string): unknown {
   return this._attributes.getAttribute(attrName).valueForDatabase;
 }
 
+/** @internal */
 function isAttributeCameFromUser(this: AttributeOwner, attrName: string): boolean {
   return this._attributes.getAttribute(attrName).cameFromUser();
 }

@@ -235,6 +235,7 @@ export class InternalMetadata {
   }
 }
 
+/** @internal */
 function updateOrCreateEntry(connection: any, key: any, value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::InternalMetadata#update_or_create_entry is not implemented",

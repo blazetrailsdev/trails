@@ -131,6 +131,8 @@ export class Association {
    * Rails behaves the same (`@association_scope` only resets via
    * `reset_scope`, called on init and `reload()`). Callers that
    * mutate FKs and want a fresh query must `reload()`.
+   *
+   * @internal
    */
   associationScope(): unknown {
     // Mirror Rails' `if klass` guard (association.rb:301): polymorphic
@@ -520,6 +522,7 @@ export class Association {
   }
 }
 
+/** @internal */
 function associationScope(assoc: Association): unknown {
   return assoc.associationScope();
 }

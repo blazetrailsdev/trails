@@ -105,12 +105,14 @@ export function isProtectedMode(): boolean {
   return currentContext().protectedMode === true;
 }
 
+/** @internal */
 function setDefaults(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Context#set_defaults is not implemented",
   );
 }
 
+/** @internal */
 function buildDefaultKeyProvider(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Context#build_default_key_provider is not implemented",

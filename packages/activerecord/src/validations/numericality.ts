@@ -31,12 +31,14 @@ export class NumericalityValidator extends BaseNumericalityValidator {
   }
 }
 
+/** @internal */
 function columnPrecisionFor(record: any, attribute: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations::NumericalityValidator#column_precision_for is not implemented",
   );
 }
 
+/** @internal */
 function columnScaleFor(record: any, attribute: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Validations::NumericalityValidator#column_scale_for is not implemented",

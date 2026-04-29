@@ -57,6 +57,7 @@ export class TypeMetadata {
   }
 }
 
+/** @internal */
 function deduplicated(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata#deduplicated is not implemented",

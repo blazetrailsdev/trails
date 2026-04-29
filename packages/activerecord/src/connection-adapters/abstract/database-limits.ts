@@ -20,6 +20,7 @@ export function indexNameLength(): number {
   return maxIdentifierLength();
 }
 
+/** @internal */
 export function bindParamsLength(): number {
   return 65535;
 }

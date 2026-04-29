@@ -30,6 +30,7 @@ export function deduplicate<T extends Deduplicable>(obj: T): T {
   return obj;
 }
 
+/** @internal */
 function deduplicated(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Deduplicable#deduplicated is not implemented",

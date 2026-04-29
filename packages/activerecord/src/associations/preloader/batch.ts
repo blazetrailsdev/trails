@@ -120,10 +120,12 @@ export class Batch {
   }
 }
 
+/** @internal */
 function loaders(batch: Batch): unknown[] {
   return (batch as any)._preloaders ?? [];
 }
 
+/** @internal */
 function groupAndLoadSimilar(batch: Batch, loaderList: unknown[]): Promise<void> {
   return (batch as any)._groupAndLoadSimilar?.(loaderList) ?? Promise.resolve();
 }

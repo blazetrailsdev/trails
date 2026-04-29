@@ -250,14 +250,17 @@ export const ClassMethods = {
   isCounterCacheColumn,
 };
 
+/** @internal */
 function _createRecord(attributeNames?: any): never {
   throw new NotImplementedError("ActiveRecord::CounterCache#_create_record is not implemented");
 }
 
+/** @internal */
 function destroyRow(): never {
   throw new NotImplementedError("ActiveRecord::CounterCache#destroy_row is not implemented");
 }
 
+/** @internal */
 function is_foreignKeysEqual(fkey1: any, fkey2: any): never {
   throw new NotImplementedError(
     "ActiveRecord::CounterCache#_foreign_keys_equal? is not implemented",

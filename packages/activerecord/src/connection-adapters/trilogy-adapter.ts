@@ -78,54 +78,63 @@ export class TrilogyAdapter extends AbstractMysqlAdapter {
   }
 }
 
+/** @internal */
 function isTextType(type: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TrilogyAdapter#text_type? is not implemented",
   );
 }
 
+/** @internal */
 function errorNumber(exception: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TrilogyAdapter#error_number is not implemented",
   );
 }
 
+/** @internal */
 function connect(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TrilogyAdapter#connect is not implemented",
   );
 }
 
+/** @internal */
 function reconnect(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TrilogyAdapter#reconnect is not implemented",
   );
 }
 
+/** @internal */
 function fullVersion(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TrilogyAdapter#full_version is not implemented",
   );
 }
 
+/** @internal */
 function getFullVersion(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TrilogyAdapter#get_full_version is not implemented",
   );
 }
 
+/** @internal */
 function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TrilogyAdapter#translate_exception is not implemented",
   );
 }
 
+/** @internal */
 function defaultPreparedStatements(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TrilogyAdapter#default_prepared_statements is not implemented",
   );
 }
 
+/** @internal */
 function initializeTypeMap(m: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::TrilogyAdapter#initialize_type_map is not implemented",

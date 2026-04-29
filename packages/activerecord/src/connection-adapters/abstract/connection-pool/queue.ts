@@ -222,6 +222,7 @@ export class Queue {
     return this._numWaiting;
   }
 
+  /** @internal */
   get any(): boolean {
     return this._queue.length > 0;
   }
@@ -241,6 +242,7 @@ export class Queue {
     return undefined;
   }
 
+  /** @internal */
   remove(conn: DatabaseAdapter): boolean {
     const idx = this._queue.indexOf(conn);
     if (idx >= 0) {
@@ -343,18 +345,21 @@ export class ConnectionLeasingQueue extends Queue {
 // Rails: `include BiasableQueue` in ConnectionLeasingQueue
 include(ConnectionLeasingQueue, BiasableQueue);
 
+/** @internal */
 function synchronize(block?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#synchronize is not implemented",
   );
 }
 
+/** @internal */
 function isAny(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#any? is not implemented",
   );
 }
 
+/** @internal */
 function remove(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#remove is not implemented",

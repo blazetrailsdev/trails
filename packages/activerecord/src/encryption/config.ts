@@ -71,10 +71,12 @@ export const defaultCompressor: Compressor = {
   },
 };
 
+/** @internal */
 function setDefaults(): never {
   throw new NotImplementedError("ActiveRecord::Encryption::Config#set_defaults is not implemented");
 }
 
+/** @internal */
 function addPreviousScheme(properties?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Config#add_previous_scheme is not implemented",

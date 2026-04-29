@@ -224,24 +224,28 @@ export class Scheme {
   }
 }
 
+/** @internal */
 function validateConfigBang(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Scheme#validate_config! is not implemented",
   );
 }
 
+/** @internal */
 function keyProviderFromKey(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Scheme#key_provider_from_key is not implemented",
   );
 }
 
+/** @internal */
 function deterministicKeyProvider(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Scheme#deterministic_key_provider is not implemented",
   );
 }
 
+/** @internal */
 function defaultKeyProvider(): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::Scheme#default_key_provider is not implemented",

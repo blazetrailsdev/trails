@@ -259,6 +259,7 @@ export class Builder {
       .join(", ");
   }
 
+  /** @internal */
   toSql(): string {
     return this._dialect === "mysql" ? this._buildMysqlSql() : this._buildStandardSql();
   }
@@ -437,74 +438,89 @@ export class Builder {
   }
 }
 
+/** @internal */
 function hasAttributeAliases(attributes: any): never {
   throw new NotImplementedError(
     "ActiveRecord::InsertAll#has_attribute_aliases? is not implemented",
   );
 }
 
+/** @internal */
 function resolveSti(): never {
   throw new NotImplementedError("ActiveRecord::InsertAll#resolve_sti is not implemented");
 }
 
+/** @internal */
 function resolveAttributeAliases(): never {
   throw new NotImplementedError(
     "ActiveRecord::InsertAll#resolve_attribute_aliases is not implemented",
   );
 }
 
+/** @internal */
 function resolveAttributeAlias(attribute: any): never {
   throw new NotImplementedError(
     "ActiveRecord::InsertAll#resolve_attribute_alias is not implemented",
   );
 }
 
+/** @internal */
 function configureOnDuplicateUpdateLogic(): never {
   throw new NotImplementedError(
     "ActiveRecord::InsertAll#configure_on_duplicate_update_logic is not implemented",
   );
 }
 
+/** @internal */
 function isCustomUpdateSqlProvided(): never {
   throw new NotImplementedError(
     "ActiveRecord::InsertAll#custom_update_sql_provided? is not implemented",
   );
 }
 
+/** @internal */
 function findUniqueIndexFor(uniqueBy: any): never {
   throw new NotImplementedError("ActiveRecord::InsertAll#find_unique_index_for is not implemented");
 }
 
+/** @internal */
 function uniqueIndexes(): never {
   throw new NotImplementedError("ActiveRecord::InsertAll#unique_indexes is not implemented");
 }
 
+/** @internal */
 function ensureValidOptionsForConnectionBang(): never {
   throw new NotImplementedError(
     "ActiveRecord::InsertAll#ensure_valid_options_for_connection! is not implemented",
   );
 }
 
+/** @internal */
 function toSql(): never {
   throw new NotImplementedError("ActiveRecord::InsertAll#to_sql is not implemented");
 }
 
+/** @internal */
 function readonlyColumns(): never {
   throw new NotImplementedError("ActiveRecord::InsertAll#readonly_columns is not implemented");
 }
 
+/** @internal */
 function uniqueByColumns(): never {
   throw new NotImplementedError("ActiveRecord::InsertAll#unique_by_columns is not implemented");
 }
 
+/** @internal */
 function verifyAttributes(attributes: any): never {
   throw new NotImplementedError("ActiveRecord::InsertAll#verify_attributes is not implemented");
 }
 
+/** @internal */
 function disallowRawSqlBang(value: any): never {
   throw new NotImplementedError("ActiveRecord::InsertAll#disallow_raw_sql! is not implemented");
 }
 
+/** @internal */
 function timestampsForCreate(): never {
   throw new NotImplementedError("ActiveRecord::InsertAll#timestamps_for_create is not implemented");
 }

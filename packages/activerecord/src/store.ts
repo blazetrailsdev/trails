@@ -193,6 +193,7 @@ export function store(
  */
 export const storeAccessor = store;
 
+/** @internal */
 function asRegularHash(obj: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Store::IndifferentCoder#as_regular_hash is not implemented",
@@ -207,6 +208,7 @@ function writeStoreAttribute(storeAttribute: any, key: any, value: any): never {
   throw new NotImplementedError("ActiveRecord::Store#write_store_attribute is not implemented");
 }
 
+/** @internal */
 function storeAccessorFor(storeAttribute: any): never {
   throw new NotImplementedError("ActiveRecord::Store#store_accessor_for is not implemented");
 }

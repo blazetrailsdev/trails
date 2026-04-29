@@ -100,42 +100,49 @@ export class MessageSerializer {
   }
 }
 
+/** @internal */
 function parseMessage(data: any, level: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessageSerializer#parse_message is not implemented",
   );
 }
 
+/** @internal */
 function validateMessageDataFormat(data: any, level: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessageSerializer#validate_message_data_format is not implemented",
   );
 }
 
+/** @internal */
 function parseProperties(headers: any, level: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessageSerializer#parse_properties is not implemented",
   );
 }
 
+/** @internal */
 function messageToJson(message: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessageSerializer#message_to_json is not implemented",
   );
 }
 
+/** @internal */
 function headersToJson(headers: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessageSerializer#headers_to_json is not implemented",
   );
 }
 
+/** @internal */
 function encodeIfNeeded(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessageSerializer#encode_if_needed is not implemented",
   );
 }
 
+/** @internal */
 function decodeIfNeeded(value: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Encryption::MessageSerializer#decode_if_needed is not implemented",

@@ -931,6 +931,7 @@ export class Base extends Model {
     return getStiBase(this);
   }
 
+  /** @internal */
   static computeType(typeName: string): typeof Base {
     return inheritanceComputeType(this, typeName);
   }
@@ -1143,6 +1144,8 @@ export class Base extends Model {
   /**
    * Returns true if the attribute is currently stored as encrypted ciphertext.
    * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute?
+   *
+   * @internal
    */
   encryptedAttribute(attributeName: string): boolean {
     return _encryptedAttributeQ(this, attributeName);
@@ -1151,6 +1154,8 @@ export class Base extends Model {
   /**
    * Returns the raw ciphertext stored for the attribute.
    * Mirrors: ActiveRecord::Encryption::EncryptableRecord#ciphertext_for
+   *
+   * @internal
    */
   ciphertextFor(attributeName: string): unknown {
     return _ciphertextFor(this, attributeName);
@@ -1159,6 +1164,8 @@ export class Base extends Model {
   /**
    * Encrypts all encryptable attributes and persists via update_columns.
    * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypt
+   *
+   * @internal
    */
   async encrypt(): Promise<void> {
     return _encryptRecord(this);
@@ -1167,6 +1174,8 @@ export class Base extends Model {
   /**
    * Decrypts all encryptable attributes and persists via update_columns.
    * Mirrors: ActiveRecord::Encryption::EncryptableRecord#decrypt
+   *
+   * @internal
    */
   async decrypt(): Promise<void> {
     return _decryptRecord(this);
@@ -2637,6 +2646,7 @@ export class Base extends Model {
   declare queryAttribute: (name: string) => boolean;
   declare _queryAttribute: (name: string) => boolean;
   declare readAttribute: (name: string) => unknown;
+  /** @internal */
   declare _readAttribute: (name: string) => unknown;
   declare _writeAttribute: (name: string, value: unknown) => void;
 

@@ -24,11 +24,9 @@ export interface DebugExceptionsOptions {
   showExceptions?: boolean;
   /** Log level for exceptions (default: "error") */
   logLevel?: "error" | "warn" | "info";
-  /** Logger instance — user-facing config option distinct from Rails' private DebugExceptions#logger accessor of the same name. */
-  // eslint-disable-next-line blazetrails/rails-private-jsdoc
+  /** Logger instance */
   logger?: Logger;
-  /** Log rescued responses (default: true) — user-facing config option distinct from Rails' private DebugExceptions#log_rescued_responses? accessor of the same name. */
-  // eslint-disable-next-line blazetrails/rails-private-jsdoc
+  /** Log rescued responses (default: true) */
   logRescuedResponses?: boolean;
   /** Interceptors called before rendering error page */
   interceptors?: Array<(request: RackEnv, exception: Error) => void>;

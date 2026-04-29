@@ -23,6 +23,7 @@ export interface AssociationMapping {
 export class PredicateBuilder {
   private _table: Table;
 
+  /** @internal */
   get table(): Table {
     return this._table;
   }

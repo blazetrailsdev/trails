@@ -242,10 +242,12 @@ const EMPTY_COLUMNS = Object.freeze([]) as unknown as string[];
 const EMPTY_ROWS = Object.freeze([]) as unknown as unknown[][];
 const EMPTY = Object.freeze(new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_TYPES)) as Result;
 
+/** @internal */
 function columnType(name: any, index: any, typeOverrides: any): never {
   throw new NotImplementedError("ActiveRecord::Result#column_type is not implemented");
 }
 
+/** @internal */
 function hashRows(): never {
   throw new NotImplementedError("ActiveRecord::Result#hash_rows is not implemented");
 }

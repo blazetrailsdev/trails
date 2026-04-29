@@ -26,78 +26,91 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 }
 
+/** @internal */
 function columnSpec(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#column_spec is not implemented",
   );
 }
 
+/** @internal */
 function columnSpecForPrimaryKey(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#column_spec_for_primary_key is not implemented",
   );
 }
 
+/** @internal */
 function prepareColumnOptions(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#prepare_column_options is not implemented",
   );
 }
 
+/** @internal */
 function isDefaultPrimaryKey(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#default_primary_key? is not implemented",
   );
 }
 
+/** @internal */
 function isExplicitPrimaryKeyDefault(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#explicit_primary_key_default? is not implemented",
   );
 }
 
+/** @internal */
 function schemaTypeWithVirtual(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_type_with_virtual is not implemented",
   );
 }
 
+/** @internal */
 function schemaType(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_type is not implemented",
   );
 }
 
+/** @internal */
 function schemaLimit(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_limit is not implemented",
   );
 }
 
+/** @internal */
 function schemaPrecision(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_precision is not implemented",
   );
 }
 
+/** @internal */
 function schemaScale(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_scale is not implemented",
   );
 }
 
+/** @internal */
 function schemaDefault(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_default is not implemented",
   );
 }
 
+/** @internal */
 function schemaExpression(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_expression is not implemented",
   );
 }
 
+/** @internal */
 function schemaCollation(column: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_collation is not implemented",

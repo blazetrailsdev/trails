@@ -212,12 +212,14 @@ export function collectionCacheKey(
   return Promise.resolve("");
 }
 
+/** @internal */
 function canUseFastCacheVersion(timestamp: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Integration#can_use_fast_cache_version? is not implemented",
   );
 }
 
+/** @internal */
 function rawTimestampToCacheVersion(timestamp: any): never {
   throw new NotImplementedError(
     "ActiveRecord::Integration#raw_timestamp_to_cache_version is not implemented",

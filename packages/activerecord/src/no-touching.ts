@@ -91,6 +91,7 @@ export function applyTo<R>(klass: any, fn: () => R | Promise<R>): R | Promise<R>
   }
 }
 
+/** @internal */
 function klasses(): never {
   throw new NotImplementedError("ActiveRecord::NoTouching#klasses is not implemented");
 }

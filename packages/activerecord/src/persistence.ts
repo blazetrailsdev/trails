@@ -37,6 +37,7 @@ import { ReadonlyAttributeError } from "./readonly-attributes.js";
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
   _instantiate(row: Record<string, unknown>, columnTypes?: Record<string, any>): any;
+  /** @internal */
   discriminateClassForRecord?(attributes: Record<string, unknown>): PersistenceHost;
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;
@@ -1052,6 +1053,7 @@ interface PersistencePrivateHost {
   };
 }
 
+/** @internal */
 function initInternals(this: PersistencePrivateHost): void {
   this._newRecord = true;
   this._destroyed = false;
@@ -1061,6 +1063,7 @@ function initInternals(this: PersistencePrivateHost): void {
   (this as any)._triggerDestroyCallback = null;
 }
 
+/** @internal */
 function strictLoadedAssociations(this: any): string[] {
   const cache: Map<string, any> = this._associationInstances;
   if (!cache) return [];
@@ -1074,6 +1077,7 @@ function strictLoadedAssociations(this: any): string[] {
   return result;
 }
 
+/** @internal */
 function _findRecord(
   this: PersistencePrivateHost & { constructor: any },
   options?: { lock?: boolean | string },
@@ -1088,6 +1092,7 @@ function _findRecord(
   return scope.findByBang(constraints);
 }
 
+/** @internal */
 function _inMemoryQueryConstraintsHash(this: PersistencePrivateHost): Record<string, unknown> {
   const constraintsList = queryConstraintsList.call(this.constructor as any);
   if (!constraintsList) {
@@ -1097,6 +1102,7 @@ function _inMemoryQueryConstraintsHash(this: PersistencePrivateHost): Record<str
   return Object.fromEntries(constraintsList.map((col) => [col, this.readAttribute(col)]));
 }
 
+/** @internal */
 function isApplyScoping(this: PersistencePrivateHost, options?: { unscoped?: boolean }): boolean {
   if (options?.unscoped) return false;
   const ctor = this.constructor as any;
@@ -1105,6 +1111,7 @@ function isApplyScoping(this: PersistencePrivateHost, options?: { unscoped?: boo
   return !!(hasDefaultScope || current);
 }
 
+/** @internal */
 function _queryConstraintsHash(this: any): Record<string, unknown> {
   const constraintsList = queryConstraintsList.call(this.constructor as any);
   if (!constraintsList) {
@@ -1119,16 +1126,20 @@ function _queryConstraintsHash(this: any): Record<string, unknown> {
   );
 }
 
+/** @internal */
 function destroyAssociations(this: PersistencePrivateHost): void {}
 
+/** @internal */
 function destroyRow(this: PersistencePrivateHost): Promise<number> {
   return _deleteRow.call(this);
 }
 
+/** @internal */
 function _deleteRow(this: PersistencePrivateHost): Promise<number> {
   return _deleteRecord.call(this.constructor as any, _queryConstraintsHash.call(this));
 }
 
+/** @internal */
 function _touchRow(
   this: any,
   attributeNames: string[],
@@ -1141,6 +1152,7 @@ function _touchRow(
   return _updateRow.call(this, attributeNames, "touch");
 }
 
+/** @internal */
 function _updateRow(
   this: PersistencePrivateHost,
   attributeNames: string[],
@@ -1153,6 +1165,7 @@ function _updateRow(
   return _updateRecord.call(this.constructor as any, values, _queryConstraintsHash.call(this));
 }
 
+/** @internal */
 function createOrUpdate(this: any): Promise<boolean> {
   if (this._readonly) _raiseReadonlyRecordError.call(this);
   if (this._destroyed) return Promise.resolve(false);
@@ -1181,6 +1194,7 @@ function createOrUpdate(this: any): Promise<boolean> {
   });
 }
 
+/** @internal */
 async function _createRecord(this: any): Promise<unknown> {
   const ctor = this.constructor as any;
   const allNames: string[] = Array.from(this._attributes?.keys?.() ?? []);
@@ -1219,12 +1233,14 @@ async function _createRecord(this: any): Promise<unknown> {
   return this.id;
 }
 
+/** @internal */
 function verifyReadonlyAttribute(this: PersistencePrivateHost, name: string): void {
   if ((this.constructor as any).readonlyAttributeQ?.(name)) {
     throw new ReadonlyAttributeError(name);
   }
 }
 
+/** @internal */
 function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
   const key = this.constructor.primaryKey;
   const keyStr = Array.isArray(key) ? key.join(", ") : key;
@@ -1240,10 +1256,12 @@ function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
   );
 }
 
+/** @internal */
 function _raiseReadonlyRecordError(this: { constructor: { name: string } }): never {
   throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
 }
 
+/** @internal */
 function _raiseRecordNotTouchedError(): never {
   throw new ActiveRecordError(
     "Cannot touch on a new or destroyed record object. Consider using persisted?, new_record?, or destroyed? before touching.",
@@ -1254,6 +1272,7 @@ function _raiseRecordNotTouchedError(): never {
 // Private class helpers — mirrors ActiveRecord::Persistence::ClassMethods private block.
 // ---------------------------------------------------------------------------
 
+/** @internal */
 function instantiateInstanceOf(
   klass: { _instantiate(attrs: Record<string, unknown>, colTypes?: Record<string, any>): any },
   attributes: Record<string, unknown>,
@@ -1265,10 +1284,12 @@ function instantiateInstanceOf(
   return record;
 }
 
+/** @internal */
 function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown>): T {
   return klass;
 }
 
+/** @internal */
 function buildDefaultConstraint(this: {
   _defaultScope?: unknown;
   defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };

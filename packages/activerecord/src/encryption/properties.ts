@@ -105,6 +105,7 @@ function _typeNameFor(value: unknown): string {
   return t;
 }
 
+/** @internal */
 function data(): never {
   throw new NotImplementedError("ActiveRecord::Encryption::Properties#data is not implemented");
 }
