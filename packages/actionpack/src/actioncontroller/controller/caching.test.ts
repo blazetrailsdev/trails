@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "../base.js";
 import { Request } from "../../actiondispatch/request.js";
 import { Response } from "../../actiondispatch/response.js";
@@ -36,6 +37,19 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         this.freshWhen({ lastModified: date });
+        if (!this.performed) this.render({ plain: "content" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("show", makeRequest(), makeResponse());
+    expect(c.getHeader("last-modified")).toBe("Sat, 15 Jun 2024 12:00:00 GMT");
+  });
+
+  it("freshWhen accepts a Temporal.Instant lastModified", async () => {
+    const instant = Temporal.Instant.from("2024-06-15T12:00:00Z");
+    class C extends Base {
+      async show() {
+        this.freshWhen({ lastModified: instant });
         if (!this.performed) this.render({ plain: "content" });
       }
     }

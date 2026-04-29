@@ -4,6 +4,8 @@
  * Represents an HTTP response with status, headers, and body.
  */
 
+import type { CookieExpires } from "./cookies.js";
+
 export class Response {
   private _status: number;
   private _headers: Record<string, string>;
@@ -217,7 +219,7 @@ export interface CookieOptions {
   value: string;
   path?: string;
   domain?: string;
-  expires?: Date;
+  expires?: CookieExpires;
   secure?: boolean;
   httpOnly?: boolean;
   sameSite?: "strict" | "lax" | "none";

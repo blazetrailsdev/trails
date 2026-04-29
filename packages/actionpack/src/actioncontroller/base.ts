@@ -6,6 +6,7 @@
  */
 
 import { getFs, getPath, getCrypto, Notifications } from "@blazetrails/activesupport";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../actiondispatch/flash.js";
 import { RequestForgeryProtection } from "../actiondispatch/request-forgery-protection.js";
@@ -398,13 +399,23 @@ export class Base extends Metal {
   // --- Caching / Conditional GET ---
 
   /** Check if the response should be fresh (304 Not Modified). */
-  freshWhen(options: { etag?: string; lastModified?: Date; public?: boolean }): void {
+  freshWhen(options: {
+    etag?: string;
+    lastModified?: Date | Temporal.Instant;
+    public?: boolean;
+  }): void {
     if (options.etag) {
       const etag = this._generateEtag(options.etag);
       this.setHeader("etag", etag);
     }
     if (options.lastModified) {
-      this.setHeader("last-modified", options.lastModified.toUTCString());
+      // Realm-safe Date check: instanceof breaks across realms (vm/iframe)
+      // for both Date and Temporal.Instant. Use the brand string instead.
+      const isDate = Object.prototype.toString.call(options.lastModified) === "[object Date]";
+      const lm = isDate
+        ? (options.lastModified as Date)
+        : new Date((options.lastModified as Temporal.Instant).epochMilliseconds);
+      this.setHeader("last-modified", lm.toUTCString());
     }
     if (options.public) {
       this.setHeader("cache-control", "public");
@@ -416,7 +427,11 @@ export class Base extends Metal {
   }
 
   /** Check if the resource is stale. Returns true if a re-render is needed. */
-  stale(options: { etag?: string; lastModified?: Date; public?: boolean }): boolean {
+  stale(options: {
+    etag?: string;
+    lastModified?: Date | Temporal.Instant;
+    public?: boolean;
+  }): boolean {
     this.freshWhen(options);
     return !this.performed;
   }
