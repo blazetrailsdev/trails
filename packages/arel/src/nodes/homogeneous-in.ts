@@ -71,4 +71,13 @@ export class HomogeneousIn extends Node {
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
+
+  // Mirrors Arel::Nodes::HomogeneousIn#ivars — protected helper Rails
+  // uses to fold this node's identity into hash/eql? comparisons.
+  // Trails' `eql()` / `hash()` from Node already walk every own
+  // property so this isn't called internally; kept for Rails-fidelity
+  // / api:compare privates coverage.
+  protected ivars(): [Node, unknown[], HomogeneousIn["type"]] {
+    return [this.attribute, this.values, this.type];
+  }
 }

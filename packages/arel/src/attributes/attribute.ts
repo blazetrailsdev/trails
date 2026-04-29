@@ -49,6 +49,7 @@ import {
 import { Over } from "../nodes/over.js";
 import { NamedWindow, Window } from "../nodes/window.js";
 import { True } from "../nodes/true.js";
+import { Predications, type PredicationHost } from "../predications.js";
 
 /**
  * Combines multiple nodes with OR, wrapped in a Grouping.
@@ -338,6 +339,63 @@ export class Attribute extends Node {
 
   notInAll(others: unknown[][]): Grouping {
     return groupedAll(others.map((o) => this.notIn(o)));
+  }
+
+  // -- Rails-private helpers (mirror Arel::Predications) --
+  //
+  // Rails' Attribute inherits these from Predications via `include`.
+  // Trails' Attribute has hand-rolled public predicates (so the include
+  // chain isn't wired) — these methods delegate to the canonical
+  // Predications impls so there's a single source of truth and
+  // behavior stays in lockstep. Marked `protected` (matching the
+  // visibility of HomogeneousIn#ivars / SelectManager#collapse) since
+  // they exist for Rails-fidelity / api:compare privates coverage,
+  // not as a public API surface.
+
+  protected groupingAny(
+    methodId: string | ((this: Attribute, expr: unknown, ...extras: unknown[]) => Node),
+    others: unknown[],
+    ...extras: unknown[]
+  ): Grouping {
+    return Predications.groupingAny.call<
+      Attribute,
+      [typeof methodId, unknown[], ...unknown[]],
+      Grouping
+    >(this, methodId, others, ...extras);
+  }
+
+  protected groupingAll(
+    methodId: string | ((this: Attribute, expr: unknown, ...extras: unknown[]) => Node),
+    others: unknown[],
+    ...extras: unknown[]
+  ): Grouping {
+    return Predications.groupingAll.call<
+      Attribute,
+      [typeof methodId, unknown[], ...unknown[]],
+      Grouping
+    >(this, methodId, others, ...extras);
+  }
+
+  protected isInfinity(value: unknown): boolean {
+    return Predications.isInfinity.call(this, value);
+  }
+
+  protected isUnboundable(value: unknown): boolean {
+    return Predications.isUnboundable.call(this, value);
+  }
+
+  protected isOpenEnded(value: unknown): boolean {
+    // Cast widens this' protected isInfinity/isUnboundable so they
+    // match Predications.isOpenEnded's `this` constraint, which
+    // requires them as public methods. The dispatch still goes through
+    // `this` at runtime, so subclass overrides are honored.
+    return Predications.isOpenEnded.call(
+      this as unknown as PredicationHost & {
+        isInfinity(value: unknown): boolean;
+        isUnboundable(value: unknown): boolean;
+      },
+      value,
+    );
   }
 
   // -- Ordering --

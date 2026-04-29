@@ -49,6 +49,28 @@ function groupedAll(nodes: Node[]): Grouping {
   return new Grouping(new And(nodes));
 }
 
+// Build the `expr → Node` callback used by groupingAny / groupingAll.
+// Resolves a method-id string against the host (with a clear error if
+// the name doesn't refer to a callable method) or invokes a closure
+// directly. Mirrors Ruby's `send(method_id, expr, *extras)` shape.
+function predicationDispatch<T extends PredicationHost>(
+  host: T,
+  methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
+  extras: unknown[],
+): (expr: unknown) => Node {
+  if (typeof methodId === "function") {
+    return (expr) => methodId.call(host, expr, ...extras);
+  }
+  const member = (host as unknown as Record<string, unknown>)[methodId];
+  if (typeof member !== "function") {
+    throw new TypeError(
+      `Predications.groupingAny/All: \`${methodId}\` is not a method on the host (${(host as object).constructor.name})`,
+    );
+  }
+  const fn = member as (...args: unknown[]) => Node;
+  return (expr) => fn.call(host, expr, ...extras);
+}
+
 /**
  * Predications — predicate-builder mixin.
  *
@@ -316,5 +338,73 @@ export const Predications = {
   },
   quotedArray(this: PredicationHost, others: unknown[]): Node[] {
     return others.map((v) => this.quotedNode(v));
+  },
+
+  // -- Rails-private helpers (mixed in alongside the public API for
+  //    surface fidelity; not referenced internally because the existing
+  //    *_any/*_all impls call the file-level groupedAny/groupedAll
+  //    above with already-built nodes). --
+
+  // Mirrors Arel::Predications#grouping_any(method_id, others, *extras)
+  // — calls `this[methodId](expr, ...extras)` on each value and folds
+  // the resulting nodes with OR inside a Grouping. The closure variant
+  // lets TS callers skip stringly-typed dispatch. Generic over the
+  // host type so a class like Attribute (with a richer surface than
+  // bare PredicationHost) can pass typed closures without `as` casts.
+  groupingAny<T extends PredicationHost>(
+    this: T,
+    methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
+    others: unknown[],
+    ...extras: unknown[]
+  ): Grouping {
+    return groupedAny(others.map(predicationDispatch(this, methodId, extras)));
+  },
+
+  // Mirrors Arel::Predications#grouping_all — fold with AND.
+  groupingAll<T extends PredicationHost>(
+    this: T,
+    methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
+    others: unknown[],
+    ...extras: unknown[]
+  ): Grouping {
+    return groupedAll(others.map(predicationDispatch(this, methodId, extras)));
+  },
+
+  // Mirrors Arel::Predications#infinity? — in the TS port, true only
+  // for JavaScript +/-Infinity values. Ruby's `infinite?` protocol
+  // (which Rails also accepts) has no TS analog; if a future Trails
+  // wrapper type wants to surface infiniteness, this is the place to
+  // teach it. Used to decide whether to clamp a `between` bound to
+  // an open half-range.
+  isInfinity(this: PredicationHost, value: unknown): boolean {
+    return value === Infinity || value === -Infinity;
+  },
+
+  // Mirrors Arel::Predications#unboundable? — Rails-side, this catches
+  // values that can't be compared (e.g. an unboundable bind value).
+  // The TS port has no analog of Ruby's `unboundable?` protocol, so
+  // this returns false; kept for surface fidelity.
+  isUnboundable(this: PredicationHost, value: unknown): boolean {
+    void this;
+    void value;
+    return false;
+  },
+
+  // Mirrors Arel::Predications#open_ended? — null, infinite, or
+  // unboundable values are treated as "no bound on this side".
+  // Dispatches `isInfinity` / `isUnboundable` through `this` (rather
+  // than calling the Predications module directly) so host classes
+  // can override either check. Mirrors Ruby's method-lookup semantics
+  // for `infinity?` / `unboundable?`.
+  isOpenEnded(
+    this: PredicationHost & {
+      isInfinity(value: unknown): boolean;
+      isUnboundable(value: unknown): boolean;
+    },
+    value: unknown,
+  ): boolean {
+    return (
+      value === null || value === undefined || this.isInfinity(value) || this.isUnboundable(value)
+    );
   },
 };

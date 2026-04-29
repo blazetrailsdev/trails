@@ -586,6 +586,20 @@ export class SelectManager extends TreeManager {
     this.core.source.right.push(node);
     return this;
   }
+
+  // Mirrors Arel::SelectManager#collapse (private). Compacts an array
+  // of expressions, wraps bare strings as SqlLiteral (Rails: `Arel.sql`),
+  // and folds them into a single Node — either the single remaining
+  // expr or an `And` of all of them. Rails uses this from `on(*exprs)`
+  // and similar multi-arg condition methods. Trails' single-arg `where`
+  // / `on` shapes don't reach for it internally; surfaced for parity.
+  protected collapse(exprs: unknown[]): Node {
+    const filtered = exprs
+      .filter((e) => e !== null && e !== undefined)
+      .map((e) => (typeof e === "string" ? new SqlLiteral(e) : (e as Node)));
+    if (filtered.length === 1) return filtered[0];
+    return this.createAnd(filtered);
+  }
 }
 
 // Surface the inherited FactoryMethods on select-manager.ts so api:compare
