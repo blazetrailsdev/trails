@@ -513,7 +513,7 @@ describe("TimeZoneTest", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
     const twz = zone.strptime("1999-12-31 12:00:00", "%Y-%m-%d %H:%M:%S");
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 17));
-    expect(twz.time.getTime()).toBe(Date.UTC(1999, 11, 31, 12));
+    expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 12));
     expect(twz.timeZone).toBe(zone);
   });
 
@@ -521,7 +521,7 @@ describe("TimeZoneTest", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
     const twz = zone.strptime("1999-12-31 12:00:00", "%Y-%m-%d %H:%M:%S");
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 17));
-    expect(twz.time.getTime()).toBe(Date.UTC(1999, 11, 31, 12));
+    expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 12));
     expect(twz.timeZone).toBe(zone);
   });
 
@@ -529,7 +529,7 @@ describe("TimeZoneTest", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
     const twz = zone.strptime("1999-12-31 12:00:00 PST", "%Y-%m-%d %H:%M:%S %Z");
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 20));
-    expect(twz.time.getTime()).toBe(Date.UTC(1999, 11, 31, 15));
+    expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 15));
     expect(twz.timeZone).toBe(zone);
   });
 
@@ -537,7 +537,7 @@ describe("TimeZoneTest", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
     const twz = zone.strptime("1999-12-31 12:00:00 -08", "%Y-%m-%d %H:%M:%S %:::z");
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 20));
-    expect(twz.time.getTime()).toBe(Date.UTC(1999, 11, 31, 15));
+    expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 15));
     expect(twz.timeZone).toBe(zone);
   });
 
@@ -545,7 +545,7 @@ describe("TimeZoneTest", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
     const twz = zone.strptime("1999-12-31 12:00:00 -08:00", "%Y-%m-%d %H:%M:%S %:z");
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 20));
-    expect(twz.time.getTime()).toBe(Date.UTC(1999, 11, 31, 15));
+    expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 15));
     expect(twz.timeZone).toBe(zone);
   });
 
@@ -553,7 +553,7 @@ describe("TimeZoneTest", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
     const twz = zone.strptime("1999-12-31 12:00:00 -08:00:00", "%Y-%m-%d %H:%M:%S %::z");
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 20));
-    expect(twz.time.getTime()).toBe(Date.UTC(1999, 11, 31, 15));
+    expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 15));
     expect(twz.timeZone).toBe(zone);
   });
 
@@ -561,7 +561,7 @@ describe("TimeZoneTest", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)");
     const twz = zone.strptime("1999-12-31 12:00:00 %Z", "%Y-%m-%d %H:%M:%S %%Z");
     expect(twz.utc().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 17));
-    expect(twz.time.getTime()).toBe(Date.UTC(1999, 11, 31, 12));
+    expect(twz.time.toZonedDateTime("UTC").epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 12));
     expect(twz.timeZone).toBe(zone);
   });
 

@@ -107,12 +107,9 @@ export class TimeWithZone {
     return this._timeZone;
   }
 
-  /** Returns the local time as a Date (wall-clock time expressed as UTC Date) */
-  get time(): Date {
-    const l = this._local();
-    return new Date(
-      Date.UTC(l.year, l.month - 1, l.day, l.hour, l.minute, l.second, l.millisecond),
-    );
+  /** Returns the local wall-clock time as a Temporal.PlainDateTime. */
+  get time(): Temporal.PlainDateTime {
+    return this._zoned.toPlainDateTime();
   }
 
   /** Timezone abbreviation (e.g., "EST", "EDT") */
@@ -269,26 +266,28 @@ export class TimeWithZone {
   }
 
   /**
-   * Returns local time as a Date (in the system timezone, adjusted to represent
-   * the same wall clock time as in this zone).
+   * Returns the local wall-clock time as a Temporal.PlainDateTime.
+   * If `utcOffsetOverride` is provided (in seconds), the result is the wall-clock
+   * time at that offset from UTC.
    */
-  localtime(utcOffsetOverride?: number): Date {
+  localtime(utcOffsetOverride?: number): Temporal.PlainDateTime {
     if (utcOffsetOverride !== undefined) {
-      return new Date(this._utc.getTime() + utcOffsetOverride * 1000);
+      const shifted = Temporal.Instant.fromEpochMilliseconds(
+        Math.trunc(this._utc.getTime() + utcOffsetOverride * 1000),
+      );
+      return shifted.toZonedDateTimeISO("UTC").toPlainDateTime();
     }
-    const l = this._local();
-    return new Date(l.year, l.month - 1, l.day, l.hour, l.minute, l.second, l.millisecond);
+    return this._zoned.toPlainDateTime();
   }
 
   /** Alias for localtime() */
-  getlocal(utcOffset?: number): Date {
+  getlocal(utcOffset?: number): Temporal.PlainDateTime {
     return this.localtime(utcOffset);
   }
 
-  /** Returns a Date representing this instant */
-  toDate(): Date {
-    const l = this._local();
-    return new Date(l.year, l.month - 1, l.day);
+  /** Returns a Temporal.PlainDate representing the local date. */
+  toDate(): Temporal.PlainDate {
+    return this._zoned.toPlainDate();
   }
 
   /** Returns the UTC instant. */

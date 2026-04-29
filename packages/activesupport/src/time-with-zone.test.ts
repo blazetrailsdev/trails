@@ -154,9 +154,9 @@ describe("TimeWithZoneTest", () => {
   it("toDate() returns a Date for just the date portion", () => {
     const twz = eastern.local(2024, 3, 15, 10, 30, 0);
     const date = twz.toDate();
-    expect(date.getFullYear()).toBe(2024);
-    expect(date.getMonth()).toBe(2); // 0-indexed
-    expect(date.getDate()).toBe(15);
+    expect(date.year).toBe(2024);
+    expect(date.month).toBe(3); // Temporal months are 1-indexed
+    expect(date.day).toBe(15);
   });
 
   it("inTimeZone() converts to a different timezone", () => {
