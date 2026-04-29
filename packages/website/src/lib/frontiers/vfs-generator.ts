@@ -67,6 +67,7 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
         isDirectory: () => false,
         isFile: () => entry !== undefined,
         size: content.length,
+        // boundary: epoch-zero placeholder for in-memory VFS file mtime.
         mtime: new Date(0),
       };
     },

@@ -87,6 +87,8 @@ export abstract class GeneratorBase {
 }
 
 export function migrationTimestamp(): string {
+  // boundary: generator timestamp uses local-clock components for the
+  // YYYYMMDDHHMMSS migration filename prefix.
   const now = new Date();
   const y = now.getFullYear().toString();
   const m = (now.getMonth() + 1).toString().padStart(2, "0");

@@ -496,6 +496,8 @@ function httpDate(date: Date): string {
 }
 
 export function deleteSetCookieHeader(key: string, value: Record<string, any> = {}): string {
+  // boundary: epoch-zero Date is the standard delete-cookie sentinel for the
+  // Set-Cookie `Expires` attribute (RFC 6265 / 6265bis).
   return setCookieHeader(key, { ...value, max_age: "0", expires: new Date(0), value: "" });
 }
 

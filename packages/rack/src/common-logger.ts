@@ -65,6 +65,8 @@ export class CommonLogger {
     const length = cl && cl !== "0" ? cl : "-";
     const time = elapsed.toFixed(4);
 
+    // boundary: Common Log Format timestamp (`[10/Oct/2000:13:55:36 -0700]`)
+    // is built from JS Date components.
     const now = new Date();
     const months = [
       "Jan",

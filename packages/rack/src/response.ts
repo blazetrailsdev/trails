@@ -296,11 +296,13 @@ export class Response {
   cache(duration: number): void {
     if (this.getHeader(CACHE_CONTROL) === "no-cache, must-revalidate") return;
     this.setHeader(CACHE_CONTROL, `public, max-age=${duration}`);
+    // boundary: HTTP Expires header is RFC 7231 HTTP-date, produced by Date#toUTCString.
     this.setHeader(EXPIRES, new Date(Date.now() + duration * 1000).toUTCString());
   }
 
   doNotCache(): void {
     this.setHeader(CACHE_CONTROL, "no-cache, must-revalidate");
+    // boundary: epoch-zero Date is the canonical "already expired" sentinel.
     this.setHeader(EXPIRES, new Date(0).toUTCString());
   }
 
