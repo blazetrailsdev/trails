@@ -6,6 +6,8 @@
  * taking a direct dependency on `node:child_process`.
  */
 
+import { env as processEnv } from "./process-adapter.js";
+
 export interface SpawnSyncOptions {
   input?: string | Uint8Array;
   env?: NodeJS.ProcessEnv;
@@ -62,7 +64,10 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
     spawnSync(cmd, args, options) {
       const result = cp.spawnSync(cmd, args, {
         input: options?.input,
-        env: options?.env,
+        // Default to the trailties-managed env (from process-adapter), not
+        // the host's ambient process.env, so child processes see the
+        // env trailties controls. Explicit `env` still wins.
+        env: options?.env ?? ({ ...processEnv } as NodeJS.ProcessEnv),
         encoding: options?.encoding ?? "utf8",
         cwd: options?.cwd,
       });
