@@ -89,13 +89,20 @@ export class TimeWithZone {
   private readonly _zoned: Temporal.ZonedDateTime;
   /** The timezone */
   private readonly _timeZone: TimeZone;
-  /** Cached Date snapshot for legacy method bodies and TimeZone helpers. */
-  private readonly _utc: Date;
 
   constructor(instant: Temporal.Instant, timeZone: TimeZone) {
     this._zoned = instant.toZonedDateTimeISO(timeZone.tzinfo);
     this._timeZone = timeZone;
-    this._utc = new Date(this._zoned.epochMilliseconds);
+  }
+
+  /** Epoch milliseconds — sourced directly from the ZonedDateTime. */
+  private get _epochMs(): number {
+    return this._zoned.epochMilliseconds;
+  }
+
+  /** Build a Date snapshot for legacy Date-based helpers and formatters. */
+  private _toDate(): Date {
+    return new Date(this._epochMs);
   }
 
   // ---------------------------------------------------------------------------
@@ -114,12 +121,12 @@ export class TimeWithZone {
 
   /** Timezone abbreviation (e.g., "EST", "EDT") */
   get zone(): string {
-    return this._timeZone.abbreviation(this._utc);
+    return this._timeZone.abbreviation(this._toDate());
   }
 
   /** UTC offset in seconds */
   get utcOffset(): number {
-    return this._timeZone.utcOffsetAt(this._utc);
+    return this._timeZone.utcOffsetAt(this._toDate());
   }
 
   /** Alias for utcOffset */
@@ -129,7 +136,7 @@ export class TimeWithZone {
 
   /** Whether DST is in effect */
   dst(): boolean {
-    return this._timeZone.isDst(this._utc);
+    return this._timeZone.isDst(this._toDate());
   }
 
   /** Alias for dst() */
@@ -273,7 +280,7 @@ export class TimeWithZone {
   localtime(utcOffsetOverride?: number): Temporal.PlainDateTime {
     if (utcOffsetOverride !== undefined) {
       const shifted = Temporal.Instant.fromEpochMilliseconds(
-        Math.trunc(this._utc.getTime() + utcOffsetOverride * 1000),
+        Math.trunc(this._epochMs + utcOffsetOverride * 1000),
       );
       return shifted.toZonedDateTimeISO("UTC").toPlainDateTime();
     }
@@ -297,7 +304,7 @@ export class TimeWithZone {
 
   /** Unix timestamp in seconds */
   toI(): number {
-    return Math.floor(this._utc.getTime() / 1000);
+    return Math.floor(this._epochMs / 1000);
   }
 
   /** Alias for toI() */
@@ -307,7 +314,7 @@ export class TimeWithZone {
 
   /** Unix timestamp as float with sub-second precision */
   toF(): number {
-    return this._utc.getTime() / 1000;
+    return this._epochMs / 1000;
   }
 
   /** Convert to a different timezone. No-argument form uses Time.zone. */
@@ -449,7 +456,7 @@ export class TimeWithZone {
 
   /** HTTP date format */
   httpdate(): string {
-    const u = this._utc;
+    const u = this._toDate();
     return (
       `${SHORT_DAY_NAMES[u.getUTCDay()]}, ${pad2(u.getUTCDate())} ` +
       `${SHORT_MONTH_NAMES[u.getUTCMonth()]} ${u.getUTCFullYear()} ` +
@@ -461,7 +468,7 @@ export class TimeWithZone {
   toFs(format: string = "default"): string {
     switch (format) {
       case "db": {
-        const u = this._utc;
+        const u = this._toDate();
         return (
           `${u.getUTCFullYear()}-${pad2(u.getUTCMonth() + 1)}-${pad2(u.getUTCDate())} ` +
           `${pad2(u.getUTCHours())}:${pad2(u.getUTCMinutes())}:${pad2(u.getUTCSeconds())}`
@@ -529,7 +536,7 @@ export class TimeWithZone {
       // Fixed duration — advance from UTC
       const ms = interval.inSeconds() * 1000;
       return new TimeWithZone(
-        Temporal.Instant.fromEpochMilliseconds(Math.trunc(this._utc.getTime() + ms)),
+        Temporal.Instant.fromEpochMilliseconds(Math.trunc(this._epochMs + ms)),
         this._timeZone,
       );
     }
@@ -540,7 +547,7 @@ export class TimeWithZone {
     }
     // Number of seconds
     return new TimeWithZone(
-      Temporal.Instant.fromEpochMilliseconds(Math.trunc(this._utc.getTime() + interval * 1000)),
+      Temporal.Instant.fromEpochMilliseconds(Math.trunc(this._epochMs + interval * 1000)),
       this._timeZone,
     );
   }
@@ -553,13 +560,13 @@ export class TimeWithZone {
   minus(other: TimeWithZone | Date | Temporal.Instant): number;
   minus(arg: number | Duration | TimeWithZone | Date | Temporal.Instant): TimeWithZone | number {
     if (arg instanceof TimeWithZone) {
-      return (this._utc.getTime() - arg._utc.getTime()) / 1000;
+      return (this._epochMs - arg._epochMs) / 1000;
     }
     if (arg instanceof Date) {
-      return (this._utc.getTime() - arg.getTime()) / 1000;
+      return (this._epochMs - arg.getTime()) / 1000;
     }
     if (arg instanceof Temporal.Instant) {
-      return (this._utc.getTime() - arg.epochMilliseconds) / 1000;
+      return (this._epochMs - arg.epochMilliseconds) / 1000;
     }
     if (arg instanceof Duration) {
       return this.plus(arg.negate());
@@ -634,7 +641,7 @@ export class TimeWithZone {
 
     if (ms !== 0) {
       return new TimeWithZone(
-        Temporal.Instant.fromEpochMilliseconds(Math.trunc(newLocal._utc.getTime() + ms)),
+        Temporal.Instant.fromEpochMilliseconds(Math.trunc(newLocal._epochMs + ms)),
         this._timeZone,
       );
     }
@@ -682,11 +689,11 @@ export class TimeWithZone {
   compareTo(other: TimeWithZone | Date | Temporal.Instant): number {
     const otherMs =
       other instanceof TimeWithZone
-        ? other._utc.getTime()
+        ? other._epochMs
         : other instanceof Temporal.Instant
           ? other.epochMilliseconds
           : other.getTime();
-    const thisMs = this._utc.getTime();
+    const thisMs = this._epochMs;
     if (thisMs < otherMs) return -1;
     if (thisMs > otherMs) return 1;
     return 0;
@@ -706,13 +713,13 @@ export class TimeWithZone {
    */
   eql(other: unknown): boolean {
     if (other instanceof TimeWithZone) {
-      return this._utc.getTime() === other._utc.getTime();
+      return this._epochMs === other._epochMs;
     }
     if (other instanceof Date) {
-      return this._utc.getTime() === other.getTime();
+      return this._epochMs === other.getTime();
     }
     if (other instanceof Temporal.Instant) {
-      return this._utc.getTime() === other.epochMilliseconds;
+      return this._epochMs === other.epochMilliseconds;
     }
     return false;
   }
@@ -732,11 +739,11 @@ export class TimeWithZone {
   // ---------------------------------------------------------------------------
 
   isPast(): boolean {
-    return this._utc.getTime() < currentTime().getTime();
+    return this._epochMs < currentTime().getTime();
   }
 
   isFuture(): boolean {
-    return this._utc.getTime() > currentTime().getTime();
+    return this._epochMs > currentTime().getTime();
   }
 
   isToday(): boolean {
@@ -871,7 +878,7 @@ export class TimeWithZone {
     if (!Number.isFinite(precision) || precision <= 0) {
       throw new RangeError(`precision must be a positive number, got ${precision}`);
     }
-    const ms = this._utc.getTime();
+    const ms = this._epochMs;
     const precisionMs = precision * 1000;
     const rounded = Math.round(ms / precisionMs) * precisionMs;
     return new TimeWithZone(
@@ -894,11 +901,11 @@ export class TimeWithZone {
 
   /** Returns the internal UTC timestamp in milliseconds */
   getTime(): number {
-    return this._utc.getTime();
+    return this._epochMs;
   }
 
   /** valueOf for comparison operators to work */
   valueOf(): number {
-    return this._utc.getTime();
+    return this._epochMs;
   }
 }
