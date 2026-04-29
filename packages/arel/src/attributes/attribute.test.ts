@@ -324,8 +324,7 @@ describe("AttributeTest", () => {
   describe("#average", () => {
     it("should create a AVG node", () => {
       const node = users.get("age").average();
-      expect(node).toBeInstanceOf(Nodes.NamedFunction);
-      expect(node.name).toBe("AVG");
+      expect(node).toBeInstanceOf(Nodes.Avg);
     });
 
     it("should generate the proper SQL", () => {
@@ -338,8 +337,7 @@ describe("AttributeTest", () => {
   describe("#maximum", () => {
     it("should create a MAX node", () => {
       const node = users.get("age").maximum();
-      expect(node).toBeInstanceOf(Nodes.NamedFunction);
-      expect(node.name).toBe("MAX");
+      expect(node).toBeInstanceOf(Nodes.Max);
     });
 
     it("should generate proper SQL", () => {
@@ -352,8 +350,7 @@ describe("AttributeTest", () => {
   describe("#minimum", () => {
     it("should create a Min node", () => {
       const node = users.get("age").minimum();
-      expect(node).toBeInstanceOf(Nodes.NamedFunction);
-      expect(node.name).toBe("MIN");
+      expect(node).toBeInstanceOf(Nodes.Min);
     });
 
     it("should generate proper SQL", () => {
@@ -366,8 +363,7 @@ describe("AttributeTest", () => {
   describe("#sum", () => {
     it("should create a SUM node", () => {
       const node = users.get("age").sum();
-      expect(node).toBeInstanceOf(Nodes.NamedFunction);
-      expect(node.name).toBe("SUM");
+      expect(node).toBeInstanceOf(Nodes.Sum);
     });
 
     it("should generate the proper SQL", () => {
@@ -380,8 +376,7 @@ describe("AttributeTest", () => {
   describe("#count", () => {
     it("should return a count node", () => {
       const node = users.get("id").count();
-      expect(node).toBeInstanceOf(Nodes.NamedFunction);
-      expect(node.name).toBe("COUNT");
+      expect(node).toBeInstanceOf(Nodes.Count);
     });
 
     it("should take a distinct param", () => {
@@ -1332,11 +1327,15 @@ describe("AttributeTest", () => {
     expect(visitor.compile(node)).toBe('SUBSTRING("users"."name", 1, 3)');
   });
 
-  it("generates CONCAT()", () => {
-    const node = users.attr("first_name").concat(" ", users.attr("last_name"));
+  it("generates a `||` Concat infix node", () => {
+    // Mirrors Rails: Predications#concat builds Nodes::Concat (the SQL
+    // standard `||` operator), not a CONCAT(...) function call.
+    const node = users.attr("first_name").concat(users.attr("last_name"));
+    expect(node).toBeInstanceOf(Nodes.Concat);
     const sql = visitor.compile(node);
-    expect(sql).toContain("CONCAT(");
     expect(sql).toContain('"users"."first_name"');
+    expect(sql).toContain("||");
+    expect(sql).toContain('"users"."last_name"');
   });
 
   it("generates REPLACE()", () => {
@@ -1559,17 +1558,17 @@ describe("AttributeTest", () => {
 
   it("count should be compatible with Addition", () => {
     const count = users.get("id").count();
-    expect(count.name).toBe("COUNT");
+    expect(count).toBeInstanceOf(Nodes.Count);
   });
 
   it("maximum should be compatible with node", () => {
     const node = users.get("age").maximum();
-    expect(node.name).toBe("MAX");
+    expect(node).toBeInstanceOf(Nodes.Max);
   });
 
   it("minimum should be compatible with node", () => {
     const node = users.get("age").minimum();
-    expect(node.name).toBe("MIN");
+    expect(node).toBeInstanceOf(Nodes.Min);
   });
 
   it("attribute node should be compatible with Subtraction", () => {

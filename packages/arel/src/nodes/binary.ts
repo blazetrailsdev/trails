@@ -46,7 +46,7 @@ export class Binary extends NodeExpression {
   }
 
   as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName));
+    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 
   and(other: Node): And {

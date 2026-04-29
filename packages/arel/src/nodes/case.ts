@@ -41,7 +41,7 @@ export class Case extends NodeExpression {
   }
 
   as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName));
+    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 
   clone(): Case {

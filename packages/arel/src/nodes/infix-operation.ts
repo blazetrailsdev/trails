@@ -34,7 +34,7 @@ export class InfixOperation extends Binary {
   }
 
   as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName));
+    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 
   asc(): Ascending {

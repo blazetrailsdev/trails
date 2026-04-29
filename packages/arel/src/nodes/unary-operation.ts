@@ -24,7 +24,7 @@ export class UnaryOperation extends Unary {
   }
 
   as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName));
+    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 
   asc(): Ascending {

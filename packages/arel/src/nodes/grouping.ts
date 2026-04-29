@@ -14,7 +14,7 @@ export class Grouping extends Unary {
   }
 
   as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName));
+    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 
   fetchAttribute(block: (attr: Node) => unknown): unknown {

@@ -13,7 +13,17 @@ import { Equality } from "../nodes/equality.js";
 import { Matches, DoesNotMatch } from "../nodes/matches.js";
 import { In } from "../nodes/in.js";
 import { NotIn } from "../nodes/binary.js";
-import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
+import {
+  Addition,
+  Subtraction,
+  Multiplication,
+  Division,
+  Concat,
+  Contains,
+  Overlaps,
+} from "../nodes/infix-operation.js";
+import { Count } from "../nodes/count.js";
+import { Sum, Max, Min, Avg } from "../nodes/function.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
 import { Quoted, Casted, buildQuoted } from "../nodes/casted.js";
@@ -30,7 +40,6 @@ import { Regexp as RegexpNode, NotRegexp } from "../nodes/regexp.js";
 import { IsDistinctFrom, IsNotDistinctFrom } from "../nodes/binary.js";
 import { Case } from "../nodes/case.js";
 import {
-  InfixOperation,
   BitwiseAnd,
   BitwiseOr,
   BitwiseXor,
@@ -102,7 +111,15 @@ export class Attribute extends Node {
       : false;
   }
 
-  private buildCasted(value: unknown): Node {
+  /**
+   * Mirrors: Arel::Predications#quoted_node — the type-aware wrapper
+   * that the Predications mixin calls to bring an arbitrary right-hand
+   * value into the AST. Attribute's impl wraps in `Casted(value, this)`
+   * so the visitor can apply column-level type-casting; ActiveModel
+   * attribute instances become BindParam so they extract as binds; raw
+   * Nodes are passed through.
+   */
+  quotedNode(value: unknown): Node {
     if (value instanceof Node) return value;
     if (value === null || value === undefined) return new Quoted(null);
     // ActiveModel::Attribute instances (QueryAttribute etc.) carry their
@@ -117,27 +134,27 @@ export class Attribute extends Node {
   // -- Predicates --
 
   eq(other: unknown): Equality {
-    return new Equality(this, this.buildCasted(other));
+    return new Equality(this, this.quotedNode(other));
   }
 
   notEq(other: unknown): NotEqual {
-    return new NotEqual(this, this.buildCasted(other));
+    return new NotEqual(this, this.quotedNode(other));
   }
 
   gt(other: unknown): GreaterThan {
-    return new GreaterThan(this, this.buildCasted(other));
+    return new GreaterThan(this, this.quotedNode(other));
   }
 
   gteq(other: unknown): GreaterThanOrEqual {
-    return new GreaterThanOrEqual(this, this.buildCasted(other));
+    return new GreaterThanOrEqual(this, this.quotedNode(other));
   }
 
   lt(other: unknown): LessThan {
-    return new LessThan(this, this.buildCasted(other));
+    return new LessThan(this, this.quotedNode(other));
   }
 
   lteq(other: unknown): LessThanOrEqual {
-    return new LessThanOrEqual(this, this.buildCasted(other));
+    return new LessThanOrEqual(this, this.quotedNode(other));
   }
 
   matches(
@@ -146,7 +163,7 @@ export class Attribute extends Node {
     caseSensitive = false,
   ): Matches {
     const right =
-      typeof pattern === "string" ? this.buildCasted(pattern) : (pattern as { ast: Node }).ast;
+      typeof pattern === "string" ? this.quotedNode(pattern) : (pattern as { ast: Node }).ast;
     return new Matches(this, right, escape, caseSensitive);
   }
 
@@ -156,16 +173,16 @@ export class Attribute extends Node {
     caseSensitive = false,
   ): DoesNotMatch {
     const right =
-      typeof pattern === "string" ? this.buildCasted(pattern) : (pattern as { ast: Node }).ast;
+      typeof pattern === "string" ? this.quotedNode(pattern) : (pattern as { ast: Node }).ast;
     return new DoesNotMatch(this, right, escape, caseSensitive);
   }
 
   matchesRegexp(pattern: string, caseSensitive = true): RegexpNode {
-    return new RegexpNode(this, this.buildCasted(pattern), caseSensitive);
+    return new RegexpNode(this, this.quotedNode(pattern), caseSensitive);
   }
 
   doesNotMatchRegexp(pattern: string, caseSensitive = true): NotRegexp {
-    return new NotRegexp(this, this.buildCasted(pattern), caseSensitive);
+    return new NotRegexp(this, this.quotedNode(pattern), caseSensitive);
   }
 
   in(values: unknown[] | { ast: Node }): In {
@@ -374,29 +391,35 @@ export class Attribute extends Node {
   // -- Aliasing --
 
   as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName));
+    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 
   // -- Aggregate functions --
+  //
+  // Mirrors: Arel::Expressions (mixed into Attribute in Rails). Returns
+  // the typed Function subclasses Rails uses (Count/Sum/Max/Min/Avg) so
+  // `instanceof` checks line up across the codebase. The visitor
+  // (visitAggregate in to-sql.ts) renders them identically to a
+  // NamedFunction with the same name.
 
-  count(distinct = false): NamedFunction {
-    return new NamedFunction("COUNT", [this], undefined, distinct);
+  count(distinct = false): Count {
+    return new Count([this], distinct);
   }
 
-  sum(): NamedFunction {
-    return new NamedFunction("SUM", [this]);
+  sum(): Sum {
+    return new Sum([this]);
   }
 
-  maximum(): NamedFunction {
-    return new NamedFunction("MAX", [this]);
+  maximum(): Max {
+    return new Max([this]);
   }
 
-  minimum(): NamedFunction {
-    return new NamedFunction("MIN", [this]);
+  minimum(): Min {
+    return new Min([this]);
   }
 
-  average(): NamedFunction {
-    return new NamedFunction("AVG", [this]);
+  average(): Avg {
+    return new Avg([this]);
   }
 
   // -- String functions --
@@ -431,8 +454,12 @@ export class Attribute extends Node {
     return new NamedFunction("SUBSTRING", args);
   }
 
-  concat(other: unknown, ...rest: unknown[]): NamedFunction {
-    return new NamedFunction("CONCAT", [this, buildQuoted(other), ...rest.map(buildQuoted)]);
+  // Mirrors: Arel::Predications#concat — `Nodes::Concat.new self, other`,
+  // i.e. SQL `||` infix concatenation. (The previous implementation built
+  // a `CONCAT(...)` NamedFunction call, which was Trails-specific and
+  // varied by dialect; the `||` form is what Rails emits.)
+  concat(other: Node): Concat {
+    return new Concat(this, other);
   }
 
   replace(from: string, to: string): NamedFunction {
@@ -497,19 +524,27 @@ export class Attribute extends Node {
   /**
    * PostgreSQL @> (contains) operator.
    *
-   * Mirrors: Arel::Attributes::Attribute#contains
+   * Mirrors: Arel::Predications#contains — `Arel::Nodes::Contains.new self, quoted_node(other)`.
+   * Returns the dedicated `Contains` subclass (rather than a generic
+   * `InfixOperation("@>", ...)`) so `instanceof` checks line up. Routes
+   * through `this.quotedNode` so a scalar RHS gets the column-aware
+   * `Casted` wrapping (matching how Rails' `quoted_node` carries the
+   * attribute as type-cast context).
    */
-  contains(other: unknown): InfixOperation {
-    return new InfixOperation("@>", this, buildQuoted(other));
+  contains(other: unknown): Contains {
+    return new Contains(this, this.quotedNode(other));
   }
 
   /**
    * PostgreSQL && (overlaps) operator.
    *
-   * Mirrors: Arel::Attributes::Attribute#overlaps
+   * Mirrors: Arel::Predications#overlaps — `Arel::Nodes::Overlaps.new self, quoted_node(other)`.
+   * Routes through `this.quotedNode` (rather than the bare `buildQuoted`)
+   * so a scalar RHS gets the column-aware `Casted` wrapping. Same fidelity
+   * fix as `contains`.
    */
-  overlaps(other: unknown): InfixOperation {
-    return new InfixOperation("&&", this, buildQuoted(other));
+  overlaps(other: unknown): Overlaps {
+    return new Overlaps(this, this.quotedNode(other));
   }
 
   /**

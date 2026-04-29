@@ -9,6 +9,6 @@ import { Nary } from "./nary.js";
  */
 export class And extends Nary {
   as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName));
+    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 }

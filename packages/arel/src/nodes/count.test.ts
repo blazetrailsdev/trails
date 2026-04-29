@@ -15,7 +15,7 @@ describe("Arel::Nodes::CountTest", () => {
   describe("eq", () => {
     it("should compare the count", () => {
       const count = users.get("id").count();
-      expect(count.name).toBe("COUNT");
+      expect(count).toBeInstanceOf(Nodes.Count);
     });
   });
 

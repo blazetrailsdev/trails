@@ -2,7 +2,7 @@
  * QueryAttribute — a value object for use when constructing query conditions.
  *
  * Extends ActiveModel::Attribute so instanceof checks work throughout
- * the system (BindMap, visitors, buildCasted, extractNodeValue).
+ * the system (BindMap, visitors, Attribute#quotedNode, extractNodeValue).
  *
  * Mirrors: ActiveRecord::Relation::QueryAttribute < ActiveModel::Attribute
  */
