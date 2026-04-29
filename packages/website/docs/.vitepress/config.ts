@@ -55,6 +55,17 @@ export default defineConfig({
 
     search: {
       provider: "local",
+      options: {
+        // Exclude the typedoc-generated API reference from the local
+        // search index. Indexing it inflates the search-index chunk to
+        // ~17MB and dominates the VitePress bundle phase. The API is
+        // navigable via the sidebar; losing in-page search there is the
+        // accepted tradeoff for a much smaller, faster build.
+        _render(src, env, md) {
+          if (env.relativePath?.startsWith("api/")) return "";
+          return md.render(src, env);
+        },
+      },
     },
   },
 });

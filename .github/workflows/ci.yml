@@ -408,6 +408,13 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Cache VitePress + Vite build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/website/docs/.vitepress/cache
+            packages/website/node_modules/.vite
+          key: vitepress-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'packages/website/docs/.vitepress/config.ts') }}
       - run: pnpm --filter @blazetrails/website exec svelte-kit sync
       - name: Build SvelteKit
         run: pnpm --filter @blazetrails/website run build:sw && pnpm --filter @blazetrails/website exec vite build
