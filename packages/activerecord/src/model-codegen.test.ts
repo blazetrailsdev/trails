@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { generateModels, unqualify } from "./model-codegen.js";
 import type { IntrospectedTable } from "./model-codegen.js";
 import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 
 // Deterministic timestamp so header-line comparisons stay stable.
-const NOW = new Date("2026-04-24T14:23:05.000Z");
+const NOW = Temporal.Instant.from("2026-04-24T14:23:05.000Z");
 
 function table(
   name: string,

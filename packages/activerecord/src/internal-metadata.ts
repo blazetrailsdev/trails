@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::InternalMetadata
  */
 
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { NotImplementedError } from "./errors.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { detectAdapterName } from "./adapter-name.js";
@@ -190,7 +191,13 @@ export class InternalMetadata {
   }
 
   private currentTime(): string {
-    return new Date().toISOString().replace("T", " ").replace("Z", "");
+    // Format: "YYYY-MM-DD HH:mm:ss.SSS" — drop the trailing 'Z' and swap 'T' for ' '.
+    // Truncate sub-ms (Rails uses ms-precise updated_at strings; default Temporal
+    // rounding is halfExpand which would otherwise round up).
+    return Temporal.Now.instant()
+      .toString({ smallestUnit: "millisecond", roundingMode: "trunc" })
+      .replace("T", " ")
+      .replace("Z", "");
   }
 
   private async selectEntry(key: string): Promise<Record<string, unknown> | null> {

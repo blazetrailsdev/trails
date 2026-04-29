@@ -1,4 +1,5 @@
 import { getFs, getPath, Logger } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   TableDefinition,
@@ -922,8 +923,8 @@ export abstract class Migration {
   }
 
   static nextMigrationNumber(_number?: number): string {
-    return new Date()
-      .toISOString()
+    return Temporal.Now.instant()
+      .toString()
       .replace(/[-T:Z.]/g, "")
       .slice(0, 14);
   }
