@@ -60,39 +60,33 @@ export class PostgreSQL extends ToSql {
   // Mirrors Rails Postgres formatting: `( expr )` with spaces inside
   // the parens. The base ToSql renders `(expr)` without spaces, so
   // override to match Rails' `visit_Arel_Nodes_GroupingElement`.
-  protected override visitGroupingElement(node: Nodes.GroupingElement): SQLString {
-    this.collector.append("( ");
-    for (let i = 0; i < node.expressions.length; i++) {
-      if (i > 0) this.collector.append(", ");
-      this.visit(node.expressions[i]);
-    }
-    this.collector.append(" )");
-    return this.collector;
+  protected override visitArelNodesGroupingElement(node: Nodes.GroupingElement): SQLString {
+    return this.groupingArrayOrGroupingElement(node);
   }
 
   // Cube/Rollup/GroupingSet: emit `CUBE` / `ROLLUP` / `GROUPING SETS`
-  // followed by `grouping_array_or_grouping_element` formatting — same
-  // `( ... )` shape with spaces. Mirrors Rails Postgres.
-  protected override visitCube(node: Nodes.Cube): SQLString {
+  // followed by `grouping_array_or_grouping_element` formatting. Mirrors
+  // Rails Postgres ([postgresql.rb](https://github.com/rails/rails/blob/v8.0.2/activerecord/lib/arel/visitors/postgresql.rb)).
+  protected override visitArelNodesCube(node: Nodes.Cube): SQLString {
     this.collector.append("CUBE");
-    return this.visitGroupingElement(node);
+    return this.groupingArrayOrGroupingElement(node);
   }
 
-  protected override visitRollup(node: Nodes.Rollup): SQLString {
+  protected override visitArelNodesRollUp(node: Nodes.Rollup): SQLString {
     this.collector.append("ROLLUP");
-    return this.visitGroupingElement(node);
+    return this.groupingArrayOrGroupingElement(node);
   }
 
-  protected override visitGroupingSet(node: Nodes.GroupingSet): SQLString {
+  protected override visitArelNodesGroupingSet(node: Nodes.GroupingSet): SQLString {
     this.collector.append("GROUPING SETS");
-    return this.visitGroupingElement(node);
+    return this.groupingArrayOrGroupingElement(node);
   }
 
   // Lateral: only add wrapping parens when the inner isn't already a
   // Grouping (Rails: `grouping_parentheses`). Trails' base unconditionally
   // wraps, so a `LATERAL (grouping)` pre-existing parens would
   // produce `LATERAL ((expr))`.
-  protected override visitLateral(node: Nodes.Lateral): SQLString {
+  protected override visitArelNodesLateral(node: Nodes.Lateral): SQLString {
     this.collector.append("LATERAL ");
     if (node.subquery instanceof Nodes.Grouping) {
       this.visit(node.subquery);
@@ -118,6 +112,24 @@ export class PostgreSQL extends ToSql {
     this.visitNodeOrValue(node.left);
     this.collector.append(" IS DISTINCT FROM ");
     this.visitNodeOrValue(node.right);
+    return this.collector;
+  }
+
+  /**
+   * Mirrors Rails Postgres `grouping_array_or_grouping_element` (postgresql.rb:87).
+   * Trails' `GroupingElement` always carries an `expressions: Node[]`
+   * (Rails normalizes between bare `expr` and array `expr`); the wrapped
+   * `( ... )` shape is the one Rails takes when `o.expr.is_a? Array`,
+   * which Trails always hits. Used by visitArelNodesCube / RollUp /
+   * GroupingSet / GroupingElement.
+   */
+  protected groupingArrayOrGroupingElement(o: Nodes.GroupingElement): SQLString {
+    this.collector.append("( ");
+    o.expressions.forEach((expr, i) => {
+      if (i > 0) this.collector.append(", ");
+      this.visit(expr);
+    });
+    this.collector.append(" )");
     return this.collector;
   }
 }

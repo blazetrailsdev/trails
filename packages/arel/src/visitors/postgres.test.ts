@@ -405,4 +405,19 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
     const node = users.get("a").isDistinctFrom(users.get("b"));
     expect(compile(node)).toBe('"users"."a" IS DISTINCT FROM "users"."b"');
   });
+
+  it("Cube/Rollup/GroupingSet route through groupingArrayOrGroupingElement", () => {
+    // Verify the helper is actually wired into the dialect-public path:
+    // CUBE / ROLLUP / GROUPING SETS each emit their prefix followed by the
+    // helper's `( ... )` formatting.
+    expect(compile(new Nodes.Cube([users.get("a"), users.get("b")]))).toBe(
+      'CUBE( "users"."a", "users"."b" )',
+    );
+    expect(compile(new Nodes.Rollup([users.get("a")]))).toBe('ROLLUP( "users"."a" )');
+    expect(compile(new Nodes.GroupingSet([users.get("a"), users.get("b")]))).toBe(
+      'GROUPING SETS( "users"."a", "users"."b" )',
+    );
+    // GroupingElement itself uses the helper too.
+    expect(compile(new Nodes.GroupingElement([users.get("a")]))).toBe('( "users"."a" )');
+  });
 });

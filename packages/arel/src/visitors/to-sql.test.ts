@@ -1199,4 +1199,132 @@ describe("the to_sql visitor", () => {
       expect(sql).toContain('"w""in" AS');
     });
   });
+
+  describe("Rails-mirrored to_sql tail helpers", () => {
+    interface ToSqlInternals {
+      isUnboundable(value: unknown): boolean;
+      hasGroupByAndHaving(o: { groups: unknown[]; havings: unknown[] }): boolean;
+      bindBlock(): (index: number) => string;
+    }
+    const make = () => new Visitors.ToSql() as unknown as ToSqlInternals;
+
+    it("isUnboundable returns true only when the value reports unboundable", () => {
+      const v = make();
+      expect(v.isUnboundable({ isUnboundable: () => 1 })).toBe(true);
+      expect(v.isUnboundable({ isUnboundable: () => false })).toBe(false);
+      expect(v.isUnboundable({})).toBe(false);
+      expect(v.isUnboundable(null)).toBe(false);
+    });
+
+    it("hasGroupByAndHaving requires both groups and havings to be non-empty", () => {
+      const v = make();
+      expect(v.hasGroupByAndHaving({ groups: [1], havings: [1] })).toBe(true);
+      expect(v.hasGroupByAndHaving({ groups: [], havings: [1] })).toBe(false);
+      expect(v.hasGroupByAndHaving({ groups: [1], havings: [] })).toBe(false);
+    });
+
+    it("bindBlock returns a placeholder callback emitting ? by default", () => {
+      const block = make().bindBlock();
+      expect(block(0)).toBe("?");
+      expect(block(7)).toBe("?");
+    });
+
+    it("an overridden bindBlock takes effect at every base addBind callsite", () => {
+      class NumberedVisitor extends Visitors.ToSql {
+        idx = 0;
+        protected override bindBlock(): (i: number) => string {
+          return () => `$${++this.idx}`;
+        }
+      }
+      const tbl = new Table("users");
+      const v = new NumberedVisitor();
+      // Two bind sites reachable via standard dispatch — BindParam (extracted)
+      // and Casted (extracted) — both routed through bindBlock.
+      const [sql] = v.compileWithBinds(
+        tbl
+          .where(tbl.get("id").eq(new Nodes.BindParam(1)))
+          .where(tbl.get("name").eq(new Nodes.Casted("hi", tbl.get("name"))))
+          .project(tbl.get("id")).ast,
+      );
+      expect(sql).toContain("$1");
+      expect(sql).toContain("$2");
+      expect(sql).not.toContain("?");
+    });
+
+    it("Nodes.SelectOptions visits limit/offset/lock via maybeVisit through dispatch", () => {
+      const opts = new Nodes.SelectOptions(
+        new Nodes.Limit(new Nodes.SqlLiteral("10")),
+        new Nodes.Offset(new Nodes.SqlLiteral("20")),
+      );
+      const sql = new Visitors.ToSql().compile(opts);
+      expect(sql).toBe(" LIMIT 10 OFFSET 20");
+    });
+
+    it("visitActiveModelAttribute routes through bindBlock (Rails parity)", () => {
+      // ActiveModel::Attribute isn't a Node ctor so it's not reachable
+      // through standard dispatch — exercise the visitor method directly
+      // to confirm Rails' add_bind(o, &bind_block) shape is preserved.
+      class NumberedVisitor extends Visitors.ToSql {
+        idx = 0;
+        protected override bindBlock(): (i: number) => string {
+          return () => `$${++this.idx}`;
+        }
+        run(o: unknown): string {
+          this.compile(new Nodes.SqlLiteral(""));
+          this.visitActiveModelAttribute(o);
+          return (this as unknown as { collector: { value: string } }).collector.value;
+        }
+      }
+      expect(new NumberedVisitor().run({ value: "x" })).toBe("$1");
+    });
+
+    it("visitArelSelectManager wraps the manager's AST in parens", () => {
+      // Called directly — SelectManager isn't in the dispatch table because
+      // it's a TreeManager, not a Node. Mirrors Rails' `visit_Arel_SelectManager`
+      // which is invoked when the visitor encounters a SelectManager value.
+      const tbl = new Table("users");
+      const mgr = new SelectManager(tbl).project(tbl.get("id"));
+      const v = new Visitors.ToSql();
+      // Initialize the collector via a no-op compile.
+      v.compile(new Nodes.SqlLiteral(""));
+      (
+        v as unknown as { visitArelSelectManager(o: { ast: Nodes.Node }): void }
+      ).visitArelSelectManager({ ast: mgr.ast as unknown as Nodes.Node });
+      const sql = (v as unknown as { collector: { value: string } }).collector.value;
+      expect(sql).toMatch(/^\(SELECT.*\)$/);
+    });
+
+    it("visitArelNodesWhen / Else are reachable as standalone visits (Case still works)", () => {
+      const tbl = new Table("users");
+      const node = new Nodes.Case(tbl.get("status")).when("ok", 1).when("warn", 2)["else"](0);
+      const sql = new Visitors.ToSql().compile(node);
+      expect(sql).toContain("CASE");
+      expect(sql).toContain("WHEN");
+      expect(sql).toContain("THEN");
+      expect(sql).toContain("ELSE");
+      expect(sql).toContain("END");
+    });
+
+    it("dispatches Nodes.When and Nodes.Else as top-level visits", () => {
+      const tbl = new Table("users");
+      const whenNode = new Nodes.When(tbl.get("status"), new Nodes.SqlLiteral("1"));
+      const elseNode = new Nodes.Else(new Nodes.SqlLiteral("0"));
+      expect(new Visitors.ToSql().compile(whenNode)).toBe('WHEN "users"."status" THEN 1');
+      expect(new Visitors.ToSql().compile(elseNode)).toBe("ELSE 0");
+    });
+
+    it("visitArray handles a mix of Node and primitive entries", () => {
+      const tbl = new Table("users");
+      const v = new Visitors.ToSql();
+      v.compile(new Nodes.SqlLiteral(""));
+      (v as unknown as { visitArray(a: ReadonlyArray<unknown>): void }).visitArray([
+        tbl.get("a"),
+        1,
+        "text",
+      ]);
+      expect((v as unknown as { collector: { value: string } }).collector.value).toBe(
+        '"users"."a", 1, \'text\'',
+      );
+    });
+  });
 });

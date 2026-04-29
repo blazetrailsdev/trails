@@ -44,3 +44,29 @@ export class SelectStatement extends NodeExpression {
     return copy;
   }
 }
+
+/**
+ * SelectOptions — the (limit, offset, lock) triple Rails extracts from a
+ * SelectStatement so it can be visited as a unit. Trails inlines limit/
+ * offset/lock on `SelectStatement` itself, so this node is rarely
+ * constructed in normal use; it exists for callers (and for parity with
+ * `Arel::Nodes::SelectOptions`) that build one explicitly.
+ *
+ * Mirrors: Arel::Nodes::SelectOptions
+ */
+export class SelectOptions extends Node {
+  readonly limit: Node | null;
+  readonly offset: Node | null;
+  readonly lock: Node | null;
+
+  constructor(limit: Node | null = null, offset: Node | null = null, lock: Node | null = null) {
+    super();
+    this.limit = limit;
+    this.offset = offset;
+    this.lock = lock;
+  }
+
+  accept<T>(visitor: NodeVisitor<T>): T {
+    return visitor.visit(this);
+  }
+}

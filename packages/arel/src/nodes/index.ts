@@ -73,7 +73,7 @@ export { FullOuterJoin } from "./full-outer-join.js";
 export { StringJoin } from "./string-join.js";
 
 export { SelectCore } from "./select-core.js";
-export { SelectStatement } from "./select-statement.js";
+export { SelectStatement, SelectOptions } from "./select-statement.js";
 export { InsertStatement } from "./insert-statement.js";
 export { UpdateStatement } from "./update-statement.js";
 export { DeleteStatement } from "./delete-statement.js";
