@@ -249,9 +249,12 @@ describe("DatabaseStatements", () => {
           await fn();
           return undefined;
         },
+        quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
+        quoteTableName: (n: string) => `"${n}"`,
+        quoteColumnName: (n: string) => `"${n}"`,
       } as unknown as DatabaseStatementsHost;
 
-      await insertFixturesSet.call(
+      await (insertFixturesSet as unknown as (...args: unknown[]) => Promise<void>).call(
         host,
         {
           users: [{ name: "Alice" }],

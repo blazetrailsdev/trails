@@ -14,14 +14,12 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TransactionIsolationError, NotImplementedError } from "../../errors.js";
 import {
-  quote,
-  quoteTableName,
-  quoteColumnName,
   formatInstantForSql,
   formatPlainDateTimeForSql,
   formatPlainDateForSql,
   formatPlainTimeForSql,
 } from "./quoting.js";
+import type { Quoting } from "./quoting-interface.js";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
@@ -509,12 +507,12 @@ export { deleteStatement as delete };
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#truncate
  */
 export async function truncate(
-  this: DatabaseStatementsHost | void,
+  this: DatabaseStatementsHost & Pick<Quoting, "quoteTableName">,
   tableName: string,
   name?: string | null,
 ): Promise<unknown> {
-  const sql = `TRUNCATE TABLE ${quoteTableName(tableName)}`;
-  const doExecute = (this as DatabaseStatementsHost)?.execute ?? execute;
+  const sql = `TRUNCATE TABLE ${this.quoteTableName(tableName)}`;
+  const doExecute = this.execute ?? execute;
   return doExecute(sql);
 }
 
@@ -524,7 +522,7 @@ export async function truncate(
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#truncate_tables
  */
 export async function truncateTables(
-  this: DatabaseStatementsHost,
+  this: DatabaseStatementsHost & Pick<Quoting, "quoteTableName">,
   ...tableNames: string[]
 ): Promise<void> {
   const schemaMigrationTable = this.pool?.schemaMigration?.tableName ?? "schema_migrations";
@@ -535,7 +533,7 @@ export async function truncateTables(
 
   if (filtered.length === 0) return;
 
-  const statements = filtered.map((t) => `TRUNCATE TABLE ${quoteTableName(t)}`);
+  const statements = filtered.map((t) => `TRUNCATE TABLE ${this.quoteTableName(t)}`);
 
   const doExecute = this.execute ?? execute;
   const doTruncate = async () => {
@@ -845,21 +843,20 @@ export async function resetSequenceBang(
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#insert_fixture
  */
 export async function insertFixture(
-  this: DatabaseStatementsHost | void,
+  this: DatabaseStatementsHost & Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">,
   fixture: Record<string, unknown>,
   tableName: string,
 ): Promise<unknown> {
-  const host = this as DatabaseStatementsHost;
   const columns = Object.keys(fixture);
-  const values = Object.values(fixture).map((v) => quote(withYamlFallback(v)));
+  const values = Object.values(fixture).map((v) => this.quote(withYamlFallback(v)));
 
-  const emptyValue = host?.emptyInsertStatementValue?.() ?? emptyInsertStatementValue();
+  const emptyValue = this.emptyInsertStatementValue?.() ?? emptyInsertStatementValue();
   const sql =
     columns.length > 0
-      ? `INSERT INTO ${quoteTableName(tableName)} (${columns.map((c) => quoteColumnName(c)).join(", ")}) VALUES (${values.join(", ")})`
-      : `INSERT INTO ${quoteTableName(tableName)} ${emptyValue}`;
+      ? `INSERT INTO ${this.quoteTableName(tableName)} (${columns.map((c) => this.quoteColumnName(c)).join(", ")}) VALUES (${values.join(", ")})`
+      : `INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`;
 
-  const doExecute = host?.execute ?? execute;
+  const doExecute = this.execute ?? execute;
   return doExecute(sql);
 }
 
@@ -869,11 +866,11 @@ export async function insertFixture(
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#insert_fixtures_set
  */
 export async function insertFixturesSet(
-  this: DatabaseStatementsHost,
+  this: DatabaseStatementsHost & Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">,
   fixtureSet: Record<string, Record<string, unknown>[]>,
   tablesToDelete: string[] = [],
 ): Promise<void> {
-  const deleteStatements = tablesToDelete.map((t) => `DELETE FROM ${quoteTableName(t)}`);
+  const deleteStatements = tablesToDelete.map((t) => `DELETE FROM ${this.quoteTableName(t)}`);
 
   const insertStatements: string[] = [];
   for (const [tableName, fixtures] of Object.entries(fixtureSet)) {
@@ -882,11 +879,11 @@ export async function insertFixturesSet(
       const columns = Object.keys(fixture);
       if (columns.length === 0) {
         const emptyValue = this.emptyInsertStatementValue?.() ?? emptyInsertStatementValue();
-        insertStatements.push(`INSERT INTO ${quoteTableName(tableName)} ${emptyValue}`);
+        insertStatements.push(`INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`);
       } else {
-        const values = Object.values(fixture).map((v) => quote(withYamlFallback(v)));
+        const values = Object.values(fixture).map((v) => this.quote(withYamlFallback(v)));
         insertStatements.push(
-          `INSERT INTO ${quoteTableName(tableName)} (${columns.map((c) => quoteColumnName(c)).join(", ")}) VALUES (${values.join(", ")})`,
+          `INSERT INTO ${this.quoteTableName(tableName)} (${columns.map((c) => this.quoteColumnName(c)).join(", ")}) VALUES (${values.join(", ")})`,
         );
       }
     }
