@@ -143,14 +143,14 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("last week", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    const result = lastWeek(dt, "monday");
+    const result = asDate(lastWeek(dt, "monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
 
   it("date time should have correct last week for leap year", () => {
     const dt = d(2016, 3, 7);
-    const result = lastWeek(dt, "monday");
+    const result = asDate(lastWeek(dt, "monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
@@ -171,13 +171,13 @@ describe("DateTimeExtCalculationsTest", () => {
   it("today with offset", () => {
     const now = new Date();
     expect(isToday(now)).toBe(true);
-    expect(isToday(prevDay(now))).toBe(false);
+    expect(isToday(asDate(prevDay(now)))).toBe(false);
   });
 
   it("today without offset", () => {
     const now = new Date();
     expect(isToday(now)).toBe(true);
-    expect(isToday(nextDay(now))).toBe(false);
+    expect(isToday(asDate(nextDay(now)))).toBe(false);
   });
 
   it("yesterday with offset", () => {
@@ -194,7 +194,7 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("prev day without offset", () => {
     const t = new Date();
-    const result = prevDay(t);
+    const result = asDate(prevDay(t));
     expect(result < t).toBe(true);
   });
 
@@ -212,7 +212,7 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("next day without offset", () => {
     const t = new Date();
-    const result = nextDay(t);
+    const result = asDate(nextDay(t));
     expect(result > t).toBe(true);
   });
 
@@ -376,14 +376,14 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("prev day with offset", () => {
     const t = d(2005, 6, 15, 12, 0, 0);
-    const result = prevDay(t);
+    const result = asDate(prevDay(t));
     expect(result.getDate()).toBe(14);
     expect(result.getMonth()).toBe(5);
   });
 
   it("next day with offset", () => {
     const t = d(2005, 6, 15, 12, 0, 0);
-    const result = nextDay(t);
+    const result = asDate(nextDay(t));
     expect(result.getDate()).toBe(16);
     expect(result.getMonth()).toBe(5);
   });

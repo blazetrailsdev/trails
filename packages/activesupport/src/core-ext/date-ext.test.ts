@@ -63,12 +63,12 @@ describe("DateExtBehaviorTest", () => {
 
 describe("DateExtCalculationsTest", () => {
   it("yesterday in calendar reform", () => {
-    const result = prevDay(d(1582, 10, 15));
+    const result = asDate(prevDay(d(1582, 10, 15)));
     expect(result.getDate()).toBe(14);
   });
 
   it("tomorrow in calendar reform", () => {
-    const result = nextDay(d(1582, 10, 4));
+    const result = asDate(nextDay(d(1582, 10, 4)));
     expect(result.getDate()).toBe(5);
   });
 
@@ -101,7 +101,7 @@ describe("DateExtCalculationsTest", () => {
   it("compare to time", () => {
     const ref = d(2023, 6, 15, 12, 0, 0);
     const before = prevDay(ref);
-    expect(before.getTime()).toBeLessThan(ref.getTime());
+    expect(before.epochMilliseconds).toBeLessThan(ref.getTime());
   });
 
   it("to datetime", () => {
@@ -155,7 +155,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("last week", () => {
-    const result = lastWeek(d(2005, 5, 17), "monday");
+    const result = asDate(lastWeek(d(2005, 5, 17), "monday"));
     expect(result.getDate()).toBe(9);
     expect(result.getMonth()).toBe(4); // May
   });

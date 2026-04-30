@@ -188,7 +188,7 @@ describe("TimeExtCalculationsTest", () => {
   it("daylight savings time crossings forward start tomorrow", () => {
     withEnvTz("America/New_York", () => {
       const st = new Date(2005, 3, 2, 19, 27, 0);
-      const result = nextDay(st);
+      const result = asDate(nextDay(st));
       expect(result.getDate()).toBe(3);
       expect(result.getHours()).toBe(19);
       expect(result.getMinutes()).toBe(27);
@@ -198,7 +198,7 @@ describe("TimeExtCalculationsTest", () => {
   it("daylight savings time crossings backward start yesterday", () => {
     withEnvTz("America/New_York", () => {
       const dt = new Date(2005, 3, 3, 19, 27, 0);
-      const result = prevDay(dt);
+      const result = asDate(prevDay(dt));
       expect(result.getDate()).toBe(2);
       expect(result.getHours()).toBe(19);
       expect(result.getMinutes()).toBe(27);
@@ -229,7 +229,7 @@ describe("TimeExtCalculationsTest", () => {
   it("daylight savings time crossings forward end tomorrow", () => {
     withEnvTz("America/New_York", () => {
       const dt = new Date(2005, 9, 30, 0, 45, 0);
-      const result = nextDay(dt);
+      const result = asDate(nextDay(dt));
       expect(result.getDate()).toBe(31);
       expect(result.getHours()).toBe(0);
       expect(result.getMinutes()).toBe(45);
@@ -239,7 +239,7 @@ describe("TimeExtCalculationsTest", () => {
   it("daylight savings time crossings backward end yesterday", () => {
     withEnvTz("America/New_York", () => {
       const st = new Date(2005, 9, 31, 0, 45, 0);
-      const result = prevDay(st);
+      const result = asDate(prevDay(st));
       expect(result.getDate()).toBe(30);
       expect(result.getHours()).toBe(0);
       expect(result.getMinutes()).toBe(45);
@@ -324,7 +324,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("last week", () => {
     withEnvTz("America/New_York", () => {
-      const result = lastWeek(new Date(2005, 2, 1, 15, 15, 10), "monday");
+      const result = asDate(lastWeek(new Date(2005, 2, 1, 15, 15, 10), "monday"));
       expect(result.getDay()).toBe(1); // Monday
       expect(result.getDate()).toBe(21);
     });
@@ -332,7 +332,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next week near daylight start", () => {
     withEnvTz("America/New_York", () => {
-      const result = nextWeek(new Date(2006, 3, 2, 23, 1, 0), "monday");
+      const result = asDate(nextWeek(new Date(2006, 3, 2, 23, 1, 0), "monday"));
       expect(result.getDate()).toBe(3);
       expect(result.getMonth()).toBe(3); // April
     });
@@ -340,7 +340,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next week near daylight end", () => {
     withEnvTz("America/New_York", () => {
-      const result = nextWeek(new Date(2006, 9, 29, 23, 1, 0), "monday");
+      const result = asDate(nextWeek(new Date(2006, 9, 29, 23, 1, 0), "monday"));
       expect(result.getDate()).toBe(30);
       expect(result.getMonth()).toBe(9); // October
     });
@@ -462,7 +462,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("prev day with time utc", () => {
     const t = new Date();
-    const result = prevDay(t);
+    const result = asDate(prevDay(t));
     expect(result < t).toBe(true);
   });
 
@@ -480,7 +480,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next day with time utc", () => {
     const t = new Date();
-    const result = nextDay(t);
+    const result = asDate(nextDay(t));
     expect(result > t).toBe(true);
   });
 
@@ -711,13 +711,13 @@ describe("TimeExtCalculationsTest", () => {
 
   it("prev day with time local", () => {
     const t = new Date();
-    const result = prevDay(t);
+    const result = asDate(prevDay(t));
     expect(result < t).toBe(true);
   });
 
   it("next day with time local", () => {
     const t = d(2005, 6, 15, 12, 0, 0);
-    const result = nextDay(t);
+    const result = asDate(nextDay(t));
     expect(result.getDate()).toBe(16);
     expect(result.getMonth()).toBe(5);
   });

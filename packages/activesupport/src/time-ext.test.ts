@@ -196,55 +196,55 @@ describe("TimeExtCalculationsTest", () => {
   it("next_week", () => {
     // A Monday (2023-01-09) -> next monday = 2023-01-16
     const monday = d(2023, 1, 9);
-    const result = nextWeek(monday, "monday");
+    const result = asDate(nextWeek(monday, "monday"));
     expect(result.getDay()).toBe(1); // Monday
     expect(result > monday).toBe(true);
   });
 
   it("prev_week", () => {
     const monday = d(2023, 1, 16);
-    const result = prevWeek(monday, "monday");
+    const result = asDate(prevWeek(monday, "monday"));
     expect(result.getDay()).toBe(1);
     expect(result < monday).toBe(true);
   });
 
   it("next_month", () => {
-    expect(nextMonth(d(2005, 1, 31))).toEqual(d(2005, 2, 28));
-    expect(nextMonth(d(2005, 3, 15))).toEqual(d(2005, 4, 15));
+    expect(nextMonth(d(2005, 1, 31))).toEqual(i(2005, 2, 28));
+    expect(nextMonth(d(2005, 3, 15))).toEqual(i(2005, 4, 15));
   });
 
   it("prev_month", () => {
-    expect(prevMonth(d(2005, 3, 31))).toEqual(d(2005, 2, 28));
-    expect(prevMonth(d(2005, 3, 15))).toEqual(d(2005, 2, 15));
+    expect(prevMonth(d(2005, 3, 31))).toEqual(i(2005, 2, 28));
+    expect(prevMonth(d(2005, 3, 15))).toEqual(i(2005, 2, 15));
   });
 
   it("next_year", () => {
-    expect(nextYear(d(2005, 6, 15))).toEqual(d(2006, 6, 15));
+    expect(nextYear(d(2005, 6, 15))).toEqual(i(2006, 6, 15));
   });
 
   it("prev_year", () => {
-    expect(prevYear(d(2005, 6, 15))).toEqual(d(2004, 6, 15));
+    expect(prevYear(d(2005, 6, 15))).toEqual(i(2004, 6, 15));
   });
 
   it("next_day", () => {
-    expect(nextDay(d(2005, 2, 28))).toEqual(d(2005, 3, 1));
+    expect(nextDay(d(2005, 2, 28))).toEqual(i(2005, 3, 1));
   });
 
   it("prev_day", () => {
-    expect(prevDay(d(2005, 3, 1))).toEqual(d(2005, 2, 28));
+    expect(prevDay(d(2005, 3, 1))).toEqual(i(2005, 2, 28));
   });
 
   it("next_occurring", () => {
     // Monday 2023-01-09, next friday
     const monday = d(2023, 1, 9);
-    const result = nextOccurring(monday, "friday");
+    const result = asDate(nextOccurring(monday, "friday"));
     expect(result.getDay()).toBe(5);
     expect(result > monday).toBe(true);
   });
 
   it("prev_occurring", () => {
     const monday = d(2023, 1, 16);
-    const result = prevOccurring(monday, "friday");
+    const result = asDate(prevOccurring(monday, "friday"));
     expect(result.getDay()).toBe(5);
     expect(result < monday).toBe(true);
   });
@@ -263,8 +263,8 @@ describe("TimeExtCalculationsTest", () => {
   it("is_today, is_tomorrow, is_yesterday", () => {
     const now = new Date();
     expect(isToday(now)).toBe(true);
-    expect(isTomorrow(nextDay(now))).toBe(true);
-    expect(isYesterday(prevDay(now))).toBe(true);
+    expect(isTomorrow(asDate(nextDay(now)))).toBe(true);
+    expect(isYesterday(asDate(prevDay(now)))).toBe(true);
   });
 
   it("is_past", () => {
@@ -347,7 +347,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("last week", () => {
     const t = d(2005, 2, 4, 10, 10, 10); // Friday
-    const result = lastWeek(t, "monday");
+    const result = asDate(lastWeek(t, "monday"));
     expect(result.getDay()).toBe(1); // Monday
     expect(result < t).toBe(true);
   });
@@ -466,7 +466,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("prev day with time utc", () => {
     const t = new Date();
-    const result = prevDay(t);
+    const result = asDate(prevDay(t));
     expect(result < t).toBe(true);
   });
 
@@ -478,7 +478,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next day with time utc", () => {
     const t = new Date();
-    const result = nextDay(t);
+    const result = asDate(nextDay(t));
     expect(result > t).toBe(true);
   });
 
@@ -656,15 +656,15 @@ describe("DateExtCalculationsTest", () => {
   it("next_week various days", () => {
     // 2023-01-09 (Monday)
     const mon = d(2023, 1, 9);
-    expect(nextWeek(mon, "wednesday").getDay()).toBe(3);
-    expect(nextWeek(mon, "friday").getDay()).toBe(5);
-    expect(nextWeek(mon, "sunday").getDay()).toBe(0);
+    expect(asDate(nextWeek(mon, "wednesday")).getDay()).toBe(3);
+    expect(asDate(nextWeek(mon, "friday")).getDay()).toBe(5);
+    expect(asDate(nextWeek(mon, "sunday")).getDay()).toBe(0);
   });
 
   it("prev_week various days", () => {
     const mon = d(2023, 1, 16);
-    expect(prevWeek(mon, "wednesday").getDay()).toBe(3);
-    expect(prevWeek(mon, "friday").getDay()).toBe(5);
+    expect(asDate(prevWeek(mon, "wednesday")).getDay()).toBe(3);
+    expect(asDate(prevWeek(mon, "friday")).getDay()).toBe(5);
   });
 
   it("to fs", () => {
@@ -702,7 +702,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("last week", () => {
     const date = d(2005, 2, 21);
-    const result = lastWeek(date, "monday");
+    const result = asDate(lastWeek(date, "monday"));
     expect(result.getDay()).toBe(1);
     expect(result < date).toBe(true);
   });
@@ -962,14 +962,14 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("next_occurring from datetime", () => {
     const dt = d(2005, 2, 22, 10, 10, 10); // Tuesday
-    const result = nextOccurring(dt, "friday");
+    const result = asDate(nextOccurring(dt, "friday"));
     expect(result.getDay()).toBe(5);
     expect(result > dt).toBe(true);
   });
 
   it("prev_occurring from datetime", () => {
     const dt = d(2005, 2, 22, 10, 10, 10); // Tuesday
-    const result = prevOccurring(dt, "monday");
+    const result = asDate(prevOccurring(dt, "monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
@@ -1019,14 +1019,14 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("next_day from datetime", () => {
     const dt = d(2005, 2, 28, 10, 10, 10);
-    const result = nextDay(dt);
+    const result = asDate(nextDay(dt));
     expect(result.getDate()).toBe(1);
     expect(result.getMonth()).toBe(2); // March
   });
 
   it("prev_day from datetime", () => {
     const dt = d(2005, 3, 1, 10, 10, 10);
-    const result = prevDay(dt);
+    const result = asDate(prevDay(dt));
     expect(result.getDate()).toBe(28);
     expect(result.getMonth()).toBe(1); // February
   });
@@ -1109,14 +1109,14 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("last week", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    const result = lastWeek(dt, "monday");
+    const result = asDate(lastWeek(dt, "monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
 
   it("date time should have correct last week for leap year", () => {
     const dt = d(2016, 3, 7); // March 7, 2016 (leap year)
-    const result = lastWeek(dt, "monday");
+    const result = asDate(lastWeek(dt, "monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
@@ -1159,7 +1159,7 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("prev day without offset", () => {
     const t = new Date();
-    const result = prevDay(t);
+    const result = asDate(prevDay(t));
     expect(result < t).toBe(true);
   });
 
@@ -1177,7 +1177,7 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("next day without offset", () => {
     const t = new Date();
-    const result = nextDay(t);
+    const result = asDate(nextDay(t));
     expect(result > t).toBe(true);
   });
 

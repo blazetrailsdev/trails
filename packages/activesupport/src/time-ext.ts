@@ -168,7 +168,7 @@ export function endOfYear(date: Date): Temporal.Instant {
 // next/prev Week/Month/Year/Day
 // ---------------------------------------------------------------------------
 
-export function nextWeek(date: Date, day = "monday"): Date {
+export function nextWeek(date: Date, day = "monday"): Temporal.Instant {
   const targetDay = dayIndex(day);
   const d = clone(date);
   d.setDate(d.getDate() + 7);
@@ -176,10 +176,10 @@ export function nextWeek(date: Date, day = "monday"): Date {
   const diff = (targetDay - 1 + 7) % 7; // offset from Monday
   bow.setDate(bow.getDate() + diff);
   bow.setHours(0, 0, 0, 0);
-  return bow;
+  return instantFrom(bow);
 }
 
-export function prevWeek(date: Date, day = "monday"): Date {
+export function prevWeek(date: Date, day = "monday"): Temporal.Instant {
   const targetDay = dayIndex(day);
   const d = clone(date);
   d.setDate(d.getDate() - 7);
@@ -187,10 +187,10 @@ export function prevWeek(date: Date, day = "monday"): Date {
   const diff = (targetDay - 1 + 7) % 7;
   bow.setDate(bow.getDate() + diff);
   bow.setHours(0, 0, 0, 0);
-  return bow;
+  return instantFrom(bow);
 }
 
-export function nextMonth(date: Date): Date {
+export function nextMonth(date: Date): Temporal.Instant {
   const d = clone(date);
   const day = d.getDate();
   d.setMonth(d.getMonth() + 1);
@@ -198,20 +198,20 @@ export function nextMonth(date: Date): Date {
   if (d.getDate() !== day) {
     d.setDate(0); // last day of previous month
   }
-  return d;
+  return instantFrom(d);
 }
 
-export function prevMonth(date: Date): Date {
+export function prevMonth(date: Date): Temporal.Instant {
   const d = clone(date);
   const day = d.getDate();
   d.setMonth(d.getMonth() - 1);
   if (d.getDate() !== day) {
     d.setDate(0);
   }
-  return d;
+  return instantFrom(d);
 }
 
-export function nextYear(date: Date): Date {
+export function nextYear(date: Date): Temporal.Instant {
   const d = clone(date);
   const month = d.getMonth();
   const day = d.getDate();
@@ -223,29 +223,29 @@ export function nextYear(date: Date): Date {
   if (d.getDate() !== day && d.getMonth() === month) {
     d.setDate(0);
   }
-  return d;
+  return instantFrom(d);
 }
 
-export function prevYear(date: Date): Date {
+export function prevYear(date: Date): Temporal.Instant {
   const d = clone(date);
   const month = d.getMonth();
   d.setFullYear(d.getFullYear() - 1);
   if (d.getMonth() !== month) {
     d.setDate(0);
   }
-  return d;
+  return instantFrom(d);
 }
 
-export function nextDay(date: Date): Date {
+export function nextDay(date: Date): Temporal.Instant {
   const d = clone(date);
   d.setDate(d.getDate() + 1);
-  return d;
+  return instantFrom(d);
 }
 
-export function prevDay(date: Date): Date {
+export function prevDay(date: Date): Temporal.Instant {
   const d = clone(date);
   d.setDate(d.getDate() - 1);
-  return d;
+  return instantFrom(d);
 }
 
 // Alias used in Rails
@@ -255,22 +255,22 @@ export { nextDay as tomorrow, prevDay as yesterday };
 // next/prev occurring
 // ---------------------------------------------------------------------------
 
-export function nextOccurring(date: Date, day: string): Date {
+export function nextOccurring(date: Date, day: string): Temporal.Instant {
   const targetDay = dayIndex(day);
   const d = clone(date);
   let diff = targetDay - d.getDay();
   if (diff <= 0) diff += 7;
   d.setDate(d.getDate() + diff);
-  return d;
+  return instantFrom(d);
 }
 
-export function prevOccurring(date: Date, day: string): Date {
+export function prevOccurring(date: Date, day: string): Temporal.Instant {
   const targetDay = dayIndex(day);
   const d = clone(date);
   let diff = d.getDay() - targetDay;
   if (diff <= 0) diff += 7;
   d.setDate(d.getDate() - diff);
-  return d;
+  return instantFrom(d);
 }
 
 // ---------------------------------------------------------------------------
@@ -442,7 +442,7 @@ export function isToday(date: Date): boolean {
 }
 
 export function isTomorrow(date: Date): boolean {
-  const tomorrow = nextDay(new Date());
+  const tomorrow = new Date(nextDay(new Date()).epochMilliseconds);
   return (
     date.getFullYear() === tomorrow.getFullYear() &&
     date.getMonth() === tomorrow.getMonth() &&
@@ -451,7 +451,7 @@ export function isTomorrow(date: Date): boolean {
 }
 
 export function isYesterday(date: Date): boolean {
-  const yesterday = prevDay(new Date());
+  const yesterday = new Date(prevDay(new Date()).epochMilliseconds);
   return (
     date.getFullYear() === yesterday.getFullYear() &&
     date.getMonth() === yesterday.getMonth() &&
@@ -537,7 +537,7 @@ export function xmlschema(date: Date): string {
 /**
  * lastWeek — returns the start of last week.
  */
-export function lastWeek(date: Date, startDay = "monday"): Date {
+export function lastWeek(date: Date, startDay = "monday"): Temporal.Instant {
   return prevWeek(date, startDay);
 }
 
