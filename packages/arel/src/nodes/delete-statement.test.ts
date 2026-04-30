@@ -15,6 +15,15 @@ describe("Arel", () => {
       expect(stmt.wheres.length).toBe(2);
     });
 
+    // Mirrors Rails: `DeleteStatement.new(relation, wheres = [])`
+    // (delete_statement.rb) accepts both args at construction.
+    it("ctor accepts a relation and initial wheres", () => {
+      const eq = users.get("id").eq(1);
+      const stmt = new Nodes.DeleteStatement(users, [eq]);
+      expect(stmt.relation).toBe(users);
+      expect(stmt.wheres).toEqual([eq]);
+    });
+
     describe("equality", () => {
       it("is equal with equal ivars", () => {
         const s1 = new Nodes.DeleteStatement();

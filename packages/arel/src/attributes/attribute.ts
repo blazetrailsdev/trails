@@ -519,7 +519,8 @@ export class Attribute extends Node {
   // -- Extract --
 
   extract(field: string): Extract {
-    return new Extract(this, field);
+    // Mirrors Rails: `Nodes::Extract.new [self], field` (expressions.rb).
+    return new Extract([this], field);
   }
 
   // -- Null handling --

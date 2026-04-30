@@ -35,6 +35,7 @@ export const Expressions: ExpressionsModule = {
     return new Avg([this]);
   },
   extract(this: Node, field: string): Extract {
-    return new Extract(this, field);
+    // Mirrors Rails: `Nodes::Extract.new [self], field` (expressions.rb).
+    return new Extract([this], field);
   },
 };

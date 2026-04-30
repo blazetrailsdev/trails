@@ -17,9 +17,9 @@ export class SelectStatement extends NodeExpression {
   with: Node | null;
   comment: Comment | null;
 
-  constructor() {
+  constructor(relation: Node | null = null) {
     super();
-    this.cores = [new SelectCore()];
+    this.cores = [new SelectCore(relation)];
     this.orders = [];
     this.limit = null;
     this.offset = null;
