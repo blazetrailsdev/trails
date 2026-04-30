@@ -362,7 +362,7 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#limit
    */
-  get limit(): unknown {
+  get limit(): Limit["expr"] | null {
     return (this.ast.limit as Limit | null)?.expr ?? null;
   }
 
@@ -379,7 +379,7 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#offset
    */
-  get offset(): unknown {
+  get offset(): Offset["expr"] | null {
     return (this.ast.offset as Offset | null)?.expr ?? null;
   }
 
