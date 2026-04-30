@@ -220,7 +220,7 @@ describe("DurationTest", () => {
     ] as const) {
       const dur = Duration[unit](1);
       const result = dur.since(now);
-      expect(typeof result.epochMilliseconds === "number").toBe(true);
+      expect(result).toBeInstanceOf(Temporal.Instant);
     }
   });
 
@@ -293,7 +293,7 @@ describe("DurationTest", () => {
   it("since and ago anchored to time now when time zone is not set", () => {
     // JS doesn't have TimeWithZone — just verify since() returns a Temporal.Instant
     const result = Duration.seconds(5).since();
-    expect(typeof result.epochMilliseconds === "number").toBe(true);
+    expect(result).toBeInstanceOf(Temporal.Instant);
   });
 
   it("since and ago anchored to time zone now when time zone is set", () => {
