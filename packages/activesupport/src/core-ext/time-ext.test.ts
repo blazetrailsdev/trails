@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import type { Temporal } from "../temporal.js";
 import {
   nextDay,
   prevDay,
@@ -27,6 +28,10 @@ import {
   isFuture,
   nextWeek,
 } from "../time-ext.js";
+
+function asDate(instant: Temporal.Instant): Date {
+  return new Date(instant.epochMilliseconds);
+}
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
   return new Date(year, month - 1, day, hour, min, sec, ms);
@@ -660,11 +665,11 @@ describe("TimeExtCalculationsTest", () => {
   it("all day with timezone", () => {
     const t = d(2011, 6, 7, 10, 10, 10);
     const { start, end } = allDay(t);
-    expect(start.getHours()).toBe(0);
-    expect(start.getMinutes()).toBe(0);
-    expect(end.getHours()).toBe(23);
-    expect(end.getMinutes()).toBe(59);
-    expect(end.getDate()).toBe(7);
+    expect(asDate(start).getHours()).toBe(0);
+    expect(asDate(start).getMinutes()).toBe(0);
+    expect(asDate(end).getHours()).toBe(23);
+    expect(asDate(end).getMinutes()).toBe(59);
+    expect(asDate(end).getDate()).toBe(7);
   });
 
   it("rfc3339 parse", () => {

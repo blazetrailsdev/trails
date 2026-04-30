@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import type { Temporal } from "../temporal.js";
 import {
   beginningOfDay,
   middleOfDay,
@@ -30,6 +31,10 @@ import {
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
   return new Date(year, month - 1, day, hour, min, sec, ms);
+}
+
+function asDate(instant: Temporal.Instant): Date {
+  return new Date(instant.epochMilliseconds);
 }
 
 describe("DateExtBehaviorTest", () => {
@@ -125,7 +130,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("sunday", () => {
-    const result = endOfWeek(d(2008, 2, 29));
+    const result = asDate(endOfWeek(d(2008, 2, 29)));
     expect(result.getDay()).toBe(0); // Sunday
     expect(result.getMonth()).toBe(2); // March
     expect(result.getDate()).toBe(2);
@@ -158,7 +163,7 @@ describe("DateExtCalculationsTest", () => {
   it("last quarter on 31st", () => {
     const dt = d(2004, 5, 31);
     const quarterStart = beginningOfQuarter(dt);
-    const lastQuarterStart = advance(quarterStart, { months: -3 });
+    const lastQuarterStart = advance(asDate(quarterStart), { months: -3 });
     expect(lastQuarterStart.getMonth()).toBe(0); // January
   });
 
@@ -210,7 +215,7 @@ describe("DateExtCalculationsTest", () => {
   it.skip("ago when zone is set");
 
   it("middle of day", () => {
-    const result = middleOfDay(d(2005, 2, 21));
+    const result = asDate(middleOfDay(d(2005, 2, 21)));
     expect(result.getHours()).toBe(12);
     expect(result.getMinutes()).toBe(0);
   });
@@ -220,41 +225,41 @@ describe("DateExtCalculationsTest", () => {
 
   it("all day", () => {
     const { start, end } = allDay(d(2011, 6, 7));
-    expect(start.getHours()).toBe(0);
-    expect(end.getHours()).toBe(23);
-    expect(end.getMinutes()).toBe(59);
+    expect(asDate(start).getHours()).toBe(0);
+    expect(asDate(end).getHours()).toBe(23);
+    expect(asDate(end).getMinutes()).toBe(59);
   });
 
   it.skip("all day when zone is set");
 
   it("all week", () => {
     const { start, end } = allWeek(d(2011, 6, 7));
-    expect(start.getDay()).toBe(1); // Monday
-    expect(start.getDate()).toBe(6);
-    expect(end.getDay()).toBe(0); // Sunday
-    expect(end.getDate()).toBe(12);
+    expect(asDate(start).getDay()).toBe(1); // Monday
+    expect(asDate(start).getDate()).toBe(6);
+    expect(asDate(end).getDay()).toBe(0); // Sunday
+    expect(asDate(end).getDate()).toBe(12);
   });
 
   it("all month", () => {
     const { start, end } = allMonth(d(2011, 6, 7));
-    expect(start.getDate()).toBe(1);
-    expect(start.getMonth()).toBe(5); // June
-    expect(end.getDate()).toBe(30);
+    expect(asDate(start).getDate()).toBe(1);
+    expect(asDate(start).getMonth()).toBe(5); // June
+    expect(asDate(end).getDate()).toBe(30);
   });
 
   it("all quarter", () => {
     const { start, end } = allQuarter(d(2011, 6, 7));
-    expect(start.getMonth()).toBe(3); // April
-    expect(end.getMonth()).toBe(5); // June
-    expect(end.getDate()).toBe(30);
+    expect(asDate(start).getMonth()).toBe(3); // April
+    expect(asDate(end).getMonth()).toBe(5); // June
+    expect(asDate(end).getDate()).toBe(30);
   });
 
   it("all year", () => {
     const { start, end } = allYear(d(2011, 6, 7));
-    expect(start.getMonth()).toBe(0); // January
-    expect(start.getDate()).toBe(1);
-    expect(end.getMonth()).toBe(11); // December
-    expect(end.getDate()).toBe(31);
+    expect(asDate(start).getMonth()).toBe(0); // January
+    expect(asDate(start).getDate()).toBe(1);
+    expect(asDate(end).getMonth()).toBe(11); // December
+    expect(asDate(end).getDate()).toBe(31);
   });
 
   it("xmlschema", () => {
@@ -289,13 +294,13 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("end of year", () => {
-    const result = endOfYear(d(2005, 6, 15));
+    const result = asDate(endOfYear(d(2005, 6, 15)));
     expect(result.getMonth()).toBe(11); // December
     expect(result.getDate()).toBe(31);
   });
 
   it("end of month", () => {
-    const result = endOfMonth(d(2005, 2, 5));
+    const result = asDate(endOfMonth(d(2005, 2, 5)));
     expect(result.getDate()).toBe(28);
     expect(result.getMonth()).toBe(1);
   });
@@ -312,7 +317,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("beginning of day", () => {
     const date = d(2005, 2, 21, 10, 30, 45);
-    const result = beginningOfDay(date);
+    const result = asDate(beginningOfDay(date));
     expect(result.getHours()).toBe(0);
     expect(result.getMinutes()).toBe(0);
     expect(result.getSeconds()).toBe(0);
@@ -320,7 +325,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("end of day", () => {
     const date = d(2005, 2, 21, 10, 30, 45);
-    const result = endOfDay(date);
+    const result = asDate(endOfDay(date));
     expect(result.getHours()).toBe(23);
     expect(result.getMinutes()).toBe(59);
   });

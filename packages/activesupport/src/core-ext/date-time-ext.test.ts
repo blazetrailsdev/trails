@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import type { Temporal } from "../temporal.js";
 import {
   advance,
   ago,
@@ -29,6 +30,10 @@ import {
   toTime,
   xmlschema,
 } from "../time-ext.js";
+
+function asDate(instant: Temporal.Instant): Date {
+  return new Date(instant.epochMilliseconds);
+}
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
   return new Date(year, month - 1, day, hour, min, sec, ms);
@@ -93,26 +98,26 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("middle of day", () => {
     const dt = d(2005, 2, 4, 10, 10, 10);
-    const result = middleOfDay(dt);
+    const result = asDate(middleOfDay(dt));
     expect(result.getHours()).toBe(12);
     expect(result.getMinutes()).toBe(0);
   });
 
   it("beginning of minute", () => {
     const dt = d(2005, 2, 4, 19, 30, 10);
-    const result = beginningOfMinute(dt);
+    const result = asDate(beginningOfMinute(dt));
     expect(result.getSeconds()).toBe(0);
   });
 
   it("end of minute", () => {
     const dt = d(2005, 2, 4, 19, 30, 10);
-    const result = endOfMinute(dt);
+    const result = asDate(endOfMinute(dt));
     expect(result.getSeconds()).toBe(59);
   });
 
   it("end of month", () => {
     const dt = d(2005, 2, 15, 10, 10, 10);
-    const result = endOfMonth(dt);
+    const result = asDate(endOfMonth(dt));
     expect(result.getDate()).toBe(28);
   });
 
@@ -153,7 +158,7 @@ describe("DateTimeExtCalculationsTest", () => {
   it("last quarter on 31st", () => {
     const dt = d(2005, 10, 31, 10, 10, 10);
     const quarterStart = beginningOfQuarter(dt);
-    const lastQuarterStart = advance(quarterStart, { months: -3 });
+    const lastQuarterStart = advance(asDate(quarterStart), { months: -3 });
     expect(lastQuarterStart.getMonth()).toBe(6); // July
   });
 
@@ -357,14 +362,14 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("beginning of hour", () => {
     const dt = d(2005, 2, 4, 19, 30, 10);
-    const result = beginningOfHour(dt);
+    const result = asDate(beginningOfHour(dt));
     expect(result.getHours()).toBe(19);
     expect(result.getMinutes()).toBe(0);
   });
 
   it("end of hour", () => {
     const dt = d(2005, 2, 4, 19, 30, 10);
-    const result = endOfHour(dt);
+    const result = asDate(endOfHour(dt));
     expect(result.getHours()).toBe(19);
     expect(result.getMinutes()).toBe(59);
   });
@@ -385,13 +390,13 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("beginning of day", () => {
     const dt = d(2005, 2, 4, 10, 10, 10);
-    const result = beginningOfDay(dt);
+    const result = asDate(beginningOfDay(dt));
     expect(result.getHours()).toBe(0);
   });
 
   it("end of day", () => {
     const dt = d(2005, 2, 4, 10, 10, 10);
-    const result = endOfDay(dt);
+    const result = asDate(endOfDay(dt));
     expect(result.getHours()).toBe(23);
     expect(result.getMinutes()).toBe(59);
   });
