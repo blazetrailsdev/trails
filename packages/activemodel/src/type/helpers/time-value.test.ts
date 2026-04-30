@@ -89,6 +89,13 @@ describe("newTime", () => {
     const i = newTime(2024, 1, 2, 12, 0, 0, 0, 3600);
     expect(i?.toString()).toBe("2024-01-02T11:00:00Z");
   });
+
+  it("splits Ruby microsec (0..999_999) across Temporal millisecond/microsecond", () => {
+    const i = newTime(2024, 1, 2, 12, 0, 0, 123456);
+    const z = i?.toZonedDateTimeISO("UTC");
+    expect(z?.millisecond).toBe(123);
+    expect(z?.microsecond).toBe(456);
+  });
 });
 
 describe("fastStringToTime", () => {
