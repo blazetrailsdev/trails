@@ -4,14 +4,13 @@ import { SelectStatement } from "./nodes/select-statement.js";
 import { SelectCore } from "./nodes/select-core.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Distinct } from "./nodes/terminal.js";
-import { Offset, Limit, Lock, On, DistinctOn, Group } from "./nodes/unary.js";
+import { Offset, Limit, Lock, On, DistinctOn, Group, OptimizerHints } from "./nodes/unary.js";
 import { CrossJoin, Join } from "./nodes/binary.js";
 import { InnerJoin } from "./nodes/inner-join.js";
 import { OuterJoin } from "./nodes/outer-join.js";
 import { RightOuterJoin } from "./nodes/right-outer-join.js";
 import { FullOuterJoin } from "./nodes/full-outer-join.js";
 import { StringJoin } from "./nodes/string-join.js";
-import { Quoted } from "./nodes/casted.js";
 import { Union, UnionAll, Intersect, Except } from "./nodes/binary.js";
 import { With, WithRecursive } from "./nodes/with.js";
 import { TableAlias } from "./nodes/table-alias.js";
@@ -131,25 +130,23 @@ export class SelectManager extends TreeManager {
 
   /**
    * Set LIMIT.
+   *
+   * Mirrors: Arel::SelectManager#take (select_manager.rb). Pass `null`
+   * to clear; raw amounts flow through `new Limit(amount)` unwrapped.
    */
-  take(amount: number | Node): this {
-    if (amount instanceof Node) {
-      this.ast.limit = amount;
-    } else {
-      this.ast.limit = new Limit(new Quoted(amount));
-    }
+  take(amount: number | Node | null): this {
+    this.ast.limit = amount == null ? null : new Limit(amount);
     return this;
   }
 
   /**
    * Set OFFSET.
+   *
+   * Mirrors: Arel::SelectManager#skip (select_manager.rb). Pass `null`
+   * to clear; raw amounts flow through `new Offset(amount)` unwrapped.
    */
-  skip(amount: number | Node): this {
-    if (amount instanceof Node) {
-      this.ast.offset = amount;
-    } else {
-      this.ast.offset = new Offset(new Quoted(amount));
-    }
+  skip(amount: number | Node | null): this {
+    this.ast.offset = amount == null ? null : new Offset(amount);
     return this;
   }
 
@@ -369,12 +366,26 @@ export class SelectManager extends TreeManager {
   }
 
   /**
+   * Mirrors: Arel::SelectManager `alias limit= take` (select_manager.rb).
+   */
+  set limit(value: number | Node | null) {
+    this.take(value);
+  }
+
+  /**
    * Return the current OFFSET node.
    *
    * Mirrors: Arel::SelectManager#offset
    */
   get offset(): Node | null {
     return this.ast.offset;
+  }
+
+  /**
+   * Mirrors: Arel::SelectManager `alias offset= skip` (select_manager.rb).
+   */
+  set offset(value: number | Node | null) {
+    this.skip(value);
   }
 
   /**
@@ -407,10 +418,14 @@ export class SelectManager extends TreeManager {
   /**
    * Add optimizer hints to the query.
    *
-   * Mirrors: Arel::SelectManager#optimizer_hints
+   * Mirrors: Arel::SelectManager#optimizer_hints (select_manager.rb).
+   * Rails wraps the splat in `Nodes::OptimizerHints.new(hints)` and only
+   * assigns when at least one hint is provided.
    */
   optimizerHints(...hints: string[]): this {
-    this.core.optimizerHints = hints;
+    if (hints.length > 0) {
+      this.core.optimizerHints = new OptimizerHints(hints);
+    }
     return this;
   }
 

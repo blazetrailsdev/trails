@@ -192,6 +192,64 @@ describe("SelectManagerTest", () => {
       const mgr = users.project(star).skip(5);
       expect(mgr.toSql()).toContain("OFFSET 5");
     });
+
+    // Mirrors Rails: `skip(amount)` flows the raw value into
+    // `Nodes::Offset.new(amount)` (select_manager.rb), no `Quoted` wrap.
+    it("stores the raw amount on the Offset (no Quoted wrap)", () => {
+      const mgr = new SelectManager(users).skip(5);
+      const offset = mgr.ast.offset as Nodes.Offset;
+      expect(offset).toBeInstanceOf(Nodes.Offset);
+      expect(offset.expr).toBe(5);
+    });
+
+    // Mirrors Rails: `skip(nil)` clears the offset.
+    it("clears the offset when given null", () => {
+      const mgr = new SelectManager(users).skip(5);
+      expect(mgr.ast.offset).not.toBeNull();
+      mgr.skip(null);
+      expect(mgr.ast.offset).toBeNull();
+    });
+  });
+
+  describe("take", () => {
+    it("stores the raw amount on the Limit (no Quoted wrap)", () => {
+      const mgr = new SelectManager(users).take(5);
+      const limit = mgr.ast.limit as Nodes.Limit;
+      expect(limit).toBeInstanceOf(Nodes.Limit);
+      expect(limit.expr).toBe(5);
+    });
+
+    // Mirrors Rails: `take(nil)` clears the limit.
+    it("clears the limit when given null", () => {
+      const mgr = new SelectManager(users).take(5);
+      expect(mgr.ast.limit).not.toBeNull();
+      mgr.take(null);
+      expect(mgr.ast.limit).toBeNull();
+    });
+  });
+
+  // Mirrors Rails: `alias :limit= :take` and `alias :offset= :skip`
+  // (select_manager.rb). The setter form is symmetric with the getter.
+  describe("limit= / offset= setters", () => {
+    it("limit= delegates to take", () => {
+      const mgr = new SelectManager(users);
+      mgr.limit = 7;
+      const limit = mgr.ast.limit as Nodes.Limit;
+      expect(limit).toBeInstanceOf(Nodes.Limit);
+      expect(limit.expr).toBe(7);
+      mgr.limit = null;
+      expect(mgr.ast.limit).toBeNull();
+    });
+
+    it("offset= delegates to skip", () => {
+      const mgr = new SelectManager(users);
+      mgr.offset = 9;
+      const offset = mgr.ast.offset as Nodes.Offset;
+      expect(offset).toBeInstanceOf(Nodes.Offset);
+      expect(offset.expr).toBe(9);
+      mgr.offset = null;
+      expect(mgr.ast.offset).toBeNull();
+    });
   });
 
   describe("offset", () => {
@@ -1220,6 +1278,22 @@ describe("SelectManagerTest", () => {
     it("strips empty hints after sanitization", () => {
       const mgr = new SelectManager(users).project(star).optimizerHints("/* */", "--");
       expect(mgr.toSql()).toBe('SELECT * FROM "users"');
+    });
+
+    // Mirrors Rails: `optimizer_hints(*hints)` builds
+    // `Nodes::OptimizerHints.new(hints)` (select_manager.rb), so the AST
+    // carries an OptimizerHints node — not a bare string array.
+    it("stores hints as an OptimizerHints node on the SelectCore", () => {
+      const mgr = new SelectManager(users).project(star).optimizerHints("X", "Y");
+      expect(mgr.ast.cores[0].optimizerHints).toBeInstanceOf(Nodes.OptimizerHints);
+      expect((mgr.ast.cores[0].optimizerHints as Nodes.OptimizerHints).hints).toEqual(["X", "Y"]);
+    });
+
+    // Mirrors Rails: `optimizer_hints` is a no-op when called with no
+    // arguments (the Rails impl skips the assignment when hints empty).
+    it("is a no-op when called with no hints", () => {
+      const mgr = new SelectManager(users).project(star).optimizerHints();
+      expect(mgr.ast.cores[0].optimizerHints).toBeNull();
     });
   });
 });

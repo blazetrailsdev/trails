@@ -292,13 +292,11 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   protected emitOptimizerHints(node: Nodes.SelectCore): void {
-    if (node.optimizerHints.length === 0) return;
-    const sanitized = node.optimizerHints
-      .map((h) => this.sanitizeHint(h))
-      .filter((h) => h.length > 0);
-    if (sanitized.length > 0) {
-      this.collector.append(` /*+ ${sanitized.join(" ")} */`);
-    }
+    // Mirrors Rails: `@ctx.optimizer_hints` is now an `OptimizerHints`
+    // node (or null); the visitor delegates to the dedicated visitor
+    // which sanitizes + wraps in `/*+ ... */`.
+    if (node.optimizerHints === null) return;
+    this.visit(node.optimizerHints);
   }
 
   // Mirrors Rails: visit_Arel_Nodes_SelectCore (to_sql.rb:149). Where Rails
@@ -1217,8 +1215,14 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // — this method exists for callers that build an OptimizerHints node
   // explicitly.
   protected visitArelNodesOptimizerHints(node: Nodes.OptimizerHints): SQLString {
-    const hints = node.hints.map((v) => this.sanitizeAsSqlComment(v)).join(" ");
-    this.collector.append(` /*+ ${hints} */`);
+    // Mirrors Rails: hints are sanitized (newlines, comment delimiters,
+    // `--` line comments stripped) and dropped when sanitization yields
+    // an empty string. No output when all hints sanitize away.
+    const sanitized = node.hints
+      .map((h) => this.sanitizeHint(typeof h === "string" ? h : h.value))
+      .filter((h) => h.length > 0);
+    if (sanitized.length === 0) return this.collector;
+    this.collector.append(` /*+ ${sanitized.join(" ")} */`);
     return this.collector;
   }
 
