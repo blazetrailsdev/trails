@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Logger } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
+import { Temporal } from "./temporal.js";
 
 function makeBuffer() {
   const lines: string[] = [];
@@ -80,7 +81,7 @@ describe("BroadcastLoggerTest", () => {
   });
 
   it("#formatter= assigns to all the loggers", () => {
-    const fmt = (_s: string, _d: Date, _p: string, msg: string) => `FMT: ${msg}\n`;
+    const fmt = (_s: string, _d: Temporal.Instant, _p: string, msg: string) => `FMT: ${msg}\n`;
     logger.formatter = fmt;
     logger.info("hello");
     expect(log1Output.string).toContain("FMT: hello");

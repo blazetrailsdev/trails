@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
+import { Temporal } from "./temporal.js";
 
 function makeBuffer() {
   const lines: string[] = [];
@@ -194,7 +195,8 @@ describe("LoggerTest", () => {
   });
 
   it("formatter can be set via keyword arg", () => {
-    logger.formatter = (_s: string, _d: Date, _p: string, msg: string) => `CUSTOM: ${msg}\n`;
+    logger.formatter = (_s: string, _d: Temporal.Instant, _p: string, msg: string) =>
+      `CUSTOM: ${msg}\n`;
     logger.info("world");
     expect(output.string).toBe("CUSTOM: world\n");
   });
@@ -373,12 +375,12 @@ describe("TaggedLoggingTest", () => {
 describe("SimpleFormatter", () => {
   it("formats a string message with newline", () => {
     const fmt = new SimpleFormatter();
-    expect(fmt.call("INFO", new Date(), null, "hello")).toBe("hello\n");
+    expect(fmt.call("INFO", Temporal.Now.instant(), null, "hello")).toBe("hello\n");
   });
 
   it("formats empty string", () => {
     const fmt = new SimpleFormatter();
-    expect(fmt.call("DEBUG", new Date(), null, "")).toBe("\n");
+    expect(fmt.call("DEBUG", Temporal.Now.instant(), null, "")).toBe("\n");
   });
 });
 

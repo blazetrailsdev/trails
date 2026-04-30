@@ -5,6 +5,7 @@
 
 import { Logger, taggedLogging as _taggedLogging } from "./logger.js";
 import type { TaggedLogger } from "./logger.js";
+import type { Temporal } from "./temporal.js";
 
 export class TagStack {
   private _tags: string[] = [];
@@ -55,7 +56,7 @@ export namespace Formatter {
   export function call(
     tagStack: TagStack,
     severity: string,
-    _timestamp: Date,
+    _timestamp: Temporal.Instant,
     _progname: string | null,
     msg: string,
   ): string {

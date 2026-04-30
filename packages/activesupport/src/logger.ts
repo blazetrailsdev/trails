@@ -2,6 +2,8 @@
  * Logger and TaggedLogging — mirroring ActiveSupport's logging API.
  */
 
+import { Temporal } from "./temporal.js";
+
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 
 export const LOG_LEVELS: Record<LogLevel, number> = {
@@ -33,15 +35,17 @@ export interface LoggerOutput {
 export class Logger {
   progname: string = "trails";
   protected _formatter:
-    | ((severity: string, datetime: Date, progname: string, msg: string) => string)
+    | ((severity: string, datetime: Temporal.Instant, progname: string, msg: string) => string)
     | null = null;
   get formatter():
-    | ((severity: string, datetime: Date, progname: string, msg: string) => string)
+    | ((severity: string, datetime: Temporal.Instant, progname: string, msg: string) => string)
     | null {
     return this._formatter;
   }
   set formatter(
-    value: ((severity: string, datetime: Date, progname: string, msg: string) => string) | null,
+    value:
+      | ((severity: string, datetime: Temporal.Instant, progname: string, msg: string) => string)
+      | null,
   ) {
     this._formatter = value;
   }
@@ -89,12 +93,18 @@ export class Logger {
 
   add(severity: number, message?: string | null, progname?: string): boolean {
     if (severity < this.level) return true;
-    const msg = message != null ? String(message) : (progname ?? this.progname);
+    let msg: string;
+    let formatterProgname: string;
+    if (message != null) {
+      msg = String(message);
+      formatterProgname = progname ?? this.progname;
+    } else {
+      msg = progname ?? this.progname;
+      formatterProgname = this.progname;
+    }
     const severityName = (LEVEL_NAMES[severity] ?? "unknown").toUpperCase();
-    // boundary: Logger#formatter receives a Date timestamp by Rails parity
-    // (Ruby Logger::Formatter#call(severity, time, progname, msg) — time is a Time).
     const line = this.formatter
-      ? this.formatter(severityName, new Date(), this.progname, msg)
+      ? this.formatter(severityName, Temporal.Now.instant(), formatterProgname, msg)
       : `${msg}\n`;
     this.output?.write(line);
     return true;
@@ -407,14 +417,19 @@ taggedLogging.logger = function (output: LoggerOutput): TaggedLogger {
 };
 
 export class SimpleFormatter {
-  call(_severity: string, _timestamp: Date, _progname: string | null, msg: string): string {
+  call(
+    _severity: string,
+    _timestamp: Temporal.Instant,
+    _progname: string | null,
+    msg: string,
+  ): string {
     return `${msg}\n`;
   }
 }
 
 export function simpleFormatter(): (
   severity: string,
-  timestamp: Date,
+  timestamp: Temporal.Instant,
   progname: string | null,
   msg: string,
 ) => string {

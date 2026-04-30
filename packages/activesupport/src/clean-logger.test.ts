@@ -14,7 +14,7 @@ describe("CleanLoggerTest", () => {
     const lines: string[] = [];
     const logger = new Logger({ write: (s) => lines.push(s) });
     logger.formatter = (severity, datetime, _prog, msg) =>
-      `[${datetime.toISOString()}] ${severity}: ${msg}\n`;
+      `[${datetime.toString()}] ${severity}: ${msg}\n`;
     logger.info("test");
     expect(lines[0]).toMatch(/^\[\d{4}-\d{2}-\d{2}/);
   });
