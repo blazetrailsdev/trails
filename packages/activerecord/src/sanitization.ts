@@ -9,34 +9,30 @@ import {
   quote as abstractQuote,
   quoteIdentifier as abstractQuoteIdentifier,
   quoteTableName as abstractQuoteTableName,
+  quoteTableNameForAssignment as abstractQuoteTableNameForAssignment,
   quoteString as abstractQuoteString,
   castBoundValue as abstractCastBoundValue,
 } from "./connection-adapters/abstract/quoting.js";
 import type { Quoting } from "./connection-adapters/abstract/quoting-interface.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
 
-/**
- * Subset of {@link Quoting} the sanitization helpers need. Adapter
- * classes implement `Quoting`, so any concrete adapter satisfies this.
- *
- * @internal
- */
+/** Subset of {@link Quoting} the sanitization helpers need. @internal */
 export type Quoter = Pick<
   Quoting,
-  "quote" | "quoteIdentifier" | "quoteTableName" | "quoteString" | "castBoundValue"
+  | "quote"
+  | "quoteIdentifier"
+  | "quoteTableName"
+  | "quoteTableNameForAssignment"
+  | "quoteString"
+  | "castBoundValue"
 >;
 
-/**
- * Module-level fallback used when a caller has no adapter to thread
- * through. Delegates to the standalone abstract functions, preserving
- * historic behavior for callers that have not been migrated yet.
- *
- * @internal
- */
+/** Fallback for callers that haven't been migrated to thread an adapter. @internal */
 const ABSTRACT_QUOTER: Quoter = {
   quote: (v) => abstractQuote(v),
   quoteIdentifier: (n) => abstractQuoteIdentifier(n),
   quoteTableName: (n) => abstractQuoteTableName(n),
+  quoteTableNameForAssignment: (t, a) => abstractQuoteTableNameForAssignment(t, a),
   quoteString: (s) => abstractQuoteString(s),
   castBoundValue: (v) => abstractCastBoundValue(v),
 };
@@ -169,8 +165,10 @@ function _sanitizeSqlHashForAssignment(
           if (type.serialize) value = type.serialize(value);
         }
       }
+      // Mirrors Rails sanitization.rb:112 — PG/SQLite override
+      // quote_table_name_for_assignment to drop the table prefix.
       const col = table
-        ? `${quoter.quoteTableName(table)}.${quoter.quoteIdentifier(attr)}`
+        ? quoter.quoteTableNameForAssignment(table, attr)
         : quoter.quoteIdentifier(attr);
       return `${col} = ${quoter.quote(value)}`;
     })
@@ -232,27 +230,29 @@ function sanitizeSqlClassMethod(
 
 /** @internal */
 interface QuoterHost {
-  connection(): unknown;
+  connection?(): unknown;
+  isConnectedQ?(): boolean;
 }
 
-/** @internal */
+/** Probes `isConnectedQ()` first to avoid throwing on the no-connection path. @internal */
 function quoterFor(host: QuoterHost): Quoter {
+  if (typeof host.connection !== "function") return ABSTRACT_QUOTER;
+  if (typeof host.isConnectedQ === "function" && !host.isConnectedQ()) return ABSTRACT_QUOTER;
+  let conn: Partial<Quoter> | null | undefined;
   try {
-    const conn = host.connection() as Partial<Quoter> | null | undefined;
-    if (
-      conn &&
-      typeof conn.quote === "function" &&
-      typeof conn.quoteIdentifier === "function" &&
-      typeof conn.quoteTableName === "function" &&
-      typeof conn.quoteString === "function" &&
-      typeof conn.castBoundValue === "function"
-    ) {
-      return conn as Quoter;
-    }
+    conn = host.connection() as Partial<Quoter> | null | undefined;
   } catch {
-    // Connection may not be configured (e.g. during boot, in tests).
+    return ABSTRACT_QUOTER;
   }
-  return ABSTRACT_QUOTER;
+  return conn &&
+    typeof conn.quote === "function" &&
+    typeof conn.quoteIdentifier === "function" &&
+    typeof conn.quoteTableName === "function" &&
+    typeof conn.quoteTableNameForAssignment === "function" &&
+    typeof conn.quoteString === "function" &&
+    typeof conn.castBoundValue === "function"
+    ? (conn as Quoter)
+    : ABSTRACT_QUOTER;
 }
 
 /**

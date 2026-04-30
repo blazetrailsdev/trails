@@ -1,10 +1,8 @@
-/**
- * Identifier-quoting parity through `sanitizeSqlForAssignment` /
- * `sanitizeSqlHashForAssignment` — verifies the quoter parameter
- * threads dialect-specific identifier quoting through the
- * sanitization helpers, matching Rails' `connection.quote` dispatch.
- */
+// Quoter-threading parity. PG/SQLite drop the table prefix in
+// quote_table_name_for_assignment (Rails sanitization.rb:112,
+// postgresql/quoting.rb:133, sqlite3/quoting.rb:70).
 import { describe, it, expect } from "vitest";
+import { ClassMethods } from "./sanitization.js";
 import {
   sanitizeSqlForAssignment,
   sanitizeSqlHashForAssignment,
@@ -12,48 +10,44 @@ import {
   type Quoter,
 } from "./sanitization.js";
 
+const dq = (n: string) => `"${n.replace(/"/g, '""')}"`;
+const bq = (n: string) => `\`${n.replace(/`/g, "``")}\``;
+const quoteVal = (v: unknown) => (typeof v === "string" ? `'${v.replace(/'/g, "''")}'` : String(v));
+
 const sqliteQuoter: Quoter = {
-  quote: (v) => (typeof v === "string" ? `'${v.replace(/'/g, "''")}'` : String(v)),
-  quoteIdentifier: (n) => `"${n.replace(/"/g, '""')}"`,
-  quoteTableName: (n) =>
-    n
-      .split(".")
-      .map((p) => `"${p.replace(/"/g, '""')}"`)
-      .join("."),
+  quote: quoteVal,
+  quoteIdentifier: dq,
+  quoteTableName: (n) => n.split(".").map(dq).join("."),
+  quoteTableNameForAssignment: (_t, a) => dq(a),
   quoteString: (s) => s.replace(/'/g, "''"),
   castBoundValue: (v) => v,
 };
-
 const pgQuoter: Quoter = { ...sqliteQuoter };
-
 const mysqlQuoter: Quoter = {
-  quote: (v) => (typeof v === "string" ? `'${v.replace(/'/g, "''")}'` : String(v)),
-  quoteIdentifier: (n) => `\`${n.replace(/`/g, "``")}\``,
-  quoteTableName: (n) =>
-    n
-      .split(".")
-      .map((p) => `\`${p.replace(/`/g, "``")}\``)
-      .join("."),
+  quote: quoteVal,
+  quoteIdentifier: bq,
+  quoteTableName: (n) => n.split(".").map(bq).join("."),
+  quoteTableNameForAssignment: (t, a) => `${bq(t)}.${bq(a)}`,
   quoteString: (s) => s.replace(/'/g, "''"),
   castBoundValue: (v) => v,
 };
 
-describe("sanitization quoter threading", () => {
-  it("MySQL quoter emits backtick-quoted identifiers", () => {
+describe("sanitization quoter threading (module-level)", () => {
+  it("MySQL emits backtick-qualified `table`.`column` for hash assignment", () => {
     expect(sanitizeSqlHashForAssignment({ name: "x" }, "users", undefined, mysqlQuoter)).toBe(
       "`users`.`name` = 'x'",
     );
   });
 
-  it("PostgreSQL quoter emits double-quoted identifiers", () => {
+  it("PostgreSQL drops the table prefix for hash assignment (Rails parity)", () => {
     expect(sanitizeSqlHashForAssignment({ name: "x" }, "users", undefined, pgQuoter)).toBe(
-      '"users"."name" = \'x\'',
+      `"name" = 'x'`,
     );
   });
 
-  it("SQLite quoter emits double-quoted identifiers", () => {
+  it("SQLite drops the table prefix for hash assignment (Rails parity)", () => {
     expect(sanitizeSqlHashForAssignment({ name: "x" }, "users", undefined, sqliteQuoter)).toBe(
-      '"users"."name" = \'x\'',
+      `"name" = 'x'`,
     );
   });
 
@@ -65,5 +59,44 @@ describe("sanitization quoter threading", () => {
 
   it("sanitizeSqlForConditions array form threads quoter through `?` binds", () => {
     expect(sanitizeSqlForConditions(["name = ?", "x"], mysqlQuoter)).toBe("name = 'x'");
+  });
+});
+
+describe("sanitization class-method dispatch threads `this.connection()`", () => {
+  const mysqlHost = { connection: () => mysqlQuoter, isConnectedQ: () => true };
+  const pgHost = { connection: () => pgQuoter, isConnectedQ: () => true };
+
+  it("sanitizeSqlHashForAssignment uses MySQL adapter from this.connection()", () => {
+    expect(ClassMethods.sanitizeSqlHashForAssignment.call(mysqlHost, { name: "x" }, "users")).toBe(
+      "`users`.`name` = 'x'",
+    );
+  });
+
+  it("sanitizeSqlHashForAssignment uses PG adapter from this.connection()", () => {
+    expect(ClassMethods.sanitizeSqlHashForAssignment.call(pgHost, { name: "x" }, "users")).toBe(
+      `"name" = 'x'`,
+    );
+  });
+
+  it("sanitizeSqlArray uses dialect quoter for `?` binds", () => {
+    expect(ClassMethods.sanitizeSqlArray.call(mysqlHost, "name = ?", "x")).toBe("name = 'x'");
+  });
+
+  it("falls back to abstract quoter when isConnectedQ() returns false", () => {
+    const host = { connection: () => mysqlQuoter, isConnectedQ: () => false };
+    expect(ClassMethods.sanitizeSqlHashForAssignment.call(host, { name: "x" }, "users")).toBe(
+      `"users"."name" = 'x'`,
+    );
+  });
+
+  it("falls back to abstract quoter when host.connection() throws", () => {
+    const host = {
+      connection: () => {
+        throw new Error("ConnectionNotDefined");
+      },
+    };
+    expect(ClassMethods.sanitizeSqlHashForAssignment.call(host, { name: "x" }, "users")).toBe(
+      `"users"."name" = 'x'`,
+    );
   });
 });
