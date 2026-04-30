@@ -15,6 +15,17 @@ export interface API {
 }
 
 import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
+import { initInternals as validationsInitInternals } from "./validations.js";
+
+/**
+ * Rails: ActiveModel::API includes Validations (api.rb), so
+ * `init_internals` is part of API's surface as well. Re-export the
+ * canonical Validations helper here so api-compare matches the shape
+ * of `api.rb` and a host that mixes in only API still has the hook.
+ *
+ * @internal Rails-private helper.
+ */
+export const initInternals = validationsInitInternals;
 
 /**
  * Rails: ActiveModel::API includes Validations, which extends Translation,

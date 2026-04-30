@@ -83,61 +83,88 @@ export function defineModelCallbacks(this: any, ...args: unknown[]): void {
 
   const timings: CallbackTiming[] = options.only ?? ["before", "after", "around"];
 
+  // NB: each `_defineXxxModelCallback` passes `fnOrObject` directly to
+  // `register`; `register` already handles `resolveCallback` internally
+  // AND stores the original filter for identity-based removal via
+  // `skip()`. Pre-resolving here would make the stored filter the
+  // wrapper function, breaking `Model.skipCallback(event, timing,
+  // originalObject)` for entries registered through the generated
+  // `beforeX`/`afterX`/`aroundX` helpers.
   for (const event of eventNames) {
-    const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
-
-    // NB: pass `fnOrObject` directly to `register`; `register` already
-    // handles `resolveCallback` internally AND stores the original
-    // filter for identity-based removal via `skip()`. Pre-resolving here
-    // would make the stored filter the wrapper function, breaking
-    // `Model.skipCallback(event, timing, originalObject)` for entries
-    // registered through the generated `beforeX`/`afterX`/`aroundX`
-    // helpers.
-    if (timings.includes("before")) {
-      const methodName = `before${capitalizedEvent}`;
-      Object.defineProperty(this, methodName, {
-        value: function (fnOrObject: CallbackFn | CallbackObject, conditions?: CallbackConditions) {
-          if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-            this._callbackChain = this._callbackChain.clone();
-          }
-          this._callbackChain.register("before", event, fnOrObject, conditions);
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
-
-    if (timings.includes("after")) {
-      const methodName = `after${capitalizedEvent}`;
-      Object.defineProperty(this, methodName, {
-        value: function (fnOrObject: CallbackFn | CallbackObject, conditions?: CallbackConditions) {
-          if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-            this._callbackChain = this._callbackChain.clone();
-          }
-          this._callbackChain.register("after", event, fnOrObject, conditions);
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
-
-    if (timings.includes("around")) {
-      const methodName = `around${capitalizedEvent}`;
-      Object.defineProperty(this, methodName, {
-        value: function (
-          fnOrObject: AroundCallbackFn | CallbackObject,
-          conditions?: CallbackConditions,
-        ) {
-          if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-            this._callbackChain = this._callbackChain.clone();
-          }
-          this._callbackChain.register("around", event, fnOrObject, conditions);
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
+    if (timings.includes("before")) _defineBeforeModelCallback(this, event);
+    if (timings.includes("after")) _defineAfterModelCallback(this, event);
+    if (timings.includes("around")) _defineAroundModelCallback(this, event);
   }
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- mixin host accepts any class constructor */
+type CallbackHost = any;
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/**
+ * Define a `before<Event>` class method that registers a before callback.
+ *
+ * Mirrors: ActiveModel::Callbacks#_define_before_model_callback
+ *
+ * @internal Rails-private helper.
+ */
+export function _defineBeforeModelCallback(klass: CallbackHost, event: string): void {
+  const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
+  Object.defineProperty(klass, `before${capitalizedEvent}`, {
+    value: function (fnOrObject: CallbackFn | CallbackObject, conditions?: CallbackConditions) {
+      if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
+        this._callbackChain = this._callbackChain.clone();
+      }
+      this._callbackChain.register("before", event, fnOrObject, conditions);
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+
+/**
+ * Define an `around<Event>` class method that registers an around callback.
+ *
+ * Mirrors: ActiveModel::Callbacks#_define_around_model_callback
+ *
+ * @internal Rails-private helper.
+ */
+export function _defineAroundModelCallback(klass: CallbackHost, event: string): void {
+  const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
+  Object.defineProperty(klass, `around${capitalizedEvent}`, {
+    value: function (
+      fnOrObject: AroundCallbackFn | CallbackObject,
+      conditions?: CallbackConditions,
+    ) {
+      if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
+        this._callbackChain = this._callbackChain.clone();
+      }
+      this._callbackChain.register("around", event, fnOrObject, conditions);
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+
+/**
+ * Define an `after<Event>` class method that registers an after callback.
+ *
+ * Mirrors: ActiveModel::Callbacks#_define_after_model_callback
+ *
+ * @internal Rails-private helper.
+ */
+export function _defineAfterModelCallback(klass: CallbackHost, event: string): void {
+  const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
+  Object.defineProperty(klass, `after${capitalizedEvent}`, {
+    value: function (fnOrObject: CallbackFn | CallbackObject, conditions?: CallbackConditions) {
+      if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
+        this._callbackChain = this._callbackChain.clone();
+      }
+      this._callbackChain.register("after", event, fnOrObject, conditions);
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 /**

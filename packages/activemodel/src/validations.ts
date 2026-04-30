@@ -1,8 +1,66 @@
-import type { Errors } from "./errors.js";
+import { Errors } from "./errors.js";
 import type { ConditionalOptions } from "./validator.js";
 import { I18n } from "./i18n.js";
 
 import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
+import {
+  _defineBeforeModelCallback as _defineBeforeModelCallbackImpl,
+  _defineAroundModelCallback as _defineAroundModelCallbackImpl,
+  _defineAfterModelCallback as _defineAfterModelCallbackImpl,
+} from "./callbacks.js";
+
+/**
+ * Rails: ActiveModel::Validations does `extend ActiveModel::Callbacks`
+ * (validations.rb:42), so the three private callback definers surface
+ * on Validations as well. Re-expose them here so api-compare matches
+ * the shape of `validations.rb` and so a host that mixes in only
+ * Validations still has the helpers available.
+ *
+ * @internal Rails-private helper.
+ */
+export const _defineBeforeModelCallback = _defineBeforeModelCallbackImpl;
+
+/**
+ * @internal Rails-private helper.
+ */
+export const _defineAroundModelCallback = _defineAroundModelCallbackImpl;
+
+/**
+ * @internal Rails-private helper.
+ */
+export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
+
+/**
+ * Per-instance reset hook for validation state. Mirrors Rails
+ * `ActiveModel::Validations#init_internals`
+ * (activemodel/lib/active_model/validations.rb:467-471):
+ *
+ *   def init_internals
+ *     super
+ *     @errors = nil
+ *     @context_for_validation = nil
+ *   end
+ *
+ * Trails eagerly initializes `errors` (rather than Rails' lazy
+ * `errors_or_create`), so this assigns a fresh `Errors` and clears
+ * the active validation context. Called from the Model constructor.
+ *
+ * @internal Rails-private helper.
+ */
+export function initInternals(this: ValidationsInternalsHost): void {
+  this.errors = new Errors(this);
+  this._validationContext = null;
+}
+
+/**
+ * Host shape consumed by `initInternals`. Kept loose so any class with
+ * the validation-related fields satisfies it without circular imports
+ * back to `Model`.
+ */
+export interface ValidationsInternalsHost {
+  errors: Errors;
+  _validationContext: string | string[] | null;
+}
 
 /**
  * Rails: ActiveModel::Validations extends Translation (validations.rb:43),

@@ -1,12 +1,16 @@
 import { Errors, StrictValidationFailed } from "./errors.js";
-import { ValidationError, ValidationContext } from "./validations.js";
+import {
+  ValidationError,
+  ValidationContext,
+  initInternals as validationsInitInternals,
+} from "./validations.js";
 import { humanize, underscore, dasherize, htmlEscape } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { I18n } from "./i18n.js";
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import { ModelName } from "./naming.js";
-import { DirtyTracker } from "./dirty.js";
+import { DirtyTracker, initInternals as dirtyInitInternals } from "./dirty.js";
 import {
   CallbackChain,
   CallbackFn,
@@ -1193,6 +1197,22 @@ export class Model {
   _dirty: DirtyTracker = new DirtyTracker();
 
   /**
+   * Per-instance reset hook. Mirrors the Rails chain
+   * `ActiveModel::{Validations,Dirty}#init_internals`
+   * (validations.rb:467-471, dirty.rb:372-376). The Trails
+   * implementation forwards to the per-module helpers exported
+   * from `validations.ts` and `dirty.ts` so each module owns its
+   * own state-reset surface, mirroring how Ruby's `super` chain
+   * walks the include order.
+   *
+   * @internal Rails-private helper.
+   */
+  initInternals(): void {
+    validationsInitInternals.call(this);
+    dirtyInitInternals.call(this);
+  }
+
+  /**
    * Mirrors: ActiveModel::API#initialize → ActiveModel::Attributes#initialize
    *
    * Rails pattern:
@@ -1201,6 +1221,12 @@ export class Model {
    */
   constructor(attrs: Record<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
+
+    // Mirrors Rails' init_internals chain (validations.rb:467,
+    // dirty.rb:372). Field initializers above already produce the
+    // same end-state, but routing through the chainable hook keeps
+    // a single point that subclasses (e.g. ActiveRecord) override.
+    this.initInternals();
 
     // Attributes#initialize — @attributes = self.class._default_attributes.deep_dup
     this._attributes = ctor._defaultAttributes().deepDup();
