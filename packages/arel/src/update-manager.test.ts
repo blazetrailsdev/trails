@@ -103,6 +103,35 @@ describe("UpdateManagerTest", () => {
       mgr.set(new Nodes.BoundSqlLiteral("name = ?", ["dean"], {}));
       expect(mgr.toSql()).toBe(`UPDATE "users" SET name = 'dean'`);
     });
+
+    // Mirrors Rails: `set` wraps each LHS in `Nodes::UnqualifiedColumn`
+    // (update_manager.rb), so the visitor strips the table qualifier
+    // structurally rather than via a stateful flag.
+    it("wraps each column in an UnqualifiedColumn", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      mgr.set([[users.get("name"), "dean"]]);
+      const assignment = mgr.ast.values[0] as Nodes.Assignment;
+      expect(assignment).toBeInstanceOf(Nodes.Assignment);
+      expect(assignment.left).toBeInstanceOf(Nodes.UnqualifiedColumn);
+    });
+
+    // Mirrors Rails: values pass through raw (no Quoted wrap); the
+    // visitor's `visitNodeOrValue` quotes primitives.
+    it("stores the raw value on the Assignment (no Quoted wrap)", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      mgr.set([[users.get("age"), 42]]);
+      const assignment = mgr.ast.values[0] as Nodes.Assignment;
+      expect(assignment.right).toBe(42);
+    });
+
+    it("renders SET col = … without the table qualifier", () => {
+      const mgr = new UpdateManager();
+      mgr.table(users);
+      mgr.set([[users.get("name"), "dean"]]);
+      expect(mgr.toSql()).toBe(`UPDATE "users" SET "name" = 'dean'`);
+    });
   });
 
   describe("table", () => {

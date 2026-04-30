@@ -30,7 +30,6 @@ const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
  */
 export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   protected collector!: SQLString;
-  private _inUpdateSet = false;
   protected _extractBinds = false;
 
   compile(node: Node): string {
@@ -365,12 +364,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
     if (node.values.length > 0) {
       this.collector.append(" SET ");
-      this._inUpdateSet = true;
-      try {
-        this.injectJoin(node.values, ", ");
-      } finally {
-        this._inUpdateSet = false;
-      }
+      this.injectJoin(node.values, ", ");
     }
 
     if (node.wheres.length > 0) {
@@ -730,11 +724,10 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   private visitArelNodesAssignment(node: Nodes.Assignment): SQLString {
-    if (this._inUpdateSet && node.left instanceof Nodes.Attribute) {
-      this.collector.append(this.quoteColumnName(node.left.name));
-    } else {
-      this.visitNodeOrValue(node.left);
-    }
+    // Mirrors Rails: bare `visit(left) = visit(right)`. Column-name
+    // unqualification is the responsibility of `UnqualifiedColumn`,
+    // which `UpdateManager#set` wraps each LHS in.
+    this.visitNodeOrValue(node.left);
     this.collector.append(" = ");
     this.visitNodeOrValue(node.right);
     return this.collector;
@@ -1438,7 +1431,10 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
         this.collector.append(this.quotedDate(v as { toISOString(): string }));
       }
     } else {
-      this.collector.append(String(v));
+      // Unknown object types (e.g. Temporal.Instant) — defer to `quote()`
+      // so the value is properly escaped/quoted rather than concatenated
+      // raw, matching the visitQuoted path.
+      this.collector.append(this.quote(v));
     }
     return this.collector;
   }

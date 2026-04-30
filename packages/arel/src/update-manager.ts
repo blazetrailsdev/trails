@@ -2,8 +2,8 @@ import { Node } from "./nodes/node.js";
 import { TreeManager, StatementMethods } from "./tree-manager.js";
 import { include } from "@blazetrails/activesupport";
 import { UpdateStatement } from "./nodes/update-statement.js";
-import { Assignment } from "./nodes/binary.js";
-import { Quoted } from "./nodes/casted.js";
+import { Assignment, type NodeOrValue } from "./nodes/binary.js";
+import { UnqualifiedColumn } from "./nodes/unqualified-column.js";
 import { Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
@@ -47,15 +47,22 @@ export class UpdateManager extends TreeManager {
    * Mirrors: Arel::UpdateManager#set
    */
   set(values: UpdateValues): this {
+    // Mirrors Arel::UpdateManager#set (update_manager.rb): pairs become
+    // `Assignment(UnqualifiedColumn(col), value)` with the value passed
+    // through raw — the visitor's `visitNodeOrValue` dispatch quotes
+    // primitives. The `UnqualifiedColumn` wrapper strips the table
+    // qualifier so the visitor does not need an `_inUpdateSet` mode flag.
     if (typeof values === "string") {
+      // Trails-only: keep the string form, but stash it as a SqlLiteral
+      // so the AST always contains Nodes (Rails stashes raw strings and
+      // relies on `visit_String`).
       this.ast.values = [new SqlLiteral(values)];
     } else if (values instanceof SqlLiteral || values instanceof BoundSqlLiteral) {
       this.ast.values = [values];
     } else {
-      this.ast.values = values.map(([col, val]) => {
-        const right = val instanceof Node ? val : new Quoted(val);
-        return new Assignment(col, right);
-      });
+      this.ast.values = values.map(
+        ([col, val]) => new Assignment(new UnqualifiedColumn(col), val as NodeOrValue),
+      );
     }
     return this;
   }
