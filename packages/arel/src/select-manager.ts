@@ -492,7 +492,7 @@ export class SelectManager extends TreeManager {
     um.offset((this.ast.offset as Offset | null)?.expr ?? null);
     um.order(...this.orders);
     um.wheres = this.constraints;
-    if (key !== null) um.key = key;
+    um.key = key;
     if (groupValuesColumns.length > 0) {
       const [first, ...rest] = groupValuesColumns;
       um.group(first, ...rest);
@@ -517,7 +517,7 @@ export class SelectManager extends TreeManager {
     dm.offset((this.ast.offset as Offset | null)?.expr ?? null);
     dm.order(...this.orders);
     dm.wheres = this.constraints;
-    if (key !== null) dm.key = key;
+    dm.key = key;
     if (groupValuesColumns.length > 0) {
       const [first, ...rest] = groupValuesColumns;
       dm.group(first, ...rest);
