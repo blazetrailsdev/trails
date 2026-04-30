@@ -26,6 +26,18 @@ describe("DecimalTest", () => {
     expect(result).toBe("42");
   });
 
+  it("convertFloatToBigDecimal: precision rounds significant digits before scale", () => {
+    // Mirrors Rails BigDecimal(value, float_precision) — Type::Decimal.new(precision: 3).cast(1.2346)
+    // rounds the input to 3 significant digits ("1.23") before any scale: pass.
+    const type = new Types.DecimalType({ precision: 3 });
+    expect(type.cast(1.2346)).toBe("1.23");
+    // 1234.5 → 3 significant digits → "1230"
+    expect(type.cast(1234.5)).toBe("1230");
+    // No precision configured: pass through (preserves the existing default).
+    const noPrec = new Types.DecimalType();
+    expect(noPrec.cast(1.2346)).toBe("1.2346");
+  });
+
   it("scale is applied before precision to prevent rounding errors", () => {
     // Rails decimal_test.rb: Type::Decimal.new(precision: 5, scale: 3).cast(1.2346)
     // rounds to BigDecimal("1.235") via apply_scale before storage.
