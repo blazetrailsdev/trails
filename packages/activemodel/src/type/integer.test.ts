@@ -62,6 +62,25 @@ describe("IntegerTest", () => {
     expect(type.cast("")).toBeNull();
   });
 
+  it("serialize raises ActiveModelRangeError for out-of-range values (default 4-byte limit)", () => {
+    // 2**31 — 1 over the default signed 4-byte upper bound
+    expect(() => type.serialize(2147483648)).toThrowError(/out of range for IntegerType/);
+    // -2**31 - 1 — 1 below the default signed 4-byte lower bound
+    expect(() => type.serialize(-2147483649)).toThrowError(/out of range for IntegerType/);
+  });
+
+  it("serialize honors a custom 1-byte limit", () => {
+    const tinyType = new Types.IntegerType({ limit: 1 });
+    expect(tinyType.serialize(127)).toBe(127);
+    expect(tinyType.serialize(-128)).toBe(-128);
+    expect(() => tinyType.serialize(128)).toThrowError(
+      /out of range for IntegerType with limit 1 bytes/,
+    );
+    expect(() => tinyType.serialize(-129)).toThrowError(
+      /out of range for IntegerType with limit 1 bytes/,
+    );
+  });
+
   it("values below int min value are out of range", () => {
     // JavaScript doesn't have the same integer limits as Ruby,
     // but we can test that very negative numbers still cast

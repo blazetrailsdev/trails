@@ -40,9 +40,12 @@ export class DecimalType extends ValueType<string> {
     if (typeof value === "bigint") return value.toString();
     if (typeof value === "number") {
       if (!Number.isFinite(value)) return null;
-      // `String(0.1)` -> "0.1" — as precise as JS can represent the
-      // input. Callers who need full precision should pass a string.
-      return String(value);
+      // Rails dispatches Float through `convert_float_to_big_decimal`
+      // (decimal.rb:75-81). Route every JS number through the same hook
+      // so a configured `precision:` applies the same significant-digit
+      // rounding per Rails; integer-valued inputs may still change when
+      // the value has more digits than `floatPrecision()` preserves.
+      return this.convertFloatToBigDecimal(value);
     }
     if (typeof value === "string") {
       const trimmed = value.trim();
@@ -57,6 +60,64 @@ export class DecimalType extends ValueType<string> {
     return null;
   }
 
+  /**
+   * Mirrors the float-conversion portion of
+   * ActiveModel::Type::Decimal#convert_float_to_big_decimal
+   * (decimal.rb:75-81).
+   *
+   *   def convert_float_to_big_decimal(value)
+   *     if precision
+   *       BigDecimal(apply_scale(value), float_precision)
+   *     else
+   *       value.to_d
+   *     end
+   *   end
+   *
+   * Trails keeps the same overall cast pipeline but applies `scale:`
+   * later via the outer `castValue() → applyScale(...)` step rather
+   * than inside this helper, so the inner `apply_scale(value)` call
+   * Rails makes here is intentionally elided. Trails has no
+   * BigDecimal — decimals are strings — so the precision-sensitive
+   * portion translates to "round to `floatPrecision()` significant
+   * digits". When no precision is configured, fall through to
+   * `String(value)` (the same form `_castWithoutScale` would
+   * otherwise emit).
+   *
+   * @internal Rails-private helper.
+   */
+  protected convertFloatToBigDecimal(value: number): string {
+    if (this.precision === undefined) return String(value);
+    const precision = this.floatPrecision();
+    if (precision <= 0) return String(value);
+    return roundFloatToSignificantDigits(value, precision);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Type::Decimal#float_precision (decimal.rb:83-89).
+   *
+   *   def float_precision
+   *     if precision.to_i > ::Float::DIG + 1
+   *       ::Float::DIG + 1
+   *     else
+   *       precision.to_i
+   *     end
+   *   end
+   *
+   * Ruby `::Float::DIG` is 15 on IEEE-754 doubles; cap at 16 so we
+   * never request more digits than the underlying representation can
+   * preserve. `precision.to_i` on `nil` gives `0`, truncates
+   * fractional values toward zero, and treats non-finite values as
+   * `0` — mirror that exactly so a fractional or NaN `precision:`
+   * doesn't trip `Number#toPrecision`'s integer requirement.
+   *
+   * @internal Rails-private helper.
+   */
+  protected floatPrecision(): number {
+    const raw = this.precision ?? 0;
+    const p = Number.isFinite(raw) ? Math.trunc(raw) : 0;
+    return p > 16 ? 16 : p;
+  }
+
   type(): string {
     return this.name;
   }
@@ -64,6 +125,26 @@ export class DecimalType extends ValueType<string> {
   typeCastForSchema(value: unknown): string {
     return JSON.stringify(value) ?? String(value);
   }
+}
+
+/**
+ * Round a JS number to `precision` significant digits, returning the
+ * decimal string. Used by `convertFloatToBigDecimal` to emulate
+ * Ruby's `BigDecimal(value, precision)`. Returns `String(value)` when
+ * `precision <= 0` (Rails treats `precision: nil` as no rounding).
+ */
+function roundFloatToSignificantDigits(value: number, precision: number): string {
+  if (precision <= 0 || !Number.isFinite(value)) return String(value);
+  // Number#toPrecision may emit scientific notation for very small / large
+  // magnitudes. Re-parse to a JS number for canonical rounding, then expand
+  // any exponent form back into a plain decimal string so the emitted value
+  // matches the rest of the cast pipeline (which feeds applyScale's regex
+  // matcher — that one rejects exponent forms).
+  const rounded = Number(value.toPrecision(precision));
+  const parts = splitDecimal(String(rounded));
+  if (!parts) return String(rounded);
+  const { sign, intPart, fracPart } = parts;
+  return fracPart.length > 0 ? `${sign}${intPart}.${fracPart}` : `${sign}${intPart}`;
 }
 
 const MAX_EXPONENT_EXPANSION = 4000;
