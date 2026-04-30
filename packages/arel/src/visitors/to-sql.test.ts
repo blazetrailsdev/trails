@@ -604,10 +604,15 @@ describe("the to_sql visitor", () => {
 
     it("renders TableAlias on the left when join sources are present", () => {
       const aliased = new Nodes.TableAlias(users, "u");
-      const stmt = new Nodes.DeleteStatement(new Nodes.JoinSource(aliased));
+      const join = new Nodes.InnerJoin(
+        posts,
+        new Nodes.On(new Nodes.Equality(posts.get("user_id"), users.get("id"))),
+      );
+      const stmt = new Nodes.DeleteStatement(new Nodes.JoinSource(aliased, [join]));
       stmt.wheres.push(new Nodes.Equality(users.get("id"), 1));
       const sql = new Visitors.ToSql().compile(stmt);
       expect(sql).toContain('DELETE "users" "u" FROM "users" "u"');
+      expect(sql).toContain("INNER JOIN");
       expect(sql).toContain("WHERE");
     });
   });
