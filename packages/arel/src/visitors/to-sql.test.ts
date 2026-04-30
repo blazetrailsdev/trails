@@ -43,24 +43,24 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle two dot ranges", () => {
+      // Mirrors Rails: not_between renders as `(col < begin OR col > end)`,
+      // not as a literal `NOT BETWEEN`.
       const node = users.get("id").notBetween([1, 3]);
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("NOT");
-      expect(sql).toContain("BETWEEN");
+      expect(sql).toBe('("users"."id" < 1 OR "users"."id" > 3)');
     });
 
     it("can handle three dot ranges", () => {
-      const node = users.get("id").notBetween([1, 2]);
+      const node = users.get("id").notBetween({ begin: 1, end: 2, excludeEnd: true });
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("NOT");
-      expect(sql).toContain("BETWEEN");
+      expect(sql).toBe('("users"."id" < 1 OR "users"."id" >= 2)');
     });
 
     it("can handle ranges bounded by infinity", () => {
+      // Mirrors Rails: not_between(-Inf..Inf) collapses to in([]) → `1=0`.
       const node = users.get("id").notBetween([-Infinity, Infinity]);
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("NOT");
-      expect(sql).toContain("TRUE");
+      expect(sql).toBe("1=0");
     });
 
     it("is not preparable when an array", () => {
@@ -650,9 +650,10 @@ describe("the to_sql visitor", () => {
     });
 
     it("can handle ranges bounded by infinity", () => {
+      // Mirrors Rails: between(-Inf..Inf) collapses to not_in([]) → `1=1`.
       const node = users.get("id").between([-Infinity, Infinity]);
       const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("TRUE");
+      expect(sql).toBe("1=1");
     });
 
     it("can handle subqueries", () => {

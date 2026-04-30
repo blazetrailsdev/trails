@@ -5,7 +5,6 @@ import {
   GreaterThanOrEqual,
   LessThan,
   LessThanOrEqual,
-  Between,
   As,
   ATTRIBUTE_BRAND,
 } from "../nodes/binary.js";
@@ -27,12 +26,12 @@ import { Sum, Max, Min, Avg } from "../nodes/function.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
 import { Quoted, Casted, buildQuoted } from "../nodes/casted.js";
+import { parseRange, betweenFromRange, notBetweenFromRange } from "../predications-range.js";
 import { BindParam } from "../nodes/bind-param.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Grouping } from "../nodes/grouping.js";
 import { And } from "../nodes/and.js";
 import { Or } from "../nodes/or.js";
-import { Not } from "../nodes/unary.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { NamedFunction } from "../nodes/named-function.js";
 import { Extract } from "../nodes/extract.js";
@@ -48,7 +47,6 @@ import {
 } from "../nodes/infix-operation.js";
 import { Over } from "../nodes/over.js";
 import { NamedWindow, Window } from "../nodes/window.js";
-import { True } from "../nodes/true.js";
 import { Predications, type PredicationHost } from "../predications.js";
 
 /**
@@ -202,55 +200,18 @@ export class Attribute extends Node {
     return new NotIn(this, values.map(buildQuoted) as unknown as Node);
   }
 
-  between(range: [unknown, unknown]): Between | LessThanOrEqual | GreaterThanOrEqual | True;
-  between(begin: unknown, end: unknown): Between | LessThanOrEqual | GreaterThanOrEqual | True;
-  between(rangeObj: {
-    begin: unknown;
-    end: unknown;
-  }): Between | LessThanOrEqual | GreaterThanOrEqual | True;
-  between(
-    beginOrRange: unknown,
-    end?: unknown,
-  ): Between | LessThanOrEqual | GreaterThanOrEqual | True {
-    let beginVal: unknown;
-    let endVal: unknown;
-    if (Array.isArray(beginOrRange) && end === undefined) {
-      beginVal = beginOrRange[0];
-      endVal = beginOrRange[1];
-    } else if (
-      typeof beginOrRange === "object" &&
-      beginOrRange !== null &&
-      !Array.isArray(beginOrRange) &&
-      !(beginOrRange instanceof Node) &&
-      "begin" in (beginOrRange as Record<string, unknown>) &&
-      "end" in (beginOrRange as Record<string, unknown>) &&
-      end === undefined
-    ) {
-      beginVal = (beginOrRange as { begin: unknown; end: unknown }).begin;
-      endVal = (beginOrRange as { begin: unknown; end: unknown }).end;
-    } else {
-      beginVal = beginOrRange;
-      endVal = end;
-    }
-    if (beginVal === -Infinity && endVal === Infinity) {
-      return new True();
-    }
-    if (beginVal === -Infinity) {
-      return new LessThanOrEqual(this, buildQuoted(endVal));
-    }
-    if (endVal === Infinity) {
-      return new GreaterThanOrEqual(this, buildQuoted(beginVal));
-    }
-    return new Between(this, new And([buildQuoted(beginVal), buildQuoted(endVal)]));
+  between(range: [unknown, unknown]): Node;
+  between(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
+  between(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+  between(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
+    return betweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
   }
 
-  notBetween(range: [unknown, unknown]): Not;
-  notBetween(begin: unknown, end: unknown): Not;
-  notBetween(beginOrRange: unknown, end?: unknown): Not {
-    if (Array.isArray(beginOrRange) && end === undefined) {
-      return new Not(this.between(beginOrRange as [unknown, unknown]));
-    }
-    return new Not(this.between(beginOrRange, end!));
+  notBetween(range: [unknown, unknown]): Node;
+  notBetween(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
+  notBetween(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+  notBetween(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
+    return notBetweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
   }
 
   isNull(): Equality {

@@ -66,7 +66,13 @@ export class RangeHandler {
     if (value.excludeEnd) {
       return new Nodes.Grouping(new Nodes.Or(attribute.lt(beginVal), attribute.gteq(endVal)));
     }
-    return attribute.notBetween(beginVal, endVal);
+    // Mirrors Rails' AR-level `where.not(col: 1..5)`: the predicate
+    // builder constructs `Between` then `where.not` wraps it in `Not`,
+    // yielding `NOT (col BETWEEN b AND e)`. Don't delegate to
+    // attribute.notBetween — that returns the predications.rb-aligned
+    // `(col < b OR col > e)` shape, which is the right Arel-level
+    // behavior but the wrong AR-level one.
+    return new Nodes.Not(attribute.between(beginVal, endVal));
   }
 
   private get predicateBuilder(): unknown {

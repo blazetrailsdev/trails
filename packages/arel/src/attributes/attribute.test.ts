@@ -585,104 +585,7 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#not_between", () => {
-    it("can be constructed with a standard range", () => {
-      const node = users.get("age").between(18, 65);
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."age" BETWEEN 18 AND 65');
-    });
-
-    it("can be constructed with a range starting from -Infinity", () => {
-      const node = users.get("age").between({ begin: -Infinity, end: 65 });
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."age" <= 65');
-    });
-
-    it("can be constructed with a quoted range starting from -Infinity", () => {
-      const node = users.get("id").lteq(new Nodes.Quoted(100));
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("<=");
-    });
-
-    it("can be constructed with an exclusive range starting from -Infinity", () => {
-      const node = users.get("id").lt(100);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("<");
-    });
-
-    it("can be constructed with a quoted exclusive range starting from -Infinity", () => {
-      const node = users.get("id").lt(new Nodes.Quoted(100));
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("<");
-    });
-
-    it("can be constructed with an infinite range", () => {
-      // -Infinity..Infinity is always true
-      const node = users.get("id").between(-Infinity, Infinity);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("TRUE");
-    });
-
-    it("can be constructed with a quoted infinite range", () => {
-      const node = users.get("id").between(-Infinity, Infinity);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toBe("TRUE");
-    });
-
-    it("can be constructed with a range ending at Infinity", () => {
-      const node = users.get("id").gteq(1);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain(">=");
-    });
-
-    it("can be constructed with a range implicitly starting at Infinity", () => {
-      const node = users.get("age").notBetween(Infinity, 65);
-      expect(node).toBeInstanceOf(Nodes.Not);
-    });
-
-    it("can be constructed with a range implicitly ending at Infinity", () => {
-      const node = users.get("age").notBetween(18, Infinity);
-      expect(node).toBeInstanceOf(Nodes.Not);
-    });
-
-    it("can be constructed with a quoted range starting from -Infinity", () => {
-      const node = users.get("id").notBetween([-Infinity, 3]);
-      expect(node).toBeInstanceOf(Nodes.Not);
-    });
-
-    it("can be constructed with an exclusive range starting from -Infinity", () => {
-      const node = users.get("id").notBetween([-Infinity, 3]);
-      expect(node).toBeInstanceOf(Nodes.Not);
-    });
-
-    it("can be constructed with a quoted exclusive range starting from -Infinity", () => {
-      const node = users.get("id").notBetween([-Infinity, 3]);
-      expect(node).toBeInstanceOf(Nodes.Not);
-    });
-
-    it("can be constructed with an infinite range", () => {
-      const node = users.get("id").notBetween([-Infinity, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.Not);
-    });
-
-    it("can be constructed with a quoted infinite range", () => {
-      const node = users.get("id").notBetween([-Infinity, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.Not);
-    });
-
-    it("can be constructed with a range ending at Infinity", () => {
-      const node = users.get("id").notBetween([1, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.Not);
-    });
-  });
-
   describe("#between", () => {
-    it("can be constructed with an exclusive range implicitly ending at Infinity", () => {
-      const node = users.get("id").lt(Infinity);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("<");
-    });
-
     it("can be constructed with a standard range", () => {
       const node = users.get("id").between([1, 3]);
       expect(node).toBeInstanceOf(Nodes.Between);
@@ -694,28 +597,28 @@ describe("AttributeTest", () => {
     });
 
     it("can be constructed with a quoted range starting from -Infinity", () => {
-      const node = users.get("id").between([-Infinity, 3]);
+      const node = users.get("id").between({ begin: -Infinity, end: 3 });
       expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
     });
 
     it("can be constructed with an exclusive range starting from -Infinity", () => {
-      const node = users.get("id").between([-Infinity, 3]);
-      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+      const node = users.get("id").between({ begin: -Infinity, end: 3, excludeEnd: true });
+      expect(node).toBeInstanceOf(Nodes.LessThan);
     });
 
     it("can be constructed with a quoted exclusive range starting from -Infinity", () => {
-      const node = users.get("id").between([-Infinity, 3]);
-      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+      const node = users.get("id").between({ begin: -Infinity, end: 3, excludeEnd: true });
+      expect(node).toBeInstanceOf(Nodes.LessThan);
     });
 
     it("can be constructed with an infinite range", () => {
       const node = users.get("id").between([-Infinity, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.True);
+      expect(node).toBeInstanceOf(Nodes.NotIn);
     });
 
     it("can be constructed with a quoted infinite range", () => {
-      const node = users.get("id").between([-Infinity, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.True);
+      const node = users.get("id").between({ begin: -Infinity, end: Infinity });
+      expect(node).toBeInstanceOf(Nodes.NotIn);
     });
 
     it("can be constructed with a range ending at Infinity", () => {
@@ -724,64 +627,123 @@ describe("AttributeTest", () => {
     });
 
     it("can be constructed with a range implicitly starting at Infinity", () => {
-      const node = users.get("id").between([1, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
-    });
-
-    it("can be constructed with a range implicitly ending at Infinity", () => {
-      const node = users.get("id").between([-Infinity, 3]);
+      const node = users.get("id").between({ begin: null, end: 3 });
       expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
     });
 
+    it("can be constructed with a range implicitly ending at Infinity", () => {
+      const node = users.get("id").between({ begin: 1, end: null });
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
+
+    it("can be constructed with an exclusive range implicitly ending at Infinity", () => {
+      const node = users.get("id").between({ begin: 1, end: null, excludeEnd: true });
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
+
     it("can be constructed with a quoted range ending at Infinity", () => {
-      const node = users.get("id").between([1, Infinity]);
+      const node = users.get("id").between({ begin: 1, end: Infinity });
       expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
     });
 
     it("can be constructed with an endless range starting from Infinity", () => {
-      const node = users.get("id").between([1, Infinity]);
-      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+      const node = users.get("id").between({ begin: Infinity, end: null });
+      expect(node).toBeInstanceOf(Nodes.In);
     });
 
     it("can be constructed with a beginless range ending in -Infinity", () => {
-      const node = users.get("id").between([-Infinity, -Infinity]);
-      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+      const node = users.get("id").between({ begin: null, end: -Infinity });
+      expect(node).toBeInstanceOf(Nodes.In);
     });
 
     it("can be constructed with an exclusive range", () => {
-      const node = users.get("id").between([1, 2]);
-      expect(node).toBeInstanceOf(Nodes.Between);
+      const node = users.get("id").between({ begin: 1, end: 3, excludeEnd: true });
+      expect(node).toBeInstanceOf(Nodes.And);
+    });
+
+    it("can be constructed with a range where the begin and end are equal", () => {
+      const node = users.get("id").between([5, 5]);
+      expect(node).toBeInstanceOf(Nodes.Equality);
     });
   });
 
   describe("#not_between", () => {
+    it("can be constructed with a standard range", () => {
+      const node = users.get("age").notBetween(18, 65);
+      expect(node).toBeInstanceOf(Nodes.Grouping);
+      expect((node as Nodes.Grouping).expr).toBeInstanceOf(Nodes.Or);
+    });
+
+    it("can be constructed with a range starting from -Infinity", () => {
+      const node = users.get("age").notBetween(-Infinity, 65);
+      expect(node).toBeInstanceOf(Nodes.GreaterThan);
+    });
+
+    it("can be constructed with a quoted range starting from -Infinity", () => {
+      const node = users.get("id").notBetween({ begin: -Infinity, end: 3 });
+      expect(node).toBeInstanceOf(Nodes.GreaterThan);
+    });
+
+    it("can be constructed with an exclusive range starting from -Infinity", () => {
+      const node = users.get("id").notBetween({ begin: -Infinity, end: 3, excludeEnd: true });
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
+
+    it("can be constructed with a quoted exclusive range starting from -Infinity", () => {
+      const node = users.get("id").notBetween({ begin: -Infinity, end: 3, excludeEnd: true });
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
+
+    it("can be constructed with an infinite range", () => {
+      const node = users.get("id").notBetween([-Infinity, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.In);
+    });
+
+    it("can be constructed with a quoted infinite range", () => {
+      const node = users.get("id").notBetween({ begin: -Infinity, end: Infinity });
+      expect(node).toBeInstanceOf(Nodes.In);
+    });
+
+    it("can be constructed with a range ending at Infinity", () => {
+      const node = users.get("id").notBetween([1, Infinity]);
+      expect(node).toBeInstanceOf(Nodes.LessThan);
+    });
+
+    it("can be constructed with a range implicitly starting at Infinity", () => {
+      const node = users.get("age").notBetween({ begin: null, end: 0 });
+      expect(node).toBeInstanceOf(Nodes.GreaterThan);
+    });
+
+    it("can be constructed with a range implicitly ending at Infinity", () => {
+      const node = users.get("age").notBetween({ begin: 0, end: null });
+      expect(node).toBeInstanceOf(Nodes.LessThan);
+    });
+
     it("can be constructed with a quoted range ending at Infinity", () => {
-      const node = users.get("age").notBetween(18, Infinity);
-      expect(node).toBeInstanceOf(Nodes.Not);
+      const node = users.get("age").notBetween({ begin: 18, end: Infinity });
+      expect(node).toBeInstanceOf(Nodes.LessThan);
     });
 
     it("can be constructed with an endless range starting from Infinity", () => {
-      const node = users.get("age").notBetween(Infinity, 100);
-      expect(node).toBeInstanceOf(Nodes.Not);
+      const node = users.get("age").notBetween({ begin: Infinity, end: null });
+      expect(node).toBeInstanceOf(Nodes.NotIn);
     });
 
     it("can be constructed with a beginless range ending in -Infinity", () => {
-      const node = users.get("age").notBetween(-Infinity, -Infinity);
-      expect(node).toBeInstanceOf(Nodes.Not);
+      const node = users.get("age").notBetween({ begin: null, end: -Infinity });
+      expect(node).toBeInstanceOf(Nodes.NotIn);
     });
 
     it("can be constructed with an exclusive range", () => {
-      const node = users.get("age").between(18, 65);
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."age" BETWEEN 18 AND 65');
+      const node = users.get("age").notBetween({ begin: 18, end: 65, excludeEnd: true });
+      expect(node).toBeInstanceOf(Nodes.Grouping);
+      const inner = (node as Nodes.Grouping).expr as Nodes.Or;
+      expect(inner.children[1]).toBeInstanceOf(Nodes.GreaterThanOrEqual);
     });
-  });
 
-  describe("#between", () => {
-    it("can be constructed with a range where the begin and end are equal", () => {
-      const node = users.get("id").between([5, 5]);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("BETWEEN");
+    it("can be constructed with a Union", () => {
+      const node = users.get("age").notBetween(1, 100);
+      expect(node).toBeInstanceOf(Nodes.Grouping);
     });
   });
 
@@ -800,8 +762,8 @@ describe("AttributeTest", () => {
     });
 
     it("can be constructed with a random object", () => {
-      const node = users.get("age").notBetween(1, 100);
-      expect(node).toBeInstanceOf(Nodes.Not);
+      const node = users.get("id").notIn(["random_thing"] as unknown[]);
+      expect(node).toBeInstanceOf(Nodes.NotIn);
     });
 
     it("can be constructed with a subquery", () => {
@@ -906,60 +868,57 @@ describe("AttributeTest", () => {
     it("can be constructed with a standard range", () => {
       const node = users.get("age").notBetween(18, 65);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toContain("NOT");
-      expect(visitor.compile(node)).toContain("BETWEEN");
+      const sql = visitor.compile(node);
+      expect(sql).toBe('("users"."age" < 18 OR "users"."age" > 65)');
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
-      const node = users.get("age").between(-Infinity, 65);
+      const node = users.get("age").notBetween(-Infinity, 65);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."age" <= 65');
+      expect(visitor.compile(node)).toBe('"users"."age" > 65');
     });
 
     it("can be constructed with a range implicitly starting at Infinity", () => {
-      const node = users.get("id").gteq(Infinity);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain(">=");
+      const node = users.get("id").notBetween({ begin: null, end: 0 });
+      expect(node).toBeInstanceOf(Nodes.GreaterThan);
     });
 
     it("can be constructed with a range implicitly ending at Infinity", () => {
-      const node = users.get("id").lteq(Infinity);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("<=");
+      const node = users.get("id").notBetween({ begin: 0, end: null });
+      expect(node).toBeInstanceOf(Nodes.LessThan);
     });
 
     it("can be constructed with a quoted range ending at Infinity", () => {
-      const node = users.get("id").gteq(new Nodes.Quoted(1));
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain(">=");
+      const node = users.get("id").notBetween({ begin: 0, end: Infinity });
+      expect(node).toBeInstanceOf(Nodes.LessThan);
     });
 
     it("can be constructed with an endless range starting from Infinity", () => {
-      const node = users.get("id").gteq(Infinity);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain(">=");
+      const node = users.get("id").notBetween({ begin: Infinity, end: null });
+      expect(node).toBeInstanceOf(Nodes.NotIn);
     });
 
     it("can be constructed with a beginless range ending in -Infinity", () => {
-      const node = users.get("id").lteq(-Infinity);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("<=");
+      const node = users.get("id").notBetween({ begin: null, end: -Infinity });
+      expect(node).toBeInstanceOf(Nodes.NotIn);
     });
 
     it("can be constructed with an exclusive range", () => {
-      const node = users.get("age").notBetween(18, 65);
+      const node = users.get("age").notBetween({ begin: 18, end: 65, excludeEnd: true });
       const visitor = new Visitors.ToSql();
       const result = visitor.compile(node);
-      expect(result).toContain("NOT");
+      expect(result).toBe('("users"."age" < 18 OR "users"."age" >= 65)');
     });
   });
 
   describe("#not_between", () => {
     it("can be constructed with a Union", () => {
       const node = users.get("age").notBetween(1, 100);
-      expect(node).toBeInstanceOf(Nodes.Not);
+      expect(node).toBeInstanceOf(Nodes.Grouping);
     });
+  });
 
+  describe("#not_in", () => {
     it("can be constructed with a list", () => {
       const node = users.get("id").notIn([1, 2, 3]);
       const visitor = new Visitors.ToSql();
@@ -967,10 +926,8 @@ describe("AttributeTest", () => {
     });
 
     it("can be constructed with a random object", () => {
-      // Using a quoted value
-      const node = users.get("id").eq(new Nodes.Quoted("random_thing"));
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("'random_thing'");
+      const node = users.get("id").notIn(["random_thing"] as unknown[]);
+      expect(node).toBeInstanceOf(Nodes.NotIn);
     });
 
     it("should generate NOT IN in sql", () => {
@@ -1182,8 +1139,9 @@ describe("AttributeTest", () => {
   });
 
   it("notBetween generates NOT BETWEEN", () => {
+    // Mirrors Rails: not_between renders as `(col < begin OR col > end)`.
     expect(users.project(star).where(users.get("age").notBetween(18, 65)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE NOT ("users"."age" BETWEEN 18 AND 65)',
+      'SELECT * FROM "users" WHERE ("users"."age" < 18 OR "users"."age" > 65)',
     );
   });
 
@@ -1597,9 +1555,10 @@ describe("AttributeTest", () => {
 
   describe("#not_between", () => {
     it("can be constructed with a range starting from -Infinity", () => {
+      // Mirrors Rails: not_between(-Inf..end) collapses to gt(end).
       const node = users.get("age").notBetween(-Infinity, 65);
       const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toContain("NOT");
+      expect(visitor.compile(node)).toBe('"users"."age" > 65');
     });
   });
 

@@ -1,7 +1,7 @@
 {
   "ar-01": {
     "side": "diff",
-    "reason": "Datetime SQL serialization does not honour column precision: trails serializes Date binds with microsecond precision ('.677000'), Rails truncates to whole seconds when the DATETIME column has no precision spec (as in this fixture's bare `created_at DATETIME`). Rails: 'reviews.created_at > ''2026-04-19 00:46:48'''; trails: 'reviews.created_at > ''2026-04-19 00:46:48.677000'''. Flakes by frozen-at: PR #854 'closed' this gap because that run's frozen-at landed on a whole second. Real fix is in Date→SQL serialization to drop fractional seconds for unscaled DATETIME columns."
+    "reason": "Datetime SQL serialization does not honour column precision: trails serializes Date binds with microsecond precision ('.677000'), Rails truncates to whole seconds when the DATETIME column has no precision spec (as in this fixture's bare `created_at DATETIME`). Rails: 'reviews.created_at > ''2026-04-19 00:46:48'''; trails: 'reviews.created_at > ''2026-04-19 00:46:48.677000'''. Flakes by frozen-at: PR #854 'closed' this gap because that run's frozen-at landed on a whole second. Real fix is in Date\u2192SQL serialization to drop fractional seconds for unscaled DATETIME columns."
   },
   "ar-52": {
     "side": "diff",
@@ -9,15 +9,15 @@
   },
   "ar-65": {
     "side": "diff",
-    "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) — rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
+    "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) \u2014 rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
   },
   "ar-134": {
     "side": "trails-missing",
-    "reason": "joins() crashes on nested hash arguments: Rails resolves joins({books: :reviews}) to two INNER JOINs via the association graph; Trails accepts the object argument into _rawJoins and later attempts to use it as a join node during SQL generation, causing a runtime failure instead of producing a valid query. Root cause: Relation#joins does not handle object/hash arguments — they fall through to _rawJoins and fail when the SQL builder encounters a non-string join entry. Real fix: handle nested object/hash arguments in Relation#joins by resolving them through _resolveAssociationJoin and applying the resulting joins via _applyJoinsToManager."
+    "reason": "joins() crashes on nested hash arguments: Rails resolves joins({books: :reviews}) to two INNER JOINs via the association graph; Trails accepts the object argument into _rawJoins and later attempts to use it as a join node during SQL generation, causing a runtime failure instead of producing a valid query. Root cause: Relation#joins does not handle object/hash arguments \u2014 they fall through to _rawJoins and fail when the SQL builder encounters a non-string join entry. Real fix: handle nested object/hash arguments in Relation#joins by resolving them through _resolveAssociationJoin and applying the resulting joins via _applyJoinsToManager."
   },
   "ar-137": {
     "side": "diff",
-    "reason": "withRecursive union uses UNION instead of UNION ALL: Rails emits 'UNION ALL' between the anchor and recursive term of a recursive CTE; trails emits bare 'UNION'. Real fix: only the recursive term assembled by withRecursive should use UNION ALL; keep non-recursive with({ cte: [rel1, rel2] }) array handling on plain UNION — do not change shared resolveCteEntry behavior globally."
+    "reason": "withRecursive union uses UNION instead of UNION ALL: Rails emits 'UNION ALL' between the anchor and recursive term of a recursive CTE; trails emits bare 'UNION'. Real fix: only the recursive term assembled by withRecursive should use UNION ALL; keep non-recursive with({ cte: [rel1, rel2] }) array handling on plain UNION \u2014 do not change shared resolveCteEntry behavior globally."
   },
   "ar-138": {
     "side": "diff",
@@ -26,10 +26,6 @@
   "ar-139": {
     "side": "diff",
     "reason": "joins(:assoc).where(assoc: {col: val}) uses inconsistent table naming between the JOIN and nested-hash predicate paths: trails resolves joins(:assoc) through _resolveAssociationJoin as an unaliased join on the base table name ('INNER JOIN \"authors\" ON \"authors\".\"id\" = ...'), but the nested-hash predicate path resolves the same association through TableMetadata.associatedTable and aliases it to the association key ('author'), producing WHERE \"author\".\"name\" against a query that only joined \"authors\". Real fix: make symbolic association joins and nested-hash predicate resolution share the same table name/alias strategy so both clauses reference the same table."
-  },
-  "ar-143": {
-    "side": "trails-missing",
-    "reason": "leftOuterJoins() crashes on nested hash arguments: trails accepts an object into Relation#leftOuterJoins/leftJoins and later tries to build a LEFT OUTER JOIN with that plain object as the table operand (relation.ts:1230+), raising 'Unknown node type: Object'. Real fix: handle or reject nested-hash/object arguments in Relation#leftOuterJoins/leftJoins before _applyJoinsToManager builds Arel JOIN nodes — for example by reusing the nested-association resolution from joins() or adding early argument validation."
   },
   "ar-150": {
     "side": "diff",
@@ -67,29 +63,13 @@
     "side": "trails-missing",
     "reason": "Arel arithmetic nodes crash on bare number operands: Nodes.Multiplication.new(col, 2) throws 'Unknown node type: Number' because Trails' Arel visitor has no handler for plain Number values. Rails wraps bare values via Nodes.build_quoted automatically. Real fix: the Arel visitor must handle raw Number operands in arithmetic nodes as quoted literals, mirroring Rails' Arel::Visitors::ToSql arithmetic visit methods."
   },
-  "ar-160": {
-    "side": "trails-missing",
-    "reason": "Arel aggregate nodes (Sum, Count, Avg, Max, Min) constructed directly via new Nodes.Sum([col]) crash: the Trails Arel visitor has no visitSum etc. handlers, throwing 'Unknown node type: Sum'. Rails' visitor handles these via visit_Arel_Nodes_Sum etc. Real fix: add visitor handlers for each aggregate node type in the Arel ToSql visitor."
-  },
   "ar-161": {
     "side": "diff",
     "reason": "ORDER BY string alias from a SELECT expression is over-qualified: order('pub_year') on a query with EXTRACT(...) AS pub_year produces ORDER BY \"books\".\"pub_year\" ASC instead of ORDER BY pub_year. Trails' string-order path qualifies any bare identifier with the model's table name. Real fix: _applyOrderToManager must pass string ORDER BY values verbatim (as Rails does) instead of qualifying unrecognised bare identifiers."
   },
   "ar-162": {
     "side": "diff",
-    "reason": "ORDER BY aggregate alias is over-qualified: order('cnt DESC') produces ORDER BY \"books\".\"cnt\" DESC instead of ORDER BY cnt DESC. Same root as ar-161 — Trails' order-qualification path treats any bare identifier as a table column. Real fix: same as ar-161."
-  },
-  "ar-163": {
-    "side": "trails-missing",
-    "reason": "Arel Nodes::Count not registered in Trails' Arel visitor: new Nodes.Count([col]) throws 'Unknown node type: Count'. Same root as ar-160 (Sum). Real fix: add visitCount to the Arel ToSql visitor."
-  },
-  "ar-164": {
-    "side": "trails-missing",
-    "reason": "Arel Nodes::Max and Nodes::Min not registered in Trails' Arel visitor: new Nodes.Max/Min([col]) throws 'Unknown node type: Max'. Same root as ar-160 (Sum). Real fix: add visitMax and visitMin to the Arel ToSql visitor."
-  },
-  "ar-165": {
-    "side": "trails-missing",
-    "reason": "Arel COUNT DISTINCT via Nodes.Count([col], true) not supported: throws 'Unknown node type: Count'. Pinning separately because the fix must also handle the distinct=true flag to emit COUNT(DISTINCT col). Real fix: visitCount must check the distinct flag and emit COUNT(DISTINCT ...) accordingly."
+    "reason": "ORDER BY aggregate alias is over-qualified: order('cnt DESC') produces ORDER BY \"books\".\"cnt\" DESC instead of ORDER BY cnt DESC. Same root as ar-161 \u2014 Trails' order-qualification path treats any bare identifier as a table column. Real fix: same as ar-161."
   },
   "ar-166": {
     "side": "diff",
@@ -99,21 +79,13 @@
     "side": "diff",
     "reason": "ORDER BY select alias over-qualified even when the alias is correctly listed in GROUP BY: order('avg_pages DESC') produces ORDER BY \"books\".\"avg_pages\" DESC instead of ORDER BY avg_pages DESC. GROUP BY correctly passes the comma-separated string through, but ORDER BY still qualifies the single-word alias. Same fix as ar-161/162/166."
   },
-  "ar-169": {
-    "side": "diff",
-    "reason": "Arel Attribute#between with an exclusive-end Range emits BETWEEN instead of >= AND <: between(Range(100, 300, excludeEnd: true)) produces WHERE pages BETWEEN 100 AND 300 instead of WHERE pages >= 100 AND pages < 300. Rails' between uses the Range's exclude_end? flag to choose between BETWEEN (inclusive) and >= AND < (exclusive). Real fix: the between() predicate implementation must check the Range's exclude_end flag and emit >= AND < for exclusive ranges."
-  },
   "ar-170": {
     "side": "diff",
-    "reason": "Float values in Range lose decimal precision: where({ rating: new Range(3.5, 5.0) }) produces BETWEEN 3.5 AND 5 instead of BETWEEN 3.5 AND 5.0. JavaScript numbers don't distinguish 5 from 5.0, so the SQL literal omits the decimal. Rails serializes Ruby Float 5.0 as '5.0'. Real fix: the SQL value serializer must emit floats with at least one decimal digit (e.g. 5 → 5.0) to match Rails' Float#to_s behavior."
+    "reason": "Float values in Range lose decimal precision: where({ rating: new Range(3.5, 5.0) }) produces BETWEEN 3.5 AND 5 instead of BETWEEN 3.5 AND 5.0. JavaScript numbers don't distinguish 5 from 5.0, so the SQL literal omits the decimal. Rails serializes Ruby Float 5.0 as '5.0'. Real fix: the SQL value serializer must emit floats with at least one decimal digit (e.g. 5 \u2192 5.0) to match Rails' Float#to_s behavior."
   },
   "ar-171": {
     "side": "trails-missing",
     "reason": "group(Arel.sql(...)) crashes: group(sql('DATE(created_at)')) throws 'col.trim is not a function' because groupBang stores Arel values in _groupColumns and groupColumnToArel later calls .trim() on each entry, assuming strings. Arel SqlLiteral (and NamedFunction, cf. ar-154) are not strings. Real fix: group/groupBang must handle Arel node arguments by passing them through to the Arel GROUP BY clause (or converting them appropriately) instead of letting non-strings reach string-only processing in groupColumnToArel."
-  },
-  "ar-172": {
-    "side": "trails-missing",
-    "reason": "Arel ordering methods (.asc()/.desc()) are missing from non-Attribute node types: NamedFunction.new('LENGTH', [col]).desc throws '(intermediate value).desc is not a function'. Rails' Arel nodes include OrderPredications which adds asc/desc to all nodes; Trails only implements these on Attribute. Real fix: add asc() and desc() to the Arel Node base class (or to non-Attribute ordering node types like NamedFunction, Extract, etc.)."
   },
   "ar-173": {
     "side": "diff",
@@ -127,13 +99,9 @@
     "side": "diff",
     "reason": "Float equality predicate loses decimal for whole-number floats: where({ rating: 4.0 }) produces = 4 instead of = 4.0. JavaScript does not distinguish 4 from 4.0, so the SQL literal omits the decimal. Rails serializes Ruby Float 4.0 as '4.0'. Same root as ar-173/174/170. Real fix: the SQL value serializer must emit floats with at least one decimal digit."
   },
-  "ar-178": {
-    "side": "trails-missing",
-    "reason": "Arel ordering methods (.desc()) are missing from Extract nodes: Nodes.Extract.new(col, 'year').desc() throws '(intermediate value).desc is not a function'. Same root as ar-172 — Rails adds asc/desc to all Arel nodes via OrderPredications but Trails only has them on Attribute. Real fix: add asc() and desc() to the Arel Node base class."
-  },
   "ar-179": {
     "side": "diff",
-    "reason": "Float 0.0 loses its decimal point: where({ rating: 0.0 }) produces = 0 instead of = 0.0. JavaScript 0.0 === 0 so the decimal is dropped during SQL serialization. Rails serializes Ruby Float 0.0 as '0.0'. Same root as ar-173/174/176 — Real fix: SQL value serializer must emit floats with at least one decimal digit."
+    "reason": "Float 0.0 loses its decimal point: where({ rating: 0.0 }) produces = 0 instead of = 0.0. JavaScript 0.0 === 0 so the decimal is dropped during SQL serialization. Rails serializes Ruby Float 0.0 as '0.0'. Same root as ar-173/174/176 \u2014 Real fix: SQL value serializer must emit floats with at least one decimal digit."
   },
   "ar-180": {
     "side": "diff",
@@ -145,7 +113,7 @@
   },
   "ar-183": {
     "side": "trails-missing",
-    "reason": "Arel Case node fluent builder with integer .then() args: Case.new(col).when('active').then(1) throws '(intermediate value).when(...).then is not a function'. Same root as ar-155 — Case builder lacks then(). This fixture pins that the gap also manifests when .then() receives integer literals rather than string values. Real fix: same as ar-155 — add then() to the Case node builder."
+    "reason": "Arel Case node fluent builder with integer .then() args: Case.new(col).when('active').then(1) throws '(intermediate value).when(...).then is not a function'. Same root as ar-155 \u2014 Case builder lacks then(). This fixture pins that the gap also manifests when .then() receives integer literals rather than string values. Real fix: same as ar-155 \u2014 add then() to the Case node builder."
   },
   "ar-184": {
     "side": "diff",

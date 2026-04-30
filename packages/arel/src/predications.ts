@@ -5,7 +5,6 @@ import {
   GreaterThanOrEqual,
   LessThan,
   LessThanOrEqual,
-  Between,
   NotIn,
   IsDistinctFrom,
   IsNotDistinctFrom,
@@ -17,11 +16,15 @@ import { Regexp as RegexpNode, NotRegexp } from "./nodes/regexp.js";
 import { Quoted } from "./nodes/casted.js";
 import { And } from "./nodes/and.js";
 import { Or } from "./nodes/or.js";
-import { Not } from "./nodes/unary.js";
 import { Grouping } from "./nodes/grouping.js";
-import { True } from "./nodes/true.js";
 import { Case } from "./nodes/case.js";
 import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
+import {
+  parseRange,
+  betweenFromRange,
+  notBetweenFromRange,
+  type RangeHost,
+} from "./predications-range.js";
 
 /**
  * Host contract for the Predications mixin.
@@ -171,83 +174,39 @@ export const Predications = {
     return new NotIn(this as unknown as Node, this.quotedNode(other));
   },
 
-  // `between` / `notBetween` accept three forms — `[begin, end]`, `{ begin,
-  // end }`, or `(begin, end)` — same as Attribute#between. Object-literal
-  // methods can't carry overload signatures directly, so the public type
-  // is asserted via `as` below; the implementation parameter list stays
-  // permissive for the runtime branch.
+  // `between` / `notBetween` accept three forms — `[begin, end]`,
+  // `{ begin, end, excludeEnd? }`, or `(begin, end, excludeEnd?)` — same
+  // as Attribute#between. The decision tree (in predications-range.ts)
+  // mirrors Rails' Predications#between (predications.rb): unboundable
+  // bounds collapse to In([])/NotIn([]), open-ended bounds reduce to
+  // half-comparisons, exclusive end uses `<` / `>=`, and degenerate
+  // `b == e` collapses to eq.
   between: function (
     this: PredicationHost,
     beginOrRange: unknown,
     end?: unknown,
-  ): Between | LessThanOrEqual | GreaterThanOrEqual | True {
-    let beginVal: unknown;
-    let endVal: unknown;
-    if (Array.isArray(beginOrRange) && end === undefined) {
-      beginVal = beginOrRange[0];
-      endVal = beginOrRange[1];
-    } else if (
-      typeof beginOrRange === "object" &&
-      beginOrRange !== null &&
-      !Array.isArray(beginOrRange) &&
-      !(beginOrRange instanceof Node) &&
-      "begin" in (beginOrRange as Record<string, unknown>) &&
-      "end" in (beginOrRange as Record<string, unknown>) &&
-      end === undefined
-    ) {
-      beginVal = (beginOrRange as { begin: unknown; end: unknown }).begin;
-      endVal = (beginOrRange as { begin: unknown; end: unknown }).end;
-    } else {
-      beginVal = beginOrRange;
-      endVal = end;
-    }
-    if (beginVal === -Infinity && endVal === Infinity) return new True();
-    if (beginVal === -Infinity) {
-      return new LessThanOrEqual(this as unknown as Node, this.quotedNode(endVal));
-    }
-    if (endVal === Infinity) {
-      return new GreaterThanOrEqual(this as unknown as Node, this.quotedNode(beginVal));
-    }
-    return new Between(
-      this as unknown as Node,
-      new And([this.quotedNode(beginVal), this.quotedNode(endVal)]),
-    );
+    excludeEnd?: boolean,
+  ): Node {
+    const range = parseRange(beginOrRange, end, excludeEnd);
+    return betweenFromRange(this as unknown as RangeHost, range);
   } as {
-    (
-      this: PredicationHost,
-      range: readonly [unknown, unknown],
-    ): Between | LessThanOrEqual | GreaterThanOrEqual | True;
-    (
-      this: PredicationHost,
-      range: { begin: unknown; end: unknown },
-    ): Between | LessThanOrEqual | GreaterThanOrEqual | True;
-    (
-      this: PredicationHost,
-      begin: unknown,
-      end: unknown,
-    ): Between | LessThanOrEqual | GreaterThanOrEqual | True;
+    (this: PredicationHost, range: readonly [unknown, unknown]): Node;
+    (this: PredicationHost, range: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+    (this: PredicationHost, begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   },
 
-  notBetween: function (this: PredicationHost, beginOrRange: unknown, end?: unknown): Not {
-    const self = this as unknown as { between(b: unknown, e?: unknown): Node };
-    if (Array.isArray(beginOrRange) && end === undefined) {
-      return new Not(self.between(beginOrRange));
-    }
-    if (
-      typeof beginOrRange === "object" &&
-      beginOrRange !== null &&
-      !(beginOrRange instanceof Node) &&
-      end === undefined &&
-      "begin" in (beginOrRange as Record<string, unknown>) &&
-      "end" in (beginOrRange as Record<string, unknown>)
-    ) {
-      return new Not(self.between(beginOrRange));
-    }
-    return new Not(self.between(beginOrRange, end));
+  notBetween: function (
+    this: PredicationHost,
+    beginOrRange: unknown,
+    end?: unknown,
+    excludeEnd?: boolean,
+  ): Node {
+    const range = parseRange(beginOrRange, end, excludeEnd);
+    return notBetweenFromRange(this as unknown as RangeHost, range);
   } as {
-    (this: PredicationHost, range: readonly [unknown, unknown]): Not;
-    (this: PredicationHost, range: { begin: unknown; end: unknown }): Not;
-    (this: PredicationHost, begin: unknown, end: unknown): Not;
+    (this: PredicationHost, range: readonly [unknown, unknown]): Node;
+    (this: PredicationHost, range: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+    (this: PredicationHost, begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   },
 
   isNull(this: PredicationHost): Equality {
