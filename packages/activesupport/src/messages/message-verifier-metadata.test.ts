@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MessageVerifier } from "../message-verifier.js";
+import { Temporal } from "../temporal.js";
 
 describe("MessageVerifierMetadataTest", () => {
   it("#verify raises when :purpose does not match", () => {
@@ -10,7 +11,7 @@ describe("MessageVerifierMetadataTest", () => {
 
   it("#verify raises when message is expired via :expires_at", () => {
     const verifier = new MessageVerifier("secret");
-    const pastDate = new Date(Date.now() - 1000);
+    const pastDate = Temporal.Now.instant().subtract({ seconds: 1 });
     const message = verifier.generate("data", { expiresAt: pastDate });
     expect(() => verifier.verify(message)).toThrow();
   });

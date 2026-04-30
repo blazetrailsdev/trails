@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base, RecordNotFound } from "./index.js";
 import { setSignedIdVerifierSecret } from "./signed-id.js";
 
@@ -49,7 +50,7 @@ describe("SignedIdTest", () => {
   it("fail to find signed record within expiration duration", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Bob" });
-    const token = await u.signedId({ expiresAt: new Date(Date.now() - 1000) });
+    const token = await u.signedId({ expiresAt: Temporal.Now.instant().subtract({ seconds: 1 }) });
     const result = await User.findSigned(token);
     expect(result).toBeNull();
   });
@@ -170,7 +171,7 @@ describe("SignedIdTest", () => {
   it("fail to find signed record within expiration time", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Expired" });
-    const token = await u.signedId({ expiresAt: new Date(Date.now() - 1000) });
+    const token = await u.signedId({ expiresAt: Temporal.Now.instant().subtract({ seconds: 1 }) });
     const result = await User.findSigned(token);
     expect(result).toBeNull();
   });
@@ -190,7 +191,7 @@ describe("SignedIdTest", () => {
       }
     }
     const u = await UserShort.create({ name: "Jake" });
-    const token = await u.signedId({ expiresAt: new Date(Date.now() - 1000) });
+    const token = await u.signedId({ expiresAt: Temporal.Now.instant().subtract({ seconds: 1 }) });
     await expect(UserShort.findSignedBang(token)).rejects.toThrow(
       /Expired message|InvalidSignature/,
     );

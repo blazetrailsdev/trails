@@ -4,6 +4,7 @@
  */
 
 import { getCrypto } from "./crypto-adapter.js";
+import { Temporal } from "./temporal.js";
 
 export class InvalidSignature extends Error {
   constructor(message = "Invalid signature") {
@@ -34,7 +35,7 @@ interface MessageVerifierOptions {
 
 interface GenerateOptions {
   expiresIn?: number; // seconds
-  expiresAt?: Date;
+  expiresAt?: Temporal.Instant;
   purpose?: string;
 }
 
@@ -59,10 +60,11 @@ export class MessageVerifier {
     const payload: Record<string, unknown> = { value };
 
     if (options.expiresAt) {
-      payload._expiresAt = options.expiresAt.toISOString();
+      payload._expiresAt = options.expiresAt.toString({ smallestUnit: "millisecond" });
     } else if (options.expiresIn !== undefined) {
-      // boundary: ISO timestamp serialized into the signed payload.
-      payload._expiresAt = new Date(Date.now() + options.expiresIn * 1000).toISOString();
+      payload._expiresAt = Temporal.Now.instant()
+        .add({ seconds: options.expiresIn })
+        .toString({ smallestUnit: "millisecond" });
     }
 
     if (options.purpose) {
@@ -101,9 +103,11 @@ export class MessageVerifier {
 
       const payload = parsed as Record<string, unknown>;
 
-      // boundary: parse the embedded ISO timestamp and compare to wall clock.
-      if (payload._expiresAt && new Date(payload._expiresAt as string) < new Date()) {
-        throw new InvalidSignature("Expired message");
+      if (payload._expiresAt) {
+        const expiresAt = Temporal.Instant.from(payload._expiresAt as string);
+        if (Temporal.Instant.compare(expiresAt, Temporal.Now.instant()) <= 0) {
+          throw new InvalidSignature("Expired message");
+        }
       }
 
       if (options.purpose && payload._purpose !== options.purpose) {

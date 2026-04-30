@@ -2795,7 +2795,7 @@ export class Base extends Model {
   async signedId(options?: {
     purpose?: string;
     expiresIn?: number;
-    expiresAt?: Date;
+    expiresAt?: Temporal.Instant;
   }): Promise<string> {
     const SignedIdModule = await loadSignedId();
     return SignedIdModule.signedId(this, options);

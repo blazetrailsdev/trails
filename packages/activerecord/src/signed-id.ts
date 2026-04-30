@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { underscore } from "@blazetrails/activesupport";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 
 /**
  * Signed ID generation and lookup for ActiveRecord models.
@@ -78,7 +79,7 @@ function combinePurposes(modelClass: typeof Base, purpose?: string): string | un
  */
 export function signedId(
   instance: Base,
-  options?: { purpose?: string; expiresIn?: number; expiresAt?: Date },
+  options?: { purpose?: string; expiresIn?: number; expiresAt?: Temporal.Instant },
 ): string {
   if (!instance.isPersisted()) {
     throw new Error("Cannot generate a signed_id for a new record");
