@@ -26,6 +26,7 @@ import {
   isTransactionOpen,
   type DatabaseStatementsHost,
 } from "./database-statements.js";
+import type { Quoting } from "./quoting-interface.js";
 
 describe("DatabaseStatements", () => {
   describe("toSql", () => {
@@ -240,16 +241,20 @@ describe("DatabaseStatements", () => {
       const executed: string[] = [];
       let transactionUsed = false;
       const { insertFixturesSet } = await import("./database-statements.js");
-      const host = {
+      const host: DatabaseStatementsHost &
+        Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName"> = {
         execute: async (sql: string) => {
           executed.push(sql);
         },
-        transaction: async (fn: (tx?: unknown) => Promise<void> | void) => {
+        transaction: async <T>(fn: (tx?: unknown) => Promise<T> | T) => {
           transactionUsed = true;
           await fn();
           return undefined;
         },
-      } as unknown as DatabaseStatementsHost;
+        quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
+        quoteTableName: (n: string) => `"${n}"`,
+        quoteColumnName: (n: string) => `"${n}"`,
+      };
 
       await insertFixturesSet.call(
         host,
@@ -262,6 +267,56 @@ describe("DatabaseStatements", () => {
       expect(transactionUsed).toBe(true);
       expect(executed[0]).toMatch(/DELETE FROM/);
       expect(executed[1]).toMatch(/INSERT INTO/);
+    });
+  });
+
+  describe("truncate / insertFixture quoter dispatch", () => {
+    type QuoterHost = DatabaseStatementsHost &
+      Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">;
+
+    function makeHost(): {
+      host: QuoterHost;
+      executed: Array<{ sql: string; name?: string | null; receiver: unknown }>;
+    } {
+      const executed: Array<{ sql: string; name?: string | null; receiver: unknown }> = [];
+      const host: QuoterHost = {
+        async execute(sql: string, name?: string | null) {
+          // captures `this` to verify receiver is preserved
+          executed.push({ sql, name, receiver: this });
+        },
+        quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
+        quoteTableName: (n: string) => `\`${n}\``,
+        quoteColumnName: (n: string) => `\`${n}\``,
+      };
+      return { host, executed };
+    }
+
+    it("truncate dispatches quoteTableName via this and forwards name to execute", async () => {
+      const { truncate } = await import("./database-statements.js");
+      const { host, executed } = makeHost();
+      await truncate.call(host, "users", "Custom Truncate");
+      expect(executed).toEqual([
+        { sql: "TRUNCATE TABLE `users`", name: "Custom Truncate", receiver: host },
+      ]);
+    });
+
+    it("insertFixture dispatches quote/quoteTableName/quoteColumnName via this", async () => {
+      const { insertFixture } = await import("./database-statements.js");
+      const { host, executed } = makeHost();
+      await insertFixture.call(host, { name: "Alice", id: 1 }, "users");
+      expect(executed).toHaveLength(1);
+      expect(executed[0]).toEqual({
+        sql: "INSERT INTO `users` (`name`, `id`) VALUES ('Alice', 1)",
+        name: "Fixture Insert",
+        receiver: host,
+      });
+    });
+
+    it("insertFixture uses emptyInsertStatementValue when no columns are present", async () => {
+      const { insertFixture } = await import("./database-statements.js");
+      const { host, executed } = makeHost();
+      await insertFixture.call(host, {}, "users");
+      expect(executed[0].sql).toBe("INSERT INTO `users` DEFAULT VALUES");
     });
   });
 
