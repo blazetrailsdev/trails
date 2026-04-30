@@ -2,7 +2,7 @@ import { Node } from "./nodes/node.js";
 import { TreeManager, StatementMethods } from "./tree-manager.js";
 import { include } from "@blazetrails/activesupport";
 import { UpdateStatement } from "./nodes/update-statement.js";
-import { Assignment } from "./nodes/binary.js";
+import { Assignment, type NodeOrValue } from "./nodes/binary.js";
 import { UnqualifiedColumn } from "./nodes/unqualified-column.js";
 import { Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
@@ -61,7 +61,7 @@ export class UpdateManager extends TreeManager {
       this.ast.values = [values];
     } else {
       this.ast.values = values.map(
-        ([col, val]) => new Assignment(new UnqualifiedColumn(col), val as Node),
+        ([col, val]) => new Assignment(new UnqualifiedColumn(col), val as NodeOrValue),
       );
     }
     return this;
