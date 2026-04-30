@@ -17,7 +17,7 @@ import {
   columnNameMatcher as abstractColumnNameMatcher,
   defaultSqlTimezone,
   formatInstantForSql,
-} from "./connection-adapters/abstract/quoting.js";
+} from "./connection-adapters/abstract/sql-formatting.js";
 import { modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
