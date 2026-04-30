@@ -122,8 +122,8 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("change", () => {
-    expect(changeDate(d(2005, 2, 11), { day: 21 }).getDate()).toBe(21);
-    const changed = changeDate(d(2005, 2, 11), { year: 2007, month: 5 });
+    expect(asDate(changeDate(d(2005, 2, 11), { day: 21 })).getDate()).toBe(21);
+    const changed = asDate(changeDate(d(2005, 2, 11), { year: 2007, month: 5 }));
     expect(changed.getFullYear()).toBe(2007);
     expect(changed.getMonth()).toBe(4); // May
     expect(changed.getDate()).toBe(11);
@@ -137,21 +137,21 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("last year in calendar reform", () => {
-    const result = advance(d(1583, 10, 14), { years: -1 });
+    const result = asDate(advance(d(1583, 10, 14), { years: -1 }));
     expect(result.getFullYear()).toBe(1582);
   });
 
   it("advance does first years and then days", () => {
-    expect(advance(d(2011, 2, 28), { years: 1, days: 1 })).toEqual(d(2012, 2, 29));
+    expect(asDate(advance(d(2011, 2, 28), { years: 1, days: 1 }))).toEqual(d(2012, 2, 29));
   });
 
   it("advance does first months and then days", () => {
-    expect(advance(d(2010, 2, 28), { months: 1, days: 1 })).toEqual(d(2010, 3, 29));
+    expect(asDate(advance(d(2010, 2, 28), { months: 1, days: 1 }))).toEqual(d(2010, 3, 29));
   });
 
   it("advance in calendar reform", () => {
-    expect(advance(d(1582, 10, 4), { days: 1 }).getDate()).toBe(5);
-    expect(advance(d(1582, 10, 15), { days: -1 }).getDate()).toBe(14);
+    expect(asDate(advance(d(1582, 10, 4), { days: 1 })).getDate()).toBe(5);
+    expect(asDate(advance(d(1582, 10, 15), { days: -1 })).getDate()).toBe(14);
   });
 
   it("last week", () => {
@@ -163,7 +163,7 @@ describe("DateExtCalculationsTest", () => {
   it("last quarter on 31st", () => {
     const dt = d(2004, 5, 31);
     const quarterStart = beginningOfQuarter(dt);
-    const lastQuarterStart = advance(asDate(quarterStart), { months: -3 });
+    const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
     expect(lastQuarterStart.getMonth()).toBe(0); // January
   });
 
@@ -197,7 +197,7 @@ describe("DateExtCalculationsTest", () => {
   it.skip("tomorrow constructor when zone is set");
 
   it("since", () => {
-    const result = since(d(2005, 2, 21), 45);
+    const result = asDate(since(d(2005, 2, 21), 45));
     expect(result.getSeconds()).toBe(45);
     expect(result.getDate()).toBe(21);
   });
@@ -205,7 +205,7 @@ describe("DateExtCalculationsTest", () => {
   it.skip("since when zone is set");
 
   it("ago", () => {
-    const result = ago(d(2005, 2, 21), 45);
+    const result = asDate(ago(d(2005, 2, 21), 45));
     expect(result.getDate()).toBe(20);
     expect(result.getHours()).toBe(23);
     expect(result.getMinutes()).toBe(59);
@@ -307,12 +307,12 @@ describe("DateExtCalculationsTest", () => {
 
   it("last year in leap years", () => {
     const date = d(2012, 6, 15);
-    const result = advance(date, { years: -1 });
+    const result = asDate(advance(date, { years: -1 }));
     expect(result.getFullYear()).toBe(2011);
   });
 
   it("advance", () => {
-    expect(advance(d(2005, 1, 31), { months: 1 })).toEqual(d(2005, 2, 28));
+    expect(asDate(advance(d(2005, 1, 31), { months: 1 }))).toEqual(d(2005, 2, 28));
   });
 
   it("beginning of day", () => {

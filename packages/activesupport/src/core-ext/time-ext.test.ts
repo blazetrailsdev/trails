@@ -98,14 +98,14 @@ describe("TimeExtCalculationsTest", () => {
 
   it("floor", () => {
     const t = new Date(2005, 1, 4, 10, 10, 10, 500);
-    const result = floor(t, 1000);
+    const result = asDate(floor(t, 1000));
     expect(result.getMilliseconds()).toBe(0);
     expect(result.getSeconds()).toBe(10);
   });
 
   it("ceil", () => {
     const t = new Date(2005, 1, 4, 10, 10, 10, 1);
-    const result = ceil(t, 1000);
+    const result = asDate(ceil(t, 1000));
     expect(result.getMilliseconds()).toBe(0);
     expect(result.getSeconds()).toBe(11);
   });
@@ -115,7 +115,7 @@ describe("TimeExtCalculationsTest", () => {
       // dt: US: 2005 April 3rd 4:18am
       // ago(86400) = subtract 86400 seconds (simple time arithmetic)
       const dt = new Date(2005, 3, 3, 4, 18, 0); // April 3 EDT
-      const result = ago(dt, 86400);
+      const result = asDate(ago(dt, 86400));
       expect(result.getFullYear()).toBe(2005);
       expect(result.getMonth()).toBe(3); // April
       expect(result.getDate()).toBe(2);
@@ -128,7 +128,7 @@ describe("TimeExtCalculationsTest", () => {
     withEnvTz("America/New_York", () => {
       // st: US: 2005 October 30th 4:03am
       const st = new Date(2005, 9, 30, 4, 3, 0); // Oct 30 EST
-      const result = ago(st, 86400);
+      const result = asDate(ago(st, 86400));
       expect(result.getFullYear()).toBe(2005);
       expect(result.getMonth()).toBe(9);
       expect(result.getDate()).toBe(29);
@@ -141,7 +141,7 @@ describe("TimeExtCalculationsTest", () => {
     withEnvTz("America/New_York", () => {
       // advance(days: -1) uses calendar arithmetic
       const dt = new Date(2005, 3, 3, 4, 18, 0);
-      const result = advance(dt, { days: -1 });
+      const result = asDate(advance(dt, { days: -1 }));
       expect(result.getDate()).toBe(2);
       expect(result.getHours()).toBe(4);
       expect(result.getMinutes()).toBe(18);
@@ -151,7 +151,7 @@ describe("TimeExtCalculationsTest", () => {
   it("daylight savings time crossings backward end 1day", () => {
     withEnvTz("America/New_York", () => {
       const st = new Date(2005, 9, 30, 4, 3, 0);
-      const result = advance(st, { days: -1 });
+      const result = asDate(advance(st, { days: -1 }));
       expect(result.getDate()).toBe(29);
       expect(result.getHours()).toBe(4);
       expect(result.getMinutes()).toBe(3);
@@ -160,14 +160,14 @@ describe("TimeExtCalculationsTest", () => {
 
   it("since with instance of time deprecated", () => {
     const t = d(2005, 2, 22, 10, 10, 10);
-    expect(since(t, 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
+    expect(asDate(since(t, 1))).toEqual(d(2005, 2, 22, 10, 10, 11));
   });
 
   it("daylight savings time crossings forward start", () => {
     withEnvTz("America/New_York", () => {
       // st: US: 2005 April 2nd 7:27pm
       const st = new Date(2005, 3, 2, 19, 27, 0);
-      const result = since(st, 86400);
+      const result = asDate(since(st, 86400));
       expect(result.getMonth()).toBe(3); // April
       expect(result.getDate()).toBe(3);
       expect(result.getHours()).toBe(20); // 8:27pm EDT (gained 1 hour)
@@ -178,7 +178,7 @@ describe("TimeExtCalculationsTest", () => {
   it("daylight savings time crossings forward start 1day", () => {
     withEnvTz("America/New_York", () => {
       const st = new Date(2005, 3, 2, 19, 27, 0);
-      const result = advance(st, { days: 1 });
+      const result = asDate(advance(st, { days: 1 }));
       expect(result.getDate()).toBe(3);
       expect(result.getHours()).toBe(19);
       expect(result.getMinutes()).toBe(27);
@@ -209,7 +209,7 @@ describe("TimeExtCalculationsTest", () => {
     withEnvTz("America/New_York", () => {
       // dt: US: 2005 October 30th 12:45am
       const dt = new Date(2005, 9, 30, 0, 45, 0);
-      const result = since(dt, 86400);
+      const result = asDate(since(dt, 86400));
       expect(result.getDate()).toBe(30);
       expect(result.getHours()).toBe(23);
       expect(result.getMinutes()).toBe(45);
@@ -219,7 +219,7 @@ describe("TimeExtCalculationsTest", () => {
   it("daylight savings time crossings forward end 1day", () => {
     withEnvTz("America/New_York", () => {
       const dt = new Date(2005, 9, 30, 0, 45, 0);
-      const result = advance(dt, { days: 1 });
+      const result = asDate(advance(dt, { days: 1 }));
       expect(result.getDate()).toBe(31);
       expect(result.getHours()).toBe(0);
       expect(result.getMinutes()).toBe(45);
@@ -247,28 +247,32 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("change", () => {
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2006 })).toEqual(
+    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2006 }))).toEqual(
       d(2006, 2, 22, 15, 15, 10),
     );
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { month: 6 })).toEqual(
+    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { month: 6 }))).toEqual(
       d(2005, 6, 22, 15, 15, 10),
     );
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2012, month: 9 })).toEqual(
+    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2012, month: 9 }))).toEqual(
       d(2012, 9, 22, 15, 15, 10),
     );
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { hour: 16 })).toEqual(d(2005, 2, 22, 16, 0, 0));
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { min: 45 })).toEqual(d(2005, 2, 22, 15, 45, 0));
+    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { hour: 16 }))).toEqual(
+      d(2005, 2, 22, 16, 0, 0),
+    );
+    expect(asDate(changeDate(d(2005, 2, 22, 15, 15, 10), { min: 45 }))).toEqual(
+      d(2005, 2, 22, 15, 45, 0),
+    );
   });
 
   it("utc change", () => {
     const t1 = utc(2005, 2, 22, 15, 15, 10);
-    const result = changeDate(t1, { year: 2006 });
+    const result = asDate(changeDate(t1, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
   });
 
   it("offset change", () => {
     const t = d(2005, 2, 22, 15, 15, 10);
-    const result = changeDate(t, { year: 2006 });
+    const result = asDate(changeDate(t, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getHours()).toBe(15);
     expect(result.getMinutes()).toBe(15);
@@ -277,7 +281,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("change offset", () => {
     const t = d(2006, 2, 22, 15, 15, 10);
-    const result = changeDate(t, { year: 2006 });
+    const result = asDate(changeDate(t, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getHours()).toBe(15);
   });
@@ -290,31 +294,31 @@ describe("TimeExtCalculationsTest", () => {
 
   it("utc advance", () => {
     const t = utc(2005, 2, 22, 15, 15, 10);
-    expect(advance(t, { years: 1 }).getUTCFullYear()).toBe(2006);
-    expect(advance(t, { months: 4 }).getUTCMonth()).toBe(5); // June
-    expect(advance(t, { hours: 5 }).getUTCHours()).toBe(20);
-    expect(advance(t, { minutes: 7 }).getUTCMinutes()).toBe(22);
-    expect(advance(t, { seconds: 9 }).getUTCSeconds()).toBe(19);
+    expect(asDate(advance(t, { years: 1 })).getUTCFullYear()).toBe(2006);
+    expect(asDate(advance(t, { months: 4 })).getUTCMonth()).toBe(5); // June
+    expect(asDate(advance(t, { hours: 5 })).getUTCHours()).toBe(20);
+    expect(asDate(advance(t, { minutes: 7 })).getUTCMinutes()).toBe(22);
+    expect(asDate(advance(t, { seconds: 9 })).getUTCSeconds()).toBe(19);
   });
 
   it("offset advance", () => {
     const t = d(2005, 2, 22, 15, 15, 10);
-    expect(advance(t, { years: 1 }).getFullYear()).toBe(2006);
-    expect(advance(t, { months: 4 }).getMonth()).toBe(5); // June
-    expect(advance(t, { hours: 5 }).getHours()).toBe(20);
-    expect(advance(t, { minutes: 7 }).getMinutes()).toBe(22);
-    expect(advance(t, { seconds: 9 }).getSeconds()).toBe(19);
+    expect(asDate(advance(t, { years: 1 })).getFullYear()).toBe(2006);
+    expect(asDate(advance(t, { months: 4 })).getMonth()).toBe(5); // June
+    expect(asDate(advance(t, { hours: 5 })).getHours()).toBe(20);
+    expect(asDate(advance(t, { minutes: 7 })).getMinutes()).toBe(22);
+    expect(asDate(advance(t, { seconds: 9 })).getSeconds()).toBe(19);
   });
 
   it("advance with nsec", () => {
     const t = new Date(108.635108);
     const result = advance(t, { months: 0 });
-    expect(result.getTime()).toBe(t.getTime());
+    expect(result.epochMilliseconds).toBe(t.getTime());
   });
 
   it("advance gregorian proleptic", () => {
-    expect(advance(d(1582, 10, 15, 15, 15, 10), { days: -1 }).getDate()).toBe(14);
-    expect(advance(d(1582, 10, 14, 15, 15, 10), { days: 1 }).getDate()).toBe(15);
+    expect(asDate(advance(d(1582, 10, 15, 15, 15, 10), { days: -1 })).getDate()).toBe(14);
+    expect(asDate(advance(d(1582, 10, 14, 15, 15, 10), { days: 1 })).getDate()).toBe(15);
   });
 
   it.skip("advance preserves offset for local times around end of dst");
@@ -389,7 +393,7 @@ describe("TimeExtCalculationsTest", () => {
   it("fp inaccuracy ticket 1836", () => {
     const t = d(2005, 2, 21, 0, 0, 0);
     const result = advance(t, { seconds: 0.1 });
-    expect(result instanceof Date).toBe(true);
+    expect(typeof result.epochMilliseconds).toBe("number");
   });
 
   it("days in month with year", () => {
@@ -685,28 +689,30 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("ago", () => {
-    expect(ago(d(2005, 2, 22, 10, 10, 10), 1)).toEqual(d(2005, 2, 22, 10, 10, 9));
-    expect(ago(d(2005, 2, 22, 10, 10, 10), 3600)).toEqual(d(2005, 2, 22, 9, 10, 10));
-    expect(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2)).toEqual(d(2005, 2, 20, 10, 10, 10));
-    expect(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(
+    expect(asDate(ago(d(2005, 2, 22, 10, 10, 10), 1))).toEqual(d(2005, 2, 22, 10, 10, 9));
+    expect(asDate(ago(d(2005, 2, 22, 10, 10, 10), 3600))).toEqual(d(2005, 2, 22, 9, 10, 10));
+    expect(asDate(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2))).toEqual(d(2005, 2, 20, 10, 10, 10));
+    expect(asDate(ago(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25))).toEqual(
       d(2005, 2, 20, 9, 9, 45),
     );
   });
 
   it("since", () => {
-    expect(since(d(2005, 2, 22, 10, 10, 10), 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
-    expect(since(d(2005, 2, 22, 10, 10, 10), 3600)).toEqual(d(2005, 2, 22, 11, 10, 10));
-    expect(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2)).toEqual(d(2005, 2, 24, 10, 10, 10));
-    expect(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25)).toEqual(
+    expect(asDate(since(d(2005, 2, 22, 10, 10, 10), 1))).toEqual(d(2005, 2, 22, 10, 10, 11));
+    expect(asDate(since(d(2005, 2, 22, 10, 10, 10), 3600))).toEqual(d(2005, 2, 22, 11, 10, 10));
+    expect(asDate(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2))).toEqual(
+      d(2005, 2, 24, 10, 10, 10),
+    );
+    expect(asDate(since(d(2005, 2, 22, 10, 10, 10), 86400 * 2 + 3600 + 25))).toEqual(
       d(2005, 2, 24, 11, 10, 35),
     );
   });
 
   it("advance", () => {
     const t = d(2005, 1, 22, 15, 15, 10);
-    expect(advance(t, { years: 1 })).toEqual(d(2006, 1, 22, 15, 15, 10));
-    expect(advance(t, { months: 1 })).toEqual(d(2005, 2, 22, 15, 15, 10));
-    expect(advance(t, { days: 1 })).toEqual(d(2005, 1, 23, 15, 15, 10));
+    expect(asDate(advance(t, { years: 1 }))).toEqual(d(2006, 1, 22, 15, 15, 10));
+    expect(asDate(advance(t, { months: 1 }))).toEqual(d(2005, 2, 22, 15, 15, 10));
+    expect(asDate(advance(t, { days: 1 }))).toEqual(d(2005, 1, 23, 15, 15, 10));
   });
 
   it("prev day with time local", () => {

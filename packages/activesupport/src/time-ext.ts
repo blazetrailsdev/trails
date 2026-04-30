@@ -3,9 +3,10 @@
  * and ActiveSupport::CoreExt::Date patterns.
  *
  * @boundary-file: Helpers accept JavaScript `Date` inputs for ergonomic interop
- *   with code that still holds Date values. Period-bound and arithmetic helpers
- *   (`beginningOf*`, `endOf*`, `allDay`, …) return `Temporal.Instant`; legacy
- *   helpers below the boundary still return `Date` and will flip in F-6b/c/d.
+ *   with code that still holds Date values. Period-bound, navigation, and
+ *   arithmetic helpers return `Temporal.Instant`. The remaining `Date`-returning
+ *   helpers (`toDate`, `toTime`) and predicates (`isPast`, `isFuture`) flip in
+ *   F-6d.
  */
 
 import { type Temporal, instantFrom } from "./temporal.js";
@@ -288,7 +289,7 @@ export function advance(
     minutes?: number;
     seconds?: number;
   },
-): Date {
+): Temporal.Instant {
   let d = clone(date);
 
   if (options.years) {
@@ -324,7 +325,7 @@ export function advance(
   if (options.seconds) ms += options.seconds * 1000;
 
   if (ms) d = new Date(d.getTime() + ms);
-  return d;
+  return instantFrom(d);
 }
 
 // ---------------------------------------------------------------------------
@@ -386,12 +387,12 @@ export function allYear(date: Date): { start: Temporal.Instant; end: Temporal.In
 // ago / since
 // ---------------------------------------------------------------------------
 
-export function ago(date: Date, seconds: number): Date {
-  return new Date(date.getTime() - seconds * 1000);
+export function ago(date: Date, seconds: number): Temporal.Instant {
+  return instantFrom(new Date(date.getTime() - seconds * 1000));
 }
 
-export function since(date: Date, seconds: number): Date {
-  return new Date(date.getTime() + seconds * 1000);
+export function since(date: Date, seconds: number): Temporal.Instant {
+  return instantFrom(new Date(date.getTime() + seconds * 1000));
 }
 
 // ---------------------------------------------------------------------------
@@ -408,7 +409,7 @@ export function changeDate(
     min?: number;
     sec?: number;
   },
-): Date {
+): Temporal.Instant {
   const d = clone(date);
   if (options.year !== undefined) d.setFullYear(options.year);
   if (options.month !== undefined) d.setMonth(options.month - 1); // 1-indexed
@@ -416,7 +417,7 @@ export function changeDate(
   if (options.hour !== undefined) d.setHours(options.hour, 0, 0, 0);
   if (options.min !== undefined) d.setMinutes(options.min, 0, 0);
   if (options.sec !== undefined) d.setSeconds(options.sec, 0);
-  return d;
+  return instantFrom(d);
 }
 
 // ---------------------------------------------------------------------------
@@ -470,15 +471,21 @@ export function isFuture(date: Date): boolean {
 /**
  * floor — rounds time down to nearest multiple of ms.
  */
-export function floor(date: Date, ms: number): Date {
-  return new Date(Math.floor(date.getTime() / ms) * ms);
+export function floor(date: Date, ms: number): Temporal.Instant {
+  if (!Number.isFinite(ms) || ms <= 0) {
+    throw new RangeError(`floor: ms must be a positive finite number, got ${ms}`);
+  }
+  return instantFrom(new Date(Math.floor(date.getTime() / ms) * ms));
 }
 
 /**
  * ceil — rounds time up to nearest multiple of ms.
  */
-export function ceil(date: Date, ms: number): Date {
-  return new Date(Math.ceil(date.getTime() / ms) * ms);
+export function ceil(date: Date, ms: number): Temporal.Instant {
+  if (!Number.isFinite(ms) || ms <= 0) {
+    throw new RangeError(`ceil: ms must be a positive finite number, got ${ms}`);
+  }
+  return instantFrom(new Date(Math.ceil(date.getTime() / ms) * ms));
 }
 
 /**

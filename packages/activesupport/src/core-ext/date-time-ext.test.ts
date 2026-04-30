@@ -123,20 +123,20 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("change", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = changeDate(dt, { year: 2006 });
+    const result = asDate(changeDate(dt, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
   });
 
   it("advance partial days", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = advance(dt, { hours: 12 });
+    const result = asDate(advance(dt, { hours: 12 }));
     expect(result.getDate()).toBe(23);
     expect(result.getHours()).toBe(3);
   });
 
   it("advanced processes first the date deltas and then the time deltas", () => {
     const dt = d(2005, 2, 28, 15, 15, 10);
-    const result = advance(dt, { months: 1, days: 1 });
+    const result = asDate(advance(dt, { months: 1, days: 1 }));
     expect(result.getMonth()).toBe(2); // March
     expect(result.getDate()).toBe(29);
   });
@@ -158,7 +158,7 @@ describe("DateTimeExtCalculationsTest", () => {
   it("last quarter on 31st", () => {
     const dt = d(2005, 10, 31, 10, 10, 10);
     const quarterStart = beginningOfQuarter(dt);
-    const lastQuarterStart = advance(asDate(quarterStart), { months: -3 });
+    const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
     expect(lastQuarterStart.getMonth()).toBe(6); // July
   });
 
@@ -403,16 +403,16 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("ago", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    expect(ago(dt, 1)).toEqual(d(2005, 2, 22, 10, 10, 9));
+    expect(asDate(ago(dt, 1))).toEqual(d(2005, 2, 22, 10, 10, 9));
   });
 
   it("since", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    expect(since(dt, 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
+    expect(asDate(since(dt, 1))).toEqual(d(2005, 2, 22, 10, 10, 11));
   });
 
   it("advance", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    expect(advance(dt, { years: 1 })).toEqual(d(2006, 2, 22, 15, 15, 10));
+    expect(asDate(advance(dt, { years: 1 }))).toEqual(d(2006, 2, 22, 15, 15, 10));
   });
 });

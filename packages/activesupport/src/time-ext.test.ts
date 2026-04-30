@@ -142,55 +142,55 @@ describe("TimeExtCalculationsTest", () => {
 
   it("change (changeDate)", () => {
     expect(changeDate(d(2005, 2, 22, 15, 15, 10), { year: 2006 })).toEqual(
-      d(2006, 2, 22, 15, 15, 10),
+      i(2006, 2, 22, 15, 15, 10),
     );
     expect(changeDate(d(2005, 2, 22, 15, 15, 10), { month: 6 })).toEqual(
-      d(2005, 6, 22, 15, 15, 10),
+      i(2005, 6, 22, 15, 15, 10),
     );
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { hour: 16 })).toEqual(d(2005, 2, 22, 16, 0, 0));
-    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { min: 45 })).toEqual(d(2005, 2, 22, 15, 45, 0));
+    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { hour: 16 })).toEqual(i(2005, 2, 22, 16, 0, 0));
+    expect(changeDate(d(2005, 2, 22, 15, 15, 10), { min: 45 })).toEqual(i(2005, 2, 22, 15, 45, 0));
   });
 
   it("advance years", () => {
-    expect(advance(d(2005, 2, 28, 15, 15, 10), { years: 1 })).toEqual(d(2006, 2, 28, 15, 15, 10));
+    expect(advance(d(2005, 2, 28, 15, 15, 10), { years: 1 })).toEqual(i(2006, 2, 28, 15, 15, 10));
   });
 
   it("advance months", () => {
-    expect(advance(d(2005, 2, 28, 15, 15, 10), { months: 4 })).toEqual(d(2005, 6, 28, 15, 15, 10));
+    expect(advance(d(2005, 2, 28, 15, 15, 10), { months: 4 })).toEqual(i(2005, 6, 28, 15, 15, 10));
   });
 
   it("advance weeks", () => {
-    expect(advance(d(2005, 2, 28, 15, 15, 10), { weeks: 3 })).toEqual(d(2005, 3, 21, 15, 15, 10));
+    expect(advance(d(2005, 2, 28, 15, 15, 10), { weeks: 3 })).toEqual(i(2005, 3, 21, 15, 15, 10));
   });
 
   it("advance days", () => {
-    expect(advance(d(2005, 2, 28, 15, 15, 10), { days: 5 })).toEqual(d(2005, 3, 5, 15, 15, 10));
+    expect(advance(d(2005, 2, 28, 15, 15, 10), { days: 5 })).toEqual(i(2005, 3, 5, 15, 15, 10));
   });
 
   it("advance hours", () => {
-    expect(advance(d(2005, 2, 28, 15, 15, 10), { hours: 5 })).toEqual(d(2005, 2, 28, 20, 15, 10));
+    expect(advance(d(2005, 2, 28, 15, 15, 10), { hours: 5 })).toEqual(i(2005, 2, 28, 20, 15, 10));
   });
 
   it("advance minutes", () => {
-    expect(advance(d(2005, 2, 28, 15, 15, 10), { minutes: 7 })).toEqual(d(2005, 2, 28, 15, 22, 10));
+    expect(advance(d(2005, 2, 28, 15, 15, 10), { minutes: 7 })).toEqual(i(2005, 2, 28, 15, 22, 10));
   });
 
   it("advance seconds", () => {
-    expect(advance(d(2005, 2, 28, 15, 15, 10), { seconds: 9 })).toEqual(d(2005, 2, 28, 15, 15, 19));
+    expect(advance(d(2005, 2, 28, 15, 15, 10), { seconds: 9 })).toEqual(i(2005, 2, 28, 15, 15, 19));
   });
 
   it("advance combined", () => {
     expect(advance(d(2005, 2, 28, 15, 15, 10), { years: 7, months: 7 })).toEqual(
-      d(2012, 9, 28, 15, 15, 10),
+      i(2012, 9, 28, 15, 15, 10),
     );
     expect(advance(d(2005, 2, 28, 15, 15, 10), { years: -3, months: -2, days: -1 })).toEqual(
-      d(2001, 12, 27, 15, 15, 10),
+      i(2001, 12, 27, 15, 15, 10),
     );
   });
 
   it("advance leap day plus one year", () => {
     // Feb 29 + 1 year = Feb 28
-    expect(advance(d(2004, 2, 29, 15, 15, 10), { years: 1 })).toEqual(d(2005, 2, 28, 15, 15, 10));
+    expect(advance(d(2004, 2, 29, 15, 15, 10), { years: 1 })).toEqual(i(2005, 2, 28, 15, 15, 10));
   });
 
   it("next_week", () => {
@@ -315,16 +315,28 @@ describe("TimeExtCalculationsTest", () => {
 
   it("floor", () => {
     const t = new Date(2005, 1, 4, 10, 10, 10, 500);
-    const result = floor(t, 1000); // floor to nearest second
+    const result = asDate(floor(t, 1000)); // floor to nearest second
     expect(result.getMilliseconds()).toBe(0);
     expect(result.getSeconds()).toBe(10);
   });
 
   it("ceil", () => {
     const t = new Date(2005, 1, 4, 10, 10, 10, 1);
-    const result = ceil(t, 1000); // ceil to nearest second
+    const result = asDate(ceil(t, 1000)); // ceil to nearest second
     expect(result.getMilliseconds()).toBe(0);
     expect(result.getSeconds()).toBe(11);
+  });
+
+  it("floor and ceil reject non-positive or non-finite ms", () => {
+    const t = new Date(2005, 1, 4, 10, 10, 10, 500);
+    expect(() => floor(t, 0)).toThrow(RangeError);
+    expect(() => floor(t, -1000)).toThrow(RangeError);
+    expect(() => floor(t, Number.NaN)).toThrow(RangeError);
+    expect(() => floor(t, Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    expect(() => ceil(t, 0)).toThrow(RangeError);
+    expect(() => ceil(t, -1000)).toThrow(RangeError);
+    expect(() => ceil(t, Number.NaN)).toThrow(RangeError);
+    expect(() => ceil(t, Number.POSITIVE_INFINITY)).toThrow(RangeError);
   });
 
   it("to fs", () => {
@@ -441,7 +453,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("change", () => {
     const t = d(2005, 2, 22, 15, 15, 10);
-    const result = changeDate(t, { year: 2006, month: 6, day: 1 });
+    const result = asDate(changeDate(t, { year: 2006, month: 6, day: 1 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getMonth()).toBe(5); // June
     expect(result.getDate()).toBe(1);
@@ -450,7 +462,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("since with instance of time deprecated", () => {
     const t = d(2005, 2, 22, 10, 10, 10);
-    expect(since(t, 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
+    expect(since(t, 1)).toEqual(i(2005, 2, 22, 10, 10, 11));
   });
 
   it("today with time utc", () => {
@@ -559,7 +571,7 @@ describe("TimeExtCalculationsTest", () => {
     // July 31 -> last quarter = Q1 start = January 1
     const t = d(2005, 7, 31, 10, 10, 10);
     const quarterStart = beginningOfQuarter(t);
-    const lastQuarterStart = advance(asDate(quarterStart), { months: -3 });
+    const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
     expect(lastQuarterStart.getMonth()).toBe(3); // April
   });
 
@@ -567,7 +579,7 @@ describe("TimeExtCalculationsTest", () => {
     // Test that floating point arithmetic doesn't cause issues
     const t = d(2005, 2, 22, 10, 10, 10);
     const result = advance(t, { seconds: 0.1 });
-    expect(result instanceof Date).toBe(true);
+    expect(result).toBeInstanceOf(Temporal.Instant);
   });
 });
 
@@ -650,7 +662,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("advance date with months overflow", () => {
     // Jan 31 + 1 month = Feb 28
-    expect(advance(d(2005, 1, 31), { months: 1 })).toEqual(d(2005, 2, 28));
+    expect(advance(d(2005, 1, 31), { months: 1 })).toEqual(i(2005, 2, 28));
   });
 
   it("next_week various days", () => {
@@ -694,7 +706,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("change", () => {
     const date = d(2005, 2, 21);
-    const result = changeDate(date, { year: 2006 });
+    const result = asDate(changeDate(date, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getMonth()).toBe(1); // February
     expect(result.getDate()).toBe(21);
@@ -709,12 +721,12 @@ describe("DateExtCalculationsTest", () => {
 
   it("advance does first years and then days", () => {
     // 2012 is a leap year (Feb 29), advance by 1 year -> 2013 (no Feb 29, so Feb 28)
-    expect(advance(d(2012, 2, 29), { years: 1 })).toEqual(d(2013, 2, 28));
+    expect(advance(d(2012, 2, 29), { years: 1 })).toEqual(i(2013, 2, 28));
   });
 
   it("advance does first months and then days", () => {
     // Jan 29 + 1 month = Feb 28 (non-leap)
-    expect(advance(d(2005, 1, 29), { months: 1 })).toEqual(d(2005, 2, 28));
+    expect(advance(d(2005, 1, 29), { months: 1 })).toEqual(i(2005, 2, 28));
   });
 
   it("yesterday constructor", () => {
@@ -734,7 +746,7 @@ describe("DateExtCalculationsTest", () => {
     const dt = d(2005, 10, 31);
     const quarterStart = beginningOfQuarter(dt);
     // last quarter = go back 3 months from current quarter start
-    const lastQuarterStart = advance(asDate(quarterStart), { months: -3 });
+    const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
     expect(lastQuarterStart.getMonth()).toBe(6); // July
     expect(lastQuarterStart.getDate()).toBe(1);
   });
@@ -761,25 +773,25 @@ describe("DateExtCalculationsTest", () => {
 
   it("since", () => {
     const date = d(2005, 2, 21);
-    const result = since(date, 3600); // 1 hour
+    const result = asDate(since(date, 3600)); // 1 hour
     expect(result.getHours()).toBe(1);
   });
 
   it("since when zone is set", () => {
     const date = d(2005, 2, 21, 12, 0, 0);
-    const result = since(date, 1800); // 30 min
+    const result = asDate(since(date, 1800)); // 30 min
     expect(result.getMinutes()).toBe(30);
   });
 
   it("ago", () => {
     const date = d(2005, 2, 22, 10, 10, 10);
-    const result = ago(date, 3600);
+    const result = asDate(ago(date, 3600));
     expect(result.getHours()).toBe(9);
   });
 
   it("ago when zone is set", () => {
     const date = d(2005, 2, 22, 10, 10, 10);
-    const result = ago(date, 600);
+    const result = asDate(ago(date, 600));
     expect(result.getMinutes()).toBe(0);
   });
 
@@ -943,21 +955,21 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("advance from datetime", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    expect(advance(dt, { years: 1 })).toEqual(d(2006, 2, 22, 15, 15, 10));
-    expect(advance(dt, { months: 4 })).toEqual(d(2005, 6, 22, 15, 15, 10));
-    expect(advance(dt, { hours: 5, minutes: 7, seconds: 9 })).toEqual(d(2005, 2, 22, 20, 22, 19));
+    expect(advance(dt, { years: 1 })).toEqual(i(2006, 2, 22, 15, 15, 10));
+    expect(advance(dt, { months: 4 })).toEqual(i(2005, 6, 22, 15, 15, 10));
+    expect(advance(dt, { hours: 5, minutes: 7, seconds: 9 })).toEqual(i(2005, 2, 22, 20, 22, 19));
   });
 
   it("ago from datetime", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    expect(ago(dt, 1)).toEqual(d(2005, 2, 22, 10, 10, 9));
-    expect(ago(dt, 3600)).toEqual(d(2005, 2, 22, 9, 10, 10));
+    expect(ago(dt, 1)).toEqual(i(2005, 2, 22, 10, 10, 9));
+    expect(ago(dt, 3600)).toEqual(i(2005, 2, 22, 9, 10, 10));
   });
 
   it("since from datetime", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
-    expect(since(dt, 1)).toEqual(d(2005, 2, 22, 10, 10, 11));
-    expect(since(dt, 3600)).toEqual(d(2005, 2, 22, 11, 10, 10));
+    expect(since(dt, 1)).toEqual(i(2005, 2, 22, 10, 10, 11));
+    expect(since(dt, 3600)).toEqual(i(2005, 2, 22, 11, 10, 10));
   });
 
   it("next_occurring from datetime", () => {
@@ -1011,7 +1023,7 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("changeDate preserves time components", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = changeDate(dt, { year: 2006 });
+    const result = asDate(changeDate(dt, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
     expect(result.getMonth()).toBe(1); // February
     expect(result.getDate()).toBe(22);
@@ -1089,20 +1101,20 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("change", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = changeDate(dt, { year: 2006 });
+    const result = asDate(changeDate(dt, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
   });
 
   it("advance partial days", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = advance(dt, { hours: 12 });
+    const result = asDate(advance(dt, { hours: 12 }));
     expect(result.getDate()).toBe(23);
     expect(result.getHours()).toBe(3);
   });
 
   it("advanced processes first the date deltas and then the time deltas", () => {
     const dt = d(2005, 2, 28, 15, 15, 10);
-    const result = advance(dt, { months: 1, days: 1 });
+    const result = asDate(advance(dt, { months: 1, days: 1 }));
     expect(result.getMonth()).toBe(2); // March (0-indexed)
     expect(result.getDate()).toBe(29); // Last day of Feb + 1 day in March
   });
@@ -1125,7 +1137,7 @@ describe("DateTimeExtCalculationsTest", () => {
     // Oct 31 -> last quarter start = July 1
     const dt = d(2005, 10, 31, 10, 10, 10);
     const quarterStart = beginningOfQuarter(dt);
-    const lastQuarterStart = advance(asDate(quarterStart), { months: -3 });
+    const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
     expect(lastQuarterStart.getMonth()).toBe(6); // July
   });
 
