@@ -209,6 +209,14 @@ describe("SelectManagerTest", () => {
       mgr.skip(null);
       expect(mgr.ast.offset).toBeNull();
     });
+
+    // Mirrors Rails: `def offset; @ast.offset && @ast.offset.expr; end`.
+    it("the offset getter returns the inner expression", () => {
+      const mgr = new SelectManager(users).skip(7);
+      expect(mgr.offset).toBe(7);
+      mgr.skip(null);
+      expect(mgr.offset).toBeNull();
+    });
   });
 
   describe("take", () => {
@@ -225,6 +233,14 @@ describe("SelectManagerTest", () => {
       expect(mgr.ast.limit).not.toBeNull();
       mgr.take(null);
       expect(mgr.ast.limit).toBeNull();
+    });
+
+    // Mirrors Rails: `def limit; @ast.limit && @ast.limit.expr; end`.
+    it("the limit getter returns the inner expression", () => {
+      const mgr = new SelectManager(users).take(5);
+      expect(mgr.limit).toBe(5);
+      mgr.take(null);
+      expect(mgr.limit).toBeNull();
     });
   });
 
@@ -1242,7 +1258,8 @@ describe("SelectManagerTest", () => {
   describe("take", () => {
     it("knows take", () => {
       const mgr = new SelectManager(users).project(star).take(5);
-      expect(mgr.limit).toBeInstanceOf(Nodes.Limit);
+      expect(mgr.ast.limit).toBeInstanceOf(Nodes.Limit);
+      expect(mgr.limit).toBe(5);
       expect(mgr.toSql()).toContain("LIMIT 5");
     });
   });

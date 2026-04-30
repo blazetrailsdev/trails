@@ -357,12 +357,13 @@ export class SelectManager extends TreeManager {
   }
 
   /**
-   * Return the current LIMIT node.
+   * Return the current LIMIT amount (the inner expression of the Limit node),
+   * or null when no limit is set.
    *
    * Mirrors: Arel::SelectManager#limit
    */
-  get limit(): Node | null {
-    return this.ast.limit;
+  get limit(): Limit["expr"] | null {
+    return (this.ast.limit as Limit | null)?.expr ?? null;
   }
 
   /**
@@ -373,12 +374,13 @@ export class SelectManager extends TreeManager {
   }
 
   /**
-   * Return the current OFFSET node.
+   * Return the current OFFSET amount (the inner expression of the Offset node),
+   * or null when no offset is set.
    *
    * Mirrors: Arel::SelectManager#offset
    */
-  get offset(): Node | null {
-    return this.ast.offset;
+  get offset(): Offset["expr"] | null {
+    return (this.ast.offset as Offset | null)?.expr ?? null;
   }
 
   /**
