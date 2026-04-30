@@ -256,8 +256,14 @@ export class SelectManager extends TreeManager {
   /**
    * Add a lock clause (FOR UPDATE by default).
    */
-  lock(lockClause?: string): this {
-    this.ast.lock = new Lock(lockClause ?? null);
+  lock(lockClause?: string | Node): this {
+    const expr =
+      lockClause === undefined
+        ? new SqlLiteral("FOR UPDATE")
+        : typeof lockClause === "string"
+          ? new SqlLiteral(lockClause)
+          : lockClause;
+    this.ast.lock = new Lock(expr);
     return this;
   }
 

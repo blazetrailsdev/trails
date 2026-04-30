@@ -994,14 +994,14 @@ describe("SelectManagerTest", () => {
   it("rightOuterJoin with string table name", () => {
     const mgr = new SelectManager(users);
     mgr.project(star);
-    mgr.rightOuterJoin("posts");
+    mgr.rightOuterJoin("posts", users.get("id").eq(new Nodes.SqlLiteral("posts.user_id")));
     expect(mgr.toSql()).toContain("RIGHT OUTER JOIN");
   });
 
   it("fullOuterJoin with string table name", () => {
     const mgr = new SelectManager(users);
     mgr.project(star);
-    mgr.fullOuterJoin("posts");
+    mgr.fullOuterJoin("posts", users.get("id").eq(new Nodes.SqlLiteral("posts.user_id")));
     expect(mgr.toSql()).toContain("FULL OUTER JOIN");
   });
 

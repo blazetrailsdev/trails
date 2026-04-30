@@ -1552,4 +1552,40 @@ describe("the to_sql visitor", () => {
       );
     });
   });
+
+  describe("Nodes::Lock", () => {
+    it("visits the inner expr (no FOR UPDATE fallback)", () => {
+      const visitor = new Visitors.ToSql();
+      const node = new Nodes.Lock(new Nodes.SqlLiteral("FOR SHARE"));
+      expect(visitor.compile(node)).toBe("FOR SHARE");
+    });
+
+    it("SelectManager#lock wraps default in SqlLiteral", () => {
+      expect(users.project(star).lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
+    });
+
+    it("SelectManager#lock with custom string wraps in SqlLiteral", () => {
+      expect(users.project(star).lock("FOR SHARE").toSql()).toBe('SELECT * FROM "users" FOR SHARE');
+    });
+  });
+
+  describe("OuterJoin guard", () => {
+    it("OuterJoin without an ON throws", () => {
+      const visitor = new Visitors.ToSql();
+      const node = new Nodes.OuterJoin(users, null);
+      expect(() => visitor.compile(node)).toThrow();
+    });
+
+    it("RightOuterJoin without an ON throws", () => {
+      const visitor = new Visitors.ToSql();
+      const node = new Nodes.RightOuterJoin(users, null);
+      expect(() => visitor.compile(node)).toThrow();
+    });
+
+    it("FullOuterJoin without an ON throws", () => {
+      const visitor = new Visitors.ToSql();
+      const node = new Nodes.FullOuterJoin(users, null);
+      expect(() => visitor.compile(node)).toThrow();
+    });
+  });
 });

@@ -524,30 +524,24 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   private visitArelNodesOuterJoin(node: Nodes.OuterJoin): SQLString {
     this.collector.append("LEFT OUTER JOIN ");
     this.visit(node.left);
-    if (node.right) {
-      this.collector.append(" ");
-      this.visit(node.right);
-    }
+    this.collector.append(" ");
+    this.visit(node.right as Node);
     return this.collector;
   }
 
   private visitArelNodesRightOuterJoin(node: Nodes.RightOuterJoin): SQLString {
     this.collector.append("RIGHT OUTER JOIN ");
     this.visit(node.left);
-    if (node.right) {
-      this.collector.append(" ");
-      this.visit(node.right);
-    }
+    this.collector.append(" ");
+    this.visit(node.right as Node);
     return this.collector;
   }
 
   private visitArelNodesFullOuterJoin(node: Nodes.FullOuterJoin): SQLString {
     this.collector.append("FULL OUTER JOIN ");
     this.visit(node.left);
-    if (node.right) {
-      this.collector.append(" ");
-      this.visit(node.right);
-    }
+    this.collector.append(" ");
+    this.visit(node.right as Node);
     return this.collector;
   }
 
@@ -813,13 +807,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   protected visitArelNodesLock(node: Nodes.Lock): SQLString {
-    if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else if (typeof node.expr === "string") {
-      this.collector.append(node.expr);
-    } else {
-      this.collector.append("FOR UPDATE");
-    }
+    this.visit(node.expr as Node);
     return this.collector;
   }
 
