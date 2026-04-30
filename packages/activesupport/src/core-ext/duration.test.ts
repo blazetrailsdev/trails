@@ -207,7 +207,7 @@ describe("DurationTest", () => {
   });
 
   it("time plus duration returns same time datatype", () => {
-    // In TypeScript/JS all times are Date objects — just verify arithmetic works
+    // Duration#since now returns Temporal.Instant — verify arithmetic works for each unit
     const now = new Date();
     for (const unit of [
       "seconds",
@@ -245,6 +245,15 @@ describe("DurationTest", () => {
     expect(Duration.seconds(1).ago(t).epochMilliseconds).toBe(t.getTime() - 1000);
   });
 
+  it("since and ago accept Temporal.Instant inputs", () => {
+    const tInstant = Duration.seconds(0).since(new Date(2000, 0, 1, 0, 0, 0, 0));
+    const baseMs = tInstant.epochMilliseconds;
+    expect(Duration.seconds(1).since(tInstant).epochMilliseconds).toBe(baseMs + 1000);
+    expect(Duration.seconds(1).ago(tInstant).epochMilliseconds).toBe(baseMs - 1000);
+    expect(Duration.seconds(1).after(tInstant).epochMilliseconds).toBe(baseMs + 1000);
+    expect(Duration.seconds(1).before(tInstant).epochMilliseconds).toBe(baseMs - 1000);
+  });
+
   it("since and ago without argument", () => {
     const before = new Date();
     const result = Duration.seconds(1).since();
@@ -272,7 +281,7 @@ describe("DurationTest", () => {
   });
 
   it("since and ago anchored to time now when time zone is not set", () => {
-    // JS doesn't have TimeWithZone — just verify since() returns a Date
+    // JS doesn't have TimeWithZone — just verify since() returns a Temporal.Instant
     const result = Duration.seconds(5).since();
     expect(typeof result.epochMilliseconds === "number").toBe(true);
   });

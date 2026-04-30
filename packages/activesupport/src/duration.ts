@@ -420,7 +420,9 @@ function singular(key: keyof DurationParts): string {
 }
 
 function toDateInput(date: Date | Temporal.Instant): Date {
-  return date instanceof Date ? date : new Date(date.epochMilliseconds);
+  if (date instanceof Date) return date;
+  if (date instanceof Temporal.Instant) return new Date(date.epochMilliseconds);
+  throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
 }
 
 /**
