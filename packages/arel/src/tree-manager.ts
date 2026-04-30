@@ -42,7 +42,9 @@ export class StatementMethods {
   }
 
   set key(key: unknown) {
-    (this as unknown as StatementMethodsHost).ast.key = key;
+    (this as unknown as StatementMethodsHost).ast.key = Array.isArray(key)
+      ? key.map((k) => buildQuoted(k))
+      : buildQuoted(key);
   }
 
   get key(): unknown {

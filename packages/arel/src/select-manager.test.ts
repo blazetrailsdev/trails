@@ -101,6 +101,22 @@ describe("SelectManagerTest", () => {
         mgr1.from(as);
         expect(mgr1.toSql()).toContain("lol");
       });
+
+      // Mirrors Rails: `from(table)` (select_manager.rb) routes a Join
+      // node to `source.right` so callers can build cross-product FROMs
+      // like `FROM users INNER JOIN posts ON ...` via `from(joinNode)`.
+      it("routes a Join to source.right rather than overwriting source.left", () => {
+        const mgr = new SelectManager();
+        mgr.from(users);
+        const join = new Nodes.InnerJoin(
+          posts,
+          new Nodes.On(users.get("id").eq(posts.get("user_id"))),
+        );
+        mgr.from(join);
+        const core = mgr.ast.cores[0];
+        expect(core.source.left).toBe(users);
+        expect(core.source.right).toContain(join);
+      });
     });
 
     describe("having", () => {

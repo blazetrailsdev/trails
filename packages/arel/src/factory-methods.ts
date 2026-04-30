@@ -1,6 +1,6 @@
 import type { Node } from "./nodes/node.js";
 import { And } from "./nodes/and.js";
-import { As } from "./nodes/binary.js";
+import { buildQuoted } from "./nodes/casted.js";
 import type { Join } from "./nodes/binary.js";
 import { False } from "./nodes/false.js";
 import { Grouping } from "./nodes/grouping.js";
@@ -42,9 +42,9 @@ export interface FactoryMethodsModule {
   createAnd(clauses: Node[]): And;
   createOn(expr: Node): On;
   grouping(expr: Node): Grouping;
-  lower(column: Node): NamedFunction;
+  lower(column: unknown): NamedFunction;
   coalesce(...exprs: Node[]): NamedFunction;
-  cast(expr: Node, type: string): NamedFunction;
+  cast(expr: Node & { as: (type: string) => Node }, type: string): NamedFunction;
 }
 
 export const FactoryMethods: FactoryMethodsModule = {
@@ -86,19 +86,18 @@ export const FactoryMethods: FactoryMethodsModule = {
     return new Grouping(expr);
   },
 
-  lower(column: Node): NamedFunction {
-    return new NamedFunction("LOWER", [column]);
+  lower(column: unknown): NamedFunction {
+    return new NamedFunction("LOWER", [buildQuoted(column)]);
   },
 
   coalesce(...exprs: Node[]): NamedFunction {
     return new NamedFunction("COALESCE", exprs);
   },
 
-  // Mirrors: Arel::FactoryMethods#cast — `Nodes::NamedFunction.new "CAST",
-  // [name.as(type)]`. Builds an `As` AST node so the visitor compiles it
-  // correctly (`CAST(expr AS type)`); the previous string-interpolation
-  // form stringified Node instances as `"[object Object]"`.
-  cast(expr: Node, type: string): NamedFunction {
-    return new NamedFunction("CAST", [new As(expr, new SqlLiteral(type))]);
+  // Mirrors: Arel::FactoryMethods#cast — `NamedFunction.new "CAST",
+  // [name.as(type)]`. Delegating to `name.as(type)` lets the receiver
+  // build an `As` with a retryable SqlLiteral alias, matching Rails.
+  cast(expr: Node & { as: (type: string) => Node }, type: string): NamedFunction {
+    return new NamedFunction("CAST", [expr.as(type)]);
   },
 };

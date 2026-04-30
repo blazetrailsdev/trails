@@ -209,4 +209,35 @@ describe("UpdateManagerTest", () => {
       expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
     });
   });
+
+  // Mirrors Rails: `tree_manager.rb` `key=` calls `Nodes.build_quoted` on
+  // scalar values and maps over arrays, so the AST always holds Quoted
+  // (or pass-through Node) values rather than raw primitives.
+  describe("key=", () => {
+    it("wraps a scalar value in Quoted", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.key = 5;
+      expect(um.ast.key).toBeInstanceOf(Nodes.Quoted);
+      expect((um.ast.key as Nodes.Quoted).value).toBe(5);
+    });
+
+    it("maps an array, wrapping each element in Quoted", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.key = [1, 2];
+      const arr = um.ast.key as unknown as Nodes.Quoted[];
+      expect(Array.isArray(arr)).toBe(true);
+      expect(arr.every((q) => q instanceof Nodes.Quoted)).toBe(true);
+      expect(arr.map((q) => q.value)).toEqual([1, 2]);
+    });
+
+    it("passes existing Nodes through unwrapped", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      const lit = new Nodes.SqlLiteral("id");
+      um.key = lit;
+      expect(um.ast.key).toBe(lit);
+    });
+  });
 });

@@ -42,6 +42,15 @@ describe("TestFactoryMethods", () => {
     expect(fn.name).toBe("LOWER");
   });
 
+  // Mirrors Rails: `lower(column)` wraps non-Node arguments via
+  // `Nodes.build_quoted` (factory_methods.rb), so a string column resolves
+  // to LOWER('name') rather than rendering "[object Object]".
+  it("lower wraps non-Node arguments via buildQuoted", () => {
+    const fn = users.lower("name");
+    expect(fn.expressions[0]).toBeInstanceOf(Nodes.Quoted);
+    expect(new Visitors.ToSql().compile(fn)).toBe("LOWER('name')");
+  });
+
   it("coalesce", () => {
     const fn = users.coalesce(users.get("name"), new Nodes.Quoted("default"));
     expect(fn).toBeInstanceOf(Nodes.NamedFunction);
@@ -56,6 +65,18 @@ describe("TestFactoryMethods", () => {
     // not a string-interpolated SqlLiteral. The compiled SQL must reference
     // the column properly rather than "[object Object] AS VARCHAR".
     expect(new Visitors.ToSql().compile(fn)).toBe('CAST("users"."age" AS VARCHAR)');
+  });
+
+  // Mirrors Rails: delegating to `name.as(type)` produces an `As` whose
+  // alias is a *retryable* SqlLiteral (factory_methods.rb / alias_predication.rb),
+  // not a plain SqlLiteral.
+  it("cast delegates to .as(type) for a retryable alias", () => {
+    const fn = users.cast(users.get("age"), "VARCHAR");
+    const asNode = fn.expressions[0] as Nodes.As;
+    expect(asNode).toBeInstanceOf(Nodes.As);
+    const right = asNode.right as Nodes.SqlLiteral;
+    expect(right).toBeInstanceOf(Nodes.SqlLiteral);
+    expect(right.retryable).toBe(true);
   });
 
   it("create true", () => {

@@ -5,8 +5,7 @@ import { SelectCore } from "./nodes/select-core.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Distinct } from "./nodes/terminal.js";
 import { Offset, Limit, Lock, On, DistinctOn, Group } from "./nodes/unary.js";
-import { CrossJoin } from "./nodes/binary.js";
-import type { Join } from "./nodes/binary.js";
+import { CrossJoin, Join } from "./nodes/binary.js";
 import { InnerJoin } from "./nodes/inner-join.js";
 import { OuterJoin } from "./nodes/outer-join.js";
 import { RightOuterJoin } from "./nodes/right-outer-join.js";
@@ -54,10 +53,11 @@ export class SelectManager extends TreeManager {
    * Set the FROM table.
    */
   from(table: Table | Node | string): this {
-    if (typeof table === "string") {
-      this.core.source.left = new SqlLiteral(table);
+    const node = typeof table === "string" ? new SqlLiteral(table) : table;
+    if (node instanceof Join) {
+      this.core.source.right.push(node);
     } else {
-      this.core.source.left = table;
+      this.core.source.left = node;
     }
     return this;
   }

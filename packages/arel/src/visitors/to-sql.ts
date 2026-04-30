@@ -1275,11 +1275,10 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // -- UnaryOperation --
 
   private visitArelNodesUnaryOperation(node: Nodes.UnaryOperation): SQLString {
-    // Rails emits ` ${operator} ` — space on both sides — so the operator
-    // sits free of surrounding tokens wherever it lands in an expression.
-    // Trim the operator first so callers who construct with decorative
-    // whitespace (e.g. "NOT ") don't get double spaces in the output.
-    this.collector.append(` ${node.operator.trim()} `);
+    // Mirrors Rails: `collector << " #{o.operator} "` (visitors/to_sql.rb).
+    // The operator is emitted verbatim with a space on each side; callers
+    // are responsible for the operator's own whitespace.
+    this.collector.append(` ${node.operator} `);
     this.visit(node.operand);
     return this.collector;
   }
