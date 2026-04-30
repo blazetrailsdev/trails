@@ -1,4 +1,5 @@
 import * as Nodes from "../nodes/index.js";
+import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 
@@ -76,5 +77,42 @@ export class SQLite extends ToSql {
 
   protected override visitArelNodesIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
     return this.visitBinaryOp(node, "IS");
+  }
+
+  /**
+   * Mirrors `sqlite.rb#infix_value_with_paren`: SQLite rejects parens around
+   * SELECT operands of UNION/INTERSECT/EXCEPT. Strip a `Grouping` wrapper from
+   * each operand so a SELECT visits raw inside the set-op.
+   */
+  protected override visitArelNodesUnion(node: Nodes.Union): SQLString {
+    return this.visitSetOperation(node, " UNION ");
+  }
+
+  protected override visitArelNodesUnionAll(node: Nodes.UnionAll): SQLString {
+    return this.visitSetOperation(node, " UNION ALL ");
+  }
+
+  protected override visitArelNodesIntersect(node: Nodes.Intersect): SQLString {
+    return this.visitSetOperation(node, " INTERSECT ");
+  }
+
+  protected override visitArelNodesExcept(node: Nodes.Except): SQLString {
+    return this.visitSetOperation(node, " EXCEPT ");
+  }
+
+  private visitSetOperation(node: { left: Node; right: Node }, op: string): SQLString {
+    this.collector.append("(");
+    this.visit(this.unwrapGrouping(node.left));
+    this.collector.append(op);
+    this.visit(this.unwrapGrouping(node.right));
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  private unwrapGrouping(node: Node): Node {
+    if (node instanceof Nodes.Grouping && node.expr && typeof node.expr === "object") {
+      return node.expr as Node;
+    }
+    return node;
   }
 }

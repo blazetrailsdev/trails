@@ -65,4 +65,49 @@ describe("SqliteTest", () => {
       expect(sql).toContain('"posts"."user_id"');
     });
   });
+
+  describe("set operations", () => {
+    // SQLite rejects parens around SELECT operands of UNION/INTERSECT/EXCEPT.
+    // Mirrors `sqlite.rb#infix_value_with_paren` — strip Grouping wrappers.
+    const q1 = () => users.project(star);
+    const q2 = () => users.project(star);
+
+    it("UNION strips Grouping wrapped operands", () => {
+      const node = new Nodes.Union(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).not.toContain("((");
+      expect(sql).toContain("UNION");
+      expect(sql).toBe('(SELECT * FROM "users" UNION SELECT * FROM "users")');
+    });
+
+    it("UNION ALL strips Grouping wrapped operands", () => {
+      const node = new Nodes.UnionAll(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).toBe('(SELECT * FROM "users" UNION ALL SELECT * FROM "users")');
+    });
+
+    it("INTERSECT strips Grouping wrapped operands", () => {
+      const node = new Nodes.Intersect(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).toBe('(SELECT * FROM "users" INTERSECT SELECT * FROM "users")');
+    });
+
+    it("EXCEPT strips Grouping wrapped operands", () => {
+      const node = new Nodes.Except(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).toBe('(SELECT * FROM "users" EXCEPT SELECT * FROM "users")');
+    });
+
+    it("UNION without Grouping operands renders bare SELECTs", () => {
+      const node = new Nodes.Union(q1().ast, q2().ast);
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).toBe('(SELECT * FROM "users" UNION SELECT * FROM "users")');
+    });
+
+    it("union via SelectManager omits inner parens", () => {
+      const sql = new Visitors.SQLite().compile(q1().union(q2()));
+      expect(sql).not.toContain("((");
+      expect(sql).toContain("UNION");
+    });
+  });
 });

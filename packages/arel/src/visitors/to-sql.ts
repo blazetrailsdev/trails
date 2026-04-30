@@ -1076,7 +1076,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
   // -- Set operations --
 
-  private visitArelNodesUnion(node: Nodes.Union): SQLString {
+  protected visitArelNodesUnion(node: Nodes.Union): SQLString {
     this.collector.append("(");
     this.visit(node.left);
     this.collector.append(" UNION ");
@@ -1085,7 +1085,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitArelNodesUnionAll(node: Nodes.UnionAll): SQLString {
+  protected visitArelNodesUnionAll(node: Nodes.UnionAll): SQLString {
     this.collector.append("(");
     this.visit(node.left);
     this.collector.append(" UNION ALL ");
@@ -1094,7 +1094,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitArelNodesIntersect(node: Nodes.Intersect): SQLString {
+  protected visitArelNodesIntersect(node: Nodes.Intersect): SQLString {
     this.collector.append("(");
     this.visit(node.left);
     this.collector.append(" INTERSECT ");
@@ -1103,7 +1103,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitArelNodesExcept(node: Nodes.Except): SQLString {
+  protected visitArelNodesExcept(node: Nodes.Except): SQLString {
     this.collector.append("(");
     this.visit(node.left);
     this.collector.append(" EXCEPT ");
