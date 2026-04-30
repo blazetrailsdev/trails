@@ -333,9 +333,10 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     if (node.columns.length > 0) {
       this.collector.append(" (");
       const colNames = node.columns.map((c) => {
-        if (c instanceof Nodes.Attribute) return `"${c.name}"`;
         if (c instanceof Nodes.SqlLiteral) return c.value;
-        return String(c);
+        const name =
+          c instanceof Nodes.Attribute ? c.name : String((c as { name?: string }).name ?? c);
+        return this.quoteColumnName(name);
       });
       this.collector.append(colNames.join(", "));
       this.collector.append(")");
@@ -389,26 +390,15 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   protected visitArelNodesDeleteStatement(o: Nodes.DeleteStatement): SQLString {
     const node = this.prepareDeleteStatement(o);
     this.collector.retryable = false;
-    this.collector.append("DELETE ");
-    if (this.hasJoinSources(node)) {
-      const joinSource = node.relation as Nodes.JoinSource;
-      if (joinSource.left) {
-        const table = joinSource.left;
-        if (table instanceof Nodes.TableAlias) {
-          this.collector.append(`"${table.name}"`);
-        } else if (table instanceof Table && table.tableAlias) {
-          this.collector.append(`"${table.tableAlias}"`);
-        } else if (table instanceof Table) {
-          this.collector.append(`"${table.name}"`);
-        } else {
-          this.visit(table);
-        }
-        this.collector.append(" FROM ");
-      } else {
-        this.collector.append("FROM ");
-      }
+    const joinSourceLeft = this.hasJoinSources(node)
+      ? (node.relation as Nodes.JoinSource).left
+      : null;
+    if (joinSourceLeft) {
+      this.collector.append("DELETE ");
+      this.visit(joinSourceLeft);
+      this.collector.append(" FROM ");
     } else {
-      this.collector.append("FROM ");
+      this.collector.append("DELETE FROM ");
     }
     if (node.relation) this.visit(node.relation);
 
