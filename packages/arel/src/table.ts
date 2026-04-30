@@ -23,7 +23,8 @@ export class Table extends Node {
   constructor(name: string, options?: { as?: string; klass?: unknown; typeCaster?: unknown }) {
     super();
     this.name = name;
-    this.tableAlias = options?.as ?? null;
+    const as = options?.as ?? null;
+    this.tableAlias = as === name ? null : as;
     this.typeCaster = options?.typeCaster ?? null;
   }
 
@@ -59,8 +60,8 @@ export class Table extends Node {
     return this.typeCaster != null;
   }
 
-  get(name: string): Attribute {
-    return new Attribute(this, name);
+  get(name: string, table?: Attribute["relation"]): Attribute {
+    return new Attribute(table ?? this, name);
   }
 
   attr(name: string): Attribute {

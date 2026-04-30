@@ -83,8 +83,8 @@ describe("TableTest", () => {
 
     it("ignores as if it equals name", () => {
       const t = new Table("users", { as: "users" });
-      // tableAlias is set to 'users' -- just proves it accepts the option
       expect(t.name).toBe("users");
+      expect(t.tableAlias).toBeNull();
     });
 
     it("should accept literal SQL", () => {
@@ -244,5 +244,22 @@ describe("TableTest", () => {
   it("should have a name", () => {
     const t = new Table("widgets");
     expect(t.name).toBe("widgets");
+  });
+
+  describe("[] (get) with explicit table", () => {
+    it("builds an attribute on the provided table", () => {
+      const other = new Table("others");
+      const attr = users.get("id", other);
+      expect(attr).toBeInstanceOf(Nodes.Attribute);
+      expect(attr.relation).toBe(other);
+      expect(attr.name).toBe("id");
+    });
+
+    it("builds an attribute on a TableAlias", () => {
+      const aliased = users.as("u");
+      const attr = users.get("id", aliased);
+      expect(attr.relation).toBe(aliased);
+      expect(new Visitors.ToSql().compile(attr)).toBe('"u"."id"');
+    });
   });
 });
