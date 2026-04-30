@@ -15,7 +15,19 @@ export interface Quoting {
   /** Mirrors: Quoting#quote — SQL-literal form of a value. */
   quote(value: unknown): string;
 
-  /** Mirrors: Quoting#quote_string — escape-only (no surrounding quotes). */
+  /**
+   * Mirrors: Quoting#quote_string — **escape-only**. Doubles `'` and
+   * applies any dialect-specific escape rules (MySQL `\\\0\n\r\Z`; PG
+   * may switch to `E'…'` form for backslashes inside `quote()`). Never
+   * adds surrounding `'`. For a fully-quoted SQL literal use
+   * `quote(value)` instead.
+   *
+   * Note: per-adapter standalone `quoteString` exports in
+   * `{sqlite3,mysql}/quoting.ts` historically wrap with surrounding
+   * `'...'` and are NOT escape-only. Adapter classes override
+   * `quoteString` to honor this contract; the standalones stay as
+   * literal-quoting helpers for legacy call sites.
+   */
   quoteString(s: string): string;
 
   /** Mirrors: Quoting#quote_column_name (identifier-form). PG/SQLite double-quote, MySQL backtick. */

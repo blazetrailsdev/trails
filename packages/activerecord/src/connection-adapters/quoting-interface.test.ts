@@ -1,6 +1,17 @@
 import { describe, it, expect } from "vitest";
 import type { Quoting } from "./abstract/quoting-interface.js";
+import { AbstractAdapter } from "./abstract-adapter.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
+
+// Compile-time guard: AbstractAdapter (the base, not a subclass) must
+// itself satisfy Quoting. A subclass-only assignment would let a
+// missing-on-base / present-on-subclass method slip through. This is a
+// pure type-level check — `never` resolves only when the conditional
+// `extends` succeeds, so any failure is a compile error, not a runtime
+// reference.
+type _AbstractAdapterIsQuoting = AbstractAdapter extends Quoting ? true : never;
+const _abstractAdapterIsQuoting: _AbstractAdapterIsQuoting = true;
+void _abstractAdapterIsQuoting;
 
 /**
  * Pin the Quoting contract: every adapter exposes the full surface
