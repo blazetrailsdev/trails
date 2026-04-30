@@ -664,4 +664,87 @@ describe("numericality with in: range", () => {
     v.validateEach(stubRecord, "x", { not: "a number" });
     expect(errors).toEqual([["x", "not_a_number"]]);
   });
+
+  it("validates against the raw before-type-cast value (prepareValueForValidation)", () => {
+    // Rails numericality validates what the user typed, not the cast
+    // value. In trails, IntegerType.cast returns null for non-numeric
+    // strings — so without prepareValueForValidation, 'abc' would read
+    // as null and slip past via the allowNil short-circuit. The raw
+    // read through readAttributeBeforeTypeCast surfaces the original
+    // 'abc' so it's caught as not_a_number.
+    class Person extends Model {
+      static {
+        this.attribute("age", "integer");
+        this.validates("age", { numericality: true });
+      }
+    }
+    // "abc" can't cast through IntegerType (trails returns null), but
+    // the validator should see the raw "abc" via
+    // readAttributeBeforeTypeCast and reject it as not_a_number — NOT
+    // accidentally pass via the null-then-allow_nil branch.
+    const p = new Person({ age: "abc" });
+    expect(p.readAttributeBeforeTypeCast("age")).toBe("abc");
+    expect(p.isValid()).toBe(false);
+    expect(p.errors.get("age")).toContain("is not a number");
+  });
+
+  it("validates raw before-type-cast input on UPDATE even when allowNil is true", () => {
+    // Regression: trails' Model.attributeChangedInPlace returns true for
+    // any change-from-snapshot (not just in-place mutation as Rails
+    // means it). So if numericality's prepareValueForValidation
+    // honored the Rails record_attribute_changed_in_place? short-circuit,
+    // a 10 → 'abc' update on an integer attr would skip the raw read
+    // and let allowNil silently pass. Pin the trails behavior: raw
+    // 'abc' is read regardless of dirty state.
+    class Person extends Model {
+      static {
+        this.attribute("age", "integer");
+        this.validates("age", { numericality: { allowNil: true } });
+      }
+    }
+    const p = new Person({ age: 10 });
+    expect(p.isValid()).toBe(true);
+    p.changesApplied(); // baseline = 10
+    p.writeAttribute("age", "abc");
+    expect(p.readAttribute("age")).toBeNull(); // cast failed
+    expect(p.readAttributeBeforeTypeCast("age")).toBe("abc");
+    expect(p.isValid()).toBe(false); // raw 'abc' wins over null cast + allowNil
+    expect(p.errors.get("age")).toContain("is not a number");
+  });
+
+  it("validates raw before-type-cast input even when allowNil is true (overridden validate)", () => {
+    // EachValidator.validate skips validateEach when allow_nil: true and
+    // value is null. Numericality overrides validate so the raw input
+    // is read FIRST — 'abc' on an integer column casts to null but
+    // should still be caught as not_a_number even with allowNil: true.
+    class Person extends Model {
+      static {
+        this.attribute("age", "integer");
+        this.validates("age", { numericality: { allowNil: true } });
+      }
+    }
+    expect(new Person({}).isValid()).toBe(true); // genuinely nil → skip
+    const bad = new Person({ age: "abc" });
+    expect(bad.isValid()).toBe(false); // raw 'abc' wins over null cast
+    expect(bad.errors.get("age")).toContain("is not a number");
+  });
+
+  it("isAllowOnlyInteger honors a record-method onlyInteger (Ruby truthiness)", () => {
+    // Rails: allow_only_integer?(record) returns
+    // resolve_value(record, options[:only_integer]). A method name
+    // like 'strictMode' resolves to record.strictMode().
+    class Person extends Model {
+      static {
+        this.attribute("score", "string");
+        this.validates("score", { numericality: { onlyInteger: "strictMode" } });
+      }
+      strictMode(): boolean {
+        return true;
+      }
+    }
+    expect(new Person({ score: "5" }).isValid()).toBe(true);
+    const f = new Person({ score: "5.5" });
+    expect(f.isValid()).toBe(false);
+    expect(f.errors.get("score")).toContain("must be an integer");
+  });
 });

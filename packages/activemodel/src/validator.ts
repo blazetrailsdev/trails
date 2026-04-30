@@ -87,16 +87,26 @@ export class EachValidator extends Validator {
     this.checkValidity();
   }
 
+  /**
+   * Mirrors: ActiveModel::Validations#read_attribute_for_validation.
+   * Defaults to `send(attr)` (record[attr]); ActiveRecord overrides to
+   * resolve associations. Subclasses that override `validate` (e.g.
+   * NumericalityValidator) reuse this helper so the lookup chain
+   * stays in one place.
+   */
+  protected readAttributeForValidation(record: AnyRecord, attribute: string): unknown {
+    if (typeof record.readAttributeForValidation === "function") {
+      return record.readAttributeForValidation(attribute);
+    }
+    if (typeof record.readAttribute === "function") {
+      return record.readAttribute(attribute);
+    }
+    return record[attribute];
+  }
+
   validate(record: AnyRecord): void {
     for (const attribute of this.attributes) {
-      // Rails: record.read_attribute_for_validation(attribute)
-      // Defaults to send(attr) — AR overrides to resolve associations.
-      const value =
-        typeof record.readAttributeForValidation === "function"
-          ? record.readAttributeForValidation(attribute)
-          : typeof record.readAttribute === "function"
-            ? record.readAttribute(attribute)
-            : record[attribute];
+      const value = this.readAttributeForValidation(record, attribute);
       if (value == null && this.options.allowNil === true) continue;
       if (isBlank(value) && this.options.allowBlank === true) continue;
       this.validateEach(record, attribute, value);
