@@ -6,13 +6,33 @@
 
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import {
-  quote,
-  quoteIdentifier,
-  quoteTableName,
-  quoteString,
-  castBoundValue,
+  quote as abstractQuote,
+  quoteIdentifier as abstractQuoteIdentifier,
+  quoteTableNameForAssignment as abstractQuoteTableNameForAssignment,
+  quoteString as abstractQuoteString,
+  castBoundValue as abstractCastBoundValue,
 } from "./connection-adapters/abstract/quoting.js";
-import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
+import type { Quoting } from "./connection-adapters/abstract/quoting-interface.js";
+import {
+  ConnectionNotDefined,
+  PreparedStatementInvalid,
+  UnknownAttributeReference,
+} from "./errors.js";
+
+/** Subset of {@link Quoting} the sanitization helpers need. @internal */
+export type Quoter = Pick<
+  Quoting,
+  "quote" | "quoteIdentifier" | "quoteTableNameForAssignment" | "quoteString" | "castBoundValue"
+>;
+
+/** Fallback for callers that haven't been migrated to thread an adapter. @internal */
+const ABSTRACT_QUOTER: Quoter = {
+  quote: (v) => abstractQuote(v),
+  quoteIdentifier: (n) => abstractQuoteIdentifier(n),
+  quoteTableNameForAssignment: (t, a) => abstractQuoteTableNameForAssignment(t, a),
+  quoteString: (s) => abstractQuoteString(s),
+  castBoundValue: (v) => abstractCastBoundValue(v),
+};
 
 /**
  * Sanitize a SQL template with bind parameters.
@@ -21,15 +41,20 @@ import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_array
  */
 export function sanitizeSqlArray(template: string, ...binds: unknown[]): string {
+  return _sanitizeSqlArray(ABSTRACT_QUOTER, template, binds);
+}
+
+/** @internal */
+function _sanitizeSqlArray(quoter: Quoter, template: string, binds: unknown[]): string {
   const statement = template;
   const [first] = binds;
 
   if (isPlainHash(first) && /:\w+/.test(statement)) {
-    return replaceNamedBindVariables(statement, first as Record<string, unknown>);
+    return replaceNamedBindVariables(quoter, statement, first as Record<string, unknown>);
   }
 
   if (statement.includes("?")) {
-    return replaceBindVariables(statement, binds);
+    return replaceBindVariables(quoter, statement, binds);
   }
 
   if (statement === "") {
@@ -42,7 +67,7 @@ export function sanitizeSqlArray(template: string, ...binds: unknown[]): string 
   if (formatStringCount > 0) {
     raiseIfBindArityMismatch(statement, formatStringCount, binds.length);
     const values = [...binds];
-    return statement.replace(/%s/g, () => quoteString(String(values.shift() ?? "")));
+    return statement.replace(/%s/g, () => quoter.quoteString(String(values.shift() ?? "")));
   }
 
   return statement;
@@ -54,9 +79,14 @@ export function sanitizeSqlArray(template: string, ...binds: unknown[]): string 
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql
  */
 export function sanitizeSql(input: string | [string, ...unknown[]]): string {
+  return _sanitizeSql(ABSTRACT_QUOTER, input);
+}
+
+/** @internal */
+function _sanitizeSql(quoter: Quoter, input: string | [string, ...unknown[]]): string {
   if (typeof input === "string") return input;
   const [template, ...binds] = input;
-  return sanitizeSqlArray(template, ...binds);
+  return _sanitizeSqlArray(quoter, template, binds);
 }
 
 /**
@@ -64,9 +94,10 @@ export function sanitizeSql(input: string | [string, ...unknown[]]): string {
  */
 export function sanitizeSqlForConditions(
   condition: string | [string, ...unknown[]] | null | undefined,
+  quoter: Quoter = ABSTRACT_QUOTER,
 ): string | null {
   if (!condition || (typeof condition === "string" && condition.trim() === "")) return null;
-  return sanitizeSql(condition);
+  return _sanitizeSql(quoter, condition);
 }
 
 /**
@@ -75,10 +106,11 @@ export function sanitizeSqlForConditions(
 export function sanitizeSqlForAssignment(
   assignments: string | [string, ...unknown[]] | Record<string, unknown>,
   defaultTableName?: string,
+  quoter: Quoter = ABSTRACT_QUOTER,
 ): string {
   if (typeof assignments === "string") return assignments;
-  if (Array.isArray(assignments)) return sanitizeSql(assignments);
-  return sanitizeSqlHashForAssignment(assignments, defaultTableName ?? "");
+  if (Array.isArray(assignments)) return _sanitizeSql(quoter, assignments);
+  return _sanitizeSqlHashForAssignment(quoter, assignments, defaultTableName ?? "");
 }
 
 /**
@@ -86,10 +118,11 @@ export function sanitizeSqlForAssignment(
  */
 export function sanitizeSqlForOrder(
   condition: string | [string, ...unknown[]] | Nodes.Node,
+  quoter: Quoter = ABSTRACT_QUOTER,
 ): string | Nodes.Node {
   if (condition instanceof Nodes.Node) return condition;
   if (Array.isArray(condition) && condition[0]?.toString().includes("?")) {
-    const sanitized = sanitizeSqlArray(condition[0], ...condition.slice(1));
+    const sanitized = _sanitizeSqlArray(quoter, condition[0], condition.slice(1));
     disallowRawSqlBang([sanitized]);
     return arelSql(sanitized);
   }
@@ -100,6 +133,19 @@ export function sanitizeSqlForOrder(
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#sanitize_sql_hash_for_assignment
  */
 export function sanitizeSqlHashForAssignment(
+  attrs: Record<string, unknown>,
+  table: string,
+  typeForAttribute?: (
+    name: string,
+  ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
+  quoter: Quoter = ABSTRACT_QUOTER,
+): string {
+  return _sanitizeSqlHashForAssignment(quoter, attrs, table, typeForAttribute);
+}
+
+/** @internal */
+function _sanitizeSqlHashForAssignment(
+  quoter: Quoter,
   attrs: Record<string, unknown>,
   table: string,
   typeForAttribute?: (
@@ -116,10 +162,11 @@ export function sanitizeSqlHashForAssignment(
           if (type.serialize) value = type.serialize(value);
         }
       }
+      // Rails sanitization.rb:112 — PG/SQLite drop the table prefix.
       const col = table
-        ? `${quoteTableName(table)}.${quoteIdentifier(attr)}`
-        : quoteIdentifier(attr);
-      return `${col} = ${quote(value)}`;
+        ? quoter.quoteTableNameForAssignment(table, attr)
+        : quoter.quoteIdentifier(attr);
+      return `${col} = ${quoter.quote(value)}`;
     })
     .join(", ");
 }
@@ -177,13 +224,54 @@ function sanitizeSqlClassMethod(
   return this.sanitizeSqlArray(template, ...binds);
 }
 
+/** @internal */
+interface QuoterHost {
+  connection?(): unknown;
+}
+
+/**
+ * Resolves quoting through `connection()`. Only `ConnectionNotDefined`
+ * (no pool configured) falls back; other failures propagate to avoid a
+ * silent dialect downgrade. @internal
+ */
+function quoterFor(host: QuoterHost): Quoter {
+  if (typeof host.connection !== "function") return ABSTRACT_QUOTER;
+  let conn: Partial<Quoter> | null | undefined;
+  try {
+    conn = host.connection() as Partial<Quoter> | null | undefined;
+  } catch (err) {
+    if (err instanceof ConnectionNotDefined) return ABSTRACT_QUOTER;
+    throw err;
+  }
+  return conn &&
+    typeof conn.quote === "function" &&
+    typeof conn.quoteIdentifier === "function" &&
+    typeof conn.quoteTableNameForAssignment === "function" &&
+    typeof conn.quoteString === "function" &&
+    typeof conn.castBoundValue === "function"
+    ? (conn as Quoter)
+    : ABSTRACT_QUOTER;
+}
+
+/**
+ * Class-method variant of `sanitizeSqlArray` that threads the active
+ * adapter as the quoter, matching Rails' `connection.quote` dispatch.
+ */
+function sanitizeSqlArrayClassMethod(
+  this: QuoterHost,
+  template: string,
+  ...binds: unknown[]
+): string {
+  return _sanitizeSqlArray(quoterFor(this), template, binds);
+}
+
 /**
  * Class-method variant of `sanitizeSqlForConditions` that dispatches
  * through `this.sanitizeSql` (and therefore `this.sanitizeSqlArray`),
  * matching Rails' Ruby `self` dispatch through `ClassMethods`.
  */
 function sanitizeSqlForConditionsClassMethod(
-  this: { sanitizeSql(input: string | [string, ...unknown[]]): string },
+  this: QuoterHost & { sanitizeSql(input: string | [string, ...unknown[]]): string },
   condition: string | [string, ...unknown[]] | null | undefined,
 ): string | null {
   if (!condition || (typeof condition === "string" && condition.trim() === "")) return null;
@@ -196,13 +284,22 @@ function sanitizeSqlForConditionsClassMethod(
  * from `sanitize_sql_for_assignment` → `sanitize_sql_array`.
  */
 function sanitizeSqlForAssignmentClassMethod(
-  this: { sanitizeSql(input: string | [string, ...unknown[]]): string },
+  this: QuoterHost & {
+    sanitizeSql(input: string | [string, ...unknown[]]): string;
+    sanitizeSqlHashForAssignment(
+      attrs: Record<string, unknown>,
+      table: string,
+      typeForAttribute?: (
+        name: string,
+      ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
+    ): string;
+  },
   assignments: string | [string, ...unknown[]] | Record<string, unknown>,
   defaultTableName?: string,
 ): string {
   if (typeof assignments === "string") return assignments;
   if (Array.isArray(assignments)) return this.sanitizeSql(assignments);
-  return sanitizeSqlHashForAssignment(assignments, defaultTableName ?? "");
+  return this.sanitizeSqlHashForAssignment(assignments, defaultTableName ?? "");
 }
 
 /**
@@ -227,17 +324,33 @@ function sanitizeSqlForOrderClassMethod(
 }
 
 /**
+ * Class-method variant of `sanitizeSqlHashForAssignment` that uses the
+ * active adapter as the quoter — so `Model.sanitizeSqlHashForAssignment`
+ * emits dialect-correct identifiers (backticks on MySQL).
+ */
+function sanitizeSqlHashForAssignmentClassMethod(
+  this: QuoterHost,
+  attrs: Record<string, unknown>,
+  table: string,
+  typeForAttribute?: (
+    name: string,
+  ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
+): string {
+  return _sanitizeSqlHashForAssignment(quoterFor(this), attrs, table, typeForAttribute);
+}
+
+/**
  * Module methods wired onto Base as static methods via `extend()` in base.ts.
  * Mirrors Rails' `ActiveRecord::Sanitization::ClassMethods`.
  */
 export const ClassMethods = {
   sanitizeSql: sanitizeSqlClassMethod,
-  sanitizeSqlArray,
+  sanitizeSqlArray: sanitizeSqlArrayClassMethod,
   sanitizeSqlLike,
   sanitizeSqlForConditions: sanitizeSqlForConditionsClassMethod,
   sanitizeSqlForAssignment: sanitizeSqlForAssignmentClassMethod,
   sanitizeSqlForOrder: sanitizeSqlForOrderClassMethod,
-  sanitizeSqlHashForAssignment,
+  sanitizeSqlHashForAssignment: sanitizeSqlHashForAssignmentClassMethod,
   disallowRawSqlBang,
 };
 
@@ -249,11 +362,11 @@ export const ClassMethods = {
  *
  * @internal
  */
-function replaceBindVariables(statement: string, values: unknown[]): string {
+function replaceBindVariables(quoter: Quoter, statement: string, values: unknown[]): string {
   raiseIfBindArityMismatch(statement, statement.match(/\?/g)?.length ?? 0, values.length);
   const bound = [...values];
   let result = statement;
-  result = result.replace(/\?/g, () => replaceBindVariable(bound.shift()));
+  result = result.replace(/\?/g, () => replaceBindVariable(quoter, bound.shift()));
   return result;
 }
 
@@ -265,8 +378,8 @@ function replaceBindVariables(statement: string, values: unknown[]): string {
  *
  * @internal
  */
-function replaceBindVariable(value: unknown): string {
-  return quoteBoundValue(value);
+function replaceBindVariable(quoter: Quoter, value: unknown): string {
+  return quoteBoundValue(quoter, value);
 }
 
 /**
@@ -277,7 +390,11 @@ function replaceBindVariable(value: unknown): string {
  *
  * @internal
  */
-function replaceNamedBindVariables(statement: string, bindVars: Record<string, unknown>): string {
+function replaceNamedBindVariables(
+  quoter: Quoter,
+  statement: string,
+  bindVars: Record<string, unknown>,
+): string {
   let result = statement;
   result = result.replace(
     /([:\\]?):([a-zA-Z]\w*)/g,
@@ -293,7 +410,7 @@ function replaceNamedBindVariables(statement: string, bindVars: Record<string, u
         if (!Object.prototype.hasOwnProperty.call(bindVars, name)) {
           throw new PreparedStatementInvalid(`missing value for :${name} in ${statement}`);
         }
-        return replaceBindVariable(bindVars[name]);
+        return replaceBindVariable(quoter, bindVars[name]);
       }
     },
   );
@@ -309,10 +426,10 @@ function replaceNamedBindVariables(statement: string, bindVars: Record<string, u
  *
  * @internal
  */
-function quoteBoundValue(value: unknown): string {
+function quoteBoundValue(quoter: Quoter, value: unknown): string {
   if (hasIdForDatabase(value)) {
-    const cast = castBoundValue(value.idForDatabase());
-    return quote(cast);
+    const cast = quoter.castBoundValue(value.idForDatabase());
+    return quoter.quote(cast);
   }
 
   // Handle collections recognized by isEnumerable (Array and Set only).
@@ -322,20 +439,20 @@ function quoteBoundValue(value: unknown): string {
   if (isEnumerable(value)) {
     const values = Array.from(value as Iterable<unknown>);
     if (values.length === 0) {
-      const cast = castBoundValue(null);
-      return quote(cast);
+      const cast = quoter.castBoundValue(null);
+      return quoter.quote(cast);
     }
     return values
       .map((v) => {
         const idVal = hasIdForDatabase(v) ? v.idForDatabase() : v;
-        const cast = castBoundValue(idVal);
-        return quote(cast);
+        const cast = quoter.castBoundValue(idVal);
+        return quoter.quote(cast);
       })
       .join(",");
   }
 
-  const cast = castBoundValue(value);
-  return quote(cast);
+  const cast = quoter.castBoundValue(value);
+  return quoter.quote(cast);
 }
 
 function hasIdForDatabase(value: unknown): value is { idForDatabase(): unknown } {

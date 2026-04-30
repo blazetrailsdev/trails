@@ -436,12 +436,12 @@ export class Base extends Model {
 
   // --- Sanitization mixin (wired via extend() after class) ---
   declare static sanitizeSql: typeof Sanitization.ClassMethods.sanitizeSql;
-  declare static sanitizeSqlArray: typeof Sanitization.sanitizeSqlArray;
+  declare static sanitizeSqlArray: typeof Sanitization.ClassMethods.sanitizeSqlArray;
   declare static sanitizeSqlLike: typeof Sanitization.sanitizeSqlLike;
   declare static sanitizeSqlForConditions: typeof Sanitization.ClassMethods.sanitizeSqlForConditions;
   declare static sanitizeSqlForAssignment: typeof Sanitization.ClassMethods.sanitizeSqlForAssignment;
   declare static sanitizeSqlForOrder: typeof Sanitization.ClassMethods.sanitizeSqlForOrder;
-  declare static sanitizeSqlHashForAssignment: typeof Sanitization.sanitizeSqlHashForAssignment;
+  declare static sanitizeSqlHashForAssignment: typeof Sanitization.ClassMethods.sanitizeSqlHashForAssignment;
   declare static disallowRawSqlBang: typeof Sanitization.disallowRawSqlBang;
 
   // --- Associations (wired below after class body) ---
