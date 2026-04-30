@@ -53,6 +53,15 @@ export function quoteColumnName(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
+/**
+ * Mirrors: SQLite3 identifier quoting — double-quote form. Re-exported
+ * so the Quoting interface has a uniform `quoteIdentifier` regardless
+ * of adapter.
+ */
+export function quoteIdentifier(name: string): string {
+  return quoteColumnName(name);
+}
+
 export function quoteString(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }

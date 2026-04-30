@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   quote,
+  quoteIdentifier,
   typeCast,
   quotedBinary,
   unquoteIdentifier,
@@ -69,6 +70,20 @@ describe("MySQL quoting — quotedBinary", () => {
 
   it("formats a binary string as hex literal", () => {
     expect(quotedBinary(Buffer.from("hello").toString("binary"))).toBe("x'68656c6c6f'");
+  });
+});
+
+describe("MySQL quoting — quoteIdentifier", () => {
+  it("wraps in backticks", () => {
+    expect(quoteIdentifier("foo")).toBe("`foo`");
+  });
+
+  it("escapes embedded backticks by doubling", () => {
+    expect(quoteIdentifier("foo`bar")).toBe("`foo``bar`");
+  });
+
+  it("passes * through unquoted (column-list star)", () => {
+    expect(quoteIdentifier("*")).toBe("*");
   });
 });
 

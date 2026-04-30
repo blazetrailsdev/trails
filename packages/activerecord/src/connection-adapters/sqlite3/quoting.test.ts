@@ -9,6 +9,7 @@ import {
   quote,
   quotedBinary,
   quoteDefaultExpression,
+  quoteIdentifier,
   typeCast,
 } from "./quoting.js";
 
@@ -133,6 +134,16 @@ describe("SQLite3::Quoting", () => {
 
     it("rejects SQL injection", () => {
       expect(matcher.test("name; DROP TABLE users")).toBe(false);
+    });
+  });
+
+  describe("quoteIdentifier", () => {
+    it("wraps in double quotes", () => {
+      expect(quoteIdentifier("foo")).toBe('"foo"');
+    });
+
+    it("escapes embedded double quotes by doubling", () => {
+      expect(quoteIdentifier('foo"bar')).toBe('"foo""bar"');
     });
   });
 

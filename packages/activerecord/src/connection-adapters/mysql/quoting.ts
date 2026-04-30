@@ -59,6 +59,15 @@ export function quoteColumnName(name: string): string {
   return `\`${name.replace(/`/g, "``")}\``;
 }
 
+/**
+ * Mirrors: MySQL identifier quoting — backtick form. Re-exported so
+ * the Quoting interface has a uniform `quoteIdentifier` regardless of
+ * adapter.
+ */
+export function quoteIdentifier(name: string): string {
+  return quoteColumnName(name);
+}
+
 // eslint-disable-next-line no-control-regex
 const MYSQL_ESCAPE_RE = /[\\\x00\n\r\x1a]/g;
 const MYSQL_ESCAPE_MAP: Record<string, string> = {

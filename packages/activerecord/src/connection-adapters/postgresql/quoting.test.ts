@@ -15,6 +15,7 @@ import {
   quotedBinary,
   quotedFalse,
   quotedTrue,
+  quoteIdentifier,
   quoteSchemaName,
   quoteTableNameForAssignment,
   typeCast,
@@ -23,8 +24,15 @@ import {
 
 describe("PostgreSQL quoting", () => {
   it("inherits abstract boolean SQL literals", () => {
+    // Rails PG does not override quoted_true/quoted_false — it inherits
+    // "TRUE"/"FALSE" from active_record/connection_adapters/abstract/quoting.rb:166.
     expect(quotedTrue()).toBe("TRUE");
     expect(quotedFalse()).toBe("FALSE");
+  });
+
+  it("quoteIdentifier wraps in double quotes and escapes embedded ones", () => {
+    expect(quoteIdentifier("foo")).toBe('"foo"');
+    expect(quoteIdentifier('foo"bar')).toBe('"foo""bar"');
   });
 
   it("type casts binary data using the PG binary bind shape", () => {

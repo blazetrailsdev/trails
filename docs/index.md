@@ -56,10 +56,9 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 
 ## Design proposals (not started)
 
-| Doc                                                            | Priority | Work | Notes                                                                                                               |
-| -------------------------------------------------------------- | -------- | ---- | ------------------------------------------------------------------------------------------------------------------- |
-| [`relation-bound-attributes.md`](relation-bound-attributes.md) | P3       | M    | `Substitute → BindParam` pipeline for `StatementCache.create`. Design only; nothing wired yet.                      |
-| [`quoting-refactor.md`](quoting-refactor.md)                   | P3       | M    | Thread adapter through every `quote`/`quoteIdentifier` call site. Design; standalone-function pattern still in use. |
+| Doc                                          | Priority | Work | Notes                                                                                                               |
+| -------------------------------------------- | -------- | ---- | ------------------------------------------------------------------------------------------------------------------- |
+| [`quoting-refactor.md`](quoting-refactor.md) | P3       | M    | Thread adapter through every `quote`/`quoteIdentifier` call site. Design; standalone-function pattern still in use. |
 
 ## Verification harnesses
 

@@ -75,6 +75,14 @@ export function unquotedFalse(): boolean {
   return false;
 }
 
+/**
+ * Mirrors: PostgreSQL::Quoting#quote_column_name (re-exported as
+ * quoteIdentifier so the Quoting interface is uniform across adapters).
+ */
+export function quoteIdentifier(name: string): string {
+  return quoteColumnName(name);
+}
+
 export function quoteTableName(name: string): string {
   return splitSchemaQualifiedName(name)
     .map((part) => {
