@@ -1,5 +1,6 @@
 import { Node, NodeVisitor } from "./node.js";
 import { JoinSource } from "./join-source.js";
+import type { OptimizerHints } from "./unary.js";
 
 /**
  * SelectCore — the core of a SELECT statement (projections, from, where, etc.).
@@ -15,8 +16,9 @@ export class SelectCore extends Node {
   windows: Node[];
   setQuantifier: Node | null;
   // Mirrors Rails: `@ctx.optimizer_hints` is an `OptimizerHints` node (or
-  // nil) — not a bare array (select_core.rb).
-  optimizerHints: Node | null;
+  // nil) — not a bare array (select_core.rb). Narrowed to the concrete
+  // node type so the SQL visitor can rely on the `/*+ … */` formatting.
+  optimizerHints: OptimizerHints | null;
   comment: Node | null;
 
   constructor(relation: Node | null = null) {

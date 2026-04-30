@@ -1211,9 +1211,8 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // Mirrors Rails: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170). The
   // OptimizerHints node carries a list of hint strings (Rails' `o.expr` is
   // an array); each hint is sanitized and the joined result wrapped in
-  // /*+ ... */. Trails' SelectCore also stores hints inline as `string[]`
-  // — this method exists for callers that build an OptimizerHints node
-  // explicitly.
+  // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
+  // node and `emitOptimizerHints` delegates here.
   protected visitArelNodesOptimizerHints(node: Nodes.OptimizerHints): SQLString {
     // Mirrors Rails: hints are sanitized (newlines, comment delimiters,
     // `--` line comments stripped) and dropped when sanitization yields
