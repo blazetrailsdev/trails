@@ -20,7 +20,29 @@ import {
   CheckConstraintDefinition,
   TableDefinition,
 } from "./schema-definitions.js";
-import { quoteIdentifier, quoteTableName, quoteDefaultExpression } from "./quoting.js";
+import {
+  quoteIdentifier as abstractQuoteIdentifier,
+  quoteTableName as abstractQuoteTableName,
+  quoteDefaultExpression as abstractQuoteDefaultExpression,
+} from "./quoting.js";
+import type { Quoting } from "./quoting-interface.js";
+
+/** Subset of {@link Quoting} that schema-creation needs for identifier and value quoting. @internal */
+type SchemaQuoter = Pick<Quoting, "quoteIdentifier" | "quoteTableName" | "quoteDefaultExpression">;
+
+/**
+ * Build a fallback quoter from the dialect-name string for the legacy
+ * code path where construction sites haven't been migrated to pass an
+ * adapter. Each PR in the refactor moves one call site over until this
+ * fallback can be removed in PR 10. @internal
+ */
+function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
+  return {
+    quoteIdentifier: (n) => abstractQuoteIdentifier(n, name),
+    quoteTableName: (n) => abstractQuoteTableName(n, name),
+    quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
+  };
+}
 
 type Definition =
   | TableDefinition
@@ -32,7 +54,15 @@ type Definition =
   | CheckConstraintDefinition;
 
 export class SchemaCreation {
-  constructor(protected adapterName: "sqlite" | "postgres" | "mysql") {}
+  /** Quoter used for identifier/table/default-expression quoting. */
+  protected adapter: SchemaQuoter;
+
+  constructor(
+    protected adapterName: "sqlite" | "postgres" | "mysql",
+    adapter?: SchemaQuoter,
+  ) {
+    this.adapter = adapter ?? quoterForAdapterName(adapterName);
+  }
 
   protected supportsPartialIndex(): boolean {
     return this.adapterName !== "mysql";
@@ -67,7 +97,7 @@ export class SchemaCreation {
 
   protected visitTableDefinition(o: TableDefinition): string {
     let sql = "CREATE TABLE ";
-    sql += `${quoteTableName(o.tableName, this.adapterName)} `;
+    sql += `${this.adapter.quoteTableName(o.tableName)} `;
 
     const statements: string[] = o.columns.map((c) => this.visitColumnDefinition(c));
 
@@ -80,7 +110,7 @@ export class SchemaCreation {
 
   protected visitColumnDefinition(o: ColumnDefinition): string {
     const sqlType = o.sqlType ?? this.typeToSql(o.type, o.options);
-    let sql = `${quoteIdentifier(o.name, this.adapterName)} ${sqlType}`;
+    let sql = `${this.adapter.quoteIdentifier(o.name)} ${sqlType}`;
     if (o.type !== "primary_key") {
       sql = this.addColumnOptions(sql, o.options);
     }
@@ -92,7 +122,7 @@ export class SchemaCreation {
   }
 
   protected visitAlterTable(o: AlterTable): string {
-    const table = quoteTableName(o.name, this.adapterName);
+    const table = this.adapter.quoteTableName(o.name);
     const parts: string[] = [];
 
     for (const add of o.adds) {
@@ -102,23 +132,25 @@ export class SchemaCreation {
       parts.push(`ADD ${this.visitForeignKeyDefinition(fk)}`);
     }
     for (const name of o.foreignKeyDrops) {
-      parts.push(`DROP CONSTRAINT ${quoteIdentifier(name, this.adapterName)}`);
+      parts.push(`DROP CONSTRAINT ${this.adapter.quoteIdentifier(name)}`);
     }
     for (const chk of o.checkConstraintAdds) {
       parts.push(`ADD ${this.visitCheckConstraintDefinition(chk)}`);
     }
     for (const name of o.checkConstraintDrops) {
-      parts.push(`DROP CONSTRAINT ${quoteIdentifier(name, this.adapterName)}`);
+      parts.push(`DROP CONSTRAINT ${this.adapter.quoteIdentifier(name)}`);
     }
     for (const name of o.constraintDrops) {
-      parts.push(`DROP CONSTRAINT ${quoteIdentifier(name, this.adapterName)}`);
+      parts.push(`DROP CONSTRAINT ${this.adapter.quoteIdentifier(name)}`);
     }
     for (const change of o.columnDefaultChanges) {
-      const col = quoteIdentifier(change.columnName, this.adapterName);
+      const col = this.adapter.quoteIdentifier(change.columnName);
       if (change.defaultValue == null) {
         parts.push(`ALTER COLUMN ${col} DROP DEFAULT`);
       } else {
-        parts.push(`ALTER COLUMN ${col} SET${quoteDefaultExpression(change.defaultValue)}`);
+        parts.push(
+          `ALTER COLUMN ${col} SET${this.adapter.quoteDefaultExpression(change.defaultValue)}`,
+        );
       }
     }
 
@@ -134,11 +166,11 @@ export class SchemaCreation {
     if (o.ifNotExists) parts.push("IF NOT EXISTS");
     if (index.type) parts.push(index.type.toUpperCase());
     parts.push(
-      `${quoteIdentifier(index.name, this.adapterName)} ON ${quoteTableName(index.table, this.adapterName)}`,
+      `${this.adapter.quoteIdentifier(index.name)} ON ${this.adapter.quoteTableName(index.table)}`,
     );
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     const columnsSql = index.columns.map((c) => {
-      let col = quoteIdentifier(c, this.adapterName);
+      let col = this.adapter.quoteIdentifier(c);
       if (index.lengths[c]) col += `(${index.lengths[c]})`;
       if (this.supportsIndexSortOrder()) {
         const order = index.orders[c];
@@ -149,7 +181,7 @@ export class SchemaCreation {
     });
     parts.push(`(${columnsSql.join(", ")})`);
     if (this.supportsIndexInclude() && index.include && index.include.length > 0) {
-      const includeCols = index.include.map((c) => quoteIdentifier(c, this.adapterName));
+      const includeCols = index.include.map((c) => this.adapter.quoteIdentifier(c));
       parts.push(`INCLUDE (${includeCols.join(", ")})`);
     }
     if (this.supportsNullsNotDistinct() && index.nullsNotDistinct) parts.push("NULLS NOT DISTINCT");
@@ -158,16 +190,16 @@ export class SchemaCreation {
   }
 
   protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
-    let sql = `CONSTRAINT ${quoteIdentifier(o.name, this.adapterName)} `;
-    sql += `FOREIGN KEY (${quoteIdentifier(o.column, this.adapterName)}) `;
-    sql += `REFERENCES ${quoteTableName(o.toTable, this.adapterName)} (${quoteIdentifier(o.primaryKey, this.adapterName)})`;
+    let sql = `CONSTRAINT ${this.adapter.quoteIdentifier(o.name)} `;
+    sql += `FOREIGN KEY (${this.adapter.quoteIdentifier(o.column)}) `;
+    sql += `REFERENCES ${this.adapter.quoteTableName(o.toTable)} (${this.adapter.quoteIdentifier(o.primaryKey)})`;
     if (o.onDelete) sql += ` ${this.actionSql("DELETE", o.onDelete)}`;
     if (o.onUpdate) sql += ` ${this.actionSql("UPDATE", o.onUpdate)}`;
     return sql;
   }
 
   protected visitCheckConstraintDefinition(o: CheckConstraintDefinition): string {
-    let sql = `CONSTRAINT ${quoteIdentifier(o.name, this.adapterName)} CHECK (${o.expression})`;
+    let sql = `CONSTRAINT ${this.adapter.quoteIdentifier(o.name)} CHECK (${o.expression})`;
     if (!o.validate) {
       if (this.adapterName !== "postgres") {
         throw new Error("Check constraint validate: false is only supported on PostgreSQL");
@@ -179,7 +211,7 @@ export class SchemaCreation {
 
   addColumnOptions(sql: string, options: ColumnOptions): string {
     if (options.default !== undefined) {
-      sql += quoteDefaultExpression(options.default);
+      sql += this.adapter.quoteDefaultExpression(options.default);
     }
     if (options.null === false) {
       sql += " NOT NULL";

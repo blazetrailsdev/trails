@@ -1,6 +1,27 @@
 import { NotImplementedError } from "../../errors.js";
-import { quoteIdentifier, quoteTableName, quoteDefaultExpression } from "./quoting.js";
+import {
+  quoteIdentifier as abstractQuoteIdentifier,
+  quoteTableName as abstractQuoteTableName,
+  quoteDefaultExpression as abstractQuoteDefaultExpression,
+} from "./quoting.js";
+import type { Quoting } from "./quoting-interface.js";
 import { singularize } from "@blazetrails/activesupport";
+
+/** Subset of {@link Quoting} that schema-definitions needs. @internal */
+type SchemaQuoter = Pick<Quoting, "quoteIdentifier" | "quoteTableName" | "quoteDefaultExpression">;
+
+/**
+ * Build a fallback quoter from the dialect-name string for the legacy
+ * code path where construction sites haven't yet been migrated to pass
+ * an adapter. Removed in PR 10. @internal
+ */
+function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
+  return {
+    quoteIdentifier: (n) => abstractQuoteIdentifier(n, name),
+    quoteTableName: (n) => abstractQuoteTableName(n, name),
+    quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
+  };
+}
 
 /**
  * Column type mapping.
@@ -458,12 +479,14 @@ export class TableDefinition {
   readonly comment?: string;
   private _id: boolean | PrimaryKeyType;
   private _adapterName: "sqlite" | "postgres" | "mysql";
+  private _adapter: SchemaQuoter;
 
   constructor(
     tableName: string,
     tdOptions: {
       id?: boolean | PrimaryKeyType;
       adapterName?: "sqlite" | "postgres" | "mysql";
+      adapter?: SchemaQuoter;
       temporary?: boolean;
       ifNotExists?: boolean;
       as?: string;
@@ -473,6 +496,7 @@ export class TableDefinition {
   ) {
     this.tableName = tableName;
     this._adapterName = tdOptions.adapterName ?? "sqlite";
+    this._adapter = tdOptions.adapter ?? quoterForAdapterName(this._adapterName);
     this._id = tdOptions.id ?? true;
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
@@ -734,7 +758,7 @@ export class TableDefinition {
    */
   toSql(): string {
     const columnDefs = this.columns.map((col) => {
-      const parts = [quoteIdentifier(col.name, this._adapterName)];
+      const parts = [this._adapter.quoteIdentifier(col.name)];
 
       switch (col.type) {
         case "primary_key":
@@ -810,7 +834,7 @@ export class TableDefinition {
       }
 
       if (col.options.collation && this._adapterName === "sqlite") {
-        parts.push(`COLLATE ${quoteIdentifier(col.options.collation, this._adapterName)}`);
+        parts.push(`COLLATE ${this._adapter.quoteIdentifier(col.options.collation)}`);
       }
 
       if (col.options.array && col.type !== "primary_key") {
@@ -827,7 +851,7 @@ export class TableDefinition {
       }
 
       if (col.options.default !== undefined) {
-        const clause = quoteDefaultExpression(col.options.default);
+        const clause = this._adapter.quoteDefaultExpression(col.options.default);
         if (clause) parts.push(clause.trimStart());
       }
 
@@ -838,14 +862,14 @@ export class TableDefinition {
     if (this.temporary) sql += " TEMPORARY";
     sql += " TABLE";
     if (this.ifNotExists) sql += " IF NOT EXISTS";
-    sql += ` ${quoteTableName(this.tableName, this._adapterName)}`;
+    sql += ` ${this._adapter.quoteTableName(this.tableName)}`;
 
     if (this.as) {
       sql += ` AS ${this.as}`;
     } else {
       const tableElements = [...columnDefs];
       for (const chk of this.checkConstraints) {
-        let chkSql = `CONSTRAINT ${quoteIdentifier(chk.name, this._adapterName)} CHECK (${chk.expression})`;
+        let chkSql = `CONSTRAINT ${this._adapter.quoteIdentifier(chk.name)} CHECK (${chk.expression})`;
         if (!chk.validate) {
           if (this._adapterName !== "postgres") {
             throw new Error("Check constraint validate: false is only supported on PostgreSQL");
@@ -855,7 +879,7 @@ export class TableDefinition {
         tableElements.push(chkSql);
       }
       for (const fk of this.foreignKeys) {
-        let fkSql = `CONSTRAINT ${quoteIdentifier(fk.name, this._adapterName)} FOREIGN KEY (${quoteIdentifier(fk.column, this._adapterName)}) REFERENCES ${quoteTableName(fk.toTable, this._adapterName)} (${quoteIdentifier(fk.primaryKey, this._adapterName)})`;
+        let fkSql = `CONSTRAINT ${this._adapter.quoteIdentifier(fk.name)} FOREIGN KEY (${this._adapter.quoteIdentifier(fk.column)}) REFERENCES ${this._adapter.quoteTableName(fk.toTable)} (${this._adapter.quoteIdentifier(fk.primaryKey)})`;
         if (fk.onDelete)
           fkSql += ` ON DELETE ${fk.onDelete.toUpperCase().replace("NULLIFY", "SET NULL").replace("NO_ACTION", "NO ACTION")}`;
         if (fk.onUpdate)
