@@ -342,12 +342,16 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       this.collector.append(")");
     }
 
-    if (node.select) {
-      this.collector.append(" ");
-      this.visit(node.select);
-    } else if (node.values) {
+    // Mirrors Rails: prefer `node.values` when both are present
+    // (insert_statement.rb / to_sql.rb pattern). Routes through
+    // `visitNodeOrValue` so a SelectManager-shaped duck-type (the form
+    // `InsertManager#select` stores) lands in `visitArelSelectManager`.
+    if (node.values) {
       this.collector.append(" ");
       this.visit(node.values);
+    } else if (node.select) {
+      this.collector.append(" ");
+      this.visitNodeOrValue(node.select as Nodes.NodeOrValue);
     }
 
     return this.collector;
@@ -1380,7 +1384,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       this.collector.append("(");
       for (let j = 0; j < node.rows[i].length; j++) {
         if (j > 0) this.collector.append(", ");
-        this.visit(node.rows[i][j]);
+        this.visitNodeOrValue(node.rows[i][j] as Nodes.NodeOrValue);
       }
       this.collector.append(")");
     }

@@ -5,11 +5,18 @@ import { Node, NodeVisitor } from "./node.js";
  *
  * Mirrors: Arel::Nodes::InsertStatement
  */
+/**
+ * Mirrors Rails: `@ast.select = select` in `InsertManager#select` —
+ * Rails stores a `SelectManager` directly (not its inner `.ast`), so
+ * the field type widens to "Node-or-SelectManager-shape-or-null".
+ */
+export type InsertSelectSource = Node | { ast: Node; toSql: () => string } | null;
+
 export class InsertStatement extends Node {
   relation: Node | null;
   columns: Node[];
   values: Node | null;
-  select: Node | null;
+  select: InsertSelectSource;
 
   constructor(relation: Node | null = null) {
     super();

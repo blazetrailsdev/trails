@@ -199,7 +199,7 @@ export class SchemaMigration {
       const im = new InsertManager(this.arelTable);
       const rows = toInsert.map((v) => [new Nodes.Quoted(v)]);
       im.ast.columns = [col];
-      im.values(im.createValuesList(rows));
+      im.values = im.createValuesList(rows);
       await this._adapter.executeMutation(im.toSql());
     }
   }

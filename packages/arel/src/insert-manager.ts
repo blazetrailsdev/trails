@@ -1,9 +1,9 @@
 import { Node } from "./nodes/node.js";
 import { TreeManager } from "./tree-manager.js";
-import { InsertStatement } from "./nodes/insert-statement.js";
+import { InsertStatement, type InsertSelectSource } from "./nodes/insert-statement.js";
 import { Attribute } from "./attributes/attribute.js";
 import { ValuesList } from "./nodes/values-list.js";
-import { Quoted } from "./nodes/casted.js";
+import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
 
 /**
@@ -16,8 +16,7 @@ export class InsertManager extends TreeManager {
 
   constructor(table?: Table | null) {
     super();
-    this.ast = new InsertStatement();
-    if (table) this.into(table);
+    this.ast = new InsertStatement(table ?? null);
   }
 
   /**
@@ -30,25 +29,44 @@ export class InsertManager extends TreeManager {
 
   /**
    * Set column/value pairs.
+   *
+   * Mirrors: Arel::InsertManager#insert (insert_manager.rb).
+   * - returns early when `fields` is empty (Rails: `return if fields.empty?`)
+   * - string form stores `Nodes::SqlLiteral.new(fields)` on `ast.values`
+   * - infers `ast.relation` from the first column when not yet set
+   *   (Rails: `@ast.relation ||= fields.first.first.relation`)
+   * - values pass through raw — no `Quoted` wrap (Rails preserves them
+   *   for the dialect-specific value visitor to quote)
    */
-  insert(values: [Attribute | Node, unknown][]): this {
-    const columns: Node[] = [];
-    const row: Node[] = [];
-    for (const [col, val] of values) {
-      columns.push(col);
-      row.push(val instanceof Node ? val : new Quoted(val));
+  insert(fields: string | [Attribute | Node, unknown][] | null | undefined): this {
+    if (fields == null) return this;
+
+    if (typeof fields === "string") {
+      this.ast.values = new SqlLiteral(fields);
+      return this;
     }
-    this.ast.columns = columns;
-    this.ast.values = new ValuesList([row]);
+
+    if (fields.length === 0) return this;
+
+    if (this.ast.relation == null) {
+      const first = fields[0]?.[0] as { relation?: Node } | undefined;
+      if (first?.relation) this.ast.relation = first.relation;
+    }
+
+    const row: unknown[] = [];
+    for (const [col, val] of fields) {
+      this.ast.columns.push(col);
+      row.push(val);
+    }
+    this.ast.values = this.createValues(row);
     return this;
   }
 
   /**
-   * Set values from raw rows.
+   * Mirrors: Arel::InsertManager `values=` (insert_manager.rb).
    */
-  values(valuesList: ValuesList): this {
-    this.ast.values = valuesList;
-    return this;
+  set values(val: Node | null) {
+    this.ast.values = val;
   }
 
   /**
@@ -63,10 +81,13 @@ export class InsertManager extends TreeManager {
   /**
    * Set a SelectManager as the source for INSERT ... SELECT.
    *
-   * Mirrors: Arel::InsertManager#select
+   * Mirrors: Arel::InsertManager#select — stores the manager itself
+   * rather than unwrapping to its inner `.ast`. The visitor handles
+   * either shape (raw Node or SelectManager-shaped duck-type) via
+   * `visitNodeOrValue`.
    */
-  select(selectManager: { ast: Node }): this {
-    this.ast.select = selectManager.ast;
+  select(selectManager: InsertSelectSource): this {
+    this.ast.select = selectManager;
     return this;
   }
 
@@ -75,8 +96,8 @@ export class InsertManager extends TreeManager {
    *
    * Mirrors: Arel::InsertManager#create_values
    */
-  createValues(row: Node[], _columns?: Node[]): ValuesList {
-    return new ValuesList([row]);
+  createValues(row: unknown[]): ValuesList {
+    return new ValuesList([row as Node[]]);
   }
 
   /**
