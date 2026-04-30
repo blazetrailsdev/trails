@@ -118,11 +118,9 @@ export class TimeWithZone {
     return this._zoned.epochMilliseconds;
   }
 
-  /** Build a Date snapshot for legacy Date-based helpers and formatters. */
-  private _toDate(): Date {
-    // boundary: bridges Temporal-backed state to still-Date-typed TimeZone
-    // helpers and time-ext/duration arithmetic.
-    return new Date(this._epochMs);
+  /** UTC-zoned snapshot of the underlying instant for component access. */
+  private get _utc(): Temporal.PlainDateTime {
+    return this._zoned.withTimeZone("UTC").toPlainDateTime();
   }
 
   // ---------------------------------------------------------------------------
@@ -141,12 +139,12 @@ export class TimeWithZone {
 
   /** Timezone abbreviation (e.g., "EST", "EDT") */
   get zone(): string {
-    return this._timeZone.abbreviation(this._toDate());
+    return this._timeZone.abbreviation(this._zoned.toInstant());
   }
 
   /** UTC offset in seconds */
   get utcOffset(): number {
-    return this._timeZone.utcOffsetAt(this._toDate());
+    return this._timeZone.utcOffsetAt(this._zoned.toInstant());
   }
 
   /** Alias for utcOffset */
@@ -156,7 +154,7 @@ export class TimeWithZone {
 
   /** Whether DST is in effect */
   dst(): boolean {
-    return this._timeZone.isDst(this._toDate());
+    return this._timeZone.isDst(this._zoned.toInstant());
   }
 
   /** Alias for dst() */
@@ -478,11 +476,11 @@ export class TimeWithZone {
 
   /** HTTP date format */
   httpdate(): string {
-    const u = this._toDate();
+    const u = this._utc;
     return (
-      `${SHORT_DAY_NAMES[u.getUTCDay()]}, ${pad2(u.getUTCDate())} ` +
-      `${SHORT_MONTH_NAMES[u.getUTCMonth()]} ${u.getUTCFullYear()} ` +
-      `${pad2(u.getUTCHours())}:${pad2(u.getUTCMinutes())}:${pad2(u.getUTCSeconds())} GMT`
+      `${SHORT_DAY_NAMES[u.dayOfWeek % 7]}, ${pad2(u.day)} ` +
+      `${SHORT_MONTH_NAMES[u.month - 1]} ${u.year} ` +
+      `${pad2(u.hour)}:${pad2(u.minute)}:${pad2(u.second)} GMT`
     );
   }
 
@@ -490,10 +488,10 @@ export class TimeWithZone {
   toFs(format: string = "default"): string {
     switch (format) {
       case "db": {
-        const u = this._toDate();
+        const u = this._utc;
         return (
-          `${u.getUTCFullYear()}-${pad2(u.getUTCMonth() + 1)}-${pad2(u.getUTCDate())} ` +
-          `${pad2(u.getUTCHours())}:${pad2(u.getUTCMinutes())}:${pad2(u.getUTCSeconds())}`
+          `${u.year}-${pad2(u.month)}-${pad2(u.day)} ` +
+          `${pad2(u.hour)}:${pad2(u.minute)}:${pad2(u.second)}`
         );
       }
       case "long":
