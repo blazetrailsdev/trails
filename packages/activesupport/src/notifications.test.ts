@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Notifications } from "./notifications.js";
 import { Event, Instrumenter, LegacyHandle, Wrapper } from "./notifications/instrumenter.js";
+import { Temporal } from "./temporal.js";
 
 beforeEach(() => {
   Notifications.unsubscribeAll();
@@ -139,7 +140,7 @@ describe("SubscribedTest", () => {
 
 describe("InspectTest", () => {
   it("inspect output is small", () => {
-    const e = new Event("test.inspect", new Date(), { key: "val" });
+    const e = new Event("test.inspect", Temporal.Now.instant(), { key: "val" });
     // inspect equivalent is just checking the object has basic info
     expect(e.name).toBe("test.inspect");
     expect(e.payload).toEqual({ key: "val" });
@@ -299,13 +300,13 @@ describe("InstrumentationTest", () => {
     Notifications.subscribe("no.block", (e) => events.push(e));
     Notifications.instrument("no.block", { a: 1 });
     expect(events).toHaveLength(1);
-    expect(events[0].end).toBeInstanceOf(Date);
+    expect(events[0].end).toBeInstanceOf(Temporal.Instant);
   });
 });
 
 describe("EventTest", () => {
   it("events are initialized with details", () => {
-    const start = new Date();
+    const start = Temporal.Now.instant();
     const e = new Event("test.event", start, { key: "val" });
     expect(e.name).toBe("test.event");
     expect(e.time).toBe(start);
@@ -313,7 +314,7 @@ describe("EventTest", () => {
   });
 
   it("event cpu time does not raise error when start or finished not called", () => {
-    const e = new Event("test", new Date());
+    const e = new Event("test", Temporal.Now.instant());
     // duration before finish should return 0, not throw
     expect(() => e.duration).not.toThrow();
     expect(e.duration).toBe(0);
@@ -321,7 +322,7 @@ describe("EventTest", () => {
 
   it("events consumes information given as payload", () => {
     const payload = { sql: "SELECT 1", binds: [1, 2] };
-    const e = new Event("sql", new Date(), payload);
+    const e = new Event("sql", Temporal.Now.instant(), payload);
     expect(e.payload.sql).toBe("SELECT 1");
     expect(e.payload.binds).toEqual([1, 2]);
   });
@@ -399,9 +400,9 @@ describe("ActiveSupport::Notifications", () => {
         event = e;
       });
       Notifications.instrument("work", {});
-      expect(event.time).toBeInstanceOf(Date);
-      expect(event.end).toBeInstanceOf(Date);
-      expect(event.end!.getTime()).toBeGreaterThanOrEqual(event.time.getTime());
+      expect(event.time).toBeInstanceOf(Temporal.Instant);
+      expect(event.end).toBeInstanceOf(Temporal.Instant);
+      expect(event.end!.epochNanoseconds).toBeGreaterThanOrEqual(event.time.epochNanoseconds);
     });
 
     it("duration reflects elapsed time", async () => {
@@ -499,7 +500,7 @@ describe("ActiveSupport::Notifications", () => {
 
   describe("Event", () => {
     it("has name, time, and payload", () => {
-      const now = new Date();
+      const now = Temporal.Now.instant();
       const e = new Event("foo", now, { x: 1 });
       expect(e.name).toBe("foo");
       expect(e.time).toBe(now);
@@ -507,20 +508,20 @@ describe("ActiveSupport::Notifications", () => {
     });
 
     it("duration is 0 before finish", () => {
-      const e = new Event("foo", new Date());
+      const e = new Event("foo", Temporal.Now.instant());
       expect(e.duration).toBe(0);
     });
 
     it("duration is positive after finish", () => {
-      const start = new Date(Date.now() - 100);
+      const start = Temporal.Now.instant().subtract({ milliseconds: 100 });
       const e = new Event("foo", start);
-      e.finish(new Date());
+      e.finish(Temporal.Now.instant());
       expect(e.duration).toBeGreaterThan(0);
     });
 
     it("has unique transactionId", () => {
-      const a = new Event("a", new Date());
-      const b = new Event("b", new Date());
+      const a = new Event("a", Temporal.Now.instant());
+      const b = new Event("b", Temporal.Now.instant());
       expect(a.transactionId).not.toBe(b.transactionId);
     });
 
@@ -641,7 +642,7 @@ describe("LegacyHandle", () => {
         published.push(event);
       },
     };
-    const event = new Event("legacy.event", new Date());
+    const event = new Event("legacy.event", Temporal.Now.instant());
     const handle = new LegacyHandle(event, notifier);
     handle.finish();
     expect(published).toHaveLength(1);

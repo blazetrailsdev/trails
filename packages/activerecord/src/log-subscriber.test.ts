@@ -6,6 +6,7 @@ import {
   NotificationEvent as Event,
   Logger,
 } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 const REGEXP_CLEAR_STR = `\\x1b\\[${BaseLogSubscriber.MODES.clear}m`;
 const REGEXP_BOLD_STR = `\\x1b\\[${BaseLogSubscriber.MODES.bold}m`;
@@ -109,13 +110,17 @@ describe("LogSubscriberTest", () => {
   it("schema statements are ignored", () => {
     expect(subscriber.debugs.length).toBe(0);
 
-    subscriber.sql(new Event("sql.active_record", new Date(), { sql: "hi mom!" }));
+    subscriber.sql(new Event("sql.active_record", Temporal.Now.instant(), { sql: "hi mom!" }));
     expect(subscriber.debugs.length).toBe(1);
 
-    subscriber.sql(new Event("sql.active_record", new Date(), { sql: "hi mom!", name: "foo" }));
+    subscriber.sql(
+      new Event("sql.active_record", Temporal.Now.instant(), { sql: "hi mom!", name: "foo" }),
+    );
     expect(subscriber.debugs.length).toBe(2);
 
-    subscriber.sql(new Event("sql.active_record", new Date(), { sql: "hi mom!", name: "SCHEMA" }));
+    subscriber.sql(
+      new Event("sql.active_record", Temporal.Now.instant(), { sql: "hi mom!", name: "SCHEMA" }),
+    );
     expect(subscriber.debugs.length).toBe(2);
   });
 
@@ -376,10 +381,9 @@ describe("LogSubscriberTest", () => {
 });
 
 function makeEvent(payload: Record<string, unknown>, durationMs = 0.9): Event {
-  const start = new Date();
+  const start = Temporal.Now.instant();
   const event = new Event("sql.active_record", start, payload);
-  const end = new Date(start.getTime());
-  event.finish(end);
+  event.finish(start);
   Object.defineProperty(event, "duration", { get: () => durationMs, configurable: true });
   return event;
 }

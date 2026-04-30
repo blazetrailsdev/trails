@@ -5,11 +5,9 @@
  *   const sub = Notifications.subscribe("sql.active_record", (event) => { ... });
  *   Notifications.instrument("sql.active_record", { sql: "SELECT 1" }, () => { ... });
  *   Notifications.unsubscribe(sub);
- *
- * @boundary-file: emits `Event` instances whose `time`/`end` fields are
- *   JS `Date` by Rails parity (see `notifications/instrumenter.ts`).
  */
 
+import { Temporal } from "./temporal.js";
 import { Event } from "./notifications/instrumenter.js";
 import type { EventPayload } from "./notifications/instrumenter.js";
 import { getAsyncContext } from "./async-context-adapter.js";
@@ -129,7 +127,7 @@ export class Notifications {
    *   Notifications.instrument("cache.miss", { key });
    */
   private static _buildEvent(name: string, payload?: EventPayload, current?: Event[]): Event {
-    const event = new Event(name, new Date(), payload ?? {});
+    const event = new Event(name, Temporal.Now.instant(), payload ?? {});
     const stack = current ?? this._eventStack();
     const parent = stack[stack.length - 1];
     if (parent) {

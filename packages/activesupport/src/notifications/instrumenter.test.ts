@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Notifications } from "../notifications.js";
 import { Event } from "./instrumenter.js";
+import { Temporal } from "../temporal.js";
 
 describe("InstrumenterTest", () => {
   afterEach(() => {
@@ -30,7 +31,7 @@ describe("InstrumenterTest", () => {
     Notifications.subscribe("foo", (e) => events.push(e));
     Notifications.instrument("foo", { x: 1 });
     expect(events).toHaveLength(1);
-    expect(events[0].end).toBeInstanceOf(Date);
+    expect(events[0].end).toBeInstanceOf(Temporal.Instant);
   });
 
   it("start", () => {
@@ -44,7 +45,7 @@ describe("InstrumenterTest", () => {
     const events: Event[] = [];
     Notifications.subscribe("finish.test", (e) => events.push(e));
     Notifications.instrument("finish.test", {});
-    expect(events[0].end).toBeInstanceOf(Date);
+    expect(events[0].end).toBeInstanceOf(Temporal.Instant);
   });
 
   it("record", () => {

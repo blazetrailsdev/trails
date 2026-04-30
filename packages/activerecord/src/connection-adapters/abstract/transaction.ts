@@ -6,6 +6,7 @@ import {
   NotImplementedError,
 } from "../../errors.js";
 import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::TransactionState
@@ -150,8 +151,11 @@ export class TransactionInstrumenter {
     Notifications.instrument("start_transaction.active_record", this._basePayload);
 
     this._payload = { ...this._basePayload };
-    // boundary: Notifications.Event#time is Date by Rails parity (see activesupport/src/notifications/instrumenter.ts).
-    this._event = new NotificationEvent("transaction.active_record", new Date(), this._payload);
+    this._event = new NotificationEvent(
+      "transaction.active_record",
+      Temporal.Now.instant(),
+      this._payload,
+    );
   }
 
   finish(outcome: string): void {

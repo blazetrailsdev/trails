@@ -1,10 +1,4 @@
-/**
- * @boundary-file: ActiveSupport::Notifications::Event exposes `time: Date` /
- *   `end: Date | null` as a public contract for log subscribers and listeners;
- *   `end` becomes a `Date` once `finish()` runs (Rails parity — Ruby
- *   Event#time returns a Time). The Temporal flip on this surface is tracked
- *   separately as a cross-cutting subscriber refactor.
- */
+import { Temporal } from "../temporal.js";
 
 export type EventPayload = Record<string, unknown>;
 
@@ -18,13 +12,18 @@ function generateTransactionId(): string {
  */
 export class Event {
   readonly name: string;
-  readonly time: Date;
-  end: Date | null;
+  readonly time: Temporal.Instant;
+  end: Temporal.Instant | null;
   readonly payload: EventPayload;
   readonly transactionId: string;
   readonly children: Event[];
 
-  constructor(name: string, start: Date, payload: EventPayload = {}, transactionId?: string) {
+  constructor(
+    name: string,
+    start: Temporal.Instant,
+    payload: EventPayload = {},
+    transactionId?: string,
+  ) {
     this.name = name;
     this.time = start;
     this.end = null;
@@ -36,7 +35,7 @@ export class Event {
   /** Duration in milliseconds (like Rails' Event#duration in ms). */
   get duration(): number {
     if (!this.end) return 0;
-    return this.end.getTime() - this.time.getTime();
+    return this.end.epochMilliseconds - this.time.epochMilliseconds;
   }
 
   /** Alias: Rails calls it `duration` but measured in ms. */
@@ -44,8 +43,8 @@ export class Event {
     return this.duration;
   }
 
-  finish(endTime?: Date): void {
-    this.end = endTime ?? new Date();
+  finish(endTime?: Temporal.Instant): void {
+    this.end = endTime ?? Temporal.Now.instant();
   }
 }
 
@@ -71,7 +70,7 @@ export class Instrumenter {
     } else if (payloadOrFn) {
       payload = payloadOrFn;
     }
-    const event = new Event(name, new Date(), payload, this.id);
+    const event = new Event(name, Temporal.Now.instant(), payload, this.id);
     const parent = this._stack[this._stack.length - 1];
     if (parent) parent.children.push(event);
     this._stack.push(event);
@@ -98,7 +97,7 @@ export class Instrumenter {
     } else if (payloadOrFn) {
       payload = payloadOrFn;
     }
-    const event = new Event(name, new Date(), payload, this.id);
+    const event = new Event(name, Temporal.Now.instant(), payload, this.id);
     const parent = this._stack[this._stack.length - 1];
     if (parent) parent.children.push(event);
     this._stack.push(event);

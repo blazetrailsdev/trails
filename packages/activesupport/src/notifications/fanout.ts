@@ -1,9 +1,4 @@
-/**
- * @boundary-file: subscriber group implementations may time their callbacks
- *   with either JS `Date` values or monotonic numeric timestamps, depending on
- *   the timing source. The public `Event.time`/`end` contract remains
- *   Date-typed for Rails parity — see notifications/instrumenter.ts.
- */
+import { Temporal } from "../temporal.js";
 import { Event } from "./instrumenter.js";
 
 export class InstrumentationSubscriberError extends Error {
@@ -50,8 +45,8 @@ type EventedListener = {
 
 type TimedCallback = (
   name: string,
-  start: Date | number,
-  finish: Date | number,
+  start: Temporal.Instant | number,
+  finish: Temporal.Instant | number,
   id: unknown,
   payload: Record<string, unknown>,
 ) => void;
@@ -166,17 +161,17 @@ export class EventedGroup extends BaseGroup {
 }
 
 export class TimedGroup extends BaseTimeGroup {
-  private startTime: Date | null = null;
+  private startTime: Temporal.Instant | null = null;
   constructor(private listeners: TimedCallback[]) {
     super();
   }
 
   start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
-    this.startTime = new Date();
+    this.startTime = Temporal.Now.instant();
   }
 
   finish(name: string, id: unknown, payload: Record<string, unknown>): void {
-    const stopTime = new Date();
+    const stopTime = Temporal.Now.instant();
     iterateGuardingExceptions(this.listeners, (l) =>
       l(name, this.startTime!, stopTime, id, payload),
     );
@@ -208,7 +203,7 @@ export class EventObjectGroup extends BaseGroup {
   }
 
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
-    this.event = new Event(name, new Date(), payload, String(id));
+    this.event = new Event(name, Temporal.Now.instant(), payload, String(id));
   }
 
   finish(_name: string, _id: unknown, payload: Record<string, unknown>): void {
