@@ -1572,19 +1572,19 @@ describe("the to_sql visitor", () => {
   describe("OuterJoin guard", () => {
     it("OuterJoin without an ON throws", () => {
       const visitor = new Visitors.ToSql();
-      const node = new Nodes.OuterJoin(users, null as unknown as Nodes.On);
+      const node = new Nodes.OuterJoin(users, null);
       expect(() => visitor.compile(node)).toThrow();
     });
 
     it("RightOuterJoin without an ON throws", () => {
       const visitor = new Visitors.ToSql();
-      const node = new Nodes.RightOuterJoin(users, null as unknown as Nodes.On);
+      const node = new Nodes.RightOuterJoin(users, null);
       expect(() => visitor.compile(node)).toThrow();
     });
 
     it("FullOuterJoin without an ON throws", () => {
       const visitor = new Visitors.ToSql();
-      const node = new Nodes.FullOuterJoin(users, null as unknown as Nodes.On);
+      const node = new Nodes.FullOuterJoin(users, null);
       expect(() => visitor.compile(node)).toThrow();
     });
   });
