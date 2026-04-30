@@ -1,4 +1,5 @@
 import { getFs, getPath } from "@blazetrails/activesupport";
+import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
 
@@ -26,7 +27,7 @@ export class Static {
   constructor(app: any, opts: StaticOptions = {}) {
     this.app = app;
     this.urls = opts.urls || ["/"];
-    this.root = opts.root ? getPath().resolve(opts.root) : process.cwd();
+    this.root = opts.root ? getPath().resolve(opts.root) : cwd();
     this.index = opts.index || null;
     this.cascade = opts.cascade || false;
     this.headerRules = opts.header_rules || [];

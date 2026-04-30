@@ -13,6 +13,7 @@
         "../../activesupport/src/message-verifier.ts"
       ],
       "@blazetrails/activesupport/temporal": ["../../activesupport/src/temporal.ts"],
+      "@blazetrails/activesupport/process-adapter": ["../../activesupport/src/process-adapter.ts"],
       "@blazetrails/activesupport/testing/temporal-helpers": [
         "../../activesupport/src/testing/temporal-helpers.ts"
       ]

@@ -9,7 +9,10 @@
       "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
       "@blazetrails/arel": ["../../arel/src/index.ts"],
       "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],
-      "@blazetrails/activesupport/message-verifier": ["../../activesupport/src/message-verifier.ts"]
+      "@blazetrails/activesupport/message-verifier": [
+        "../../activesupport/src/message-verifier.ts"
+      ],
+      "@blazetrails/activesupport/process-adapter": ["../../activesupport/src/process-adapter.ts"]
     }
   },
   "include": ["."]

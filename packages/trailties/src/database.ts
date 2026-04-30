@@ -15,10 +15,18 @@ export interface DatabaseConfig {
 
 /**
  * Resolve the current environment.
- * Checks TRAILS_ENV, then NODE_ENV, defaults to "development".
+ *
+ * Mirrors Rails' RAILS_ENV: reads TRAILS_ENV, defaults to "development".
+ *
+ * Deliberately does NOT fall back to NODE_ENV. The JS ecosystem treats
+ * NODE_ENV as a build-time hint (bundler optimization, dead-code
+ * elimination via `process.env.NODE_ENV !== "production"` checks), not
+ * a runtime environment selector. Conflating the two leads to scripts
+ * running with `NODE_ENV=test` silently picking the wrong database,
+ * skipping production-only setup, etc.
  */
 export function resolveEnv(): string {
-  return env.TRAILS_ENV || env.NODE_ENV || "development";
+  return env.TRAILS_ENV || "development";
 }
 
 /**

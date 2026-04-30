@@ -135,19 +135,22 @@ describe("resolveEnv", () => {
 
   it("prefers TRAILS_ENV", () => {
     setEnv("TRAILS_ENV", "staging");
-    setEnv("NODE_ENV", "production");
     expect(resolveEnv()).toBe("staging");
-  });
-
-  it("falls back to NODE_ENV", () => {
-    setEnv("TRAILS_ENV", undefined);
-    setEnv("NODE_ENV", "production");
-    expect(resolveEnv()).toBe("production");
   });
 
   it("defaults to development", () => {
     setEnv("TRAILS_ENV", undefined);
-    setEnv("NODE_ENV", undefined);
+    expect(resolveEnv()).toBe("development");
+  });
+
+  // Behavior change: previously this suite had a "falls back to
+  // NODE_ENV" test. NODE_ENV is a build-time bundler hint in JS
+  // (dead-code elimination, etc.), not a runtime env selector;
+  // conflating it with the runtime env caused action-at-a-distance.
+  // The replacement test below locks in the new behavior.
+  it("ignores NODE_ENV", () => {
+    setEnv("TRAILS_ENV", undefined);
+    setEnv("NODE_ENV", "production");
     expect(resolveEnv()).toBe("development");
   });
 });

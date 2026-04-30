@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { env as processEnv, setEnv } from "@blazetrails/activesupport/process-adapter";
 import { Railtie } from "./railtie.js";
 import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
 import { SecurePassword } from "./secure-password.js";
@@ -52,19 +53,17 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers applies the active_model.secure_password setting", () => {
-    // Simulate a test environment via NODE_ENV so the initializer fires
-    // the min_cost branch.
-    const prev = process.env.NODE_ENV;
-    process.env.NODE_ENV = "test";
+    // Simulate a test environment via TRAILS_ENV so the initializer
+    // fires the min_cost branch. Snapshot-and-restore the prior value
+    // so a developer or runner that already had TRAILS_ENV set sees
+    // it back after the test.
+    const prev = processEnv.TRAILS_ENV;
+    setEnv("TRAILS_ENV", "test");
     try {
       Railtie.runInitializers();
       expect(SecurePassword.minCost).toBe(true);
     } finally {
-      if (prev === undefined) {
-        delete process.env.NODE_ENV;
-      } else {
-        process.env.NODE_ENV = prev;
-      }
+      setEnv("TRAILS_ENV", prev);
     }
   });
 });

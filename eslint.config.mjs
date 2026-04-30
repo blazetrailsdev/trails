@@ -104,15 +104,25 @@ export default defineConfig(
     },
   },
 
-  // ── no-process-bypass: forbid direct process.* in trailties src ──
-  // process.* must go through @blazetrails/activesupport's processAdapter
-  // so trailties can run on browser/non-Node hosts. app-generator.ts is
-  // exempt because it contains template strings emitting user-app code
-  // (which legitimately uses process.* at runtime in the user's app).
+  // ── no-process-bypass: forbid direct process.* in browser-target src ──
+  // process.* must go through @blazetrails/activesupport/process-adapter
+  // so these packages can run on browser/non-Node hosts. Test files are
+  // always exempt (legit mocking/inspection of the host process).
+  // Per-package exemptions noted inline.
   {
-    files: ["packages/trailties/src/**/*.ts"],
+    files: [
+      "packages/trailties/src/**/*.ts",
+      "packages/actionpack/src/**/*.ts",
+      "packages/actionview/src/**/*.ts",
+      "packages/arel/src/**/*.ts",
+      "packages/rack/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+    ],
     ignores: [
-      "packages/trailties/src/**/*.test.ts",
+      "**/*.test.ts",
+      // trailties: app-generator.ts contains template strings emitting
+      // user-app code (which legitimately uses process.* at runtime in
+      // the user's app).
       "packages/trailties/src/generators/app-generator.ts",
     ],
     rules: {
