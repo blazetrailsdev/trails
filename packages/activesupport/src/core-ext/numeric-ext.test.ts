@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { Temporal } from "../temporal.js";
 import { numberToHuman } from "../number-helper.js";
 import { Duration } from "../duration.js";
+
+function asDate(instant: Temporal.Instant): Date {
+  return new Date(instant.epochMilliseconds);
+}
 
 describe("NumericExtTimeAndDateTimeTest", () => {
   it("units", () => {
@@ -15,13 +20,13 @@ describe("NumericExtTimeAndDateTimeTest", () => {
   it("irregular durations", () => {
     const now = new Date(2005, 1, 10, 15, 30, 45); // Feb 10 2005
     const in3000days = Duration.days(3000).since(now);
-    expect(in3000days.getDate()).toBeGreaterThan(0);
+    expect(asDate(in3000days).getDate()).toBeGreaterThan(0);
     // 1 month since Feb → March (month index 2)
     const in1month = Duration.months(1).since(now);
-    expect(in1month.getMonth()).toBe(2); // March (0-indexed)
+    expect(asDate(in1month).getMonth()).toBe(2); // March (0-indexed)
     // until = ago — 1 month before Feb → January (month index 0)
     const minus1month = Duration.months(1).until(now);
-    expect(minus1month.getMonth()).toBe(0); // January
+    expect(asDate(minus1month).getMonth()).toBe(0); // January
   });
 
   it("duration addition", () => {
@@ -31,17 +36,17 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     const expected = new Date(now);
     expected.setDate(expected.getDate() + 1);
     expected.setMonth(expected.getMonth() + 1);
-    expect(combined.getTime()).toBe(expected.getTime());
+    expect(combined.epochMilliseconds).toBe(expected.getTime());
   });
 
   it("time plus duration", () => {
     const now = new Date(2005, 1, 10, 15, 30, 45);
     const plus8 = Duration.seconds(8).since(now);
-    expect(plus8.getTime()).toBe(now.getTime() + 8000);
+    expect(plus8.epochMilliseconds).toBe(now.getTime() + 8000);
     const plus15days = Duration.days(15).since(now);
     const expected15 = new Date(now);
     expected15.setDate(expected15.getDate() + 15);
-    expect(plus15days.getTime()).toBe(expected15.getTime());
+    expect(plus15days.epochMilliseconds).toBe(expected15.getTime());
   });
 
   it("chaining duration operations", () => {
@@ -50,7 +55,7 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     const expected = new Date(now);
     expected.setDate(expected.getDate() + 2);
     expected.setMonth(expected.getMonth() - 3);
-    expect(result.getTime()).toBe(expected.getTime());
+    expect(result.epochMilliseconds).toBe(expected.getTime());
   });
 
   it("duration after conversion is no longer accurate", () => {
@@ -62,9 +67,9 @@ describe("NumericExtTimeAndDateTimeTest", () => {
   it("add one year to leap day", () => {
     const leapDay = new Date(2004, 1, 29, 15, 15, 10);
     const result = Duration.years(1).since(leapDay);
-    expect(result.getFullYear()).toBe(2005);
+    expect(asDate(result).getFullYear()).toBe(2005);
     // JS behavior: setFullYear(2005) on Feb 29 overflows to Mar 1
-    expect(result.getMonth()).toBe(2); // Mar (0-indexed), overflowed from Feb 29
+    expect(asDate(result).getMonth()).toBe(2); // Mar (0-indexed), overflowed from Feb 29
   });
 
   it("in milliseconds", () => {
@@ -76,13 +81,13 @@ describe("NumericExtDateTest", () => {
   it("date plus duration", () => {
     const today = new Date(2005, 1, 10); // Feb 10 2005
     const plus1day = Duration.days(1).since(today);
-    expect(plus1day.getDate()).toBe(11);
+    expect(asDate(plus1day).getDate()).toBe(11);
 
     const plus1month = Duration.months(1).since(today);
-    expect(plus1month.getMonth()).toBe(2); // March
+    expect(asDate(plus1month).getMonth()).toBe(2); // March
 
     const plus1sec = Duration.seconds(1).since(today);
-    expect(plus1sec.getTime()).toBe(today.getTime() + 1000);
+    expect(plus1sec.epochMilliseconds).toBe(today.getTime() + 1000);
   });
 });
 

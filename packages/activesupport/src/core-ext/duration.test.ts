@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { Temporal } from "../temporal.js";
 import { Duration } from "../duration.js";
+
+function asDate(instant: Temporal.Instant): Date {
+  return new Date(instant.epochMilliseconds);
+}
 
 describe("DurationTest", () => {
   it("is a", () => {
@@ -159,24 +164,24 @@ describe("DurationTest", () => {
   it("date added with zero days", () => {
     const date = new Date(2017, 0, 1); // Jan 1 2017
     const result = Duration.days(0).since(date);
-    expect(result.getFullYear()).toBe(2017);
-    expect(result.getMonth()).toBe(0);
-    expect(result.getDate()).toBe(1);
+    expect(asDate(result).getFullYear()).toBe(2017);
+    expect(asDate(result).getMonth()).toBe(0);
+    expect(asDate(result).getDate()).toBe(1);
   });
 
   it("date added with multiplied duration", () => {
     const date = new Date(2017, 0, 1);
     const result = Duration.days(1).times(2).since(date);
-    expect(result.getFullYear()).toBe(2017);
-    expect(result.getDate()).toBe(3);
+    expect(asDate(result).getFullYear()).toBe(2017);
+    expect(asDate(result).getDate()).toBe(3);
   });
 
   it("date added with multiplied duration larger than one month", () => {
     const date = new Date(2017, 0, 1);
     const result = Duration.days(1).times(45).since(date);
-    expect(result.getFullYear()).toBe(2017);
-    expect(result.getMonth()).toBe(1); // February
-    expect(result.getDate()).toBe(15);
+    expect(asDate(result).getFullYear()).toBe(2017);
+    expect(asDate(result).getMonth()).toBe(1); // February
+    expect(asDate(result).getDate()).toBe(15);
   });
 
   it("date added with divided duration", () => {
@@ -185,7 +190,7 @@ describe("DurationTest", () => {
     const ms = Duration.days(4).dividedBy(2).inSeconds() * 1000;
     const expected = new Date(date.getTime() + ms);
     const result = Duration.days(4).dividedBy(2).since(date);
-    expect(result.getDate()).toBe(expected.getDate());
+    expect(asDate(result).getDate()).toBe(expected.getDate());
   });
 
   it("date added with divided duration larger than one month", () => {
@@ -202,7 +207,7 @@ describe("DurationTest", () => {
   });
 
   it("time plus duration returns same time datatype", () => {
-    // In TypeScript/JS all times are Date objects — just verify arithmetic works
+    // Duration#since now returns Temporal.Instant — verify arithmetic works for each unit
     const now = new Date();
     for (const unit of [
       "seconds",
@@ -215,7 +220,7 @@ describe("DurationTest", () => {
     ] as const) {
       const dur = Duration[unit](1);
       const result = dur.since(now);
-      expect(result instanceof Date).toBe(true);
+      expect(result).toBeInstanceOf(Temporal.Instant);
     }
   });
 
@@ -236,15 +241,34 @@ describe("DurationTest", () => {
 
   it("since and ago", () => {
     const t = new Date(2000, 0, 1, 0, 0, 0, 0);
-    expect(Duration.seconds(1).since(t).getTime()).toBe(t.getTime() + 1000);
-    expect(Duration.seconds(1).ago(t).getTime()).toBe(t.getTime() - 1000);
+    expect(Duration.seconds(1).since(t).epochMilliseconds).toBe(t.getTime() + 1000);
+    expect(Duration.seconds(1).ago(t).epochMilliseconds).toBe(t.getTime() - 1000);
+  });
+
+  it("since and ago preserve sub-millisecond precision of Temporal.Instant inputs", () => {
+    const baseMs = new Date(2000, 0, 1).getTime();
+    const baseNs = BigInt(baseMs) * 1_000_000n + 123_456n; // 123_456 ns past the ms boundary
+    const t = Temporal.Instant.fromEpochNanoseconds(baseNs);
+    const after = Duration.seconds(1).since(t);
+    expect(after.epochNanoseconds).toBe(baseNs + 1_000_000_000n);
+    const before = Duration.seconds(1).ago(t);
+    expect(before.epochNanoseconds).toBe(baseNs - 1_000_000_000n);
+  });
+
+  it("since and ago accept Temporal.Instant inputs", () => {
+    const tInstant = Duration.seconds(0).since(new Date(2000, 0, 1, 0, 0, 0, 0));
+    const baseMs = tInstant.epochMilliseconds;
+    expect(Duration.seconds(1).since(tInstant).epochMilliseconds).toBe(baseMs + 1000);
+    expect(Duration.seconds(1).ago(tInstant).epochMilliseconds).toBe(baseMs - 1000);
+    expect(Duration.seconds(1).after(tInstant).epochMilliseconds).toBe(baseMs + 1000);
+    expect(Duration.seconds(1).before(tInstant).epochMilliseconds).toBe(baseMs - 1000);
   });
 
   it("since and ago without argument", () => {
     const before = new Date();
     const result = Duration.seconds(1).since();
     // result should be at least 1 second after before
-    expect(result.getTime()).toBeGreaterThanOrEqual(before.getTime() + 1000 - 50);
+    expect(result.epochMilliseconds).toBeGreaterThanOrEqual(before.getTime() + 1000 - 50);
   });
 
   it("since and ago with fractional days", () => {
@@ -252,24 +276,24 @@ describe("DurationTest", () => {
     const via36h = Duration.hours(36).since(t);
     const via15days = Duration.days(1.5).since(t);
     // fractional days use ms arithmetic, same as hours — should be equal
-    expect(Math.abs(via36h.getTime() - via15days.getTime())).toBeLessThan(1000);
+    expect(Math.abs(via36h.epochMilliseconds - via15days.epochMilliseconds)).toBeLessThan(1000);
 
     const ago36h = Duration.hours(36).ago(t);
     const ago15days = Duration.days(1.5).ago(t);
-    expect(Math.abs(ago36h.getTime() - ago15days.getTime())).toBeLessThan(1000);
+    expect(Math.abs(ago36h.epochMilliseconds - ago15days.epochMilliseconds)).toBeLessThan(1000);
   });
 
   it("since and ago with fractional weeks", () => {
     const t = new Date(2000, 0, 1);
     const via252h = Duration.hours(7 * 36).since(t);
     const via15weeks = Duration.weeks(1.5).since(t);
-    expect(Math.abs(via252h.getTime() - via15weeks.getTime())).toBeLessThan(1000);
+    expect(Math.abs(via252h.epochMilliseconds - via15weeks.epochMilliseconds)).toBeLessThan(1000);
   });
 
   it("since and ago anchored to time now when time zone is not set", () => {
-    // JS doesn't have TimeWithZone — just verify since() returns a Date
+    // JS doesn't have TimeWithZone — just verify since() returns a Temporal.Instant
     const result = Duration.seconds(5).since();
-    expect(result instanceof Date).toBe(true);
+    expect(result).toBeInstanceOf(Temporal.Instant);
   });
 
   it("since and ago anchored to time zone now when time zone is set", () => {
@@ -279,16 +303,16 @@ describe("DurationTest", () => {
 
   it("before and after", () => {
     const t = new Date(2000, 0, 1, 0, 0, 0, 0);
-    expect(Duration.seconds(1).after(t).getTime()).toBe(t.getTime() + 1000);
-    expect(Duration.seconds(1).before(t).getTime()).toBe(t.getTime() - 1000);
+    expect(Duration.seconds(1).after(t).epochMilliseconds).toBe(t.getTime() + 1000);
+    expect(Duration.seconds(1).before(t).epochMilliseconds).toBe(t.getTime() - 1000);
   });
 
   it("before and after without argument", () => {
     const now = new Date();
     const after = Duration.seconds(1).after();
     const before = Duration.seconds(1).before();
-    expect(after.getTime()).toBeGreaterThan(now.getTime());
-    expect(before.getTime()).toBeLessThan(now.getTime());
+    expect(after.epochMilliseconds).toBeGreaterThan(now.getTime());
+    expect(before.epochMilliseconds).toBeLessThan(now.getTime());
   });
 
   it("adding hours across dst boundary", () => {
@@ -296,15 +320,15 @@ describe("DurationTest", () => {
     const base = new Date(2009, 2, 29, 0, 0, 0); // Mar 29 2009
     const result = Duration.hours(24).since(base);
     // 24 hours later in wall-clock time
-    expect(result.getTime()).toBe(base.getTime() + 24 * 3600 * 1000);
+    expect(result.epochMilliseconds).toBe(base.getTime() + 24 * 3600 * 1000);
   });
 
   it("adding day across dst boundary", () => {
     const base = new Date(2009, 2, 29, 0, 0, 0); // Mar 29 2009
     const result = Duration.days(1).since(base);
     // calendar day advance
-    expect(result.getDate()).toBe(30);
-    expect(result.getMonth()).toBe(2);
+    expect(asDate(result).getDate()).toBe(30);
+    expect(asDate(result).getMonth()).toBe(2);
   });
 
   it("delegation with block works", () => {
@@ -455,8 +479,8 @@ describe("DurationTest", () => {
     // Jan 14 + 1 month = Feb 14
     const jan14 = new Date(2016, 0, 14);
     const feb14 = Duration.months(1).since(jan14);
-    expect(feb14.getMonth()).toBe(1);
-    expect(feb14.getDate()).toBe(14);
+    expect(asDate(feb14).getMonth()).toBe(1);
+    expect(asDate(feb14).getDate()).toBe(14);
   });
 
   it("iso8601 parsing wrong patterns with raise", () => {
@@ -490,7 +514,9 @@ describe("DurationTest", () => {
     const reparsed = Duration.parse(d.iso8601());
     const now = new Date();
     // Both should produce roughly same result when applied to now
-    expect(Math.abs(d.since(now).getTime() - reparsed.since(now).getTime())).toBeLessThan(1000);
+    expect(
+      Math.abs(d.since(now).epochMilliseconds - reparsed.since(now).epochMilliseconds),
+    ).toBeLessThan(1000);
   });
 
   it("iso8601 parsing across spring dst boundary", () => {
@@ -512,7 +538,7 @@ describe("DurationTest", () => {
     const time = new Date("Nov 29, 2016");
     const d1 = Duration.months(3).minus(Duration.months(3));
     const d2 = Duration.months(2).minus(Duration.months(2));
-    expect(d1.since(time).getTime()).toBe(d2.since(time).getTime());
+    expect(d1.since(time).epochMilliseconds).toBe(d2.since(time).epochMilliseconds);
   });
 
   it("durations survive yaml serialization", () => {
@@ -549,6 +575,6 @@ describe("DurationTest", () => {
     const time = new Date("Dec 7, 2021");
     const expected = new Date("2021-12-06T23:59:59");
     const d = Duration.seconds(1);
-    expect(d.negate().since(time).getTime()).toBeCloseTo(expected.getTime(), -3);
+    expect(d.negate().since(time).epochMilliseconds).toBeCloseTo(expected.getTime(), -3);
   });
 });

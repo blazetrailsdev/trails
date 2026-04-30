@@ -1,11 +1,12 @@
 /**
  * ActiveSupport::Duration — mirrors the Rails API as closely as possible.
  *
- * @boundary-file: This file's public API is Date-typed by Rails parity
- *   (`since`/`ago`/`from_now`/`until`/`after`/`before` all take and return
- *   `Time`-like values, which JS expresses as `Date`). The Temporal flip lives
- *   on `TimeWithZone` instead.
+ * @boundary-file: `since`/`ago`/`from_now`/`until`/`after`/`before` accept
+ *   `Date | Temporal.Instant` (`Date` for ergonomic interop) but return
+ *   `Temporal.Instant`. The default reference is `Temporal.Now.instant()`.
  */
+
+import { Temporal, instantFrom } from "./temporal.js";
 
 export type DurationParts = {
   years: number;
@@ -178,27 +179,27 @@ export class Duration {
   // Date application — applies each part sequentially like Rails does
   // ---------------------------------------------------------------------------
 
-  since(date: Date = new Date()): Date {
-    return applyDuration(date, this.parts, 1);
+  since(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+    return applyDurationPreservingNs(date, this.parts, 1);
   }
 
-  ago(date: Date = new Date()): Date {
-    return applyDuration(date, this.parts, -1);
+  ago(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+    return applyDurationPreservingNs(date, this.parts, -1);
   }
 
-  fromNow(): Date {
-    return this.since(new Date());
+  fromNow(): Temporal.Instant {
+    return this.since();
   }
 
-  until(date: Date = new Date()): Date {
+  until(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
     return this.ago(date);
   }
 
-  after(date: Date = new Date()): Date {
+  after(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
     return this.since(date);
   }
 
-  before(date: Date = new Date()): Date {
+  before(date: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
     return this.ago(date);
   }
 
@@ -416,6 +417,27 @@ function singular(key: keyof DurationParts): string {
     case "seconds":
       return "second";
   }
+}
+
+function toDateInput(date: Date | Temporal.Instant): Date {
+  if (date instanceof Date) return date;
+  if (date instanceof Temporal.Instant) return new Date(date.epochMilliseconds);
+  throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
+}
+
+/**
+ * Apply a Duration while preserving the sub-millisecond nanosecond remainder
+ * of a Temporal.Instant input. Calendar math runs at ms precision through
+ * applyDuration; the original ns remainder is re-added to the result.
+ */
+function applyDurationPreservingNs(
+  date: Date | Temporal.Instant,
+  parts: DurationParts,
+  direction: 1 | -1,
+): Temporal.Instant {
+  const nsRemainder = date instanceof Temporal.Instant ? date.epochNanoseconds % 1_000_000n : 0n;
+  const result = instantFrom(applyDuration(toDateInput(date), parts, direction));
+  return nsRemainder === 0n ? result : result.add({ nanoseconds: Number(nsRemainder) });
 }
 
 /**

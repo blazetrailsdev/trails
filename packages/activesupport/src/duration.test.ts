@@ -47,12 +47,12 @@ describe("Numeric helpers (functional equivalents of Rails numeric extensions)",
 
   it("fromNow returns a future Date", () => {
     const future = minutes(10).fromNow();
-    expect(future.getTime()).toBeGreaterThan(Date.now() + 9 * 60 * 1000);
+    expect(future.epochMilliseconds).toBeGreaterThan(Date.now() + 9 * 60 * 1000);
   });
 
   it("ago returns a past Date", () => {
     const past = hours(1).ago();
-    expect(past.getTime()).toBeLessThan(Date.now() - 59 * 60 * 1000);
+    expect(past.epochMilliseconds).toBeLessThan(Date.now() - 59 * 60 * 1000);
   });
 
   it("Duration.sum adds an array of durations", () => {
