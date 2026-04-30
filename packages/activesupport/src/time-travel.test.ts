@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 
+import { Temporal } from "./temporal.js";
 import { travelTo, travelBack, travel, freezeTime, currentTime } from "./testing-helpers.js";
+import { currentTimeInstant, setFrozenInstant, setTimeOffsetNs } from "./time-travel.js";
 
 describe("TimeTravelTest", () => {
   afterEach(() => {
@@ -172,5 +174,35 @@ describe("TimeTravelTest", () => {
     freezeTime();
     travelBack();
     expect(Math.abs(currentTime().getTime() - Date.now())).toBeLessThan(100);
+  });
+
+  it("currentTimeInstant returns Temporal.Instant", () => {
+    expect(currentTimeInstant()).toBeInstanceOf(Temporal.Instant);
+  });
+
+  it("currentTimeInstant respects frozen instant at nanosecond precision", () => {
+    const baseMs = Date.UTC(2030, 0, 1, 0, 0, 0);
+    const baseNs = BigInt(baseMs) * 1_000_000n + 123_456n;
+    const frozen = Temporal.Instant.fromEpochNanoseconds(baseNs);
+    setFrozenInstant(frozen);
+    try {
+      expect(currentTimeInstant().epochNanoseconds).toBe(baseNs);
+    } finally {
+      setFrozenInstant(null);
+    }
+  });
+
+  it("currentTimeInstant respects nanosecond time offset", () => {
+    const offsetNs = 365n * 24n * 3600n * 1_000_000_000n + 42n; // ~1 year + 42 ns
+    const before = Temporal.Now.instant().epochNanoseconds;
+    setTimeOffsetNs(offsetNs);
+    try {
+      const traveled = currentTimeInstant().epochNanoseconds;
+      const drift = traveled - before - offsetNs;
+      expect(drift).toBeGreaterThanOrEqual(-1_000_000_000n);
+      expect(drift).toBeLessThanOrEqual(1_000_000_000n);
+    } finally {
+      setTimeOffsetNs(0n);
+    }
   });
 });
