@@ -15,6 +15,7 @@ import {
   quoteTableName as pgQuoteTableName,
   quoteColumnName as pgQuoteColumnName,
   quoteString as pgQuoteString,
+  quoteTableNameForAssignment as pgQuoteTableNameForAssignment,
   quoteDefaultExpression as pgQuoteDefaultExpression,
   columnNameMatcher as pgColumnNameMatcher,
   columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
@@ -3271,6 +3272,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   override quoteIdentifier(name: string): string {
     return pgQuoteColumnName(name);
+  }
+
+  /**
+   * Mirrors: PostgreSQL::Quoting#quote_table_name_for_assignment
+   * (`postgresql/quoting.rb:136`) — PG ignores the table and quotes
+   * only the column. Abstract default returns `table.attr`-qualified;
+   * PG overrides because PostgreSQL UPDATE syntax doesn't allow a
+   * table-qualified column on the LHS of `SET`.
+   */
+  override quoteTableNameForAssignment(_table: string, attr: string): string {
+    return pgQuoteTableNameForAssignment(_table, attr);
   }
 
   private quoteSchemaName(name: string): string {

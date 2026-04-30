@@ -92,6 +92,20 @@ const ER_QUERY_INTERRUPTED = 1317;
 const ER_QUERY_TIMEOUT = 3024;
 const ER_TABLE_EXISTS = 1050;
 
+// Hot-path constants for the escape-only `quoteString` override below.
+// Match `MYSQL_ESCAPE_RE` / `MYSQL_ESCAPE_MAP` in `mysql/quoting.ts`
+// (those are module-private). Hoisted here so each call avoids
+// re-allocating the regex and lookup table.
+// eslint-disable-next-line no-control-regex
+const MYSQL_ADAPTER_ESCAPE_RE = /[\\\x00\n\r\x1a]/g;
+const MYSQL_ADAPTER_ESCAPE_MAP: Record<string, string> = {
+  "\\": "\\\\",
+  "\0": "\\0",
+  "\n": "\\n",
+  "\r": "\\r",
+  "\x1a": "\\Z",
+};
+
 export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly Version = Version;
 
@@ -620,16 +634,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * wraps with surrounding `'...'` for SQL-literal contexts.
    */
   override quoteString(s: string): string {
-    // eslint-disable-next-line no-control-regex
-    const ESCAPE_RE = /[\\\x00\n\r\x1a]/g;
-    const ESCAPE_MAP: Record<string, string> = {
-      "\\": "\\\\",
-      "\0": "\\0",
-      "\n": "\\n",
-      "\r": "\\r",
-      "\x1a": "\\Z",
-    };
-    return s.replace(/'/g, "''").replace(ESCAPE_RE, (ch) => ESCAPE_MAP[ch] ?? ch);
+    return s
+      .replace(/'/g, "''")
+      .replace(MYSQL_ADAPTER_ESCAPE_RE, (ch) => MYSQL_ADAPTER_ESCAPE_MAP[ch] ?? ch);
   }
 
   /** Retains the literal-quoting helper for legacy callers in this file. */
