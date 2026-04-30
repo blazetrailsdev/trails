@@ -195,6 +195,27 @@ describe("SerializationTest", () => {
     expect((result.comments as any[])[0].text).toBe("Great!");
   });
 
+  it("include accepts mixed array of strings and option hashes", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    const comment = {
+      _attributes: new Map([
+        ["text", "Great!"],
+        ["author", "Bob"],
+      ]),
+    };
+    const tag = { _attributes: new Map([["name", "rails"]]) };
+    (p as any)._preloadedAssociations = new Map<string, unknown>([
+      ["comments", [comment]],
+      ["tags", [tag]],
+    ]);
+    const result = p.serializableHash({
+      include: ["tags", { comments: { only: ["text"] } }],
+    });
+    expect((result.tags as any[])[0].name).toBe("rails");
+    expect((result.comments as any[])[0].text).toBe("Great!");
+    expect((result.comments as any[])[0].author).toBeUndefined();
+  });
+
   it("include with options", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
     const comment = {

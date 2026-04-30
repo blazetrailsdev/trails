@@ -1,4 +1,11 @@
-import { serializableHash, coerceForJson, type SerializeOptions } from "../serialization.js";
+import {
+  serializableHash,
+  attributeNamesForSerialization,
+  serializableAttributes,
+  serializableAddIncludes,
+  coerceForJson,
+  type SerializeOptions,
+} from "../serialization.js";
 import { ModelName } from "../naming.js";
 
 function isPlainJsonObject(v: unknown): v is Record<string, unknown> {
@@ -62,6 +69,39 @@ export class JSON {
    */
   serializableHash(options?: SerializeOptions): Record<string, unknown> {
     return serializableHash(this as unknown as Parameters<typeof serializableHash>[0], options);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
+   * (serialization.rb:158-160), inherited via `include Serialization`.
+   *
+   * @internal Rails-private helper.
+   */
+  protected attributeNamesForSerialization(): string[] {
+    return attributeNamesForSerialization(this);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization#serializable_attributes
+   * (serialization.rb:162-164), inherited via `include Serialization`.
+   *
+   * @internal Rails-private helper.
+   */
+  protected serializableAttributes(attributeNames: readonly string[]): Record<string, unknown> {
+    return serializableAttributes(this, attributeNames);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization#serializable_add_includes
+   * (serialization.rb:171-183), inherited via `include Serialization`.
+   *
+   * @internal Rails-private helper.
+   */
+  protected serializableAddIncludes(
+    options: SerializeOptions = {},
+    callback: (association: string, records: unknown, opts: SerializeOptions) => void = () => {},
+  ): void {
+    serializableAddIncludes(this, options, callback);
   }
 
   /**

@@ -4,6 +4,23 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 type AnyRecord = any;
 
 /**
+ * Set `key` on `target` as an own data property, even when `key` is
+ * `__proto__` (or another magic name that has accessors on
+ * `Object.prototype`). A plain assignment would invoke the inherited
+ * setter and mutate the target's prototype chain. Used everywhere the
+ * key may originate from user input — attribute names, include keys,
+ * association names from a JSON-decoded options bag.
+ */
+function safeSet(target: Record<string, unknown>, key: string, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+/**
  * Serialization mixin contract — provides serializable_hash.
  *
  * Mirrors: ActiveModel::Serialization
@@ -19,31 +36,96 @@ export interface SerializeOptions {
   only?: string[];
   except?: string[];
   methods?: string[];
-  include?: Record<string, SerializeOptions> | string[] | string;
+  // Mirrors Rails `:include` polymorphism: a single name, an array of
+  // names, a hash of name → opts, or — like `include: [:posts, { comments: {} }]`
+  // — an array mixing names and hashes.
+  include?:
+    | Record<string, SerializeOptions>
+    | Array<string | Record<string, SerializeOptions>>
+    | string;
 }
 
 /**
  * Serialize a model's attributes to a plain object.
  *
  * Mirrors: ActiveModel::Serialization#serializable_hash
+ * (serialization.rb:111-138)
  */
 export function serializableHash(
   record: AnyRecord,
   options: SerializeOptions = {},
 ): Record<string, unknown> {
-  // Models can override `attributeNamesForSerialization` to scope which
-  // attributes appear (Rails' private `attribute_names_for_serialization`
-  // hook). When absent, fall back to the underlying attribute store.
+  // Prefer an instance-level override (Rails' subclass-override
+  // semantics) over the standalone helper. The JSON mixin host's
+  // protected delegator just forwards to the standalone
+  // `attributeNamesForSerialization` function below, so calling it
+  // here is safe and respects any genuine override a Model installs.
+  const instanceAttrNames = (record as { attributeNamesForSerialization?: () => string[] })
+    .attributeNamesForSerialization;
+  let keys =
+    typeof instanceAttrNames === "function"
+      ? instanceAttrNames.call(record)
+      : attributeNamesForSerialization(record);
+
+  if (options.only) {
+    keys = keys.filter((k) => options.only!.includes(k));
+  } else if (options.except) {
+    keys = keys.filter((k) => !options.except!.includes(k));
+  }
+
+  const result = serializableAttributes(record, keys);
+
+  if (options.methods) {
+    for (const method of options.methods) {
+      if (typeof record[method] === "function") {
+        safeSet(result, method, record[method]());
+      } else if (method in record) {
+        safeSet(result, method, record[method]);
+      } else {
+        throw new Error(
+          `undefined method '${method}' for an instance of ${record.constructor.name}`,
+        );
+      }
+    }
+  }
+
+  serializableAddIncludes(record, options, (assocName, records, opts) => {
+    if (Array.isArray(records)) {
+      safeSet(
+        result,
+        assocName,
+        records.map((r: AnyRecord) => serializableHash(r, opts)),
+      );
+    } else if (records && typeof records === "object" && (records as AnyRecord)._attributes) {
+      safeSet(result, assocName, serializableHash(records, opts));
+    } else {
+      safeSet(result, assocName, records);
+    }
+  });
+
+  return result;
+}
+
+/**
+ * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
+ * (serialization.rb:158-160)
+ *
+ *   def attribute_names_for_serialization
+ *     attributes.keys
+ *   end
+ *
+ * Models can override this hook to scope which attributes appear.
+ * Trails has multiple attribute storage shapes (AttributeSet via
+ * `_attributes`, Map, plain object) so the fallback walks them in
+ * order. Virtual attributes (acceptance/confirmation) are filtered
+ * out — they aren't real attributes and shouldn't surface in JSON.
+ *
+ * @internal Rails-private helper.
+ */
+export function attributeNamesForSerialization(record: AnyRecord): string[] {
   const attrStore = record._attributes;
   let keys: string[];
-  if (
-    typeof (record as { attributeNamesForSerialization?: () => string[] })
-      .attributeNamesForSerialization === "function"
-  ) {
-    keys = (
-      record as { attributeNamesForSerialization: () => string[] }
-    ).attributeNamesForSerialization();
-  } else if (attrStore && typeof attrStore.keys === "function" && !(attrStore instanceof Map)) {
+  if (attrStore && typeof attrStore.keys === "function" && !(attrStore instanceof Map)) {
     keys = attrStore.keys();
   } else if (attrStore instanceof Map) {
     keys = Array.from(attrStore.keys());
@@ -53,68 +135,106 @@ export function serializableHash(
     keys = [];
   }
 
-  // Exclude virtual attributes (e.g., acceptance/confirmation) from serialization
   const defs = record.constructor?._attributeDefinitions as
     | Map<string, { virtual?: boolean }>
     | undefined;
   if (defs) {
     keys = keys.filter((k) => !defs.get(k)?.virtual);
   }
+  return keys;
+}
 
-  if (options.only) {
-    keys = keys.filter((k) => options.only!.includes(k));
-  } else if (options.except) {
-    keys = keys.filter((k) => !options.except!.includes(k));
-  }
-
-  // Read values only for filtered keys
+/**
+ * Mirrors: ActiveModel::Serialization#serializable_attributes
+ * (serialization.rb:162-164)
+ *
+ *   def serializable_attributes(attribute_names)
+ *     attribute_names.index_with { |n| read_attribute_for_serialization(n) }
+ *   end
+ *
+ * Builds a `{ name → value }` hash by reading each attribute via the
+ * attribute store fall-through (AttributeSet → Map → readAttribute →
+ * plain attributes). The Rails analogue dispatches through
+ * `read_attribute_for_serialization` (aliased to `send` by default).
+ *
+ * @internal Rails-private helper.
+ */
+export function serializableAttributes(
+  record: AnyRecord,
+  attributeNames: readonly string[],
+): Record<string, unknown> {
+  const attrStore = record._attributes;
   const result: Record<string, unknown> = {};
-  for (const key of keys) {
+  for (const key of attributeNames) {
+    let value: unknown;
     if (attrStore && typeof attrStore.fetchValue === "function") {
-      result[key] = attrStore.fetchValue(key);
+      value = attrStore.fetchValue(key);
     } else if (attrStore instanceof Map) {
-      result[key] = attrStore.get(key);
+      value = attrStore.get(key);
     } else if (record.readAttribute) {
-      result[key] = record.readAttribute(key);
+      value = record.readAttribute(key);
     } else {
-      result[key] = record.attributes?.[key];
+      value = record.attributes?.[key];
     }
+    safeSet(result, key, value);
   }
-
-  if (options.methods) {
-    for (const method of options.methods) {
-      if (typeof record[method] === "function") {
-        result[method] = record[method]();
-      } else if (method in record) {
-        result[method] = record[method];
-      } else {
-        throw new Error(
-          `undefined method '${method}' for an instance of ${record.constructor.name}`,
-        );
-      }
-    }
-  }
-
-  // Handle include option for nested associations
-  if (options.include) {
-    const includes = normalizeIncludes(options.include);
-    for (const [assocName, assocOpts] of Object.entries(includes)) {
-      // Check for cached/preloaded associations
-      const cached =
-        record._preloadedAssociations?.get(assocName) ?? record._cachedAssociations?.get(assocName);
-      if (cached !== undefined) {
-        if (Array.isArray(cached)) {
-          result[assocName] = cached.map((r: AnyRecord) => serializableHash(r, assocOpts));
-        } else if (cached && typeof cached === "object" && cached._attributes) {
-          result[assocName] = serializableHash(cached, assocOpts);
-        } else {
-          result[assocName] = cached;
-        }
-      }
-    }
-  }
-
   return result;
+}
+
+/**
+ * Mirrors: ActiveModel::Serialization#serializable_add_includes
+ * (serialization.rb:171-183)
+ *
+ *   def serializable_add_includes(options = {})
+ *     return unless includes = options[:include]
+ *     unless includes.is_a?(Hash)
+ *       includes = Hash[Array(includes).flat_map { |n| n.is_a?(Hash) ? n.to_a : [[n, {}]] }]
+ *     end
+ *     includes.each do |association, opts|
+ *       if records = send(association)
+ *         yield association, records, opts
+ *       end
+ *     end
+ *   end
+ *
+ * The trails port resolves associations against the model's preload /
+ * association cache rather than `send`, since trails uses explicit
+ * cache slots instead of Ruby's method-missing-driven association
+ * accessors. The yield contract is identical: `(association, records,
+ * opts)` per included entry.
+ *
+ * @internal Rails-private helper.
+ */
+export function serializableAddIncludes(
+  record: AnyRecord,
+  options: SerializeOptions = {},
+  callback: (association: string, records: unknown, opts: SerializeOptions) => void,
+): void {
+  // Rails: `return unless includes = options[:include]` skips on
+  // nil/false. Empty string is truthy in Ruby, so JS `!` would
+  // diverge. Guard explicitly on null/undefined/false to mirror
+  // Ruby truthiness without dropping `""`. The `false` branch also
+  // protects against untyped JS callers that bypass the
+  // `SerializeOptions.include` shape.
+  const includeOpt = options.include as
+    | string
+    | Array<string | Record<string, SerializeOptions>>
+    | Record<string, SerializeOptions>
+    | false
+    | null
+    | undefined;
+  if (includeOpt == null || includeOpt === false) return;
+  const includes = normalizeIncludes(includeOpt);
+  for (const [assocName, assocOpts] of Object.entries(includes)) {
+    const cached =
+      record._preloadedAssociations?.get(assocName) ?? record._cachedAssociations?.get(assocName);
+    // Rails: `if records = send(association)` skips on nil. The trails
+    // preloader stores `null` in `_cachedAssociations` for has_one
+    // associations with no row, so guard both null and undefined.
+    if (cached !== null && cached !== undefined) {
+      callback(assocName, cached, assocOpts);
+    }
+  }
 }
 
 /**
@@ -264,18 +384,38 @@ function _coerceForJson(
   return value;
 }
 
+/**
+ * Normalize `:include` to a `{ name → opts }` hash. Mirrors Rails'
+ * `Hash[Array(includes).flat_map { |n| n.is_a?(Hash) ? n.to_a : [[n, {}]] }]`
+ * — strings/arrays of strings get empty opts, embedded hashes flatten
+ * into the result so `[:posts, { comments: {} }]` becomes
+ * `{ posts: {}, comments: {} }`.
+ */
 function normalizeIncludes(
-  include: Record<string, SerializeOptions> | string[] | string,
+  include:
+    | Record<string, SerializeOptions>
+    | Array<string | Record<string, SerializeOptions>>
+    | string,
 ): Record<string, SerializeOptions> {
+  const result: Record<string, SerializeOptions> = {};
   if (typeof include === "string") {
-    return { [include]: {} };
+    safeSet(result as Record<string, unknown>, include, {});
+    return result;
   }
   if (Array.isArray(include)) {
-    const result: Record<string, SerializeOptions> = {};
-    for (const name of include) {
-      result[name] = {};
+    for (const entry of include) {
+      if (typeof entry === "string") {
+        safeSet(result as Record<string, unknown>, entry, {});
+      } else {
+        for (const [k, v] of Object.entries(entry)) {
+          safeSet(result as Record<string, unknown>, k, v);
+        }
+      }
     }
     return result;
   }
-  return include;
+  for (const [k, v] of Object.entries(include)) {
+    safeSet(result as Record<string, unknown>, k, v);
+  }
+  return result;
 }
