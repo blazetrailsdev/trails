@@ -1,7 +1,7 @@
 # activerecord test:compare → 100% Plan
 
-Snapshot 2026-04-26: `activerecord 5894/8348 (70.6%) | 338/338 files | 0 misplaced`.
-Total pending: **2454 tests** across skipped tests; zero missing files, zero misplaced.
+Snapshot 2026-04-30: `activerecord 5872/8177 (71.8%) | 334/334 files | 0 misplaced`.
+Total pending: **2305 tests** across skipped tests; zero missing files, zero misplaced.
 
 PR sizing follows the repo rule (≤20 methods/feature touchpoints unless trivial).
 For each PR the rails source path(s) and trails source/test paths are listed.
@@ -21,6 +21,7 @@ For each PR the rails source path(s) and trails source/test paths are listed.
 - **PR 1.28** transaction instrumentation — PR #904
 - **PR 1.29** counter cache — PR #903
 - **PR 1.37** transactions residual — PR #907
+- **PR 1.37b** locking residual — PR #911
 - **PR 1.38** filter_attributes — PR #905
 
 ---

@@ -300,27 +300,6 @@ Both shells share one module tree, all inside
 
 Status legend: ✅ merged, 🚧 in flight, 📋 planned.
 
-### Completed phases (#528 through Phase 1b PRs)
-
-- **Phase 0 (#528)** — removed `experimentalDecorators` /
-  `emitDecoratorMetadata` from the four tsconfigs that carried them.
-- **Phase 1a (#529)** — `packages/activerecord/src/type-virtualization/`
-  landed (virtualize, walker, synthesize, type-registry).
-- **Phase R (#532, #536, #543)** — made `blog.posts` return
-  `AssociationProxy<T>` instead of `Base[]`, added strict-loading for
-  singular readers, and made the proxy array-like so existing consumers
-  keep working.
-- **Phase 1a-fixup (#539)** — `synthesize.ts` now emits
-  `declare <name>: AssociationProxy<target>;` for hasMany / HABTM,
-  with inline `import("@blazetrails/activerecord").<Type>` qualification
-  so zero-declare files don't need extra imports.
-- **Phase 1b** — six sub-PRs building the `trails-tsc` CLI shell: driver
-  that virtualizes Base-extending files before tsc, diagnostic remap
-  back to user coordinates, composite `--build` support, auto-import
-  injection for associated types, and the `virtualized-dx-tests/`
-  canonical zero-declare reference. CI runs `pnpm trails-tsc --noEmit`
-  as a second typecheck job alongside plain tsc.
-
 ### Phase 2 — tsserver plugin 📋
 
 The **editor** shell that brings the same virtualization the CLI does
@@ -800,45 +779,20 @@ OSes.
 
 ### Ordering
 
-The dependency graph:
-
 ```
-Phase 0 ✅ (#528)
-   │
-   ├── Phase 1a ✅ (#529)
-   │       │
-   │       └── Phase 1a-fixup ✅ (#539)  — AssociationProxy<T> emit
-   │
-   ├── Phase R ✅
-   │      R.1 ✅ additive array-likeness on CollectionProxy   (#532)
-   │      R.2 ✅ swap collection reader → AssociationProxy    (#536)
-   │      R.3 ✅ strict-loading catches sync singular reader  (#543)
-   │
-   ├── Singular loaders ✅ (#541)  — post.loadBelongsTo(...) / post.loadHasOne(...)
-   │
-   ├── Phase 1b ✅ — `trails-tsc` CLI shell
-   │      1b.1 ✅ CLI skeleton + single-file virtualization  (#549)
-   │      1b.2 ✅ Diagnostic remap                           (#551)
-   │      1b.3 ✅ Transitive-extends walker                  (#553)
-   │      1b.4 ✅ Auto-import resolution                     (#557)
-   │      1b.5 ✅ --build support                            (#561)
-   │      1b.6 ✅ In-repo migration + CI                     (#563)
-   │
-   └── Phase 2 📋 — tsserver plugin (Phase 1b done; unblocked)
-         │
-         ├── 2.1 Plugin skeleton + getScriptSnapshot override
-         ├── 2.2 Model-registry build + invalidation  (after 2.1)
-         ├── 2.3 Position/range remap                 (after 2.2)
-         ├── 2.4 Diagnostic remap + quick-fix         (after 2.3)
-         ├── 2.5 Incremental walker + perf budget    (after 2.2)
-         └── 2.6 Editor install docs + smoke tests   (after 2.3/2.4/2.5)
-                  │
-                  └── Phase 3 📋 — docs + consumer cutover
+Phase 2 — tsserver plugin
+   ├── 2.1 Plugin skeleton + getScriptSnapshot override
+   ├── 2.2 Model-registry build + invalidation  (after 2.1)
+   ├── 2.3 Position/range remap                 (after 2.2)
+   ├── 2.4 Diagnostic remap + quick-fix         (after 2.3)
+   ├── 2.5 Incremental walker + perf budget    (after 2.2)
+   └── 2.6 Editor install docs + smoke tests   (after 2.3/2.4/2.5)
+            │
+            └── Phase 3 — docs + consumer cutover
 ```
 
-Phase 1b shipped in six merged PRs. Phase 2 picks up the same cadence
-against the **editor** shell, reusing every module the CLI built:
-`virtualize()`, `collectBaseDescendants()`, `resolveAutoImports()`,
+Phase 2 reuses every module the CLI built: `virtualize()`,
+`collectBaseDescendants()`, `resolveAutoImports()`,
 `remapDiagnostics()`, `resolve-target.ts`. Only new code is the
 tsserver plugin adapter, the position-remap layer, and the perf
 harness. 2.1 must land first; after 2.2 the rest fan out — 2.3 and

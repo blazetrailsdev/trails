@@ -1,19 +1,17 @@
 # Private API Parity — Path to 100%
 
-`pnpm api:compare --package activerecord --privates-only` reports
-**205/1429 (14.3%)** for private/protected methods, vs 96.3% for
-public-only. Of the remaining gap, roughly **~10% is detection**
-(fixable in the extractor) and **~90% is real implementation work**
-spread across many Rails subsystems.
+`pnpm tsx scripts/api-compare/compare.ts --package activerecord --privates`
+reports **3683/5111 methods (72.1%)** with privates included
+(public-only is 3074/3398, 90.5%). Tier 1, Tier 2 (#924), and Tier 4
+(#917) are complete. Remaining work concentrates in adapters,
+encryption, migration/schema, and the long tail.
+
+> Note: `pnpm api:compare` is a chained `&&` script and forwards
+> `--package` / `--privates` only to the LAST command in the chain.
+> Always invoke `compare.ts` directly when you need package-scoped
+> totals or privates numbers.
 
 ## 1. Script improvements
-
-### ✅ 1a. Detect non-exported file-local helpers as private methods
-
-Landed in **PR #870**. `extract-ts-api.ts` now walks un-exported
-`FunctionDeclaration` and arrow-const `VariableStatement` nodes and
-emits them as `internal: true` methods bound to the file's host class.
-Also added `--privates-only` flag (filters to internal-only surface).
 
 ### 1b. Audit `this`-typed mixin-helper detection
 
@@ -34,32 +32,6 @@ Spot-check 3–5 0% files for predicate mismatches.
 
 ## 2. Implementation roadmap
 
-### Tier 1 — foundation ✅ COMPLETE
-
-- **`persistence.rb`** — **95% (20/21)** — PR #874. One stub remains
-  (`_updateRecordWithLock` composite-PK path).
-- **`transactions.rb`** — **100%** — PR #882.
-- **`relation/query_methods.rb`** — **100%** — PRs #884 + #901 + #908.
-
-Still open in Tier 1:
-
-- **`attribute_methods.rb` submodules** (0/6 + 0/3 + 0/6 + 0/1 ×4 +
-  0/2 + 0/4) — read/write/dirty/serialization/time-zone/before-type-cast.
-  ~30 methods.
-- **`callbacks.rb`** (0/3).
-
-### Tier 2 — associations cluster
-
-`associations/` directory is mostly red:
-
-- `association.rb` 5/20, `collection_association.rb` 5/15,
-  `has_many_through_association.rb` 2/19, `join_dependency.rb` 0/12,
-  `preloader/*` 0/14 + 0/10 + 0/2 + 0/2, `association_scope.rb` 0/9,
-  `alias_tracker.rb` 0/2, builders 0/3.
-
-Subtotal: ~120 methods. 6–8 PRs. Sequence: `association.rb` →
-`collection_*` → `has_many_through` → `preloader/*` → `join_dependency`.
-
 ### Tier 3 — connection adapters
 
 Largest aggregate gap (~300+ methods):
@@ -76,16 +48,6 @@ Largest aggregate gap (~300+ methods):
 Subtotal: ~310 methods. ~16 PRs. Many of these are private helpers
 behind already-implemented public APIs — likely a high "script-detection"
 hit rate once 1b/1c lands; re-measure before scoping.
-
-### Tier 4 — relation cluster
-
-`relation.rb` 0/19, `relation/batches.rb` 0/11,
-`relation/calculations.rb` 0/17, `relation/finder_methods.rb` 0/15,
-`relation/merger.rb` 0/8, `relation/predicate_builder.rb` 0/5,
-`relation/where_clause.rb` 0/12 (mostly script-fix), plus several
-predicate_builder subfiles.
-
-Subtotal: ~110 methods. 6 PRs.
 
 ### Tier 5 — encryption
 
@@ -125,9 +87,5 @@ Subtotal: ~110 methods. ~6 PRs.
 
 ## 3. Sequencing
 
-1. **Finish Tier 1 stragglers** — `attribute_methods` submodules and
-   `callbacks.rb`.
-2. **Tier 4** (relation cluster) — exercised by every test.
-3. **Tier 2** (associations).
-4. **Tier 3** (adapters) — sequence per-driver after `abstract_*`.
-5. **Tiers 5–7** in parallel as bandwidth allows.
+1. **Tier 3** (adapters) — sequence per-driver after `abstract_*`.
+2. **Tiers 5–7** in parallel as bandwidth allows.
