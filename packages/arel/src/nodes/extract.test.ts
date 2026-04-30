@@ -21,6 +21,18 @@ describe("Arel::Nodes::ExtractTest", () => {
     expect(sql).toBe('EXTRACT(MONTH FROM "users"."created_at")');
   });
 
+  // Mirrors Rails: `Expressions#extract` calls `Nodes::Extract.new [self], field`,
+  // wrapping the receiver in an array (expressions.rb). The visitor renders
+  // the array via `inject_join`, so a single-element array still produces
+  // the same SQL as a bare expression.
+  it("expressions.extract wraps the receiver in an array", () => {
+    const createdAt = users.get("created_at");
+    const node = createdAt.extract("year");
+    expect(Array.isArray(node.expr)).toBe(true);
+    expect((node.expr as Nodes.Node[])[0]).toBe(createdAt);
+    expect(new Visitors.ToSql().compile(node)).toBe('EXTRACT(YEAR FROM "users"."created_at")');
+  });
+
   describe("as", () => {
     it("should alias the extract", () => {
       const createdAt = users.get("created_at");

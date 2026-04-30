@@ -1056,7 +1056,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
   private visitArelNodesExtract(node: Nodes.Extract): SQLString {
     this.collector.append(`EXTRACT(${String(node.field).toUpperCase()} FROM `);
-    if (node.expr instanceof Node) {
+    if (Array.isArray(node.expr)) {
+      this.visitArray(node.expr);
+    } else if (node.expr instanceof Node) {
       this.visit(node.expr);
     } else if (node.expr !== null && node.expr !== undefined) {
       this.collector.append(String(node.expr));
@@ -1390,6 +1392,11 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     // a bare SelectManager — so the wrapping behavior lives in one place.
     if (v !== null && v !== undefined && typeof v === "object" && "ast" in v && "toSql" in v) {
       return this.visitArelSelectManager(v as unknown as { ast: Node });
+    }
+    if (Array.isArray(v)) {
+      // Mirrors Rails: `visit_Array` (to_sql.rb) — primitives and Nodes in
+      // arrays both flow through here, joined by ", ".
+      return this.visitArray(v);
     }
     if (v instanceof Node) {
       // Duck-type check to avoid circular dependency (SelectManager → ToSql → SelectManager)

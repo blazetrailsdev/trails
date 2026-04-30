@@ -2,9 +2,9 @@ import { Node, NodeVisitor } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
 export class Unary extends NodeExpression {
-  readonly expr: Node | string | number | null;
+  readonly expr: Node | Node[] | string | number | null;
 
-  constructor(expr: Node | string | number | null) {
+  constructor(expr: Node | Node[] | string | number | null) {
     super();
     this.expr = expr;
   }
@@ -82,10 +82,9 @@ export class GroupingSet extends GroupingElement {
 export class Group extends Unary {}
 /**
  * Rails' `Arel::Nodes::OptimizerHints` stores `[hint1, hint2, ...]` and the
- * visitor iterates them. The Unary base types `expr` as
- * `Node | string | number | null` — TS won't let us widen `expr` to an array
- * via `declare`, so the hints live in their own typed field and `expr` is
- * left as `null` (consistent with the declared base type).
+ * visitor iterates them. The hints live on a dedicated typed field (rather
+ * than on the now-`Node | Node[] | string | number | null` `expr`) so the
+ * element type can be `string | SqlLiteral` instead of `Node`.
  */
 export class OptimizerHints extends Unary {
   readonly hints: ReadonlyArray<string | import("./sql-literal.js").SqlLiteral>;

@@ -11,9 +11,9 @@ export class InsertStatement extends Node {
   values: Node | null;
   select: Node | null;
 
-  constructor() {
+  constructor(relation: Node | null = null) {
     super();
-    this.relation = null;
+    this.relation = relation;
     this.columns = [];
     this.values = null;
     this.select = null;

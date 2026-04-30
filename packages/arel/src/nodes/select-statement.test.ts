@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Nodes } from "../index.js";
+import { Nodes, Table } from "../index.js";
 
 describe("Arel", () => {
   describe("select-statement", () => {
@@ -27,6 +27,15 @@ describe("Arel", () => {
         s2.offset = new Nodes.Offset(new Nodes.Quoted(2));
         expect(s1.hash()).not.toBe(s2.hash());
       });
+    });
+
+    // Mirrors Rails: `SelectStatement.new(relation)` (select_statement.rb)
+    // forwards the relation to the seed `SelectCore.new(relation)` so callers
+    // can construct a SELECT pre-bound to a FROM target in one step.
+    it("ctor accepts a relation and seeds source.left", () => {
+      const users = new Table("users");
+      const stmt = new Nodes.SelectStatement(users);
+      expect(stmt.cores[0].source.left).toBe(users);
     });
 
     describe("#clone", () => {

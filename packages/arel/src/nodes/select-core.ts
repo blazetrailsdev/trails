@@ -17,9 +17,9 @@ export class SelectCore extends Node {
   optimizerHints: string[];
   comment: Node | null;
 
-  constructor() {
+  constructor(relation: Node | null = null) {
     super();
-    this.source = new JoinSource(null);
+    this.source = new JoinSource(relation);
     this.projections = [];
     this.wheres = [];
     this.groups = [];

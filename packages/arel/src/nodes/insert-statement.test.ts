@@ -15,6 +15,13 @@ describe("Arel", () => {
       expect(stmt.columns.length).toBe(2);
     });
 
+    // Mirrors Rails: `InsertStatement.new(relation)` (insert_statement.rb)
+    // assigns `@relation = relation`, so the AST is constructed pre-bound.
+    it("ctor accepts a relation", () => {
+      const stmt = new Nodes.InsertStatement(users);
+      expect(stmt.relation).toBe(users);
+    });
+
     describe("equality", () => {
       it("is equal with equal ivars", () => {
         const s1 = new Nodes.InsertStatement();
