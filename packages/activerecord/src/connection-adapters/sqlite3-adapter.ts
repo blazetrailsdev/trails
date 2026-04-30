@@ -1198,6 +1198,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "1" : "0";
     if (typeof value === "function") return String(value());
+    // boundary: defensive Date branch in SQLite adapter literal quoting.
     if (value instanceof globalThis.Date) return quoteString(value.toISOString());
     // SqlLiteral or objects with toSql
     if (typeof (value as any)?.toSql === "function") return String((value as any).toSql());

@@ -417,6 +417,7 @@ export class Base extends Metal {
       // realms). Last-Modified is RFC 7231 — emit via Date#toUTCString,
       // bridging a Temporal.Instant input through epoch ms.
       const isDate = Object.prototype.toString.call(options.lastModified) === "[object Date]";
+      // boundary: bridge Temporal.Instant input → Date for toUTCString rendering.
       const lm = isDate
         ? (options.lastModified as Date)
         : new Date((options.lastModified as Temporal.Instant).epochMilliseconds);

@@ -150,6 +150,7 @@ export class TransactionInstrumenter {
     Notifications.instrument("start_transaction.active_record", this._basePayload);
 
     this._payload = { ...this._basePayload };
+    // boundary: Notifications.Event#time is Date by Rails parity (see activesupport/src/notifications/instrumenter.ts).
     this._event = new NotificationEvent("transaction.active_record", new Date(), this._payload);
   }
 

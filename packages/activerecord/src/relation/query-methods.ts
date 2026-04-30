@@ -787,6 +787,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
   // compare by epoch since Object.is treats distinct Date instances as unequal.
   // Use Object.is on the epoch so two invalid (NaN) Dates compare equal too.
   if (a instanceof Date) return b instanceof Date && Object.is(a.getTime(), b.getTime());
+  // boundary: paired with the `a instanceof Date` branch above.
   if (b instanceof Date) return false;
 
   const aAny = a as { eql?: (x: unknown) => boolean; equals?: (x: unknown) => boolean };

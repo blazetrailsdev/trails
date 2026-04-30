@@ -2,6 +2,10 @@
  * SQLite3 quoting — SQLite-specific value and identifier quoting.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::Quoting
+ *
+ * @boundary-file: SQL value quoting branches on `instanceof Date` alongside
+ *   Temporal types; legacy Date values from custom-typed columns hit a
+ *   typed-error path that mirrors the abstract dispatcher.
  */
 
 import {

@@ -213,6 +213,7 @@ function inspect(value: unknown): string {
   if (value instanceof Temporal.PlainDateTime) return value.toString();
   if (value instanceof Temporal.PlainDate) return value.toString();
   if (value instanceof Temporal.PlainTime) return value.toString();
+  // boundary: explicit Date rejection so legacy callers get a clear error.
   if (value instanceof Date)
     throw new TypeError("Range inspect: JS Date is not accepted — use a Temporal type");
   return String(value);

@@ -2,6 +2,10 @@
  * Database statements — query execution interface.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements
+ *
+ * @boundary-file: typeCast accepts caller-supplied bind values; the
+ *   defensive `instanceof Date` branch catches legacy values flowing through
+ *   custom types and rejects them with a clear error (per PR 6).
  */
 
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";

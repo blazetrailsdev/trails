@@ -2,6 +2,10 @@
  * Quoting — SQL value and identifier quoting.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting
+ *
+ * @boundary-file: SQL quoting accepts caller-supplied values; legacy callers
+ *   may pass JS `Date` for date-typed columns. The dispatcher branches on
+ *   `instanceof Date` alongside Temporal types and handles each separately.
  */
 
 import { NotImplementedError } from "../../errors.js";

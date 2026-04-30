@@ -8,6 +8,7 @@ import vitest from "@vitest/eslint-plugin";
 import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
 import noProcessBypass from "./eslint/no-process-bypass.mjs";
 import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
+import noNativeDate from "./eslint/no-native-date.mjs";
 
 export default defineConfig(
   {
@@ -87,7 +88,7 @@ export default defineConfig(
     },
   },
 
-  // ── blazetrails plugin (shared by no-node-builtins + rails-private-jsdoc) ──
+  // ── blazetrails plugin (no-node-builtins + rails-private-jsdoc + no-native-date) ──
   // Registered without a `files` restriction so any block below can
   // reference its rules without re-declaring the plugin.
   {
@@ -97,6 +98,7 @@ export default defineConfig(
           "no-node-builtins": noNodeBuiltins,
           "no-process-bypass": noProcessBypass,
           "rails-private-jsdoc": railsPrivateJsdoc,
+          "no-native-date": noNativeDate,
         },
       },
     },
@@ -115,6 +117,33 @@ export default defineConfig(
     ],
     rules: {
       "blazetrails/no-process-bypass": "error",
+    },
+  },
+
+  // ── no-native-date (Temporal migration safety net) ──
+  {
+    files: [
+      "packages/arel/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+      "packages/activerecord/src/**/*.ts",
+      "packages/activesupport/src/**/*.ts",
+      "packages/rack/src/**/*.ts",
+      "packages/actionpack/src/**/*.ts",
+      "packages/actionview/src/**/*.ts",
+      "packages/trailties/src/**/*.ts",
+      "packages/website/src/**/*.ts",
+    ],
+    ignores: [
+      "**/*.test.ts",
+      "**/*.test-d.ts",
+      // Temporal bridge — the canonical Date↔Instant adapter.
+      "packages/activesupport/src/temporal.ts",
+      // Test infrastructure: travelTo, fixture helpers, etc.
+      "packages/activesupport/src/testing/**",
+      "packages/activesupport/src/testing-helpers.ts",
+    ],
+    rules: {
+      "blazetrails/no-native-date": "error",
     },
   },
 

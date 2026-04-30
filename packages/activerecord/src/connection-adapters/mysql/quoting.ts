@@ -6,6 +6,10 @@
  * In Rails, Quoting is a module mixed into AbstractMysqlAdapter.
  * Here we export standalone functions and an interface, matching
  * the pattern used by the PostgreSQL and SQLite3 adapters.
+ *
+ * @boundary-file: SQL value quoting branches on `instanceof Date` alongside
+ *   Temporal types; legacy Date values from custom-typed columns hit a
+ *   typed-error path that mirrors the abstract dispatcher.
  */
 
 import {

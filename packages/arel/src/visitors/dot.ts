@@ -502,6 +502,7 @@ export class Dot extends Visitor {
       t === "boolean" ||
       t === "bigint" ||
       t === "symbol" ||
+      // boundary: Arel dot-graph leaf detection includes legacy Date values.
       o instanceof Date
     );
   }
@@ -535,6 +536,7 @@ export class Dot extends Visitor {
     if (typeof o === "boolean") return o ? "TrueClass" : "FalseClass";
     if (typeof o === "bigint") return "Integer";
     if (typeof o === "symbol") return "Symbol";
+    // boundary: legacy JS Date values stringify to Rails' `Time` class name.
     if (o instanceof Date) return "Time";
     const ctor = (o as { constructor?: { name?: string } }).constructor;
     return ctor?.name ?? "Object";
