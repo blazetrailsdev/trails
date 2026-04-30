@@ -1193,8 +1193,8 @@ export class Model {
 
   _attributes: AttributeSet = new AttributeSet();
   _accessedFields: Set<string> = new Set();
-  errors: Errors = new Errors(this);
-  _dirty: DirtyTracker = new DirtyTracker();
+  errors!: Errors;
+  _dirty!: DirtyTracker;
 
   /**
    * Per-instance reset hook. Mirrors the Rails chain
