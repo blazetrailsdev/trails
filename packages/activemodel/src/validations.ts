@@ -272,14 +272,19 @@ export interface ValidationsContextHost {
 export function contextForValidation(this: ContextForValidationHost): ValidationContext {
   if (this._contextForValidation) return this._contextForValidation;
   const vc = Object.create(ValidationContext.prototype) as ValidationContext;
-  Object.defineProperty(vc, "context", {
+  // Override `context` and the underlying `_context` slot the
+  // prototype's `name` getter reads. Both must be aliased so
+  // `vc.name` / `vc.toString()` stay consistent with the live field.
+  const accessor: PropertyDescriptor = {
     get: (): string | string[] | null => this._validationContext,
     set: (value: string | string[] | null): void => {
       this._validationContext = value;
     },
     configurable: true,
     enumerable: true,
-  });
+  };
+  Object.defineProperty(vc, "context", accessor);
+  Object.defineProperty(vc, "_context", accessor);
   this._contextForValidation = vc;
   return vc;
 }
