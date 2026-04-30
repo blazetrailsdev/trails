@@ -14,15 +14,13 @@ PRs marked **independent** can be parallelized. Trails files are paths under
 
 PRs 1–5 merged (see Completed below).
 
-| Wave | PRs                        | Notes                                    |
-| ---- | -------------------------- | ---------------------------------------- |
-| 1    | 13, 15, 18, 19, 20, 21, 22 | independent fixes                        |
-| 2    | 6, 8, 12, 14               | depend on wave-1 helpers / shape changes |
-| 3    | 7, 16, 23, 24              | breaking-change wave; ship serially      |
-| 4    | 10, 25, 26                 | dialect / cross-package work             |
+| Wave | PRs          | Notes                               |
+| ---- | ------------ | ----------------------------------- |
+| 3    | 23b, 23c, 24 | breaking-change wave; ship serially |
+| 4    | 10, 25, 26   | dialect / cross-package work        |
 
-Wave-1 PRs can be opened in parallel. Wave-3 requires sequential merge
-because each one moves AR-visible API.
+Waves 1 and 2 are complete. Wave-3 requires sequential merge because
+each one moves AR-visible API.
 
 ---
 
@@ -55,146 +53,20 @@ api:compare` is a chained script — args don't reach `compare.ts`.)
 - PR 9 — `Table` self-alias normalization + 2-arg `[]` overload — merged in #1038.
 - PR 11 — `Math` over-quoting + `bitwiseNot` — merged in #1042.
 - PR 17 — `crud.ts` always assign `key` — merged in #1045.
-
----
-
-## PR 6 — `SelectManager#take` / `#skip` accept raw amount, allow `null` clear
-
-Write-side change. Read-side getter change is PR 7.
-
-### Rails reference
-
-- `select_manager.rb` — `take`, `skip`, `limit=`, `offset=`.
-
-### Trails files to change
-
-- `select-manager.ts`:
-  - `take(amount: number | Node | null)`: pass `amount` directly to
-    `new Limit(amount)`. On `null`, set `ast.limit = null`.
-  - `skip(amount)` symmetric.
-  - `set limit(value)` / `set offset(value)` setters per Rails (assign
-    `Limit`/`Offset` directly when number passed).
-- `nodes/unary.ts` — verify `Limit` / `Offset` accept raw number expr
-  (visitor should already render).
-
-### Tests to add
-
-- `select-manager.test.ts`:
-  - `mgr.take(5)` → `mgr.ast.limit instanceof Limit && limit.expr === 5`
-    (no `Quoted` wrapper).
-  - `mgr.take(null)` → `mgr.ast.limit === null`.
-  - `mgr.skip(null)` → cleared.
-
-### Risk
-
-- The `Quoted` wrap was masking type ambiguity. After this PR, any code
-  reading `limit.expr` gets a primitive (was a `Quoted`). Listed as a
-  consumer-visible API change in the migration matrix.
-
-### Verification
-
-- New tests pass.
-- `pnpm test:types` AR suite still typechecks.
-
-### Size
-
-~40 LOC src + ~50 LOC test.
-
----
-
-## PR 7 — `SelectManager#limit` / `#offset` getters return inner expr
-
-Read-side. Breaking change for AR.
-
-### Depends on
-
-- PR 6 (so test setup uses raw amounts).
-
-### Trails files to change
-
-- `select-manager.ts`:
-  - `get limit()`: return `this.ast.limit?.expr ?? null` (was `this.ast.limit`).
-  - `get offset()`: symmetric.
-- `packages/activerecord/` — find every `.limit` / `.offset` read on a
-  SelectManager (grep for `selectManager.limit`, `arel.limit`, and
-  manager-typed receivers) and migrate. Expect ≤10 sites.
-
-### Tests to add
-
-- `select-manager.test.ts`: `mgr.take(5); mgr.limit === 5`.
-- AR test changes are point-fixes, no new tests.
-
-### Risk
-
-- Highest of any PR in the plan. Ship behind a single atomic commit,
-  not split across packages.
-
-### Verification
-
-- `pnpm test` (full repo) green.
-- `pnpm parity:query` no diffs.
-
-### Size
-
-~30 LOC arel src + ~40 LOC AR migration + tests.
-
----
-
-## PR 8 — `UpdateManager#set` shape: wrap columns in `UnqualifiedColumn`
-
-### Rails reference
-
-- `update_manager.rb` — `set(values)`.
-- `nodes/unqualified_column.rb`.
-
-### Pre-PR audit (must complete before opening)
-
-Grep `_inUpdateSet` across `packages/arel/src/visitors/`. Document each
-reader and confirm what it does. As of audit:
-
-- `to-sql.ts` `visitArelNodesAssignment` — toggles state to skip column
-  qualification.
-- `to-sql.ts` `visitArelNodesAttribute` (or equivalent) — branches on
-  the flag.
-- (Possibly) `mysql.ts` overrides referencing it.
-
-### Trails files to change
-
-- `update-manager.ts`:
-  - `set(values)`:
-    - Pairs: wrap `[col, val]` → `new Assignment(new UnqualifiedColumn(col), val)`
-      (where `val` stays raw — drop the `Quoted` wrap).
-    - Raw string: store on `ast.values` as `new SqlLiteral(string)`.
-- `visitors/to-sql.ts`:
-  - Remove `_inUpdateSet` flag.
-  - `visitArelNodesAssignment` becomes plain `visit(left) = visit(right)`.
-  - `visitArelNodesUnqualifiedColumn` already emits the bare name
-    (verify, otherwise align).
-- `visitors/mysql.ts` — verify no `_inUpdateSet` reader remains.
-
-### Tests to add
-
-- `update-manager.test.ts`:
-  - AST shape: `assignment.left instanceof UnqualifiedColumn`.
-  - SQL output: identical to current snapshots.
-  - Raw string: `mgr.set("a = b")` → `ast.values instanceof SqlLiteral`.
-- `visitors/to-sql.test.ts` — unchanged SQL output assertion.
-- `visitors/mysql.test.ts` — `UPDATE t SET col = ...` (no `t.col`).
-
-### Risk
-
-- The `_inUpdateSet` flag also masks Attribute → bare-name rendering in
-  spots beyond Assignment. If grep finds unexpected readers, split this
-  PR or add explicit rendering paths first.
-
-### Verification
-
-- All `update*` tests in arel + AR pass.
-- `pnpm parity:query` UPDATE fixtures unchanged.
-
-### Size
-
-~70 LOC src + ~80 LOC test.
+- PR 13 — `SelectManager#from` Join routing — merged in #1048.
+- PR 18 — `tree-manager.ts` `key=` build_quoted — merged in #1048.
+- PR 19 — `factory-methods.ts` `lower` / `cast` alignment — merged in #1048.
+- PR 20 — `UnaryOperation` operator whitespace preservation — merged in #1048.
+- PR 21 — `Statement` ctors take `relation` arg — merged in #1050.
+- PR 22 — `expressions.ts` `extract` packs self in array — merged in #1050.
+- PR 15 — `SelectManager#distinct(value)` / `lateral` / `comment` — merged in #1055.
+- PR 6 — `SelectManager#take` / `#skip` raw amount + null clear — merged in #1057.
+- PR 14 — `SelectManager#optimizerHints` AST node — merged in #1057.
+- PR 12 — `InsertManager` shape parity — merged in #1061.
+- PR 8 — `UpdateManager#set` wraps columns in `UnqualifiedColumn` — merged in #1062.
+- PR 7 — `SelectManager#limit` / `#offset` getters return inner expr — merged in #1063.
+- PR 16 — `DeleteStatement` / `InsertStatement` visitor shape — merged in #1066.
+- PR 23 — Visitor leaf alignment (Lock + outer-join guards slice) — merged in #1069. Casted/Quoted collapse + Date-bind removal deferred to PR 23b; In-array wrap + Table-name-Node + ESCAPE deferred to PR 23c.
 
 ---
 
@@ -248,293 +120,44 @@ Rails (`@klass.attribute_aliases`).
 
 ---
 
-## PR 12 — `InsertManager` shape parity
-
-### Rails reference
-
-- `insert_manager.rb` — `insert`, `select=`, `values=`, `create_values`.
-- `crud.rb` — `compile_insert`.
-
-### Trails files to change
-
-- `insert-manager.ts`:
-  - `insert(fields)`:
-    - `if (fields == null || fields.length === 0) return;` (match Rails
-      early-return).
-    - `string` form: `this.ast.values = new SqlLiteral(fields)`.
-    - If `this.ast.relation == null && fields[0]?.[0]?.relation`, set
-      `this.ast.relation = fields[0][0].relation`.
-    - Drop the `Quoted` wrap on value halves (let visitor `quote`).
-  - `set values(list)` setter (mirror Rails `values=`); replace the
-    existing `values(list)` method outright (pre-release, no aliases).
-  - `select(selectManager)`: store the SelectManager itself; do not
-    unwrap to `.ast`. Visitor accepts both.
-
-### Tests to add
-
-- `insert-manager.test.ts`:
-  - `mgr.insert([])` is a no-op (relation/columns/values untouched).
-  - `mgr.insert("RAW")` → `ast.values instanceof SqlLiteral`.
-  - `mgr.insert([[col, val]])` infers relation.
-  - `mgr.select(other)` → `ast.select === other`.
-  - `mgr.values = list` setter form.
-
-### Risk
-
-- `select` storing a SelectManager (rather than a Node) requires the
-  visitor to handle both. Confirm `visitArelNodesInsertStatement` calls
-  `visit()` (which dispatches on constructor) — SelectManager isn't a
-  Node, so a tiny shim or `if (select.ast) visit(select.ast)` is needed.
-
-### Verification
-
-- New tests pass.
-- AR `insert_all` parity fixture unchanged.
-
-### Size
-
-~80 LOC src + ~100 LOC test.
-
----
-
-## PR 13 — `SelectManager#from` Join routing **[independent]**
-
-### Rails reference
-
-- `select_manager.rb` — `from`.
-
-### Change
-
-- `from(table)`: if `table instanceof Join`, push to `core.source.right`;
-  else assign to `core.source.left`.
-
-### Tests
-
-- `select-manager.test.ts` — pass an `InnerJoin` to `from`; assert it
-  lands on `source.right`.
-
-### Size
-
-~10 LOC src + ~20 LOC test.
-
----
-
-## PR 14 — `SelectManager#optimizerHints` AST node
-
-### Rails reference
-
-- `nodes/optimizer_hints.rb`.
-
-### Change
-
-- `select-manager.ts` `optimizerHints(...hints)` → wrap in
-  `new OptimizerHints(hints)` (add the node if absent), store on
-  `core.optimizerHints` as a node.
-- `visitors/to-sql.ts` `emitOptimizerHints` — visit the node.
-
-### Tests
-
-- AST shape + SQL identical.
-
-### Size
-
-~40 LOC src + ~40 LOC test.
-
----
-
-## PR 15 — `SelectManager#distinct(value=true)` clear, `lateral` order, `comment` array form **[independent]**
-
-Three small Rails-fidelity tweaks bundled because they all fit in one
-manager file and share a test file. Strictly under 100 LOC.
-
-### Changes
-
-- `distinct(value = true)`: when falsy, set `core.setQuantifier = null`.
-- `lateral(name?)`: produce `Nodes.Lateral.new(this.as(name))` —
-  `Lateral` wraps the `TableAlias`, not vice versa. Audit
-  `visitors/to-sql.ts` `visitArelNodesLateral` to confirm it visits
-  inner `TableAlias` correctly.
-- `comment(...values)` → `new Comment(values)` (single array arg). Verify
-  `Comment` ctor accepts `string[]` (it does today; spread-vs-array
-  produces the same AST so this is a no-op aside from API shape).
-
-### Tests
-
-- One test per case in `select-manager.test.ts`.
-
-### Risk
-
-- `lateral` swap changes SQL (`LATERAL (...) "x"` vs `LATERAL (... "x")`).
-  Update snapshots; confirm AR's `from(lateral_subquery)` still works.
-
-### Size
-
-~50 LOC src + ~70 LOC test.
-
----
-
-## PR 16 — `DeleteStatement` / `InsertStatement` visitor shape
-
-### Rails reference
-
-- `visitors/to_sql.rb` — `visit_Arel_Nodes_DeleteStatement`,
-  `visit_Arel_Nodes_InsertStatement`.
-
-### Changes
-
-- `visitArelNodesDeleteStatement`: emit `DELETE`, then `FROM`, then
-  `visit(joinSource.left)` (so `TableAlias` renders correctly).
-- `visitArelNodesInsertStatement`:
-  - Prefer `node.values` over `node.select` when both present.
-  - Route column quoting through `this.quoteColumnName(name)` (so MySQL
-    backtick override applies once it lands in PR 17).
-
-### Tests
-
-- `visitors/to-sql.test.ts`:
-  - `DELETE FROM users AS u WHERE ...`.
-  - `INSERT` with both `values` and `select` — assert values wins.
-- `visitors/mysql.test.ts` — INSERT column names backtick-quoted (after
-  PR 25 lands; cross-link).
-
-### Size
-
-~40 LOC src + ~70 LOC test.
-
----
-
-## PR 18 — `tree-manager.ts` `key=` build_quoted **[independent]**
-
-### Change
-
-- `tree-manager.ts` `set key(value)`: wrap with
-  `Nodes.buildQuoted(value)`; for arrays, map.
-
-### Test
-
-- `tree-manager.test.ts` — assert `ast.key instanceof Quoted` after
-  setter.
-
-### Size
-
-~10 LOC src + ~20 LOC test.
-
----
-
-## PR 19 — `factory-methods.ts` `lower` / `cast` alignment **[independent]**
-
-### Changes
-
-- `lower(column)` → `buildQuoted(column)` first.
-- `cast(name, type)` → `name.as(type)` (drop `SqlLiteral` pre-wrap; let
-  `as` handle retryable).
-
-### Test
-
-- `factory-methods.test.ts` — string `lower("name")` → AST contains
-  `Quoted("name")`.
-
-### Size
-
-~15 LOC src + ~25 LOC test.
-
----
-
-## PR 20 — `UnaryOperation` operator whitespace preservation **[independent]**
-
-### Rails ref
-
-- `visitors/to_sql.rb` — emits `${op}` without trim.
-
-### Changes
-
-- `visitors/to-sql.ts` `visitArelNodesUnaryOperation` — drop
-  `operator.trim()`. Emit literal `<space>${operator}<space>`.
-
-### Risk
-
-- Existing TS callers passing `" - "` would have rendered `<space>-<space>`
-  via trim+pad. After change, they render `<space> - <space>`. Audit
-  Trails callers (none expected — operators are short tokens).
-
-### Test
-
-- `visitors/to-sql.test.ts` — `UnaryOperation("- ", expr)` → exact whitespace
-  preserved.
-
-### Size
-
-~5 LOC src + ~20 LOC test.
-
----
-
-## PR 21 — `Statement` ctors take `relation` arg
-
-### Changes
-
-- `nodes/insert-statement.ts`, `nodes/select-statement.ts`,
-  `nodes/update-statement.ts`, `nodes/delete-statement.ts`:
-  ctor `constructor(relation: Node | null = null)`. Set
-  `this.relation = relation` (Insert) or `this.cores[0].source.left = relation`
-  (Select).
-
-### Test
-
-- `nodes/select-statement.test.ts` — `new SelectStatement(table)` →
-  source.left set.
-
-### Size
-
-~30 LOC src + ~40 LOC test.
-
----
-
-## PR 22 — `expressions.ts` `extract` packs self in array
-
-### Rails ref
-
-- `expressions.rb` — `Nodes::Extract.new [self], field`.
-
-### Changes
-
-- `expressions.ts` `extract(field)` → `new Extract([this], field)`.
-- `nodes/extract.ts` ctor accepts `Node[]`.
-- Visitor iterates the array.
-
-### Risk
-
-- Visitor change is required; otherwise SQL breaks. Audit
-  `visitArelNodesExtract` first.
-
-### Test
-
-- `expressions.test.ts` — `extract("year")` AST + SQL.
-
-### Size
-
-~20 LOC src + ~30 LOC test.
-
----
-
-## PR 23 — Visitor leaf alignment
-
-Bundles Lock, OuterJoin, Casted/Quoted, Table-name-Node, In-array-wrap,
-PostgreSQL ESCAPE.
+## PR 23b — Casted/Quoted collapse + Date-bind removal
 
 ### Changes
 
 - `visitors/to-sql.ts`:
-  - `visitArelNodesLock`: `visit(node.expr)` only — no `"FOR UPDATE"`
-    fallback. Also update `SelectManager#lock` (in PR 15 or here) to
-    always wrap in `SqlLiteral`.
-  - `visit{Outer,RightOuter,FullOuter}Join`: drop `if (node.right)` guard.
-    Document: passing a join with no ON now throws via SqlString.
   - `visitArelNodesCasted` / `visitQuoted`: collapse to a single shared
-    visitor `visit_quoted_or_casted` (both call `quote(o.valueForDatabase())`).
-    Drop the Date-bind branch in `visitQuoted`.
+    visitor (both call `quote(o.valueForDatabase())`).
+  - Drop the `_extractBinds` Date branch in `visitQuoted`. Audit
+    `PostgreSQLWithBinds.visitArelNodesCasted` and `addDateBind` overrides
+    — base ToSql no longer special-cases Date binds, so subclasses must
+    cover any extractBinds Date paths AR relies on.
+
+### Risk
+
+- High. The Date bind-branch removal changes how AR's
+  `where(created_at: date)` renders through extractBinds. Run
+  `pnpm parity:query` on date fixtures and confirm unchanged before
+  merge.
+
+### Verification
+
+- `pnpm parity:query` unchanged on date fixtures.
+- `pnpm parity:schema` unchanged.
+
+### Size
+
+~40 LOC src + ~60 LOC test.
+
+---
+
+## PR 23c — In-array wrap, Table-name-Node, PostgreSQL ESCAPE
+
+### Changes
+
+- `visitors/to-sql.ts`:
   - `visitArelTable`: branch on `node.name instanceof Node` → visit it.
-  - `prepareUpdateStatement` / `prepareDeleteStatement`: wrap subselect:
-    `new In(columns, [subselect])`.
+  - `prepareUpdateStatement` / `prepareDeleteStatement`: wrap subselect
+    as `new In(columns, [subselect])` (array, not bare).
 - `visitors/postgresql.ts`: `ESCAPE` form — when `escape instanceof Node`,
   visit it; else hard-quote.
 
@@ -543,19 +166,13 @@ PostgreSQL ESCAPE.
 - One test per change in `visitors/to-sql.test.ts` /
   `visitors/postgresql.test.ts`.
 
-### Risk
-
-- The `Date` bind-branch removal changes how AR-side date binds render.
-  Verify AR's `where(created_at: date)` parity before merge.
-
 ### Verification
 
-- `pnpm parity:query` on date fixtures unchanged.
-- `pnpm parity:schema` unchanged.
+- `pnpm parity:query` unchanged.
 
 ### Size
 
-~90 LOC src + ~140 LOC test.
+~50 LOC src + ~80 LOC test.
 
 ---
 
@@ -686,17 +303,10 @@ Recommendation: option 1 (less churn, same SQL).
 Pre-release: each PR migrates all in-tree call sites atomically. No
 deprecated aliases, no shims.
 
-| PR  | Surface                                                     | Notes                          |
-| --- | ----------------------------------------------------------- | ------------------------------ |
-| 6   | `take(n)` AST shape (`Limit.expr` raw)                      | inventory + migrate in same PR |
-| 7   | `mgr.limit` getter return type                              | atomic AR migration in same PR |
-| 8   | UpdateManager AST: `Assignment.left` is `UnqualifiedColumn` | inventory + migrate            |
-| 11  | Math AST: no inner `Quoted` for raw nodes                   | docs note                      |
-| 12  | InsertManager `ast.select` is SelectManager not Node        | visitor handles both shapes    |
-| 15  | `lateral` SQL output order                                  | update fixtures                |
-| 20  | `UnaryOperation` operator whitespace                        | low-risk                       |
-| 24  | `Union/Intersect/Except/Join` extends `Binary`              | API gain only                  |
-| 25  | MySQL identifier quoting                                    | curate snapshot diff           |
+| PR  | Surface                                        | Notes                |
+| --- | ---------------------------------------------- | -------------------- |
+| 24  | `Union/Intersect/Except/Join` extends `Binary` | API gain only        |
+| 25  | MySQL identifier quoting                       | curate snapshot diff |
 
 ---
 
