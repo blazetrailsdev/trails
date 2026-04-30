@@ -1216,7 +1216,6 @@ export class Model {
   initInternals(): void {
     validationsInitInternals.call(this);
     dirtyInitInternals.call(this);
-    this._contextForValidation = undefined;
   }
 
   /**

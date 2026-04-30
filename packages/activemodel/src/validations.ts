@@ -50,6 +50,7 @@ export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
 export function initInternals(this: ValidationsInternalsHost): void {
   this.errors = new Errors(this);
   this._validationContext = null;
+  this._contextForValidation = undefined;
 }
 
 /**
@@ -60,6 +61,7 @@ export function initInternals(this: ValidationsInternalsHost): void {
 export interface ValidationsInternalsHost {
   errors: Errors;
   _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
 }
 
 /**
