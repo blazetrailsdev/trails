@@ -11,46 +11,74 @@
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Lint {}
 
+/**
+ * Resolve the model fixture under test. Mirrors Rails
+ * `Lint::Tests#model` (activemodel/lib/active_model/lint.rb:108-111)
+ * which calls `@model.to_model` so the fixture can stand in via
+ * Conversion.
+ *
+ * @internal Rails-private helper.
+ */
+export function model<T>(m: T | { toModel(): T }): T {
+  if (m && typeof (m as { toModel?: unknown }).toModel === "function") {
+    return (m as { toModel(): T }).toModel();
+  }
+  return m as T;
+}
+
+/**
+ * Assert a value is a strict boolean. Mirrors Rails
+ * `Lint::Tests#assert_boolean` (activemodel/lib/active_model/lint.rb:113-115).
+ *
+ * @internal Rails-private helper.
+ */
+export function assertBoolean(result: unknown, name: string): void {
+  if (result !== true && result !== false) {
+    throw new Error(`${name} should be a boolean`);
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Tests {
-  export function testToKey(model: { toKey(): unknown[] | null; isPersisted(): boolean }): void {
-    const key = model.toKey();
+  type ToKeyHost = { toKey(): unknown[] | null; isPersisted(): boolean };
+  export function testToKey(input: ToKeyHost | { toModel(): ToKeyHost }): void {
+    const m = model(input);
+    const key = m.toKey();
     if (key !== null && !Array.isArray(key)) {
       throw new Error("toKey must return null or an array");
     }
 
-    const persisted = model.isPersisted();
-    if (typeof persisted !== "boolean") {
-      throw new Error("isPersisted must return a boolean");
-    }
+    const persisted = m.isPersisted();
+    assertBoolean(persisted, "isPersisted");
 
     if (persisted && key === null) {
       throw new Error("toKey must not return null when the model is persisted");
     }
   }
 
-  export function testToParam(model: {
-    toParam(): string | null;
-    toKey(): unknown[] | null;
-  }): void {
-    const param = model.toParam();
+  type ToParamHost = { toParam(): string | null; toKey(): unknown[] | null };
+  export function testToParam(input: ToParamHost | { toModel(): ToParamHost }): void {
+    const m = model(input);
+    const param = m.toParam();
     if (param !== null && typeof param !== "string") {
       throw new Error("toParam must return null or a string");
     }
   }
 
-  export function testToPartialPath(model: { toPartialPath(): string }): void {
-    const path = model.toPartialPath();
+  type ToPartialPathHost = { toPartialPath(): string };
+  export function testToPartialPath(
+    input: ToPartialPathHost | { toModel(): ToPartialPathHost },
+  ): void {
+    const m = model(input);
+    const path = m.toPartialPath();
     if (typeof path !== "string") {
       throw new Error("toPartialPath must return a string");
     }
   }
 
-  export function testPersisted(model: { isPersisted(): boolean }): void {
-    const result = model.isPersisted();
-    if (typeof result !== "boolean") {
-      throw new Error("isPersisted must return a boolean");
-    }
+  type PersistedHost = { isPersisted(): boolean };
+  export function testPersisted(input: PersistedHost | { toModel(): PersistedHost }): void {
+    assertBoolean(model(input).isPersisted(), "isPersisted");
   }
 
   export function testErrors(model: { errors: { fullMessages: unknown[] } }): void {

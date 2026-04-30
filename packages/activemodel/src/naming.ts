@@ -196,7 +196,10 @@ export class ModelName {
     const segmentsUnderscored = segments.map(underscore);
 
     // Rails `@singular = _singularize(@name)` flattens the path separator
-    // to `_`; the segments-join is the exact equivalent.
+    // to `_`; with the namespace segments split out we equivalently join
+    // the underscored segments with `_`. Pre-segmented input lets us
+    // skip an explicit `_singularize(name)` here without changing the
+    // result. (`_singularize` is exposed below for parity with Rails.)
     this.singular = [...segmentsUnderscored, bareUnderscored].join("_");
     // Rails `@plural = pluralize(@singular)`.
     this.plural = ModelName._uncountables.has(this.singular)
@@ -359,7 +362,7 @@ export class ModelName {
   get human(): string {
     if (!this._klass) return this._humanFallback;
 
-    const i18nKeys = this._i18nKeys();
+    const i18nKeys = this.i18nKeys();
     const i18nScope = this._i18nScope();
     if (i18nKeys.length === 0 || i18nScope.length === 0) return this._humanFallback;
 
@@ -375,15 +378,40 @@ export class ModelName {
     return I18n.t(fullKey, { defaults });
   }
 
-  private _i18nKeys(): string[] {
-    if (!this._klass) return [];
-    if (typeof this._klass.lookupAncestors === "function") {
-      return this._klass.lookupAncestors().map((k) => {
+  /**
+   * Lazy list of i18n lookup keys for this model and its ancestors.
+   * Mirrors Rails `i18n_keys` (activemodel/lib/active_model/naming.rb:220-226).
+   *
+   * @internal Rails-private helper.
+   */
+  i18nKeys(): string[] {
+    if (this._cachedI18nKeys) return this._cachedI18nKeys;
+    let keys: string[];
+    if (!this._klass) {
+      keys = [];
+    } else if (typeof this._klass.lookupAncestors === "function") {
+      keys = this._klass.lookupAncestors().map((k) => {
         if (k.modelName) return k.modelName.i18nKey;
         return underscore(k.name);
       });
+    } else {
+      keys = [this.i18nKey];
     }
-    return [this.i18nKey];
+    this._cachedI18nKeys = keys;
+    return keys;
+  }
+
+  private _cachedI18nKeys?: string[];
+
+  /**
+   * Flatten a class name into the singular `_`-joined form. Mirrors
+   * Rails `_singularize` (activemodel/lib/active_model/naming.rb:216-218):
+   * `ActiveSupport::Inflector.underscore(string).tr("/", "_")`.
+   *
+   * @internal Rails-private helper.
+   */
+  _singularize(string: string): string {
+    return underscore(string).replace(/\//g, "_");
   }
 
   private _i18nScope(): string[] {

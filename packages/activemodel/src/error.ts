@@ -188,12 +188,26 @@ export class Error {
   }
 
   equals(other: Error): boolean {
-    return (
-      other instanceof Error &&
-      this.base === other.base &&
-      this.attribute === other.attribute &&
-      this.rawType === other.rawType
-    );
+    if (!(other instanceof Error)) return false;
+    const a = this.attributesForHash();
+    const b = other.attributesForHash();
+    if (a[0] !== b[0] || a[1] !== b[1] || a[2] !== b[2]) return false;
+    return optionsEqual(a[3], b[3]);
+  }
+
+  /**
+   * Identity tuple used by `==` and `hash`. Mirrors Rails
+   * `attributes_for_hash` (activemodel/lib/active_model/error.rb:204-206):
+   * `[@base, @attribute, @raw_type, @options.except(*CALLBACKS_OPTIONS)]`.
+   *
+   * @internal Rails-private helper.
+   */
+  attributesForHash(): [AnyRecord, string, string, Record<string, unknown>] {
+    const own: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(this.options)) {
+      if (!CALLBACKS_OPTIONS.has(k)) own[k] = v;
+    }
+    return [this.base, this.attribute, this.rawType, own];
   }
 
   inspect(): string {
