@@ -172,6 +172,10 @@ const zoneCache = new Map<string, TimeZone>();
 /**
  * Get timezone abbreviation and offset for a given IANA zone at a specific instant.
  */
+function toDate(at: Date | Temporal.Instant): Date {
+  return at instanceof Date ? at : new Date(at.epochMilliseconds);
+}
+
 function getZoneInfo(
   ianaName: string,
   date: Date,
@@ -665,8 +669,8 @@ export class TimeZone {
   /**
    * UTC offset at a specific instant.
    */
-  utcOffsetAt(date: Date): number {
-    return getZoneInfo(this.tzinfo, date).utcOffsetSeconds;
+  utcOffsetAt(date: Date | Temporal.Instant): number {
+    return getZoneInfo(this.tzinfo, toDate(date)).utcOffsetSeconds;
   }
 
   /**
@@ -684,15 +688,16 @@ export class TimeZone {
   /**
    * Whether DST is in effect at the given instant.
    */
-  isDst(date: Date = new Date()): boolean {
+  isDst(date: Date | Temporal.Instant = Temporal.Now.instant()): boolean {
     // Compare offset at this date vs January (standard time for Northern hemisphere)
     // and July (standard time for Southern hemisphere). If current offset differs
     // from the minimum offset, DST is in effect.
-    const jan = new Date(date.getFullYear(), 0, 1);
-    const jul = new Date(date.getFullYear(), 6, 1);
+    const d = toDate(date);
+    const jan = new Date(d.getFullYear(), 0, 1);
+    const jul = new Date(d.getFullYear(), 6, 1);
     const janOffset = getZoneInfo(this.tzinfo, jan).utcOffsetSeconds;
     const julOffset = getZoneInfo(this.tzinfo, jul).utcOffsetSeconds;
-    const currentOffset = getZoneInfo(this.tzinfo, date).utcOffsetSeconds;
+    const currentOffset = getZoneInfo(this.tzinfo, d).utcOffsetSeconds;
     const standardOffset = Math.min(janOffset, julOffset);
     return currentOffset !== standardOffset;
   }
@@ -700,8 +705,8 @@ export class TimeZone {
   /**
    * Timezone abbreviation at a given instant.
    */
-  abbreviation(date: Date = new Date()): string {
-    return getZoneInfo(this.tzinfo, date).abbreviation;
+  abbreviation(date: Date | Temporal.Instant = Temporal.Now.instant()): string {
+    return getZoneInfo(this.tzinfo, toDate(date)).abbreviation;
   }
 
   /**
