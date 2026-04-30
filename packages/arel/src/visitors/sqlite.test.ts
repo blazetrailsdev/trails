@@ -77,31 +77,40 @@ describe("SqliteTest", () => {
       const sql = new Visitors.SQLite().compile(node);
       expect(sql).not.toContain("((");
       expect(sql).toContain("UNION");
-      expect(sql).toBe('(SELECT * FROM "users" UNION SELECT * FROM "users")');
+      expect(sql).toBe('( SELECT * FROM "users" UNION SELECT * FROM "users" )');
     });
 
     it("UNION ALL strips Grouping wrapped operands", () => {
       const node = new Nodes.UnionAll(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toBe('(SELECT * FROM "users" UNION ALL SELECT * FROM "users")');
+      expect(sql).toBe('( SELECT * FROM "users" UNION ALL SELECT * FROM "users" )');
     });
 
     it("INTERSECT strips Grouping wrapped operands", () => {
       const node = new Nodes.Intersect(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toBe('(SELECT * FROM "users" INTERSECT SELECT * FROM "users")');
+      expect(sql).toBe('( SELECT * FROM "users" INTERSECT SELECT * FROM "users" )');
     });
 
     it("EXCEPT strips Grouping wrapped operands", () => {
       const node = new Nodes.Except(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toBe('(SELECT * FROM "users" EXCEPT SELECT * FROM "users")');
+      expect(sql).toBe('( SELECT * FROM "users" EXCEPT SELECT * FROM "users" )');
     });
 
     it("UNION without Grouping operands renders bare SELECTs", () => {
       const node = new Nodes.Union(q1().ast, q2().ast);
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toBe('(SELECT * FROM "users" UNION SELECT * FROM "users")');
+      expect(sql).toBe('( SELECT * FROM "users" UNION SELECT * FROM "users" )');
+    });
+
+    it("nested unions are flattened (Rails-style)", () => {
+      const q3 = users.project(star);
+      const node = new Nodes.Union(q1().ast, new Nodes.Union(q2().ast, q3.ast));
+      const sql = new Visitors.SQLite().compile(node);
+      expect(sql).toBe(
+        '( SELECT * FROM "users" UNION SELECT * FROM "users" UNION SELECT * FROM "users" )',
+      );
     });
 
     it("union via SelectManager omits inner parens", () => {

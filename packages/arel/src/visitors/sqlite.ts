@@ -80,32 +80,33 @@ export class SQLite extends ToSql {
   }
 
   /**
-   * Mirrors `sqlite.rb#infix_value_with_paren`: SQLite rejects parens around
-   * SELECT operands of UNION/INTERSECT/EXCEPT. Strip a `Grouping` wrapper from
-   * each operand so a SELECT visits raw inside the set-op.
+   * Mirrors `sqlite.rb#infix_value_with_paren`. SQLite rejects parens around
+   * SELECT operands of UNION/INTERSECT/EXCEPT — strip a `Grouping` wrapper
+   * from each operand before recursing/visiting.
    */
-  protected override visitArelNodesUnion(node: Nodes.Union): SQLString {
-    return this.visitSetOperation(node, " UNION ");
-  }
+  protected override infixValueWithParen(
+    o: Node & { left: Node; right: Node },
+    value: string,
+    suppressParens = false,
+  ): SQLString {
+    const sameClass = (child: Node): child is typeof o =>
+      Object.getPrototypeOf(child) === Object.getPrototypeOf(o);
 
-  protected override visitArelNodesUnionAll(node: Nodes.UnionAll): SQLString {
-    return this.visitSetOperation(node, " UNION ALL ");
-  }
-
-  protected override visitArelNodesIntersect(node: Nodes.Intersect): SQLString {
-    return this.visitSetOperation(node, " INTERSECT ");
-  }
-
-  protected override visitArelNodesExcept(node: Nodes.Except): SQLString {
-    return this.visitSetOperation(node, " EXCEPT ");
-  }
-
-  private visitSetOperation(node: { left: Node; right: Node }, op: string): SQLString {
-    this.collector.append("(");
-    this.visit(this.unwrapGrouping(node.left));
-    this.collector.append(op);
-    this.visit(this.unwrapGrouping(node.right));
-    this.collector.append(")");
+    if (!suppressParens) this.collector.append("( ");
+    const left = this.unwrapGrouping(o.left);
+    if (sameClass(left)) {
+      this.infixValueWithParen(left, value, true);
+    } else {
+      this.groupingParentheses(left, false);
+    }
+    this.collector.append(value);
+    const right = this.unwrapGrouping(o.right);
+    if (sameClass(right)) {
+      this.infixValueWithParen(right, value, true);
+    } else {
+      this.groupingParentheses(right, false);
+    }
+    if (!suppressParens) this.collector.append(" )");
     return this.collector;
   }
 

@@ -1077,39 +1077,19 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // -- Set operations --
 
   protected visitArelNodesUnion(node: Nodes.Union): SQLString {
-    this.collector.append("(");
-    this.visit(node.left);
-    this.collector.append(" UNION ");
-    this.visit(node.right);
-    this.collector.append(")");
-    return this.collector;
+    return this.infixValueWithParen(node, " UNION ");
   }
 
   protected visitArelNodesUnionAll(node: Nodes.UnionAll): SQLString {
-    this.collector.append("(");
-    this.visit(node.left);
-    this.collector.append(" UNION ALL ");
-    this.visit(node.right);
-    this.collector.append(")");
-    return this.collector;
+    return this.infixValueWithParen(node, " UNION ALL ");
   }
 
   protected visitArelNodesIntersect(node: Nodes.Intersect): SQLString {
-    this.collector.append("(");
-    this.visit(node.left);
-    this.collector.append(" INTERSECT ");
-    this.visit(node.right);
-    this.collector.append(")");
-    return this.collector;
+    return this.infixValueWithParen(node, " INTERSECT ");
   }
 
   protected visitArelNodesExcept(node: Nodes.Except): SQLString {
-    this.collector.append("(");
-    this.visit(node.left);
-    this.collector.append(" EXCEPT ");
-    this.visit(node.right);
-    this.collector.append(")");
-    return this.collector;
+    return this.infixValueWithParen(node, " EXCEPT ");
   }
 
   // -- CTE --
