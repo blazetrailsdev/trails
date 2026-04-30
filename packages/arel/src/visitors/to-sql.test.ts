@@ -595,6 +595,43 @@ describe("the to_sql visitor", () => {
     expect(collector.retryable).toBe(false);
   });
 
+  describe("Nodes::DeleteStatement", () => {
+    it("renders DELETE FROM via the table visitor", () => {
+      const stmt = new DeleteManager().from(users).ast;
+      const sql = new Visitors.ToSql().compile(stmt);
+      expect(sql).toBe('DELETE FROM "users"');
+    });
+
+    it("renders TableAlias on the left when join sources are present", () => {
+      const aliased = new Nodes.TableAlias(users, "u");
+      const stmt = new Nodes.DeleteStatement(new Nodes.JoinSource(aliased));
+      stmt.wheres.push(new Nodes.Equality(users.get("id"), 1));
+      const sql = new Visitors.ToSql().compile(stmt);
+      expect(sql).toContain('DELETE "users" "u" FROM "users" "u"');
+      expect(sql).toContain("WHERE");
+    });
+  });
+
+  describe("Nodes::InsertStatement", () => {
+    it("prefers values over select when both are present", () => {
+      const mgr = new InsertManager(users);
+      mgr.insert([[users.get("name"), "dean"]]);
+      const sub = users.project(users.get("name"));
+      mgr.ast.select = sub.ast;
+      const sql = new Visitors.ToSql().compile(mgr.ast);
+      expect(sql).toContain("VALUES");
+      expect(sql).toContain("'dean'");
+      expect(sql).not.toContain("SELECT");
+    });
+
+    it("routes column names through quoteColumnName", () => {
+      const mgr = new InsertManager(users);
+      mgr.insert([[users.get("name"), "dean"]]);
+      const sql = new Visitors.ToSql().compile(mgr.ast);
+      expect(sql).toContain('("name")');
+    });
+  });
+
   it("should mark collector as non-retryable when visiting named function", () => {
     const fn = users.get("name").lower();
     const collector = new Visitors.ToSql().compileWithCollector(fn);
