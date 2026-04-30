@@ -67,11 +67,7 @@ describe("DateTest", () => {
   it("newDate rejects out-of-range components (rescue nil parity)", () => {
     class Probe extends Types.DateType {
       newDateFor(y: number, m: number, d: number) {
-        return (
-          this as unknown as {
-            newDate(y: number, m: number, d: number): Temporal.PlainDate | null;
-          }
-        ).newDate(y, m, d);
+        return this.newDate(y, m, d);
       }
     }
     const p = new Probe();

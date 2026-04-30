@@ -112,11 +112,7 @@ describe("DateTimeTest", () => {
   it("valueFromMultiparameterAssignment reconstructs an Instant from {1..6}", () => {
     class Probe extends Types.DateTimeType {
       call(values: Record<number, unknown>) {
-        return (
-          this as unknown as {
-            valueFromMultiparameterAssignment(v: Record<number, unknown>): unknown;
-          }
-        ).valueFromMultiparameterAssignment(values);
+        return this.valueFromMultiparameterAssignment(values);
       }
     }
     const result = new Probe().call({ 1: 2024, 2: 1, 3: 2, 4: 12, 5: 30, 6: 0 });
@@ -126,11 +122,7 @@ describe("DateTimeTest", () => {
   it("valueFromMultiparameterAssignment throws when keys 1/2/3 missing", () => {
     class Probe extends Types.DateTimeType {
       call(values: Record<number, unknown>) {
-        return (
-          this as unknown as {
-            valueFromMultiparameterAssignment(v: Record<number, unknown>): unknown;
-          }
-        ).valueFromMultiparameterAssignment(values);
+        return this.valueFromMultiparameterAssignment(values);
       }
     }
     expect(() => new Probe().call({ 1: 2024, 4: 12 })).toThrow(

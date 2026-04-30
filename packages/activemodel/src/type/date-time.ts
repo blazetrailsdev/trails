@@ -125,21 +125,8 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    * @internal Rails-private helper.
    */
   protected fallbackStringToTime(s: string): Temporal.Instant | null {
-    try {
-      const normalized = s
-        .replace(" ", "T")
-        .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
-      const datetimeString = /^\d{4}-\d{2}-\d{2}$/.test(normalized)
-        ? `${normalized}T00:00:00`
-        : normalized;
-      const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(datetimeString);
-      if (hasOffset) return Temporal.Instant.from(datetimeString);
-      return Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
-        .toZonedDateTime(configuredTimezone())
-        .toInstant();
-    } catch {
-      return null;
-    }
+    const result = this.parseString(s.trim());
+    return result instanceof Temporal.Instant ? result : null;
   }
 
   /**
