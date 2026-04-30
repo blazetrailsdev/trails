@@ -19,8 +19,8 @@ Rails routes every quoting call through the connection adapter:
 `connection.quote(value)`, `connection.quote_table_name(name)`. The
 `Quoting` module is mixed into `AbstractAdapter`; each concrete adapter
 overrides what differs (PG: backslash escaping, `escape_bytea`; MySQL:
-backtick identifiers, control-char escaping; SQLite: `'1'`/`'0'`
-booleans, double-quote identifiers). Call sites never touch the module
+backtick identifiers, control-char escaping; SQLite: `1`/`0` booleans,
+double-quote identifiers). Call sites never touch the module
 functions directly. **Booleans:** Rails abstract returns `"TRUE"`/`"FALSE"`;
 PG and MySQL both inherit this default; only SQLite overrides
 `quoted_true → "1"`.
