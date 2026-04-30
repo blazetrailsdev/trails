@@ -49,8 +49,6 @@ and activemodel for column/association/class-name normalization.
 `Duration` (with `.since`, `.ago`, `.fromNow`, `.until`), `instant`,
 `plainDate`, `plainDateTime`, `plainTime`, time-travel test helpers
 under `testing/temporal-helpers`. Re-exports `Temporal` polyfill.
-F-6 sweep flips remaining `Date`-returning helpers — see
-[`temporal-migration-plan.md`](temporal-migration-plan.md).
 
 ### Notifications + instrumentation
 
