@@ -103,7 +103,7 @@ export class DateType extends ValueType<DateCastResult> {
    */
   protected fallbackStringToDate(s: string): Temporal.PlainDate | null {
     try {
-      const pd = Temporal.PlainDate.from(s);
+      const pd = Temporal.PlainDate.from(s, { overflow: "reject" });
       return this.newDate(pd.year, pd.month, pd.day);
     } catch {
       return null;
