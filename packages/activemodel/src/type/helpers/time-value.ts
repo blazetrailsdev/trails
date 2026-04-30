@@ -176,10 +176,12 @@ export function newTime(
   };
   try {
     if (offset != null) {
-      const instant = Temporal.PlainDateTime.from(components).toZonedDateTime("UTC").toInstant();
+      const instant = Temporal.PlainDateTime.from(components, { overflow: "reject" })
+        .toZonedDateTime("UTC")
+        .toInstant();
       return offset === 0 ? instant : instant.subtract({ seconds: offset });
     }
-    return Temporal.PlainDateTime.from(components)
+    return Temporal.PlainDateTime.from(components, { overflow: "reject" })
       .toZonedDateTime(configuredTimezone())
       .toInstant();
   } catch {
@@ -212,11 +214,13 @@ export function newTime(
  */
 export function fastStringToTime(s: string): Temporal.Instant | null {
   if (!s.includes("-")) return null;
-  const normalized = s.replace(" ", "T");
-  const hasOffset = /Z$|[+-]\d{2}(?::?\d{2})?$/.test(normalized);
+  const normalized = s
+    .replace(" ", "T")
+    .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
+  const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(normalized);
   try {
     if (hasOffset) return Temporal.Instant.from(normalized);
-    return Temporal.PlainDateTime.from(normalized)
+    return Temporal.PlainDateTime.from(normalized, { overflow: "reject" })
       .toZonedDateTime(configuredTimezone())
       .toInstant();
   } catch {

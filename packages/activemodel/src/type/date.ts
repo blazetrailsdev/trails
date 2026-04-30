@@ -131,7 +131,10 @@ export class DateType extends ValueType<DateCastResult> {
   ): Temporal.PlainDate | null {
     if (year == null || (year === 0 && mon === 0 && mday === 0)) return null;
     try {
-      return Temporal.PlainDate.from({ year, month: mon ?? 1, day: mday ?? 1 });
+      return Temporal.PlainDate.from(
+        { year, month: mon ?? 1, day: mday ?? 1 },
+        { overflow: "reject" },
+      );
     } catch {
       return null;
     }

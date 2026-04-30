@@ -5,6 +5,7 @@ import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
+import { ArgumentError } from "../attribute-assignment.js";
 import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
 import { ValueType } from "./value.js";
@@ -129,10 +130,12 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    */
   protected fallbackStringToTime(s: string): Temporal.Instant | null {
     try {
-      const normalized = s.replace(" ", "T");
-      const hasOffset = /Z$|[+-]\d{2}(?::?\d{2})?$/.test(normalized);
+      const normalized = s
+        .replace(" ", "T")
+        .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
+      const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(normalized);
       if (hasOffset) return Temporal.Instant.from(normalized);
-      return Temporal.PlainDateTime.from(normalized)
+      return Temporal.PlainDateTime.from(normalized, { overflow: "reject" })
         .toZonedDateTime(configuredTimezone())
         .toInstant();
     } catch {
@@ -166,7 +169,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   ): DateTimeCastResult | null {
     const missing = [1, 2, 3].filter((k) => !(k in values));
     if (missing.length > 0) {
-      throw new Error(
+      throw new ArgumentError(
         `Provided hash ${JSON.stringify(values)} doesn't contain necessary keys: ${JSON.stringify(missing)}`,
       );
     }

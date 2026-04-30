@@ -63,4 +63,20 @@ describe("DateTest", () => {
   it("typeCastForSchema returns null for null", () => {
     expect(type.typeCastForSchema(null)).toBe("null");
   });
+
+  it("newDate rejects out-of-range components (rescue nil parity)", () => {
+    class Probe extends Types.DateType {
+      newDateFor(y: number, m: number, d: number) {
+        return (
+          this as unknown as {
+            newDate(y: number, m: number, d: number): Temporal.PlainDate | null;
+          }
+        ).newDate(y, m, d);
+      }
+    }
+    const p = new Probe();
+    expect(p.newDateFor(2024, 2, 30)).toBe(null);
+    expect(p.newDateFor(0, 0, 0)).toBe(null);
+    expect(p.newDateFor(2024, 1, 15)?.toString()).toBe("2024-01-15");
+  });
 });

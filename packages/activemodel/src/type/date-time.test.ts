@@ -133,6 +133,8 @@ describe("DateTimeTest", () => {
         ).valueFromMultiparameterAssignment(values);
       }
     }
-    expect(() => new Probe().call({ 1: 2024, 4: 12 })).toThrow(/necessary keys/);
+    expect(() => new Probe().call({ 1: 2024, 4: 12 })).toThrow(
+      expect.objectContaining({ name: "ArgumentError" }),
+    );
   });
 });
