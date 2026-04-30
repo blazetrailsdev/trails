@@ -89,15 +89,27 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // Per-class dispatch wrappers for shared helpers — mirrors Rails' per-method
   // form (each operator/aggregate has its own visit method).
   protected visitArelNodesGreaterThan(node: Nodes.GreaterThan): SQLString {
+    const sign = this.unboundableSign(node.right);
+    if (sign === 1) return this.collector.append("1=0");
+    if (sign === -1) return this.collector.append("1=1");
     return this.visitBinaryOp(node, ">");
   }
   protected visitArelNodesGreaterThanOrEqual(node: Nodes.GreaterThanOrEqual): SQLString {
+    const sign = this.unboundableSign(node.right);
+    if (sign === 1) return this.collector.append("1=0");
+    if (sign === -1) return this.collector.append("1=1");
     return this.visitBinaryOp(node, ">=");
   }
   protected visitArelNodesLessThan(node: Nodes.LessThan): SQLString {
+    const sign = this.unboundableSign(node.right);
+    if (sign === 1) return this.collector.append("1=1");
+    if (sign === -1) return this.collector.append("1=0");
     return this.visitBinaryOp(node, "<");
   }
   protected visitArelNodesLessThanOrEqual(node: Nodes.LessThanOrEqual): SQLString {
+    const sign = this.unboundableSign(node.right);
+    if (sign === 1) return this.collector.append("1=1");
+    if (sign === -1) return this.collector.append("1=0");
     return this.visitBinaryOp(node, "<=");
   }
   protected visitArelNodesCount(node: Nodes.Count): SQLString {
@@ -575,6 +587,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // -- Predicates --
 
   private visitArelNodesEquality(node: Nodes.Equality): SQLString {
+    if (this.unboundableSign(node.right) !== 0) {
+      return this.collector.append("1=0");
+    }
     if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
       this.visitNodeOrValue(node.left);
       this.collector.append(" IS NULL");
@@ -587,6 +602,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   private visitArelNodesNotEqual(node: Nodes.NotEqual): SQLString {
+    if (this.unboundableSign(node.right) !== 0) {
+      return this.collector.append("1=1");
+    }
     if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
       this.visitNodeOrValue(node.left);
       this.collector.append(" IS NOT NULL");
@@ -614,54 +632,66 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   private visitArelNodesIn(node: Nodes.In): SQLString {
-    if (Array.isArray(node.right) && node.right.length === 0) {
-      // Empty IN is always false — Rails uses 1=0
-      this.collector.append("1=0");
-      return this.collector;
+    let values = node.right;
+    if (Array.isArray(values)) {
+      if (values.length > 0) {
+        values = values.filter((v) => this.unboundableSign(v) === 0);
+      }
+      if (values.length === 0) {
+        // Empty IN is always false — Rails uses 1=0
+        this.collector.append("1=0");
+        return this.collector;
+      }
     }
     this.visitNodeOrValue(node.left);
     // Duck-type check for SelectManager subquery - visitNodeOrValue wraps it in parens
     if (
-      node.right &&
-      typeof node.right === "object" &&
-      !Array.isArray(node.right) &&
-      "ast" in (node.right as unknown as Record<string, unknown>) &&
-      "toSql" in (node.right as unknown as Record<string, unknown>)
+      values &&
+      typeof values === "object" &&
+      !Array.isArray(values) &&
+      "ast" in (values as unknown as Record<string, unknown>) &&
+      "toSql" in (values as unknown as Record<string, unknown>)
     ) {
       this.collector.append(" IN ");
-      this.visitNodeOrValue(node.right);
+      this.visitNodeOrValue(values);
       return this.collector;
     }
     this.collector.append(" IN (");
-    if (Array.isArray(node.right)) {
-      for (let i = 0; i < node.right.length; i++) {
+    if (Array.isArray(values)) {
+      for (let i = 0; i < values.length; i++) {
         if (i > 0) this.collector.append(", ");
-        this.visit(node.right[i]);
+        this.visit(values[i]);
       }
     } else {
-      this.visitNodeOrValue(node.right);
+      this.visitNodeOrValue(values);
     }
     this.collector.append(")");
     return this.collector;
   }
 
   private visitArelNodesNotIn(node: Nodes.NotIn): SQLString {
-    if (Array.isArray(node.right) && node.right.length === 0) {
-      // Empty NOT IN is always true — Rails uses 1=1
-      this.collector.append("1=1");
-      return this.collector;
+    let values = node.right;
+    if (Array.isArray(values)) {
+      if (values.length > 0) {
+        values = values.filter((v) => this.unboundableSign(v) === 0);
+      }
+      if (values.length === 0) {
+        // Empty NOT IN is always true — Rails uses 1=1
+        this.collector.append("1=1");
+        return this.collector;
+      }
     }
     this.visitNodeOrValue(node.left);
-    if (Array.isArray(node.right)) {
+    if (Array.isArray(values)) {
       this.collector.append(" NOT IN (");
-      for (let i = 0; i < node.right.length; i++) {
+      for (let i = 0; i < values.length; i++) {
         if (i > 0) this.collector.append(", ");
-        this.visit(node.right[i]);
+        this.visit(values[i]);
       }
       this.collector.append(")");
     } else {
       this.collector.append(" NOT IN (");
-      this.visitNodeOrValue(node.right);
+      this.visitNodeOrValue(values);
       this.collector.append(")");
     }
     return this.collector;
@@ -1592,10 +1622,42 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return DEFAULT_BIND_BLOCK;
   }
 
-  /** Mirrors `to_sql.rb#unboundable?`. */
+  /**
+   * Mirrors `to_sql.rb#unboundable?` returning a sign — `1` for +∞, `-1`
+   * for -∞, `0` for bounded values. Comparison visitors `case` on the
+   * sign; equality/IN visitors use a truthy check (`sign !== 0`).
+   *
+   * Unwraps Quoted/Casted/BindParam to inspect the wrapped value, and
+   * recognises `Float::INFINITY` analogues (`±Infinity`) plus any value
+   * exposing `isInfinite()` / `isUnboundable()`.
+   */
+  protected unboundableSign(value: unknown): 1 | -1 | 0 {
+    if (value === Infinity) return 1;
+    if (value === -Infinity) return -1;
+    if (value && typeof value === "object") {
+      const v = value as {
+        value?: unknown;
+        isInfinite?: () => unknown;
+        isUnboundable?: () => unknown;
+      };
+      if (typeof v.isInfinite === "function") {
+        const r = v.isInfinite();
+        if (r === 1) return 1;
+        if (r === -1) return -1;
+      }
+      if (typeof v.isUnboundable === "function") {
+        const r = v.isUnboundable();
+        if (r === 1 || r === true) return 1;
+        if (r === -1) return -1;
+      }
+      if ("value" in v) return this.unboundableSign(v.value);
+    }
+    return 0;
+  }
+
+  /** Mirrors `to_sql.rb#unboundable?` as a truthy check. */
   protected isUnboundable(value: unknown): boolean {
-    const v = value as { isUnboundable?: () => unknown } | null | undefined;
-    return typeof v?.isUnboundable === "function" ? Boolean(v.isUnboundable()) : false;
+    return this.unboundableSign(value) !== 0;
   }
 
   /** Mirrors `to_sql.rb#has_group_by_and_having?`. */
