@@ -292,13 +292,11 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   protected emitOptimizerHints(node: Nodes.SelectCore): void {
-    if (node.optimizerHints.length === 0) return;
-    const sanitized = node.optimizerHints
-      .map((h) => this.sanitizeHint(h))
-      .filter((h) => h.length > 0);
-    if (sanitized.length > 0) {
-      this.collector.append(` /*+ ${sanitized.join(" ")} */`);
-    }
+    // Mirrors Rails: `@ctx.optimizer_hints` is now an `OptimizerHints`
+    // node (or null); the visitor delegates to the dedicated visitor
+    // which sanitizes + wraps in `/*+ ... */`.
+    if (node.optimizerHints === null) return;
+    this.visit(node.optimizerHints);
   }
 
   // Mirrors Rails: visit_Arel_Nodes_SelectCore (to_sql.rb:149). Where Rails
@@ -1213,12 +1211,18 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // Mirrors Rails: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170). The
   // OptimizerHints node carries a list of hint strings (Rails' `o.expr` is
   // an array); each hint is sanitized and the joined result wrapped in
-  // /*+ ... */. Trails' SelectCore also stores hints inline as `string[]`
-  // — this method exists for callers that build an OptimizerHints node
-  // explicitly.
+  // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
+  // node and `emitOptimizerHints` delegates here.
   protected visitArelNodesOptimizerHints(node: Nodes.OptimizerHints): SQLString {
-    const hints = node.hints.map((v) => this.sanitizeAsSqlComment(v)).join(" ");
-    this.collector.append(` /*+ ${hints} */`);
+    // Mirrors Rails: plain string hints are sanitized (newlines, comment
+    // delimiters, `--` line comments stripped) and empty results dropped.
+    // SqlLiteral hints are the explicit escape hatch and pass through
+    // unchanged — same contract as `sanitizeAsSqlComment`.
+    const sanitized = node.hints
+      .map((h) => (h instanceof Nodes.SqlLiteral ? h.value : this.sanitizeHint(h)))
+      .filter((h) => h.length > 0);
+    if (sanitized.length === 0) return this.collector;
+    this.collector.append(` /*+ ${sanitized.join(" ")} */`);
     return this.collector;
   }
 
@@ -1545,9 +1549,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
   /**
    * Mirrors `to_sql.rb#collect_optimizer_hints`. Rails delegates to
-   * `maybe_visit o.optimizer_hints` since hints are an Arel node;
-   * Trails' SelectCore stores hints inline as `string[]`, so we call into
-   * the existing `emitOptimizerHints` formatter for parity at the seam.
+   * `maybe_visit o.optimizer_hints`; Trails' SelectCore now stores an
+   * `OptimizerHints` node (or null), and `emitOptimizerHints` does the
+   * `maybe_visit` no-op-when-nil dispatch.
    */
   protected collectOptimizerHints(o: Nodes.SelectCore): SQLString {
     this.emitOptimizerHints(o);
