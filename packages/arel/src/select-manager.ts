@@ -244,10 +244,15 @@ export class SelectManager extends TreeManager {
   }
 
   /**
-   * Make the SELECT DISTINCT.
+   * Make the SELECT DISTINCT (or clear DISTINCT when `value` is `false`
+   * or `null`).
+   *
+   * Mirrors: Arel::SelectManager#distinct (select_manager.rb). Ruby's
+   * `if value` treats only `false` and `nil` as falsy, so we test those
+   * exactly — `0`, `""`, etc. enable DISTINCT in Rails.
    */
-  distinct(): this {
-    this.core.setQuantifier = new Distinct();
+  distinct(value: unknown = true): this {
+    this.core.setQuantifier = value === false || value == null ? null : new Distinct();
     return this;
   }
 
@@ -436,12 +441,13 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#lateral
    */
-  lateral(alias?: string): Lateral | TableAlias {
-    const lat = new Lateral(this.ast);
-    if (alias) {
-      return new TableAlias(lat, alias);
-    }
-    return lat;
+  lateral(alias?: string): Lateral {
+    // Mirrors Rails: `lateral(table_name = nil)` builds the base — either the
+    // raw AST or `as(table_name)` (a TableAlias wrapping a Grouping) — and
+    // wraps it in a Lateral. The TableAlias lives inside the Lateral, not
+    // outside (select_manager.rb).
+    const base = alias === undefined ? this.ast : this.as(alias);
+    return new Lateral(base);
   }
 
   /**
@@ -450,7 +456,9 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#comment
    */
   comment(...values: string[]): this {
-    this.ast.comment = new Comment(...values);
+    // Mirrors Rails: `comment(*values)` constructs `Nodes::Comment.new(values)`
+    // — a single array arg, not a splat (select_manager.rb).
+    this.ast.comment = new Comment(values);
     return this;
   }
 

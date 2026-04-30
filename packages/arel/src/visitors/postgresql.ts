@@ -82,22 +82,6 @@ export class PostgreSQL extends ToSql {
     return this.groupingArrayOrGroupingElement(node);
   }
 
-  // Lateral: only add wrapping parens when the inner isn't already a
-  // Grouping (Rails: `grouping_parentheses`). Trails' base unconditionally
-  // wraps, so a `LATERAL (grouping)` pre-existing parens would
-  // produce `LATERAL ((expr))`.
-  protected override visitArelNodesLateral(node: Nodes.Lateral): SQLString {
-    this.collector.append("LATERAL ");
-    if (node.subquery instanceof Nodes.Grouping) {
-      this.visit(node.subquery);
-    } else {
-      this.collector.append("(");
-      this.visit(node.subquery);
-      this.collector.append(")");
-    }
-    return this.collector;
-  }
-
   // Postgres natively supports `IS [NOT] DISTINCT FROM`. Behaviorally
   // identical to the base ToSql visitor; the explicit override mirrors
   // Rails' Postgres visitor for fidelity (no behavior change).

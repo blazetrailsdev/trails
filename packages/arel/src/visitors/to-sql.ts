@@ -1196,10 +1196,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   protected visitArelNodesLateral(node: Nodes.Lateral): SQLString {
-    this.collector.append("LATERAL (");
-    this.visit(node.subquery);
-    this.collector.append(")");
-    return this.collector;
+    // Mirrors Rails: `collector << "LATERAL "; grouping_parentheses(o.expr, ...)`.
+    this.collector.append("LATERAL ");
+    return this.groupingParentheses(node.subquery);
   }
 
   // Mirrors Rails: visit_Arel_Nodes_Comment (to_sql.rb:175) — emits the

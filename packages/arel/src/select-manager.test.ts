@@ -829,6 +829,47 @@ describe("SelectManagerTest", () => {
     );
   });
 
+  // Mirrors Rails: `distinct(value=true)` clears the set quantifier only
+  // when value is `false` or `nil` (select_manager.rb's `if value`); any
+  // other value enables DISTINCT.
+  it("distinct(false) clears the set quantifier", () => {
+    const mgr = users.project(users.get("name")).distinct();
+    expect(mgr.toSql()).toContain("DISTINCT");
+    mgr.distinct(false);
+    expect(mgr.toSql()).not.toContain("DISTINCT");
+  });
+
+  describe("lateral", () => {
+    // Mirrors Rails: `lateral` returns `Lateral.new(ast)` when no name is
+    // given (select_manager.rb), so the visitor renders `LATERAL (...)`.
+    it("returns a Lateral wrapping the SELECT", () => {
+      const mgr = new SelectManager(users).project(users.get("id"));
+      const lat = mgr.lateral() as Nodes.Lateral;
+      expect(lat).toBeInstanceOf(Nodes.Lateral);
+      const sql = new Visitors.ToSql().compile(lat);
+      expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users")');
+    });
+
+    // Mirrors Rails: `lateral(name)` builds `Lateral.new(as(name))` —
+    // TableAlias inside Lateral, not vice versa. The TableAlias renders
+    // its own grouping parens, so the visitor emits `LATERAL (...) name`.
+    it("with a name wraps the alias inside the Lateral", () => {
+      const mgr = new SelectManager(users).project(users.get("id"));
+      const lat = mgr.lateral("u") as Nodes.Lateral;
+      expect(lat).toBeInstanceOf(Nodes.Lateral);
+      expect(lat.subquery).toBeInstanceOf(Nodes.TableAlias);
+      const sql = new Visitors.ToSql().compile(lat);
+      expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users") u');
+    });
+  });
+
+  // Mirrors Rails: `comment(*values)` constructs `Comment.new(values)` —
+  // values are passed as a single array arg (select_manager.rb).
+  it("comment ctor stores the values array", () => {
+    const c = new Nodes.Comment(["hello", "world"]);
+    expect(c.values).toEqual(["hello", "world"]);
+  });
+
   describe("lock", () => {
     it("adds a lock node", () => {
       expect(users.project(star).lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');

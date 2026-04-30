@@ -109,11 +109,14 @@ describe("PostgresTest", () => {
   });
 
   it("produces LATERAL queries with alias", () => {
+    // Mirrors Rails: `lateral(name)` builds `Lateral.new(as(name))`, where
+    // `as` produces `TableAlias(Grouping(ast), SqlLiteral(name, retryable))`.
+    // The Postgres visitor emits `LATERAL (...) name`; the alias is bare
+    // because Rails' `quote_table_name` returns SqlLiterals unchanged.
     const sub = users.project(users.get("id"));
     const lat = sub.lateral("t");
     const sql = new Visitors.PostgreSQL().compile(lat);
-    expect(sql).toContain("LATERAL (");
-    expect(sql).toContain('"t"');
+    expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users") t');
   });
 
   describe("Nodes::BindParam", () => {
@@ -382,19 +385,10 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
     expect(compile(g)).toBe('GROUPING SETS( "users"."a", "users"."b" )');
   });
 
-  it("Lateral does not double-wrap an inner Grouping", () => {
-    // Inner is already a Grouping (renders its own parens), so the
-    // PostgreSQL visitor should not add another set — Rails Postgres
-    // uses a `grouping_parentheses` helper that wraps only when the
-    // inner isn't a Grouping.
-    const inner = new Nodes.Grouping(new Nodes.SqlLiteral("SELECT 1"));
-    expect(compile(new Nodes.Lateral(inner))).toBe("LATERAL (SELECT 1)");
-  });
-
-  it("Lateral wraps a non-Grouping inner expression in parens", () => {
-    const inner = new Nodes.SqlLiteral("SELECT 1");
-    expect(compile(new Nodes.Lateral(inner))).toBe("LATERAL (SELECT 1)");
-  });
+  // The Lateral visitor lives on the base ToSql visitor (matching Rails'
+  // `grouping_parentheses` semantics: parens only for SelectStatement).
+  // PostgreSQL no longer overrides; its tests live in
+  // `select-manager.test.ts` (`describe("lateral")`).
 
   it("IsNotDistinctFrom uses standard SQL keyword on Postgres", () => {
     const node = users.get("a").isNotDistinctFrom(users.get("b"));

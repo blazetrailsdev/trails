@@ -8,7 +8,7 @@ import { Node, NodeVisitor } from "./node.js";
 export class Comment extends Node {
   readonly values: string[];
 
-  constructor(...values: string[]) {
+  constructor(values: string[]) {
     super();
     this.values = values;
   }
