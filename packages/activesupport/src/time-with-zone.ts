@@ -85,6 +85,23 @@ function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
+const NS_PER_SECOND = 1_000_000_000n;
+
+/** Sign of a BigInt as a Number-typed -1 / 0 / 1. */
+function signOf(diff: bigint): number {
+  return diff < 0n ? -1 : diff > 0n ? 1 : 0;
+}
+
+/**
+ * Convert a nanosecond-difference BigInt to a JS Number of seconds, preserving
+ * sub-second precision via floating-point fractional seconds.
+ */
+function nsDiffToSeconds(diffNs: bigint): number {
+  const wholeSeconds = diffNs / NS_PER_SECOND;
+  const remainderNs = diffNs % NS_PER_SECOND;
+  return Number(wholeSeconds) + Number(remainderNs) / 1e9;
+}
+
 export class TimeWithZone {
   /** The underlying zoned instant */
   private readonly _zoned: Temporal.ZonedDateTime;
@@ -565,7 +582,7 @@ export class TimeWithZone {
   minus(other: TimeWithZone | Date | Temporal.Instant): number;
   minus(arg: number | Duration | TimeWithZone | Date | Temporal.Instant): TimeWithZone | number {
     if (arg instanceof TimeWithZone) {
-      return (this._epochMs - arg._epochMs) / 1000;
+      return nsDiffToSeconds(this._zoned.epochNanoseconds - arg._zoned.epochNanoseconds);
     }
     // boundary: minus accepts Date for backwards compat with Rails' `t1 - t2`
     // overload that takes any Time-like value (including Ruby Time / DateTime).
@@ -573,7 +590,7 @@ export class TimeWithZone {
       return (this._epochMs - arg.getTime()) / 1000;
     }
     if (arg instanceof Temporal.Instant) {
-      return (this._epochMs - arg.epochMilliseconds) / 1000;
+      return nsDiffToSeconds(this._zoned.epochNanoseconds - arg.epochNanoseconds);
     }
     if (arg instanceof Duration) {
       return this.plus(arg.negate());
@@ -692,15 +709,19 @@ export class TimeWithZone {
 
   /**
    * Compare to another TimeWithZone, Date, or Temporal.Instant. Returns -1, 0, or 1.
+   * Comparison is nanosecond-precise for TimeWithZone / Temporal.Instant
+   * arguments; Date arguments compare at millisecond resolution (Date's
+   * native granularity).
    */
   compareTo(other: TimeWithZone | Date | Temporal.Instant): number {
-    const otherMs =
-      other instanceof TimeWithZone
-        ? other._epochMs
-        : other instanceof Temporal.Instant
-          ? other.epochMilliseconds
-          : other.getTime();
+    if (other instanceof TimeWithZone) {
+      return signOf(this._zoned.epochNanoseconds - other._zoned.epochNanoseconds);
+    }
+    if (other instanceof Temporal.Instant) {
+      return signOf(this._zoned.epochNanoseconds - other.epochNanoseconds);
+    }
     const thisMs = this._epochMs;
+    const otherMs = other.getTime();
     if (thisMs < otherMs) return -1;
     if (thisMs > otherMs) return 1;
     return 0;
@@ -720,14 +741,14 @@ export class TimeWithZone {
    */
   eql(other: unknown): boolean {
     if (other instanceof TimeWithZone) {
-      return this._epochMs === other._epochMs;
+      return this._zoned.epochNanoseconds === other._zoned.epochNanoseconds;
     }
     // boundary: eql is duck-typed in Rails (any Time-like); accept Date.
     if (other instanceof Date) {
       return this._epochMs === other.getTime();
     }
     if (other instanceof Temporal.Instant) {
-      return this._epochMs === other.epochMilliseconds;
+      return this._zoned.epochNanoseconds === other.epochNanoseconds;
     }
     return false;
   }

@@ -528,6 +528,28 @@ describe("TimeWithZoneTest", () => {
     expect(a.compareTo(a)).toBe(0);
   });
 
+  it("compareTo distinguishes Temporal.Instant operands at nanosecond precision", () => {
+    const baseNs = 1_700_000_000_000_000_000n;
+    const earlier = new TimeWithZone(Temporal.Instant.fromEpochNanoseconds(baseNs), eastern);
+    const laterByOneNs = Temporal.Instant.fromEpochNanoseconds(baseNs + 1n);
+    expect(earlier.compareTo(laterByOneNs)).toBe(-1);
+    expect(earlier.compareTo(Temporal.Instant.fromEpochNanoseconds(baseNs))).toBe(0);
+  });
+
+  it("minus() preserves nanosecond precision for Temporal.Instant operands", () => {
+    const baseNs = 1_700_000_000_000_000_000n;
+    const a = new TimeWithZone(Temporal.Instant.fromEpochNanoseconds(baseNs), eastern);
+    const b = Temporal.Instant.fromEpochNanoseconds(baseNs - 500n); // 500 ns earlier
+    expect(a.minus(b)).toBeCloseTo(5e-7, 12); // 5e-7 seconds = 500 ns
+  });
+
+  it("eql() is nanosecond-precise for Temporal.Instant operands", () => {
+    const baseNs = 1_700_000_000_000_000_000n;
+    const twz = new TimeWithZone(Temporal.Instant.fromEpochNanoseconds(baseNs), eastern);
+    expect(twz.eql(Temporal.Instant.fromEpochNanoseconds(baseNs))).toBe(true);
+    expect(twz.eql(Temporal.Instant.fromEpochNanoseconds(baseNs + 1n))).toBe(false);
+  });
+
   it("equals() compares same moment regardless of timezone", () => {
     const est = eastern.local(2024, 1, 15, 12, 0, 0);
     const pst = est.inTimeZone(pacific);
