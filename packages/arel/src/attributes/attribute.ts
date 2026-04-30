@@ -45,6 +45,8 @@ import {
   BitwiseShiftLeft,
   BitwiseShiftRight,
 } from "../nodes/infix-operation.js";
+import { BitwiseNot } from "../nodes/unary-operation.js";
+import type { NodeOrValue } from "../nodes/binary.js";
 import { Over } from "../nodes/over.js";
 import { NamedWindow, Window } from "../nodes/window.js";
 import { Predications, type PredicationHost } from "../predications.js";
@@ -372,41 +374,48 @@ export class Attribute extends Node {
   }
 
   // -- Math --
+  //
+  // Mirrors Arel::Math: operands pass through unwrapped. The visitor
+  // renders primitive values via `visitNodeOrValue`.
 
   add(other: unknown): Grouping {
-    return new Grouping(new Addition(this, buildQuoted(other)));
+    return new Grouping(new Addition(this, other as NodeOrValue));
   }
 
   subtract(other: unknown): Grouping {
-    return new Grouping(new Subtraction(this, buildQuoted(other)));
+    return new Grouping(new Subtraction(this, other as NodeOrValue));
   }
 
   multiply(other: unknown): Multiplication {
-    return new Multiplication(this, buildQuoted(other));
+    return new Multiplication(this, other as NodeOrValue);
   }
 
   divide(other: unknown): Division {
-    return new Division(this, buildQuoted(other));
+    return new Division(this, other as NodeOrValue);
   }
 
   bitwiseAnd(other: unknown): Grouping {
-    return new Grouping(new BitwiseAnd(this, buildQuoted(other)));
+    return new Grouping(new BitwiseAnd(this, other as NodeOrValue));
   }
 
   bitwiseOr(other: unknown): Grouping {
-    return new Grouping(new BitwiseOr(this, buildQuoted(other)));
+    return new Grouping(new BitwiseOr(this, other as NodeOrValue));
   }
 
   bitwiseXor(other: unknown): Grouping {
-    return new Grouping(new BitwiseXor(this, buildQuoted(other)));
+    return new Grouping(new BitwiseXor(this, other as NodeOrValue));
   }
 
   bitwiseShiftLeft(other: unknown): Grouping {
-    return new Grouping(new BitwiseShiftLeft(this, buildQuoted(other)));
+    return new Grouping(new BitwiseShiftLeft(this, other as NodeOrValue));
   }
 
   bitwiseShiftRight(other: unknown): Grouping {
-    return new Grouping(new BitwiseShiftRight(this, buildQuoted(other)));
+    return new Grouping(new BitwiseShiftRight(this, other as NodeOrValue));
+  }
+
+  bitwiseNot(): BitwiseNot {
+    return new BitwiseNot(this);
   }
 
   // -- Aliasing --

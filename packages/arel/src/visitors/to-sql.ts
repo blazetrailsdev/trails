@@ -1041,9 +1041,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // -- Concat --
 
   protected visitArelNodesConcat(node: Nodes.Concat): SQLString {
-    this.visit(node.left);
+    this.visitNodeOrValue(node.left);
     this.collector.append(" || ");
-    this.visit(node.right);
+    this.visitNodeOrValue(node.right);
     return this.collector;
   }
 
@@ -1068,9 +1068,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // -- InfixOperation --
 
   private visitArelNodesInfixOperation(node: Nodes.InfixOperation): SQLString {
-    this.visit(node.left);
+    this.visitNodeOrValue(node.left);
     this.collector.append(` ${node.operator} `);
-    this.visit(node.right);
+    this.visitNodeOrValue(node.right);
     return this.collector;
   }
 

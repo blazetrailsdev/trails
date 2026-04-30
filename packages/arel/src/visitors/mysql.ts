@@ -98,9 +98,9 @@ export class MySQL extends ToSql {
 
   protected override visitArelNodesConcat(node: Nodes.Concat): SQLString {
     this.collector.append("CONCAT(");
-    this.visit(node.left);
+    this.visitNodeOrValue(node.left);
     this.collector.append(", ");
-    this.visit(node.right);
+    this.visitNodeOrValue(node.right);
     this.collector.append(")");
     return this.collector;
   }

@@ -1,5 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
-import { Binary } from "./binary.js";
+import { Binary, type NodeOrValue } from "./binary.js";
 import { As } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { buildQuoted } from "./casted.js";
@@ -15,10 +15,10 @@ import type { Included } from "@blazetrails/activesupport";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class InfixOperation extends Binary {
   readonly operator: string;
-  readonly left: Node;
-  readonly right: Node;
+  readonly left: NodeOrValue;
+  readonly right: NodeOrValue;
 
-  constructor(operator: string, left: Node, right: Node) {
+  constructor(operator: string, left: NodeOrValue, right: NodeOrValue) {
     super(left, right);
     this.operator = operator;
     this.left = left;
@@ -54,81 +54,81 @@ export class InfixOperation extends Binary {
 
 /** Bitwise AND: left & right */
 export class BitwiseAnd extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("&", left, right);
   }
 }
 
 /** Bitwise OR: left | right */
 export class BitwiseOr extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("|", left, right);
   }
 }
 
 /** Bitwise XOR: left ^ right */
 export class BitwiseXor extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("^", left, right);
   }
 }
 
 /** Bitwise Shift Left: left << right */
 export class BitwiseShiftLeft extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("<<", left, right);
   }
 }
 
 /** Bitwise Shift Right: left >> right */
 export class BitwiseShiftRight extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super(">>", left, right);
   }
 }
 
 /** Math operations — these live here to match Rails infix_operation.rb */
 export class Addition extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("+", left, right);
   }
 }
 
 export class Subtraction extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("-", left, right);
   }
 }
 
 export class Multiplication extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("*", left, right);
   }
 }
 
 export class Division extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("/", left, right);
   }
 }
 
 /** String concatenation: left || right */
 export class Concat extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("||", left, right);
   }
 }
 
 /** PostgreSQL @> contains operator */
 export class Contains extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("@>", left, right);
   }
 }
 
 /** PostgreSQL && overlaps operator */
 export class Overlaps extends InfixOperation {
-  constructor(left: Node, right: Node) {
+  constructor(left: NodeOrValue, right: NodeOrValue) {
     super("&&", left, right);
   }
 }
