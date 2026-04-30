@@ -1,3 +1,4 @@
+import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -8,7 +9,7 @@ export function routesCommand(): Command {
     .description("Print the application route table")
     .option("-g, --grep <pattern>", "Filter routes by pattern")
     .action(async (options) => {
-      const cwd = process.cwd();
+      const cwd = getCwd();
       const routesFile = path.join(cwd, "src", "config", "routes.ts");
 
       if (!fs.existsSync(routesFile)) {

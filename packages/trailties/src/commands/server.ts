@@ -1,3 +1,4 @@
+import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
 import { DevServer } from "../server/dev-server.js";
 
@@ -12,7 +13,7 @@ export function serverCommand(): Command {
       const server = new DevServer({
         port: parseInt(options.port, 10),
         host: options.binding,
-        cwd: process.cwd(),
+        cwd: cwd(),
       });
       await server.start();
     });

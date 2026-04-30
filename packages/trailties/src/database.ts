@@ -1,4 +1,5 @@
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { env } from "@blazetrails/activesupport/process-adapter";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 
 export interface DatabaseConfig {
@@ -17,7 +18,7 @@ export interface DatabaseConfig {
  * Checks TRAILS_ENV, then NODE_ENV, defaults to "development".
  */
 export function resolveEnv(): string {
-  return process.env.TRAILS_ENV || process.env.NODE_ENV || "development";
+  return env.TRAILS_ENV || env.NODE_ENV || "development";
 }
 
 /**
@@ -377,8 +378,8 @@ export async function resolveSchemaFormat(
   // silently falling through to the next rung.
   if (opts.format !== undefined) return normalize(opts.format, "--format");
 
-  if ("SCHEMA_FORMAT" in process.env) {
-    return normalize(process.env.SCHEMA_FORMAT ?? "", "SCHEMA_FORMAT env var");
+  if ("SCHEMA_FORMAT" in env) {
+    return normalize(env.SCHEMA_FORMAT ?? "", "SCHEMA_FORMAT env var");
   }
 
   // Inspect the config file for a top-level `schemaFormat` key (sibling

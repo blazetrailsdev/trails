@@ -6,6 +6,7 @@ import tseslint from "typescript-eslint";
 import unusedImports from "eslint-plugin-unused-imports";
 import vitest from "@vitest/eslint-plugin";
 import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
+import noProcessBypass from "./eslint/no-process-bypass.mjs";
 import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
 
 export default defineConfig(
@@ -94,9 +95,26 @@ export default defineConfig(
       blazetrails: {
         rules: {
           "no-node-builtins": noNodeBuiltins,
+          "no-process-bypass": noProcessBypass,
           "rails-private-jsdoc": railsPrivateJsdoc,
         },
       },
+    },
+  },
+
+  // ── no-process-bypass: forbid direct process.* in trailties src ──
+  // process.* must go through @blazetrails/activesupport's processAdapter
+  // so trailties can run on browser/non-Node hosts. app-generator.ts is
+  // exempt because it contains template strings emitting user-app code
+  // (which legitimately uses process.* at runtime in the user's app).
+  {
+    files: ["packages/trailties/src/**/*.ts"],
+    ignores: [
+      "packages/trailties/src/**/*.test.ts",
+      "packages/trailties/src/generators/app-generator.ts",
+    ],
+    rules: {
+      "blazetrails/no-process-bypass": "error",
     },
   },
 

@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { getFsAsync, getPathAsync, Logger } from "@blazetrails/activesupport";
+import { env, setExitCode, stdout } from "@blazetrails/activesupport/process-adapter";
 import {
   loadDatabaseConfig,
   loadAllDatabaseConfigs,
@@ -460,7 +461,7 @@ async function runTestLoadSchema(options: {
   const fs = await getFsAsync();
   if (!(await fs.exists(filename))) {
     console.error(`No schema file found at ${filename}. Run \`trails db schema:dump\` first.`);
-    process.exitCode = 1;
+    setExitCode(1);
     return;
   }
   await DatabaseTasks.purge(config);
@@ -603,7 +604,7 @@ async function withMigratorForDb(
   const prevLogger = Migration.logger;
   if (ctx.prefix) {
     Migration.logger = new Logger({
-      write: (s) => process.stdout.write(`${ctx.prefix}${s}`),
+      write: (s) => stdout.write(`${ctx.prefix}${s}`),
     });
   }
   try {
@@ -628,8 +629,7 @@ export function dbCommand(): Command {
       // Rails: ENV["VERSION"] is an alternative to the --version flag
       // for CI scripts that set VERSION=20260101000000. Normalize blank
       // to null so an empty VERSION="" doesn't fail BigInt parsing.
-      const rawVersion =
-        opts.version != null ? String(opts.version).trim() : process.env.VERSION?.trim();
+      const rawVersion = opts.version != null ? String(opts.version).trim() : env.VERSION?.trim();
       const targetVersion = rawVersion && rawVersion.length > 0 ? rawVersion : null;
       await forEachDatabase(opts, async (ctx) => {
         await withMigratorForDb(
@@ -658,7 +658,7 @@ export function dbCommand(): Command {
       const step = Number(opts.step);
       if (!Number.isInteger(step) || step < 1) {
         console.error(`Invalid value for --step: "${opts.step}". Expected a positive integer.`);
-        process.exitCode = 1;
+        setExitCode(1);
         return;
       }
       await forEachDatabase(opts, async (ctx) => {
@@ -677,7 +677,7 @@ export function dbCommand(): Command {
       const step = Number(opts.step);
       if (!Number.isInteger(step) || step < 1) {
         console.error(`Invalid value for --step: "${opts.step}". Expected a positive integer.`);
-        process.exitCode = 1;
+        setExitCode(1);
         return;
       }
       await forEachDatabase(opts, async (ctx) => {
@@ -735,7 +735,7 @@ export function dbCommand(): Command {
         await runProtectedEnvCheck(config, envName);
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
-        process.exitCode = 1;
+        setExitCode(1);
       }
     });
 
@@ -771,7 +771,7 @@ export function dbCommand(): Command {
             console.error(`${prefix}  ${version.padStart(4, " ")} ${m.name}`);
           }
           console.error(`${prefix}Run \`trails db migrate\` to resolve this issue.`);
-          process.exitCode = 1;
+          setExitCode(1);
         }
       });
     });
@@ -961,7 +961,7 @@ export function dbCommand(): Command {
       const step = Number(opts.step);
       if (!Number.isInteger(step) || step < 1) {
         console.error(`Invalid value for --step: "${opts.step}". Expected a positive integer.`);
-        process.exitCode = 1;
+        setExitCode(1);
         return;
       }
       await forEachDatabase(opts, async (ctx) => {
@@ -1059,7 +1059,7 @@ export function dbCommand(): Command {
           const filename = DatabaseTasks.schemaDumpPath(config);
           if (!(await fs.exists(filename))) {
             console.error(`${prefix}No schema file found at ${filename}`);
-            process.exitCode = 1;
+            setExitCode(1);
             return;
           }
           DatabaseTasks.setAdapter(adapter);

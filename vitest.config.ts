@@ -16,6 +16,10 @@ export default defineConfig({
         __dirname,
         "packages/activesupport/src/glob.ts",
       ),
+      "@blazetrails/activesupport/process-adapter": path.resolve(
+        __dirname,
+        "packages/activesupport/src/process-adapter.ts",
+      ),
       "@blazetrails/activesupport/testing/temporal-helpers": path.resolve(
         __dirname,
         "packages/activesupport/src/testing/temporal-helpers.ts",

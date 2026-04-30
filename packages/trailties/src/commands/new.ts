@@ -1,3 +1,4 @@
+import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
 import path from "node:path";
 import { execSync } from "node:child_process";
@@ -14,7 +15,7 @@ export function newCommand(): Command {
     .option("--skip-install", "Skip dependency installation")
     .option("--skip-docker", "Skip Dockerfile creation")
     .action(async (name: string, options) => {
-      const cwd = process.cwd();
+      const cwd = getCwd();
       const gen = new AppGenerator({
         cwd,
         output: console.log,

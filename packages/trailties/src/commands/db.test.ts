@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { env, setEnv } from "@blazetrails/activesupport/process-adapter";
 import { createProgram } from "../cli.js";
 import {
   loadDatabaseConfig,
@@ -124,31 +125,29 @@ describe("DbCommand", () => {
 });
 
 describe("resolveEnv", () => {
-  const origRailsEnv = process.env.TRAILS_ENV;
-  const origNodeEnv = process.env.NODE_ENV;
+  const origRailsEnv = env.TRAILS_ENV;
+  const origNodeEnv = env.NODE_ENV;
 
   afterEach(() => {
-    if (origRailsEnv === undefined) delete process.env.TRAILS_ENV;
-    else process.env.TRAILS_ENV = origRailsEnv;
-    if (origNodeEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = origNodeEnv;
+    setEnv("TRAILS_ENV", origRailsEnv);
+    setEnv("NODE_ENV", origNodeEnv);
   });
 
   it("prefers TRAILS_ENV", () => {
-    process.env.TRAILS_ENV = "staging";
-    process.env.NODE_ENV = "production";
+    setEnv("TRAILS_ENV", "staging");
+    setEnv("NODE_ENV", "production");
     expect(resolveEnv()).toBe("staging");
   });
 
   it("falls back to NODE_ENV", () => {
-    delete process.env.TRAILS_ENV;
-    process.env.NODE_ENV = "production";
+    setEnv("TRAILS_ENV", undefined);
+    setEnv("NODE_ENV", "production");
     expect(resolveEnv()).toBe("production");
   });
 
   it("defaults to development", () => {
-    delete process.env.TRAILS_ENV;
-    delete process.env.NODE_ENV;
+    setEnv("TRAILS_ENV", undefined);
+    setEnv("NODE_ENV", undefined);
     expect(resolveEnv()).toBe("development");
   });
 });
@@ -376,7 +375,7 @@ describe("loadAllDatabaseConfigs", () => {
 
 describe("resolveSchemaFormat", () => {
   let tmpDir: string;
-  const origSchemaFormatEnv = process.env.SCHEMA_FORMAT;
+  const origSchemaFormatEnv = env.SCHEMA_FORMAT;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sf-"));
@@ -385,13 +384,12 @@ describe("resolveSchemaFormat", () => {
     // Phase 6 reads SCHEMA_FORMAT as a Rails-parity override; make sure
     // tests start from a clean slot so a stray env var from the outer
     // process doesn't flip results.
-    delete process.env.SCHEMA_FORMAT;
+    setEnv("SCHEMA_FORMAT", undefined);
   });
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    if (origSchemaFormatEnv === undefined) delete process.env.SCHEMA_FORMAT;
-    else process.env.SCHEMA_FORMAT = origSchemaFormatEnv;
+    setEnv("SCHEMA_FORMAT", origSchemaFormatEnv);
   });
 
   it("prefers an explicit --format flag over everything else", async () => {
@@ -423,7 +421,7 @@ describe("resolveSchemaFormat", () => {
   development: { adapter: "sqlite3", database: ":memory:" },
 };`,
     );
-    process.env.SCHEMA_FORMAT = "sql";
+    setEnv("SCHEMA_FORMAT", "sql");
     // Env wins over config.
     expect(await resolveSchemaFormat({}, tmpDir)).toBe("sql");
     // --format still beats env.
@@ -431,7 +429,7 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("rejects invalid SCHEMA_FORMAT env values", async () => {
-    process.env.SCHEMA_FORMAT = "yaml";
+    setEnv("SCHEMA_FORMAT", "yaml");
     await expect(resolveSchemaFormat({}, tmpDir)).rejects.toThrow(/SCHEMA_FORMAT env var/);
   });
 
@@ -453,13 +451,13 @@ describe("resolveSchemaFormat", () => {
     // --format="", SCHEMA_FORMAT="", schemaFormat: "" in config all
     // represent an explicitly-set knob; they shouldn't silently fall
     // through to inference. Detection is presence-based (`!== undefined`
-    // / `"KEY" in process.env` / `"schemaFormat" in module`) so a
+    // / `"KEY" in env` / `"schemaFormat" in module`) so a
     // deliberately-empty value reaches the validator.
     await expect(resolveSchemaFormat({ format: "" }, tmpDir)).rejects.toThrow(/Invalid --format/);
 
-    process.env.SCHEMA_FORMAT = "";
+    setEnv("SCHEMA_FORMAT", "");
     await expect(resolveSchemaFormat({}, tmpDir)).rejects.toThrow(/SCHEMA_FORMAT env var/);
-    delete process.env.SCHEMA_FORMAT;
+    setEnv("SCHEMA_FORMAT", undefined);
 
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),

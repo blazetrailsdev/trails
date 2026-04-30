@@ -1,3 +1,4 @@
+import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -13,7 +14,7 @@ export function destroyCommand(): Command {
     .description("Remove a model, its migration, and test")
     .argument("<name>", "Model name")
     .action((name: string) => {
-      const cwd = process.cwd();
+      const cwd = getCwd();
       const fileName = dasherize(name);
       const className = classify(name);
       const tableName = tableize(className);
@@ -38,7 +39,7 @@ export function destroyCommand(): Command {
     .description("Remove a controller and its test")
     .argument("<name>", "Controller name")
     .action((name: string) => {
-      const cwd = process.cwd();
+      const cwd = getCwd();
       const fileName = dasherize(name.replace(/Controller$/i, "")) + "-controller";
       removeFile(cwd, `src/app/controllers/${fileName}.ts`);
       removeFile(cwd, `test/controllers/${fileName}.test.ts`);
@@ -49,7 +50,7 @@ export function destroyCommand(): Command {
     .description("Remove a migration")
     .argument("<name>", "Migration name")
     .action((name: string) => {
-      const cwd = process.cwd();
+      const cwd = getCwd();
       const migrationsDir = path.join(cwd, "db", "migrations");
       if (!fs.existsSync(migrationsDir)) return;
 
@@ -66,7 +67,7 @@ export function destroyCommand(): Command {
     .description("Remove a scaffold (model, controller, migration, tests)")
     .argument("<name>", "Resource name")
     .action((name: string) => {
-      const cwd = process.cwd();
+      const cwd = getCwd();
       const fileName = dasherize(name);
       const className = classify(name);
       const tableName = tableize(className);
