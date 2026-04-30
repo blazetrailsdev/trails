@@ -62,8 +62,14 @@ export class MessageVerifier {
     if (options.expiresAt) {
       payload._expiresAt = options.expiresAt.toString({ smallestUnit: "millisecond" });
     } else if (options.expiresIn !== undefined) {
+      // Temporal.Duration components must be integers, but Rails (and
+      // existing trails callers) pass fractional seconds — e.g. 0.001
+      // for a 1ms expiry. Round to the nearest millisecond so any
+      // sub-second precision is preserved without violating Temporal's
+      // integer-component invariant.
+      const milliseconds = Math.round(options.expiresIn * 1000);
       payload._expiresAt = Temporal.Now.instant()
-        .add({ seconds: options.expiresIn })
+        .add({ milliseconds })
         .toString({ smallestUnit: "millisecond" });
     }
 
