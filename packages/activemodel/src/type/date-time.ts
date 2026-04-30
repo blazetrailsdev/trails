@@ -5,12 +5,10 @@ import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
-import { isUtc } from "./helpers/timezone.js";
+import { ArgumentError } from "../attribute-assignment.js";
+import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
+import { configuredTimezone } from "./helpers/timezone.js";
 import { ValueType } from "./value.js";
-
-function configuredTimezone(): string {
-  return isUtc() ? "UTC" : Temporal.Now.timeZoneId();
-}
 
 export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 
@@ -85,5 +83,82 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   type(): string {
     return this.name;
+  }
+
+  /**
+   * Mirrors: ActiveModel::Type::DateTime#microseconds (date_time.rb:62-64).
+   *
+   *   # '0.123456' -> 123456
+   *   # '1.123456' -> 123456
+   *   def microseconds(time)
+   *     time[:sec_fraction] ? (time[:sec_fraction] * 1_000_000).to_i : 0
+   *   end
+   *
+   * Rails parses sub-second precision out of `Date._parse` results as
+   * a `Rational` (e.g. `123456/1000000`); multiplying by 1_000_000
+   * normalizes it to an integer microsecond count.
+   *
+   * @internal Rails-private helper.
+   */
+  protected microseconds(time: { sec_fraction?: number | null }): number {
+    return time.sec_fraction ? Math.trunc(time.sec_fraction * 1_000_000) : 0;
+  }
+
+  /**
+   * Mirrors: ActiveModel::Type::DateTime#fallback_string_to_time
+   * (date_time.rb:66-75).
+   *
+   *   def fallback_string_to_time(string)
+   *     time_hash = begin
+   *       ::Date._parse(string)
+   *     rescue ArgumentError
+   *     end
+   *     return unless time_hash
+   *     time_hash[:sec_fraction] = microseconds(time_hash)
+   *     new_time(*time_hash.values_at(:year, :mon, :mday, :hour, :min, :sec, :sec_fraction, :offset))
+   *   end
+   *
+   * Trails has no `Date._parse` equivalent; reuse Temporal's
+   * permissive parser plus the configured-zone resolution that
+   * `parseString` already implements. Returns null on parse failure.
+   *
+   * @internal Rails-private helper.
+   */
+  protected fallbackStringToTime(s: string): Temporal.Instant | null {
+    const result = this.parseString(s.trim());
+    return result instanceof Temporal.Instant ? result : null;
+  }
+
+  /**
+   * Mirrors: ActiveModel::Type::DateTime#value_from_multiparameter_assignment
+   * (date_time.rb:77-83).
+   *
+   *   def value_from_multiparameter_assignment(values_hash)
+   *     missing_parameters = [1, 2, 3].delete_if { |key| values_hash.key?(key) }
+   *     unless missing_parameters.empty?
+   *       raise ArgumentError, "Provided hash #{values_hash} doesn't contain necessary keys: #{missing_parameters}"
+   *     end
+   *     super
+   *   end
+   *
+   * Validates that year/mon/mday (multiparameter keys 1, 2, 3) are
+   * present, then defers to the multiparameter wrapper. Trails routes
+   * the actual reconstruction through `AcceptsMultiparameterTime`
+   * (`helpers/accepts-multiparameter-time.ts`); this helper exists for
+   * Rails parity and as the entry point for callers that want the
+   * key-presence check.
+   *
+   * @internal Rails-private helper.
+   */
+  protected valueFromMultiparameterAssignment(
+    values: Record<number, unknown>,
+  ): DateTimeCastResult | null {
+    const missing = [1, 2, 3].filter((k) => !Object.hasOwn(values, k));
+    if (missing.length > 0) {
+      throw new ArgumentError(
+        `Provided hash ${JSON.stringify(values)} doesn't contain necessary keys: ${JSON.stringify(missing)}`,
+      );
+    }
+    return new AcceptsMultiparameterTime(this).cast(values) as DateTimeCastResult | null;
   }
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { applySecondsPrecision } from "./time-value.js";
+import { applySecondsPrecision, fastStringToTime, newTime } from "./time-value.js";
 
 // Mirrors ActiveModel::Type::Helpers::TimeValue#apply_seconds_precision
 // (time_value.rb:24-34). Truncation, not rounding — verify each
@@ -76,5 +76,35 @@ describe("applySecondsPrecision", () => {
   it("passes null/undefined through unchanged", () => {
     expect(applySecondsPrecision.call({ precision: 3 }, null)).toBeNull();
     expect(applySecondsPrecision.call({ precision: 3 }, undefined)).toBeUndefined();
+  });
+});
+
+describe("newTime", () => {
+  it("returns null for 0000-00-00 00:00:00 and rejects out-of-range components", () => {
+    expect(newTime(0, 0, 0, 0, 0, 0, 0)).toBeNull();
+    expect(newTime(2024, 2, 30, 0, 0, 0, 0)).toBeNull();
+  });
+
+  it("subtracts offset (in seconds) when offset != 0", () => {
+    const i = newTime(2024, 1, 2, 12, 0, 0, 0, 3600);
+    expect(i?.toString()).toBe("2024-01-02T11:00:00Z");
+  });
+
+  it("splits Ruby microsec (0..999_999) across Temporal millisecond/microsecond", () => {
+    const i = newTime(2024, 1, 2, 12, 0, 0, 123456);
+    const z = i?.toZonedDateTimeISO("UTC");
+    expect(z?.millisecond).toBe(123);
+    expect(z?.microsecond).toBe(456);
+  });
+});
+
+describe("fastStringToTime", () => {
+  it("returns null for strings without '-'", () => {
+    expect(fastStringToTime("1234")).toBeNull();
+  });
+
+  it("normalizes Postgres short offset (+00) to (+00:00)", () => {
+    const i = fastStringToTime("2026-04-26 14:23:55.123456+00");
+    expect(i?.toString().startsWith("2026-04-26T14:23:55.123456")).toBe(true);
   });
 });

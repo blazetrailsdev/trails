@@ -108,4 +108,25 @@ describe("DateTimeTest", () => {
     const result = type.cast(pdt);
     expect(result).toBeInstanceOf(Temporal.Instant);
   });
+
+  it("valueFromMultiparameterAssignment reconstructs an Instant from {1..6}", () => {
+    class Probe extends Types.DateTimeType {
+      call(values: Record<number, unknown>) {
+        return this.valueFromMultiparameterAssignment(values);
+      }
+    }
+    const result = new Probe().call({ 1: 2024, 2: 1, 3: 2, 4: 12, 5: 30, 6: 0 });
+    expect(result).toBeInstanceOf(Temporal.Instant);
+  });
+
+  it("valueFromMultiparameterAssignment throws when keys 1/2/3 missing", () => {
+    class Probe extends Types.DateTimeType {
+      call(values: Record<number, unknown>) {
+        return this.valueFromMultiparameterAssignment(values);
+      }
+    }
+    expect(() => new Probe().call({ 1: 2024, 4: 12 })).toThrow(
+      expect.objectContaining({ name: "ArgumentError" }),
+    );
+  });
 });
