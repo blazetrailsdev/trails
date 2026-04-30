@@ -3,8 +3,8 @@ import { Type } from "./value.js";
 export class BigIntegerType extends Type<bigint> {
   readonly name: string = "big_integer";
 
-  cast(value: unknown): bigint | null {
-    if (value === null || value === undefined) return null;
+  /** @internal Rails-private helper. */
+  protected castValue(value: unknown): bigint | null {
     if (typeof value === "bigint") return value;
     if (typeof value === "string") {
       try {

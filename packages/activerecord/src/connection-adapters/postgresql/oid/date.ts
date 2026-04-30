@@ -15,7 +15,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   DateType,
-  type DateCastResult,
   DateInfinity,
   DateNegativeInfinity,
   type DateInfinityType,
@@ -26,18 +25,17 @@ import { parsePostgresDate } from "../../abstract/temporal-wire.js";
 export class Date extends DateType {
   override readonly name: string = "date";
 
-  override cast(value: unknown): DateCastResult | null {
-    return this.castValue(value);
-  }
-
   /**
-   * Rails' `cast_value` — the protected hook cast delegates to.
-   * Kept public so subclasses and tests can call it directly, and so
-   * api:compare finds the method name that matches Rails.
+   * Rails' `cast_value` — the hook cast delegates to. Kept public so
+   * subclasses and tests can call it directly. Base `cast()` handles
+   * the nil short-circuit and dispatches here, so we fall through to
+   * the parent's `castValue` (NOT `cast`) to avoid the virtual-dispatch
+   * loop that would re-enter this method.
    */
-  castValue(
+  override castValue(
     value: unknown,
   ): Temporal.PlainDate | DateInfinityType | DateNegativeInfinityType | null {
+    if (value === null || value === undefined) return null;
     if (typeof value === "string") {
       if (value === "infinity") return DateInfinity;
       if (value === "-infinity") return DateNegativeInfinity;
@@ -49,7 +47,7 @@ export class Date extends DateType {
         }
       }
     }
-    return super.cast(value);
+    return super.castValue(value);
   }
 
   override serialize(value: unknown): string | null {

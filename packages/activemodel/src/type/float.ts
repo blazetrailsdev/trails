@@ -3,8 +3,8 @@ import { ValueType } from "./value.js";
 export class FloatType extends ValueType<number> {
   readonly name = "float";
 
-  cast(value: unknown): number | null {
-    if (value === null || value === undefined) return null;
+  /** @internal Rails-private helper. */
+  protected castValue(value: unknown): number | null {
     if (typeof value === "number") return value;
     const parsed = parseFloat(String(value));
     return isNaN(parsed) ? null : parsed;

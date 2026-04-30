@@ -4,8 +4,8 @@ import { ValueType } from "./value.js";
 export class TimeType extends ValueType<Temporal.PlainTime> {
   readonly name = "time";
 
-  cast(value: unknown): Temporal.PlainTime | null {
-    if (value === null || value === undefined) return null;
+  /** @internal Rails-private helper. */
+  protected castValue(value: unknown): Temporal.PlainTime | null {
     if (value instanceof Temporal.PlainTime) return value;
     // Accept PlainDateTime from multiparameter assignment — extract the time part.
     if (value instanceof Temporal.PlainDateTime) return value.toPlainTime();

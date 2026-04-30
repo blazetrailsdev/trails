@@ -19,7 +19,40 @@ export abstract class Type<T = unknown> {
     return this._scale;
   }
 
-  abstract cast(value: unknown): T | null;
+  /**
+   * Mirrors: ActiveModel::Type::Value#cast (value.rb:53-55)
+   *
+   *   def cast(value)
+   *     cast_value(value) unless value.nil?
+   *   end
+   *
+   * Public coercion entrypoint. Subclasses normally override
+   * {@link castValue} (the protected hook) rather than `cast` itself,
+   * so the `value == null → null` short-circuit lives in one place.
+   * Subclasses with non-Rails-shaped coercion (e.g. Integer's blank
+   * string handling) may still override `cast` directly to match Rails.
+   */
+  cast(value: unknown): T | null {
+    if (value === null || value === undefined) return null;
+    return this.castValue(value);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Type::Value#cast_value (value.rb:155-157)
+   *
+   *   def cast_value(value) # :doc:
+   *     value
+   *   end
+   *
+   * Convenience method for types which do not need separate type
+   * casting behavior for user and database inputs. Called by `cast`
+   * for non-nil values. The default passes the value through.
+   *
+   * @internal Rails-private helper.
+   */
+  protected castValue(value: unknown): T | null {
+    return value as T | null;
+  }
 
   type(): string {
     return this.name;
@@ -155,12 +188,6 @@ export abstract class Type<T = unknown> {
 
 export class ValueType<T = unknown> extends Type<T> {
   readonly name: string = "value";
-
-  cast(value: unknown): T | null {
-    // No-op default: pass the value through. Subclasses narrow by
-    // overriding `cast` with a concrete return type.
-    return value as T | null;
-  }
 
   equals(other: Type): boolean {
     return this.constructor === other.constructor;

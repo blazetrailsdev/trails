@@ -43,16 +43,16 @@ export class Money extends DecimalType {
    * itself, then delegates to DecimalType via super.cast(...) for
    * numeric casting.
    */
-  override cast(value: unknown): string | null {
-    return this.castValue(value);
-  }
-
   /**
    * Rails' cast_value — exposed publicly so api:compare matches the
-   * Rails method name and callers can invoke the hook directly.
+   * Rails method name and callers can invoke the hook directly. Base
+   * `cast()` now handles the nil short-circuit and dispatches here, so
+   * we only fall through to the parent's `castValue` (NOT `cast`) to
+   * avoid the virtual-dispatch loop that would re-enter this method.
    */
-  castValue(value: unknown): string | null {
-    if (typeof value !== "string") return super.cast(value);
+  override castValue(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value !== "string") return super.castValue(value);
 
     // (4) (2.55) → -2.55
     let str = value.replace(/^\((.+)\)$/, "-$1");
@@ -65,6 +65,6 @@ export class Money extends DecimalType {
       str = str.replace(/[^\-0-9,]/g, "").replace(/,/g, ".");
     }
 
-    return super.cast(str);
+    return super.castValue(str);
   }
 }

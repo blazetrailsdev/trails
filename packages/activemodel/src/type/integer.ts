@@ -12,8 +12,8 @@ export class IntegerType extends ValueType<number> {
     this._range = [-max, max - 1];
   }
 
-  cast(value: unknown): number | null {
-    if (value === null || value === undefined) return null;
+  /** @internal Rails-private helper. */
+  protected castValue(value: unknown): number | null {
     if (typeof value === "number") {
       if (isNaN(value)) return null;
       return Math.trunc(value);

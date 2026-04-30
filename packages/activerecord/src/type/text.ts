@@ -3,14 +3,11 @@
  */
 import { StringType } from "@blazetrails/activemodel";
 
-export class Text extends (StringType as new () => Omit<StringType, "name" | "type"> & {
-  name: string;
-  type(): string;
-}) {
-  readonly name = "text";
+export class Text extends StringType {
+  override readonly name: string = "text";
 
   /** Mirrors: ActiveRecord::Type::Text#type */
-  type(): string {
+  override type(): string {
     return "text";
   }
 }

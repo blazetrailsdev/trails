@@ -35,8 +35,8 @@ export class BooleanType extends ValueType<boolean> {
    * policy. "yes", "no", "garbage" all coerce to `true`. Empty string
    * and `null`/`undefined` map to `null`.
    */
-  cast(value: unknown): boolean | null {
-    if (value === null || value === undefined) return null;
+  /** @internal Rails-private helper. */
+  protected castValue(value: unknown): boolean | null {
     if (value === "") return null;
     return !BooleanType.FALSE_VALUES.has(value);
   }

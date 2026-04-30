@@ -28,18 +28,14 @@ export class Uuid extends ValueType<string> {
     return "uuid";
   }
 
-  cast(value: unknown): string | null {
-    return this.castValue(value);
-  }
-
   override deserialize(value: unknown): string | null {
-    return this.castValue(value);
+    return this.cast(value);
   }
 
   // Rails does `alias :serialize :deserialize` — serialize routes through
   // the same casting path as deserialize.
   override serialize(value: unknown): string | null {
-    return this.castValue(value);
+    return this.cast(value);
   }
 
   /**
@@ -57,8 +53,8 @@ export class Uuid extends ValueType<string> {
     return rawOldValue?.constructor !== newValue?.constructor || newValue !== rawOldValue;
   }
 
-  private castValue(value: unknown): string | null {
-    if (value == null) return null;
+  /** @internal Rails-private helper. */
+  protected override castValue(value: unknown): string | null {
     const str = String(value);
     if (!ACCEPTABLE_UUID.test(str)) return null;
     return this.formatUuid(str);

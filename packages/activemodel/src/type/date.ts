@@ -15,8 +15,8 @@ export type DateCastResult = Temporal.PlainDate | DateInfinityType | DateNegativ
 export class DateType extends ValueType<DateCastResult> {
   readonly name: string = "date";
 
-  cast(value: unknown): DateCastResult | null {
-    if (value === null || value === undefined) return null;
+  /** @internal Rails-private helper. */
+  protected castValue(value: unknown): DateCastResult | null {
     if (value === DateInfinity) return DateInfinity;
     if (value === DateNegativeInfinity) return DateNegativeInfinity;
     if (value instanceof Temporal.PlainDate) return value;

@@ -31,15 +31,15 @@ type PgDateTimeResult = Temporal.Instant | DateInfinityType | DateNegativeInfini
 export class DateTime extends DateTimeType {
   override readonly name: string = "datetime";
 
-  override cast(value: unknown): PgDateTimeResult | null {
-    return this.castValue(value);
-  }
-
   /**
    * Rails' `cast_value` — public here so subclasses can call directly
-   * and api:compare matches the Rails method name.
+   * and api:compare matches the Rails method name. Base `cast()`
+   * handles the nil short-circuit and dispatches here, so we fall
+   * through to the parent's `castValue` (NOT `cast`) to avoid the
+   * virtual-dispatch loop that would re-enter this method.
    */
-  castValue(value: unknown): PgDateTimeResult | null {
+  override castValue(value: unknown): PgDateTimeResult | null {
+    if (value === null || value === undefined) return null;
     if (typeof value === "string") {
       if (value === "infinity") return DateInfinity;
       if (value === "-infinity") return DateNegativeInfinity;
@@ -56,7 +56,7 @@ export class DateTime extends DateTimeType {
         }
       }
     }
-    return super.cast(value);
+    return super.castValue(value);
   }
 
   override serialize(value: unknown): string | null {

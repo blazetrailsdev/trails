@@ -17,8 +17,8 @@ export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegat
 export class DateTimeType extends ValueType<DateTimeCastResult> {
   readonly name: string = "datetime";
 
-  cast(value: unknown): DateTimeCastResult | null {
-    if (value === null || value === undefined) return null;
+  /** @internal Rails-private helper. */
+  protected castValue(value: unknown): DateTimeCastResult | null {
     if (value === DateInfinity) return DateInfinity;
     if (value === DateNegativeInfinity) return DateNegativeInfinity;
     if (value instanceof Temporal.Instant) return value;

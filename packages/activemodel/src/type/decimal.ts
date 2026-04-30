@@ -10,7 +10,8 @@ export class DecimalType extends ValueType<string> {
   //   - nil      -> nil
   // We mirror the same shape, returning the string form rather than a
   // BigDecimal wrapper.
-  cast(value: unknown): string | null {
+  /** @internal Rails-private helper. */
+  protected castValue(value: unknown): string | null {
     const casted = this._castWithoutScale(value);
     return this.applyScale(casted);
   }
