@@ -250,6 +250,124 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
     expect(compile(node)).toBe('"users"."name" NOT REGEXP \'^a\'');
   });
 
+  describe("prepareUpdateStatement / prepareDeleteStatement (MySQL)", () => {
+    const posts = new Table("posts");
+    const visitor = new Visitors.MySQL();
+    type WithPrepare = {
+      prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement;
+      prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement;
+    };
+    const prep = visitor as unknown as WithPrepare;
+
+    const buildUpdate = (opts: {
+      withJoin?: boolean;
+      limit?: boolean;
+      offset?: boolean;
+      orders?: boolean;
+      groups?: boolean;
+      havings?: boolean;
+    }): Nodes.UpdateStatement => {
+      const stmt = new Nodes.UpdateStatement();
+      const relation = opts.withJoin
+        ? new Nodes.JoinSource(users, [
+            new Nodes.InnerJoin(posts, new Nodes.On(new Nodes.SqlLiteral("1=1"))),
+          ])
+        : new Nodes.JoinSource(users);
+      stmt.relation = relation;
+      stmt.key = users.get("id");
+      if (opts.limit) stmt.limit = new Nodes.Limit(new Nodes.SqlLiteral("1"));
+      if (opts.offset) stmt.offset = new Nodes.Offset(new Nodes.SqlLiteral("1"));
+      if (opts.orders) stmt.orders = [users.get("id")];
+      if (opts.groups) stmt.groups = [users.get("id")];
+      if (opts.havings) stmt.havings = [new Nodes.SqlLiteral("1=1")];
+      return stmt;
+    };
+
+    it("UPDATE with JOIN but no LIMIT/OFFSET/ORDER returns the original statement (no subselect)", () => {
+      const stmt = buildUpdate({ withJoin: true });
+      const out = prep.prepareUpdateStatement(stmt);
+      expect(out).toBe(stmt);
+    });
+
+    it("UPDATE without JOIN and without OFFSET returns original even with LIMIT/ORDER", () => {
+      const stmt = buildUpdate({ limit: true, orders: true });
+      const out = prep.prepareUpdateStatement(stmt);
+      expect(out).toBe(stmt);
+    });
+
+    it("UPDATE with JOIN + LIMIT triggers subselect rewrite", () => {
+      const stmt = buildUpdate({ withJoin: true, limit: true });
+      const out = prep.prepareUpdateStatement(stmt);
+      expect(out).not.toBe(stmt);
+      expect(out.wheres.length).toBe(1);
+      expect(out.wheres[0]).toBeInstanceOf(Nodes.In);
+    });
+
+    it("UPDATE with OFFSET (no JOIN) triggers subselect rewrite", () => {
+      const stmt = buildUpdate({ offset: true });
+      const out = prep.prepareUpdateStatement(stmt);
+      expect(out).not.toBe(stmt);
+    });
+
+    it("UPDATE with JOIN + GROUP BY + HAVING triggers subselect rewrite", () => {
+      const stmt = buildUpdate({ withJoin: true, groups: true, havings: true });
+      const out = prep.prepareUpdateStatement(stmt);
+      expect(out).not.toBe(stmt);
+    });
+
+    it("UPDATE with GROUP BY only (no HAVING) does NOT trigger rewrite", () => {
+      const stmt = buildUpdate({ groups: true });
+      const out = prep.prepareUpdateStatement(stmt);
+      expect(out).toBe(stmt);
+    });
+
+    it("DELETE follows the same rules (alias of prepareUpdateStatement)", () => {
+      const stmt = new Nodes.DeleteStatement(
+        new Nodes.JoinSource(users, [
+          new Nodes.InnerJoin(posts, new Nodes.On(new Nodes.SqlLiteral("1=1"))),
+        ]),
+      );
+      stmt.key = users.get("id");
+      stmt.limit = new Nodes.Limit(new Nodes.SqlLiteral("1"));
+      const out = prep.prepareDeleteStatement(stmt);
+      expect(out).not.toBe(stmt);
+      expect(out.wheres[0]).toBeInstanceOf(Nodes.In);
+    });
+
+    it("buildSubselect adds DISTINCT when the subselect has no LIMIT/OFFSET/ORDER", () => {
+      // JOIN + GROUP BY + HAVING (no LIMIT/OFFSET/ORDER): super clones
+      // and clears limit/offset/orders on the rewritten stmt, build_subselect
+      // sees an `o` with none of those → MySQL adds DISTINCT to materialize.
+      const stmt = buildUpdate({ withJoin: true, groups: true, havings: true });
+      const out = prep.prepareUpdateStatement(stmt);
+      const sql = visitor.compile(out);
+      expect(sql).toContain("__active_record_temp");
+      expect(sql).toContain("DISTINCT");
+    });
+
+    it("buildSubselect skips DISTINCT when subselect already carries LIMIT", () => {
+      const stmt = buildUpdate({ withJoin: true, limit: true });
+      const out = prep.prepareUpdateStatement(stmt);
+      const sql = visitor.compile(out);
+      expect(sql).toContain("__active_record_temp");
+      expect(sql).not.toContain("DISTINCT");
+    });
+
+    // Full-shape regression for the JOIN+GROUP+HAVING path: pins the
+    // exact subselect wrapping (DISTINCT, `__active_record_temp` alias,
+    // outer projection of the quoted key column) so any future
+    // visitor change that drifts from Rails will be caught here.
+    it("JOIN + GROUP BY + HAVING produces the full Rails-shaped subselect", () => {
+      const stmt = buildUpdate({ withJoin: true, groups: true, havings: true });
+      const out = prep.prepareUpdateStatement(stmt);
+      const sql = visitor.compile(out);
+      expect(sql).toContain('IN (SELECT "id" FROM (SELECT DISTINCT "users"."id" FROM "users"');
+      expect(sql).toContain('INNER JOIN "posts" ON 1=1');
+      expect(sql).toContain('GROUP BY "users"."id" HAVING 1=1');
+      expect(sql).toContain(") AS __active_record_temp)");
+    });
+  });
+
   it("Cte uses backtick-quoted identifiers (not double quotes)", () => {
     const inner = new SelectManager(users).project(users.get("id"));
     const cte = new Nodes.Cte("recent", inner.ast);

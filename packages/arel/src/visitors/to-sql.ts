@@ -470,7 +470,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return o;
   }
 
-  private buildSubselect(
+  protected buildSubselect(
     key: Node,
     o: {
       relation: Node | null;
@@ -502,11 +502,11 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return key;
   }
 
-  private hasJoinSources(o: { relation: Node | null }): boolean {
+  protected hasJoinSources(o: { relation: Node | null }): boolean {
     return o.relation instanceof Nodes.JoinSource && o.relation.right.length > 0;
   }
 
-  private hasLimitOrOffsetOrOrders(o: {
+  protected hasLimitOrOffsetOrOrders(o: {
     limit: Node | null;
     offset: Node | null;
     orders: Node[];

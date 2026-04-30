@@ -187,6 +187,62 @@ export class MySQL extends ToSql {
     return this.collector;
   }
 
+  // In the simple case, MySQL allows JOINs directly in UPDATE/DELETE
+  // queries. LIMIT/OFFSET/ORDER need a subquery. Mirrors Rails MySQL's
+  // `prepare_update_statement` / `prepare_delete_statement` (aliased).
+  protected override prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement {
+    if (
+      o.offset ||
+      this.hasGroupByAndHaving(o) ||
+      (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
+    ) {
+      return super.prepareUpdateStatement(o);
+    }
+    return o;
+  }
+
+  protected override prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
+    if (
+      o.offset ||
+      this.hasGroupByAndHaving(o) ||
+      (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
+    ) {
+      return super.prepareDeleteStatement(o);
+    }
+    return o;
+  }
+
+  // MySQL doesn't auto-create a temp table for the subquery; force it by
+  // adding DISTINCT (when LIMIT/OFFSET/ORDER doesn't already materialize)
+  // and wrapping the subselect in another SELECT aliased as
+  // `__active_record_temp`. Mirrors Rails MySQL's `build_subselect`.
+  protected override buildSubselect(
+    key: Node,
+    o: {
+      relation: Node | null;
+      wheres: Node[];
+      groups: Node[];
+      havings: Node[];
+      limit: Node | null;
+      offset: Node | null;
+      orders: Node[];
+    },
+  ): Nodes.SelectStatement {
+    const subselect = super.buildSubselect(key, o);
+
+    if (!this.hasLimitOrOffsetOrOrders(subselect)) {
+      const subCore = subselect.cores[subselect.cores.length - 1];
+      subCore.setQuantifier = new Nodes.Distinct();
+    }
+
+    const stmt = new Nodes.SelectStatement();
+    const core = stmt.cores[stmt.cores.length - 1];
+    const keyName = (key as unknown as { name: string }).name;
+    core.source = new Nodes.JoinSource(new Nodes.Grouping(subselect).as("__active_record_temp"));
+    core.projections = [new Nodes.SqlLiteral(this.quoteColumnName(keyName), { retryable: true })];
+    return stmt;
+  }
+
   protected override visitArelNodesCte(node: Nodes.Cte): SQLString {
     // MySQL identifiers are backtick-quoted, not double-quoted, and the
     // MATERIALIZED / NOT MATERIALIZED modifiers Postgres supports are
