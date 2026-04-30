@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { snakeToCamel, rubyMethodToTs } from "./conventions.js";
+import { snakeToCamel, rubyMethodToTs, rubyFileToTs } from "./conventions.js";
 
 describe("snakeToCamel", () => {
   it("converts standard snake_case to camelCase", () => {
@@ -46,11 +46,6 @@ describe("rubyMethodToTs", () => {
     expect(rubyMethodToTs("initialize")).toEqual(["constructor"]);
   });
 
-  it("turns predicate methods into TS is*-prefixed candidates", () => {
-    expect(rubyMethodToTs("valid?")).toEqual(["isValid", "valid"]);
-    expect(rubyMethodToTs("has_attribute?")).toEqual(["hasAttribute", "isHasAttribute"]);
-  });
-
   it("transforms bang methods to *Bang", () => {
     expect(rubyMethodToTs("save!")).toEqual(["saveBang"]);
   });
@@ -64,5 +59,54 @@ describe("rubyMethodToTs", () => {
       "visitArelNodesSelectStatement",
     ]);
     expect(rubyMethodToTs("visit__no_edges")).toEqual(["visitNoEdges"]);
+  });
+});
+
+describe("rubyMethodToTs predicates", () => {
+  it("strips the redundant is-prefix when the Ruby name already starts with is_", () => {
+    // No `isPrefixed` fallback — that would let trails authors land
+    // isIsNumber and still get api:compare credit, defeating the rule.
+    expect(rubyMethodToTs("is_number?")).toEqual(["isNumber"]);
+    expect(rubyMethodToTs("is_integer?")).toEqual(["isInteger"]);
+    expect(rubyMethodToTs("is_hexadecimal_literal?")).toEqual(["isHexadecimalLiteral"]);
+  });
+
+  it("keeps prepending is for predicates that don't already start with one of the allowlisted prefixes", () => {
+    expect(rubyMethodToTs("number?")).toEqual(["isNumber", "number"]);
+    expect(rubyMethodToTs("blank?")).toEqual(["isBlank", "blank"]);
+    expect(rubyMethodToTs("present?")).toEqual(["isPresent", "present"]);
+  });
+
+  it("does NOT treat names that merely camelize to start with 'is' as the is_*? family", () => {
+    // The is_*? guard tests the Ruby BASE NAME, not the camel form.
+    // `isolation_level?` camelizes to `isolationLevel` (starts with
+    // 'is'), but the Ruby base doesn't start with `is_` — keep both
+    // candidates so trails methods named either way still match.
+    expect(rubyMethodToTs("isolation_level?")).toEqual(["isIsolationLevel", "isolationLevel"]);
+    expect(rubyMethodToTs("island?")).toEqual(["isIsland", "island"]);
+  });
+
+  it("keeps the existing has/supports/can/etc allowlist behavior intact (camel preferred, isPrefixed available as fallback)", () => {
+    // Only the `is_*?` family loses the isPrefixed fallback. Other
+    // Ruby predicate prefixes keep both candidates because trails
+    // sometimes needs the disambiguating alias — Reflection exposes
+    // `isHasOne()` alongside the `Model.hasOne` association
+    // declaration, for example.
+    expect(rubyMethodToTs("has_attribute?")).toEqual(["hasAttribute", "isHasAttribute"]);
+    expect(rubyMethodToTs("supports_savepoints?")).toEqual([
+      "supportsSavepoints",
+      "isSupportsSavepoints",
+    ]);
+    expect(rubyMethodToTs("can_load?")).toEqual(["canLoad", "isCanLoad"]);
+    expect(rubyMethodToTs("should_retry?")).toEqual(["shouldRetry", "isShouldRetry"]);
+  });
+});
+
+describe("rubyFileToTs", () => {
+  it("snake-case → kebab-case .ts", () => {
+    expect(rubyFileToTs("validations/numericality.rb")).toBe("validations/numericality.ts");
+    expect(rubyFileToTs("connection_adapters/postgresql_adapter.rb")).toBe(
+      "connection-adapters/postgresql-adapter.ts",
+    );
   });
 });

@@ -32,11 +32,11 @@ export class NumericalityValidator extends EachValidator {
   /** @internal Rails-private helper. */
   declare round: typeof round;
   /** @internal Rails-private helper. */
-  declare isIsNumber: typeof isIsNumber;
+  declare isNumber: typeof isNumber;
   /** @internal Rails-private helper. */
-  declare isIsInteger: typeof isIsInteger;
+  declare isInteger: typeof isInteger;
   /** @internal Rails-private helper. */
-  declare isIsHexadecimalLiteral: typeof isIsHexadecimalLiteral;
+  declare isHexadecimalLiteral: typeof isHexadecimalLiteral;
 
   private resolveNumeric(
     val: NumericValue | undefined,
@@ -88,14 +88,14 @@ export class NumericalityValidator extends EachValidator {
     }
     if (this.options.allowBlank && isBlank(value)) return;
 
-    if (!this.isIsNumber(value, precision, scale)) {
+    if (!this.isNumber(value, precision, scale)) {
       record.errors.add(attribute, "not_a_number", { value, message: this.options.message });
       return;
     }
 
     const num = parseAsNumber(Number(value), precision, scale) as number;
 
-    if (this.options.onlyInteger && !this.isIsInteger(value)) {
+    if (this.options.onlyInteger && !this.isInteger(value)) {
       record.errors.add(attribute, "not_an_integer", { value, message: this.options.message });
       return;
     }
@@ -267,8 +267,8 @@ export function round(num: number, scale?: number): number {
  *
  * @internal Rails-private helper.
  */
-export function isIsNumber(
-  this: { options: Record<string, unknown>; isIsHexadecimalLiteral(v: unknown): boolean },
+export function isNumber(
+  this: { options: Record<string, unknown>; isHexadecimalLiteral(v: unknown): boolean },
   rawValue: unknown,
   precision: number,
   scale?: number,
@@ -290,7 +290,7 @@ export function isIsNumber(
   // Trails extends this to 0b… / 0o… because JS Number() coerces those
   // too (Rails Kernel.Float would raise).
   const trimmed = rawValue.trimStart();
-  if (this.isIsHexadecimalLiteral(trimmed)) return false;
+  if (this.isHexadecimalLiteral(trimmed)) return false;
   if (NON_DECIMAL_LITERAL_REGEX.test(trimmed)) return false;
   // Rails: rescue ArgumentError, TypeError; false; end (numericality.rb:99).
   // The non-string/non-number paths return early above, and Number(string)
@@ -310,7 +310,7 @@ export function isIsNumber(
  *
  * @internal Rails-private helper.
  */
-export function isIsInteger(rawValue: unknown): boolean {
+export function isInteger(rawValue: unknown): boolean {
   return INTEGER_REGEX.test(String(rawValue));
 }
 
@@ -322,7 +322,7 @@ export function isIsInteger(rawValue: unknown): boolean {
  *
  * @internal Rails-private helper.
  */
-export function isIsHexadecimalLiteral(rawValue: unknown): boolean {
+export function isHexadecimalLiteral(rawValue: unknown): boolean {
   return HEXADECIMAL_REGEX.test(String(rawValue));
 }
 
@@ -388,6 +388,6 @@ export function optionAsNumber(
 NumericalityValidator.prototype.optionAsNumber = optionAsNumber;
 NumericalityValidator.prototype.parseFloat = parseFloatRails;
 NumericalityValidator.prototype.round = round;
-NumericalityValidator.prototype.isIsNumber = isIsNumber;
-NumericalityValidator.prototype.isIsInteger = isIsInteger;
-NumericalityValidator.prototype.isIsHexadecimalLiteral = isIsHexadecimalLiteral;
+NumericalityValidator.prototype.isNumber = isNumber;
+NumericalityValidator.prototype.isInteger = isInteger;
+NumericalityValidator.prototype.isHexadecimalLiteral = isHexadecimalLiteral;

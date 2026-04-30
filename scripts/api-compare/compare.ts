@@ -348,6 +348,29 @@ export function flattenIncludedMethodInfos(
   return { instance, klass };
 }
 
+/**
+ * Dedup expected Ruby methods by Ruby method name (NOT first TS
+ * candidate). Two distinct Ruby methods can produce the same first TS
+ * candidate (`is_number?` and `number?` both → `"isNumber"`); keying
+ * by the TS candidate would silently drop the second method from the
+ * expected set. Caller supplies a per-file `seen` map (keyed by method
+ * name); this helper just records the first sighting and ignores
+ * subsequent ones, matching the original per-file dedup behavior with
+ * a different key. Skips methods with no TS-candidate mapping
+ * (operators, SKIP list).
+ */
+export function dedupeRubyMethodInto(
+  seen: Map<string, { rubyName: string; rubyModule: string }>,
+  rm: MethodInfo,
+  itemFqn: string,
+): void {
+  if (rubyMethodToTs(rm.name) === null) return;
+  const key = rm.name;
+  if (!seen.has(key)) {
+    seen.set(key, { rubyName: rm.name, rubyModule: itemFqn });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -686,21 +709,20 @@ function main() {
         }
       }
 
-      // Deduplicate: collect all unique TS method names expected from this file.
-      // Multiple Ruby classes in the same file often define the same method
-      // (e.g., 8 subclasses in binary.rb each override `invert`). Count once.
+      // Deduplicate: collect all unique Ruby methods expected from this
+      // file (keyed by Ruby method name, not first TS candidate, so two
+      // distinct Ruby methods that camelize to the same first candidate
+      // — e.g. `is_number?` and `number?` both → "isNumber" — both
+      // survive). Multiple Ruby classes in the same file often define
+      // the same method (e.g., 8 subclasses in binary.rb each override
+      // `invert`). Count once.
       const seen = new Map<string, { rubyName: string; rubyModule: string }>();
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, rubyPkg, moduleFqnByShort);
         const rubyMethods = [...f.instance, ...f.klass];
         for (const rm of rubyMethods) {
           if (!methodMatchesMode(rm)) continue;
-          const tsCandidates = rubyMethodToTs(rm.name);
-          if (tsCandidates === null) continue;
-          const key = tsCandidates[0];
-          if (!seen.has(key)) {
-            seen.set(key, { rubyName: rm.name, rubyModule: item.fqn });
-          }
+          dedupeRubyMethodInto(seen, rm, item.fqn);
         }
       }
 

@@ -94,7 +94,10 @@ function analyzeTsCalls(pkgSrcDir: string): TsCallMap {
     if (sourceFile.fileName.endsWith(".test.ts")) continue;
     if (sourceFile.fileName.endsWith(".d.ts")) continue;
 
-    const relPath = path.relative(pkgSrcDir, sourceFile.fileName);
+    // Normalize separators to POSIX so the keys match rubyFileToTs
+    // output. Windows path.relative emits backslashes; without this
+    // the lookup against rubyFileToTs paths would miss.
+    const relPath = path.relative(pkgSrcDir, sourceFile.fileName).split(path.sep).join("/");
     const fileMap = new Map<string, Set<string>>();
 
     const addMethod = (name: string, body: ts.Node) => {

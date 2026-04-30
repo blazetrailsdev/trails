@@ -19,10 +19,17 @@ export function snakeToCamel(name: string): string {
   return prefix + rest.replace(/_+([a-zA-Z0-9])/g, (_, ch: string) => ch.toUpperCase());
 }
 
-/** Ruby file path → expected TS file path (kebab-case, .ts extension) */
+/**
+ * Ruby file path → expected TS file path (kebab-case, .ts extension).
+ *
+ * Uses `path.posix.*` so the mapping stays cross-platform stable —
+ * Ruby source paths are POSIX, the rest of api-compare keys files by
+ * POSIX paths, and the default `path.join` would return backslashes
+ * on Windows.
+ */
 export function rubyFileToTs(rubyFile: string): string {
-  const dir = path.dirname(rubyFile);
-  const base = path.basename(rubyFile, ".rb");
+  const dir = path.posix.dirname(rubyFile);
+  const base = path.posix.basename(rubyFile, ".rb");
   const kebab = base.replace(/_/g, "-");
   const tsFile = kebab.replace(/\berb\b/g, "ejs") + ".ts";
   if (dir === ".") return tsFile;
@@ -30,7 +37,7 @@ export function rubyFileToTs(rubyFile: string): string {
     .split("/")
     .map((d) => d.replace(/_/g, "-").replace(/\berb\b/g, "ejs"))
     .join("/");
-  return path.join(tsDir, tsFile);
+  return path.posix.join(tsDir, tsFile);
 }
 
 export const OPERATORS = new Set([
@@ -104,11 +111,24 @@ export const SKIP = new Set([
 
 /**
  * Convert Ruby method name → candidate TS names to try matching.
- * Returns null if the method should be skipped entirely.
- * Returns multiple candidates for predicates where both forms are common:
- *   has_attribute? → ["hasAttribute", "isHasAttribute"]
- *   supports_savepoints? → ["supportsSavepoints", "isSupportsSavepoints"]
- *   valid? → ["isValid", "valid"]
+ *
+ * Returns null if the method should be skipped entirely. Otherwise
+ * returns one or more candidate TS names; compare.ts matches the first
+ * candidate found in the target file's symbol set.
+ *
+ * Predicate naming policy:
+ *   - `is_*?` returns ONLY the camel form (`is_number?` → ["isNumber"]).
+ *     The doubled `isIsNumber` form is always redundant — Ruby already
+ *     conveys the predicate via the `is_` prefix.
+ *   - Other already-predicate prefixes (`has_*?`, `supports_*?`,
+ *     `can_*?`, …) keep BOTH the camel form and the isPrefixed form
+ *     (`has_attribute?` → ["hasAttribute", "isHasAttribute"]). The
+ *     isPrefixed fallback exists because trails sometimes needs the
+ *     disambiguating alias when the bare name collides with a Rails
+ *     macro — e.g. Reflection exposes `isHasOne()` alongside the
+ *     `Model.hasOne` association declaration.
+ *   - Bare predicates (`valid?`, `blank?`) return both forms with the
+ *     isPrefixed form first (`valid?` → ["isValid", "valid"]).
  */
 export function rubyMethodToTs(name: string): string[] | null {
   if (OPERATORS.has(name)) return null;
@@ -122,7 +142,25 @@ export function rubyMethodToTs(name: string): string[] | null {
     const base = name.slice(0, -1);
     const camel = snakeToCamel(base);
     const isPrefixed = "is" + camel.replace(/^./, (c) => c.toUpperCase());
-    // If base already starts with a predicate word, try without "is" prefix first
+    // Names already starting with `is_` collapse to one candidate so
+    // `is_number?` → ["isNumber"] (not ["isIsNumber", "isNumber"]).
+    // The `isPrefixed` form is intentionally NOT offered as a fallback
+    // here — Ruby already conveys the predicate via the `is_` prefix,
+    // and offering `isIsNumber` would let a trails author land that
+    // doubled form and still get api:compare credit. Test on the Ruby
+    // base name (with the underscore) so e.g. `isolation_level?` —
+    // which camelizes to `isolationLevel` — is NOT swept into this
+    // branch.
+    if (base.startsWith("is_")) {
+      return [camel];
+    }
+    // Other already-predicate Ruby prefixes (has_one?, supports_x?,
+    // can_y?, …) keep both candidates: the canonical camel form
+    // (`hasOne`) and the isPrefixed fallback (`isHasOne`). The
+    // fallback exists because trails sometimes needs the disambiguating
+    // alias when the bare name collides with a macro (e.g. Reflection
+    // exposes `isHasOne()` as a predicate alongside the `Model.hasOne`
+    // association declaration).
     if (/^(has|supports|can|should|needs|includes|responds|allows|uses)/.test(camel)) {
       return [camel, isPrefixed];
     }

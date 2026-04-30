@@ -149,7 +149,7 @@ function newColumnFromField(tableName: any, field: any, definitions: any): never
 }
 
 /** @internal */
-function isIsColumnTheRowid(field: any, columnDefinitions: any): never {
+function isColumnTheRowid(field: any, columnDefinitions: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#is_column_the_rowid? is not implemented",
   );

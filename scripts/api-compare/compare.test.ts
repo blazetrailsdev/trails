@@ -6,6 +6,7 @@ import {
   methodInMode,
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
+  dedupeRubyMethodInto,
 } from "./compare.js";
 import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
@@ -398,5 +399,40 @@ describe("flattenIncludedMethodInfos", () => {
     ]);
     const f = flattenIncludedMethodInfos(host, pkg, byShort);
     expect(f.instance.map((m) => m.name).sort()).toEqual(["a1", "b1", "h1"]);
+  });
+});
+
+describe("dedupeRubyMethodInto", () => {
+  function rm(name: string): MethodInfo {
+    return {
+      name,
+      visibility: "public",
+      params: [],
+      isStatic: false,
+      file: "x.rb",
+      line: 1,
+    };
+  }
+
+  it("retains distinct Ruby methods even when their first TS candidates collide", () => {
+    // Regression: previous dedup keyed on the first TS candidate, so
+    // `is_number?` and `number?` (both → "isNumber") collapsed silently.
+    // Keying by Ruby name keeps them as two distinct expected entries.
+    const seen = new Map<string, { rubyName: string; rubyModule: string }>();
+    dedupeRubyMethodInto(seen, rm("is_number?"), "ActiveModel::Validations::Numericality");
+    dedupeRubyMethodInto(seen, rm("number?"), "ActiveModel::Validations::Numericality");
+    expect([...seen.values()].map((v) => v.rubyName).sort()).toEqual(["is_number?", "number?"]);
+  });
+
+  it("still dedups true repeats of the same Ruby method (e.g. subclass overrides)", () => {
+    // Multiple subclasses in one file overriding `invert` should count
+    // once — the original behavior the dedup was designed for.
+    const seen = new Map<string, { rubyName: string; rubyModule: string }>();
+    dedupeRubyMethodInto(seen, rm("invert"), "Foo::A");
+    dedupeRubyMethodInto(seen, rm("invert"), "Foo::B");
+    dedupeRubyMethodInto(seen, rm("invert"), "Foo::C");
+    expect(seen.size).toBe(1);
+    // First insertion wins, so the FQN points at the first observer.
+    expect([...seen.values()][0]).toEqual({ rubyName: "invert", rubyModule: "Foo::A" });
   });
 });

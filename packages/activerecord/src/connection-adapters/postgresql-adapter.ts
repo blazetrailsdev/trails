@@ -4063,7 +4063,7 @@ function loadAdditionalTypes(oids?: any): never {
 }
 
 /** @internal */
-function isIsCachedPlanFailure(pgerror: any): never {
+function isCachedPlanFailure(pgerror: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#is_cached_plan_failure? is not implemented",
   );

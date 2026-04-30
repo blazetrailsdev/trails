@@ -626,4 +626,42 @@ describe("numericality with in: range", () => {
     expect(new User({ score: 20 }).isValid()).toBe(true);
     expect(new User({ score: 5 }).isValid()).toBe(true);
   });
+
+  it("rejects non-string/non-number values (boolean, Temporal.Instant, plain object)", () => {
+    // Rails Kernel.Float raises TypeError for non-Numeric/non-String
+    // input, so is_number? returns false. In JS, Number(true) === 1
+    // and Number(<object with valueOf>) can coerce silently — the
+    // explicit string|number narrowing in isNumber prevents that.
+    // (Trails casts datetime attributes to Temporal.Instant, not JS
+    // Date, so the datetime case below exercises the
+    // non-string/non-number path for Temporal types specifically.)
+    class User extends Model {
+      static {
+        this.attribute("flag", "boolean");
+        this.attribute("when", "datetime");
+        this.validates("flag", { numericality: true });
+        this.validates("when", { numericality: true });
+      }
+    }
+    expect(new User({ flag: true }).isValid()).toBe(false);
+    expect(new User({ flag: false }).isValid()).toBe(false);
+    expect(new User({ when: "2026-04-29T00:00:00Z" }).isValid()).toBe(false);
+  });
+
+  it("rejects plain object values via NumericalityValidator.validateEach directly", async () => {
+    // Direct exercise of the non-string/non-number narrowing in isNumber.
+    // Going through Model attributes wouldn't work — string-typed attrs
+    // cast objects to "[object Object]" before validation, value-typed
+    // attrs go through their own cast path. Bypass attribute infra and
+    // call the validator with a stub record so a real plain object
+    // reaches isNumber.
+    const { NumericalityValidator } = await import("./numericality.js");
+    const v = new NumericalityValidator({ attributes: ["x"] });
+    const errors: Array<[string, string]> = [];
+    const stubRecord = {
+      errors: { add: (attr: string, key: string) => errors.push([attr, key]) },
+    };
+    v.validateEach(stubRecord, "x", { not: "a number" });
+    expect(errors).toEqual([["x", "not_a_number"]]);
+  });
 });

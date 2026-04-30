@@ -149,7 +149,11 @@ function analyzeTsDepUsage(pkgSrcDir: string, tsImport: string, tsIdentifiers: s
     if (sourceFile.fileName.endsWith(".test.ts")) continue;
     if (sourceFile.fileName.endsWith(".d.ts")) continue;
 
-    const relPath = path.relative(pkgSrcDir, sourceFile.fileName);
+    // Normalize separators to POSIX so the keys match rubyFileToTs
+    // output (which uses path.posix.* for cross-platform stability).
+    // Without this, Windows path.relative emits backslashes and the
+    // tsDepMap.get(rubyFileToTs(...)) lookup misses.
+    const relPath = path.relative(pkgSrcDir, sourceFile.fileName).split(path.sep).join("/");
 
     // Collect import bindings from the target package
     const importedNames = new Set<string>();
@@ -334,7 +338,12 @@ function crossReference(
     if (!tsCandidates) continue;
 
     const tsFile = rubyFileToTs(rm.rubyFile);
-    const dedupeKey = `${tsFile}:${tsCandidates[0]}`;
+    // Key by Ruby method name, not first TS candidate — two distinct
+    // Ruby methods can produce the same first TS candidate
+    // (`is_number?` and `number?` both → "isNumber"), and keying by
+    // the TS candidate would silently drop the second method. Same
+    // fix as compare.ts:dedupeRubyMethodInto.
+    const dedupeKey = `${tsFile}:${rm.rubyName}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
