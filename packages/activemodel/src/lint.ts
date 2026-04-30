@@ -40,7 +40,8 @@ export function assertBoolean(result: unknown, name: string): void {
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Tests {
-  export function testToKey(input: { toKey(): unknown[] | null; isPersisted(): boolean }): void {
+  type ToKeyHost = { toKey(): unknown[] | null; isPersisted(): boolean };
+  export function testToKey(input: ToKeyHost | { toModel(): ToKeyHost }): void {
     const m = model(input);
     const key = m.toKey();
     if (key !== null && !Array.isArray(key)) {
@@ -54,10 +55,8 @@ export namespace Tests {
     }
   }
 
-  export function testToParam(input: {
-    toParam(): string | null;
-    toKey(): unknown[] | null;
-  }): void {
+  type ToParamHost = { toParam(): string | null; toKey(): unknown[] | null };
+  export function testToParam(input: ToParamHost | { toModel(): ToParamHost }): void {
     const m = model(input);
     const param = m.toParam();
     if (param !== null && typeof param !== "string") {
@@ -65,7 +64,10 @@ export namespace Tests {
     }
   }
 
-  export function testToPartialPath(input: { toPartialPath(): string }): void {
+  type ToPartialPathHost = { toPartialPath(): string };
+  export function testToPartialPath(
+    input: ToPartialPathHost | { toModel(): ToPartialPathHost },
+  ): void {
     const m = model(input);
     const path = m.toPartialPath();
     if (typeof path !== "string") {
@@ -73,7 +75,8 @@ export namespace Tests {
     }
   }
 
-  export function testPersisted(input: { isPersisted(): boolean }): void {
+  type PersistedHost = { isPersisted(): boolean };
+  export function testPersisted(input: PersistedHost | { toModel(): PersistedHost }): void {
     assertBoolean(model(input).isPersisted(), "isPersisted");
   }
 
