@@ -15,17 +15,43 @@ export interface API {
 }
 
 import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
-import { initInternals as validationsInitInternals } from "./validations.js";
+import {
+  initInternals as validationsInitInternals,
+  contextForValidation as validationsContextForValidation,
+  runValidationsBang as validationsRunValidationsBang,
+  raiseValidationError as validationsRaiseValidationError,
+  _mergeAttributes as validationsMergeAttributes,
+} from "./validations.js";
 
 /**
- * Rails: ActiveModel::API includes Validations (api.rb), so
- * `init_internals` is part of API's surface as well. Re-export the
- * canonical Validations helper here so api-compare matches the shape
- * of `api.rb` and a host that mixes in only API still has the hook.
+ * Rails: ActiveModel::API includes Validations (api.rb), so the
+ * Validations private surface is part of API as well. Re-export the
+ * canonical helpers so api-compare matches the shape of `api.rb` and
+ * a host that mixes in only API still has the hooks.
  *
  * @internal Rails-private helper.
  */
 export const initInternals = validationsInitInternals;
+
+/**
+ * @internal Rails-private helper.
+ */
+export const contextForValidation = validationsContextForValidation;
+
+/**
+ * @internal Rails-private helper.
+ */
+export const runValidationsBang = validationsRunValidationsBang;
+
+/**
+ * @internal Rails-private helper.
+ */
+export const raiseValidationError = validationsRaiseValidationError;
+
+/**
+ * @internal Rails-private helper.
+ */
+export const _mergeAttributes = validationsMergeAttributes;
 
 /**
  * Rails: ActiveModel::API includes Validations, which extends Translation,

@@ -1,8 +1,14 @@
 import { Errors, StrictValidationFailed } from "./errors.js";
 import {
-  ValidationError,
   ValidationContext,
   initInternals as validationsInitInternals,
+  contextForValidation as validationsContextForValidation,
+  runValidationsBang as validationsRunValidationsBang,
+  raiseValidationError as validationsRaiseValidationError,
+  predicateForValidationContext as validationsPredicateForValidationContext,
+  _mergeAttributes as validationsMergeAttributes,
+  _validatesDefaultKeys as validationsValidatesDefaultKeys,
+  _parseValidatesOptions as validationsParseValidatesOptions,
 } from "./validations.js";
 import { humanize, underscore, dasherize, htmlEscape } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -1094,20 +1100,11 @@ export class Model {
     const parts: Array<(record: AnyRecord) => boolean> = [];
 
     if (options.on !== undefined) {
-      // Rails `predicate_for_validation_context` (validations.rb:294-306):
-      // both the registered `on:` and the model's current
-      // `validation_context` may be Symbols or Arrays of Symbols. A
-      // validator with `on: [:create, :publish]` fires when the model's
-      // context is `:create`, `[:create]`, `[:publish, :foo]`, etc. —
-      // intersection, not equality.
-      const registered = Array.isArray(options.on) ? options.on : [options.on];
-      const registeredSet = new Set(registered);
-      parts.push((record: AnyRecord) => {
-        const ctx = record._validationContext;
-        if (ctx == null) return false;
-        const current = Array.isArray(ctx) ? ctx : [ctx];
-        return current.some((c: unknown) => registeredSet.has(c as string));
-      });
+      // Mirrors Rails (validations.rb:170-172): the `on:` clause is
+      // installed via `predicate_for_validation_context(options[:on])`,
+      // so route through the same module-level cache here. Single
+      // source of truth for the intersection-vs-equality semantics.
+      parts.push(validationsPredicateForValidationContext(options.on));
     }
 
     if (options.if !== undefined) {
@@ -1211,6 +1208,42 @@ export class Model {
     validationsInitInternals.call(this);
     dirtyInitInternals.call(this);
   }
+
+  /**
+   * Build the `if`-predicate that gates a validator on a validation
+   * context. Mirrors Rails `predicate_for_validation_context`
+   * (validations.rb:296-306).
+   *
+   * @internal Rails-private helper.
+   */
+  static predicateForValidationContext = validationsPredicateForValidationContext;
+
+  /**
+   * Normalize the trailing options hash from a `validates_each`
+   * argument list and stamp `attributes:` onto it. Mirrors Rails
+   * `Validations::HelperMethods#_merge_attributes`.
+   *
+   * @internal Rails-private helper.
+   */
+  static _mergeAttributes = validationsMergeAttributes;
+
+  /**
+   * Default option keys recognized by `validates(...)`. Subclasses
+   * override to add custom keys. Mirrors Rails
+   * `_validates_default_keys` (validations/validates.rb:162-164).
+   *
+   * @internal Rails-private helper.
+   */
+  static _validatesDefaultKeys = validationsValidatesDefaultKeys;
+
+  /**
+   * Normalize a validator option value into the option hash the
+   * validator constructor expects. Mirrors Rails
+   * `_parse_validates_options` (validations/validates.rb:166-177).
+   *
+   * @internal Rails-private helper.
+   */
+  static _parseValidatesOptions = validationsParseValidatesOptions;
 
   /**
    * Mirrors: ActiveModel::API#initialize → ActiveModel::Attributes#initialize
@@ -1403,6 +1436,45 @@ export class Model {
   // validators all fire. See `validations.rb:361-368` and `:294-306`.
   _validationContext: string | string[] | null = null;
 
+  /**
+   * Lazy-initialized live `ValidationContext` view. Populated on first
+   * call to `contextForValidation()` and cleared by `initInternals()`.
+   *
+   * @internal
+   */
+  _contextForValidation?: ValidationContext;
+
+  /**
+   * Lazy accessor for the active `ValidationContext`. Mirrors Rails
+   * `context_for_validation` (validations.rb:463-465). The returned
+   * object's `.context` property is a live view of `_validationContext`.
+   *
+   * @internal Rails-private helper.
+   */
+  contextForValidation(): ValidationContext {
+    return validationsContextForValidation.call(this);
+  }
+
+  /**
+   * Run the `:validate` callbacks and report whether the model has no
+   * errors. Mirrors Rails `run_validations!` (validations.rb:473-476).
+   *
+   * @internal Rails-private helper.
+   */
+  runValidationsBang(): boolean {
+    return validationsRunValidationsBang.call(this);
+  }
+
+  /**
+   * Throw `ValidationError` for the current model. Mirrors Rails
+   * `raise_validation_error` (validations.rb:478-480).
+   *
+   * @internal Rails-private helper.
+   */
+  raiseValidationError(): never {
+    return validationsRaiseValidationError.call(this);
+  }
+
   isValid(context?: string | string[] | ValidationContext | null): boolean {
     this.errors.clear();
     const ctor = this.constructor as typeof Model;
@@ -1431,7 +1503,7 @@ export class Model {
         "validation",
         this,
         () => {
-          this._runValidateCallbacks();
+          this.runValidationsBang();
         },
         { strict: "sync" },
       );
@@ -1442,7 +1514,8 @@ export class Model {
     }
   }
 
-  private _runValidateCallbacks(): void {
+  /** @internal */
+  _runValidateCallbacks(): void {
     const ctor = this.constructor as typeof Model;
     ctor._callbackChain.runBefore("validate", this, { strict: "sync" });
   }
@@ -1479,14 +1552,21 @@ export class Model {
    *
    * Rails pre-touches `@errors` and `@context_for_validation` so frozen
    * models can still answer `#errors` and `#validation_context` without
-   * tripping their `||=` lazy-init. We mirror that by going through the
-   * public API (`.errors`, `.validationContext`) — that way, if either
-   * becomes lazy in the future, the pre-materialization still runs
-   * without this method coupling to private fields.
+   * tripping their `||=` lazy-init. Trails mirrors that by reading
+   * `errors` and calling `contextForValidation()` to populate its
+   * cached `ValidationContext`. The `validationContext` getter alone
+   * is not enough — it doesn't write to `_contextForValidation`, so a
+   * subsequent `contextForValidation()` call on the frozen instance
+   * would throw on the cache assignment.
    */
   freeze(): this {
     void this.errors;
-    void this.validationContext;
+    // Pre-materialize the lazy ValidationContext cache so callers can
+    // still invoke `contextForValidation()` on a frozen instance —
+    // Rails does the equivalent at validations.rb:374 by touching
+    // `context_for_validation` inside `freeze`. Touching
+    // `validationContext` alone would not populate the cache.
+    void this.contextForValidation();
     Object.freeze(this);
     return this;
   }
@@ -2024,7 +2104,7 @@ export class Model {
    */
   validateBang(context?: string | string[] | ValidationContext | null): true {
     if (!this.isValid(context)) {
-      throw new ValidationError(this);
+      this.raiseValidationError();
     }
     return true;
   }

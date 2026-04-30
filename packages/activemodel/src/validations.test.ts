@@ -1162,6 +1162,22 @@ describe("ValidationsTest", () => {
       expect(t.errors).toBeDefined();
       expect(t.validationContext).toBe(null);
     });
+
+    it("contextForValidation is a live view of validationContext", () => {
+      const t = new Topic({ title: "ok" });
+      const vc = t.contextForValidation();
+      vc.context = "create";
+      expect(t.validationContext).toBe("create");
+      // Same instance is returned on subsequent calls (Rails ||= memoization).
+      expect(t.contextForValidation()).toBe(vc);
+    });
+
+    it("contextForValidation is callable on a frozen model", () => {
+      const t = new Topic({ title: "ok" });
+      t.freeze();
+      // freeze() pre-materializes the cache; access must not throw.
+      expect(() => t.contextForValidation()).not.toThrow();
+    });
   });
 
   describe("_validators hash-of-arrays (Rails fidelity)", () => {

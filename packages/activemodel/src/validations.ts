@@ -50,6 +50,7 @@ export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
 export function initInternals(this: ValidationsInternalsHost): void {
   this.errors = new Errors(this);
   this._validationContext = null;
+  this._contextForValidation = undefined;
 }
 
 /**
@@ -60,6 +61,7 @@ export function initInternals(this: ValidationsInternalsHost): void {
 export interface ValidationsInternalsHost {
   errors: Errors;
   _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
 }
 
 /**
@@ -206,4 +208,181 @@ export class ValidationContext {
   toString(): string {
     return this.name;
   }
+}
+
+/**
+ * Module-level cache for predicate functions keyed by sorted context
+ * arrays. Mirrors Rails `@@predicates_for_validation_contexts = {}`
+ * (activemodel/lib/active_model/validations.rb:294) — a class variable
+ * shared across all hosts that include Validations.
+ *
+ * @internal Rails-private state.
+ */
+const _predicatesForValidationContexts = new Map<
+  string,
+  (model: ValidationsContextHost) => boolean
+>();
+
+/**
+ * Build a predicate that returns whether a model's
+ * `validationContext` matches one of the supplied contexts. Used by
+ * `validates(..., on: :create)` to gate a validator on the active
+ * context. Mirrors Rails
+ * `predicate_for_validation_context(context)`
+ * (activemodel/lib/active_model/validations.rb:296-306).
+ *
+ * @internal Rails-private helper.
+ */
+export function predicateForValidationContext(
+  context: string | string[],
+): (model: ValidationsContextHost) => boolean {
+  const arr = Array.isArray(context) ? [...context].sort() : [context];
+  const key = JSON.stringify(arr);
+  let cached = _predicatesForValidationContexts.get(key);
+  if (!cached) {
+    cached = (model: ValidationsContextHost): boolean => {
+      const mc = model.validationContext;
+      if (Array.isArray(mc)) {
+        return mc.some((c) => arr.includes(c));
+      }
+      return mc !== null && mc !== undefined && arr.includes(mc);
+    };
+    _predicatesForValidationContexts.set(key, cached);
+  }
+  return cached;
+}
+
+/**
+ * Host shape consumed by `predicateForValidationContext`.
+ */
+export interface ValidationsContextHost {
+  readonly validationContext: string | string[] | null;
+}
+
+/**
+ * Lazy per-instance accessor for the active `ValidationContext`.
+ * Mirrors Rails
+ * `def context_for_validation; @context_for_validation ||= ValidationContext.new; end`
+ * (activemodel/lib/active_model/validations.rb:463-465). Trails stores
+ * the active context as `_validationContext: string | string[] | null`
+ * directly; this helper returns a `ValidationContext` whose
+ * `.context` property is a live view of that field, so Rails' pattern
+ * `context_for_validation.context = ctx` still works.
+ *
+ * @internal Rails-private helper.
+ */
+export function contextForValidation(this: ContextForValidationHost): ValidationContext {
+  if (this._contextForValidation) return this._contextForValidation;
+  // Construct via the real constructor so any future
+  // ValidationContext initialization runs, then replace the
+  // `context` and underlying `_context` slot with a live view of
+  // `_validationContext`. Both must be aliased so `vc.name` /
+  // `vc.toString()` stay consistent with the live field.
+  const vc = new ValidationContext();
+  const accessor: PropertyDescriptor = {
+    get: (): string | string[] | null => this._validationContext,
+    set: (value: string | string[] | null): void => {
+      this._validationContext = value;
+    },
+    configurable: true,
+    enumerable: false,
+  };
+  Object.defineProperty(vc, "context", accessor);
+  Object.defineProperty(vc, "_context", accessor);
+  this._contextForValidation = vc;
+  return vc;
+}
+
+/**
+ * Host shape consumed by `contextForValidation`.
+ */
+export interface ContextForValidationHost {
+  _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
+}
+
+/**
+ * Run the `:validate` callbacks and report whether the model has no
+ * errors. Mirrors Rails
+ * `def run_validations!; _run_validate_callbacks; errors.empty?; end`
+ * (activemodel/lib/active_model/validations.rb:473-476).
+ *
+ * @internal Rails-private helper.
+ */
+export function runValidationsBang(this: RunValidationsHost): boolean {
+  this._runValidateCallbacks();
+  return this.errors.empty;
+}
+
+/**
+ * Host shape consumed by `runValidationsBang`.
+ */
+export interface RunValidationsHost {
+  errors: Errors;
+  _runValidateCallbacks(): void;
+}
+
+/**
+ * Throw `ValidationError` for the current model. Mirrors Rails
+ * `def raise_validation_error; raise(ValidationError.new(self)); end`
+ * (activemodel/lib/active_model/validations.rb:478-480).
+ *
+ * @internal Rails-private helper.
+ */
+export function raiseValidationError(this: { errors: Errors }): never {
+  throw new ValidationError(this);
+}
+
+/**
+ * Normalize the `validates_each` argument list, splitting attribute
+ * names from the trailing options hash and stamping the merged
+ * options with `attributes:`. Mirrors Rails
+ * `Validations::HelperMethods#_merge_attributes`
+ * (activemodel/lib/active_model/validations/helper_methods.rb:7-11).
+ *
+ * @internal Rails-private helper.
+ */
+export function _mergeAttributes(attrNames: unknown[]): Record<string, unknown> {
+  const last = attrNames[attrNames.length - 1];
+  const options: Record<string, unknown> =
+    last !== null && typeof last === "object" && !Array.isArray(last) && last.constructor === Object
+      ? { ...(attrNames.pop() as Record<string, unknown>) }
+      : {};
+  const flat = (attrNames as unknown[]).flat(Infinity).map((n) => String(n));
+  options.attributes = flat;
+  return options;
+}
+
+/**
+ * The default option keys recognized by `validates(...)`. Subclasses
+ * override to add custom keys. Mirrors Rails
+ * `_validates_default_keys`
+ * (activemodel/lib/active_model/validations/validates.rb:162-164).
+ *
+ * @internal Rails-private helper.
+ */
+export function _validatesDefaultKeys(): string[] {
+  return ["if", "unless", "on", "allowBlank", "allowNil", "strict", "exceptOn"];
+}
+
+/**
+ * Normalize a validator option value into the option hash the
+ * validator constructor expects. Mirrors Rails
+ * `_parse_validates_options(options)`
+ * (activemodel/lib/active_model/validations/validates.rb:166-177):
+ * `true` → `{}`, plain hash → unchanged, Array → `{ in: options }`,
+ * anything else → `{ with: options }`. Rails also routes `Range` to
+ * `{ in: ... }`; TS has no first-class Range (see the note in
+ * `validations/clusivity.ts`), so a Range-like dispatch slots in
+ * here when one lands.
+ *
+ * @internal Rails-private helper.
+ */
+export function _parseValidatesOptions(options: unknown): Record<string, unknown> {
+  if (options === true) return {};
+  if (Array.isArray(options)) return { in: options };
+  if (options !== null && typeof options === "object" && options.constructor === Object) {
+    return options as Record<string, unknown>;
+  }
+  return { with: options };
 }
