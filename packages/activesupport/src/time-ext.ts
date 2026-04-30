@@ -3,13 +3,13 @@
  * and ActiveSupport::CoreExt::Date patterns.
  *
  * @boundary-file: Helpers accept JavaScript `Date` inputs for ergonomic interop
- *   with code that still holds Date values. Period-bound, navigation, and
- *   arithmetic helpers return `Temporal.Instant`. The remaining `Date`-returning
- *   helpers (`toDate`, `toTime`) and predicates (`isPast`, `isFuture`) flip in
- *   F-6d.
+ *   with code that still holds Date values. Period-bound, navigation,
+ *   arithmetic, and coercion helpers all return `Temporal.*` types
+ *   (`Temporal.Instant` for time-of-day helpers, `Temporal.PlainDate` for
+ *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { type Temporal, instantFrom } from "./temporal.js";
+import { Temporal, instantFrom } from "./temporal.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
@@ -460,12 +460,14 @@ export function isYesterday(date: Date): boolean {
   );
 }
 
-export function isPast(date: Date): boolean {
-  return date.getTime() < Date.now();
+export function isPast(date: Date | Temporal.Instant): boolean {
+  const instant = date instanceof Date ? instantFrom(date) : date;
+  return Temporal.Instant.compare(instant, Temporal.Now.instant()) < 0;
 }
 
-export function isFuture(date: Date): boolean {
-  return date.getTime() > Date.now();
+export function isFuture(date: Date | Temporal.Instant): boolean {
+  const instant = date instanceof Date ? instantFrom(date) : date;
+  return Temporal.Instant.compare(instant, Temporal.Now.instant()) > 0;
 }
 
 /**
@@ -549,17 +551,21 @@ export function lastWeek(date: Date, startDay = "monday"): Temporal.Instant {
 }
 
 /**
- * toDate — returns a Date object representing just the date portion.
+ * toDate — Rails `Time#to_date`. Returns the calendar date in local time.
  */
-export function toDate(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+export function toDate(date: Date): Temporal.PlainDate {
+  return Temporal.PlainDate.from({
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+  });
 }
 
 /**
- * toTime — alias, returns same date (in TS, Date represents both date and time).
+ * toTime — Rails `Time#to_time`. Returns the instant the Date refers to.
  */
-export function toTime(date: Date): Date {
-  return new Date(date.getTime());
+export function toTime(date: Date): Temporal.Instant {
+  return instantFrom(date);
 }
 
 /**

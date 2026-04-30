@@ -371,23 +371,21 @@ describe("TimeExtCalculationsTest", () => {
   it("to date", () => {
     const t = d(2005, 2, 21, 17, 44, 30);
     const result = toDate(t);
-    expect(result.getFullYear()).toBe(2005);
-    expect(result.getMonth()).toBe(1); // February
-    expect(result.getDate()).toBe(21);
-    expect(result.getHours()).toBe(0);
+    expect(result.year).toBe(2005);
+    expect(result.month).toBe(2);
+    expect(result.day).toBe(21);
   });
 
   it("to datetime", () => {
     const t = d(2005, 2, 21, 17, 44, 30);
     const result = toTime(t);
-    expect(result.getTime()).toBe(t.getTime());
+    expect(result.epochMilliseconds).toBe(t.getTime());
   });
 
   it("to time", () => {
     const t = d(2005, 2, 21, 17, 44, 30);
     const result = toTime(t);
-    expect(result instanceof Date).toBe(true);
-    expect(result.getTime()).toBe(t.getTime());
+    expect(result.epochMilliseconds).toBe(t.getTime());
   });
 
   it("fp inaccuracy ticket 1836", () => {

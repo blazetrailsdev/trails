@@ -72,26 +72,26 @@ describe("DateTimeExtCalculationsTest", () => {
   it("to date", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
     const result = toDate(dt);
-    expect(result.getHours()).toBe(0);
-    expect(result.getDate()).toBe(22);
+    expect(result.day).toBe(22);
+    expect(result.month).toBe(2);
   });
 
   it("to datetime", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
     const result = toTime(dt);
-    expect(result.getTime()).toBe(dt.getTime());
+    expect(result.epochMilliseconds).toBe(dt.getTime());
   });
 
   it("to time", () => {
     const dt = d(2005, 2, 22, 10, 10, 10);
     const result = toTime(dt);
-    expect(result instanceof Date).toBe(true);
+    expect(result.epochMilliseconds).toBe(dt.getTime());
   });
 
   it("to time preserves fractional seconds", () => {
     const dt = new Date(2005, 1, 22, 10, 10, 10, 500);
     const result = toTime(dt);
-    expect(result.getMilliseconds()).toBe(500);
+    expect(asDate(result).getMilliseconds()).toBe(500);
   });
 
   it.skip("civil from format");

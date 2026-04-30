@@ -94,8 +94,7 @@ describe("DateExtCalculationsTest", () => {
   it("to time", () => {
     const date = d(2005, 2, 21);
     const result = toTime(date);
-    expect(result instanceof Date).toBe(true);
-    expect(result.getFullYear()).toBe(2005);
+    expect(asDate(result).getFullYear()).toBe(2005);
   });
 
   it("compare to time", () => {
@@ -107,18 +106,18 @@ describe("DateExtCalculationsTest", () => {
   it("to datetime", () => {
     const date = d(2005, 2, 21);
     const result = toTime(date);
-    expect(result.getFullYear()).toBe(2005);
-    expect(result.getMonth()).toBe(1); // February
-    expect(result.getDate()).toBe(21);
+    const back = asDate(result);
+    expect(back.getFullYear()).toBe(2005);
+    expect(back.getMonth()).toBe(1); // February
+    expect(back.getDate()).toBe(21);
   });
 
   it("to date", () => {
     const date = d(2005, 2, 21, 10, 30);
     const result = toDate(date);
-    expect(result.getFullYear()).toBe(2005);
-    expect(result.getMonth()).toBe(1);
-    expect(result.getDate()).toBe(21);
-    expect(result.getHours()).toBe(0);
+    expect(result.year).toBe(2005);
+    expect(result.month).toBe(2);
+    expect(result.day).toBe(21);
   });
 
   it("change", () => {
