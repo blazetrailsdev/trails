@@ -29,7 +29,24 @@ import {
   DatabaseStatements,
   transaction as dbStatementsTransaction,
 } from "./abstract/database-statements.js";
-import { quote as abstractQuote, typeCast as abstractTypeCast } from "./abstract/quoting.js";
+import {
+  quote as abstractQuote,
+  typeCast as abstractTypeCast,
+  quoteString as abstractQuoteString,
+  quoteIdentifier as abstractQuoteIdentifier,
+  quoteTableName as abstractQuoteTableName,
+  quoteColumnName as abstractQuoteColumnName,
+  quoteTableNameForAssignment as abstractQuoteTableNameForAssignment,
+  quoteDefaultExpression as abstractQuoteDefaultExpression,
+  quotedTrue as abstractQuotedTrue,
+  quotedFalse as abstractQuotedFalse,
+  unquotedTrue as abstractUnquotedTrue,
+  unquotedFalse as abstractUnquotedFalse,
+  quotedBinary as abstractQuotedBinary,
+  castBoundValue as abstractCastBoundValue,
+  sanitizeAsSqlComment as abstractSanitizeAsSqlComment,
+} from "./abstract/quoting.js";
+import type { Quoting } from "./abstract/quoting-interface.js";
 import { include } from "@blazetrails/activesupport";
 import type { Result } from "../result.js";
 
@@ -115,7 +132,7 @@ export interface AbstractAdapter {
   ): [unknown, unknown[]];
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class AbstractAdapter {
+export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
 
   private _connection: DatabaseAdapter | null = null;
@@ -195,6 +212,67 @@ export class AbstractAdapter {
    */
   typeCast(value: unknown): unknown {
     return abstractTypeCast(value);
+  }
+
+  /**
+   * Default identifier and bool-literal quoting — delegates to the
+   * abstract quoting module. Concrete adapters override the dialect-
+   * specific methods (PG/SQLite double-quote vs. MySQL backtick;
+   * SQLite `"1"` bools).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting (mixed into
+   * AbstractAdapter).
+   */
+  quoteString(s: string): string {
+    return abstractQuoteString(s);
+  }
+
+  quoteIdentifier(name: string): string {
+    return abstractQuoteIdentifier(name);
+  }
+
+  quoteTableName(name: string): string {
+    return abstractQuoteTableName(name);
+  }
+
+  quoteColumnName(name: string): string {
+    return abstractQuoteColumnName(name);
+  }
+
+  quoteTableNameForAssignment(table: string, attr: string): string {
+    return abstractQuoteTableNameForAssignment(table, attr);
+  }
+
+  quoteDefaultExpression(value: unknown): string {
+    return abstractQuoteDefaultExpression(value);
+  }
+
+  quotedTrue(): string {
+    return abstractQuotedTrue();
+  }
+
+  quotedFalse(): string {
+    return abstractQuotedFalse();
+  }
+
+  unquotedTrue(): boolean | number {
+    return abstractUnquotedTrue();
+  }
+
+  unquotedFalse(): boolean | number {
+    return abstractUnquotedFalse();
+  }
+
+  quotedBinary(value: unknown): string {
+    return abstractQuotedBinary(value);
+  }
+
+  castBoundValue(value: unknown): unknown {
+    return abstractCastBoundValue(value);
+  }
+
+  sanitizeAsSqlComment(value: unknown): string {
+    return abstractSanitizeAsSqlComment(value);
   }
 
   /**

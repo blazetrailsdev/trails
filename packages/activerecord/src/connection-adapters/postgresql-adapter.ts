@@ -15,7 +15,9 @@ import {
   quoteTableName as pgQuoteTableName,
   quoteColumnName as pgQuoteColumnName,
   quoteString as pgQuoteString,
+  quoteTableNameForAssignment as pgQuoteTableNameForAssignment,
   quoteDefaultExpression as pgQuoteDefaultExpression,
+  quotedBinary as pgQuotedBinary,
   columnNameMatcher as pgColumnNameMatcher,
   columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
 } from "./postgresql/quoting.js";
@@ -3269,8 +3271,38 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return { schema: pgName.schema, table: pgName.identifier };
   }
 
-  private quoteIdentifier(name: string): string {
+  override quoteIdentifier(name: string): string {
     return pgQuoteColumnName(name);
+  }
+
+  /**
+   * Mirrors: PostgreSQL::Quoting#quote_table_name_for_assignment
+   * (`postgresql/quoting.rb:136`) — PG ignores the table and quotes
+   * only the column. Abstract default returns `table.attr`-qualified;
+   * PG overrides because PostgreSQL UPDATE syntax doesn't allow a
+   * table-qualified column on the LHS of `SET`.
+   */
+  override quoteTableNameForAssignment(_table: string, attr: string): string {
+    return pgQuoteTableNameForAssignment(_table, attr);
+  }
+
+  /**
+   * Mirrors: PostgreSQL::Quoting#quoted_binary
+   * (`postgresql/quoting.rb:152`) — `'\\xHEX'` bytea-escape form.
+   * Without this override, the adapter would inherit
+   * AbstractAdapter#quotedBinary (Rails-equivalent
+   * `"'#{quote_string(value.to_s)}'"` from `abstract/quoting.rb:206`)
+   * and emit malformed bytea literals on PG.
+   */
+  override quotedBinary(value: unknown): string {
+    if (value instanceof Uint8Array) return pgQuotedBinary(value);
+    if (value instanceof ArrayBuffer) return pgQuotedBinary(new Uint8Array(value));
+    if (typeof value === "string") return pgQuotedBinary(value);
+    throw new TypeError(
+      `quotedBinary expects Uint8Array, ArrayBuffer, Buffer, or string; got ${
+        value === null ? "null" : typeof value
+      }`,
+    );
   }
 
   private quoteSchemaName(name: string): string {

@@ -33,6 +33,13 @@ import {
   unquoteIdentifier as mysqlUnquoteIdentifier,
   columnNameMatcher as mysqlColumnNameMatcher,
   columnNameWithOrderMatcher as mysqlColumnNameWithOrderMatcher,
+  quoteIdentifier as mysqlQuoteIdentifier,
+  quoteTableName as mysqlQuoteTableName,
+  quoteColumnName as mysqlQuoteColumnName,
+  quotedTrue as mysqlQuotedTrue,
+  quotedFalse as mysqlQuotedFalse,
+  unquotedTrue as mysqlUnquotedTrue,
+  unquotedFalse as mysqlUnquotedFalse,
 } from "./mysql/quoting.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { TypeMap } from "../type/type-map.js";
@@ -86,6 +93,20 @@ const ER_LOCK_WAIT_TIMEOUT = 1205;
 const ER_QUERY_INTERRUPTED = 1317;
 const ER_QUERY_TIMEOUT = 3024;
 const ER_TABLE_EXISTS = 1050;
+
+// Hot-path constants for the escape-only `quoteString` override below.
+// Match `MYSQL_ESCAPE_RE` / `MYSQL_ESCAPE_MAP` in `mysql/quoting.ts`
+// (those are module-private). Hoisted here so each call avoids
+// re-allocating the regex and lookup table.
+// eslint-disable-next-line no-control-regex
+const MYSQL_ADAPTER_ESCAPE_RE = /[\\\x00\n\r\x1a]/g;
+const MYSQL_ADAPTER_ESCAPE_MAP: Record<string, string> = {
+  "\\": "\\\\",
+  "\0": "\\0",
+  "\n": "\\n",
+  "\r": "\\r",
+  "\x1a": "\\Z",
+};
 
 export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly Version = Version;
@@ -166,6 +187,68 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    */
   override typeCast(value: unknown): unknown {
     return mysqlTypeCast(value);
+  }
+
+  /**
+   * MySQL dialect overrides — backtick identifiers and integer bool
+   * coercion. Matches Rails:
+   *
+   * - `quote_column_name` / `quote_table_name` — backticks
+   *   (`mysql/quoting.rb:48-53`).
+   * - `unquoted_true` / `unquoted_false` → `1` / `0`
+   *   (`mysql/quoting.rb:72-77`).
+   *
+   * Note on `quotedTrue`/`quotedFalse`: Rails MySQL does NOT override
+   * these — it inherits `"TRUE"`/`"FALSE"` from `abstract/quoting.rb:166`.
+   * Trails MySQL's per-module standalone returns `"1"`/`"0"` (a
+   * pre-existing trails-vs-Rails divergence flagged in
+   * `docs/quoting-refactor.md`; not addressed here). We override on
+   * the adapter so `quote(true)` and `quotedTrue()` agree (both `"1"`
+   * via the per-module standalone). Without the override the adapter
+   * would inherit AbstractAdapter#quotedTrue (`"TRUE"`) while
+   * `quote()` returns `"1"`, breaking call sites that switch between
+   * the two through the Quoting interface.
+   */
+  override quoteIdentifier(name: string): string {
+    return mysqlQuoteIdentifier(name);
+  }
+
+  override quoteTableName(name: string): string {
+    return mysqlQuoteTableName(name);
+  }
+
+  override quoteColumnName(name: string): string {
+    return mysqlQuoteColumnName(name);
+  }
+
+  override quotedTrue(): string {
+    return mysqlQuotedTrue();
+  }
+
+  override quotedFalse(): string {
+    return mysqlQuotedFalse();
+  }
+
+  override unquotedTrue(): number {
+    return mysqlUnquotedTrue();
+  }
+
+  override unquotedFalse(): number {
+    return mysqlUnquotedFalse();
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_table_name_for_assignment
+   * (`abstract/quoting.rb:153-155`) — Rails MySQL inherits from
+   * abstract. Dispatching `quote_table_name("#{table}.#{attr}")`
+   * resolves polymorphically to `MySQL::Quoting#quote_table_name` which
+   * splits on `.` and backticks each part. The TS port doesn't get
+   * polymorphic dispatch from the abstract standalone (it would call
+   * the abstract module's `quoteTableName` and emit double quotes), so
+   * we override on the MySQL adapter to route through `this.quoteTableName`.
+   */
+  override quoteTableNameForAssignment(table: string, attr: string): string {
+    return this.quoteTableName(`${table}.${attr}`);
   }
 
   isMariadb(): boolean {
@@ -571,8 +654,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   checkVersion(): void {}
 
-  quoteString(string: string): string {
-    return mysqlQuoteString(string);
+  /**
+   * Escape-only string quoting per the Quoting interface contract
+   * (`abstract/quoting-interface.ts`). Mirrors Rails MySQL
+   * `quote_string` (`mysql/quoting.rb`): doubles `'` and backslash-
+   * escapes the same control chars MySQL's wire protocol requires.
+   * Distinct from the per-module `mysqlQuoteString` standalone, which
+   * wraps with surrounding `'...'` for SQL-literal contexts.
+   */
+  override quoteString(s: string): string {
+    return s
+      .replace(/'/g, "''")
+      .replace(MYSQL_ADAPTER_ESCAPE_RE, (ch) => MYSQL_ADAPTER_ESCAPE_MAP[ch] ?? ch);
   }
 
   static dbconsole(

@@ -39,9 +39,22 @@ import { isWriteQuerySql } from "./sql-classification.js";
 import {
   quote as sqliteQuote,
   typeCast as sqliteTypeCast,
-  quoteString,
+  // Note: the standalone `quoteString` exported by sqlite3/quoting.ts
+  // returns a fully-quoted SQL literal (`'foo'`), not the escape-only
+  // form Rails' `quote_string` returns. The instance override below
+  // implements escape-only inline; the standalone is kept under an
+  // alias here for the few legacy call sites in this file that want
+  // the literal form.
+  quoteString as sqliteQuoteStringLiteral,
   quoteTableName,
   quoteColumnName,
+  quoteIdentifier as sqliteQuoteIdentifier,
+  quoteTableNameForAssignment as sqliteQuoteTableNameForAssignment,
+  quotedTrue as sqliteQuotedTrue,
+  unquotedTrue as sqliteUnquotedTrue,
+  quotedFalse as sqliteQuotedFalse,
+  unquotedFalse as sqliteUnquotedFalse,
+  quotedBinary as sqliteQuotedBinary,
 } from "./sqlite3/quoting.js";
 import {
   CheckConstraintDefinition,
@@ -469,6 +482,81 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override typeCast(value: unknown): unknown {
     return sqliteTypeCast(value);
+  }
+
+  /**
+   * SQLite-specific quoting overrides — route every Quoting interface
+   * method to the per-adapter module so call sites can dispatch via
+   * `connection.quoteX(...)` and get the dialect-correct form
+   * (double-quote identifiers, `"1"`/`"0"` bools, hex binary literals).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::Quoting overrides.
+   */
+  override quoteString(s: string): string {
+    // Mirrors: SQLite3::Quoting#quote_string — escape-only (no
+    // surrounding quotes). The standalone sqlite3/quoting.ts
+    // `quoteString` wraps for historical reasons; this override
+    // matches the Rails contract: just `'` → `''`.
+    return s.replace(/'/g, "''");
+  }
+
+  override quoteIdentifier(name: string): string {
+    return sqliteQuoteIdentifier(name);
+  }
+
+  override quoteTableName(name: string): string {
+    return quoteTableName(name);
+  }
+
+  override quoteColumnName(name: string): string {
+    return quoteColumnName(name);
+  }
+
+  override quoteTableNameForAssignment(table: string, attr: string): string {
+    return sqliteQuoteTableNameForAssignment(table, attr);
+  }
+
+  // `quoteDefaultExpression` deliberately not overridden here. The
+  // SQLite standalone (`sqlite3/quoting.ts:114`) returns an unprefixed
+  // expression (`NULL` / `(NOW())`) — Rails-correct — but the abstract
+  // and PG adapters return a `" DEFAULT ..."`-prefixed clause. Until
+  // that contract divergence is reconciled across adapters (Phase 2
+  // call-site work), inheriting the abstract default keeps DDL output
+  // consistent across adapters in this PR.
+
+  override quotedTrue(): string {
+    return sqliteQuotedTrue();
+  }
+
+  override quotedFalse(): string {
+    return sqliteQuotedFalse();
+  }
+
+  override unquotedTrue(): number {
+    return sqliteUnquotedTrue();
+  }
+
+  override unquotedFalse(): number {
+    return sqliteUnquotedFalse();
+  }
+
+  override quotedBinary(value: unknown): string {
+    // Mirrors: SQLite3::Quoting#quoted_binary (`sqlite3/quoting.rb:79`)
+    // — Rails calls `value.hex` and would NoMethodError on non-Binary
+    // values. The TS standalone iterates the value as a byte source,
+    // so non-binary inputs (strings, plain arrays) silently produce
+    // garbage hex. Validate at the interface boundary.
+    if (value instanceof Uint8Array) {
+      return sqliteQuotedBinary(value);
+    }
+    if (value instanceof ArrayBuffer) {
+      return sqliteQuotedBinary(new Uint8Array(value));
+    }
+    throw new TypeError(
+      `quotedBinary expects a Uint8Array, ArrayBuffer, or Buffer; got ${
+        value === null ? "null" : typeof value
+      }`,
+    );
   }
 
   /**
@@ -1158,12 +1246,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (schema) {
       sql =
         schema.toLowerCase() === "temp"
-          ? `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name=${quoteString(bare)}`
-          : `SELECT sql FROM ${quoteColumnName(schema)}.sqlite_master WHERE type='table' AND name=${quoteString(bare)}`;
+          ? `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`
+          : `SELECT sql FROM ${quoteColumnName(schema)}.sqlite_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`;
     } else {
-      sql = `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name=${quoteString(bare)}
+      sql = `SELECT sql FROM sqlite_temp_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}
              UNION ALL
-             SELECT sql FROM sqlite_master WHERE type='table' AND name=${quoteString(bare)}`;
+             SELECT sql FROM sqlite_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`;
     }
     const row = this.db.prepare(sql).get() as { sql: string } | undefined;
     return row?.sql ?? null;
@@ -1194,15 +1282,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   private quoteDefault(value: unknown): string {
     if (value === null) return "NULL";
-    if (typeof value === "string") return quoteString(value);
+    if (typeof value === "string") return sqliteQuoteStringLiteral(value);
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "1" : "0";
     if (typeof value === "function") return String(value());
     // boundary: defensive Date branch in SQLite adapter literal quoting.
-    if (value instanceof globalThis.Date) return quoteString(value.toISOString());
+    if (value instanceof globalThis.Date) return sqliteQuoteStringLiteral(value.toISOString());
     // SqlLiteral or objects with toSql
     if (typeof (value as any)?.toSql === "function") return String((value as any).toSql());
-    return quoteString(String(value));
+    return sqliteQuoteStringLiteral(String(value));
   }
 
   // --- Schema introspection (drives SchemaCache.addAll) ---
@@ -1265,7 +1353,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async tableExists(name: string): Promise<boolean> {
     const { sqliteMaster, bare } = this._sqliteMasterFor(name);
     const rows = (await this.execute(
-      `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name=${quoteString(bare)}`,
+      `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`,
       [],
       "SCHEMA",
     )) as Array<{ one: number }>;
@@ -1275,7 +1363,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async dataSourceExists(name: string): Promise<boolean> {
     const { sqliteMaster, bare } = this._sqliteMasterFor(name);
     const rows = (await this.execute(
-      `SELECT 1 AS one FROM ${sqliteMaster} WHERE type IN ('table','view') AND name=${quoteString(bare)}`,
+      `SELECT 1 AS one FROM ${sqliteMaster} WHERE type IN ('table','view') AND name=${sqliteQuoteStringLiteral(bare)}`,
       [],
       "SCHEMA",
     )) as Array<{ one: number }>;
@@ -1595,7 +1683,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       if (idxName.startsWith("sqlite_autoindex_")) continue;
       const createSql = this.db
         .prepare(
-          `SELECT sql FROM ${pragmaPrefix}sqlite_master WHERE type='index' AND name=${quoteString(idxName)}`,
+          `SELECT sql FROM ${pragmaPrefix}sqlite_master WHERE type='index' AND name=${sqliteQuoteStringLiteral(idxName)}`,
         )
         .get() as { sql: string } | undefined;
       if (createSql?.sql) {
