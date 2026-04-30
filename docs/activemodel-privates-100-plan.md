@@ -155,14 +155,22 @@ microseconds/fallbackStringToTime (date_time), newTime/fastStringToTime
 (time_value), valueFromMultiparameterAssignment (date+date_time).
 ~9 misses. **Coordinate with Track C1/C2/C3** — same surface.
 
-**PR B5 — Internals callbacks + validation lifecycle (`validations.rb` + `callbacks.rb` + cross-file initInternals)**
-The 3 `_defineXxxModelCallback` methods + `initInternals` +
-`runValidationsBang` + `raiseValidationError` +
-`predicateForValidationContext` + `contextForValidation` +
-`_mergeAttributes`. Mostly one shared cluster surfaced across
-multiple files. ~15-18 misses across `validations.rb`, `callbacks.rb`,
-`model.rb`, `api.rb`, `dirty.rb`. Likely needs splitting into B5a
-(definitions) + B5b (consumption rewiring).
+**PR B5a — Internals callbacks definitions — ✅ done**
+The 3 `_defineXxxModelCallback` helpers extracted from
+`defineModelCallbacks` and re-exposed via `validations.ts` (Rails
+`Validations` extends `Callbacks`). `initInternals` exported from
+`validations.ts` (resets `errors` + `_validationContext`) and
+`dirty.ts` (resets `_dirty`); Model gains an instance hook
+`initInternals()` that chains both, called from the constructor.
+`api.ts` re-exports the validations helper. Closes 10 privates
+misses (callbacks.rb 4/4, +1 each on validations/dirty/model/api).
+
+**PR B5b — Validation lifecycle consumption**
+`runValidationsBang`, `raiseValidationError`,
+`predicateForValidationContext`, `contextForValidation`,
+`_mergeAttributes`. Wires the call sites to the B5a definitions
+and propagates the include-mixed methods across `model.rb`,
+`api.rb`, `dirty.rb`, `attribute_registration.rb`.
 
 **PR B6 — Attribute method dispatch cluster (`attribute_methods.rb` + `attributes.rb` + `attribute_set/builder.rb`)**
 isAttributeMethod, matchedAttributeMethod, missingAttribute,

@@ -35,6 +35,34 @@ function resolveValue(value: unknown): unknown {
 }
 
 /**
+ * Per-instance reset hook for dirty-tracking state. Mirrors Rails
+ * `ActiveModel::Dirty#init_internals`
+ * (activemodel/lib/active_model/dirty.rb:372-376):
+ *
+ *   def init_internals
+ *     super
+ *     @mutations_before_last_save = nil
+ *     @mutations_from_database = nil
+ *   end
+ *
+ * Trails consolidates Rails' two mutation trackers into a single
+ * `DirtyTracker`, so a fresh tracker is the equivalent reset.
+ * Called from the Model constructor.
+ *
+ * @internal Rails-private helper.
+ */
+export function initInternals(this: DirtyInternalsHost): void {
+  this._dirty = new DirtyTracker();
+}
+
+/**
+ * Host shape consumed by `initInternals`.
+ */
+export interface DirtyInternalsHost {
+  _dirty: DirtyTracker;
+}
+
+/**
  * Dirty tracking mixin — tracks attribute changes on a model.
  *
  * Mirrors: ActiveModel::Dirty
