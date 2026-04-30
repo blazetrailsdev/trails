@@ -130,11 +130,11 @@ export class DateType extends ValueType<DateCastResult> {
     mday: number | null | undefined,
   ): Temporal.PlainDate | null {
     if (year == null || (year === 0 && mon === 0 && mday === 0)) return null;
+    // Rails' ::Date.new(year, nil, nil) raises → rescue nil. Treat missing
+    // month/day the same way rather than silently coercing to Jan 1.
+    if (mon == null || mday == null) return null;
     try {
-      return Temporal.PlainDate.from(
-        { year, month: mon ?? 1, day: mday ?? 1 },
-        { overflow: "reject" },
-      );
+      return Temporal.PlainDate.from({ year, month: mon, day: mday }, { overflow: "reject" });
     } catch {
       return null;
     }
