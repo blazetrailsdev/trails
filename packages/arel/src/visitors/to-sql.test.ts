@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   Table,
   star,
@@ -1550,6 +1551,47 @@ describe("the to_sql visitor", () => {
       expect((v as unknown as { collector: { value: string } }).collector.value).toBe(
         '"users"."a", 1, \'text\'',
       );
+    });
+  });
+
+  describe("Quoted/Casted collapse", () => {
+    it("Quoted inlines via quote(valueForDatabase) when not extracting binds", () => {
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(new Nodes.Quoted("hi"))).toBe("'hi'");
+    });
+
+    it("Quoted Temporal.Instant binds through unified addBind path under extractBinds", () => {
+      const visitor = new Visitors.ToSql();
+      const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
+      const [sql, binds] = visitor.compileWithBinds(new Nodes.Quoted(instant));
+      expect(sql).toBe("?");
+      expect(binds).toHaveLength(1);
+      expect(binds[0]).toBe(instant);
+    });
+
+    it("Quoted non-Date inlines under extractBinds=false", () => {
+      const visitor = new Visitors.ToSql();
+      expect(visitor.compile(new Nodes.Quoted(42))).toBe("42");
+    });
+
+    it("Quoted string binds raw under extractBinds", () => {
+      const [sql, binds] = new Visitors.ToSql().compileWithBinds(new Nodes.Quoted("hi"));
+      expect(sql).toBe("?");
+      expect(binds).toEqual(["hi"]);
+    });
+
+    it("Quoted number binds raw under extractBinds", () => {
+      const [sql, binds] = new Visitors.ToSql().compileWithBinds(new Nodes.Quoted(42));
+      expect(sql).toBe("?");
+      expect(binds).toEqual([42]);
+    });
+
+    it("Quoted toISOString-bearing object binds raw under extractBinds", () => {
+      const value = { toISOString: () => "2026-04-30T00:00:00.000Z" };
+      const [sql, binds] = new Visitors.ToSql().compileWithBinds(new Nodes.Quoted(value));
+      expect(sql).toBe("?");
+      expect(binds).toHaveLength(1);
+      expect(binds[0]).toBe(value);
     });
   });
 

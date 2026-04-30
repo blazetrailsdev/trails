@@ -1316,29 +1316,10 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   private visitQuoted(node: Nodes.Quoted): SQLString {
-    if (
-      this._extractBinds &&
-      node.value !== null &&
-      node.value !== undefined &&
-      typeof node.value === "object" &&
-      "toISOString" in node.value &&
-      typeof (node.value as { toISOString: unknown }).toISOString === "function"
-    ) {
-      // boundary: bind real Date instances directly (drivers handle them
-      // natively). For other objects with a `toISOString()` method, bind the
-      // formatted string so drivers don't receive an unsupported object type.
-      const bind =
-        node.value instanceof Date
-          ? node.value
-          : this.quotedDate(node.value as { toISOString(): string }).slice(1, -1);
-      this.addDateBind(bind);
-    } else {
-      this.collector.append(this.quote(node.value));
-    }
-    return this.collector;
+    return this.visitArelNodesCasted(node);
   }
 
-  protected visitArelNodesCasted(node: Nodes.Casted): SQLString {
+  protected visitArelNodesCasted(node: Nodes.Casted | Nodes.Quoted): SQLString {
     const value = node.valueForDatabase();
     if (this._extractBinds) {
       this.collector.addBind(value, this.bindBlock());
