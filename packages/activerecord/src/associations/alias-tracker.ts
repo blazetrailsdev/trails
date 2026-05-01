@@ -5,7 +5,7 @@
  */
 import { Table, Nodes } from "@blazetrails/arel";
 import { tableAliasLength as getTableAliasLength } from "../connection-adapters/abstract/database-limits.js";
-import { quoteTableName } from "../connection-adapters/abstract/quoting.js";
+import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 
 const DEFAULT_TABLE_ALIAS_LENGTH = getTableAliasLength();
 
@@ -13,11 +13,18 @@ export class AliasTracker {
   readonly aliases: Map<string, number>;
   private _tableAliasLength: number;
   private _joins: any[];
+  private _quoter?: Quoting;
 
-  constructor(tableAliasLength?: number, aliases?: Map<string, number>, joins?: any[]) {
+  constructor(
+    tableAliasLength?: number,
+    aliases?: Map<string, number>,
+    joins?: any[],
+    quoter?: Quoting,
+  ) {
     this._tableAliasLength = tableAliasLength ?? DEFAULT_TABLE_ALIAS_LENGTH;
     this.aliases = aliases ?? new Map();
     this._joins = joins ?? [];
+    this._quoter = quoter;
   }
 
   static create(
@@ -25,6 +32,7 @@ export class AliasTracker {
     initialTable: string,
     joins: any[],
     aliases?: Map<string, number>,
+    quoter?: Quoting,
   ): AliasTracker {
     const tableAliasLength =
       typeof pool?.withConnection === "function"
@@ -33,11 +41,12 @@ export class AliasTracker {
 
     const map = aliases ? new Map(aliases) : new Map<string, number>();
     map.set(initialTable, 1);
-    return new AliasTracker(tableAliasLength, map, joins);
+    return new AliasTracker(tableAliasLength, map, joins, quoter);
   }
 
-  static initialCountFor(name: string, tableJoins: any[]): number {
-    const quotedNameEscaped = quoteTableName(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  static initialCountFor(quoter: Quoting | undefined, name: string, tableJoins: any[]): number {
+    const quotedName = quoter ? quoter.quoteTableName(name) : `"${name}"`;
+    const quotedNameEscaped = quotedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const nameEscaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(
       `JOIN(?:\\s+\\w+)?\\s+(?:\\S+\\s+)?(?:${quotedNameEscaped}|${nameEscaped})\\s+ON`,
@@ -63,7 +72,7 @@ export class AliasTracker {
   private _getCount(key: string): number {
     if (this.aliases.has(key)) return this.aliases.get(key)!;
     if (this._joins.length > 0) {
-      const count = AliasTracker.initialCountFor(key, this._joins);
+      const count = AliasTracker.initialCountFor(this._quoter, key, this._joins);
       this.aliases.set(key, count);
       return count;
     }

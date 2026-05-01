@@ -1049,8 +1049,10 @@ describe("AssociationScope", () => {
     // (or get dropped) doesn't slip through. PR 3 builds these via
     // _nextChainScope using joinPrimaryKey / joinForeignKey from the
     // chain's pair.
-    expect(sql).toMatch(/ON\s+"hot_settings"\."hot_account_id"\s*=\s*"hot_accounts"\."id"/);
-    expect(sql).toMatch(/"hot_accounts"\."hot_user_id"\s*=\s*5/);
+    expect(sql).toMatch(
+      /ON\s+["`]hot_settings["`]\.["`]hot_account_id["`]\s*=\s*["`]hot_accounts["`]\.["`]id["`]/,
+    );
+    expect(sql).toMatch(/["`]hot_accounts["`]\.["`]hot_user_id["`]\s*=\s*5/);
     expect(sql).toMatch(/LIMIT\s+1/);
   });
 
@@ -1108,7 +1110,9 @@ describe("AssociationScope", () => {
     ).toSql();
     expect(sql).toMatch(/FROM\s+"through_posts"/);
     expect(sql).toMatch(/INNER JOIN\s+"?through_memberships"?/i);
-    expect(sql).toMatch(/"through_posts"\."id"\s*=\s*"through_memberships"\."through_post_id"/);
-    expect(sql).toMatch(/"through_memberships"\."through_author_id"\s*=\s*1/);
+    expect(sql).toMatch(
+      /["`]through_posts["`]\.["`]id["`]\s*=\s*["`]through_memberships["`]\.["`]through_post_id["`]/,
+    );
+    expect(sql).toMatch(/["`]through_memberships["`]\.["`]through_author_id["`]\s*=\s*1/);
   });
 });

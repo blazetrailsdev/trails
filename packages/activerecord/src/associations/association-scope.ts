@@ -10,7 +10,7 @@ import {
   polymorphicName,
 } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
-import { quoteTableName, quoteColumnName, quote } from "../connection-adapters/abstract/quoting.js";
+import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 
 /**
  * Lambda applied to each FK/type bind value before it reaches the
@@ -232,6 +232,7 @@ export class AssociationScope {
    */
   scope(association: AssociationScopeable): unknown {
     const { owner, reflection, klass } = association;
+    const quoter = klass.adapter as unknown as Quoting;
     // Rails: `klass.unscoped` (association_scope.rb:23). Rails' unscoped
     // bypasses default_scope but STILL applies the STI `type_condition`
     // because `relation()` adds it for `finder_needs_type_condition?`
@@ -254,9 +255,9 @@ export class AssociationScope {
     // default seeding with `klass.arel_table`). The tracker is
     // shared across the chain walk within this call so repeated
     // joins to the same table get unique aliases.
-    const tracker = AliasTracker.create(null, klass.arelTable.name, []);
+    const tracker = AliasTracker.create(null, klass.arelTable.name, [], undefined, quoter);
     const chain = this._getChain(reflection, tracker);
-    scope = this._addConstraints(scope, owner, chain, klass);
+    scope = this._addConstraints(scope, owner, chain, klass, quoter);
     if (!reflection.isCollection()) {
       scope = (scope as { limit: (n: number) => unknown }).limit(1);
     }
@@ -433,6 +434,7 @@ export class AssociationScope {
     reflection: AbstractReflection | ReflectionProxy,
     nextReflection: AbstractReflection | ReflectionProxy,
     klass?: typeof Base,
+    quoter?: Quoting,
   ): unknown {
     const r = reflection as {
       joinPrimaryKey: string | string[];
@@ -497,12 +499,14 @@ export class AssociationScope {
     // Relation is stored as a SQL string and re-wrapped in
     // Nodes.SqlLiteral at apply time, so we still produce a string —
     // but the identifiers/values are escape-safe.
-    const qTable = quoteTableName(table);
-    const qForeignTable = quoteTableName(foreignTable);
+    const q = quoter;
+    if (!q) throw new Error("AssociationScope._nextChainScope requires a quoter");
+    const qTable = q.quoteTableName(table);
+    const qForeignTable = q.quoteTableName(foreignTable);
     const conditions: string[] = [];
     for (let i = 0; i < joinPks.length; i++) {
       conditions.push(
-        `${qTable}.${quoteColumnName(joinPks[i])} = ${qForeignTable}.${quoteColumnName(joinFks[i])}`,
+        `${qTable}.${q.quoteColumnName(joinPks[i])} = ${qForeignTable}.${q.quoteColumnName(joinFks[i])}`,
       );
     }
     let onClause = conditions.join(" AND ");
@@ -514,7 +518,7 @@ export class AssociationScope {
       // STI) and the value-transformation lambda.
       const nextKlass = (nextReflection as { klass?: typeof Base }).klass;
       const nextName = nextKlass ? polymorphicName(nextKlass) : "";
-      onClause += ` AND ${qTable}.${quoteColumnName(r.type)} = ${quote(this._transformValue(nextName))}`;
+      onClause += ` AND ${qTable}.${q.quoteColumnName(r.type)} = ${q.quote(this._transformValue(nextName))}`;
     }
     return (scope as { joins: (table: string, on: string) => unknown }).joins(
       foreignTable,
@@ -535,6 +539,7 @@ export class AssociationScope {
     owner: Base,
     chain: Array<AbstractReflection | ReflectionProxy>,
     klass?: typeof Base,
+    quoter?: Quoting,
   ): unknown {
     const last = chain[chain.length - 1];
     scope = this._lastChainScope(scope, last, owner, klass);
@@ -542,7 +547,7 @@ export class AssociationScope {
     // `chain.each_cons(2) { |r, nr| next_chain_scope(scope, r, nr) }`
     // (association_scope.rb:128-130).
     for (let i = 0; i < chain.length - 1; i++) {
-      scope = this._nextChainScope(scope, chain[i], chain[i + 1], klass);
+      scope = this._nextChainScope(scope, chain[i], chain[i + 1], klass, quoter);
     }
     // Rails' chain.reverse_each over reflection.constraints (Rails:
     // association_scope.rb:131-156) merges scope-chain items into the
