@@ -9,6 +9,7 @@ import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/s
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
+import { adapterNameFromConfig } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter } from "./adapter.js";
 import { Result } from "./result.js";
 
@@ -1018,5 +1019,30 @@ describe("ConnectionPool schema cache", () => {
     expect((reflection as unknown as { _cachePath: string | null })._cachePath).toBe(
       "db/custom_cache.json",
     );
+  });
+});
+
+describe("adapterNameFromConfig", () => {
+  it("maps postgresql variants to postgres", () => {
+    expect(adapterNameFromConfig("postgresql")).toBe("postgres");
+    expect(adapterNameFromConfig("postgres")).toBe("postgres");
+    expect(adapterNameFromConfig("pg")).toBe("postgres");
+  });
+
+  it("maps mysql variants to mysql", () => {
+    expect(adapterNameFromConfig("mysql2")).toBe("mysql");
+    expect(adapterNameFromConfig("mysql")).toBe("mysql");
+    expect(adapterNameFromConfig("trilogy")).toBe("mysql");
+    expect(adapterNameFromConfig("mariadb")).toBe("mysql");
+  });
+
+  it("maps sqlite variants to sqlite", () => {
+    expect(adapterNameFromConfig("sqlite3")).toBe("sqlite");
+    expect(adapterNameFromConfig("sqlite")).toBe("sqlite");
+  });
+
+  it("defaults unknown to sqlite", () => {
+    expect(adapterNameFromConfig(undefined)).toBe("sqlite");
+    expect(adapterNameFromConfig("unknown")).toBe("sqlite");
   });
 });
