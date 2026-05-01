@@ -760,6 +760,24 @@ class SchemaAdapter implements DatabaseAdapter {
     );
   }
 
+  quoteIdentifier(name: string): string {
+    return (this.inner as { quoteIdentifier(n: string): string }).quoteIdentifier(name);
+  }
+
+  quoteTableName(name: string): string {
+    return (this.inner as { quoteTableName(n: string): string }).quoteTableName(name);
+  }
+
+  quoteColumnName(name: string): string {
+    return (this.inner as { quoteColumnName(n: string): string }).quoteColumnName(name);
+  }
+
+  quoteDefaultExpression(value: unknown): string {
+    return (this.inner as { quoteDefaultExpression(v: unknown): string }).quoteDefaultExpression(
+      value,
+    );
+  }
+
   async cleanup(): Promise<void> {
     await dropAllTables(this.inner);
   }

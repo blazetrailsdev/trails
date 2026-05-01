@@ -10,6 +10,7 @@ import {
   type AddForeignKeyOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
+import type { Quoting } from "./connection-adapters/abstract/quoting-interface.js";
 import { detectAdapterName } from "./adapter-name.js";
 import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
@@ -170,7 +171,7 @@ export abstract class Migration {
 
   get schema(): SchemaStatements {
     if (!this._schema) {
-      this._schema = new SchemaStatements(this.adapter);
+      this._schema = new SchemaStatements(this.adapter as DatabaseAdapter & Quoting);
     }
     return this._schema;
   }

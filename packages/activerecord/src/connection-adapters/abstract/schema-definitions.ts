@@ -479,7 +479,7 @@ export class TableDefinition {
   readonly comment?: string;
   private _id: boolean | PrimaryKeyType;
   private _adapterName: "sqlite" | "postgres" | "mysql";
-  private _adapter: SchemaQuoter;
+  protected _adapter: SchemaQuoter;
 
   constructor(
     tableName: string,

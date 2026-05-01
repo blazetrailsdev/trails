@@ -2027,6 +2027,10 @@ function mockMigration(): { migration: Migration; sql: string[] } {
     createSavepoint: async () => {},
     releaseSavepoint: async () => {},
     rollbackToSavepoint: async () => {},
+    quoteIdentifier: (n: string) => `"${n.replace(/"/g, '""')}"`,
+    quoteTableName: (n: string) => `"${n.replace(/"/g, '""')}"`,
+    quoteColumnName: (n: string) => `"${n.replace(/"/g, '""')}"`,
+    quoteDefaultExpression: (v: unknown) => (v === undefined ? "" : ` DEFAULT ${String(v)}`),
   };
   return { migration, sql };
 }
