@@ -8,7 +8,6 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { NotImplementedError } from "./errors.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { detectAdapterName } from "./adapter-name.js";
-import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { EnvironmentStorageError } from "./migration.js";
 import {
   Table,
@@ -42,12 +41,8 @@ export class InternalMetadata {
   private _adapter: DatabaseAdapter;
   readonly arelTable: Table;
 
-  private get _adapterName(): "sqlite" | "postgres" | "mysql" {
-    return detectAdapterName(this._adapter);
-  }
-
   private _q(name: string): string {
-    return quoteIdentifier(name, this._adapterName);
+    return this._adapter.quoteIdentifier(name);
   }
 
   get primaryKey(): string {
@@ -82,10 +77,10 @@ export class InternalMetadata {
 
   async createTable(): Promise<void> {
     if (!this._enabled) return;
-    const tsType = this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
+    const tsType = detectAdapterName(this._adapter) === "postgres" ? "TIMESTAMP" : "DATETIME";
     const q = (n: string) => this._q(n);
     await this._adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS ${quoteTableName(this.tableName, this._adapterName)} (` +
+      `CREATE TABLE IF NOT EXISTS ${this._adapter.quoteTableName(this.tableName)} (` +
         `${q("key")} VARCHAR(255) NOT NULL PRIMARY KEY, ` +
         `${q("value")} VARCHAR(255), ` +
         `${q("created_at")} ${tsType} NOT NULL, ` +
@@ -113,7 +108,7 @@ export class InternalMetadata {
     // config or adapter is actively using.
     if (!this._enabled) return;
     await this._adapter.executeMutation(
-      `DROP TABLE IF EXISTS ${quoteTableName(this.tableName, this._adapterName)}`,
+      `DROP TABLE IF EXISTS ${this._adapter.quoteTableName(this.tableName)}`,
     );
   }
 

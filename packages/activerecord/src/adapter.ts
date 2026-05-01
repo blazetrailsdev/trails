@@ -208,7 +208,29 @@ export interface DatabaseAdapter {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote
    */
-  quote?(value: unknown): string;
+  quote(value: unknown): string;
+
+  /**
+   * Quote an identifier (table or column name) for use in SQL.
+   * Abstract and SQLite/PG use double-quotes; MySQL uses backticks.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_identifier
+   */
+  quoteIdentifier(name: string): string;
+
+  /**
+   * Quote a table name for use in SQL.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_table_name
+   */
+  quoteTableName(name: string): string;
+
+  /**
+   * Quote a column name for use in SQL.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_column_name
+   */
+  quoteColumnName(name: string): string;
 
   /**
    * Cast a value to the primitive form drivers expect for binds.

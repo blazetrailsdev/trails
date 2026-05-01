@@ -3,10 +3,9 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
-import { quoteIdentifier } from "../connection-adapters/abstract/quoting.js";
-import { detectAdapterName } from "../adapter-name.js";
 import { underscore } from "@blazetrails/activesupport";
 import { dangerousAttributeMethods } from "../attribute-methods.js";
+import type { DatabaseAdapter } from "../adapter.js";
 
 interface PrimaryKeyRecord {
   id: unknown;
@@ -110,11 +109,13 @@ export function isDangerousAttributeMethod(_this: PrimaryKeyHost, name: string):
 /**
  * Rails: adapter_class.quote_column_name(primary_key)
  */
-export function quotedPrimaryKey(this: PrimaryKeyHost & { adapter?: any }): string {
+export function quotedPrimaryKey(this: PrimaryKeyHost & { adapter?: DatabaseAdapter }): string {
   const pk = this.primaryKey;
-  const adapter = this.adapter ? detectAdapterName(this.adapter) : undefined;
-  if (Array.isArray(pk)) return pk.map((k) => quoteIdentifier(k, adapter)).join(", ");
-  return quoteIdentifier(pk, adapter);
+  const quoter = this.adapter;
+  const fallback = (k: string) => `"${k.replace(/"/g, '""')}"`;
+  if (Array.isArray(pk))
+    return pk.map((k) => (quoter ? quoter.quoteColumnName(k) : fallback(k))).join(", ");
+  return quoter ? quoter.quoteColumnName(pk as string) : fallback(pk as string);
 }
 
 export function resetPrimaryKey(this: PrimaryKeyHost): void {

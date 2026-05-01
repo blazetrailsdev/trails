@@ -48,6 +48,32 @@ export class SqlJsAdapter implements DatabaseAdapter {
     this.db.run(`ROLLBACK TO SAVEPOINT "${name.replace(/"/g, '""')}"`);
   }
 
+  quoteIdentifier(name: string): string {
+    return `"${name.replace(/"/g, '""')}"`;
+  }
+  quoteColumnName(name: string): string {
+    return this.quoteIdentifier(name);
+  }
+  quoteTableName(name: string): string {
+    return name
+      .split(".")
+      .map((part) => this.quoteIdentifier(part))
+      .join(".");
+  }
+  quote(value: unknown): string {
+    if (value === null || value === undefined) return "NULL";
+    if (typeof value === "boolean") return value ? "1" : "0";
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) return `'${value}'`;
+      return String(value);
+    }
+    if (typeof value === "bigint") return String(value);
+    if (typeof value === "string") return `'${value.replace(/'/g, "''")}'`;
+    throw new TypeError(
+      `SqlJsAdapter.quote: unsupported type ${Object.prototype.toString.call(value)}`,
+    );
+  }
+
   async explain(sql: string): Promise<string> {
     const results = this.db.exec(`EXPLAIN QUERY PLAN ${sql}`);
     return results[0]?.values.map((r: any[]) => r.join("|")).join("\n") ?? "";
