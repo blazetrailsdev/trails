@@ -1,17 +1,15 @@
 # Quoting Refactor: Thread Adapter Through All Call Sites
 
-> **Status (2026-04-30):** Adapter classes (`AbstractAdapter`,
-> `PostgreSQLAdapter`, `AbstractMysqlAdapter`, `SQLite3Adapter`) all have
-> a `quote()` instance method, but ~14 call sites outside the adapter
-> layer still import the **standalone** `quote` / `quoteIdentifier` /
-> `quoteTableName` / `quoteDefaultExpression` from
-> `connection-adapters/abstract/quoting.ts` and pass an
-> `adapter?: "sqlite" | "postgres" | "mysql"` string to select dialect.
-> That string-dispatch path duplicates dialect logic and produces wrong
-> SQL when the adapter dispatch on the receiver would diverge from the
-> abstract default — most importantly identifier quoting (MySQL
-> backticks vs. abstract double-quotes) inside `sanitization.ts`,
-> `relation/query-methods.ts`, and the model-schema / migration paths.
+> **Status (2026-05-01):** Phases 0–3 merged
+> (#1051, #1058, #1065, #1068, #1070, #1072, #1075). The hot path
+> (sanitization, query-methods, database-statements) and abstract +
+> PostgreSQL schema layers all route quoting through the adapter's
+> `Quoting` interface. **Remaining:** Phase 4 (model-schema +
+> internal-metadata + primary-key + migration + alias-tracker +
+> association-scope) and Phase 5 (remove the
+> `adapter?: "sqlite" | "postgres" | "mysql"` enum from
+> `abstract/quoting.ts`). Until Phase 5 lands, the enum still exists and
+> the abstract module still has dialect branches.
 
 ## Problem
 
@@ -245,8 +243,159 @@ parameter and pass it as a string to the standalone functions. Replace
 
 **PR split:**
 
-- **PR 8** — model-schema + internal-metadata + primary-key. ~200 LOC.
-- **PR 9** — migration + association-scope + alias-tracker. ~150 LOC.
+### PR 8 — model-schema + internal-metadata + primary-key (~200 LOC)
+
+Common pattern across all three files: replace
+`quoteX(name, this._adapterName)` (or `adapterName` constructor arg)
+with `this._adapter.quoteX(name)`, holding a `Quoting` reference
+instead of a dialect string.
+
+#### Step-by-step
+
+1. **`packages/activerecord/src/internal-metadata.ts`** —
+   - Lines 23–116. The class currently holds `private _adapter` (the
+     adapter instance) and a derived
+     `private get _adapterName(): "sqlite" | "postgres" | "mysql"`
+     (line 45). The `_adapter` field already satisfies `Quoting`
+     after quoting-refactor PR 2.
+   - **Delete** the `_adapterName` getter and every callsite that
+     consumes it (lines 50, 85, 88, 116). Replace with direct calls
+     on `this._adapter`:
+     ```ts
+     // before
+     return quoteIdentifier(name, this._adapterName);
+     // after
+     return this._adapter.quoteIdentifier(name);
+     ```
+   - Line 85 (`_adapterName === "postgres" ? "TIMESTAMP" : "DATETIME"`)
+     is a SQL-type choice, **not quoting** — leave the conditional
+     logic but base it on a different adapter capability check
+     (`this._adapter instanceof PostgreSQLAdapter`, or a typed
+     `adapterCapabilities` getter). If unclear, keep as-is and
+     leave a TODO referencing this plan.
+   - Update the import at line 11 to drop `quoteIdentifier`/
+     `quoteTableName` from `abstract/quoting.js`.
+
+2. **`packages/activerecord/src/model-schema.ts`** —
+   Lines 13, 65, 70, 310, 316, 318–319, 325, 332, 336, 340, 374.
+   Class methods (`createTable`, `dropTable`, `quotedTableName`,
+   etc.) already have `this.adapter` (or `this.connection`) in
+   scope. For each callsite:
+   ```ts
+   // before
+   `${quoteIdentifier(pk, adapterName)} INTEGER PRIMARY KEY`
+   // after
+   `${this.adapter.quoteIdentifier(pk)} INTEGER PRIMARY KEY`
+   ```
+   The `detectAdapterName(this.adapter)` line at 305 disappears —
+   delete it and any branches that switched purely on the dialect
+   string for **identifier quoting**. Type-related branches
+   (lines 316–319, MySQL `BIGINT AUTO_INCREMENT` vs PG `SERIAL`)
+   remain but should switch on `instanceof` or a capability check.
+
+3. **`packages/activerecord/src/attribute-methods/primary-key.ts`** —
+   Lines 6, 116–117.
+   - Line 6: drop the `quoteX from "abstract/quoting.js"` import.
+   - Lines 116–117: helper currently takes `adapter: string`. Change
+     signature to `adapter: Quoting` (or rename the param). Callers
+     are class methods that already have `this.constructor.connection`.
+
+4. **Compliance grep within the changed files** —
+   `grep -nE 'from.*abstract/quoting' packages/activerecord/src/{model-schema,internal-metadata,attribute-methods/primary-key}.ts`
+   should report 0 matches after the change.
+
+#### Tests
+
+- Existing tests for `internal-metadata`, `model-schema`,
+  `primary-key` are sufficient if they pass — the SQL output is
+  identical. Add one new assertion per file confirming the
+  identifier comes from `this._adapter.quoteIdentifier`:
+  ```ts
+  it("uses adapter quoting for table names", () => {
+    const adapter = mockAdapterWith({ quoteIdentifier: () => "<<X>>" });
+    new InternalMetadata(adapter, ...).quotedTableName();
+    expect(...).toContain("<<X>>");
+  });
+  ```
+
+#### Verification
+
+- `pnpm --filter @blazetrails/activerecord test` green.
+- `pnpm parity:schema` unchanged (these files emit DDL; if a fixture
+  changes it's a bug, not expected drift).
+
+---
+
+### PR 9 — migration + association-scope + alias-tracker (~150 LOC)
+
+#### Step-by-step
+
+1. **`packages/activerecord/src/migration.ts`** —
+   Lines 14, 1290, 1298.
+   - Line 14: drop `quoteIdentifier`/`quoteTableName` import from
+     `abstract/quoting.js`.
+   - Lines 1290, 1298: migrations already hold `this.connection`
+     (the adapter). Replace `quoteIdentifier(x, dialect)` with
+     `this.connection.quoteIdentifier(x)`.
+
+2. **`packages/activerecord/src/associations/alias-tracker.ts`** —
+   Lines 8, 40.
+   - Line 8: drop the `quoteTableName` import.
+   - Line 40: the static `initialCountFor(name, tableJoins)` calls
+     `quoteTableName(name)` (no dialect, so it falls through to the
+     abstract default). The method is static, so threading
+     `this.connection` is not an option. Two viable shapes:
+
+     **A.** Make the method instance-bound: move `initialCountFor`
+     onto the `AliasTracker` instance and pass `this._quoter` (a
+     `Quoting` field added to the constructor) to the regex
+     builder.
+
+     **B.** Keep the method static but add a `quoter: Quoting`
+     parameter; callers (search `grep -rn "initialCountFor" packages/`)
+     pass their connection.
+
+     Recommendation: **A**. The constructor at line 17 already
+     accepts a `pool` indirectly via `create(pool, …)` at line 23;
+     thread `pool.withConnection().quoter` (or equivalent) into a
+     `_quoter` field. Confirms the regex anchor uses MySQL backticks
+     for MySQL connections.
+
+3. **`packages/activerecord/src/associations/association-scope.ts`** —
+   Lines 13, 500–517 (~5 sites).
+   - Line 13: drop the abstract-quoting import.
+   - The scope context already carries the connection; replace
+     each `quoteX(name, dialect)` with
+     `scopeContext.connection.quoteX(name)`.
+
+4. **Compliance grep** —
+   ```sh
+   grep -nE 'from.*abstract/quoting' \
+     packages/activerecord/src/migration.ts \
+     packages/activerecord/src/associations/alias-tracker.ts \
+     packages/activerecord/src/associations/association-scope.ts
+   ```
+   should report 0.
+
+#### Tests
+
+- Existing migration / association tests must remain green.
+- `alias-tracker.test.ts` — new test: build a tracker with a MySQL
+  quoter, call `initialCountFor("users", joins)` against a join
+  containing `` JOIN `users` ON … ``, assert count = 1. Same with
+  PG/SQLite (double-quoted identifiers).
+- Mirror Rails test names from
+  `scripts/api-compare/.rails-source/activerecord/test/cases/associations/alias_tracker_test.rb`.
+
+#### Verification
+
+- `pnpm --filter @blazetrails/activerecord test`.
+- `pnpm parity:query` green; MySQL fixtures involving aliased
+  joins should now match the regex correctly under backtick
+  quoting (this is the load-bearing behavior — was previously
+  silently passing because `quoteTableName(name)` defaulted to
+  double-quotes which never matched the backticked SQL produced
+  by the visitor).
 
 ## Phase 5 — Remove the `adapter?:` parameter (PR 10)
 
@@ -302,20 +451,21 @@ PR 1 ──► PR 2 ──► PR 3, 4, 5  (phase 2, parallel after PR 2)
                               └─► PR 10 (phase 5, after all above)
 ```
 
-| PR  | Phase | Scope                                            | Est. LOC |
-| --- | ----- | ------------------------------------------------ | -------- |
-| 1   | 0     | uniform `quoteIdentifier` across adapter modules | ~50      |
-| 2   | 1     | `Quoting` interface + adapter `implements`       | ~120     |
-| 3   | 2     | sanitization through `quoter`                    | ~150     |
-| 4   | 2     | query-methods + relation neutralize              | ~120     |
-| 5   | 2     | database-statements `this.quoteX`                | ~80      |
-| 6   | 3     | abstract schema-creation + schema-definitions    | ~250     |
-| 7   | 3     | abstract schema-statements + PG schema files     | ~200     |
-| 8   | 4     | model-schema + internal-metadata + primary-key   | ~200     |
-| 9   | 4     | migration + alias-tracker + association-scope    | ~150     |
-| 10  | 5     | remove `adapter?:` param                         | ~80      |
+| PR  | Phase | Scope                                            | Est. LOC | Status        |
+| --- | ----- | ------------------------------------------------ | -------- | ------------- |
+| 1   | 0     | uniform `quoteIdentifier` across adapter modules | ~50      | merged #1051  |
+| 2   | 1     | `Quoting` interface + adapter `implements`       | ~120     | merged #1058  |
+| 3   | 2     | sanitization through `quoter`                    | ~150     | merged #1065  |
+| 4   | 2     | query-methods + relation neutralize              | ~120     | merged #1068  |
+| 5   | 2     | database-statements `this.quoteX`                | ~80      | merged #1070  |
+| 6   | 3     | abstract schema-creation + schema-definitions    | ~250     | merged #1072  |
+| 7   | 3     | abstract schema-statements + PG schema files     | ~200     | merged #1075  |
+| 8   | 4     | model-schema + internal-metadata + primary-key   | ~200     | open          |
+| 9   | 4     | migration + alias-tracker + association-scope    | ~150     | open          |
+| 10  | 5     | remove `adapter?:` param                         | ~80      | open          |
 
-Total: 10 PRs, all under the 300-LOC ceiling.
+Total: 10 PRs, all under the 300-LOC ceiling. PRs 8/9 parallel; PR 10
+gates on both.
 
 ## Acceptance criteria
 
