@@ -13,11 +13,12 @@
  * Usage:
  *   npx tsx scripts/api-compare/compare.ts \
  *     [--package activerecord] [--missing] [--files] [--incomplete] \
- *     [--inheritance] [--json] [--public-only | --privates-only]
+ *     [--inheritance] [--public-only | --privates-only]
  *
  * The default reports the full surface (public + private). `--public-only`
  * drops Rails-private/internal methods on both sides for a contract-only
- * view; `--privates-only` is the inverse.
+ * view; `--privates-only` is the inverse. The JSON artifact is always
+ * written to output/api-comparison*.json regardless of flags.
  *
  * Each host class's expected method set is expanded with the instance
  * methods of every module it `include`s (and class methods of modules it
@@ -281,9 +282,13 @@ export function superclassesMatch(
 
 /**
  * Comparison bucket a method participates in.
- *   - "public":  default — public API only (drops `internal: true`)
- *   - "all":     default — public + private combined (full surface)
- *   - "private": `--privates-only` — private/protected only
+ *   - "all":     default — public + private combined (full surface).
+ *                Reported by `pnpm api:compare` with no flags.
+ *   - "public":  `--public-only` — drops `internal: true` on both sides
+ *                for a contract-only view (matches the historical
+ *                default's numbers).
+ *   - "private": `--privates-only` — Ruby `private`/`protected` and TS
+ *                `private`/`protected`/`#`-prefixed methods only.
  * Exported so compare.test.ts can pin the filter semantics.
  */
 export type CompareMode = "public" | "all" | "private";
@@ -454,10 +459,19 @@ function main() {
   //                    older coverage numbers and external API contracts)
   //   --privates-only→ private/protected only (Ruby `private`/`protected`,
   //                    TS `private`/`protected`, `#`-prefixed fields)
-  //   --privates     → kept as a backwards-compatible alias for the
-  //                    default (was the opt-in flag for "all" mode).
+  //   --privates     → no-op alias for the new default; pre-flip CI
+  //                    invocations and docs continue to work without
+  //                    edits. Combining --privates with --public-only or
+  //                    --privates-only is rejected as ambiguous.
   const privatesOnly = args.includes("--privates-only");
   const publicOnly = args.includes("--public-only");
+  const privatesAlias = args.includes("--privates");
+  if (privatesAlias && (privatesOnly || publicOnly)) {
+    console.error(
+      "Error: --privates (alias for the default full-surface mode) cannot be combined with --public-only or --privates-only.",
+    );
+    process.exit(1);
+  }
   const mode: CompareMode = privatesOnly ? "private" : publicOnly ? "public" : "all";
   const methodMatchesMode = (m: MethodInfo): boolean => methodInMode(m, mode);
 

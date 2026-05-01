@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Driver for `pnpm api:compare`. Forwards any extra args ("$@") to
 # compare.ts so flags like `--package`, `--public-only`, `--privates-only`,
-# `--files`, `--incomplete`, `--missing`, `--inheritance`, `--json` reach
-# the comparison step. The fetch / extract / manifest steps don't take
-# args, so they run unconditionally.
+# `--files`, `--incomplete`, `--missing`, `--inheritance` reach the
+# comparison step. The fetch / extract / manifest steps don't take args,
+# so they run unconditionally.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
