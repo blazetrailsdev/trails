@@ -63,10 +63,6 @@ class Mysql2StatementPool extends MysqlStatementPool {
  * Uses a connection pool internally for concurrent access.
  */
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
-  override get adapterName(): string {
-    return "Mysql2";
-  }
-
   override get active(): boolean {
     return this._driverPool != null;
   }

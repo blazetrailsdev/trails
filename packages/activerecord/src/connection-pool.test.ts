@@ -9,7 +9,7 @@ import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/s
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { AdapterName, DatabaseAdapter } from "./adapter.js";
 import { Result } from "./result.js";
 
 /**
@@ -40,8 +40,8 @@ function makePool(size: number = 5): ConnectionPool {
 }
 
 class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
-  override get adapterName() {
-    return "TestTransactionAdapter";
+  override get adapterName(): AdapterName {
+    return "sqlite";
   }
   readonly inTransaction = false;
 

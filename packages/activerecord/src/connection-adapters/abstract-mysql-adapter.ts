@@ -9,7 +9,7 @@
  */
 
 import { inspectExplainOption } from "../adapter.js";
-import type { ExplainOption } from "../adapter.js";
+import type { AdapterName, ExplainOption } from "../adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
 import {
@@ -158,8 +158,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    */
   protected _onStatementLimitChanged(_value: number): void {}
 
-  get adapterName(): string {
-    return "Mysql2";
+  get adapterName(): AdapterName {
+    return "mysql";
   }
 
   /**

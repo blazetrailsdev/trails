@@ -7,7 +7,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { NotImplementedError } from "./errors.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { detectAdapterName } from "./adapter-name.js";
 import { EnvironmentStorageError } from "./migration.js";
 import {
   Table,
@@ -77,7 +76,7 @@ export class InternalMetadata {
 
   async createTable(): Promise<void> {
     if (!this._enabled) return;
-    const tsType = detectAdapterName(this._adapter) === "postgres" ? "TIMESTAMP" : "DATETIME";
+    const tsType = this._adapter.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
     const q = (n: string) => this._q(n);
     await this._adapter.executeMutation(
       `CREATE TABLE IF NOT EXISTS ${this._adapter.quoteTableName(this.tableName)} (` +

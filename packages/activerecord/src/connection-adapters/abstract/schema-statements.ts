@@ -26,7 +26,6 @@ import {
   type ColumnOptions,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
-import { detectAdapterName } from "../../adapter-name.js";
 import { quote } from "./quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
@@ -42,8 +41,8 @@ export class SchemaStatements {
 
   constructor(protected readonly adapter: DatabaseAdapter & SchemaQuoter) {}
 
-  protected get adapterName(): "sqlite" | "postgres" | "mysql" {
-    return detectAdapterName(this.adapter);
+  protected get adapterName() {
+    return this.adapter.adapterName;
   }
 
   get schemaCreation(): SchemaCreation {

@@ -19,7 +19,7 @@ import {
 } from "@blazetrails/activemodel";
 export { Type } from "@blazetrails/activemodel";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
-import { detectAdapterName } from "./adapter-name.js";
+import type { AdapterName, DatabaseAdapter } from "./adapter.js";
 import { Date } from "./type/date.js";
 import { DateTime } from "./type/date-time.js";
 import { Time } from "./type/time.js";
@@ -55,7 +55,7 @@ export const Value = ValueType;
 
 let _registry = new AdapterSpecificRegistry();
 let _defaultValue: Type | undefined;
-let _currentAdapterResolver: (() => string) | undefined;
+let _currentAdapterResolver: (() => AdapterName) | undefined;
 
 _registry.register("big_integer", BigIntegerType, { override: false });
 _registry.register("binary", BinaryType, { override: false });
@@ -90,7 +90,7 @@ export function setRegistry(r: AdapterSpecificRegistry): void {
 }
 
 // Called by Base to wire the real connection adapter into type lookups.
-export function setCurrentAdapterResolver(resolver: () => string): void {
+export function setCurrentAdapterResolver(resolver: () => AdapterName): void {
   _currentAdapterResolver = resolver;
 }
 
@@ -118,14 +118,14 @@ export function defaultValue(): Type {
  *
  * Mirrors: ActiveRecord::Type.adapter_name_from
  */
-export function adapterNameFrom(model: { adapter?: unknown }): string {
-  return detectAdapterName(model.adapter as Parameters<typeof detectAdapterName>[0]);
+export function adapterNameFrom(model: { adapter?: unknown }): AdapterName {
+  return (model.adapter as DatabaseAdapter | null | undefined)?.adapterName ?? "sqlite";
 }
 
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.
 // When Base wires setCurrentAdapterResolver(), it reads the real connection adapter.
 /** @internal */
-export function currentAdapterName(getBase?: () => { adapter?: unknown }): string {
+export function currentAdapterName(getBase?: () => { adapter?: unknown }): AdapterName {
   if (getBase) return adapterNameFrom(getBase());
   return _currentAdapterResolver?.() ?? "sqlite";
 }

@@ -27,7 +27,12 @@ import {
   initializeTypeMap as staticInitializeTypeMap,
 } from "./postgresql/type-map-init.js";
 import { inspectExplainOption } from "../adapter.js";
-import type { DatabaseAdapter, ExplainOption, PostgreSQLAdapterOptions } from "../adapter.js";
+import type {
+  AdapterName,
+  DatabaseAdapter,
+  ExplainOption,
+  PostgreSQLAdapterOptions,
+} from "../adapter.js";
 import {
   ConnectionNotEstablished,
   DatabaseConnectionError,
@@ -85,8 +90,8 @@ import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
  * Uses a connection pool internally for concurrent access.
  */
 export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapter {
-  override get adapterName(): string {
-    return "PostgreSQL";
+  override get adapterName(): AdapterName {
+    return "postgres";
   }
 
   static columnNameMatcher(): RegExp {

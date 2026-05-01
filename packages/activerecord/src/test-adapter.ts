@@ -17,7 +17,7 @@
  */
 
 import { inspectExplainOption } from "./adapter.js";
-import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
+import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
 import { include } from "@blazetrails/activesupport";
 import { isWriteQuerySql } from "./connection-adapters/sql-classification.js";
@@ -383,8 +383,8 @@ interface SchemaAdapter {
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class SchemaAdapter implements DatabaseAdapter {
-  get adapterName(): string {
-    return this.inner?.adapterName ?? "SchemaAdapter";
+  get adapterName(): AdapterName {
+    return this.inner?.adapterName ?? "sqlite";
   }
 
   private inner: any;

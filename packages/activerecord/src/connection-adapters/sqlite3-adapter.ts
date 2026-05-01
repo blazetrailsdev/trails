@@ -1,6 +1,11 @@
 import Database from "better-sqlite3";
 import { Visitors } from "@blazetrails/arel";
-import type { DatabaseAdapter, ExplainOption, TrailsAdapterOptions } from "../adapter.js";
+import type {
+  AdapterName,
+  DatabaseAdapter,
+  ExplainOption,
+  TrailsAdapterOptions,
+} from "../adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -93,8 +98,8 @@ export class SQLiteDateTimeType extends ARDateTimeType {
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter
  */
 export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
-  override get adapterName(): string {
-    return "SQLite";
+  override get adapterName(): AdapterName {
+    return "sqlite";
   }
 
   static columnNameMatcher(): RegExp {

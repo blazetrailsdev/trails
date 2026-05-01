@@ -13,7 +13,7 @@ import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-defi
 /**
  * Return a proxy over `adapter` that hides the named methods so the
  * SchemaStatements fallback path inside `introspect*` runs. Keeping
- * the real adapter underneath means detectAdapterName + execute()
+ * the real adapter underneath means adapterName + execute()
  * work, so SchemaStatements' query dispatch can complete.
  */
 function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {

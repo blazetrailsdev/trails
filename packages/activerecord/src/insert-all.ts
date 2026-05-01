@@ -5,10 +5,10 @@ import { SerializeCastValue } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { quoteSqlValue } from "./base.js";
 import type { Relation } from "./relation.js";
-import { detectAdapterName } from "./adapter-name.js";
+import type { AdapterName } from "./adapter.js";
 
 type ModelClass = typeof Base;
-type AdapterDialect = "sqlite" | "postgres" | "mysql";
+type AdapterDialect = AdapterName;
 
 const TIMESTAMP_COLUMNS = ["created_at", "updated_at"] as const;
 const UPDATE_TIMESTAMP_COLUMNS = ["updated_at"] as const;
@@ -98,7 +98,7 @@ export class InsertAll {
 
   async execute(): Promise<number> {
     if (this.inserts.length === 0) return 0;
-    const dialect = detectAdapterName(this.connection);
+    const dialect = this.connection.adapterName;
     const builder = new Builder(this, dialect);
     return this.connection.executeMutation(builder.toSql());
   }

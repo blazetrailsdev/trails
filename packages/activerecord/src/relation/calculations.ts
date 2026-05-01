@@ -10,7 +10,7 @@
 
 import { Nodes, Table } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
-import { detectAdapterName } from "../adapter-name.js";
+import type { AdapterName } from "../adapter.js";
 
 /**
  * Qualify a GROUP BY column string as an Arel attribute node when it is a
@@ -39,6 +39,7 @@ interface CalculationRelation {
     primaryKey: string | string[];
     name: string;
     adapter: {
+      adapterName: AdapterName;
       execute(sql: string): Promise<Record<string, unknown>[]>;
       selectAll(sql: string, name?: string | null): Promise<import("../result.js").Result>;
     };
@@ -142,7 +143,7 @@ function buildAggNode(table: any, fn: AggFn, column: string, distinct: boolean):
  * Both are handled by BigIntegerType.cast without any SQL wrapping.
  */
 function needsBigintCast(rel: CalculationRelation): boolean {
-  return detectAdapterName(rel._modelClass.adapter as any) === "sqlite";
+  return rel._modelClass.adapter.adapterName === "sqlite";
 }
 
 /**

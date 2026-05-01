@@ -10,7 +10,6 @@ import {
   type Type,
 } from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
-import { detectAdapterName } from "./adapter-name.js";
 import { applyPendingEncryptions } from "./encryption.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
 
@@ -301,7 +300,7 @@ export function sqlTypeFor(typeName: string, adapterName?: string): string {
 export async function createTable(this: typeof Base): Promise<void> {
   const table = resolveTableName.call(this);
   const pks = Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey];
-  const adapterName = detectAdapterName(this.adapter);
+  const adapterName = this.adapter.adapterName;
   const isMysql = adapterName === "mysql";
   const isPg = adapterName === "postgres";
   const pkSet = new Set(pks);

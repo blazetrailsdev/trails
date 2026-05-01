@@ -10,7 +10,7 @@
  */
 
 import { Notifications } from "@blazetrails/activesupport";
-import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
+import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { Result } from "./result.js";
 // Import under the qualified TS name so the public `QueryCacheAdapter`
 // surface (e.g. `.cache: QueryCacheStore`) doesn't leak the generic
@@ -116,7 +116,7 @@ function cacheKey(sql: string, binds?: unknown[]): string {
  * - Locked queries (FOR UPDATE) bypass the cache
  */
 export class QueryCacheAdapter implements DatabaseAdapter {
-  get adapterName(): string {
+  get adapterName(): AdapterName {
     return this.inner.adapterName;
   }
 
