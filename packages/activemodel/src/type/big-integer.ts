@@ -31,4 +31,21 @@ export class BigIntegerType extends Type<bigint> {
   serializeCastValue(value: bigint | null): string | null {
     return value !== null ? value.toString() : null;
   }
+
+  /**
+   * Mirrors: ActiveModel::Type::BigInteger#max_value (big_integer.rb:27-29).
+   *   def max_value
+   *     ::Float::INFINITY
+   *   end
+   *
+   * Overrides Integer#max_value so range checks treat big-integer values
+   * as unbounded. trails' BigIntegerType uses native bigint so the
+   * Integer#range/ensure_in_range chain isn't inherited, but we expose
+   * the helper for parity and so subclasses see the same hook Rails does.
+   *
+   * @internal Rails-private helper.
+   */
+  protected maxValue(): number {
+    return Number.POSITIVE_INFINITY;
+  }
 }

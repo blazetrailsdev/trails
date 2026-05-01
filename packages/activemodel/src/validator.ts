@@ -106,11 +106,28 @@ export class EachValidator extends Validator {
 
   validate(record: AnyRecord): void {
     for (const attribute of this.attributes) {
-      const value = this.readAttributeForValidation(record, attribute);
+      let value = this.readAttributeForValidation(record, attribute);
       if (value == null && this.options.allowNil === true) continue;
       if (isBlank(value) && this.options.allowBlank === true) continue;
+      value = this.prepareValueForValidation(value, record, attribute);
       this.validateEach(record, attribute, value);
     }
+  }
+
+  /**
+   * Mirrors: ActiveModel::EachValidator#prepare_value_for_validation
+   * (validator.rb:170-172). Identity by default; subclasses (e.g.
+   * NumericalityValidator) override to coerce the value before
+   * validation. Wired through `validate` so subclass overrides fire.
+   *
+   * @internal Rails-private hook.
+   */
+  protected prepareValueForValidation(
+    value: unknown,
+    _record: AnyRecord,
+    _attribute: string,
+  ): unknown {
+    return value;
   }
 
   validateEach(_record: AnyRecord, _attribute: string, _value: unknown): void {

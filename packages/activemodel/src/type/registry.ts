@@ -15,7 +15,26 @@ import { TimeType } from "./time.js";
 import { ArrayType } from "./array.js";
 
 export class TypeRegistry {
-  private types = new Map<string, () => Type>();
+  /**
+   * Mirrors: ActiveModel::Type::Registry's `@registrations` ivar
+   * (registry.rb:6, exposed via `attr_reader :registrations`).
+   * Storage is a Map (trails uses Map; Rails uses a Hash) but the
+   * accessor name matches Rails so subclasses can override or read it.
+   *
+   * @internal Rails-private storage.
+   */
+  protected registrationsMap = new Map<string, () => Type>();
+
+  /**
+   * Mirrors: ActiveModel::Type::Registry#registrations (registry.rb:30,
+   * `attr_reader :registrations`). Private in Rails; protected here so
+   * subclasses can read or replace the registry.
+   *
+   * @internal Rails-private helper.
+   */
+  protected get registrations(): Map<string, () => Type> {
+    return this.registrationsMap;
+  }
 
   constructor() {
     this.register("string", () => new StringType());
@@ -36,11 +55,11 @@ export class TypeRegistry {
   }
 
   register(name: string, factory: () => Type): void {
-    this.types.set(name, factory);
+    this.registrations.set(name, factory);
   }
 
   lookup(name: string): Type {
-    const factory = this.types.get(name);
+    const factory = this.registrations.get(name);
     if (!factory) throw new Error(`Unknown type: ${name}`);
     return factory();
   }
