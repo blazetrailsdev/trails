@@ -14,7 +14,6 @@ import {
   assertSchemaAdapter,
 } from "./connection-adapters/abstract/schema-statements.js";
 import { detectAdapterName } from "./adapter-name.js";
-import { quoteIdentifier, quoteTableName } from "./connection-adapters/abstract/quoting.js";
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
@@ -1291,7 +1290,7 @@ export class MigrationContext {
     const ifNotExistsStr = options?.ifNotExists ? "IF NOT EXISTS " : "";
     const colsStr = cols
       .map((c) => {
-        let col = quoteIdentifier(c, an);
+        let col = this.adapter.quoteIdentifier(c);
         if (an !== "mysql") {
           const ord = options?.order?.[c];
           if (ord) col += ` ${ord.toUpperCase()}`;
@@ -1299,7 +1298,7 @@ export class MigrationContext {
         return col;
       })
       .join(", ");
-    let sql = `CREATE ${uniqueStr}INDEX ${ifNotExistsStr}${quoteIdentifier(indexName, an)} ON ${quoteTableName(table, an)} (${colsStr})`;
+    let sql = `CREATE ${uniqueStr}INDEX ${ifNotExistsStr}${this.adapter.quoteIdentifier(indexName)} ON ${this.adapter.quoteTableName(table)} (${colsStr})`;
     if (an !== "mysql" && options?.where) sql += ` WHERE ${options.where}`;
     await this.adapter.executeMutation(sql);
     if (!this._indexes.has(table)) this._indexes.set(table, []);
