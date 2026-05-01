@@ -14,6 +14,7 @@ export type { LoadedRelation } from "./relation.js";
 export { QueryAttribute } from "./relation/query-attribute.js";
 export { InsertAll, Builder as InsertAllBuilder } from "./insert-all.js";
 export type { InsertAllOptions } from "./insert-all.js";
+export { adapterNameFromConfig } from "./adapter.js";
 export type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
 export { Migration, MigrationContext } from "./migration.js";
 export {

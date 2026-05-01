@@ -98,6 +98,20 @@ export function inspectExplainOption(o: unknown): string {
 export type AdapterName = "sqlite" | "postgres" | "mysql";
 
 /**
+ * Map a database.yml `adapter:` config string (e.g. `"postgresql"`, `"mysql2"`,
+ * `"sqlite3"`) to the normalized `AdapterName` family.
+ *
+ * Mirrors: the adapter-family branching Rails applies throughout ActiveRecord
+ * when it checks `adapter_name` against known families.
+ */
+export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
+  const a = configAdapter?.toLowerCase() ?? "";
+  if (a.includes("postgres") || a === "pg") return "postgres";
+  if (a.includes("mysql") || a.includes("maria") || a.includes("trilogy")) return "mysql";
+  return "sqlite";
+}
+
+/**
  * Database adapter interface — pluggable backends.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter
