@@ -3,8 +3,6 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey
  */
-import { quoteIdentifier } from "../connection-adapters/abstract/quoting.js";
-import { detectAdapterName } from "../adapter-name.js";
 import { underscore } from "@blazetrails/activesupport";
 import { dangerousAttributeMethods } from "../attribute-methods.js";
 
@@ -112,9 +110,9 @@ export function isDangerousAttributeMethod(_this: PrimaryKeyHost, name: string):
  */
 export function quotedPrimaryKey(this: PrimaryKeyHost & { adapter?: any }): string {
   const pk = this.primaryKey;
-  const adapter = this.adapter ? detectAdapterName(this.adapter) : undefined;
-  if (Array.isArray(pk)) return pk.map((k) => quoteIdentifier(k, adapter)).join(", ");
-  return quoteIdentifier(pk, adapter);
+  const quoter = this.adapter;
+  if (Array.isArray(pk)) return pk.map((k) => quoter?.quoteIdentifier(k) ?? `"${k}"`).join(", ");
+  return quoter?.quoteIdentifier(pk) ?? `"${pk}"`;
 }
 
 export function resetPrimaryKey(this: PrimaryKeyHost): void {
