@@ -274,7 +274,9 @@ migration matrix entry needed.
        this.left = left;
        this.right = right;
      }
-     accept<T>(visitor: NodeVisitor<T>): T { return visitor.visit(this); }
+     accept<T>(visitor: NodeVisitor<T>): T {
+       return visitor.visit(this);
+     }
    }
 
    // after
@@ -498,7 +500,6 @@ implementation already emits them — no per-visitor override needed.
 3. **Activerecord visitor construction sites** — every place
    that instantiates an arel visitor must pass the connection
    (which already `implements Quoting` per quoting-refactor PR 2):
-
    - `packages/activerecord/src/connection-adapters/abstract-adapter.ts:731`
      `return new Visitors.ToSql();` → `return new Visitors.ToSql(this);`
    - `packages/activerecord/src/connection-adapters/sqlite3-adapter.ts:127`
@@ -617,7 +618,7 @@ subset of Rails.
      (constructor calls — first arg is the SQL string; rename param
      locally if helpful but the positional API doesn't break).
    - `packages/arel/src/update-manager.ts:60` — `instanceof
-     BoundSqlLiteral` branch; no field access, no change needed.
+BoundSqlLiteral` branch; no field access, no change needed.
    - `packages/arel/src/visitors/to-sql.ts:1006` — old visitor reads
      `node.parts`. Replace per step 3.
    - `packages/arel/src/visitors/dot.ts:598` — registered as
@@ -688,7 +689,7 @@ subset of Rails.
 
 4. **`packages/arel/src/errors.ts`** — add or align `BindError`
    class with Rails-shaped message strings (`wrong number of bind
-   variables …` and `missing value for :<name> …`). Existing
+variables …` and `missing value for :<name> …`). Existing
    `Error("Cannot mix positional and named bind parameters")` cases
    in `validate()` retain trails phrasing — Rails doesn't have an
    exact analog there.
@@ -739,11 +740,11 @@ it gains) + ~120 LOC test.
 Pre-release: each PR migrates all in-tree call sites atomically. No
 deprecated aliases, no shims.
 
-| PR  | Surface                                        | Notes                |
-| --- | ---------------------------------------------- | -------------------- |
-| 24  | `Union/Intersect/Except/Join` extends `Binary` | API gain only        |
-| 25b | Visitors accept `Quoting` quoter (MySQL backticks fall out) | curate snapshot diff |
-| 26  | `BoundSqlLiteral` node fields (`parts` → Rails shape) | atomic in-tree migrate |
+| PR  | Surface                                                     | Notes                  |
+| --- | ----------------------------------------------------------- | ---------------------- |
+| 24  | `Union/Intersect/Except/Join` extends `Binary`              | API gain only          |
+| 25b | Visitors accept `Quoting` quoter (MySQL backticks fall out) | curate snapshot diff   |
+| 26  | `BoundSqlLiteral` node fields (`parts` → Rails shape)       | atomic in-tree migrate |
 
 ---
 

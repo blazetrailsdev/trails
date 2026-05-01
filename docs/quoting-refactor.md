@@ -281,12 +281,14 @@ instead of a dialect string.
    Class methods (`createTable`, `dropTable`, `quotedTableName`,
    etc.) already have `this.adapter` (or `this.connection`) in
    scope. For each callsite:
+
    ```ts
    // before
    `${quoteIdentifier(pk, adapterName)} INTEGER PRIMARY KEY`
    // after
-   `${this.adapter.quoteIdentifier(pk)} INTEGER PRIMARY KEY`
+   `${this.adapter.quoteIdentifier(pk)} INTEGER PRIMARY KEY`;
    ```
+
    The `detectAdapterName(this.adapter)` line at 305 disappears —
    delete it and any branches that switched purely on the dialect
    string for **identifier quoting**. Type-related branches
@@ -382,7 +384,7 @@ instead of a dialect string.
 - Existing migration / association tests must remain green.
 - `alias-tracker.test.ts` — new test: build a tracker with a MySQL
   quoter, call `initialCountFor("users", joins)` against a join
-  containing `` JOIN `users` ON … ``, assert count = 1. Same with
+  containing ``JOIN `users` ON …``, assert count = 1. Same with
   PG/SQLite (double-quoted identifiers).
 - Mirror Rails test names from
   `scripts/api-compare/.rails-source/activerecord/test/cases/associations/alias_tracker_test.rb`.
@@ -451,18 +453,18 @@ PR 1 ──► PR 2 ──► PR 3, 4, 5  (phase 2, parallel after PR 2)
                               └─► PR 10 (phase 5, after all above)
 ```
 
-| PR  | Phase | Scope                                            | Est. LOC | Status        |
-| --- | ----- | ------------------------------------------------ | -------- | ------------- |
-| 1   | 0     | uniform `quoteIdentifier` across adapter modules | ~50      | merged #1051  |
-| 2   | 1     | `Quoting` interface + adapter `implements`       | ~120     | merged #1058  |
-| 3   | 2     | sanitization through `quoter`                    | ~150     | merged #1065  |
-| 4   | 2     | query-methods + relation neutralize              | ~120     | merged #1068  |
-| 5   | 2     | database-statements `this.quoteX`                | ~80      | merged #1070  |
-| 6   | 3     | abstract schema-creation + schema-definitions    | ~250     | merged #1072  |
-| 7   | 3     | abstract schema-statements + PG schema files     | ~200     | merged #1075  |
-| 8   | 4     | model-schema + internal-metadata + primary-key   | ~200     | open          |
-| 9   | 4     | migration + alias-tracker + association-scope    | ~150     | open          |
-| 10  | 5     | remove `adapter?:` param                         | ~80      | open          |
+| PR  | Phase | Scope                                            | Est. LOC | Status       |
+| --- | ----- | ------------------------------------------------ | -------- | ------------ |
+| 1   | 0     | uniform `quoteIdentifier` across adapter modules | ~50      | merged #1051 |
+| 2   | 1     | `Quoting` interface + adapter `implements`       | ~120     | merged #1058 |
+| 3   | 2     | sanitization through `quoter`                    | ~150     | merged #1065 |
+| 4   | 2     | query-methods + relation neutralize              | ~120     | merged #1068 |
+| 5   | 2     | database-statements `this.quoteX`                | ~80      | merged #1070 |
+| 6   | 3     | abstract schema-creation + schema-definitions    | ~250     | merged #1072 |
+| 7   | 3     | abstract schema-statements + PG schema files     | ~200     | merged #1075 |
+| 8   | 4     | model-schema + internal-metadata + primary-key   | ~200     | open         |
+| 9   | 4     | migration + alias-tracker + association-scope    | ~150     | open         |
+| 10  | 5     | remove `adapter?:` param                         | ~80      | open         |
 
 Total: 10 PRs, all under the 300-LOC ceiling. PRs 8/9 parallel; PR 10
 gates on both.
