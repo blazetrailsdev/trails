@@ -5,7 +5,7 @@ import { Composite } from "../collectors/composite.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
-import { UnsupportedVisitError, NotImplementedError } from "../errors.js";
+import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors.js";
 
 /**
  * Resolve a bind's database value. QueryAttribute exposes
@@ -1005,10 +1005,53 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
   private visitArelNodesBoundSqlLiteral(node: Nodes.BoundSqlLiteral): SQLString {
     this.collector.retryable = false;
-    for (const part of node.parts) {
-      this.visit(part);
+    const sql = node.sqlWithPlaceholders;
+
+    if (node.positionalBinds.length > 0) {
+      const segments = sql.split("?");
+      const expected = segments.length - 1;
+      if (node.positionalBinds.length !== expected) {
+        throw new BindError(
+          `wrong number of bind variables (${node.positionalBinds.length} for ${expected})`,
+          sql,
+        );
+      }
+      for (let i = 0; i < segments.length; i++) {
+        if (segments[i]) this.collector.append(segments[i]);
+        if (i < node.positionalBinds.length) this.visitBindValue(node.positionalBinds[i]);
+      }
+    } else if (Object.keys(node.namedBinds).length > 0) {
+      const re = /:(?<!::)([a-zA-Z]\w*)|([^:]+|.)/gy;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(sql)) !== null) {
+        if (m[2] !== undefined) {
+          this.collector.append(m[2]);
+        } else {
+          const name = m[1];
+          if (!(name in node.namedBinds)) {
+            throw new BindError(`missing value for :${name}`, sql);
+          }
+          this.visitBindValue(node.namedBinds[name]);
+        }
+      }
+    } else {
+      this.collector.append(sql);
     }
+
     return this.collector;
+  }
+
+  private visitBindValue(value: unknown): void {
+    if (value instanceof Node) {
+      this.visit(value);
+    } else if (Array.isArray(value)) {
+      value.forEach((v, i) => {
+        if (i > 0) this.collector.append(", ");
+        this.visitBindValue(v);
+      });
+    } else {
+      this.collector.append(this.quote(value));
+    }
   }
 
   // -- Concat --

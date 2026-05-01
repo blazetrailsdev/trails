@@ -400,12 +400,11 @@ describe("the to_sql visitor", () => {
     });
 
     it("requires all named bind params to be supplied", () => {
-      expect(() => new Nodes.BoundSqlLiteral("id = :id", [], {})).toThrow();
+      expect(() => new Nodes.BoundSqlLiteral("id IN (:foo, :bar)", [], { foo: 1 })).toThrow();
     });
 
     it("requires positional binds to match the placeholders", () => {
-      const node = new Nodes.BoundSqlLiteral("id = ? AND name = ?", [1]);
-      expect(() => new Visitors.ToSql().compile(node)).toThrow();
+      expect(() => new Nodes.BoundSqlLiteral("id = ? AND name = ?", [1])).toThrow();
     });
   });
 
