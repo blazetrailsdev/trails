@@ -4,18 +4,25 @@ import {
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
 } from "./quoting.js";
+import {
+  quoteIdentifier as mysqlQuoteIdentifier,
+  quoteTableName as mysqlQuoteTableName,
+} from "../mysql/quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { singularize } from "@blazetrails/activesupport";
 
-/**
- * Build a fallback quoter from the dialect-name string for the legacy
- * code path where construction sites haven't yet been migrated to pass
- * an adapter. Removed in PR 10. @internal
- */
+/** @internal */
 function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
+  if (name === "mysql") {
+    return {
+      quoteIdentifier: (n) => mysqlQuoteIdentifier(n),
+      quoteTableName: (n) => mysqlQuoteTableName(n),
+      quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
+    };
+  }
   return {
-    quoteIdentifier: (n) => abstractQuoteIdentifier(n, name),
-    quoteTableName: (n) => abstractQuoteTableName(n, name),
+    quoteIdentifier: (n) => abstractQuoteIdentifier(n),
+    quoteTableName: (n) => abstractQuoteTableName(n),
     quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
   };
 }

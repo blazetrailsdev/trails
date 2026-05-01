@@ -40,10 +40,11 @@ export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 export class SchemaStatements {
   private _schemaCreation?: SchemaCreation;
 
-  constructor(
-    protected adapter: DatabaseAdapter & SchemaQuoter,
-    protected adapterName: "sqlite" | "postgres" | "mysql" = detectAdapterName(adapter),
-  ) {}
+  constructor(protected readonly adapter: DatabaseAdapter & SchemaQuoter) {}
+
+  protected get adapterName(): "sqlite" | "postgres" | "mysql" {
+    return detectAdapterName(this.adapter);
+  }
 
   get schemaCreation(): SchemaCreation {
     if (!this._schemaCreation) {
@@ -99,7 +100,11 @@ export class SchemaStatements {
       return;
     }
 
-    const td = new TableDefinition(name, { ...options, adapterName: this.adapterName });
+    const td = new TableDefinition(name, {
+      ...options,
+      adapterName: this.adapterName,
+      adapter: this.adapter,
+    });
     if (definer) definer(td);
 
     await this.adapter.executeMutation(td.toSql());
@@ -890,6 +895,7 @@ export class SchemaStatements {
     const td = new TableDefinition(tableName, {
       id: hasCustomPk ? false : options.id,
       adapterName: this.adapterName,
+      adapter: this.adapter,
     });
     if (hasCustomPk) {
       const pkType = (typeof options.id === "string" ? options.id : "primary_key") as ColumnType;
