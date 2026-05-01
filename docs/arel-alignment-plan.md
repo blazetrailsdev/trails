@@ -14,10 +14,10 @@ PRs marked **independent** can be parallelized. Trails files are paths under
 
 PRs 1–5 merged (see Completed below).
 
-| Wave | PRs          | Notes                               |
-| ---- | ------------ | ----------------------------------- |
-| 3    | 23b, 23c, 24 | breaking-change wave; ship serially |
-| 4    | 10, 25, 26   | dialect / cross-package work        |
+| Wave | PRs        | Notes                               |
+| ---- | ---------- | ----------------------------------- |
+| 3    | 24         | breaking-change wave; ship serially |
+| 4    | 10, 25, 26 | dialect / cross-package work        |
 
 Waves 1 and 2 are complete. Wave-3 requires sequential merge because
 each one moves AR-visible API.
@@ -66,7 +66,9 @@ api:compare` is a chained script — args don't reach `compare.ts`.)
 - PR 8 — `UpdateManager#set` wraps columns in `UnqualifiedColumn` — merged in #1062.
 - PR 7 — `SelectManager#limit` / `#offset` getters return inner expr — merged in #1063.
 - PR 16 — `DeleteStatement` / `InsertStatement` visitor shape — merged in #1066.
-- PR 23 — Visitor leaf alignment (Lock + outer-join guards slice) — merged in #1069. Casted/Quoted collapse + Date-bind removal deferred to PR 23b; In-array wrap + Table-name-Node + ESCAPE deferred to PR 23c.
+- PR 23 — Visitor leaf alignment (Lock + outer-join guards slice) — merged in #1069.
+- PR 23b — Casted/Quoted visitor collapse + Date-bind branch removal — merged in #1074.
+- PR 23c — In-array wrap, Table-name-Node, PostgreSQL ESCAPE — merged in #1078.
 
 ---
 
@@ -117,62 +119,6 @@ Rails (`@klass.attribute_aliases`).
 ### Size
 
 ~60 LOC src + ~80 LOC test.
-
----
-
-## PR 23b — Casted/Quoted collapse + Date-bind removal
-
-### Changes
-
-- `visitors/to-sql.ts`:
-  - `visitArelNodesCasted` / `visitQuoted`: collapse to a single shared
-    visitor (both call `quote(o.valueForDatabase())`).
-  - Drop the `_extractBinds` Date branch in `visitQuoted`. Audit
-    `PostgreSQLWithBinds.visitArelNodesCasted` and `addDateBind` overrides
-    — base ToSql no longer special-cases Date binds, so subclasses must
-    cover any extractBinds Date paths AR relies on.
-
-### Risk
-
-- High. The Date bind-branch removal changes how AR's
-  `where(created_at: date)` renders through extractBinds. Run
-  `pnpm parity:query` on date fixtures and confirm unchanged before
-  merge.
-
-### Verification
-
-- `pnpm parity:query` unchanged on date fixtures.
-- `pnpm parity:schema` unchanged.
-
-### Size
-
-~40 LOC src + ~60 LOC test.
-
----
-
-## PR 23c — In-array wrap, Table-name-Node, PostgreSQL ESCAPE
-
-### Changes
-
-- `visitors/to-sql.ts`:
-  - `visitArelTable`: branch on `node.name instanceof Node` → visit it.
-  - `prepareUpdateStatement` / `prepareDeleteStatement`: wrap subselect
-    as `new In(columns, [subselect])` (array, not bare).
-- `visitors/postgresql.ts`: `ESCAPE` form — when `escape instanceof Node`,
-  visit it; else hard-quote.
-
-### Tests
-
-- One test per change in `visitors/to-sql.test.ts` /
-  `visitors/postgresql.test.ts`.
-
-### Verification
-
-- `pnpm parity:query` unchanged.
-
-### Size
-
-~50 LOC src + ~80 LOC test.
 
 ---
 
