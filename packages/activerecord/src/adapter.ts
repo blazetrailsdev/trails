@@ -105,10 +105,19 @@ export type AdapterName = "sqlite" | "postgres" | "mysql";
  * when it checks `adapter_name` against known families.
  */
 export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
-  const a = configAdapter?.toLowerCase() ?? "";
-  if (a.includes("postgres") || a === "pg") return "postgres";
-  if (a.includes("mysql") || a.includes("maria") || a.includes("trilogy")) return "mysql";
-  return "sqlite";
+  switch (configAdapter?.toLowerCase()) {
+    case "postgresql":
+    case "postgres":
+    case "pg":
+      return "postgres";
+    case "mysql":
+    case "mysql2":
+    case "trilogy":
+    case "mariadb":
+      return "mysql";
+    default:
+      return "sqlite";
+  }
 }
 
 /**
