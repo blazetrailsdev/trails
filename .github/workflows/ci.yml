@@ -255,7 +255,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest run --no-file-parallelism packages/activerecord
+      - run: pnpm vitest run packages/activerecord
 
   postgres-tests:
     name: PostgreSQL Tests
@@ -286,9 +286,15 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest run --no-file-parallelism packages/activerecord
+      - name: Create parallel test databases
+        run: |
+          for i in 2 3 4; do
+            PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE rails_js_test_$i;"
+          done
+      - run: pnpm vitest run packages/activerecord
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
+          AR_DB_FORKS: 4
 
   mariadb-tests:
     name: MariaDB Tests
@@ -318,12 +324,16 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Set MariaDB to case-sensitive collation
+      - name: Create parallel test databases
         run: |
+          for i in 2 3 4; do
+            mysql -h 127.0.0.1 -u root -e "CREATE DATABASE rails_js_test_$i CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
+          done
           mysql -h 127.0.0.1 -u root -e "ALTER DATABASE rails_js_test CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
-      - run: pnpm vitest run --no-file-parallelism packages/activerecord
+      - run: pnpm vitest run packages/activerecord
         env:
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
+          AR_DB_FORKS: 4
 
   website:
     name: Website
