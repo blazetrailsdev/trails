@@ -12,21 +12,29 @@ set -euo pipefail
 
 AR_SRC="packages/activerecord/src"
 
-# Files that directly reference DB setup utilities
-DIRECT_DB=$(grep -rL \
+# Candidate DB-free files: those that do NOT reference DB setup utilities
+# (grep -rL = files that do NOT match the pattern)
+UNIT_CANDIDATES=$(grep -rL \
   "createTestAdapter\|test-adapter\|createTestTable\|withDatabase\|PG_TEST_URL\|MYSQL_TEST_URL" \
   "$AR_SRC" --include="*.test.ts" | sort)
 
-# Among those, exclude any that open a real adapter connection themselves
-DIRECT_ADAPTER=$(grep -rl \
-  "SQLite3Adapter\|PostgreSQLAdapter\|Mysql2Adapter\|new.*Adapter\b\|\.execute\b\|\.exec\b" \
-  $DIRECT_DB 2>/dev/null | sort -u)
+# Among the candidates, exclude any that open a real adapter connection directly.
+# Guard against empty input (grep reads stdin when given no files) and treat
+# no-match as an empty list rather than a script failure.
+if [ -n "$UNIT_CANDIDATES" ]; then
+  DIRECT_ADAPTER=$(echo "$UNIT_CANDIDATES" | xargs grep -rl \
+    "SQLite3Adapter\|PostgreSQLAdapter\|Mysql2Adapter\|new.*Adapter\b\|\.execute\b\|\.exec\b" \
+    2>/dev/null | sort -u || true)
+else
+  DIRECT_ADAPTER=""
+fi
 
-# Also exclude encryption tests that use DB via test-helpers.ts intermediary
+# Also exclude encryption tests that use DB via test-helpers.ts intermediary.
+# || true so a no-match doesn't abort the script.
 ENCRYPTION_DB=$(grep -rl \
   "freshAdapter\|makeEncrypted\|makeFreshModel\|makeKeyProvider" \
-  "$AR_SRC/encryption/" 2>/dev/null | sort -u)
+  "$AR_SRC/encryption/" 2>/dev/null | sort -u || true)
 
 comm -23 \
-  <(echo "$DIRECT_DB") \
+  <(echo "$UNIT_CANDIDATES") \
   <(printf '%s\n' $DIRECT_ADAPTER $ENCRYPTION_DB | sort -u)

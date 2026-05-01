@@ -158,10 +158,10 @@ const AR_UNIT_FILES = [
   "packages/activerecord/src/yaml-serialization.test.ts",
 ];
 
-// When a real DB is present each worker gets its own database (rails_js_test_N),
-// so we can run ar-db files in parallel. SQLite uses :memory: which is already
-// isolated per fork; its parallelism is governed by the default CPU-count pool.
-const AR_DB_FORKS = process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 4 : undefined;
+// Number of parallel forks for ar-db. Set AR_DB_FORKS=4 in CI after provisioning
+// rails_js_test_2/3/4 alongside the base database. Leave unset (or 0/1) for local
+// runs where only a single database exists — workers fall back to the base URL.
+const AR_DB_FORKS = parseInt(process.env.AR_DB_FORKS ?? "0", 10) || undefined;
 
 const SHARED_EXCLUDE = [
   "**/node_modules/**",

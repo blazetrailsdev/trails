@@ -294,6 +294,7 @@ jobs:
       - run: pnpm vitest run packages/activerecord
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
+          AR_DB_FORKS: 4
 
   mariadb-tests:
     name: MariaDB Tests
@@ -332,6 +333,7 @@ jobs:
       - run: pnpm vitest run packages/activerecord
         env:
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
+          AR_DB_FORKS: 4
 
   website:
     name: Website
