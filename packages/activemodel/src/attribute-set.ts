@@ -42,7 +42,7 @@ export class AttributeSet {
    * Get the Attribute instance for a name.
    */
   getAttribute(name: string): Attribute {
-    return this.attributes.get(name) ?? Attribute.null(name);
+    return this.attributes.get(name) ?? this.defaultAttribute(name);
   }
 
   /**
@@ -52,6 +52,11 @@ export class AttributeSet {
     const attr = this.attributes.get(name);
     if (!attr) return undefined;
     return attr.value;
+  }
+
+  /** @internal */
+  protected defaultAttribute(name: string): Attribute {
+    return Attribute.null(name);
   }
 
   set(name: string, attrOrValue: Attribute | unknown): void {

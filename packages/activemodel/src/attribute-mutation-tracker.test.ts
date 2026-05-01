@@ -73,6 +73,17 @@ describe("AttributeMutationTracker", () => {
     expect(tracker.isChanged("name", { to: "Charlie" })).toBe(false);
   });
 
+  it("isChanged type-casts from/to candidates against the attribute type", () => {
+    const set = buildSet({ age: 30 });
+    const tracker = new AttributeMutationTracker(set);
+
+    set.writeFromUser("age", 31);
+    // String "30" / "31" cast to integers should match the typed values.
+    expect(tracker.isChanged("age", { from: "30", to: "31" })).toBe(true);
+    expect(tracker.isChanged("age", { from: "29" })).toBe(false);
+    expect(tracker.isChanged("age", { to: "32" })).toBe(false);
+  });
+
   it("changedValues returns original values for changed attrs", () => {
     const set = buildSet({ name: "Alice", age: 30 });
     const tracker = new AttributeMutationTracker(set);
