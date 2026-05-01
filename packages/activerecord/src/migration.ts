@@ -1068,7 +1068,6 @@ export class MigrationContext {
     if (options?.ifNotExists && this.tableExists(name)) {
       return;
     }
-    assertSchemaAdapter(this.adapter);
     const td = new TableDefinition(name, {
       id: options?.id,
       adapterName: this._adapterName,

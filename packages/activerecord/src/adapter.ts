@@ -233,6 +233,13 @@ export interface DatabaseAdapter {
   quoteColumnName(name: string): string;
 
   /**
+   * Quote a column default expression for use in DDL.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#quote_default_expression
+   */
+  quoteDefaultExpression(value: unknown): string;
+
+  /**
    * Cast a value to the primitive form drivers expect for binds.
    * Returns an **unquoted** primitive suitable for passing as a bind
    * value — distinct from `quote()`, which returns a SQL literal

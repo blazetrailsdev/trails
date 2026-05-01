@@ -41,7 +41,7 @@ export class SchemaStatements {
   private _schemaCreation?: SchemaCreation;
 
   constructor(
-    protected adapter: DatabaseAdapter & SchemaQuoter,
+    readonly adapter: DatabaseAdapter & SchemaQuoter,
     protected adapterName: "sqlite" | "postgres" | "mysql" = detectAdapterName(adapter),
   ) {}
 
