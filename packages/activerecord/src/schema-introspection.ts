@@ -14,7 +14,10 @@
  */
 
 import type { DatabaseAdapter } from "./adapter.js";
-import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
+import {
+  SchemaStatements,
+  assertSchemaAdapter,
+} from "./connection-adapters/abstract/schema-statements.js";
 import type { Column } from "./connection-adapters/column.js";
 import type { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 
@@ -64,6 +67,7 @@ function schemaStatementsFor(adapter: DatabaseAdapter): SchemaStatements {
   const key = adapter as unknown as object;
   let s = SCHEMA_STATEMENTS.get(key);
   if (!s) {
+    assertSchemaAdapter(adapter);
     s = new SchemaStatements(adapter);
     SCHEMA_STATEMENTS.set(key, s);
   }

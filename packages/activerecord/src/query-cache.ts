@@ -343,6 +343,39 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     );
   }
 
+  quoteIdentifier(name: string): string {
+    const inner = this.inner as { quoteIdentifier?: (n: string) => string };
+    if (typeof inner.quoteIdentifier === "function") return inner.quoteIdentifier(name);
+    throw new Error(
+      `QueryCacheAdapter.quoteIdentifier: wrapped ${this.inner.adapterName} does not implement quoteIdentifier()`,
+    );
+  }
+
+  quoteTableName(name: string): string {
+    const inner = this.inner as { quoteTableName?: (n: string) => string };
+    if (typeof inner.quoteTableName === "function") return inner.quoteTableName(name);
+    throw new Error(
+      `QueryCacheAdapter.quoteTableName: wrapped ${this.inner.adapterName} does not implement quoteTableName()`,
+    );
+  }
+
+  quoteColumnName(name: string): string {
+    const inner = this.inner as { quoteColumnName?: (n: string) => string };
+    if (typeof inner.quoteColumnName === "function") return inner.quoteColumnName(name);
+    throw new Error(
+      `QueryCacheAdapter.quoteColumnName: wrapped ${this.inner.adapterName} does not implement quoteColumnName()`,
+    );
+  }
+
+  quoteDefaultExpression(value: unknown): string {
+    const inner = this.inner as { quoteDefaultExpression?: (v: unknown) => string };
+    if (typeof inner.quoteDefaultExpression === "function")
+      return inner.quoteDefaultExpression(value);
+    throw new Error(
+      `QueryCacheAdapter.quoteDefaultExpression: wrapped ${this.inner.adapterName} does not implement quoteDefaultExpression()`,
+    );
+  }
+
   // --- DatabaseStatements ---
   // Read methods go through this.execute() to leverage the query cache.
   // Write methods go through this.executeMutation() to clear the cache.

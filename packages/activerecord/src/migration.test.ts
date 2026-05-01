@@ -8,6 +8,7 @@ import { Base, MigrationContext, MigrationRunner, Migrator } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
+import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration } from "./migration.js";
 import { Logger } from "@blazetrails/activesupport";
@@ -2027,6 +2028,10 @@ function mockMigration(): { migration: Migration; sql: string[] } {
     createSavepoint: async () => {},
     releaseSavepoint: async () => {},
     rollbackToSavepoint: async () => {},
+    quoteIdentifier: (n: string) => `"${n.replace(/"/g, '""')}"`,
+    quoteTableName: (n: string) => `"${n.replace(/"/g, '""')}"`,
+    quoteColumnName: (n: string) => `"${n.replace(/"/g, '""')}"`,
+    quoteDefaultExpression: quoteDefaultExpression,
   };
   return { migration, sql };
 }

@@ -20,7 +20,7 @@ import type {
   ColumnType,
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
-import { quoteIdentifier } from "../abstract/quoting.js";
+import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PostgreSQL {
@@ -176,6 +176,7 @@ export class TableDefinition extends AbstractTableDefinition {
       temporary?: boolean;
       ifNotExists?: boolean;
       as?: string;
+      adapter?: SchemaQuoter;
     } = {},
   ) {
     super(tableName, { ...options, adapterName: "postgres" });
@@ -326,7 +327,7 @@ export class TableDefinition extends AbstractTableDefinition {
 
   private exclusionConstraintSql(ec: ExclusionConstraintDefinition): string {
     const parts: string[] = [];
-    if (ec.name) parts.push("CONSTRAINT", quoteIdentifier(ec.name, "postgres"));
+    if (ec.name) parts.push("CONSTRAINT", this._adapter.quoteIdentifier(ec.name));
     parts.push("EXCLUDE");
     if (ec.using) parts.push(`USING ${ec.using}`);
     parts.push(`(${ec.expression})`);
@@ -338,13 +339,13 @@ export class TableDefinition extends AbstractTableDefinition {
   private uniqueConstraintSql(uc: UniqueConstraintDefinition): string {
     const columns = Array.isArray(uc.column) ? uc.column : [uc.column];
     const parts: string[] = [];
-    if (uc.name) parts.push("CONSTRAINT", quoteIdentifier(uc.name, "postgres"));
+    if (uc.name) parts.push("CONSTRAINT", this._adapter.quoteIdentifier(uc.name));
     parts.push("UNIQUE");
     if (uc.nullsNotDistinct) parts.push("NULLS NOT DISTINCT");
     if (uc.usingIndex) {
-      parts.push(`USING INDEX ${quoteIdentifier(uc.usingIndex, "postgres")}`);
+      parts.push(`USING INDEX ${this._adapter.quoteIdentifier(uc.usingIndex)}`);
     } else {
-      parts.push(`(${columns.map((c) => quoteIdentifier(c, "postgres")).join(", ")})`);
+      parts.push(`(${columns.map((c) => this._adapter.quoteIdentifier(c)).join(", ")})`);
     }
     parts.push(...deferrableSql(uc.deferrable));
     return parts.join(" ");

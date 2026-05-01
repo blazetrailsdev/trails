@@ -598,6 +598,36 @@ describe("QueryCache executor hooks", () => {
     expect(adapter.cache.size).toBe(0);
   });
 
+  it("forwards Quoting methods to inner adapter", () => {
+    const inner = createTestAdapter();
+    const adapter = new QueryCacheAdapter(inner);
+    expect(adapter.quoteIdentifier("users")).toBe(
+      (inner as unknown as { quoteIdentifier(n: string): string }).quoteIdentifier("users"),
+    );
+    expect(adapter.quoteTableName("public.users")).toBe(
+      (inner as unknown as { quoteTableName(n: string): string }).quoteTableName("public.users"),
+    );
+    expect(adapter.quoteColumnName("id")).toBe(
+      (inner as unknown as { quoteColumnName(n: string): string }).quoteColumnName("id"),
+    );
+    expect(adapter.quoteDefaultExpression("foo")).toBe(
+      (inner as unknown as { quoteDefaultExpression(v: unknown): string }).quoteDefaultExpression(
+        "foo",
+      ),
+    );
+  });
+
+  it("Quoting forwarders throw a descriptive error when inner does not implement them", () => {
+    const stub = { adapterName: "stub" } as unknown as ConstructorParameters<
+      typeof QueryCacheAdapter
+    >[0];
+    const adapter = new QueryCacheAdapter(stub);
+    expect(() => adapter.quoteIdentifier("x")).toThrow(/quoteIdentifier/);
+    expect(() => adapter.quoteTableName("x")).toThrow(/quoteTableName/);
+    expect(() => adapter.quoteColumnName("x")).toThrow(/quoteColumnName/);
+    expect(() => adapter.quoteDefaultExpression("x")).toThrow(/quoteDefaultExpression/);
+  });
+
   it("installExecutorHooks wires run/complete to executor", () => {
     const inner = createTestAdapter();
     const adapter = new QueryCacheAdapter(inner);

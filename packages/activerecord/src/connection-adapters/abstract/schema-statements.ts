@@ -27,34 +27,37 @@ import {
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { detectAdapterName } from "../../adapter-name.js";
-import { quoteIdentifier, quoteDefaultExpression, quoteTableName, quote } from "./quoting.js";
+import { quote } from "./quoting.js";
+import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 
+export { assertSchemaAdapter } from "./assert-schema-adapter.js";
+
 export class SchemaStatements {
   private _schemaCreation?: SchemaCreation;
 
   constructor(
-    protected adapter: DatabaseAdapter,
+    protected adapter: DatabaseAdapter & SchemaQuoter,
     protected adapterName: "sqlite" | "postgres" | "mysql" = detectAdapterName(adapter),
   ) {}
 
   get schemaCreation(): SchemaCreation {
     if (!this._schemaCreation) {
-      this._schemaCreation = new SchemaCreation(this.adapterName);
+      this._schemaCreation = new SchemaCreation(this.adapterName, this.adapter);
     }
     return this._schemaCreation;
   }
 
   protected _qi(name: string): string {
-    return quoteIdentifier(name, this.adapterName);
+    return this.adapter.quoteIdentifier(name);
   }
 
   protected _qt(tableName: string): string {
-    return quoteTableName(tableName, this.adapterName);
+    return this.adapter.quoteTableName(tableName);
   }
 
   async createTable(
@@ -222,7 +225,7 @@ export class SchemaStatements {
 
     if (this.adapterName === "mysql") {
       const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause = quoteDefaultExpression(options.default);
+      const defaultClause = this.adapter.quoteDefaultExpression(options.default);
       await this.adapter.executeMutation(
         `ALTER TABLE ${table} MODIFY COLUMN ${col} ${sqlType}${nullable}${defaultClause}`,
       );
@@ -234,12 +237,14 @@ export class SchemaStatements {
         );
       }
       if (options.default !== undefined) {
-        clauses.push(`ALTER COLUMN ${col} SET${quoteDefaultExpression(options.default)}`);
+        clauses.push(
+          `ALTER COLUMN ${col} SET${this.adapter.quoteDefaultExpression(options.default)}`,
+        );
       }
       await this.adapter.executeMutation(`ALTER TABLE ${table} ${clauses.join(", ")}`);
     } else {
       const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause = quoteDefaultExpression(options.default);
+      const defaultClause = this.adapter.quoteDefaultExpression(options.default);
       await this.adapter.executeMutation(
         `ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${sqlType}${nullable}${defaultClause}`,
       );
@@ -302,7 +307,7 @@ export class SchemaStatements {
       typeof options === "object" && options !== null && "to" in (options as any)
         ? (options as any).to
         : options;
-    const clause = quoteDefaultExpression(defaultVal);
+    const clause = this.adapter.quoteDefaultExpression(defaultVal);
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET${clause || " DEFAULT NULL"}`,
     );
@@ -315,7 +320,7 @@ export class SchemaStatements {
     defaultValue?: unknown,
   ): Promise<void> {
     if (!allowNull && defaultValue !== undefined) {
-      const quoted = quoteDefaultExpression(defaultValue).replace(/^ DEFAULT /, "");
+      const quoted = this.adapter.quoteDefaultExpression(defaultValue).replace(/^ DEFAULT /, "");
       await this.adapter.executeMutation(
         `UPDATE ${this._qi(tableName)} SET ${this._qi(columnName)} = ${quoted} WHERE ${this._qi(columnName)} IS NULL`,
       );
@@ -682,7 +687,7 @@ export class SchemaStatements {
       }
       case "mysql": {
         const rows = await this.adapter.execute(
-          `SHOW INDEX FROM ${quoteIdentifier(tableName, "mysql")} WHERE Key_name != 'PRIMARY'`,
+          `SHOW INDEX FROM ${this._qt(tableName)} WHERE Key_name != 'PRIMARY'`,
         );
         const indexMap = new Map<string, { unique: boolean; seqs: [number, string][] }>();
         for (const row of rows as any[]) {
