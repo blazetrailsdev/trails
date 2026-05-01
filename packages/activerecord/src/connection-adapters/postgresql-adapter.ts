@@ -3751,7 +3751,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   schemaCreation(): PgSchemaCreation {
-    return new PgSchemaCreation();
+    return new PgSchemaCreation(this);
   }
 
   updateTableDefinition(tableName: string, base: unknown): PgTable {

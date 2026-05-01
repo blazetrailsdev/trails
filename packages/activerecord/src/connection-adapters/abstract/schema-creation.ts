@@ -25,10 +25,7 @@ import {
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
 } from "./quoting.js";
-import type { Quoting } from "./quoting-interface.js";
-
-/** Subset of {@link Quoting} that schema-creation needs for identifier and value quoting. @internal */
-type SchemaQuoter = Pick<Quoting, "quoteIdentifier" | "quoteTableName" | "quoteDefaultExpression">;
+import type { SchemaQuoter } from "./assert-schema-adapter.js";
 
 /**
  * Build a fallback quoter from the dialect-name string for the legacy

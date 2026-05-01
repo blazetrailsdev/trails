@@ -4,11 +4,8 @@ import {
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
 } from "./quoting.js";
-import type { Quoting } from "./quoting-interface.js";
+import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { singularize } from "@blazetrails/activesupport";
-
-/** Subset of {@link Quoting} that schema-definitions needs. @internal */
-type SchemaQuoter = Pick<Quoting, "quoteIdentifier" | "quoteTableName" | "quoteDefaultExpression">;
 
 /**
  * Build a fallback quoter from the dialect-name string for the legacy
@@ -479,7 +476,7 @@ export class TableDefinition {
   readonly comment?: string;
   private _id: boolean | PrimaryKeyType;
   private _adapterName: "sqlite" | "postgres" | "mysql";
-  private _adapter: SchemaQuoter;
+  protected _adapter: SchemaQuoter;
 
   constructor(
     tableName: string,
