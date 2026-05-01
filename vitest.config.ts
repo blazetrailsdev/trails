@@ -211,25 +211,22 @@ export default defineConfig({
     globals: true,
     projects: [
       {
-        // DB-free AR tests: run sequentially within a single fork so the
-        // ar-unit and ar-db forks don't compete for MariaDB connections when
-        // both projects start concurrently. ar-unit files don't use the DB,
-        // but the forks-pool pre-creates workers that share the connection
-        // limit with ar-db's fork. singleFork keeps the total fork count at 2.
+        // DB-free AR tests: always run in parallel across CPU cores.
         resolve: { alias },
         test: {
           name: "ar-unit",
           include: AR_UNIT_FILES,
           exclude: SHARED_EXCLUDE,
           setupFiles: ["./packages/activerecord/src/test-setup.ts"],
-          pool: "forks",
-          poolOptions: { forks: { singleFork: true } },
         },
       },
       {
-        // DB-dependent AR tests: single fork to prevent table conflicts on
-        // shared PG/MySQL servers. SQLite :memory: would be safe in parallel,
-        // but single-fork is correct for all three backends.
+        // DB-dependent AR tests: default forks pool so each file runs in its
+        // own fork process. On fork exit the OS closes all TCP connections,
+        // which is the only reliable way to release mysql2 pool connections
+        // between files. singleFork causes pool accumulation that exhausts
+        // MariaDB's max_connections. CI runs with --no-file-parallelism so
+        // only one fork is active at a time (no table conflicts).
         resolve: { alias },
         test: {
           name: "ar-db",
@@ -241,8 +238,6 @@ export default defineConfig({
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
           ],
-          pool: "forks",
-          poolOptions: { forks: { singleFork: true } },
         },
       },
       {
