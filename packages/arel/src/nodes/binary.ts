@@ -195,14 +195,12 @@ export class NotIn extends Binary {
 }
 
 /** Join base class — Rails defines via const_set in binary.rb */
-export abstract class Join extends Node {
-  readonly left: Node;
-  readonly right: Node | null;
+export abstract class Join extends Binary {
+  declare readonly left: Node;
+  declare readonly right: Node | null;
 
   constructor(left: Node, right: Node | null = null) {
-    super();
-    this.left = left;
-    this.right = right;
+    super(left, right);
   }
 }
 
@@ -213,48 +211,30 @@ export class CrossJoin extends Join {
 }
 
 /** Set operations — Rails defines via const_set in binary.rb */
-export class Union extends Node {
-  readonly left: Node;
-  readonly right: Node;
+export class Union extends Binary {
+  declare readonly left: Node;
+  declare readonly right: Node;
 
   constructor(left: Node, right: Node) {
-    super();
-    this.left = left;
-    this.right = right;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+    super(left, right);
   }
 }
 
-export class UnionAll extends Node {
-  readonly left: Node;
-  readonly right: Node;
+export class UnionAll extends Binary {
+  declare readonly left: Node;
+  declare readonly right: Node;
 
   constructor(left: Node, right: Node) {
-    super();
-    this.left = left;
-    this.right = right;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+    super(left, right);
   }
 }
 
-export class Intersect extends Node {
-  readonly left: Node;
-  readonly right: Node;
+export class Intersect extends Binary {
+  declare readonly left: Node;
+  declare readonly right: Node;
 
   constructor(left: Node, right: Node) {
-    super();
-    this.left = left;
-    this.right = right;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+    super(left, right);
   }
 }
 
@@ -276,17 +256,11 @@ export interface FetchAttribute {
   fetchAttribute(block: (attr: Node) => unknown): unknown;
 }
 
-export class Except extends Node {
-  readonly left: Node;
-  readonly right: Node;
+export class Except extends Binary {
+  declare readonly left: Node;
+  declare readonly right: Node;
 
   constructor(left: Node, right: Node) {
-    super();
-    this.left = left;
-    this.right = right;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+    super(left, right);
   }
 }
