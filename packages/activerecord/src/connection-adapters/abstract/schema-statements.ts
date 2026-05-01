@@ -99,7 +99,11 @@ export class SchemaStatements {
       return;
     }
 
-    const td = new TableDefinition(name, { ...options, adapterName: this.adapterName });
+    const td = new TableDefinition(name, {
+      ...options,
+      adapterName: this.adapterName,
+      adapter: this.adapter,
+    });
     if (definer) definer(td);
 
     await this.adapter.executeMutation(td.toSql());
@@ -890,6 +894,7 @@ export class SchemaStatements {
     const td = new TableDefinition(tableName, {
       id: hasCustomPk ? false : options.id,
       adapterName: this.adapterName,
+      adapter: this.adapter,
     });
     if (hasCustomPk) {
       const pkType = (typeof options.id === "string" ? options.id : "primary_key") as ColumnType;

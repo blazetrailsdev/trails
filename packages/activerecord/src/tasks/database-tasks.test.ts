@@ -1159,10 +1159,9 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
    * back through adapter.execute).
    */
   function stubAdapter(adapterName: string, versions: string[]) {
+    const lower = adapterName.toLowerCase();
     const isMySQL =
-      adapterName.toLowerCase().includes("mysql") ||
-      adapterName.toLowerCase().includes("trilogy") ||
-      adapterName.toLowerCase().includes("mariadb");
+      lower.includes("mysql") || lower.includes("trilogy") || lower.includes("mariadb");
     return {
       adapterName,
       quoteTableName: (name: string) =>
