@@ -27,7 +27,7 @@ const resolved = new Map<string, Promise<AdapterClass>>();
  *
  *   ConnectionAdapters.register("megadb", () => import("megadb").then(m => m.MegaDBAdapter))
  *
- * Pre-registered: sqlite3, mysql2, postgresql, trilogy
+ * Pre-registered: sqlite3, mysql2, postgresql
  */
 export function register(name: string, loader: AdapterLoader): void {
   adapters.set(name, loader);
@@ -66,13 +66,9 @@ const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>
   (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
-const trilogyLoader: AdapterLoader = async () =>
-  (await import("./connection-adapters/trilogy-adapter.js")).TrilogyAdapter as any;
-
 register("sqlite3", sqlite3Loader);
 register("mysql2", mysql2Loader);
 register("postgresql", postgresqlLoader);
-register("trilogy", trilogyLoader);
 
 // Backward-compat aliases — canonical names come from Rails (sqlite3, mysql2,
 // postgresql) but our codebase historically also accepts these short forms.

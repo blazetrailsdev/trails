@@ -1048,7 +1048,7 @@ export class DatabaseTasks {
         password: c.password as string | undefined,
       });
     }
-    if (/mysql|trilogy/.test(adapter)) {
+    if (/mysql/.test(adapter)) {
       const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
       const c = config.configuration;
       if (c.url) return new Mysql2Adapter(String(c.url));

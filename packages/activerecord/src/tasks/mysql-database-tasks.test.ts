@@ -38,7 +38,6 @@ describe("MySQLDatabaseTasks", () => {
     DatabaseTasks.clearRegisteredTasks();
     MySQLDatabaseTasks.register();
     expect(DatabaseTasks.resolveTask("mysql2")).toBeDefined();
-    expect(DatabaseTasks.resolveTask("trilogy")).toBeDefined();
   });
 
   it("test_truncate_all_queries_information_schema_and_truncates_each_user_table", async () => {

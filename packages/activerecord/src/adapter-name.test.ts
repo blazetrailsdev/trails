@@ -44,10 +44,6 @@ describe("detectAdapterName", () => {
       expect(detectAdapterName({ adapterName: "Mysql2" } as any)).toBe("mysql");
     });
 
-    it("returns mysql for adapterName Trilogy", () => {
-      expect(detectAdapterName({ adapterName: "Trilogy" } as any)).toBe("mysql");
-    });
-
     it("returns sqlite for adapterName SQLite", () => {
       expect(detectAdapterName({ adapterName: "SQLite" } as any)).toBe("sqlite");
     });

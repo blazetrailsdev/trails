@@ -207,7 +207,6 @@ export class MySQLDatabaseTasks {
       ) => new MySQLDatabaseTasks(config).structureLoad(filename, flags),
     };
     DatabaseTasks.registerTask(/mysql/, handler);
-    DatabaseTasks.registerTask(/trilogy/, handler);
   }
 
   private creationOptions(): { charset?: string; collation?: string } {

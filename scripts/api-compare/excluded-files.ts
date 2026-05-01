@@ -118,6 +118,18 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
       "Trails has not ported Railties / ActionController; reintroduce when a web " +
       "framework integration lands.",
   },
+  {
+    pattern: "adapters/trilogy",
+    testFile: "adapters/trilogy/",
+    reason:
+      "Trilogy is a C extension for Ruby with no Node.js equivalent. MySQL connections " +
+      "go through Mysql2Adapter instead.",
+  },
+  {
+    pattern: "trilogy_adapter.rb",
+    testFile: "trilogy_adapter_test.rb",
+    reason: "Trilogy adapter implementation; excluded along with adapters/trilogy.",
+  },
 ];
 
 export function isExcluded(file: string): boolean {
