@@ -17,7 +17,7 @@ Rails reference: `scripts/api-compare/.rails-source/activemodel/`.
 
 ```
 pnpm api:compare --package activemodel                                        → 451/452 (99.8%)
-pnpm tsx scripts/api-compare/compare.ts --privates --package activemodel      → 572/625 (91.5%)
+pnpm tsx scripts/api-compare/compare.ts --privates --package activemodel      → 578/625 (92.5%)
 pnpm test:compare --package activemodel                                       → 959/963 (99.6%)
 ```
 
@@ -59,6 +59,13 @@ because they go stale immediately after each merge.
   (`attributesForHash` consumed by `equals`), lint (`model`,
   `assertBoolean` consumed by the test fns). naming.rb / errors.rb /
   error.rb / lint.rb at 100%.
+- **B7b** (#1077) — attribute leaves: `_valueForDatabase` /
+  `_originalValueForDatabase` indirection on `Attribute` with
+  `FromDatabase` / `FromUser` overrides (FromUser uses the
+  `serializeCastValue` fast path); `fetchValue` / `typeCast` helpers
+  on `AttributeMutationTracker` (with `ForcedMutationTracker` no-op
+  `typeCast` override); `defaultAttribute` on `AttributeSet`.
+  attribute.rb / attribute_mutation_tracker.rb / attribute_set.rb at 100%.
 - **Track A** (validator privates) — fully merged.
 
 ---
@@ -87,12 +94,6 @@ until Track D0 lands the readAttribute caller audit — the dispatch
 cluster's design depends on whether trails introduces
 `tryReadAttribute` or keeps `hasAttribute` guards.
 
-**PR B7b — Attribute leaves**
-`_valueForDatabase`, `_originalValueForDatabase` (`attribute.rb`),
-`fetchValue`, `typeCast` (`attribute_mutation_tracker.rb`),
-`defaultAttribute` (`attribute_set.rb` + `attribute_set/builder.rb`).
-~6 misses.
-
 **PR B7c — Type / validator leaves**
 `maxValue` (`type/big_integer.rb`), `registrations`
 (`type/registry.rb`), `prepareValueForValidation` (`validator.rb`),
@@ -113,7 +114,7 @@ checking before scoping.
 Re-run the live miss command before scoping each — counts shift as
 upstream PRs land.
 
-**Track B target:** activemodel privates 91.5% → ~99%. Final 1% is
+**Track B target:** activemodel privates 92.5% → ~99%. Final 1% is
 non-portable Ruby internals (lifecycle hooks, `method_missing`, etc.)
 that should stay in the api-compare skip list.
 
@@ -215,7 +216,7 @@ override semantics; mechanism mismatch is unavoidable. Comment in
 
 ## Suggested execution order (remaining)
 
-1. **B7b + B7c** in parallel (small leaf clusters).
+1. **B7c** (small leaf cluster).
 2. **C1** in parallel (cheap, banks 2/4).
 3. **B8 / B9** (assignment + attribute-registration).
 4. **C2 + C3** as bandwidth allows.
