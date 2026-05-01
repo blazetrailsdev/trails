@@ -11,7 +11,14 @@
  * This prevents agents from gaming the metric with empty interfaces.
  *
  * Usage:
- *   npx tsx scripts/api-compare/compare.ts [--package activerecord] [--missing] [--files] [--incomplete]
+ *   npx tsx scripts/api-compare/compare.ts \
+ *     [--package activerecord] [--missing] [--files] [--incomplete] \
+ *     [--inheritance] [--public-only | --privates-only]
+ *
+ * The default reports the full surface (public + private). `--public-only`
+ * drops Rails-private/internal methods on both sides for a contract-only
+ * view; `--privates-only` is the inverse. The JSON artifact is always
+ * written to output/api-comparison*.json regardless of flags.
  *
  * Each host class's expected method set is expanded with the instance
  * methods of every module it `include`s (and class methods of modules it
@@ -63,6 +70,12 @@ interface FileResult {
   rubyFile: string;
   expectedTsFile: string;
   tsFileExists: boolean;
+  /**
+   * If set, the expected TS file does not exist but methods cluster at
+   * this sibling path (cross-file misplacement detection). Reported with
+   * a `↦` marker and counted in the package's `misplacedFiles` tally.
+   */
+  misplacedAt?: string;
   matched: number;
   missing: number;
   total: number;
@@ -78,6 +91,7 @@ interface PackageResult {
   percent: number;
   totalFiles: number;
   filesExist: number;
+  misplacedFiles: number;
   excludedFiles: string[];
   files: FileResult[];
   inheritance: InheritanceResult;
@@ -268,9 +282,13 @@ export function superclassesMatch(
 
 /**
  * Comparison bucket a method participates in.
- *   - "public":  default — public API only (drops `internal: true`)
- *   - "all":     `--privates` — public + private combined
- *   - "private": `--privates-only` — private/protected only
+ *   - "all":     default — public + private combined (full surface).
+ *                Reported by `pnpm api:compare` with no flags.
+ *   - "public":  `--public-only` — drops `internal: true` on both sides
+ *                for a contract-only view (matches the historical
+ *                default's numbers).
+ *   - "private": `--privates-only` — Ruby `private`/`protected` and TS
+ *                `private`/`protected`/`#`-prefixed methods only.
  * Exported so compare.test.ts can pin the filter semantics.
  */
 export type CompareMode = "public" | "all" | "private";
@@ -375,6 +393,50 @@ export function dedupeRubyMethodInto(
 // Main
 // ---------------------------------------------------------------------------
 
+/**
+ * Pick the best candidate sibling TS file for a Ruby file whose
+ * expected TS path doesn't exist. Returns the path, or null if no
+ * cluster meets all three thresholds:
+ *
+ * 1. Absolute floor (`MISPLACED_MIN_HITS`, currently 3) — at least
+ *    this many of the Ruby file's candidate method names appear.
+ *    Filters out 1- or 2-method noise hits.
+ * 2. Coverage floor (`bestCount * 2 >= rubyMethodCount`) — the
+ *    cluster covers at least 50% of the Ruby file's expected methods.
+ * 3. Separation (`bestCount >= secondCount * 2`) — the leader has at
+ *    least 2× the runner-up's hits. Without this, a Ruby file whose
+ *    methods are evenly scattered across many TS files (generic names
+ *    like `name`/`value`/`run`) would arbitrarily latch onto whichever
+ *    file iterated first.
+ *
+ * All three together rule out the `deprecator.rb ↦ migration.ts`
+ * pattern observed during development: 3 hits but only 43% coverage
+ * and no separation from the noise floor.
+ */
+export const MISPLACED_MIN_HITS = 3;
+export function selectMisplacedFile(
+  fileHits: Map<string, number>,
+  rubyMethodCount: number,
+): string | null {
+  let bestFile: string | null = null;
+  let bestCount = 0;
+  let secondCount = 0;
+  for (const [f, c] of fileHits) {
+    if (c > bestCount) {
+      secondCount = bestCount;
+      bestFile = f;
+      bestCount = c;
+    } else if (c > secondCount) {
+      secondCount = c;
+    }
+  }
+  if (!bestFile) return null;
+  if (bestCount < MISPLACED_MIN_HITS) return null;
+  if (bestCount * 2 < rubyMethodCount) return null;
+  if (bestCount < secondCount * 2) return null;
+  return bestFile;
+}
+
 function main() {
   const args = process.argv.slice(2);
   const pkgIndex = args.indexOf("--package");
@@ -392,13 +454,29 @@ function main() {
   const showIncomplete = args.includes("--incomplete");
   const showInheritance = args.includes("--inheritance");
   // Comparison bucket:
-  //   default        → public API only (matches historical coverage numbers)
-  //   --privates     → public + private combined (full surface)
+  //   default        → public + private combined (full surface)
+  //   --public-only  → public API only (historical default; matches
+  //                    older coverage numbers and external API contracts)
   //   --privates-only→ private/protected only (Ruby `private`/`protected`,
   //                    TS `private`/`protected`, `#`-prefixed fields)
+  //   --privates     → no-op alias for the new default; pre-flip CI
+  //                    invocations and docs continue to work without
+  //                    edits. Combining --privates with --public-only or
+  //                    --privates-only is rejected as ambiguous.
   const privatesOnly = args.includes("--privates-only");
-  const includePrivates = args.includes("--privates");
-  const mode: CompareMode = privatesOnly ? "private" : includePrivates ? "all" : "public";
+  const publicOnly = args.includes("--public-only");
+  const privatesAlias = args.includes("--privates");
+  if (privatesOnly && publicOnly) {
+    console.error("Error: --public-only and --privates-only are mutually exclusive — pick one.");
+    process.exit(1);
+  }
+  if (privatesAlias && (privatesOnly || publicOnly)) {
+    console.error(
+      "Error: --privates (alias for the default full-surface mode) cannot be combined with --public-only or --privates-only.",
+    );
+    process.exit(1);
+  }
+  const mode: CompareMode = privatesOnly ? "private" : publicOnly ? "public" : "all";
   const methodMatchesMode = (m: MethodInfo): boolean => methodInMode(m, mode);
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-api.json");
@@ -680,11 +758,30 @@ function main() {
     // Resolve package src directory for file existence checks
     const pkgSrcDir = packageSrcDir(pkg);
 
+    // Reverse index: TS method name → list of TS files defining it.
+    // Used as a last-resort fallback when a Ruby file's expected TS path
+    // doesn't exist but a sibling file in the same package implements
+    // most of its methods (e.g. trailties' `commands/server/server_command.rb`
+    // is implemented at `commands/server.ts`). Surfaces as a "misplaced"
+    // file in the summary, mirroring how test:compare flags misplaced tests.
+    const tsFilesByMethod = new Map<string, Set<string>>();
+    for (const [tsFile, methods] of tsMethodsByFile) {
+      for (const m of methods) {
+        let set = tsFilesByMethod.get(m);
+        if (!set) {
+          set = new Set();
+          tsFilesByMethod.set(m, set);
+        }
+        set.add(tsFile);
+      }
+    }
+
     // Compare methods per file
     let totalMatched = 0;
     let totalMissing = 0;
     let totalFiles = 0;
     let filesExist = 0;
+    let totalMisplaced = 0;
     const fileResults: FileResult[] = [];
 
     for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -726,6 +823,30 @@ function main() {
         }
       }
 
+      // Misplaced-file detection: tally per-sibling-file how many of
+      // this Ruby file's expected TS candidates land there, then pick
+      // the strongest cluster (see `selectMisplacedFile` for thresholds).
+      let misplacedActualFile: string | null = null;
+      if (!tsFileExists && seen.size > 0) {
+        const fileHits = new Map<string, number>();
+        for (const [, { rubyName }] of seen) {
+          const candidates = rubyMethodToTs(rubyName);
+          if (!candidates) continue;
+          const containingFiles = new Set<string>();
+          for (const c of candidates) {
+            const files = tsFilesByMethod.get(c);
+            if (files) for (const f of files) containingFiles.add(f);
+          }
+          for (const f of containingFiles) {
+            fileHits.set(f, (fileHits.get(f) || 0) + 1);
+          }
+        }
+        misplacedActualFile = selectMisplacedFile(fileHits, seen.size);
+      }
+      const actualMethods = misplacedActualFile
+        ? tsMethodsByFile.get(misplacedActualFile) || new Set<string>()
+        : null;
+
       for (const [_dedupeKey, { rubyName, rubyModule }] of seen) {
         const tsCandidates = rubyMethodToTs(rubyName)!;
 
@@ -759,10 +880,28 @@ function main() {
             expectedFile: expectedTs,
             actualFile: foundViaInclude,
           });
-        } else {
-          fileMissing++;
-          missingMethods.push({ rubyName, tsName: tsCandidates[0], rubyModule });
+          continue;
         }
+
+        // Cross-file misplaced fallback: method exists in the cluster
+        // file we identified above.
+        if (actualMethods) {
+          const misplacedMatch = tsCandidates.find((c) => actualMethods.has(c));
+          if (misplacedMatch) {
+            fileMatched++;
+            moves.push({
+              tsName: misplacedMatch,
+              rubyName,
+              rubyModule,
+              expectedFile: expectedTs,
+              actualFile: misplacedActualFile!,
+            });
+            continue;
+          }
+        }
+
+        fileMissing++;
+        missingMethods.push({ rubyName, tsName: tsCandidates[0], rubyModule });
       }
 
       const total = fileMatched + fileMissing;
@@ -772,6 +911,7 @@ function main() {
         rubyFile,
         expectedTsFile: expectedTs,
         tsFileExists,
+        misplacedAt: misplacedActualFile ?? undefined,
         matched: fileMatched,
         missing: fileMissing,
         total,
@@ -783,6 +923,10 @@ function main() {
       totalMissing += fileMissing;
       totalFiles++;
       if (tsFileExists) filesExist++;
+      else if (misplacedActualFile) {
+        totalMisplaced++;
+        filesExist++;
+      }
     }
 
     const totalMethods = totalMatched + totalMissing;
@@ -913,6 +1057,7 @@ function main() {
       percent: pct,
       totalFiles,
       filesExist,
+      misplacedFiles: totalMisplaced,
       excludedFiles: [...excludedFiles].sort(),
       files: fileResults,
       inheritance,
@@ -924,8 +1069,8 @@ function main() {
   const jsonFilename =
     mode === "private"
       ? "api-comparison-privates-only.json"
-      : mode === "all"
-        ? "api-comparison-privates.json"
+      : mode === "public"
+        ? "api-comparison-public-only.json"
         : "api-comparison.json";
   const jsonPath = path.join(OUTPUT_DIR, jsonFilename);
   fs.writeFileSync(
@@ -979,8 +1124,9 @@ function printReport(
     const inhPct = inh.checked > 0 ? Math.round((inh.matched / inh.checked) * 1000) / 10 : 0;
     const inhNote =
       inh.checked > 0 ? `  |  inheritance: ${inh.matched}/${inh.checked} (${inhPct}%)` : "";
+    const misplacedNote = pkg.misplacedFiles > 0 ? `  |  ${pkg.misplacedFiles} misplaced` : "";
     console.log(
-      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${inhNote}${excludedNote}`,
+      `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${misplacedNote}${inhNote}${excludedNote}`,
     );
     console.log(`${"=".repeat(100)}`);
 
@@ -1009,8 +1155,17 @@ function printReport(
 
       for (const f of pkg.files) {
         const pct = f.total > 0 ? Math.round((f.matched / f.total) * 100) : 0;
-        if (showIncomplete && f.total > 0 && f.matched === f.total) continue;
-        const marker = !f.tsFileExists ? " \u2717" : f.matched === f.total ? " \u2713" : "";
+        const fullyMatched = f.total > 0 && f.matched === f.total;
+        // A misplaced file is "incomplete" even at 100% match \u2014 the
+        // file still needs to move to its conventional path.
+        if (showIncomplete && fullyMatched && !f.misplacedAt) continue;
+        const marker = f.misplacedAt
+          ? ` \u21a6 ${f.misplacedAt}`
+          : !f.tsFileExists
+            ? " \u2717"
+            : fullyMatched
+              ? " \u2713"
+              : "";
         console.log(
           `  ${f.rubyFile.padEnd(55)} ${f.expectedTsFile.padEnd(40)} ${String(f.matched).padStart(6)} ${String(f.missing).padStart(6)} ${String(f.total).padStart(6)} ${String(pct).padStart(3)}%${marker}`,
         );

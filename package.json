@@ -19,7 +19,7 @@
     "test:db": "PG_TEST_URL=postgres://postgres:postgres@localhost:25432/rails_js_test MYSQL_TEST_URL=mysql://root@localhost:13306/rails_js_test vitest run",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
-    "api:compare": "bash scripts/api-compare/fetch-rails.sh && ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/extract-ts-api.ts && pnpm tsx scripts/api-compare/compare.ts && pnpm tsx scripts/build-rails-privates-manifest.ts",
+    "api:compare": "bash scripts/api-compare/run.sh",
     "rails-privates:manifest": "pnpm tsx scripts/build-rails-privates-manifest.ts",
     "api:moves": "pnpm tsx scripts/api-compare/moves.ts",
     "lint:deps": "bash scripts/api-compare/fetch-rails.sh && ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/lint-deps.ts",

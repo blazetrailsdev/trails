@@ -7,6 +7,8 @@ import {
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
   dedupeRubyMethodInto,
+  selectMisplacedFile,
+  MISPLACED_MIN_HITS,
 } from "./compare.js";
 import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
@@ -434,5 +436,56 @@ describe("dedupeRubyMethodInto", () => {
     expect(seen.size).toBe(1);
     // First insertion wins, so the FQN points at the first observer.
     expect([...seen.values()][0]).toEqual({ rubyName: "invert", rubyModule: "Foo::A" });
+  });
+});
+
+describe("selectMisplacedFile", () => {
+  function hits(...entries: [string, number][]): Map<string, number> {
+    return new Map(entries);
+  }
+
+  it("returns null when no file has any hits", () => {
+    expect(selectMisplacedFile(hits(), 10)).toBeNull();
+  });
+
+  it("returns null below the absolute hit floor", () => {
+    // 2 hits, 2 expected methods → 100% coverage and 2× over zero
+    // runner-up, but absolute floor is MISPLACED_MIN_HITS=3.
+    expect(selectMisplacedFile(hits(["a.ts", 2]), 2)).toBeNull();
+    expect(MISPLACED_MIN_HITS).toBe(3);
+  });
+
+  it("returns null when coverage is below 50%", () => {
+    // 3 hits but ruby file has 7 methods → 43% coverage. This is the
+    // exact `deprecator.rb ↦ migration.ts` false-positive shape.
+    expect(selectMisplacedFile(hits(["migration.ts", 3]), 7)).toBeNull();
+  });
+
+  it("returns null when leader is not 2× the runner-up", () => {
+    // 3 hits leader, 2 hits runner-up → leader < 2×, ambiguous.
+    const result = selectMisplacedFile(hits(["a.ts", 3], ["b.ts", 2]), 6);
+    expect(result).toBeNull();
+  });
+
+  it("returns the cluster file when all three thresholds pass", () => {
+    // 5 hits in app-generator.ts out of 8 expected methods → 62%
+    // coverage, ≥3 absolute, runner-up only 1.
+    const result = selectMisplacedFile(hits(["app-generator.ts", 5], ["other.ts", 1]), 8);
+    expect(result).toBe("app-generator.ts");
+  });
+
+  it("picks the file with the highest count when several are tied at low values", () => {
+    // Pure tie at the noise floor → still null because no separation.
+    const result = selectMisplacedFile(hits(["a.ts", 3], ["b.ts", 3], ["c.ts", 3]), 6);
+    expect(result).toBeNull();
+  });
+
+  it("accepts a clear leader even with multiple low-hit competitors", () => {
+    // 6/10 hits in winner, scattered noise elsewhere.
+    const result = selectMisplacedFile(
+      hits(["winner.ts", 6], ["a.ts", 1], ["b.ts", 1], ["c.ts", 1]),
+      10,
+    );
+    expect(result).toBe("winner.ts");
   });
 });

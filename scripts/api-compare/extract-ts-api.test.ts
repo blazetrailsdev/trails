@@ -6,14 +6,17 @@
  * resolve to the same target.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import * as ts from "typescript";
 import * as path from "path";
+import * as fs from "node:fs";
+import * as os from "node:os";
 import {
   resolveRelModule,
   extractClass,
   extractFileLocalHelpers,
   extractFromProgram,
+  packageFingerprint,
 } from "./extract-ts-api.js";
 import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
@@ -428,5 +431,84 @@ describe("extractFromProgram — include() detection", () => {
       `,
     });
     expect(info.classes["node-expression.ts:NodeExpression"].extends).toContain("Predications");
+  });
+});
+
+describe("packageFingerprint (per-package cache key)", () => {
+  // Track every tmp dir we create so afterEach can clean up; otherwise
+  // repeated test runs leave /tmp/fp-*/ entries behind.
+  const tmpDirs: string[] = [];
+  function makeTmpDir(prefix: string): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+    tmpDirs.push(dir);
+    return dir;
+  }
+  afterEach(() => {
+    while (tmpDirs.length > 0) {
+      const dir = tmpDirs.pop()!;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  function fixture(): { dir: string; files: string[] } {
+    const dir = makeTmpDir("fp-");
+    fs.writeFileSync(path.join(dir, "a.ts"), "export const a = 1;\n");
+    fs.writeFileSync(path.join(dir, "b.ts"), "export const b = 22;\n");
+    return { dir, files: [path.join(dir, "a.ts"), path.join(dir, "b.ts")] };
+  }
+
+  it("is stable across calls when nothing changed (cache HIT)", () => {
+    const { dir, files } = fixture();
+    expect(packageFingerprint(files, dir)).toBe(packageFingerprint(files, dir));
+  });
+
+  it("changes when file content changes (cache MISS on edit)", () => {
+    const { dir, files } = fixture();
+    const before = packageFingerprint(files, dir);
+    // Bump mtime + write different content. Sleep 5ms because some
+    // filesystems quantize mtimeMs at millisecond granularity.
+    const later = new Date(Date.now() + 50);
+    fs.writeFileSync(files[0], "export const a = 999;\n");
+    fs.utimesSync(files[0], later, later);
+    expect(packageFingerprint(files, dir)).not.toBe(before);
+  });
+
+  it("changes on rename even when count/size/maxMtime are identical", () => {
+    // The earlier `count + maxMtime + sumSize` heuristic missed
+    // renames. SHA over sorted (relPath, mtime, size) triples
+    // catches them.
+    const { dir, files } = fixture();
+    const before = packageFingerprint(files, dir);
+    const renamed = path.join(dir, "renamed.ts");
+    fs.renameSync(files[0], renamed);
+    const after = packageFingerprint([renamed, files[1]], dir);
+    expect(after).not.toBe(before);
+  });
+
+  it("is independent of input order (sort makes the digest deterministic)", () => {
+    const { dir, files } = fixture();
+    const a = packageFingerprint(files, dir);
+    const b = packageFingerprint([...files].reverse(), dir);
+    expect(a).toBe(b);
+  });
+
+  it("is independent of absolute path location (uses relative paths)", () => {
+    // Move the same files under a different parent dir → digest
+    // unchanged once mtimes are pinned. utimesSync with a fixed Date
+    // is the only filesystem-portable way to assert this; copyFile +
+    // stat-restore lost sub-ms precision on some filesystems.
+    const { dir, files } = fixture();
+    const fixedMtime = new Date(1700000000000);
+    for (const f of files) fs.utimesSync(f, fixedMtime, fixedMtime);
+    const before = packageFingerprint(files, dir);
+
+    const dir2 = makeTmpDir("fp2-");
+    const moved = files.map((f) => {
+      const dest = path.join(dir2, path.basename(f));
+      fs.copyFileSync(f, dest);
+      fs.utimesSync(dest, fixedMtime, fixedMtime);
+      return dest;
+    });
+    expect(packageFingerprint(moved, dir2)).toBe(before);
   });
 });

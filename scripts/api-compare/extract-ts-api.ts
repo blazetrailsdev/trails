@@ -8,38 +8,219 @@
 import * as ts from "typescript";
 import * as path from "path";
 import * as fs from "fs";
+import { createHash } from "node:crypto";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
+import { fileURLToPath } from "node:url";
+import { cpus } from "node:os";
 import type { ApiManifest, PackageInfo, ClassInfo, MethodInfo, ParamInfo } from "./types.js";
 import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } from "./config.js";
 
-function main() {
+// Per-package cache: extracting all packages with the TS Compiler API
+// takes ~16s; only a handful of packages typically change between
+// runs. Each package's PackageInfo is cached at
+// output/ts-api-cache/<package>.json keyed by `packageFingerprint`
+// (SHA-1 over sorted (relPath, mtimeMs, size) triples) plus a
+// SCHEMA_VERSION constant we can bump when the extractor's output
+// shape changes. Set `API_COMPARE_FORCE=1` to skip the cache entirely.
+const SCHEMA_VERSION = 3;
+const CACHE_DIR = path.join(OUTPUT_DIR, "ts-api-cache");
+
+interface CacheEntry {
+  schemaVersion: number;
+  fingerprint: string;
+  package: PackageInfo;
+}
+
+/**
+ * Hash of `(relative path, mtimeMs, size)` triples for the package's
+ * source files (and tsconfig). Sorting the inputs makes the digest
+ * order-independent; folding the path in makes the fingerprint
+ * sensitive to renames and moves — earlier `count + maxMtime + sum`
+ * approach would silently keep a stale cache when same-sized files
+ * were swapped or renamed without bumping any mtime.
+ *
+ * `baseDir` is the package root (e.g. `packages/arel`) so all inputs
+ * — every src `.ts` file and the sibling `tsconfig.json` — appear as
+ * forward paths in the digest, and absolute paths don't change the
+ * result when the repo is moved or run from a worktree.
+ */
+export function packageFingerprint(files: string[], baseDir: string): string {
+  const entries = files.map((f) => {
+    const st = fs.statSync(f);
+    const rel = path.relative(baseDir, f).replace(/\\/g, "/");
+    return `${rel}\t${st.mtimeMs}\t${st.size}`;
+  });
+  entries.sort();
+  const hash = createHash("sha1");
+  for (const e of entries) {
+    hash.update(e);
+    hash.update("\n");
+  }
+  return hash.digest("hex");
+}
+
+// Worker entry: when this module loads inside a worker thread (after
+// the .mjs bootstrap below has registered tsx's ESM loader on this
+// thread — see WORKER_BOOTSTRAP), run the requested extraction
+// synchronously and ship the result back to the parent.
+interface WorkerInput {
+  package: string;
+  srcDir: string;
+}
+interface WorkerOutput {
+  package: PackageInfo;
+}
+if (!isMainThread && parentPort) {
+  const { package: pkgName, srcDir } = workerData as WorkerInput;
+  const data = extractPackage(pkgName, srcDir);
+  const out: WorkerOutput = { package: data };
+  parentPort.postMessage(out);
+}
+
+// tsx's ESM loader doesn't propagate from a parent that registered it
+// via `--import tsx` to a spawned worker. The .mjs bootstrap below
+// registers tsx inside the worker first, then imports this module —
+// when it loads, the `!isMainThread` guard at the top dispatches into
+// extractPackage and posts the result back.
+const WORKER_BOOTSTRAP = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "extract-ts-api-worker.mjs",
+);
+
+function extractInWorker(pkgName: string, srcDir: string): Promise<PackageInfo> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(WORKER_BOOTSTRAP, {
+      workerData: { package: pkgName, srcDir } satisfies WorkerInput,
+    });
+    worker.once("message", (msg: WorkerOutput) => resolve(msg.package));
+    worker.once("error", reject);
+    worker.once("exit", (code) => {
+      if (code !== 0)
+        reject(new Error(`extract-ts-api worker for ${pkgName} exited with code ${code}`));
+    });
+  });
+}
+
+/**
+ * Run an array of async tasks with bounded concurrency.
+ *
+ * `worker_threads` is real CPU parallelism (each worker runs the
+ * synchronous TS Compiler API on a separate JS isolate). We cap at
+ * `min(packages, cpus())` so a small machine doesn't oversubscribe
+ * and a large machine doesn't waste workers on packages that don't
+ * exist. Order of resolution doesn't matter — results are keyed by
+ * package name when merged into the manifest.
+ */
+async function runWithConcurrency<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let next = 0;
+  async function lane() {
+    while (true) {
+      const i = next++;
+      if (i >= tasks.length) return;
+      results[i] = await tasks[i]();
+    }
+  }
+  const lanes = Array.from({ length: Math.min(limit, tasks.length) }, () => lane());
+  await Promise.all(lanes);
+  return results;
+}
+
+async function main() {
   const manifest: ApiManifest = {
     source: "typescript",
     generatedAt: new Date().toISOString(),
     packages: {},
   };
 
+  fs.mkdirSync(CACHE_DIR, { recursive: true });
+  const force = process.env.API_COMPARE_FORCE === "1";
+  // `Set` so the per-package summary loop's membership check is O(1).
+  const cacheHits = new Set<string>();
+
+  // Pass 1: serve every cache hit synchronously and record the
+  // metadata needed to extract the misses below.
+  interface PendingExtract {
+    pkg: string;
+    srcDir: string;
+    fingerprint: string;
+    cachePath: string;
+  }
+  const pending: PendingExtract[] = [];
+
   for (const pkg of PACKAGES) {
     const pkgDir = packageSrcDir(pkg);
-    manifest.packages[pkg] = extractPackage(pkg, pkgDir);
+    const files = getAllTsFiles(pkgDir);
+    const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
+    const pkgRoot = path.join(ROOT_DIR, "packages", dirName);
+    const tsConfigPath = path.join(pkgRoot, "tsconfig.json");
+    const fingerprintInputs = [...files];
+    if (fs.existsSync(tsConfigPath)) fingerprintInputs.push(tsConfigPath);
+    // Anchor relative paths at the package root so tsconfig.json
+    // doesn't show up as `../tsconfig.json` (which it would if we
+    // anchored at the src dir).
+    const fingerprint = packageFingerprint(fingerprintInputs, pkgRoot);
+    const cachePath = path.join(CACHE_DIR, `${pkg}.json`);
+
+    if (!force && fs.existsSync(cachePath)) {
+      try {
+        const cached = JSON.parse(fs.readFileSync(cachePath, "utf-8")) as CacheEntry;
+        if (cached.schemaVersion === SCHEMA_VERSION && cached.fingerprint === fingerprint) {
+          manifest.packages[pkg] = cached.package;
+          cacheHits.add(pkg);
+          continue;
+        }
+      } catch {
+        // Corrupt cache — fall through to re-extract.
+      }
+    }
+
+    pending.push({ pkg, srcDir: pkgDir, fingerprint, cachePath });
   }
 
-  // Print summary
-  for (const [pkg, data] of Object.entries(manifest.packages)) {
+  // Pass 2: extract cache misses in parallel via worker threads.
+  if (pending.length > 0) {
+    const concurrency = Math.max(1, Math.min(pending.length, cpus().length));
+    const tasks = pending.map((p) => async () => {
+      const data = await extractInWorker(p.pkg, p.srcDir);
+      const entry: CacheEntry = {
+        schemaVersion: SCHEMA_VERSION,
+        fingerprint: p.fingerprint,
+        package: data,
+      };
+      fs.writeFileSync(p.cachePath, JSON.stringify(entry));
+      return [p.pkg, data] as const;
+    });
+    const results = await runWithConcurrency(tasks, concurrency);
+    for (const [pkg, data] of results) {
+      manifest.packages[pkg] = data;
+    }
+  }
+
+  // Print summary in PACKAGES order (not extraction order).
+  for (const pkg of PACKAGES) {
+    const data = manifest.packages[pkg];
     const classCount = Object.keys(data.classes).length;
     const moduleCount = Object.keys(data.modules).length;
     let methodCount = 0;
     for (const cls of Object.values(data.classes)) {
       methodCount += cls.instanceMethods.length + cls.classMethods.length;
     }
+    const tag = cacheHits.has(pkg) ? " (cached)" : "";
     console.log(
-      `  ${pkg}: ${classCount} classes, ${moduleCount} modules, ${methodCount} public methods`,
+      `  ${pkg}: ${classCount} classes, ${moduleCount} modules, ${methodCount} methods${tag}`,
+    );
+  }
+  if (cacheHits.size > 0) {
+    console.log(
+      `\n  ${cacheHits.size}/${PACKAGES.length} packages served from cache (set API_COMPARE_FORCE=1 to rebuild).`,
     );
   }
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const outputPath = path.join(OUTPUT_DIR, "ts-api.json");
   fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 2));
-  console.log(`\nWritten to ${outputPath}`);
+  console.log(`Written to ${outputPath}`);
 }
 
 interface PendingReExport {
@@ -1038,13 +1219,14 @@ function getAllTsFiles(dir: string): string[] {
   return results;
 }
 
-// Only run when invoked as a script (not when imported for its
-// exports by the test file). fileURLToPath + argv[1] is the common
-// ESM "if __main__" pattern; resolve argv[1] first so the guard
-// works regardless of whether the caller passed a relative path or
-// went through a wrapper (matches the pattern in
-// scripts/guides-typecheck/check.ts).
-import { fileURLToPath as _fileURLToPath } from "node:url";
-if (process.argv[1] && path.resolve(process.argv[1]) === _fileURLToPath(import.meta.url)) {
+// Run main() only on the main thread when invoked as a script.
+// Worker threads dispatch via the early `!isMainThread` block above
+// and never reach this guard. Importing the module from a test file
+// also leaves both branches inert.
+if (
+  isMainThread &&
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   main();
 }
