@@ -25,7 +25,7 @@ export abstract class Attribute {
   private originalAttribute: Attribute | null;
   private _value: unknown;
   private _hasValue: boolean;
-  private _valueForDatabase: unknown;
+  private _cachedValueForDatabase: unknown;
   private _hasValueForDatabase: boolean;
 
   constructor(
@@ -47,7 +47,7 @@ export abstract class Attribute {
       this._value = undefined;
       this._hasValue = false;
     }
-    this._valueForDatabase = undefined;
+    this._cachedValueForDatabase = undefined;
     this._hasValueForDatabase = false;
   }
 
@@ -72,10 +72,15 @@ export abstract class Attribute {
 
   get valueForDatabase(): unknown {
     if (!this._hasValueForDatabase || this.changedInPlace()) {
-      this._valueForDatabase = this.type.serialize(this.value);
+      this._cachedValueForDatabase = this._valueForDatabase();
       this._hasValueForDatabase = true;
     }
-    return this._valueForDatabase;
+    return this._cachedValueForDatabase;
+  }
+
+  /** @internal */
+  protected _valueForDatabase(): unknown {
+    return this.type.serialize(this.value);
   }
 
   isChanged(): boolean {
@@ -126,8 +131,13 @@ export abstract class Attribute {
   overrideCastValue(value: unknown): void {
     this._value = value;
     this._hasValue = true;
-    this._valueForDatabase = undefined;
+    this._cachedValueForDatabase = undefined;
     this._hasValueForDatabase = false;
+  }
+
+  /** @internal */
+  protected _originalValueForDatabase(): unknown {
+    return this.type.serialize(this.originalValue);
   }
 
   equals(other: Attribute): boolean {
@@ -150,7 +160,7 @@ export abstract class Attribute {
     if (this.originalAttribute !== null) {
       return this.originalAttribute.originalValueForDatabase();
     }
-    return this.type.serialize(this.originalValue);
+    return this._originalValueForDatabase();
   }
 
   withUserDefault(value: unknown): Attribute {
@@ -245,6 +255,11 @@ export class FromDatabase extends Attribute {
   typeCast(value: unknown): unknown {
     return this.type.deserialize(value);
   }
+
+  /** @internal */
+  protected override _originalValueForDatabase(): unknown {
+    return this.valueBeforeTypeCast;
+  }
 }
 
 export class FromUser extends Attribute {
@@ -254,6 +269,15 @@ export class FromUser extends Attribute {
 
   cameFromUser(): boolean {
     return !this.type.isValueConstructedByMassAssignment(this.valueBeforeTypeCast);
+  }
+
+  /** @internal */
+  protected override _valueForDatabase(): unknown {
+    const compatible = this.type.itselfIfSerializeCastValueCompatible();
+    if (compatible === this.type) {
+      return this.type.serializeCastValue(this.value);
+    }
+    return this.type.serialize(this.value);
   }
 }
 

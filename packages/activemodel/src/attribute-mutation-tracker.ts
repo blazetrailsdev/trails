@@ -73,7 +73,7 @@ export class AttributeMutationTracker {
 
   changeToAttribute(name: string): [unknown, unknown] | undefined {
     if (this.isChanged(name)) {
-      return [this.originalValue(name), this.attributes.fetchValue(name)];
+      return [this.originalValue(name), this.fetchValue(name)];
     }
     return undefined;
   }
@@ -84,9 +84,17 @@ export class AttributeMutationTracker {
 
   isChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
     if (!this.attributeChanged(name)) return false;
-    if (options && "from" in options && !valuesEqual(this.originalValue(name), options.from))
+    if (
+      options &&
+      "from" in options &&
+      !valuesEqual(this.originalValue(name), this.typeCast(name, options.from))
+    )
       return false;
-    if (options && "to" in options && !valuesEqual(this.attributes.fetchValue(name), options.to))
+    if (
+      options &&
+      "to" in options &&
+      !valuesEqual(this.fetchValue(name), this.typeCast(name, options.to))
+    )
       return false;
     return true;
   }
@@ -112,7 +120,7 @@ export class AttributeMutationTracker {
 
   forceChange(name: string): void {
     if (this.forcedChanges.has(name)) return;
-    const value = this.attributes.fetchValue(name);
+    const value = this.fetchValue(name);
     this.forcedChanges.set(name, cloneValue(value));
   }
 
@@ -124,6 +132,16 @@ export class AttributeMutationTracker {
     const keys = new Set(this.attributes.keys());
     for (const name of this.forcedChanges.keys()) keys.add(name);
     return [...keys];
+  }
+
+  /** @internal */
+  protected fetchValue(name: string): unknown {
+    return this.attributes.fetchValue(name);
+  }
+
+  /** @internal */
+  protected typeCast(name: string, value: unknown): unknown {
+    return this.attributes.getAttribute(name).typeCast(value);
   }
 }
 
@@ -165,17 +183,22 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
     if (this.isChanged(name)) {
       return this.forcedChanges.get(name);
     }
-    return this.attributes.fetchValue(name);
+    return this.fetchValue(name);
   }
 
   forceChange(name: string): void {
     if (this.forcedChanges.has(name)) return;
-    const value = this.attributes.fetchValue(name);
+    const value = this.fetchValue(name);
     this.forcedChanges.set(name, cloneValue(value));
   }
 
   finalizeChanges(): void {
     this.finalizedChanges = this.changes();
+  }
+
+  /** @internal */
+  protected override typeCast(_name: string, value: unknown): unknown {
+    return value;
   }
 }
 
