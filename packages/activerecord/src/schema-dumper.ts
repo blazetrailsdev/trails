@@ -22,7 +22,7 @@ import type { DatabaseAdapter } from "./adapter.js";
 // cycle that `ReferenceError`s on evaluation order. We lazy-import
 // the implementation inside `AdapterSchemaSource.indexes()` below.
 import type { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
-import type { Quoting } from "./connection-adapters/abstract/quoting-interface.js";
+import { assertSchemaAdapter } from "./connection-adapters/abstract/assert-schema-adapter.js";
 import type * as SchemaIntrospectionModule from "./schema-introspection.js";
 import { SchemaMigration } from "./schema-migration.js";
 
@@ -314,7 +314,8 @@ class AdapterSchemaSource implements SchemaSource {
   async indexes(tableName: string): Promise<IndexInfo[]> {
     if (!this._schema) {
       const mod = await import("./connection-adapters/abstract/schema-statements.js");
-      this._schema = new mod.SchemaStatements(this._adapter as DatabaseAdapter & Quoting);
+      assertSchemaAdapter(this._adapter);
+      this._schema = new mod.SchemaStatements(this._adapter);
     }
     const idxs = await this._schema.indexes(tableName);
     return idxs.map((idx) => ({

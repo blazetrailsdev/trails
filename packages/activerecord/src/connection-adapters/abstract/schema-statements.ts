@@ -35,6 +35,8 @@ import { deduplicate } from "../deduplicable.js";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 
+export { assertSchemaAdapter } from "./assert-schema-adapter.js";
+
 export class SchemaStatements {
   private _schemaCreation?: SchemaCreation;
 

@@ -761,20 +761,35 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   quoteIdentifier(name: string): string {
-    return (this.inner as { quoteIdentifier(n: string): string }).quoteIdentifier(name);
+    const inner = this.inner as { quoteIdentifier?: (n: string) => string };
+    if (typeof inner.quoteIdentifier === "function") return inner.quoteIdentifier(name);
+    throw new Error(
+      `SchemaAdapter.quoteIdentifier: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteIdentifier()`,
+    );
   }
 
   quoteTableName(name: string): string {
-    return (this.inner as { quoteTableName(n: string): string }).quoteTableName(name);
+    const inner = this.inner as { quoteTableName?: (n: string) => string };
+    if (typeof inner.quoteTableName === "function") return inner.quoteTableName(name);
+    throw new Error(
+      `SchemaAdapter.quoteTableName: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteTableName()`,
+    );
   }
 
   quoteColumnName(name: string): string {
-    return (this.inner as { quoteColumnName(n: string): string }).quoteColumnName(name);
+    const inner = this.inner as { quoteColumnName?: (n: string) => string };
+    if (typeof inner.quoteColumnName === "function") return inner.quoteColumnName(name);
+    throw new Error(
+      `SchemaAdapter.quoteColumnName: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteColumnName()`,
+    );
   }
 
   quoteDefaultExpression(value: unknown): string {
-    return (this.inner as { quoteDefaultExpression(v: unknown): string }).quoteDefaultExpression(
-      value,
+    const inner = this.inner as { quoteDefaultExpression?: (v: unknown) => string };
+    if (typeof inner.quoteDefaultExpression === "function")
+      return inner.quoteDefaultExpression(value);
+    throw new Error(
+      `SchemaAdapter.quoteDefaultExpression: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteDefaultExpression()`,
     );
   }
 
