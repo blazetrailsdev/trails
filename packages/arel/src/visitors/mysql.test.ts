@@ -137,13 +137,13 @@ describe("MysqlTest", () => {
     it("concats columns", () => {
       const node = new Nodes.Concat(users.get("name"), users.get("email"));
       const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toBe('CONCAT("users"."name", "users"."email")');
+      expect(sql).toBe(' CONCAT("users"."name", "users"."email") ');
     });
 
     it("concats a string", () => {
       const node = new Nodes.Concat(users.get("name"), new Nodes.Quoted("x"));
       const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toBe('CONCAT("users"."name", \'x\')');
+      expect(sql).toBe(' CONCAT("users"."name", \'x\') ');
     });
   });
 
@@ -375,5 +375,20 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
     // Embedded backticks must be doubled.
     const weird = new Nodes.Cte("we`ird", inner.ast);
     expect(compile(weird)).toMatch(/^`we``ird` AS \(/);
+  });
+
+  it("Cte renders exactly one set of parens around a bare SelectStatement", () => {
+    const inner = new SelectManager(users).project(users.get("id"));
+    const cte = new Nodes.Cte("x", inner.ast);
+    const sql = compile(cte);
+    expect(sql).toBe('`x` AS (SELECT "users"."id" FROM "users")');
+  });
+
+  it("Cte renders exactly one set of parens when relation is a Grouping (SqlLiteral path)", () => {
+    const lit = new Nodes.SqlLiteral("SELECT 1");
+    const cte = new Nodes.Cte("x", new Nodes.Grouping(lit));
+    const sql = compile(cte);
+    expect(sql).toBe("`x` AS (SELECT 1)");
+    expect(sql).not.toMatch(/\(\s*\(/);
   });
 });

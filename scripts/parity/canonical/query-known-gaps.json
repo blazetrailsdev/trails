@@ -9,7 +9,7 @@
   },
   "ar-65": {
     "side": "diff",
-    "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) \u2014 rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
+    "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) — rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
   },
   "ar-134": {
     "side": "trails-missing",
@@ -58,10 +58,6 @@
   "ar-158": {
     "side": "diff",
     "reason": "Table alias from SelectManager#as is over-quoted in Arel JOIN ON: Rails emits the alias unquoted in ON conditions (sub.\"book_id\"); Trails quotes the alias as a table name (\"sub\".\"book_id\"). Real fix: the Arel visitor's visitAs or table-alias resolution must emit the alias name without double-quoting in ON clause references."
-  },
-  "ar-159": {
-    "side": "trails-missing",
-    "reason": "Arel arithmetic nodes crash on bare number operands: Nodes.Multiplication.new(col, 2) throws 'Unknown node type: Number' because Trails' Arel visitor has no handler for plain Number values. Rails wraps bare values via Nodes.build_quoted automatically. Real fix: the Arel visitor must handle raw Number operands in arithmetic nodes as quoted literals, mirroring Rails' Arel::Visitors::ToSql arithmetic visit methods."
   },
   "ar-161": {
     "side": "diff",

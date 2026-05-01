@@ -97,11 +97,11 @@ export class MySQL extends ToSql {
   }
 
   protected override visitArelNodesConcat(node: Nodes.Concat): SQLString {
-    this.collector.append("CONCAT(");
+    this.collector.append(" CONCAT(");
     this.visitNodeOrValue(node.left);
     this.collector.append(", ");
     this.visitNodeOrValue(node.right);
-    this.collector.append(")");
+    this.collector.append(") ");
     return this.collector;
   }
 
@@ -248,10 +248,19 @@ export class MySQL extends ToSql {
     // MATERIALIZED / NOT MATERIALIZED modifiers Postgres supports are
     // ignored. Mirrors Rails' MySQL visit_Arel_Nodes_Cte which calls
     // `quote_table_name` (which emits backticks on the MySQL adapter).
+    // Parens: Trails stores a SelectStatement in Cte.relation (not a
+    // SelectManager as Rails does), so we add them explicitly. But
+    // buildWithExpressionFromValue wraps SqlLiteral relations in a Grouping,
+    // which visits with its own parens — skip the explicit wrap in that case.
     const escaped = node.name.replace(/`/g, "``");
-    this.collector.append(`\`${escaped}\` AS (`);
-    this.visit(node.relation);
-    this.collector.append(")");
+    this.collector.append(`\`${escaped}\` AS `);
+    if (node.relation instanceof Nodes.Grouping) {
+      this.visit(node.relation);
+    } else {
+      this.collector.append("(");
+      this.visit(node.relation);
+      this.collector.append(")");
+    }
     return this.collector;
   }
 }
