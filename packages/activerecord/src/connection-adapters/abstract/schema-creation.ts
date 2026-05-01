@@ -35,8 +35,8 @@ import type { SchemaQuoter } from "./assert-schema-adapter.js";
  */
 function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
   return {
-    quoteIdentifier: (n) => abstractQuoteIdentifier(n, name),
-    quoteTableName: (n) => abstractQuoteTableName(n, name),
+    quoteIdentifier: (n) => abstractQuoteIdentifier(n),
+    quoteTableName: (n) => abstractQuoteTableName(n),
     quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
   };
 }

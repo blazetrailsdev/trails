@@ -14,14 +14,10 @@ import { getDefaultTimezone } from "../../type/internal/timezone.js";
 
 /**
  * Quote a SQL identifier (table name, column name, index name).
- * Uses double quotes for SQLite/PG, backticks for MySQL.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_column_name
  */
-export function quoteIdentifier(name: string, adapter?: "sqlite" | "postgres" | "mysql"): string {
-  if (adapter === "mysql") {
-    return `\`${name.replace(/`/g, "``")}\``;
-  }
+export function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
@@ -30,10 +26,10 @@ export function quoteIdentifier(name: string, adapter?: "sqlite" | "postgres" | 
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_table_name
  */
-export function quoteTableName(name: string, adapter?: "sqlite" | "postgres" | "mysql"): string {
+export function quoteTableName(name: string): string {
   return name
     .split(".")
-    .map((part) => quoteIdentifier(part, adapter))
+    .map((part) => quoteIdentifier(part))
     .join(".");
 }
 
@@ -42,11 +38,8 @@ export function quoteTableName(name: string, adapter?: "sqlite" | "postgres" | "
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_column_name
  */
-export function quoteColumnName(
-  columnName: string,
-  adapter?: "sqlite" | "postgres" | "mysql",
-): string {
-  return quoteIdentifier(columnName, adapter);
+export function quoteColumnName(columnName: string): string {
+  return quoteIdentifier(columnName);
 }
 
 /**
@@ -155,12 +148,8 @@ export function quoteString(s: string): string {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_table_name_for_assignment
  */
-export function quoteTableNameForAssignment(
-  table: string,
-  attr: string,
-  adapter?: "sqlite" | "postgres" | "mysql",
-): string {
-  return quoteTableName(`${table}.${attr}`, adapter);
+export function quoteTableNameForAssignment(table: string, attr: string): string {
+  return quoteTableName(`${table}.${attr}`);
 }
 
 /**

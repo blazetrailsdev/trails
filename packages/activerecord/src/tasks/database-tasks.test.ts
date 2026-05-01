@@ -1159,8 +1159,22 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
    * adapter.execute).
    */
   function stubAdapter(adapterName: string, versions: string[]) {
+    const isMySQL =
+      adapterName.toLowerCase().includes("mysql") ||
+      adapterName.toLowerCase().includes("trilogy") ||
+      adapterName.toLowerCase().includes("mariadb");
     return {
       adapterName,
+      quoteTableName: (name: string) =>
+        isMySQL
+          ? name
+              .split(".")
+              .map((p) => `\`${p.replace(/`/g, "``")}\``)
+              .join(".")
+          : name
+              .split(".")
+              .map((p) => `"${p.replace(/"/g, '""')}"`)
+              .join("."),
       execute: async (sql: string) => {
         // Both tableExists() and versions() funnel through execute().
         // Return one row to claim the table exists; for the versions
