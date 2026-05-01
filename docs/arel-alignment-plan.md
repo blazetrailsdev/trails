@@ -13,13 +13,40 @@ PRs marked **independent** can be parallelized. Trails files are paths under
 ## Sequencing
 
 Waves 1 and 2 (PRs 1–9, 11–23, 23b, 23c) are merged — see **Completed**
-below for the full list. Remaining waves:
+below for the full list. Remaining work, grouped by type:
 
-| Wave | PRs         | Notes                                                                          |
-| ---- | ----------- | ------------------------------------------------------------------------------ |
-| 3    | 24          | breaking-change wave (Binary reparenting); ship before wave 4                  |
-| 4    | 10, 25a, 26 | dialect / cross-package work; 25a is formatting-only and independent           |
+- **Node-shape parity** (Rails class hierarchy / field shapes):
+  PRs **24** (`Binary` reparenting), **26** (`BoundSqlLiteral` →
+  `sqlWithSubstitutes` + `bindValues`).
+- **Visitor formatting** (visitor-internal SQL bugs): PR **25a**
+  (MySQL `Concat`/`Cte`).
+- **Cross-package wiring** (arel ↔ activerecord seams):
+  PRs **10** (`Table#[]` alias resolution via `klass` ref), **25b**
+  (visitors accept a `Quoting` quoter at construction).
+
+Wave order (when to ship):
+
+| Wave | PRs         | Notes                                                                           |
+| ---- | ----------- | ------------------------------------------------------------------------------- |
+| 3    | 24          | breaking-change wave (Binary reparenting); ship before wave 4                   |
+| 4    | 10, 25a, 26 | independent of one another; ship in any order, parallel-friendly                |
 | 5    | 25b         | gates on quoting-refactor Phases 4–5 (PRs 8/9/10 in `docs/quoting-refactor.md`) |
+
+### Definition of done
+
+The plan closes when:
+
+- All five remaining PRs (10, 24, 25a, 25b, 26) merged.
+- `pnpm parity:query` green on PG / MySQL / SQLite fixtures with no
+  dialect-specific identifier quirks left in the arel visitors (only
+  in the adapter `Quoting` implementations).
+- No `as: "sqlite" | "postgres" | "mysql"` enum or equivalent
+  string-dispatch survives in `packages/arel/`.
+- `nodes/binary.rb` and `nodes/bound_sql_literal.rb` shape-aligned
+  (Union/Intersect/Except/Join inherit `Binary`; `BoundSqlLiteral`
+  fields match Rails).
+- `pnpm tsx scripts/api-compare/compare.ts --package arel --privates`
+  remains at 820/820.
 
 ---
 
@@ -213,9 +240,14 @@ of the quoting refactor.
 
 ---
 
-## PR 25b — MySQL identifier quoting via `Quoting` injection
+## PR 25b — Arel visitors accept a `Quoting` quoter at construction
 
-Folds in the long-deferred `arel MySQL identifier quoting` memory.
+Pervasive arel architectural shift: visitors stop carrying dialect
+identifier logic and instead delegate to a `Quoting`-shaped quoter
+passed in at construction. MySQL backticks fall out as a side effect
+(folds in the long-deferred `arel MySQL identifier quoting` memory),
+and the same delegation cleans up PG / SQLite identifier paths too.
+
 **Depends on `docs/quoting-refactor.md` Phase 2 (merged) and ideally
 Phase 4–5 to remove the residual `mysqlQuote(sql)` post-processor.**
 
@@ -346,7 +378,7 @@ deprecated aliases, no shims.
 | PR  | Surface                                        | Notes                |
 | --- | ---------------------------------------------- | -------------------- |
 | 24  | `Union/Intersect/Except/Join` extends `Binary` | API gain only        |
-| 25b | MySQL identifier quoting via Quoting injection | curate snapshot diff |
+| 25b | Visitors accept `Quoting` quoter (MySQL backticks fall out) | curate snapshot diff |
 | 26  | `BoundSqlLiteral` node fields (`parts` → Rails shape) | atomic in-tree migrate |
 
 ---
