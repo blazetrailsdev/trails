@@ -414,4 +414,24 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
     // GroupingElement itself uses the helper too.
     expect(compile(new Nodes.GroupingElement([users.get("a")]))).toBe('( "users"."a" )');
   });
+
+  describe("Matches ESCAPE", () => {
+    it("hard-quotes a string escape", () => {
+      const node = new Nodes.Matches(users.get("name"), "x%", "!");
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ESCAPE '!'");
+    });
+
+    it("visits a Node escape", () => {
+      const node = new Nodes.Matches(users.get("name"), "x%", new Nodes.SqlLiteral("'!'"));
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ESCAPE '!'");
+    });
+
+    it("visits a Node escape on DoesNotMatch", () => {
+      const node = new Nodes.DoesNotMatch(users.get("name"), "x%", new Nodes.SqlLiteral("'!'"));
+      const sql = new Visitors.PostgreSQL().compile(node);
+      expect(sql).toContain("ESCAPE '!'");
+    });
+  });
 });

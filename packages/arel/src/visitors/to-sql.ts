@@ -429,7 +429,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       stmt.orders = [];
       const key = this.subselectKey(o.key);
       const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, this.buildSubselect(key, o))];
+      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
       if (this.hasJoinSources(o)) {
         stmt.relation = (o.relation as Nodes.JoinSource).left;
       }
@@ -447,7 +447,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       const rawKey = Array.isArray(o.key) ? o.key[0] : o.key;
       const key = this.subselectKey(rawKey);
       const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, this.buildSubselect(key, o))];
+      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
       if (this.hasJoinSources(o)) {
         stmt.relation = (o.relation as Nodes.JoinSource).left;
       }
@@ -1281,11 +1281,13 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   private visitArelTable(node: Table): SQLString {
-    const quoted = this.quoteTableName(node.name);
-    if (node.tableAlias) {
-      this.collector.append(`${quoted} ${this.quoteTableName(node.tableAlias)}`);
+    if ((node.name as unknown) instanceof Node) {
+      this.visit(node.name as unknown as Node);
     } else {
-      this.collector.append(quoted);
+      this.collector.append(this.quoteTableName(node.name));
+    }
+    if (node.tableAlias) {
+      this.collector.append(` ${this.quoteTableName(node.tableAlias)}`);
     }
     return this.collector;
   }
