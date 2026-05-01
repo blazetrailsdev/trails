@@ -1630,4 +1630,35 @@ describe("the to_sql visitor", () => {
       expect(() => visitor.compile(node)).toThrow();
     });
   });
+
+  describe("Table with Node name", () => {
+    it("visits the Node when name is an Arel Node", () => {
+      const tbl = new Table("ignored");
+      (tbl as unknown as { name: Nodes.Node }).name = new Nodes.SqlLiteral("my_subq");
+      expect(new Visitors.ToSql().compile(tbl)).toBe("my_subq");
+    });
+  });
+
+  describe("UpdateManager subselect", () => {
+    it("renders WHERE pk IN (SELECT pk ...) when limit is present", () => {
+      const um = new UpdateManager();
+      um.table(users);
+      um.set([[users.get("name"), "x"]]);
+      um.take(1);
+      um.key = users.get("id");
+      const sql = new Visitors.ToSql().compile(um.ast);
+      expect(sql).toContain('IN (SELECT "users"."id"');
+    });
+  });
+
+  describe("DeleteManager subselect", () => {
+    it("renders WHERE pk IN (SELECT pk ...) when limit is present", () => {
+      const dm = new DeleteManager();
+      dm.from(users);
+      dm.take(1);
+      dm.key = users.get("id");
+      const sql = new Visitors.ToSql().compile(dm.ast);
+      expect(sql).toContain('IN (SELECT "users"."id"');
+    });
+  });
 });

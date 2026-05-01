@@ -110,7 +110,7 @@ export const Predications = {
   matches(
     this: PredicationHost,
     pattern: unknown,
-    escape: string | null = null,
+    escape: string | Node | null = null,
     caseSensitive = false,
   ): Matches {
     // Rails: `Nodes::Matches.new self, quoted_node(other), ...`.
@@ -122,7 +122,7 @@ export const Predications = {
   doesNotMatch(
     this: PredicationHost,
     pattern: unknown,
-    escape: string | null = null,
+    escape: string | Node | null = null,
     caseSensitive = false,
   ): DoesNotMatch {
     return new DoesNotMatch(

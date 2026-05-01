@@ -25,9 +25,7 @@ export class PostgreSQL extends ToSql {
     this.visitNodeOrValue(node.left);
     this.collector.append(node.caseSensitive ? " LIKE " : " ILIKE ");
     this.visitNodeOrValue(node.right);
-    if (node.escape) {
-      this.collector.append(` ESCAPE '${node.escape}'`);
-    }
+    this.appendEscape(node.escape);
     return this.collector;
   }
 
@@ -35,9 +33,7 @@ export class PostgreSQL extends ToSql {
     this.visitNodeOrValue(node.left);
     this.collector.append(node.caseSensitive ? " NOT LIKE " : " NOT ILIKE ");
     this.visitNodeOrValue(node.right);
-    if (node.escape) {
-      this.collector.append(` ESCAPE '${node.escape}'`);
-    }
+    this.appendEscape(node.escape);
     return this.collector;
   }
 

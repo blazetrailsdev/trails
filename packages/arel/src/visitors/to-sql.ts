@@ -429,7 +429,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       stmt.orders = [];
       const key = this.subselectKey(o.key);
       const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, this.buildSubselect(key, o))];
+      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
       if (this.hasJoinSources(o)) {
         stmt.relation = (o.relation as Nodes.JoinSource).left;
       }
@@ -447,7 +447,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       const rawKey = Array.isArray(o.key) ? o.key[0] : o.key;
       const key = this.subselectKey(rawKey);
       const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, this.buildSubselect(key, o))];
+      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
       if (this.hasJoinSources(o)) {
         stmt.relation = (o.relation as Nodes.JoinSource).left;
       }
@@ -1207,9 +1207,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     this.visitNodeOrValue(node.left);
     this.collector.append(" LIKE ");
     this.visitNodeOrValue(node.right);
-    if (node.escape) {
-      this.collector.append(` ESCAPE '${node.escape}'`);
-    }
+    this.appendEscape(node.escape);
     return this.collector;
   }
 
@@ -1217,10 +1215,22 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     this.visitNodeOrValue(node.left);
     this.collector.append(" NOT LIKE ");
     this.visitNodeOrValue(node.right);
-    if (node.escape) {
-      this.collector.append(` ESCAPE '${node.escape}'`);
-    }
+    this.appendEscape(node.escape);
     return this.collector;
+  }
+
+  // Mirrors Rails to_sql.rb: when ESCAPE is set, Rails calls `visit
+  // o.escape, collector`. Trails' `escape` is `string | Node | null`; for
+  // Node we visit, for string we route through `quote()` so embedded
+  // quotes are escaped properly.
+  protected appendEscape(escape: string | Node | null): void {
+    if (escape == null) return;
+    this.collector.append(" ESCAPE ");
+    if (escape instanceof Node) {
+      this.visit(escape);
+    } else {
+      this.collector.append(this.quote(escape));
+    }
   }
 
   // -- NullsFirst / NullsLast --
@@ -1281,11 +1291,17 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   private visitArelTable(node: Table): SQLString {
-    const quoted = this.quoteTableName(node.name);
-    if (node.tableAlias) {
-      this.collector.append(`${quoted} ${this.quoteTableName(node.tableAlias)}`);
+    // Mirrors Rails visit_Arel_Table (to_sql.rb): if name is a Node, visit
+    // it (subquery-as-table); else quote as identifier. Trails types
+    // `Table.name` as `string`; callers smuggling a Node in must cast.
+    const name = node.name as unknown;
+    if (name instanceof Node) {
+      this.visit(name);
     } else {
-      this.collector.append(quoted);
+      this.collector.append(this.quoteTableName(node.name));
+    }
+    if (node.tableAlias) {
+      this.collector.append(` ${this.quoteTableName(node.tableAlias)}`);
     }
     return this.collector;
   }

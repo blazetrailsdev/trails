@@ -162,7 +162,7 @@ export class Attribute extends Node {
 
   matches(
     pattern: string | { ast: Node },
-    escape: string | null = null,
+    escape: string | Node | null = null,
     caseSensitive = false,
   ): Matches {
     const right =
@@ -172,7 +172,7 @@ export class Attribute extends Node {
 
   doesNotMatch(
     pattern: string | { ast: Node },
-    escape: string | null = null,
+    escape: string | Node | null = null,
     caseSensitive = false,
   ): DoesNotMatch {
     const right =
