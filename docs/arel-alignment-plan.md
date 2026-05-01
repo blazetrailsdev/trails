@@ -18,25 +18,22 @@ below for the full list. Remaining work, grouped by type:
 - **Node-shape parity** (Rails class hierarchy / field shapes):
   PRs **24** (`Binary` reparenting), **26** (`BoundSqlLiteral` →
   `sqlWithSubstitutes` + `bindValues`).
-- **Visitor formatting** (visitor-internal SQL bugs): PR **25a**
-  (MySQL `Concat`/`Cte`).
 - **Cross-package wiring** (arel ↔ activerecord seams):
   PRs **10** (`Table#[]` alias resolution via `klass` ref), **25b**
   (visitors accept a `Quoting` quoter at construction).
 
 Wave order (when to ship):
 
-| Wave | PRs         | Notes                                                                           |
-| ---- | ----------- | ------------------------------------------------------------------------------- |
-| 3    | 24          | breaking-change wave (Binary reparenting); ship before wave 4                   |
-| 4    | 10, 25a, 26 | independent of one another; ship in any order, parallel-friendly                |
-| 5    | 25b         | gates on quoting-refactor Phases 4–5 (PRs 8/9/10 in `docs/quoting-refactor.md`) |
+| Wave | PRs    | Notes                                                                           |
+| ---- | ------ | ------------------------------------------------------------------------------- |
+| 4    | 10, 26 | independent of one another; ship in any order, parallel-friendly                |
+| 5    | 25b    | gates on quoting-refactor Phases 4–5 (PRs 8/9/10 in `docs/quoting-refactor.md`) |
 
 ### Definition of done
 
 The plan closes when:
 
-- All five remaining PRs (10, 24, 25a, 25b, 26) merged.
+- All remaining PRs (10, 25b, 26) merged.
 - `pnpm parity:query` green on PG / MySQL / SQLite fixtures with no
   dialect-specific identifier quirks left in the arel visitors (only
   in the adapter `Quoting` implementations).
@@ -95,6 +92,8 @@ api:compare` is a chained script — args don't reach `compare.ts`.)
 - PR 23 — Visitor leaf alignment (Lock + outer-join guards slice) — merged in #1069.
 - PR 23b — Casted/Quoted collapse + Date-bind removal — merged in #1074.
 - PR 23c — In-array wrap, Table-name-Node, PostgreSQL ESCAPE — merged in #1078.
+- PR 24 — `Binary` subclass restoration (Union/UnionAll/Intersect/Except/Join) — merged in #1093.
+- PR 25a — MySQL `Concat`/`Cte` formatting (spaces around CONCAT, Grouping-aware parens) — merged in #1094.
 
 ---
 
@@ -323,101 +322,6 @@ migration matrix entry needed.
 ### Size
 
 ~50 LOC src + ~80 LOC test.
-
----
-
-## PR 25a — MySQL `Concat` / `Cte` formatting
-
-Visitor-side formatting only; no identifier-quoting changes. Independent
-of the quoting refactor.
-
-### Rails reference
-
-`activerecord/lib/arel/visitors/mysql.rb`:
-
-```ruby
-def visit_Arel_Nodes_Concat(o, collector)
-  collector << " CONCAT("
-  visit o.left, collector
-  collector << ", "
-  visit o.right, collector
-  collector << ") "
-end
-
-def visit_Arel_Nodes_Cte(o, collector)
-  collector << quote_table_name(o.name)
-  collector << " AS "
-  visit o.relation, collector
-end
-```
-
-Two divergences from current Trails:
-
-1. **Concat** has leading and trailing spaces around `CONCAT(...)` in
-   Rails. Trails emits `CONCAT(...)` flush, no surrounding spaces
-   (`packages/arel/src/visitors/mysql.ts:99-106`).
-2. **Cte** in Rails relies on `o.relation` being a `Grouping` that
-   renders its own parens. Trails wraps with explicit
-   `` `name` AS ( ... ) `` parens
-   (`packages/arel/src/visitors/mysql.ts:251-255`), which collides
-   with the inner Grouping and produces `((SELECT ...))`.
-
-### Step-by-step
-
-1. **`packages/arel/src/visitors/mysql.ts:99-106`** —
-   `visitArelNodesConcat`. Change to:
-
-   ```ts
-   protected override visitArelNodesConcat(node: Nodes.Concat): SQLString {
-     this.collector.append(" CONCAT(");
-     this.visitNodeOrValue(node.left);
-     this.collector.append(", ");
-     this.visitNodeOrValue(node.right);
-     this.collector.append(") ");
-     return this.collector;
-   }
-   ```
-
-2. **`packages/arel/src/visitors/mysql.ts:246-256`** —
-   `visitArelNodesCte`. Drop the literal `(` / `)` around
-   `node.relation`; the relation visit emits its own parens via
-   `Grouping`:
-
-   ```ts
-   protected override visitArelNodesCte(node: Nodes.Cte): SQLString {
-     const escaped = node.name.replace(/`/g, "``");
-     this.collector.append(`\`${escaped}\` AS `);
-     this.visit(node.relation);
-     return this.collector;
-   }
-   ```
-
-   (Backtick-escaping stays here for now; PR 25b removes it once the
-   visitor delegates identifier quoting to a Quoting quoter.)
-
-### Tests
-
-- `packages/arel/src/visitors/mysql.test.ts`:
-  - **Concat**: build `Nodes.Concat(attr("a"), attr("b"))`, render
-    via MySQL visitor → SQL contains `" CONCAT(a, b) "` (note the
-    surrounding spaces; assert via substring or full snapshot of
-    a `WHERE name = CONCAT(a, b)`-style expression).
-  - **Cte**: build a `Cte("x", new Grouping(<select>))`, render →
-    `` `x` AS (SELECT ...) `` — exactly one set of parens.
-  - Mirror Rails test names from
-    `scripts/api-compare/.rails-source/activerecord/test/cases/arel/visitors/mysql_test.rb`
-    (look for `concat` and `cte`).
-
-### Verification
-
-- `pnpm --filter @blazetrails/arel test`.
-- `pnpm parity:query` — should remain unchanged (these visitors are
-  rarely hit by the parity fixtures; if a CTE fixture exists,
-  expect the snapshot to lose its extra parens — curate).
-
-### Size
-
-~10 LOC src + ~50 LOC test.
 
 ---
 

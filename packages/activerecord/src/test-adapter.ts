@@ -24,6 +24,8 @@ import { isWriteQuerySql } from "./connection-adapters/sql-classification.js";
 import type { Result } from "./result.js";
 import { _setOnAdapterSetHook } from "./base.js";
 
+// process.env.PG_TEST_URL / MYSQL_TEST_URL are already worker-scoped by
+// test-setup-worker-db.ts (a setupFile that runs before this module loads).
 const PG_TEST_URL = process.env.PG_TEST_URL;
 const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
 
