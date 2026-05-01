@@ -163,6 +163,12 @@ const AR_UNIT_FILES = [
 // runs where only a single database exists — workers fall back to the base URL.
 const AR_DB_FORKS = parseInt(process.env.AR_DB_FORKS ?? "0", 10) || undefined;
 
+// When AR_DB_FORKS is unset and a real DB is present, cap to 1 fork so parallel
+// workers don't race on the same PG/MySQL database. SQLite uses :memory: which is
+// isolated per fork, so no cap is needed there.
+const AR_DB_MAX_FORKS =
+  AR_DB_FORKS ?? (process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 1 : undefined);
+
 const SHARED_EXCLUDE = [
   "**/node_modules/**",
   "**/dist/**",
@@ -243,7 +249,7 @@ export default defineConfig({
               : []),
           ],
           pool: "forks",
-          poolOptions: { forks: { maxForks: AR_DB_FORKS } },
+          poolOptions: { forks: { maxForks: AR_DB_MAX_FORKS } },
         },
       },
       {

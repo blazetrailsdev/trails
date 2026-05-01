@@ -12,11 +12,12 @@ set -euo pipefail
 
 AR_SRC="packages/activerecord/src"
 
-# Candidate DB-free files: those that do NOT reference DB setup utilities
-# (grep -rL = files that do NOT match the pattern)
+# Candidate DB-free files: those that do NOT reference DB setup utilities.
+# grep -rL lists files that do NOT match the pattern; || true so an empty
+# result set (all files match) doesn't abort under set -e.
 UNIT_CANDIDATES=$(grep -rL \
   "createTestAdapter\|test-adapter\|createTestTable\|withDatabase\|PG_TEST_URL\|MYSQL_TEST_URL" \
-  "$AR_SRC" --include="*.test.ts" | sort)
+  "$AR_SRC" --include="*.test.ts" | sort || true)
 
 # Among the candidates, exclude any that open a real adapter connection directly.
 # Guard against empty input (grep reads stdin when given no files) and treat
@@ -38,6 +39,13 @@ ENCRYPTION_DB=$(grep -rl \
   "freshAdapter\|makeEncrypted\|makeFreshModel\|makeKeyProvider" \
   "$AR_SRC/encryption/" 2>/dev/null | sort -u || true)
 
+# Build the exclusion list safely without relying on word-splitting of
+# multi-line variables (which breaks on paths with spaces).
+EXCLUSIONS=$(
+  { [ -n "$DIRECT_ADAPTER" ] && echo "$DIRECT_ADAPTER"; true; }
+  { [ -n "$ENCRYPTION_DB" ] && echo "$ENCRYPTION_DB"; true; }
+)
+
 comm -23 \
   <(echo "$UNIT_CANDIDATES") \
-  <(printf '%s\n' $DIRECT_ADAPTER $ENCRYPTION_DB | sort -u)
+  <(echo "$EXCLUSIONS" | sort -u)

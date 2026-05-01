@@ -14,7 +14,7 @@
 
 function workerDbUrl(baseUrl: string): string {
   const forks = parseInt(process.env.AR_DB_FORKS ?? "1", 10);
-  if (forks <= 1) return baseUrl;
+  if (!Number.isFinite(forks) || forks <= 1) return baseUrl;
 
   const raw = parseInt(process.env.VITEST_WORKER_ID ?? "1", 10);
   const slot = ((raw - 1) % forks) + 1;
