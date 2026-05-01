@@ -5,6 +5,7 @@
  */
 import { underscore } from "@blazetrails/activesupport";
 import { dangerousAttributeMethods } from "../attribute-methods.js";
+import type { DatabaseAdapter } from "../adapter.js";
 
 interface PrimaryKeyRecord {
   id: unknown;
@@ -108,7 +109,7 @@ export function isDangerousAttributeMethod(_this: PrimaryKeyHost, name: string):
 /**
  * Rails: adapter_class.quote_column_name(primary_key)
  */
-export function quotedPrimaryKey(this: PrimaryKeyHost & { adapter?: any }): string {
+export function quotedPrimaryKey(this: PrimaryKeyHost & { adapter?: DatabaseAdapter }): string {
   const pk = this.primaryKey;
   const quoter = this.adapter;
   const fallback = (k: string) => `"${k.replace(/"/g, '""')}"`;

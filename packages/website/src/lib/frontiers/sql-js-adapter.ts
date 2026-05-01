@@ -48,6 +48,22 @@ export class SqlJsAdapter implements DatabaseAdapter {
     this.db.run(`ROLLBACK TO SAVEPOINT "${name.replace(/"/g, '""')}"`);
   }
 
+  quoteIdentifier(name: string): string {
+    return `"${name.replace(/"/g, '""')}"`;
+  }
+  quoteTableName(name: string): string {
+    return this.quoteIdentifier(name);
+  }
+  quoteColumnName(name: string): string {
+    return this.quoteIdentifier(name);
+  }
+  quote(value: unknown): string {
+    if (value === null || value === undefined) return "NULL";
+    if (typeof value === "boolean") return value ? "1" : "0";
+    if (typeof value === "number" || typeof value === "bigint") return String(value);
+    return `'${String(value).replace(/'/g, "''")}'`;
+  }
+
   async explain(sql: string): Promise<string> {
     const results = this.db.exec(`EXPLAIN QUERY PLAN ${sql}`);
     return results[0]?.values.map((r: any[]) => r.join("|")).join("\n") ?? "";
