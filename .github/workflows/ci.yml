@@ -39,11 +39,6 @@ jobs:
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
       parity_mysql: ${{ steps.filter.outputs.parity_mysql }}
-      # Pure-Node jobs route to self-hosted only for trusted actor + same
-      # repo. Fork PRs and any other actor fall back to ubuntu-latest, so
-      # untrusted code never executes on the self-hosted box. Consumers:
-      # `runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}`.
-      runner: ${{ steps.runner.outputs.value }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -110,59 +105,12 @@ jobs:
               echo "parity_mysql=false"    >> "$GITHUB_OUTPUT"
               ;;
           esac
-      - id: runner
-        env:
-          EVENT: ${{ github.event_name }}
-          ACTOR: ${{ github.actor }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          REPO: ${{ github.repository }}
-          # Newline-separated allowlist; vars.SELF_HOSTED_ACTORS overrides
-          # the default. Set repo-level via:
-          #   gh variable set SELF_HOSTED_ACTORS --body $'deanmarano'
-          ALLOWLIST: ${{ vars.SELF_HOSTED_ACTORS || 'deanmarano' }}
-        run: |
-          set -euo pipefail
-          # Trust gate: pure-node jobs land on self-hosted iff
-          #   1. the relevant principal is in ALLOWLIST, AND
-          #   2. the code being executed is from this repo (no fork code).
-          # The "principal" depends on event type:
-          #   - pull_request*: the PR author. github.actor on a `labeled`
-          #     event is the labeler (a maintainer labeling a fork PR
-          #     would otherwise pin fork code to self-hosted).
-          #   - push/schedule/workflow_dispatch: github.actor (the pusher
-          #     or dispatcher). HEAD_REPO is empty here; same-repo by
-          #     construction.
-          case "$EVENT" in
-            pull_request|pull_request_target)
-              principal="$PR_AUTHOR"
-              same_repo=$([ "$HEAD_REPO" = "$REPO" ] && echo true || echo false)
-              ;;
-            *)
-              principal="$ACTOR"
-              same_repo=true
-              ;;
-          esac
-          allowed=false
-          while IFS= read -r u; do
-            [ -z "$u" ] && continue
-            [ "$u" = "$principal" ] && { allowed=true; break; }
-          done <<< "$ALLOWLIST"
-          if [ "$allowed" = "true" ] && [ "$same_repo" = "true" ]; then
-            echo 'value=["self-hosted","Linux","X64"]' >> "$GITHUB_OUTPUT"
-            echo "→ self-hosted (event=$EVENT principal=$principal)"
-          else
-            echo 'value="ubuntu-latest"' >> "$GITHUB_OUTPUT"
-            echo "→ ubuntu-latest (event=$EVENT principal=$principal allowed=$allowed same_repo=$same_repo)"
-          fi
 
   build-and-typecheck:
     name: Build & Type Check
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
-    # Self-hosted runner can go offline (laptop closed, service crash).
-    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -180,9 +128,7 @@ jobs:
     name: Lint
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
-    # Self-hosted runner can go offline (laptop closed, service crash).
-    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -199,9 +145,7 @@ jobs:
     name: Prettier
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
-    # Self-hosted runner can go offline (laptop closed, service crash).
-    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -219,9 +163,7 @@ jobs:
     name: Guides Code Type Check
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
-    # Self-hosted runner can go offline (laptop closed, service crash).
-    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -240,9 +182,7 @@ jobs:
     name: DX Type Tests
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
-    # Self-hosted runner can go offline (laptop closed, service crash).
-    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -260,9 +200,7 @@ jobs:
     name: Virtualized DX Type Tests
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
-    # Self-hosted runner can go offline (laptop closed, service crash).
-    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -280,9 +218,7 @@ jobs:
     name: Unit Tests
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
-    # Self-hosted runner can go offline (laptop closed, service crash).
-    # Cap so jobs fail fast instead of queueing for the GitHub default 24h.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
