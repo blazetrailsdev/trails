@@ -7,13 +7,15 @@
 import { NotImplementedError } from "../../errors.js";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
 import type { ForeignKeyDefinition, ReferentialAction } from "../abstract/schema-definitions.js";
-import { quoteIdentifier, quoteTableName } from "../abstract/quoting.js";
+import type { Quoting } from "../abstract/quoting-interface.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
 import { Utils } from "./utils.js";
 
+type SchemaQuoter = Pick<Quoting, "quoteIdentifier" | "quoteTableName" | "quoteDefaultExpression">;
+
 export class SchemaCreation extends AbstractSchemaCreation {
-  constructor() {
-    super("postgres");
+  constructor(adapter?: SchemaQuoter) {
+    super("postgres", adapter);
   }
 
   protected override visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
@@ -23,6 +25,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return sql;
   }
 
+  /** @internal */
   visitAddForeignKey(fromTable: string, toTable: string, options: Record<string, unknown>): string {
     const fromName = Utils.extractSchemaQualifiedName(fromTable);
     const toName = Utils.extractSchemaQualifiedName(toTable);
@@ -30,8 +33,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const primaryKey = (options.primaryKey as string) ?? "id";
     const name = (options.name as string) ?? `fk_rails_${fromName.identifier}_${column}`;
 
-    let sql = `ALTER TABLE ${quoteTableName(fromTable, "postgres")} ADD CONSTRAINT ${quoteIdentifier(name, "postgres")} `;
-    sql += `FOREIGN KEY (${quoteIdentifier(column, "postgres")}) REFERENCES ${quoteTableName(toTable, "postgres")} (${quoteIdentifier(primaryKey, "postgres")})`;
+    let sql = `ALTER TABLE ${this.adapter.quoteTableName(fromTable)} ADD CONSTRAINT ${this.adapter.quoteIdentifier(name)} `;
+    sql += `FOREIGN KEY (${this.adapter.quoteIdentifier(column)}) REFERENCES ${this.adapter.quoteTableName(toTable)} (${this.adapter.quoteIdentifier(primaryKey)})`;
 
     if (options.onDelete) {
       sql += ` ${this.actionSql("DELETE", options.onDelete as ReferentialAction)}`;

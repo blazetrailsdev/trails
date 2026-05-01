@@ -10,6 +10,12 @@
 
 import { NotImplementedError } from "../../errors.js";
 import type { DatabaseAdapter } from "../../adapter.js";
+import type { Quoting } from "./quoting-interface.js";
+import {
+  quoteIdentifier as abstractQuoteIdentifier,
+  quoteTableName as abstractQuoteTableName,
+  quoteDefaultExpression as abstractQuoteDefaultExpression,
+} from "./quoting.js";
 import {
   TableDefinition,
   Table,
@@ -27,34 +33,62 @@ import {
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { detectAdapterName } from "../../adapter-name.js";
-import { quoteIdentifier, quoteDefaultExpression, quoteTableName, quote } from "./quoting.js";
+import { quote } from "./quoting.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { deduplicate } from "../deduplicable.js";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 
+type SchemaQuoter = Pick<Quoting, "quoteIdentifier" | "quoteTableName" | "quoteDefaultExpression">;
+
+/**
+ * Build a fallback quoter from the dialect-name string for the legacy
+ * code path where the adapter passed in does not yet implement the
+ * Quoting interface. Removed in PR 10. @internal
+ */
+function isSchemaQuoter(value: unknown): value is SchemaQuoter {
+  const v = value as Partial<SchemaQuoter> | null;
+  return (
+    !!v &&
+    typeof v.quoteIdentifier === "function" &&
+    typeof v.quoteTableName === "function" &&
+    typeof v.quoteDefaultExpression === "function"
+  );
+}
+
+function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
+  return {
+    quoteIdentifier: (n) => abstractQuoteIdentifier(n, name),
+    quoteTableName: (n) => abstractQuoteTableName(n, name),
+    quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
+  };
+}
+
 export class SchemaStatements {
   private _schemaCreation?: SchemaCreation;
+  protected _quoter: SchemaQuoter;
 
   constructor(
     protected adapter: DatabaseAdapter,
     protected adapterName: "sqlite" | "postgres" | "mysql" = detectAdapterName(adapter),
-  ) {}
+  ) {
+    this._quoter = isSchemaQuoter(adapter) ? adapter : quoterForAdapterName(adapterName);
+  }
 
   get schemaCreation(): SchemaCreation {
     if (!this._schemaCreation) {
-      this._schemaCreation = new SchemaCreation(this.adapterName);
+      this._schemaCreation = new SchemaCreation(this.adapterName, this._quoter);
     }
     return this._schemaCreation;
   }
 
   protected _qi(name: string): string {
-    return quoteIdentifier(name, this.adapterName);
+    return this._quoter.quoteIdentifier(name);
   }
 
   protected _qt(tableName: string): string {
-    return quoteTableName(tableName, this.adapterName);
+    return this._quoter.quoteTableName(tableName);
   }
 
   async createTable(
@@ -222,7 +256,7 @@ export class SchemaStatements {
 
     if (this.adapterName === "mysql") {
       const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause = quoteDefaultExpression(options.default);
+      const defaultClause = this._quoter.quoteDefaultExpression(options.default);
       await this.adapter.executeMutation(
         `ALTER TABLE ${table} MODIFY COLUMN ${col} ${sqlType}${nullable}${defaultClause}`,
       );
@@ -234,12 +268,14 @@ export class SchemaStatements {
         );
       }
       if (options.default !== undefined) {
-        clauses.push(`ALTER COLUMN ${col} SET${quoteDefaultExpression(options.default)}`);
+        clauses.push(
+          `ALTER COLUMN ${col} SET${this._quoter.quoteDefaultExpression(options.default)}`,
+        );
       }
       await this.adapter.executeMutation(`ALTER TABLE ${table} ${clauses.join(", ")}`);
     } else {
       const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause = quoteDefaultExpression(options.default);
+      const defaultClause = this._quoter.quoteDefaultExpression(options.default);
       await this.adapter.executeMutation(
         `ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${sqlType}${nullable}${defaultClause}`,
       );
@@ -302,7 +338,7 @@ export class SchemaStatements {
       typeof options === "object" && options !== null && "to" in (options as any)
         ? (options as any).to
         : options;
-    const clause = quoteDefaultExpression(defaultVal);
+    const clause = this._quoter.quoteDefaultExpression(defaultVal);
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET${clause || " DEFAULT NULL"}`,
     );
@@ -315,7 +351,7 @@ export class SchemaStatements {
     defaultValue?: unknown,
   ): Promise<void> {
     if (!allowNull && defaultValue !== undefined) {
-      const quoted = quoteDefaultExpression(defaultValue).replace(/^ DEFAULT /, "");
+      const quoted = this._quoter.quoteDefaultExpression(defaultValue).replace(/^ DEFAULT /, "");
       await this.adapter.executeMutation(
         `UPDATE ${this._qi(tableName)} SET ${this._qi(columnName)} = ${quoted} WHERE ${this._qi(columnName)} IS NULL`,
       );
@@ -682,7 +718,7 @@ export class SchemaStatements {
       }
       case "mysql": {
         const rows = await this.adapter.execute(
-          `SHOW INDEX FROM ${quoteIdentifier(tableName, "mysql")} WHERE Key_name != 'PRIMARY'`,
+          `SHOW INDEX FROM ${this._quoter.quoteIdentifier(tableName)} WHERE Key_name != 'PRIMARY'`,
         );
         const indexMap = new Map<string, { unique: boolean; seqs: [number, string][] }>();
         for (const row of rows as any[]) {
