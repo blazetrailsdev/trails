@@ -4,7 +4,8 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool
  */
 
-import type { AdapterName, DatabaseAdapter } from "../../adapter.js";
+import { adapterNameFromConfig } from "../../adapter.js";
+import type { DatabaseAdapter } from "../../adapter.js";
 import type { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { PoolConfig } from "../pool-config.js";
 import type { ConnectionDescriptor } from "./connection-descriptor.js";
@@ -333,13 +334,6 @@ export class ConnectionPool implements ReapablePool {
   private _internalMetadata?: InternalMetadata;
   private _adapterProxy?: DatabaseAdapter;
 
-  private _adapterNameFromConfig(): AdapterName {
-    const a = this.dbConfig.adapter?.toLowerCase() ?? "";
-    if (a.includes("postgres") || a === "pg") return "postgres";
-    if (a.includes("mysql") || a.includes("maria") || a.includes("trilogy")) return "mysql";
-    return "sqlite";
-  }
-
   private _getAdapterProxy(): DatabaseAdapter {
     if (!this._adapterProxy) {
       const pool = this;
@@ -348,7 +342,7 @@ export class ConnectionPool implements ReapablePool {
           if (prop === "adapterName")
             return (
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??
-              pool._adapterNameFromConfig()
+              adapterNameFromConfig(pool.dbConfig.adapter)
             );
           return (...args: unknown[]) => {
             return pool.withConnection((conn) => (conn as any)[prop](...args));
