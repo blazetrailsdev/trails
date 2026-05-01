@@ -1835,3 +1835,31 @@ describe("AttributeMethodsTest", () => {
 // ==========================================================================
 // AttributeMethodsTest — targets attribute_methods_test.rb (continued)
 // ==========================================================================
+
+describe("attribute_alias arelTable integration", () => {
+  const adapter = freshAdapter();
+
+  it("test_attribute_alias_in_where_references_association_name", () => {
+    class User extends Base {
+      static {
+        this.attribute("username", "string");
+        this.aliasAttribute("login", "username");
+        this.adapter = adapter;
+      }
+    }
+    const attr = User.arelTable.get("login");
+    expect(attr.name).toBe("username");
+  });
+
+  it("arelTable.get passthrough for unaliased attribute", () => {
+    class User extends Base {
+      static {
+        this.attribute("username", "string");
+        this.aliasAttribute("login", "username");
+        this.adapter = adapter;
+      }
+    }
+    const attr = User.arelTable.get("username");
+    expect(attr.name).toBe("username");
+  });
+});

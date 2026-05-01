@@ -7,6 +7,12 @@ import { InnerJoin } from "./nodes/inner-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
 
+/** Structural duck-type for Rails' `@klass.attribute_aliases`.
+ *  Kept minimal so arel does not import activerecord. */
+export interface TableKlass {
+  readonly _attributeAliases?: Record<string, string>;
+}
+
 /**
  * Table — represents a database table.
  *
@@ -18,13 +24,15 @@ export class Table extends Node {
 
   readonly name: string;
   readonly tableAlias: string | null;
+  readonly klass?: TableKlass;
   private typeCaster: unknown;
 
-  constructor(name: string, options?: { as?: string; klass?: unknown; typeCaster?: unknown }) {
+  constructor(name: string, options?: { as?: string; klass?: TableKlass; typeCaster?: unknown }) {
     super();
     this.name = name;
     const as = options?.as ?? null;
     this.tableAlias = as === name ? null : as;
+    this.klass = options?.klass;
     this.typeCaster = options?.typeCaster ?? null;
   }
 
@@ -61,7 +69,8 @@ export class Table extends Node {
   }
 
   get(name: string, table?: Attribute["relation"]): Attribute {
-    return new Attribute(table ?? this, name);
+    const resolved = this.klass?._attributeAliases?.[name] ?? name;
+    return new Attribute(table ?? this, resolved);
   }
 
   attr(name: string): Attribute {

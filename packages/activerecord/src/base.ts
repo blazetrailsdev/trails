@@ -733,7 +733,7 @@ export class Base extends Model {
    * call since Table is cheap).
    */
   static get arelTable(): Table {
-    return new Table(this.tableName, { typeCaster: new TypeCasterMap(this) });
+    return new Table(this.tableName, { typeCaster: new TypeCasterMap(this), klass: this });
   }
 
   /**

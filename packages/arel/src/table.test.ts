@@ -262,4 +262,25 @@ describe("TableTest", () => {
       expect(new Visitors.ToSql().compile(attr)).toBe('"u"."id"');
     });
   });
+
+  describe("attribute_aliases", () => {
+    it("resolves an aliased attribute name", () => {
+      const t = new Table("users", { klass: { _attributeAliases: { nickname: "name" } } });
+      const attr = t.get("nickname");
+      expect(attr).toBeInstanceOf(Nodes.Attribute);
+      expect(attr.name).toBe("name");
+    });
+
+    it("passes through an unaliased attribute name", () => {
+      const t = new Table("users", { klass: { _attributeAliases: { nickname: "name" } } });
+      const attr = t.get("name");
+      expect(attr.name).toBe("name");
+    });
+
+    it("passes through when no klass is set", () => {
+      const t = new Table("users");
+      const attr = t.get("nickname");
+      expect(attr.name).toBe("nickname");
+    });
+  });
 });
