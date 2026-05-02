@@ -57,7 +57,7 @@ export class LazyAttributeSet extends AttributeSet {
   }
 
   /**
-   * @internal Rails-private helper. Mirrors: LazyAttributeSet#attributes (protected)
+   * @internal Rails-private helper. Mirrors: LazyAttributeSet#materialize (protected)
    * Materializes the lazy set by resolving all keys into the attribute map.
    */
   protected materialize(): Map<string, Attribute> {

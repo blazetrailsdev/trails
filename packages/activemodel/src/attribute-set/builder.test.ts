@@ -5,7 +5,6 @@ import { typeRegistry } from "../type/registry.js";
 
 describe("Builder", () => {
   const strType = typeRegistry.lookup("string");
-  const intType = typeRegistry.lookup("integer");
 
   it("buildFromDatabase creates initialized attributes for present values", () => {
     const types = new Map([["name", strType]]);
@@ -69,6 +68,16 @@ describe("LazyAttributeSet", () => {
     // After materialize: entry is written into the internal map with the correct type.
     expect(lazy.getAttribute("score").type.name).toBe("integer");
     expect(lazy.getAttribute("score").isInitialized()).toBe(false);
+  });
+
+  it("materialize does not overwrite existing attributes when additionalTypes shares a key", () => {
+    const existingAttr = Attribute.fromDatabase("score", "42", strType);
+    const attrs = new Map<string, Attribute>([["score", existingAttr]]);
+    const extra = new Map([["score", intType]]);
+    const lazy = new LazyAttributeSet(attrs, extra);
+    (lazy as any).materialize();
+    // The existing string attribute must be preserved — not replaced by intType.
+    expect(lazy.getAttribute("score")).toBe(existingAttr);
   });
 
   it("materialize works on a frozen instance without throwing", () => {
