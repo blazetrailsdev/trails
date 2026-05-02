@@ -81,7 +81,12 @@ export default defineConfig({
               : []),
           ],
           pool: "forks",
-          poolOptions: { forks: { maxForks: AR_DB_MAX_FORKS } },
+          // minForks = maxForks: keep a fixed pool of workers so VITEST_WORKER_ID
+          // stays within [1, AR_DB_FORKS]. Without this, Vitest spawns a new fork
+          // for every test file; IDs wrap modulo AR_DB_FORKS, so workers with IDs
+          // differing by AR_DB_FORKS share the same database and race on table
+          // creation/deletion.
+          poolOptions: { forks: { maxForks: AR_DB_MAX_FORKS, minForks: AR_DB_MAX_FORKS } },
         },
       },
       {
