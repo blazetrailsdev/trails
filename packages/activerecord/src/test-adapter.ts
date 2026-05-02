@@ -276,10 +276,12 @@ async function execDdlWithSavepoint(inner: any, sql: string): Promise<void> {
  * Drop all known tables and reset tracking state.
  */
 async function dropAllTables(inner: any): Promise<void> {
-  if (_cleanupPromise) {
-    await _cleanupPromise;
-    return;
-  }
+  // Wait for any in-flight cleanup to finish, then run our own. The previous
+  // early-return-after-await pattern was unsound: if another setup() had
+  // already re-populated _createdTables between the moment we started waiting
+  // and now, returning early would leave those entries un-dropped from this
+  // caller's perspective.
+  while (_cleanupPromise) await _cleanupPromise;
   let resolve!: () => void;
   _cleanupPromise = new Promise<void>((r) => {
     resolve = r;
@@ -519,20 +521,11 @@ class SchemaAdapter implements DatabaseAdapter {
     await this.setup();
     sql = this.fixSqliteCompat(sql);
 
-    // Track DDL so we know what tables exist
+    // Detect DDL shape ahead of time. We record table tracking only AFTER the
+    // SQL succeeds — recording up front poisons _createdTables when the SQL
+    // fails, which then makes handleMissingSchemaError refuse to recover.
     const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
-    if (createMatch) {
-      _createdTables.add(createMatch[1]);
-      if (!_createdColumns.has(createMatch[1])) {
-        _createdColumns.set(createMatch[1], new Set(["id"]));
-      }
-    }
-
     const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+["`](\w+)["`]/i);
-    if (dropMatch) {
-      _createdTables.delete(dropMatch[1]);
-      _createdColumns.delete(dropMatch[1]);
-    }
 
     // Auto-add IF NOT EXISTS to CREATE TABLE to prevent "already exists" errors
     if (/CREATE\s+TABLE\s+(?!IF)/i.test(sql)) {
@@ -551,6 +544,16 @@ class SchemaAdapter implements DatabaseAdapter {
         if (useSp) await this.inner.createSavepoint(sp);
         const result = await this.inner.executeMutation(sql, binds, name);
         if (useSp) await this.inner.releaseSavepoint(sp);
+        if (createMatch) {
+          _createdTables.add(createMatch[1]);
+          if (!_createdColumns.has(createMatch[1])) {
+            _createdColumns.set(createMatch[1], new Set(["id"]));
+          }
+        }
+        if (dropMatch) {
+          _createdTables.delete(dropMatch[1]);
+          _createdColumns.delete(dropMatch[1]);
+        }
         return result;
       } catch (e: any) {
         lastError = e;
@@ -634,7 +637,15 @@ class SchemaAdapter implements DatabaseAdapter {
     if (!tableMatch) return false;
 
     const tableName = tableMatch[1];
-    if (_createdTables.has(tableName)) return false;
+    if (_createdTables.has(tableName)) {
+      // The DB error says the table is missing but our in-memory tracker thinks
+      // it exists. The trackers can drift from DB state (e.g. a prior CREATE
+      // TABLE through this adapter recorded the table before failing, or a
+      // concurrent dropAllTables early-returned without re-running its drops).
+      // Trust the DB error: drop the stale tracking entry and recover.
+      _createdTables.delete(tableName);
+      _createdColumns.delete(tableName);
+    }
 
     // Extract columns from SQL
     const cols = new Map<string, string>();
