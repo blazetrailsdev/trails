@@ -4,6 +4,24 @@ import { buildQuoted } from "./casted.js";
 import { Attribute as AMAttribute, ValueType } from "@blazetrails/activemodel";
 import { SelectManager } from "../select-manager.js";
 
+describe("Arel::Nodes::Quoted", () => {
+  it("is a Unary subclass (value stored in expr slot)", () => {
+    const q = new Nodes.Quoted(42);
+    expect(q).toBeInstanceOf(Nodes.Unary);
+  });
+
+  it("value getter returns expr", () => {
+    const q = new Nodes.Quoted("hello");
+    expect(q.value).toBe("hello");
+    expect((q as { expr: unknown }).expr).toBe("hello");
+  });
+
+  it("eql compares by value", () => {
+    expect(new Nodes.Quoted(1).eql(new Nodes.Quoted(1))).toBe(true);
+    expect(new Nodes.Quoted(1).eql(new Nodes.Quoted(2))).toBe(false);
+  });
+});
+
 describe("#hash", () => {
   const users = new Table("users");
   it("is equal when eql? returns true", () => {

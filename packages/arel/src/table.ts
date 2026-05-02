@@ -218,6 +218,27 @@ export class Table extends Node {
     return new TableAlias(this, aliasName);
   }
 
+  /**
+   * Mirrors: Arel::Table#eql? — compares name and tableAlias (not klass).
+   * Rails excludes aliases array and engine from the hash to avoid loops.
+   */
+  eql(other: unknown): boolean {
+    if (!(other instanceof Table)) return false;
+    return this.name === other.name && this.tableAlias === other.tableAlias;
+  }
+
+  /**
+   * Mirrors: Arel::Table#hash — only name (Rails excludes aliases to avoid loops).
+   */
+  override hash(): number {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < this.name.length; i++) {
+      h ^= this.name.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
+  }
+
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }

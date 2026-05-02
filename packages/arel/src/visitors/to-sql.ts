@@ -256,7 +256,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     reg(Nodes.Avg, "visitArelNodesAvg");
     // Advanced grouping
     reg(Nodes.Cube, "visitArelNodesCube");
-    reg(Nodes.Rollup, "visitArelNodesRollUp");
+    reg(Nodes.RollUp, "visitArelNodesRollUp");
     reg(Nodes.GroupingSet, "visitArelNodesGroupingSet");
     reg(Nodes.Group, "visitArelNodesGroup");
     reg(Nodes.GroupingElement, "visitArelNodesGroupingElement");
@@ -886,7 +886,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
   protected visitArelNodesExists(node: Nodes.Exists): SQLString {
     this.collector.append("EXISTS (");
-    this.visit(node.expressions);
+    this.visit(node.expressions[0]);
     this.collector.append(")");
     if (node.alias) {
       this.collector.append(" AS ");
@@ -1007,7 +1007,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   // Mirrors Rails: visit_Arel_Nodes_Else (to_sql.rb).
   protected visitArelNodesElse(node: Nodes.Else): SQLString {
     this.collector.append("ELSE ");
-    this.visitNodeOrValue(node.expr);
+    this.visitNodeOrValue(node.expr as Nodes.NodeOrValue);
     return this.collector;
   }
 
@@ -1204,7 +1204,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  protected visitArelNodesRollUp(node: Nodes.Rollup): SQLString {
+  protected visitArelNodesRollUp(node: Nodes.RollUp): SQLString {
     this.collector.append("ROLLUP(");
     const exprs = node.expressions;
     for (let i = 0; i < exprs.length; i++) {

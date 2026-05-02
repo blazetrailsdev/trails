@@ -7,18 +7,26 @@ import { SqlLiteral } from "./sql-literal.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Function extends NodeExpression {
   readonly expressions: Node[];
-  alias: Node | null;
   distinct: boolean;
+  private _alias: Node | null;
 
-  constructor(expressions: Node[], alias: string | null = null) {
+  constructor(expressions: Node[], aliasNode: Node | string | null = null) {
     super();
     this.expressions = expressions;
-    this.alias = alias ? new SqlLiteral(alias) : null;
+    this._alias = typeof aliasNode === "string" ? new SqlLiteral(aliasNode) : aliasNode;
     this.distinct = false;
   }
 
+  get alias(): Node | null {
+    return this._alias;
+  }
+
+  set alias(value: Node | string | null) {
+    this._alias = typeof value === "string" ? new SqlLiteral(value) : value;
+  }
+
   as(aliasName: string): this {
-    this.alias = new SqlLiteral(aliasName);
+    this.alias = aliasName;
     return this;
   }
 
@@ -27,18 +35,14 @@ export class Function extends NodeExpression {
   }
 }
 
-export class Exists extends Node {
-  readonly expressions: Node;
-  readonly alias: Node | null;
-
-  constructor(expressions: Node, alias: Node | null = null) {
-    super();
-    this.expressions = expressions;
-    this.alias = alias;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+/**
+ * Exists — EXISTS(subquery) node.
+ *
+ * Mirrors: Arel::Nodes::Exists (extends Function in Rails)
+ */
+export class Exists extends Function {
+  constructor(expression: Node, aliasNode: Node | null = null) {
+    super([expression], aliasNode);
   }
 }
 
