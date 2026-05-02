@@ -112,16 +112,13 @@ export class AttributeMutationTracker {
   }
 
   originalValue(name: string): unknown {
-    if (this.forcedChanges.has(name)) {
-      return this.forcedChanges.get(name);
-    }
     return this.attributes.getAttribute(name).originalValue;
   }
 
   forceChange(name: string): void {
-    if (this.forcedChanges.has(name)) return;
-    const value = this.fetchValue(name);
-    this.forcedChanges.set(name, cloneValue(value));
+    // Intentionally store the live value (no clone) to match Rails:
+    // in-place mutations after forceChange must surface via dirty tracking.
+    this.forcedChanges.set(name, this.fetchValue(name));
   }
 
   protected attributeChanged(name: string): boolean {
