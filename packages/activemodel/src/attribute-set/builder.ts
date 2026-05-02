@@ -11,27 +11,40 @@ export class Builder {
     this.defaultAttributes = defaultAttributes;
   }
 
-  buildFromDatabase(values: Record<string, unknown> = {}): AttributeSet {
+  buildFromDatabase(
+    values: Record<string, unknown> = {},
+    additionalTypes: Map<string, Type> = new Map(),
+  ): AttributeSet {
     const attrs = new Map<string, Attribute>();
 
     for (const [name, type] of this.types) {
-      if (name in values) {
-        attrs.set(name, Attribute.fromDatabase(name, values[name], type));
+      const effectiveType = additionalTypes.get(name) ?? type;
+      if (Object.prototype.hasOwnProperty.call(values, name)) {
+        attrs.set(name, Attribute.fromDatabase(name, values[name], effectiveType));
       } else {
         const defaultAttr = this.defaultAttributes.get(name);
         if (defaultAttr) {
-          attrs.set(
-            name,
-            Object.assign(Object.create(Object.getPrototypeOf(defaultAttr)), defaultAttr),
-          );
+          attrs.set(name, dupAttribute(defaultAttr));
         } else {
-          attrs.set(name, Attribute.uninitialized(name, type));
+          attrs.set(name, Attribute.uninitialized(name, effectiveType));
         }
       }
     }
 
     return new AttributeSet(attrs);
   }
+}
+
+/**
+ * Shallow clone of an Attribute that preserves the prototype chain, so
+ * mutations on the clone don't bleed back into the schema-default prototype.
+ *
+ * Mirrors: `default.dup` in ActiveModel::LazyAttributeHash#assign_default_value
+ *
+ * @internal Rails-private helper.
+ */
+function dupAttribute(attr: Attribute): Attribute {
+  return Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
 }
 
 /**
@@ -92,13 +105,24 @@ export class LazyAttributeSet extends AttributeSet {
  * Mirrors: ActiveModel::LazyAttributeHash
  */
 export class LazyAttributeHash {
-  private delegate: Map<string, Attribute> = new Map();
+  private delegate: Map<string, Attribute>;
   private types: Map<string, Type>;
   private values: Record<string, unknown>;
+  private additionalTypes: Map<string, Type>;
+  private defaultAttributes: Map<string, Attribute>;
 
-  constructor(types: Map<string, Type>, values: Record<string, unknown>) {
+  constructor(
+    types: Map<string, Type>,
+    values: Record<string, unknown>,
+    additionalTypes: Map<string, Type> = new Map(),
+    defaultAttributes: Map<string, Attribute> = new Map(),
+    delegateHash: Map<string, Attribute> = new Map(),
+  ) {
     this.types = types;
     this.values = values;
+    this.additionalTypes = additionalTypes;
+    this.defaultAttributes = defaultAttributes;
+    this.delegate = delegateHash;
   }
 
   get(name: string): Attribute {
@@ -128,7 +152,12 @@ export class LazyAttributeHash {
   }
 
   deepDup(): LazyAttributeHash {
-    const copy = new LazyAttributeHash(this.types, { ...this.values });
+    const copy = new LazyAttributeHash(
+      this.types,
+      { ...this.values },
+      this.additionalTypes,
+      this.defaultAttributes,
+    );
     const cache = new Map<Attribute, Attribute>();
     for (const [name, attr] of this.delegate) {
       copy.delegate.set(name, LazyAttributeHash.cloneAttr(attr, cache));
@@ -161,12 +190,26 @@ export class LazyAttributeHash {
     for (const key of allKeys) fn(key);
   }
 
-  marshalDump(): [Map<string, Type>, Record<string, unknown>] {
-    return [this.types, this.values];
+  marshalDump(): [
+    Map<string, Type>,
+    Record<string, unknown>,
+    Map<string, Type>,
+    Map<string, Attribute>,
+    Map<string, Attribute>,
+  ] {
+    return [this.types, this.values, this.additionalTypes, this.defaultAttributes, this.delegate];
   }
 
-  static marshalLoad(data: [Map<string, Type>, Record<string, unknown>]): LazyAttributeHash {
-    return new LazyAttributeHash(data[0], data[1]);
+  static marshalLoad(
+    data: [
+      Map<string, Type>,
+      Record<string, unknown>,
+      (Map<string, Type> | undefined)?,
+      (Map<string, Attribute> | undefined)?,
+      (Map<string, Attribute> | undefined)?,
+    ],
+  ): LazyAttributeHash {
+    return new LazyAttributeHash(data[0], data[1], data[2], data[3], data[4]);
   }
 
   /** @internal Rails-private helper. Mirrors: LazyAttributeHash#delegate_hash (attr_reader) */
@@ -183,14 +226,15 @@ export class LazyAttributeHash {
   }
 
   private assignDefault(name: string): Attribute {
-    const type = this.types.get(name);
+    const type = this.additionalTypes.get(name) ?? this.types.get(name);
     if (Object.prototype.hasOwnProperty.call(this.values, name) && type) {
       const attr = Attribute.fromDatabase(name, this.values[name], type);
       this.delegate.set(name, attr);
       return attr;
     }
-    if (type) {
-      const attr = Attribute.uninitialized(name, type);
+    if (this.types.has(name)) {
+      const defaultAttr = this.defaultAttributes.get(name);
+      const attr = defaultAttr ? dupAttribute(defaultAttr) : Attribute.uninitialized(name, type!);
       this.delegate.set(name, attr);
       return attr;
     }
