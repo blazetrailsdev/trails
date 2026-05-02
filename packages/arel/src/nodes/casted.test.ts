@@ -61,4 +61,16 @@ describe("Arel::Nodes.build_quoted", () => {
     expect(node).toBeInstanceOf(Nodes.Quoted);
     expect((node as Nodes.Quoted).value).toBe(42);
   });
+
+  it("wraps duck-typed ActiveModel::Attribute in BindParam without requiring activemodel import", () => {
+    const duckAttr = { name: "age", valueForDatabase: 42 };
+    const node = buildQuoted(duckAttr);
+    expect(node).toBeInstanceOf(Nodes.BindParam);
+    expect((node as Nodes.BindParam).value).toBe(duckAttr);
+  });
+
+  it("does not treat plain objects with only name as ActiveModel::Attribute", () => {
+    const node = buildQuoted({ name: "x" });
+    expect(node).toBeInstanceOf(Nodes.Quoted);
+  });
 });
