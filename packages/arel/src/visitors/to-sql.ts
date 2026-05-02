@@ -1328,9 +1328,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
   protected visitArelNodesCte(node: Nodes.Cte): SQLString {
     this.collector.append(`${this.quoteTableName(node.name)} AS `);
-    if (node.materialized === "materialized") {
+    if (node.materialized === true) {
       this.collector.append("MATERIALIZED ");
-    } else if (node.materialized === "not_materialized") {
+    } else if (node.materialized === false) {
       this.collector.append("NOT MATERIALIZED ");
     }
     this.collector.append("(");

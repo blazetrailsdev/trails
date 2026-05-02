@@ -177,17 +177,17 @@ describe("MysqlTest", () => {
 
   describe("Nodes::Cte", () => {
     it("ignores MATERIALIZED modifiers", () => {
-      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, "materialized");
+      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, true);
       const stmt = new SelectManager().with(cte).project("1");
       const sql = new Visitors.MySQL().compile(stmt.ast);
       expect(sql).not.toContain("MATERIALIZED");
     });
 
     it("ignores NOT MATERIALIZED modifiers", () => {
-      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, "not_materialized");
+      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, false);
       const stmt = new SelectManager().with(cte).project("1");
       const sql = new Visitors.MySQL().compile(stmt.ast);
-      expect(sql).not.toContain("NOT MATERIALIZED");
+      expect(sql).not.toContain("MATERIALIZED");
     });
   });
 });
