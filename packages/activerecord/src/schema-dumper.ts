@@ -51,6 +51,14 @@ export interface IndexInfo {
   columns: string[];
   unique: boolean;
   name?: string;
+  /** Per-column max lengths (number for single-column, Record for multi). */
+  lengths?: number | Record<string, number>;
+  /** Per-column sort order (e.g. "asc"/"desc"). */
+  orders?: string | Record<string, string>;
+  /** Per-column operator class (Postgres). */
+  opclasses?: string | Record<string, string>;
+  where?: string;
+  using?: string;
 }
 
 /**
@@ -701,6 +709,12 @@ export class SchemaDumper {
     const parts: string[] = [cols];
     if (index.name) parts.push(`name: ${JSON.stringify(index.name)}`);
     if (index.unique) parts.push("unique: true");
+    if (index.lengths !== undefined) parts.push(`length: ${this.formatIndexParts(index.lengths)}`);
+    if (index.orders !== undefined) parts.push(`order: ${this.formatIndexParts(index.orders)}`);
+    if (index.opclasses !== undefined)
+      parts.push(`opclass: ${this.formatIndexParts(index.opclasses)}`);
+    if (index.where) parts.push(`where: ${JSON.stringify(index.where)}`);
+    if (index.using) parts.push(`using: ${JSON.stringify(index.using)}`);
     return parts;
   }
 
@@ -715,14 +729,6 @@ export class SchemaDumper {
   }
 
   /** @internal */
-  checkParts(check: { expression: string; name?: string; validate?: boolean }): string[] {
-    const parts: string[] = [JSON.stringify(check.expression)];
-    if (check.name) parts.push(`name: ${JSON.stringify(check.name)}`);
-    if (check.validate === false) parts.push("validate: false");
-    return parts;
-  }
-
-  /** @internal */
   async checkConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
     const adapter = this._source instanceof AdapterSchemaSource ? this._source.adapter : undefined;
     const fn = (adapter as Record<string, unknown> | undefined)?.checkConstraints;
@@ -731,10 +737,18 @@ export class SchemaDumper {
       (await (fn as (t: string) => Promise<unknown[]>).call(adapter, tableName)) ?? [];
     const stripped = this.removePrefixAndSuffix(tableName);
     for (const chk of constraints as { expression: string; name?: string; validate?: boolean }[]) {
-      lines.push(
-        `  await ctx.addCheckConstraint(${JSON.stringify(stripped)}, ${this.checkParts(chk).join(", ")});`,
-      );
+      const [expr, ...opts] = this.checkParts(chk);
+      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+      lines.push(`  await ctx.addCheckConstraint(${JSON.stringify(stripped)}, ${expr}${optStr});`);
     }
+  }
+
+  /** @internal */
+  checkParts(check: { expression: string; name?: string; validate?: boolean }): string[] {
+    const parts: string[] = [JSON.stringify(check.expression)];
+    if (check.name) parts.push(`name: ${JSON.stringify(check.name)}`);
+    if (check.validate === false) parts.push("validate: false");
+    return parts;
   }
 
   /** @internal */
@@ -754,17 +768,17 @@ export class SchemaDumper {
       validate?: boolean;
     };
     for (const fk of fks as Fk[]) {
-      const parts = [
-        JSON.stringify(this.removePrefixAndSuffix(fk.fromTable ?? tableName)),
-        JSON.stringify(this.removePrefixAndSuffix(fk.toTable)),
-      ];
-      if (fk.column) parts.push(`column: ${JSON.stringify(fk.column)}`);
-      if (fk.primaryKey) parts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
-      if (fk.name) parts.push(`name: ${JSON.stringify(fk.name)}`);
-      if (fk.onUpdate) parts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
-      if (fk.onDelete) parts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
-      if (fk.validate === false) parts.push("validate: false");
-      lines.push(`  await ctx.addForeignKey(${parts.join(", ")});`);
+      const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable ?? tableName));
+      const toExpr = JSON.stringify(this.removePrefixAndSuffix(fk.toTable));
+      const opts: string[] = [];
+      if (fk.column) opts.push(`column: ${JSON.stringify(fk.column)}`);
+      if (fk.primaryKey) opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
+      if (fk.name) opts.push(`name: ${JSON.stringify(fk.name)}`);
+      if (fk.onUpdate) opts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
+      if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
+      if (fk.validate === false) opts.push("validate: false");
+      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+      lines.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }
   }
 
