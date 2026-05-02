@@ -19,21 +19,20 @@ below for the full list. Remaining work, grouped by type:
   PRs **24** (`Binary` reparenting), **26** (`BoundSqlLiteral` →
   `sqlWithSubstitutes` + `bindValues`).
 - **Cross-package wiring** (arel ↔ activerecord seams):
-  PRs **10** (`Table#[]` alias resolution via `klass` ref), **25b**
-  (visitors accept a `Quoting` quoter at construction).
+  PR **10** (`Table#[]` alias resolution via `klass` ref). PR **25b** is
+  open at #1098.
 
 Wave order (when to ship):
 
-| Wave | PRs    | Notes                                                                           |
-| ---- | ------ | ------------------------------------------------------------------------------- |
-| 4    | 10, 26 | independent of one another; ship in any order, parallel-friendly                |
-| 5    | 25b    | gates on quoting-refactor Phases 4–5 (PRs 8/9/10 in `docs/quoting-refactor.md`) |
+| Wave | PRs    | Notes                                                            |
+| ---- | ------ | ---------------------------------------------------------------- |
+| 4    | 10, 26 | independent of one another; ship in any order, parallel-friendly |
 
 ### Definition of done
 
 The plan closes when:
 
-- All remaining PRs (10, 25b, 26) merged.
+- All remaining PRs (10, 26) merged + PR 25b (#1098) merged.
 - `pnpm parity:query` green on PG / MySQL / SQLite fixtures with no
   dialect-specific identifier quirks left in the arel visitors (only
   in the adapter `Quoting` implementations).
@@ -43,7 +42,7 @@ The plan closes when:
   (Union/Intersect/Except/Join inherit `Binary`; `BoundSqlLiteral`
   fields match Rails).
 - `pnpm tsx scripts/api-compare/compare.ts --package arel --privates`
-  remains at 820/820.
+  remains at 884/884.
 
 ---
 
@@ -94,6 +93,7 @@ api:compare` is a chained script — args don't reach `compare.ts`.)
 - PR 23c — In-array wrap, Table-name-Node, PostgreSQL ESCAPE — merged in #1078.
 - PR 24 — `Binary` subclass restoration (Union/UnionAll/Intersect/Except/Join) — merged in #1093.
 - PR 25a — MySQL `Concat`/`Cte` formatting (spaces around CONCAT, Grouping-aware parens) — merged in #1094.
+- PR 25b — Visitors accept `ArelQuoter` at construction; MySQL backticks via connection quoter — open in #1098.
 
 ---
 
