@@ -70,6 +70,11 @@ import {
   attributeTypes,
   typeForAttribute as staticTypeForAttribute,
   decorateAttributes,
+  pendingAttributeModifications as _pendingAttributeModificationsHelper,
+  resetDefaultAttributesBang as _resetDefaultAttributesBangHelper,
+  resolveAttributeName as _resolveAttributeNameHelper,
+  resolveTypeName as _resolveTypeNameHelper,
+  hookAttributeType as _hookAttributeTypeHelper,
 } from "./attribute-registration.js";
 import { _toPartialPath } from "./conversion.js";
 
@@ -121,6 +126,37 @@ export class Model {
   static attributeTypes = attributeTypes;
   static typeForAttribute = staticTypeForAttribute;
   static _toPartialPath = _toPartialPath;
+
+  /** @internal Rails-private helper. */
+  static pendingAttributeModifications(): ReturnType<typeof _pendingAttributeModificationsHelper> {
+    return _pendingAttributeModificationsHelper.call(this);
+  }
+
+  /** @internal Rails-private helper. */
+  static resetDefaultAttributesBang(): void {
+    _resetDefaultAttributesBangHelper.call(this);
+  }
+
+  /** @internal Rails-private helper. */
+  static resolveAttributeName(name: string): string {
+    return _resolveAttributeNameHelper.call(this, name);
+  }
+
+  /** @internal Rails-private helper. */
+  static resolveTypeName(
+    name: string,
+    options?: Record<string, unknown>,
+  ): import("./type/value.js").Type {
+    return _resolveTypeNameHelper.call(this, name, options);
+  }
+
+  /** @internal Rails-private helper. */
+  static hookAttributeType(
+    attribute: string,
+    type: import("./type/value.js").Type,
+  ): import("./type/value.js").Type {
+    return _hookAttributeTypeHelper.call(this, attribute, type);
+  }
 
   static attributeNames(): string[] {
     return Array.from(this._attributeDefinitions.entries())
