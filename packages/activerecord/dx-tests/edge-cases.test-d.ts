@@ -1,5 +1,6 @@
 import { describe, it, expectTypeOf, assertType } from "vitest";
-import { Base } from "@blazetrails/activerecord";
+import { Base, type DatabaseAdapter } from "@blazetrails/activerecord";
+import type { Visitors } from "@blazetrails/arel";
 
 // Scenario: the rough edges a real app will hit — composite keys, enums,
 // scopes, transactions, and the permissive attributes bag.
@@ -92,5 +93,11 @@ describe("edge cases — rough edges in current DX", () => {
     expectTypeOf<ReturnType<typeof Base.hasMany>>().toEqualTypeOf<void>();
     expectTypeOf<ReturnType<typeof Base.hasOne>>().toEqualTypeOf<void>();
     expectTypeOf<ReturnType<typeof Base.hasAndBelongsToMany>>().toEqualTypeOf<void>();
+  });
+
+  it("DatabaseAdapter is a structural superset of ArelQuoter", () => {
+    // The arel visitor accepts any ArelQuoter; the connection adapter satisfies
+    // it structurally so passing `connection` to `new ToSql(connection)` type-checks.
+    expectTypeOf<DatabaseAdapter>().toMatchTypeOf<Visitors.ArelQuoter>();
   });
 });

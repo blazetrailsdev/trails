@@ -2616,11 +2616,9 @@ describe("RelationTest", () => {
 
 describe("RelationTest", () => {
   it("toSql includes FOR UPDATE", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const sql = User.all().lock().toSql();
@@ -2628,11 +2626,9 @@ describe("RelationTest", () => {
   });
 
   it("toSql includes custom lock clause", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const sql = User.all().lock("FOR SHARE").toSql();

@@ -76,32 +76,32 @@ describe("MysqlTest", () => {
       const visitor = new Visitors.MySQL();
       const node = users.get("id").asc().nullsFirst();
       const sql = visitor.compile(node);
-      expect(sql).toContain('"users"."id" IS NOT NULL');
-      expect(sql).toContain('"users"."id" ASC');
+      expect(sql).toContain("`users`.`id` IS NOT NULL");
+      expect(sql).toContain("`users`.`id` ASC");
     });
 
     it("emulates NULLS LAST with IS NULL", () => {
       const visitor = new Visitors.MySQL();
       const node = users.get("id").asc().nullsLast();
       const sql = visitor.compile(node);
-      expect(sql).toContain('"users"."id" IS NULL');
-      expect(sql).toContain('"users"."id" ASC');
+      expect(sql).toContain("`users`.`id` IS NULL");
+      expect(sql).toContain("`users`.`id` ASC");
     });
 
     it("emulates NULLS FIRST with DESC ordering", () => {
       const visitor = new Visitors.MySQL();
       const node = users.get("id").desc().nullsFirst();
       const sql = visitor.compile(node);
-      expect(sql).toContain('"users"."id" IS NOT NULL');
-      expect(sql).toContain('"users"."id" DESC');
+      expect(sql).toContain("`users`.`id` IS NOT NULL");
+      expect(sql).toContain("`users`.`id` DESC");
     });
 
     it("emulates NULLS LAST with DESC ordering", () => {
       const visitor = new Visitors.MySQL();
       const node = users.get("id").desc().nullsLast();
       const sql = visitor.compile(node);
-      expect(sql).toContain('"users"."id" IS NULL');
-      expect(sql).toContain('"users"."id" DESC');
+      expect(sql).toContain("`users`.`id` IS NULL");
+      expect(sql).toContain("`users`.`id` DESC");
     });
   });
 
@@ -137,13 +137,13 @@ describe("MysqlTest", () => {
     it("concats columns", () => {
       const node = new Nodes.Concat(users.get("name"), users.get("email"));
       const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toBe(' CONCAT("users"."name", "users"."email") ');
+      expect(sql).toBe(" CONCAT(`users`.`name`, `users`.`email`) ");
     });
 
     it("concats a string", () => {
       const node = new Nodes.Concat(users.get("name"), new Nodes.Quoted("x"));
       const sql = new Visitors.MySQL().compile(node);
-      expect(sql).toBe(' CONCAT("users"."name", \'x\') ');
+      expect(sql).toBe(" CONCAT(`users`.`name`, 'x') ");
     });
   });
 
@@ -154,24 +154,24 @@ describe("MysqlTest", () => {
   describe("Nodes::IsNotDistinctFrom", () => {
     it("should handle column names on both sides", () => {
       const node = users.get("id").isNotDistinctFrom(posts.get("user_id"));
-      expect(new Visitors.MySQL().compile(node)).toBe('"users"."id" <=> "posts"."user_id"');
+      expect(new Visitors.MySQL().compile(node)).toBe("`users`.`id` <=> `posts`.`user_id`");
     });
 
     it("should handle nil", () => {
       const node = users.get("name").isNotDistinctFrom(null);
-      expect(new Visitors.MySQL().compile(node)).toBe('"users"."name" <=> NULL');
+      expect(new Visitors.MySQL().compile(node)).toBe("`users`.`name` <=> NULL");
     });
 
     it("should construct a valid generic SQL statement", () => {
       const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
-      expect(new Visitors.MySQL().compile(node)).toBe('"users"."name" <=> 1');
+      expect(new Visitors.MySQL().compile(node)).toBe("`users`.`name` <=> 1");
     });
   });
 
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle column names on both sides", () => {
       const node = users.get("id").isDistinctFrom(posts.get("user_id"));
-      expect(new Visitors.MySQL().compile(node)).toBe('NOT "users"."id" <=> "posts"."user_id"');
+      expect(new Visitors.MySQL().compile(node)).toBe("NOT `users`.`id` <=> `posts`.`user_id`");
     });
   });
 
@@ -200,54 +200,49 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
   const compile = (n: Nodes.Node): string => new Visitors.MySQL().compile(n);
 
   it("Bin uses CAST(... AS BINARY) (mirrors Rails)", () => {
-    expect(compile(new Nodes.Bin(users.get("name")))).toBe('CAST("users"."name" AS BINARY)');
+    expect(compile(new Nodes.Bin(users.get("name")))).toBe("CAST(`users`.`name` AS BINARY)");
   });
 
   it("UnqualifiedColumn delegates to its inner expression", () => {
-    expect(compile(new Nodes.UnqualifiedColumn(users.get("name")))).toBe('"users"."name"');
+    expect(compile(new Nodes.UnqualifiedColumn(users.get("name")))).toBe("`users`.`name`");
   });
 
   it("UnqualifiedColumn renders an UPDATE SET assignment without dialect drift", () => {
-    // The override exists so `UPDATE t SET col = col + 1` works on
-    // MySQL — the LHS of the assignment must compile cleanly through
-    // the inner Attribute. Regression coverage: any future change to
-    // visitUnqualifiedColumn that throws or short-circuits would
-    // break this end-to-end shape.
     const lhs = new Nodes.UnqualifiedColumn(users.get("counter"));
     const sql = compile(new Nodes.Assignment(lhs, new Nodes.SqlLiteral("1")));
-    expect(sql).toContain('"users"."counter"');
+    expect(sql).toContain("`users`.`counter`");
     expect(sql).toContain("=");
     expect(sql).toContain("1");
   });
 
   it("IsNotDistinctFrom uses MySQL `<=>` operator", () => {
     const node = new Nodes.IsNotDistinctFrom(users.get("a"), users.get("b"));
-    expect(compile(node)).toBe('"users"."a" <=> "users"."b"');
+    expect(compile(node)).toBe("`users`.`a` <=> `users`.`b`");
   });
 
   it("IsNotDistinctFrom handles NULL on the right (Rails: `<=> NULL`)", () => {
     const node = users.get("name").isNotDistinctFrom(null);
-    expect(compile(node)).toBe('"users"."name" <=> NULL');
+    expect(compile(node)).toBe("`users`.`name` <=> NULL");
   });
 
   it("IsDistinctFrom uses MySQL `NOT ... <=>` operator", () => {
     const node = new Nodes.IsDistinctFrom(users.get("a"), users.get("b"));
-    expect(compile(node)).toBe('NOT "users"."a" <=> "users"."b"');
+    expect(compile(node)).toBe("NOT `users`.`a` <=> `users`.`b`");
   });
 
   it("IsDistinctFrom handles NULL on the right (Rails: `NOT … <=> NULL`)", () => {
     const node = users.get("name").isDistinctFrom(null);
-    expect(compile(node)).toBe('NOT "users"."name" <=> NULL');
+    expect(compile(node)).toBe("NOT `users`.`name` <=> NULL");
   });
 
   it("Regexp uses MySQL REGEXP keyword (not Postgres `~`)", () => {
     const node = new Nodes.Regexp(users.get("name"), new Nodes.SqlLiteral("'^a'"));
-    expect(compile(node)).toBe('"users"."name" REGEXP \'^a\'');
+    expect(compile(node)).toBe("`users`.`name` REGEXP '^a'");
   });
 
   it("NotRegexp uses MySQL NOT REGEXP keyword", () => {
     const node = new Nodes.NotRegexp(users.get("name"), new Nodes.SqlLiteral("'^a'"));
-    expect(compile(node)).toBe('"users"."name" NOT REGEXP \'^a\'');
+    expect(compile(node)).toBe("`users`.`name` NOT REGEXP '^a'");
   });
 
   describe("prepareUpdateStatement / prepareDeleteStatement (MySQL)", () => {
@@ -361,9 +356,9 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
       const stmt = buildUpdate({ withJoin: true, groups: true, havings: true });
       const out = prep.prepareUpdateStatement(stmt);
       const sql = visitor.compile(out);
-      expect(sql).toContain('IN (SELECT "id" FROM (SELECT DISTINCT "users"."id" FROM "users"');
-      expect(sql).toContain('INNER JOIN "posts" ON 1=1');
-      expect(sql).toContain('GROUP BY "users"."id" HAVING 1=1');
+      expect(sql).toContain("IN (SELECT `id` FROM (SELECT DISTINCT `users`.`id` FROM `users`");
+      expect(sql).toContain("INNER JOIN `posts` ON 1=1");
+      expect(sql).toContain("GROUP BY `users`.`id` HAVING 1=1");
       expect(sql).toContain(") AS __active_record_temp)");
     });
   });
@@ -381,7 +376,7 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
     const inner = new SelectManager(users).project(users.get("id"));
     const cte = new Nodes.Cte("x", inner.ast);
     const sql = compile(cte);
-    expect(sql).toBe('`x` AS (SELECT "users"."id" FROM "users")');
+    expect(sql).toBe("`x` AS (SELECT `users`.`id` FROM `users`)");
   });
 
   it("Cte renders exactly one set of parens when relation is a Grouping (SqlLiteral path)", () => {
@@ -390,5 +385,18 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
     const sql = compile(cte);
     expect(sql).toBe("`x` AS (SELECT 1)");
     expect(sql).not.toMatch(/\(\s*\(/);
+  });
+
+  it("new MySQL() with mysqlQuoter emits backtick identifiers end-to-end", () => {
+    const sql = compile(users.project(users.get("id")).ast);
+    expect(sql).toContain("`users`.`id`");
+    expect(sql).toContain("FROM `users`");
+  });
+
+  it("identifier with embedded backtick is doubled by mysqlDefaultQuoter", () => {
+    const tbl = new Table("we`ird");
+    const sql = compile(tbl.project(tbl.get("co`l")).ast);
+    expect(sql).toContain("`we``ird`");
+    expect(sql).toContain("`co``l`");
   });
 });

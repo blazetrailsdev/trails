@@ -414,9 +414,12 @@ export class Builder {
   }
 
   private _visitor(): Visitors.ToSql {
-    if (this._dialect === "mysql") return new Visitors.MySQL();
-    if (this._dialect === "postgres") return new Visitors.PostgreSQL();
-    return new Visitors.SQLite();
+    const v = this._insertAll.connection.arelVisitor;
+    if (v) return v;
+    const q = this._insertAll.connection as unknown as Visitors.ArelQuoter;
+    if (this._dialect === "mysql") return new Visitors.MySQL(q);
+    if (this._dialect === "postgres") return new Visitors.PostgreSQL(q);
+    return new Visitors.SQLite(q);
   }
 
   private _firstColumn(): string | undefined {

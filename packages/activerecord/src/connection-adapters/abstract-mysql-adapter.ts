@@ -22,7 +22,7 @@ import {
   sqlTypeToMigrationKeyword,
   NotImplementedError,
 } from "../errors.js";
-import { sql as arelSql, type Nodes } from "@blazetrails/arel";
+import { sql as arelSql, type Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import {
   quoteString as mysqlQuoteString,
@@ -219,6 +219,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   override quoteColumnName(name: string): string {
     return mysqlQuoteColumnName(name);
+  }
+
+  /** @internal */
+  override get arelVisitor(): Visitors.ToSql {
+    return new Visitors.MySQL(this);
   }
 
   override quotedTrue(): string {

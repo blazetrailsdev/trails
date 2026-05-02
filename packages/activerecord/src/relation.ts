@@ -128,12 +128,6 @@ function _addAssocJoin(
   clauses.push({ type, table: join.table, on: join.on, quoted: true });
 }
 
-/** Compile one or more Arel predicate nodes to the ON string used in _joinClauses. */
-function _buildOnString(...predicates: Nodes.Node[]): string {
-  const node = predicates.length === 1 ? predicates[0] : new Nodes.And(predicates);
-  return new Visitors.ToSql().compile(node);
-}
-
 /**
  * Return the alias bare if it is a valid SQL identifier (letters/digits/underscore,
  * starting with a letter or underscore), otherwise double-quote and escape it.
@@ -559,7 +553,7 @@ export class Relation<T extends Base> {
         onPredicates.push(tgt.get(typeCol).eq(modelClass.name));
       }
       const onNode = onPredicates.length === 1 ? onPredicates[0] : new Nodes.And(onPredicates);
-      const on = new Visitors.ToSql().compile(onNode);
+      const on = this._arelVisitor().compile(onNode);
       return { joins: [{ table: targetTable, on }], table: targetTable, pks: ["id"] };
     }
     return null;
@@ -1343,7 +1337,12 @@ export class Relation<T extends Base> {
         predicates.push(tgt.get(inheritanceCol).in(stiNames));
       }
 
-      return { table: targetTable, on: _buildOnString(...predicates) };
+      return {
+        table: targetTable,
+        on: this._arelVisitor().compile(
+          predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
+        ),
+      };
     }
 
     if (assocDef.type === "hasOne" || assocDef.type === "hasMany") {
@@ -1383,7 +1382,12 @@ export class Relation<T extends Base> {
         predicates.push(tgt.get(inheritanceCol).in(stiNames));
       }
 
-      return { table: targetTable, on: _buildOnString(...predicates) };
+      return {
+        table: targetTable,
+        on: this._arelVisitor().compile(
+          predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
+        ),
+      };
     }
 
     // hasManyThrough (test-data style where type is literally "hasManyThrough")
@@ -1495,8 +1499,18 @@ export class Relation<T extends Base> {
     }
 
     return [
-      { table: throughTable, on: _buildOnString(...throughPredicates) },
-      { table: targetTable, on: _buildOnString(...targetPredicates) },
+      {
+        table: throughTable,
+        on: this._arelVisitor().compile(
+          throughPredicates.length === 1 ? throughPredicates[0] : new Nodes.And(throughPredicates),
+        ),
+      },
+      {
+        table: targetTable,
+        on: this._arelVisitor().compile(
+          targetPredicates.length === 1 ? targetPredicates[0] : new Nodes.And(targetPredicates),
+        ),
+      },
     ];
   }
 
@@ -1536,10 +1550,13 @@ export class Relation<T extends Base> {
     const joinT = new Table(joinTable);
     const tgtT = new Table(targetTable);
     return [
-      { table: joinTable, on: _buildOnString(joinT.get(ownerFk).eq(srcT.get(sourcePk))) },
+      {
+        table: joinTable,
+        on: this._arelVisitor().compile(joinT.get(ownerFk).eq(srcT.get(sourcePk))),
+      },
       {
         table: targetTable,
-        on: _buildOnString(tgtT.get(targetPk as string).eq(joinT.get(targetFk))),
+        on: this._arelVisitor().compile(tgtT.get(targetPk as string).eq(joinT.get(targetFk))),
       },
     ];
   }
@@ -3454,8 +3471,15 @@ export class Relation<T extends Base> {
     }
   }
 
+  private _arelVisitor(): Visitors.ToSql {
+    const adapter = (this._modelClass as any)._adapter as
+      | (Visitors.ArelQuoter & { arelVisitor?: Visitors.ToSql })
+      | null;
+    return adapter?.arelVisitor ?? new Visitors.ToSql(adapter ?? undefined);
+  }
+
   private _compileArelNode(node: Nodes.Node): string {
-    return new Visitors.ToSql().compile(node);
+    return this._arelVisitor().compile(node);
   }
 
   // Returns true when `col` is a known schema attribute OR is (part of) the

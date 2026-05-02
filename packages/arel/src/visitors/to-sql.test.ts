@@ -1661,3 +1661,23 @@ describe("the to_sql visitor", () => {
     });
   });
 });
+
+describe("ArelQuoter / defaultQuoter wiring", () => {
+  const users = new Table("users");
+
+  it("default quoter emits double-quoted identifiers", () => {
+    const sql = new Visitors.ToSql().compile(users.get("id").eq(1));
+    expect(sql).toContain('"users"."id"');
+  });
+
+  it("stub quoter: quoteTableName output appears in compiled SQL", () => {
+    const stubQuoter: Visitors.ArelQuoter = {
+      quoteTableName: (name) => `<<${name}>>`,
+      quoteColumnName: (name) => `<<${name}>>`,
+      quoteString: (s) => s.replace(/'/g, "''"),
+      quote: (v) => (v === null ? "NULL" : `'${v}'`),
+    };
+    const sql = new Visitors.ToSql(stubQuoter).compile(users.get("id").eq(1));
+    expect(sql).toContain("<<users>>");
+  });
+});

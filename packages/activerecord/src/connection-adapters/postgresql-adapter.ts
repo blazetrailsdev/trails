@@ -1756,7 +1756,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /** @internal */
   get arelVisitor(): Visitors.ToSql {
-    return new Visitors.PostgreSQLWithBinds();
+    return new Visitors.PostgreSQLWithBinds(this);
   }
 
   supportsDdlTransactions(): boolean {

@@ -1,7 +1,8 @@
 import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { ToSql } from "./to-sql.js";
+import { ToSql, type ArelQuoter } from "./to-sql.js";
+import { mysqlDefaultQuoter } from "./default-quoter.js";
 
 /**
  * MySQL visitor — dialect tweaks on top of generic ToSql.
@@ -9,6 +10,10 @@ import { ToSql } from "./to-sql.js";
  * Mirrors: Arel::Visitors::MySQL
  */
 export class MySQL extends ToSql {
+  constructor(quoter: ArelQuoter = mysqlDefaultQuoter) {
+    super(quoter);
+  }
+
   protected override visitArelNodesSelectStatement(node: Nodes.SelectStatement): SQLString {
     if (node.with) {
       this.visit(node.with);
@@ -252,8 +257,7 @@ export class MySQL extends ToSql {
     // SelectManager as Rails does), so we add them explicitly. But
     // buildWithExpressionFromValue wraps SqlLiteral relations in a Grouping,
     // which visits with its own parens — skip the explicit wrap in that case.
-    const escaped = node.name.replace(/`/g, "``");
-    this.collector.append(`\`${escaped}\` AS `);
+    this.collector.append(`${this.quoter.quoteTableName(node.name)} AS `);
     if (node.relation instanceof Nodes.Grouping) {
       this.visit(node.relation);
     } else {

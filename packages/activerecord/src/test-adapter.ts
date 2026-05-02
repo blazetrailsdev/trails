@@ -18,6 +18,7 @@
 
 import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
+import { Visitors } from "@blazetrails/arel";
 import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
 import { include } from "@blazetrails/activesupport";
 import { isWriteQuerySql } from "./connection-adapters/sql-classification.js";
@@ -793,6 +794,16 @@ class SchemaAdapter implements DatabaseAdapter {
     throw new Error(
       `SchemaAdapter.quoteDefaultExpression: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteDefaultExpression()`,
     );
+  }
+
+  quoteString(s: string): string {
+    const inner = this.inner as { quoteString?: (s: string) => string };
+    if (typeof inner.quoteString === "function") return inner.quoteString(s);
+    return s.replace(/\\/g, "\\\\").replace(/'/g, "''");
+  }
+
+  get arelVisitor(): Visitors.ToSql | undefined {
+    return undefined;
   }
 
   async cleanup(): Promise<void> {

@@ -6,6 +6,26 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors.js";
+import { defaultQuoter } from "./default-quoter.js";
+
+/**
+ * Structural duck-type for identifier and value quoting.
+ * activerecord's full `Quoting` interface is a superset; both satisfy this.
+ *
+ * Mirrors: Arel::Visitors::ToSql constructor `connection` param (Rails passes
+ * the full connection; we accept only the quoting subset so arel stays
+ * dependency-free from activerecord).
+ */
+export interface ArelQuoter {
+  /** @internal */
+  quoteTableName(name: string): string;
+  /** @internal */
+  quoteColumnName(name: string): string;
+  /** @internal */
+  quoteString(s: string): string;
+  /** @internal */
+  quote(value: unknown): string;
+}
 
 /**
  * Resolve a bind's database value. QueryAttribute exposes
@@ -29,8 +49,14 @@ const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
  * Mirrors: Arel::Visitors::ToSql
  */
 export class ToSql extends Visitor implements NodeVisitor<SQLString> {
+  protected readonly quoter: ArelQuoter;
   protected collector!: SQLString;
   protected _extractBinds = false;
+
+  constructor(quoter: ArelQuoter = defaultQuoter) {
+    super();
+    this.quoter = quoter;
+  }
 
   compile(node: Node): string {
     this.collector = new SQLString();
@@ -1591,29 +1617,16 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       .trim();
   }
 
-  /**
-   * Mirrors `to_sql.rb#quote_table_name`. SqlLiteral pass-through; otherwise
-   * default double-quoted identifier with embedded `"` doubled. Schema-
-   * qualified names (e.g. `"schema.table"`) are split on `.` and each
-   * segment is quoted independently — same behavior the connection adapter
-   * provides in Rails. MySQL overrides to backtick-quote (deferred — see
-   * project memory `arel MySQL identifier quoting`).
-   */
+  /** @internal */
   protected quoteTableName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return String(name)
-      .split(".")
-      .map((p) => `"${p.replace(/"/g, '""')}"`)
-      .join(".");
+    return this.quoter.quoteTableName(String(name));
   }
 
-  /**
-   * Mirrors `to_sql.rb#quote_column_name`. Column names are not schema-
-   * qualified, so a plain double-quote suffices.
-   */
+  /** @internal */
   protected quoteColumnName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return `"${String(name).replace(/"/g, '""')}"`;
+    return this.quoter.quoteColumnName(String(name));
   }
 
   /**

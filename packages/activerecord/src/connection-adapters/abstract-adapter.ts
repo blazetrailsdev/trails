@@ -728,7 +728,7 @@ export class AbstractAdapter implements Quoting {
    * @internal
    */
   get arelVisitor(): Visitors.ToSql {
-    return new Visitors.ToSql();
+    return new Visitors.ToSql(this);
   }
 
   private _preparedStatementsDisabledCache = new Set<unknown>();

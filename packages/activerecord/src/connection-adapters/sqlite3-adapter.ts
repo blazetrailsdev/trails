@@ -129,7 +129,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   override get arelVisitor(): Visitors.ToSql {
-    return new Visitors.SQLite();
+    return new Visitors.SQLite(this);
   }
 
   private db: Database.Database;
