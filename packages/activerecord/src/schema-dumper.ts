@@ -15,7 +15,6 @@
  * connection-adapters/abstract/schema-dumper.ts.
  */
 
-import { NotImplementedError } from "./errors.js";
 import type { DatabaseAdapter } from "./adapter.js";
 // Type-only import: SchemaStatements -> SchemaDumper (abstract inner
 // extends this file's base) -> schema-dumper.ts would be a runtime
@@ -52,6 +51,14 @@ export interface IndexInfo {
   columns: string[];
   unique: boolean;
   name?: string;
+  /** Per-column max lengths (number for single-column, Record for multi). */
+  lengths?: number | Record<string, number>;
+  /** Per-column sort order (e.g. "asc"/"desc"). */
+  orders?: string | Record<string, string>;
+  /** Per-column operator class (Postgres). */
+  opclasses?: string | Record<string, string>;
+  where?: string;
+  using?: string;
 }
 
 /**
@@ -71,6 +78,8 @@ export type SchemaDumpLanguage = "ts" | "js";
 export interface SchemaDumperOptions {
   /** Output language for the generated schema DSL: "ts" (default) or "js". */
   language?: SchemaDumpLanguage;
+  /** Migration version string, surfaced via `defineParams()` in the header. */
+  version?: string;
 }
 
 interface DslMapping {
@@ -337,6 +346,9 @@ export class SchemaDumper {
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
   private _language: SchemaDumpLanguage;
+  private _tableName?: string;
+  private _version?: string;
+  private _ignoreTables: (string | RegExp)[];
 
   /** @internal */
   constructor(source: SchemaSource, options: Record<string, unknown> = {}) {
@@ -344,6 +356,40 @@ export class SchemaDumper {
     this._options = options;
     const lang = (options.language as SchemaDumpLanguage | undefined) ?? "ts";
     this._language = lang;
+    this._version = typeof options.version === "string" ? options.version : undefined;
+    const subclassIgnore = (this.constructor as typeof SchemaDumper).ignoreTables ?? [];
+    this._ignoreTables = ["schema_migrations", "ar_internal_metadata", ...subclassIgnore];
+  }
+
+  /** @internal */
+  get tableName(): string | undefined {
+    return this._tableName;
+  }
+  /** @internal */
+  set tableName(value: string | undefined) {
+    this._tableName = value;
+  }
+
+  /** @internal */
+  formattedVersion(): string {
+    const s = this._version ?? "";
+    if (s.length !== 14) return s;
+    return `${s.slice(0, 4)}_${s.slice(4, 6)}_${s.slice(6, 8)}_${s.slice(8)}`;
+  }
+
+  /** @internal */
+  defineParams(): string {
+    return this._version ? `version: ${this.formattedVersion()}` : "";
+  }
+
+  /** @internal */
+  static generateOptions(
+    config: { tableNamePrefix?: string; tableNameSuffix?: string } = {},
+  ): Record<string, unknown> {
+    return {
+      tableNamePrefix: config.tableNamePrefix ?? "",
+      tableNameSuffix: config.tableNameSuffix ?? "",
+    };
   }
 
   /**
@@ -413,22 +459,25 @@ export class SchemaDumper {
         version = versions[versions.length - 1];
       }
     }
-    const schema = await (this.dump(adapter, options) as Promise<string>);
+    const schema = await (this.dump(adapter, { ...options, version }) as Promise<string>);
     return `// Schema version: ${version}\n${schema}`;
   }
 
   dump(): string | Promise<string> {
     const lines: string[] = [];
     this.header(lines);
+    this.schemas(lines);
+    this.extensions(lines);
+    this.types(lines);
     const result = this.dumpTables(lines);
     if (result instanceof Promise) {
       return result.then(async () => {
-        await this.dumpVirtualTables(lines);
+        await this.virtualTables(lines);
         this.trailer(lines);
         return lines.join("\n");
       });
     }
-    const vtResult = this.dumpVirtualTables(lines);
+    const vtResult = this.virtualTables(lines);
     if (vtResult instanceof Promise) {
       return vtResult.then(() => {
         this.trailer(lines);
@@ -439,9 +488,17 @@ export class SchemaDumper {
     return lines.join("\n");
   }
 
-  // Mirrors: SQLite3::SchemaDumper#virtual_tables — emits createVirtualTable
-  // calls for any virtual tables found via the adapter.
-  protected dumpVirtualTables(lines: string[]): void | Promise<void> {
+  /** @internal */
+  protected extensions(_lines: string[]): void {}
+
+  /** @internal */
+  protected types(_lines: string[]): void {}
+
+  /** @internal */
+  protected schemas(_lines: string[]): void {}
+
+  /** @internal */
+  protected virtualTables(lines: string[]): void | Promise<void> {
     const adapter = this._source instanceof AdapterSchemaSource ? this._source.adapter : undefined;
     if (!adapter || typeof (adapter as any).virtualTables !== "function") return;
     return this._dumpVirtualTablesAsync(lines);
@@ -474,6 +531,8 @@ export class SchemaDumper {
   private header(lines: string[]): void {
     lines.push("// This file is auto-generated from the current state of the database.");
     lines.push("// Instead of editing this file, please use the migrations feature.");
+    const params = this.defineParams();
+    if (params) lines.push(`// ${params}`);
     lines.push("");
     if (this._language === "ts") {
       lines.push(`import type { MigrationContext } from "@blazetrails/activerecord";`);
@@ -492,15 +551,23 @@ export class SchemaDumper {
   private dumpTables(lines: string[]): void | Promise<void> {
     const tableNames = this._source.tables();
     if (tableNames instanceof Promise) {
-      return tableNames.then(async (names) => {
+      return tableNames.then(async (raw) => {
+        const names = [...raw].sort();
         for (const tableName of names) {
-          if (this.shouldIgnore(tableName)) continue;
-          await this.dumpTable(lines, tableName);
+          if (this.isIgnored(tableName)) continue;
+          await this.table(tableName, lines);
+        }
+        if (this._fkHookHost() !== undefined) {
+          for (const tableName of names) {
+            if (this.isIgnored(tableName)) continue;
+            await this.foreignKeys(tableName, lines);
+          }
         }
       });
     }
-    for (const tableName of tableNames) {
-      if (this.shouldIgnore(tableName)) continue;
+    const sorted = [...(tableNames as string[])].sort();
+    for (const tableName of sorted) {
+      if (this.isIgnored(tableName)) continue;
       const columns = this._source.columns(tableName);
       const indexes = this._source.indexes(tableName);
       if (columns instanceof Promise || indexes instanceof Promise) {
@@ -509,35 +576,58 @@ export class SchemaDumper {
             "Use the async schema dumper path (make tables() return a Promise) or ensure all schema methods are synchronous.",
         );
       }
-      this.emitTable(lines, tableName, columns as ColumnInfo[], indexes as IndexInfo[]);
+      this.tableName = tableName;
+      try {
+        this.emitTable(lines, tableName, columns as ColumnInfo[], indexes as IndexInfo[]);
+        lines.push("");
+      } finally {
+        this.tableName = undefined;
+      }
     }
   }
 
-  private shouldIgnore(tableName: string): boolean {
-    if (tableName === "schema_migrations" || tableName === "ar_internal_metadata") {
-      return true;
-    }
-    // Read off the concrete subclass so setting
-    // `InnerSchemaDumper.ignoreTables = [...]` (or a postgres/sqlite
-    // subclass's own) is honored. Rails does the equivalent with
-    // `self.class.ignore_tables` — the static is per-class, not a
-    // single global on the base.
-    const subclass = this.constructor as typeof SchemaDumper;
-    for (const pattern of subclass.ignoreTables) {
+  /** @internal */
+  isIgnored(tableName: string): boolean {
+    const stripped = this.removePrefixAndSuffix(tableName);
+    for (const pattern of this._ignoreTables) {
       if (typeof pattern === "string") {
-        if (tableName === pattern) return true;
+        if (stripped === pattern) return true;
       } else if (pattern instanceof RegExp) {
         pattern.lastIndex = 0;
-        if (pattern.test(tableName)) return true;
+        if (pattern.test(stripped)) return true;
       }
     }
     return false;
   }
 
+  /** @internal */
+  removePrefixAndSuffix(table: string): string {
+    const prefix = (this._options.tableNamePrefix as string | undefined) ?? "";
+    const suffix = (this._options.tableNameSuffix as string | undefined) ?? "";
+    if (!prefix && !suffix) return table;
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^${escape(prefix)}(.+)${escape(suffix)}$`);
+    const m = table.match(re);
+    return m ? m[1] : table;
+  }
+
+  /** @internal Used by `dumpTableSchema` and external callers. */
   async dumpTable(lines: string[], tableName: string): Promise<void> {
-    const columns = await this._source.columns(tableName);
-    const indexes = await this._source.indexes(tableName);
-    this.emitTable(lines, tableName, columns, indexes);
+    await this.table(tableName, lines);
+  }
+
+  /** @internal */
+  async table(tableName: string, lines: string[]): Promise<void> {
+    this.tableName = tableName;
+    try {
+      const columns = await this._source.columns(tableName);
+      const indexes = await this._source.indexes(tableName);
+      this.emitTable(lines, tableName, columns, indexes);
+      await this.checkConstraintsInCreate(tableName, lines);
+      lines.push("");
+    } finally {
+      this.tableName = undefined;
+    }
   }
 
   private emitTable(
@@ -548,50 +638,48 @@ export class SchemaDumper {
   ): void {
     const pkColumn = columns.find((c) => c.primaryKey);
     const hasId = pkColumn?.name === "id";
+    const stripped = this.removePrefixAndSuffix(tableName);
 
-    const options: string[] = [];
-    if (!hasId) {
-      options.push("id: false");
-    }
-    const optStr = options.length > 0 ? `{ ${options.join(", ")} }` : "{}";
+    const tableOpts: Record<string, unknown> = {};
+    if (!hasId) tableOpts.id = false;
+    const optStr =
+      Object.keys(tableOpts).length > 0 ? `{ ${this.formatOptions(tableOpts)} }` : "{}";
 
-    lines.push(`  await ctx.createTable(${JSON.stringify(tableName)}, ${optStr}, (t) => {`);
+    lines.push(`  await ctx.createTable(${JSON.stringify(stripped)}, ${optStr}, (t) => {`);
 
     for (const col of columns) {
       if (col.name === "id" && hasId) continue;
 
       const { dslType, extraOpts } = sqlTypeToDsl(col.type);
-      const opts: string[] = [];
+      const colspec: Record<string, unknown> = {};
 
-      if (col.null === false) opts.push("null: false");
-
+      if (col.null === false) colspec.null = false;
       const cleanedDefault = cleanDefault(col.default);
       if (cleanedDefault !== undefined && cleanedDefault !== null) {
-        opts.push(`default: ${JSON.stringify(cleanedDefault)}`);
+        colspec.default = cleanedDefault;
       }
-
       if (extraOpts) {
         for (const [key, value] of Object.entries(extraOpts)) {
           // `enum_type` carries the PG enum type name — consumed by
           // the column-type fallback below, not a column option.
           if (key === "enum_type") continue;
-          opts.push(`${key}: ${JSON.stringify(value)}`);
+          colspec[key] = value;
         }
       }
-
       if (col.limit !== undefined && col.limit !== null && extraOpts?.limit === undefined)
-        opts.push(`limit: ${col.limit}`);
+        colspec.limit = col.limit;
       if (
         col.precision !== undefined &&
         col.precision !== null &&
         extraOpts?.precision === undefined
       )
-        opts.push(`precision: ${col.precision}`);
+        colspec.precision = col.precision;
       if (col.scale !== undefined && col.scale !== null && extraOpts?.scale === undefined)
-        opts.push(`scale: ${col.scale}`);
-      if (col.collation != null) opts.push(`collation: ${JSON.stringify(col.collation)}`);
+        colspec.scale = col.scale;
+      if (col.collation != null) colspec.collation = col.collation;
 
-      const optionsStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+      const optionsStr =
+        Object.keys(colspec).length > 0 ? `, { ${this.formatColspec(colspec)} }` : "";
 
       if (DSL_HELPER_METHODS.has(dslType)) {
         lines.push(`    t.${dslType}(${JSON.stringify(col.name)}${optionsStr});`);
@@ -612,19 +700,144 @@ export class SchemaDumper {
 
     lines.push("  });");
 
-    for (const idx of indexes) {
-      const cols =
-        idx.columns.length === 1
-          ? JSON.stringify(idx.columns[0])
-          : `[${idx.columns.map((c: string) => JSON.stringify(c)).join(", ")}]`;
-      const idxOpts: string[] = [];
-      if (idx.unique) idxOpts.push("unique: true");
-      if (idx.name) idxOpts.push(`name: ${JSON.stringify(idx.name)}`);
-      const idxOptStr = idxOpts.length > 0 ? `, { ${idxOpts.join(", ")} }` : "";
-      lines.push(`  await ctx.addIndex(${JSON.stringify(tableName)}, ${cols}${idxOptStr});`);
-    }
+    this.indexesInCreate(tableName, lines, indexes);
+  }
 
-    lines.push("");
+  /** @internal */
+  indexParts(index: IndexInfo): string[] {
+    const cols =
+      index.columns.length === 1
+        ? JSON.stringify(index.columns[0])
+        : `[${index.columns.map((c) => JSON.stringify(c)).join(", ")}]`;
+    const parts: string[] = [cols];
+    if (index.name) parts.push(`name: ${JSON.stringify(index.name)}`);
+    if (index.unique) parts.push("unique: true");
+    if (index.lengths !== undefined) parts.push(`length: ${this.formatIndexParts(index.lengths)}`);
+    if (index.orders !== undefined) parts.push(`order: ${this.formatIndexParts(index.orders)}`);
+    if (index.opclasses !== undefined)
+      parts.push(`opclass: ${this.formatIndexParts(index.opclasses)}`);
+    if (index.where) parts.push(`where: ${JSON.stringify(index.where)}`);
+    if (index.using) parts.push(`using: ${JSON.stringify(index.using)}`);
+    return parts;
+  }
+
+  /** @internal */
+  indexesInCreate(tableName: string, lines: string[], indexes: IndexInfo[] = []): void {
+    const stripped = this.removePrefixAndSuffix(tableName);
+    for (const idx of indexes) {
+      const [cols, ...opts] = this.indexParts(idx);
+      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+      lines.push(`  await ctx.addIndex(${JSON.stringify(stripped)}, ${cols}${optStr});`);
+    }
+  }
+
+  /**
+   * Resolve the host that exposes optional `checkConstraints(table)` /
+   * `foreignKeys(table)` hooks. Both an `AdapterSchemaSource`'s wrapped
+   * adapter and a `SchemaStatements`-backed source can provide them, so
+   * check both — keeps dumps consistent regardless of which entry point
+   * the dumper was constructed with.
+   * @internal
+   */
+  private _hookHost(method: "checkConstraints" | "foreignKeys"): unknown {
+    const candidates: unknown[] = [
+      this._source,
+      this._source instanceof AdapterSchemaSource ? this._source.adapter : undefined,
+    ];
+    for (const c of candidates) {
+      const fn = (c as Record<string, unknown> | undefined)?.[method];
+      if (typeof fn === "function") return c;
+    }
+    return undefined;
+  }
+
+  /** @internal */
+  private _fkHookHost(): unknown {
+    return this._hookHost("foreignKeys");
+  }
+
+  /** @internal */
+  async checkConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
+    const host = this._hookHost("checkConstraints");
+    if (!host) return;
+    const fn = (host as { checkConstraints: (t: string) => Promise<unknown[]> }).checkConstraints;
+    const constraints = (await fn.call(host, tableName)) ?? [];
+    const stripped = this.removePrefixAndSuffix(tableName);
+    for (const chk of constraints as { expression: string; name?: string; validate?: boolean }[]) {
+      const [expr, ...opts] = this.checkParts(chk);
+      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+      lines.push(`  await ctx.addCheckConstraint(${JSON.stringify(stripped)}, ${expr}${optStr});`);
+    }
+  }
+
+  /** @internal */
+  checkParts(check: { expression: string; name?: string; validate?: boolean }): string[] {
+    const parts: string[] = [JSON.stringify(check.expression)];
+    if (check.name) parts.push(`name: ${JSON.stringify(check.name)}`);
+    if (check.validate === false) parts.push("validate: false");
+    return parts;
+  }
+
+  /** @internal */
+  async foreignKeys(tableName: string, lines: string[]): Promise<void> {
+    const host = this._hookHost("foreignKeys");
+    if (!host) return;
+    const fn = (host as { foreignKeys: (t: string) => Promise<unknown[]> }).foreignKeys;
+    const fks = (await fn.call(host, tableName)) ?? [];
+    type Fk = {
+      fromTable?: string;
+      toTable: string;
+      column?: string;
+      primaryKey?: string;
+      name?: string;
+      onUpdate?: string;
+      onDelete?: string;
+      deferrable?: boolean | string;
+      validate?: boolean;
+    };
+    for (const fk of fks as Fk[]) {
+      const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable ?? tableName));
+      const toExpr = JSON.stringify(this.removePrefixAndSuffix(fk.toTable));
+      const opts: string[] = [];
+      if (fk.column) opts.push(`column: ${JSON.stringify(fk.column)}`);
+      if (fk.primaryKey) opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
+      if (fk.name) opts.push(`name: ${JSON.stringify(fk.name)}`);
+      if (fk.onUpdate) opts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
+      if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
+      if (fk.deferrable !== undefined && fk.deferrable !== false)
+        opts.push(`deferrable: ${JSON.stringify(fk.deferrable)}`);
+      if (fk.validate === false) opts.push("validate: false");
+      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+      lines.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
+    }
+  }
+
+  /** @internal */
+  formatColspec(colspec: Record<string, unknown>): string {
+    return Object.entries(colspec)
+      .map(([k, v]) => {
+        if (v && typeof v === "object" && !Array.isArray(v)) {
+          return `${k}: { ${this.formatColspec(v as Record<string, unknown>)} }`;
+        }
+        return `${k}: ${JSON.stringify(v)}`;
+      })
+      .join(", ");
+  }
+
+  /** @internal */
+  formatOptions(options: Record<string, unknown>): string {
+    const isIdent = /^[a-zA-Z_$][\w$]*$/;
+    return Object.entries(options)
+      .map(([k, v]) => `${isIdent.test(k) ? k : JSON.stringify(k)}: ${JSON.stringify(v)}`)
+      .join(", ");
+  }
+
+  /** @internal */
+  formatIndexParts(options: unknown): string {
+    if (options && typeof options === "object" && !Array.isArray(options)) {
+      return `{ ${this.formatOptions(options as Record<string, unknown>)} }`;
+    }
+    return JSON.stringify(options);
   }
 }
 
@@ -649,108 +862,4 @@ function isDatabaseAdapter(v: unknown): v is DatabaseAdapter {
     typeof obj.executeMutation === "function" &&
     typeof obj.adapterName === "string"
   );
-}
-
-/** @internal */
-function tableName(): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#table_name is not implemented");
-}
-
-/** @internal */
-function constructor(connection: any, options?: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#initialize is not implemented");
-}
-
-/** @internal */
-function formattedVersion(): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#formatted_version is not implemented");
-}
-
-/** @internal */
-function defineParams(): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#define_params is not implemented");
-}
-
-/** @internal */
-function extensions(stream: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#extensions is not implemented");
-}
-
-/** @internal */
-function types(stream: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#types is not implemented");
-}
-
-/** @internal */
-function schemas(stream: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#schemas is not implemented");
-}
-
-/** @internal */
-function virtualTables(stream: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#virtual_tables is not implemented");
-}
-
-/** @internal */
-function table(table: any, stream: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#table is not implemented");
-}
-
-/** @internal */
-function indexesInCreate(table: any, stream: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#indexes_in_create is not implemented");
-}
-
-/** @internal */
-function indexParts(index: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#index_parts is not implemented");
-}
-
-/** @internal */
-function checkConstraintsInCreate(table: any, stream: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::SchemaDumper#check_constraints_in_create is not implemented",
-  );
-}
-
-/** @internal */
-function checkParts(check: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#check_parts is not implemented");
-}
-
-/** @internal */
-function foreignKeys(table: any, stream: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#foreign_keys is not implemented");
-}
-
-/** @internal */
-function formatColspec(colspec: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#format_colspec is not implemented");
-}
-
-/** @internal */
-function formatOptions(options: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#format_options is not implemented");
-}
-
-/** @internal */
-function formatIndexParts(options: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#format_index_parts is not implemented");
-}
-
-/** @internal */
-function removePrefixAndSuffix(table: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::SchemaDumper#remove_prefix_and_suffix is not implemented",
-  );
-}
-
-/** @internal */
-function isIgnored(tableName: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#ignored? is not implemented");
-}
-
-/** @internal */
-function generateOptions(config: any): never {
-  throw new NotImplementedError("ActiveRecord::SchemaDumper#generate_options is not implemented");
 }
