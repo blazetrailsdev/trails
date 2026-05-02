@@ -94,7 +94,7 @@ describe("SqlLiteralTest", () => {
       const fragments = a.join(b);
       expect(fragments).toBeInstanceOf(Nodes.Fragments);
       const sql = new Visitors.ToSql().compile(fragments);
-      expect(sql).toBe("foobar");
+      expect(sql).toBe("foo bar");
     });
   });
 });

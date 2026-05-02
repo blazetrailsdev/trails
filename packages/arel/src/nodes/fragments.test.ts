@@ -27,7 +27,7 @@ describe("FragmentsTest", () => {
       const a = new Nodes.Fragments([new Nodes.SqlLiteral("foo")]);
       const joined = a.join(new Nodes.SqlLiteral("bar"));
       const sql = new Visitors.ToSql().compile(joined);
-      expect(sql).toBe("foobar");
+      expect(sql).toBe("foo bar");
     });
   });
 });
