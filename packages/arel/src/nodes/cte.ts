@@ -10,9 +10,9 @@ import { Table } from "../table.js";
 export class Cte extends Binary {
   readonly name: string;
   readonly relation: Node;
-  readonly materialized?: "materialized" | "not_materialized";
+  readonly materialized: boolean | null;
 
-  constructor(name: string, relation: Node, materialized?: "materialized" | "not_materialized") {
+  constructor(name: string, relation: Node, materialized: boolean | null = null) {
     super(name, relation);
     this.name = name;
     this.relation = relation;

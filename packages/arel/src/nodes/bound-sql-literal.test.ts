@@ -39,6 +39,12 @@ describe("BoundSqlLiteralTest", () => {
         () => new Nodes.BoundSqlLiteral("id = ? AND name = :name", [1], { name: "x" }),
       ).toThrow(BindError);
     });
+
+    it("error message is quoted", () => {
+      expect(
+        () => new Nodes.BoundSqlLiteral("id = ? AND name = :name", [1], { name: "x" }),
+      ).toThrow('cannot mix positional and named binds in: "id = ? AND name = :name"');
+    });
   });
 
   describe("requires positional binds to match the placeholders", () => {
@@ -52,7 +58,15 @@ describe("BoundSqlLiteralTest", () => {
 
     it("error message matches Rails phrasing", () => {
       expect(() => new Nodes.BoundSqlLiteral("id IN (?, ?, ?)", [1, 2])).toThrow(
-        "wrong number of bind variables (2 for 3) in: id IN (?, ?, ?)",
+        'wrong number of bind variables (2 for 3) in: "id IN (?, ?, ?)"',
+      );
+    });
+
+    it("JSON.stringify escapes embedded double-quotes in error message", () => {
+      // SQL has 1 placeholder; 2 binds triggers a count mismatch.
+      // Verifies JSON.stringify correctly escapes the embedded double-quote in the SQL.
+      expect(() => new Nodes.BoundSqlLiteral('name = "O\'Brien" AND ?', [1, 2])).toThrow(
+        'wrong number of bind variables (2 for 1) in: "name = \\"O\'Brien\\" AND ?"',
       );
     });
   });
@@ -66,7 +80,13 @@ describe("BoundSqlLiteralTest", () => {
 
     it("error message matches Rails phrasing", () => {
       expect(() => new Nodes.BoundSqlLiteral("id IN (:foo, :bar)", [], { foo: 1 })).toThrow(
-        "missing value for :bar in: id IN (:foo, :bar)",
+        'missing value for :bar in: "id IN (:foo, :bar)"',
+      );
+    });
+
+    it("error message matches Rails phrasing (plural missing)", () => {
+      expect(() => new Nodes.BoundSqlLiteral("id IN (:foo, :bar, :baz)", [], { foo: 1 })).toThrow(
+        'missing values for ["bar","baz"] in: "id IN (:foo, :bar, :baz)"',
       );
     });
   });

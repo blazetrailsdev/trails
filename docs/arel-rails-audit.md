@@ -178,10 +178,10 @@ Generated: 2026-05-01. Rails source: `.rails-source/activerecord/lib/arel/`. TS 
 
 #### Behavioral
 
-**B1 — `materialized` type differs**
+**B1 — `materialized` type differs** ✅ fixed in PR 31
 
 - Rails: `materialized:` keyword arg is a tristate (`nil` / `true` / `false`). The visitor (to_sql.rb:736) branches on `true` / `false`.
-- TS: `materialized` is `"materialized" | "not_materialized" | undefined`. The TS visitor checks for the string values. The values are semantically equivalent but the types are incompatible with any cross-boundary code.
+- TS: now `boolean | null` (default `null`). Visitor branches on `=== true` / `=== false`, matching Rails exactly.
 
 **B2 — `Cte.toCte()` delegates to self vs. constructing**
 
@@ -266,10 +266,10 @@ Generated: 2026-05-01. Rails source: `.rails-source/activerecord/lib/arel/`. TS 
 
 #### Behavioral
 
-**B1 — Validation of `named_binds` is stricter in Rails**
+**B1 — Validation of `named_binds` is stricter in Rails** ✅ fixed in PR 31
 
 - Rails (bound_sql_literal.rb:20–34): validates that every `:token` appearing in the SQL string has a corresponding key in `named_binds`; raises `BindError` listing all missing keys at construction time.
-- TS (`bound-sql-literal.ts`): validation is deferred to visitor time (raises per missing key during iteration). Construction does not pre-validate.
+- TS: now validates at construction time, deduplicates tokens (matching Rails `.uniq`), and raises `BindError` for all missing keys in a single call.
 
 **B2 — `+` operator: Rails allows any `arel_node?`, TS expects a `Node` instance**
 
@@ -574,10 +574,10 @@ Generated: 2026-05-01. Rails source: `.rails-source/activerecord/lib/arel/`. TS 
 
 #### Behavioral
 
-**B1 — `BindError#initialize` message format differs**
+**B1 — `BindError#initialize` message format differs** ✅ fixed in PR 31
 
 - Rails (errors.rb:14): `super("#{message} in: #{sql.inspect}")` — uses Ruby's `.inspect` (adds surrounding quotes and escapes internals).
-- TS (`errors.ts`): equivalent string interpolation without `.inspect` semantics.
+- TS: now uses `JSON.stringify(sql)` which produces the same surrounding double-quotes and internal escape sequences as Ruby's `.inspect` for typical SQL strings.
 
 ---
 

@@ -280,14 +280,14 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::Cte", () => {
     it("handles CTEs with a MATERIALIZED modifier", () => {
-      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, "materialized");
+      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, true);
       const stmt = new SelectManager().with(cte).project("1");
       const sql = new Visitors.ToSql().compile(stmt.ast);
       expect(sql).toContain("MATERIALIZED");
     });
 
     it("handles CTEs with a NOT MATERIALIZED modifier", () => {
-      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, "not_materialized");
+      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, false);
       const stmt = new SelectManager().with(cte).project("1");
       const sql = new Visitors.ToSql().compile(stmt.ast);
       expect(sql).toContain("NOT MATERIALIZED");
@@ -295,6 +295,13 @@ describe("the to_sql visitor", () => {
 
     it("handles CTEs with no MATERIALIZED modifier", () => {
       const cte = new Nodes.Cte("t", users.project(users.get("id")).ast);
+      const stmt = new SelectManager().with(cte).project("1");
+      const sql = new Visitors.ToSql().compile(stmt.ast);
+      expect(sql).not.toContain("MATERIALIZED");
+    });
+
+    it("handles CTEs with null materialized (tristate nil — no modifier)", () => {
+      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast, null);
       const stmt = new SelectManager().with(cte).project("1");
       const sql = new Visitors.ToSql().compile(stmt.ast);
       expect(sql).not.toContain("MATERIALIZED");

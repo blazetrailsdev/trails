@@ -14,7 +14,7 @@ export class EmptyJoinError extends ArelError {
 
 export class BindError extends ArelError {
   constructor(message: string, sql?: string) {
-    super(sql ? `${message} in: ${sql}` : message);
+    super(sql !== undefined ? `${message} in: ${JSON.stringify(sql)}` : message);
     this.name = "BindError";
   }
 }
