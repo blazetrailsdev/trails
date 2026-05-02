@@ -89,10 +89,10 @@ because they go stale immediately after each merge.
 
 **PR B6 — Attribute method dispatch cluster**
 `isAttributeMethod`, `matchedAttributeMethod`, `missingAttribute`,
-`_readAttribute`, `_writeAttribute`, `resolveAttributeName`. Defer
-until Track D0 lands the readAttribute caller audit — the dispatch
-cluster's design depends on whether trails introduces
-`tryReadAttribute` or keeps `hasAttribute` guards.
+`_readAttribute`, `_writeAttribute`, `resolveAttributeName` in
+`attribute_methods.rb`, `attributes.rb`, `dirty.rb`.
+Previously gated on D0; D0 audit confirmed no design dependency —
+proceed directly.
 
 **PR B7c — Type / validator leaves**
 `maxValue` (`type/big_integer.rb`), `registrations`
@@ -159,44 +159,125 @@ infra C2 introduces).
 
 ## Track D — `Model#readAttribute` → `MissingAttributeError`
 
-The 217-call-site refactor that the post-100% review flagged but kept
-out of scope because it's much larger than a cleanup PR.
+### D0 Audit — completed 2026-05-02
 
-Rails `attribute_methods.rb:553` raises `MissingAttributeError` via
-`missing_attribute(attr_name, stack)`. Trails `Model#readAttribute`
-returns `null` for unknown attributes — divergence currently documented
-inline in `model.ts:readAttribute`. As of 2026-04-29, ~217 internal
-call sites across ~47 files (excluding tests / `dist/` / `.d.ts`)
-rely on null-return — re-grep at D0 time, the count drifts.
+**Scope:** 277 non-test call sites across 57 source files (re-grepped
+from main; count grew from 217 as new AR features landed since
+2026-04-29).
 
-**PR D0 — Caller audit, no code**
-Categorize the 217 sites:
+---
 
-- (a) "definitely defined, raise on miss" → keep `readAttribute`.
-- (b) "may be undefined, treat as nil" → switch to
-  `hasAttribute(name) ? readAttribute(name) : null` or a new
-  `tryReadAttribute(name)` helper.
+#### Rails semantics clarified
 
-Decide whether to introduce `tryReadAttribute` or require explicit
-`hasAttribute` guards. Rails ActiveRecord overrides `_read_attribute`
-to return nil via `@attributes.fetch_value(attr)`; ActiveModel raises.
-Pick a stance.
+The original framing assumed trails diverges from Rails. The audit
+shows this is only half-true:
 
-Output: addendum to this doc with per-file caller breakdown + the
-helper-vs-guard decision.
+- **Rails AR `read_attribute`** (`activerecord/lib/.../read.rb:33`):
+  calls `@attributes.fetch_value(name, &block)`.
+  `AttributeSet#fetch_value` calls `self[name].value(&block)`, and
+  `self[name]` for a missing key returns `Attribute.null(name)` — a
+  `NullAttribute` whose `.value` is nil. **So Rails AR `read_attribute`
+  for a missing attribute → nil, not a raise.**
 
-**PR D1 — Introduce `tryReadAttribute` (or chosen alternative)**
-Pure addition. No behavior change to existing `readAttribute`.
+- **`MissingAttributeError`** is only raised from the
+  _generated per-attribute methods_ (`name`, `email`, …). These methods
+  pass a block to `_read_attribute` that calls `missing_attribute` when
+  the attribute was not loaded (i.e. excluded by a `SELECT` subset).
+  Rails AM `_read_attribute` routes through `__send__(attr)` to hit
+  that generated method. Trails `_readAttribute` skips the dispatch
+  layer and goes straight to the attribute store.
 
-**PR D2…Dn — Migrate callers, file by file or feature cluster**
-Probably 4-6 PRs grouped by area: secure-password, validators,
-callbacks, dirty tracking, ActiveRecord-side callers, the rest.
-Each PR replaces the relevant `readAttribute` calls with the chosen
-alternative.
+- **Conclusion:** Trails' null-return for `readAttribute` matches Rails
+  AR. The divergence comment in `model.ts:readAttribute` is
+  misleading — it should say "matches AR, diverges from AM for SELECT
+  subsets."
 
-**PR Dfinal — Flip `readAttribute` to raise**
-Once all internal callers are migrated, flip the default. Remove the
-divergence comment in `model.ts:readAttribute`.
+---
+
+#### Call-site categorization
+
+**Category A — Infrastructure reads of always-present columns (raise-safe)**
+All `_readAttribute` calls and the vast majority of `readAttribute`
+calls. These read PK, FK, timestamp, lock, and explicitly declared
+model columns — attributes that are always in the schema. The null
+check is purely defensive; in production they never return null.
+Examples: all 35 sites in `associations.ts`, all 23 in
+`collection-proxy.ts`, all in `attribute-methods/primary-key.ts`,
+`composite-primary-key.ts`, `persistence.ts`, `base.ts`, `enum.ts`,
+`delegated-type.ts`, `integration.ts`, `locking/optimistic.ts`,
+`serialization.ts`, `model.ts`, `attribute-methods.ts`.
+
+**Category B — Nil-return intentional**
+Sites that explicitly handle null/nil. The attribute may genuinely be
+unset or the caller is defensively handling a new record / partial
+load. Examples:
+
+- `base.ts:2445-2451`: `=== null` check for `created_at`/`updated_at`
+  on new records before the first `save`.
+- `secure-token.ts:59`: `!record.readAttribute(attribute)` — treats
+  null as "not yet set".
+- `persistence.ts:562`: `if (col && !this._readAttribute(col))`.
+- `secure-password.ts` (all 8 sites): digest columns start as null for
+  new records; null-return is the expected signal.
+- `has-many-through-association.ts:81,155-156,206-207`: uses `?.`
+  operator — already nil-safe.
+- `confirmation.ts:17`: uses `?.` operator.
+- `association.ts:516-521`: cross-object equality check where either
+  side may not have the FK set yet.
+
+**Category C — Definition / interface sites (no behavior)**
+`model.ts:1327-1347` (the two definitions), `attribute-methods/read.ts`
+(interface + AR override), `base.ts:2731,2733` (declare), interface
+lines in `core.ts`, `locking/optimistic.ts`, etc.
+
+---
+
+#### Decision: **no change to `readAttribute` semantics**
+
+Rationale:
+
+1. **Trails matches Rails AR today.** Both return nil for missing
+   attributes via `fetch_value` → `NullAttribute#value`. There is no
+   actual semantic divergence on the AR path that trails users exercise.
+
+2. **The raise path requires partial-column loading.** `MissingAttributeError`
+   is meaningful only when a record is loaded with `SELECT a, b` (not
+   `SELECT *`) and code tries to read an excluded column. Trails does
+   not implement partial-column loading — all records are fully loaded.
+   Without that feature, raising on miss would break every Category-B
+   caller for no benefit.
+
+3. **All 277 sites are correct as-is.** No caller needs a migrate;
+   Category-A callers are raise-safe in practice (columns always
+   present), and Category-B callers rely on nil-return by design.
+
+4. **No `tryReadAttribute` needed.** Adding a helper just to have
+   parity with a behaviour trails doesn't actually exercise would be
+   a signature without behavior (violates CLAUDE.md).
+
+---
+
+#### Follow-up actions (small, not Track D)
+
+- [ ] **Fix the divergence comment** in `model.ts:readAttribute`: change
+      "divergence from Rails" to "matches AR; diverges from AM for
+      SELECT-subset partial loads, which trails doesn't implement."
+- [ ] **Unblock B6**: the attribute-method dispatch cluster
+      (`isAttributeMethod`, `matchedAttributeMethod`, `missingAttribute`,
+      `_readAttribute`, etc.) does not depend on the raise decision. Remove
+      the "gated by Track D" note from B6's entry.
+
+---
+
+#### Track D status: **closed — no migration needed**
+
+The raise-on-missing-attribute behavior belongs to a future
+partial-column-loading feature, not to the current privates push.
+When/if trails implements `select(:col1, :col2)` style partial loads,
+Track D should be reopened as part of that feature's scoping.
+
+Remove PRs D1–Dfinal from the roadmap; they have no target state to
+migrate toward.
 
 **Track D target:** Trails `readAttribute` matches Rails' raise
 semantics; activemodel divergence comment removed.
@@ -216,10 +297,12 @@ override semantics; mechanism mismatch is unavoidable. Comment in
 
 ## Suggested execution order (remaining)
 
-1. **B7c** (small leaf cluster).
-2. **C1** in parallel (cheap, banks 2/4).
-3. **B8 / B9** (assignment + attribute-registration).
-4. **C2 + C3** as bandwidth allows.
-5. **Track D last** — biggest commitment, biggest risk. Don't start
-   until B6 has a comfortable cadence so the Model touch surface is
-   stable. **B6** itself is gated by D0.
+1. **B6** — attribute-method dispatch cluster (unblocked by D0 audit).
+   Closes `attribute_methods.rb`, `attributes.rb`, `dirty.rb` gaps.
+   New leaf: **attribute-set/builder.ts** (4 misses:
+   `additionalTypes`, `materialize`, `delegateHash`,
+   `assignDefaultValue`) — small, independent, scope alongside B6 or
+   as B10.
+2. **C1** in parallel (cheap, banks 2/4 of test:compare gap).
+3. **C2 + C3** as bandwidth allows.
+4. Track D is closed — no migration needed (see D0 audit above).
