@@ -562,10 +562,14 @@ export class Relation<T extends Base> {
         onPredicates.push(tgt.get(typeCol).eq(modelClass.name));
       }
       const onNode = onPredicates.length === 1 ? onPredicates[0] : new Nodes.And(onPredicates);
-      const rawAdapter = (this._modelClass as any)._adapter as {
-        arelVisitor?: Visitors.ToSql;
-      } | null;
-      const on = (rawAdapter?.arelVisitor ?? new Visitors.ToSql()).compile(onNode);
+      const rawAdapter = (this._modelClass as any)._adapter as
+        | (Visitors.ArelQuoter & {
+            arelVisitor?: Visitors.ToSql;
+          })
+        | null;
+      const on = (rawAdapter?.arelVisitor ?? new Visitors.ToSql(rawAdapter ?? undefined)).compile(
+        onNode,
+      );
       return { joins: [{ table: targetTable, on }], table: targetTable, pks: ["id"] };
     }
     return null;
@@ -3482,9 +3486,12 @@ export class Relation<T extends Base> {
   }
 
   private _compileArelNode(node: Nodes.Node): string {
-    const adapter = (this._modelClass as any)._adapter as { arelVisitor?: Visitors.ToSql } | null;
-    const visitor = adapter?.arelVisitor;
-    return (visitor ?? new Visitors.ToSql()).compile(node);
+    const adapter = (this._modelClass as any)._adapter as
+      | (Visitors.ArelQuoter & {
+          arelVisitor?: Visitors.ToSql;
+        })
+      | null;
+    return (adapter?.arelVisitor ?? new Visitors.ToSql(adapter ?? undefined)).compile(node);
   }
 
   // Returns true when `col` is a known schema attribute OR is (part of) the
