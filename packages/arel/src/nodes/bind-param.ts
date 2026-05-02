@@ -23,8 +23,8 @@ export class BindParam extends Node {
     return typeof v?.isInfinite === "function" ? v.isInfinite() : null;
   }
 
-  isUnboundable(): boolean {
-    const v = this.value as { isUnboundable?: () => boolean } | null | undefined;
+  isUnboundable(): 1 | -1 | false {
+    const v = this.value as { isUnboundable?: () => 1 | -1 | false } | null | undefined;
     return typeof v?.isUnboundable === "function" ? v.isUnboundable() : false;
   }
 

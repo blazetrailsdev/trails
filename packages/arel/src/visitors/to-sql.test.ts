@@ -1204,6 +1204,84 @@ describe("the to_sql visitor", () => {
     });
   });
 
+  describe("BindParam unboundable short-circuit", () => {
+    const unboundable = (sign: 1 | -1) => new Nodes.BindParam({ isUnboundable: () => sign });
+
+    it("GreaterThan short-circuits to 1=0 for positive unboundable", () => {
+      const node = new Nodes.GreaterThan(users.get("id"), unboundable(1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=0");
+    });
+
+    it("GreaterThan short-circuits to 1=1 for negative unboundable", () => {
+      const node = new Nodes.GreaterThan(users.get("id"), unboundable(-1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=1");
+    });
+
+    it("GreaterThanOrEqual short-circuits to 1=0 for positive unboundable", () => {
+      const node = new Nodes.GreaterThanOrEqual(users.get("id"), unboundable(1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=0");
+    });
+
+    it("GreaterThanOrEqual short-circuits to 1=1 for negative unboundable", () => {
+      const node = new Nodes.GreaterThanOrEqual(users.get("id"), unboundable(-1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=1");
+    });
+
+    it("LessThan short-circuits to 1=1 for positive unboundable", () => {
+      const node = new Nodes.LessThan(users.get("id"), unboundable(1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=1");
+    });
+
+    it("LessThan short-circuits to 1=0 for negative unboundable", () => {
+      const node = new Nodes.LessThan(users.get("id"), unboundable(-1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=0");
+    });
+
+    it("LessThanOrEqual short-circuits to 1=1 for positive unboundable", () => {
+      const node = new Nodes.LessThanOrEqual(users.get("id"), unboundable(1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=1");
+    });
+
+    it("LessThanOrEqual short-circuits to 1=0 for negative unboundable", () => {
+      const node = new Nodes.LessThanOrEqual(users.get("id"), unboundable(-1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=0");
+    });
+
+    it("Equality short-circuits to 1=0 for any unboundable", () => {
+      const node = new Nodes.Equality(users.get("id"), unboundable(1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=0");
+    });
+
+    it("NotEqual short-circuits to 1=1 for any unboundable", () => {
+      const node = new Nodes.NotEqual(users.get("id"), unboundable(1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=1");
+    });
+  });
+
+  describe("BindParam infinite short-circuit", () => {
+    const infinite = (sign: 1 | -1) => new Nodes.BindParam({ isInfinite: () => sign });
+
+    it("GreaterThan short-circuits to 1=0 for positive infinite", () => {
+      const node = new Nodes.GreaterThan(users.get("id"), infinite(1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=0");
+    });
+
+    it("GreaterThan short-circuits to 1=1 for negative infinite", () => {
+      const node = new Nodes.GreaterThan(users.get("id"), infinite(-1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=1");
+    });
+
+    it("LessThan short-circuits to 1=1 for positive infinite", () => {
+      const node = new Nodes.LessThan(users.get("id"), infinite(1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=1");
+    });
+
+    it("LessThan short-circuits to 1=0 for negative infinite", () => {
+      const node = new Nodes.LessThan(users.get("id"), infinite(-1));
+      expect(new Visitors.ToSql().compile(node)).toBe("1=0");
+    });
+  });
+
   // Mirrors Rails' to_sql.rb private helpers (sanitize_as_sql_comment,
   // quote_table_name, quote_column_name).
   describe("Rails-mirrored private helpers", () => {

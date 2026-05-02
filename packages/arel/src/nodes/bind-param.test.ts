@@ -20,4 +20,50 @@ describe("BindParam", () => {
     const b = new Nodes.BindParam(99);
     expect(a.value).not.toBe(b.value);
   });
+
+  describe("valueBeforeTypeCast", () => {
+    it("returns value when value has no valueBeforeTypeCast", () => {
+      const bp = new Nodes.BindParam(42);
+      expect(bp.valueBeforeTypeCast()).toBe(42);
+    });
+
+    it("delegates to value.valueBeforeTypeCast when present", () => {
+      const bp = new Nodes.BindParam({ valueBeforeTypeCast: () => "raw" });
+      expect(bp.valueBeforeTypeCast()).toBe("raw");
+    });
+  });
+
+  describe("isInfinite", () => {
+    it("returns null when value has no isInfinite", () => {
+      const bp = new Nodes.BindParam(42);
+      expect(bp.isInfinite()).toBeNull();
+    });
+
+    it("delegates to value.isInfinite when present — positive", () => {
+      const bp = new Nodes.BindParam({ isInfinite: () => 1 });
+      expect(bp.isInfinite()).toBe(1);
+    });
+
+    it("delegates to value.isInfinite when present — negative", () => {
+      const bp = new Nodes.BindParam({ isInfinite: () => -1 });
+      expect(bp.isInfinite()).toBe(-1);
+    });
+  });
+
+  describe("isUnboundable", () => {
+    it("returns false when value has no isUnboundable", () => {
+      const bp = new Nodes.BindParam(42);
+      expect(bp.isUnboundable()).toBe(false);
+    });
+
+    it("delegates to value.isUnboundable when present", () => {
+      const bp = new Nodes.BindParam({ isUnboundable: () => 1 });
+      expect(bp.isUnboundable()).toBe(1);
+    });
+
+    it("propagates negative unboundable sign", () => {
+      const bp = new Nodes.BindParam({ isUnboundable: () => -1 });
+      expect(bp.isUnboundable()).toBe(-1);
+    });
+  });
 });
