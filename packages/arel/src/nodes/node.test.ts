@@ -143,8 +143,8 @@ describe("Node base polymorphic defaults", () => {
         new Nodes.LessThan(attr, q),
         new Nodes.LessThanOrEqual(attr, q),
         new Nodes.Equality(attr, q),
-        new Nodes.In(attr, q),
-        new Nodes.NotIn(attr, q),
+        new Nodes.In(attr, [q]),
+        new Nodes.NotIn(attr, [q]),
       ];
       for (const node of withFetch) {
         const hits: unknown[] = [];
@@ -157,11 +157,12 @@ describe("Node base polymorphic defaults", () => {
     it("is a no-op on Binary subclasses without FetchAttribute (Assignment, Union, Intersect, Except)", () => {
       const attr = users.get("id");
       const q = new Nodes.Quoted(1);
+      const sel = users.project(users.get("id")).ast;
       const noFetch = [
         new Nodes.As(attr, q),
-        new Nodes.Union(attr as unknown as Nodes.Node, q),
-        new Nodes.Intersect(attr as unknown as Nodes.Node, q),
-        new Nodes.Except(attr as unknown as Nodes.Node, q),
+        new Nodes.Union(sel, sel),
+        new Nodes.Intersect(sel, sel),
+        new Nodes.Except(sel, sel),
       ];
       for (const node of noFetch) {
         const hits: unknown[] = [];
