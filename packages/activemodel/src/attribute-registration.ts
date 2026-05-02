@@ -308,7 +308,8 @@ export function resetDefaultAttributesBang(this: AnyAttributeHost): void {
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#resolve_attribute_name
  *
- * Coerces an attribute name to a string.
+ * Returns the attribute name as-is. Rails calls name.to_s here; our public
+ * API already enforces string, so no coercion is needed.
  *
  * @internal Rails-private helper.
  */
