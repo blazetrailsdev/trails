@@ -1329,14 +1329,12 @@ export class Model {
     // (attribute_aliases[name] || name); `_read_attribute` skips it.
     const resolved = resolveAliasName(this.constructor as typeof Model, name);
     if (!this._attributes.has(resolved)) {
-      // Trails-specific divergence: returns null for unknown attributes.
-      // Rails attribute_methods.rb:553 raises MissingAttributeError here,
-      // but many trails callers (secure-password, callbacks, etc.) rely
-      // on the null-return behavior, so changing it would be a wide
-      // breaking change. Note that Rails `attribute_missing` is the
-      // method_missing dispatcher for *generated* per-attribute methods
-      // (name_changed?, name_was, …), NOT a fallback for plain reads —
-      // see Model#attributeMissing for the Rails-faithful dispatcher.
+      // Matches Rails AR: fetch_value → NullAttribute#value → nil.
+      // MissingAttributeError is only raised by the generated per-attribute
+      // methods (name, email, …) when a record is partially loaded via a
+      // SELECT subset — a feature trails does not implement. Rails AM
+      // _read_attribute routes through __send__ to hit those methods;
+      // trails _readAttribute skips that dispatch and reads the store directly.
       return null;
     }
     this._accessedFields.add(resolved);
