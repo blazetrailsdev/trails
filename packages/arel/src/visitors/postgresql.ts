@@ -68,7 +68,7 @@ export class PostgreSQL extends ToSql {
     return this.groupingArrayOrGroupingElement(node);
   }
 
-  protected override visitArelNodesRollUp(node: Nodes.Rollup): SQLString {
+  protected override visitArelNodesRollUp(node: Nodes.RollUp): SQLString {
     this.collector.append("ROLLUP");
     return this.groupingArrayOrGroupingElement(node);
   }

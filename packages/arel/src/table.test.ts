@@ -283,4 +283,30 @@ describe("TableTest", () => {
       expect(attr.name).toBe("nickname");
     });
   });
+
+  describe("equality", () => {
+    it("eql returns true for tables with the same name", () => {
+      expect(new Table("users").eql(new Table("users"))).toBe(true);
+    });
+
+    it("eql returns false for different names", () => {
+      expect(new Table("users").eql(new Table("posts"))).toBe(false);
+    });
+
+    it("eql compares tableAlias", () => {
+      const a = new Table("users", { as: "u" });
+      const b = new Table("users", { as: "u" });
+      const c = new Table("users");
+      expect(a.eql(b)).toBe(true);
+      expect(a.eql(c)).toBe(false);
+    });
+
+    it("hash is stable for the same name", () => {
+      expect(new Table("users").hash()).toBe(new Table("users").hash());
+    });
+
+    it("hash differs for different names", () => {
+      expect(new Table("users").hash()).not.toBe(new Table("posts").hash());
+    });
+  });
 });

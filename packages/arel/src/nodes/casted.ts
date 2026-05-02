@@ -1,5 +1,6 @@
 import { Node, NodeVisitor } from "./node.js";
 import { NodeExpression, registerBuildQuoted } from "./node-expression.js";
+import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
 import { ATTRIBUTE_BRAND } from "./binary.js";
 import { BindParam } from "./bind-param.js";
@@ -93,14 +94,15 @@ export class Casted extends NodeExpression {
 /**
  * Quoted — a value that will be quoted/escaped in the output SQL.
  *
- * Mirrors: Arel::Nodes::Quoted
+ * Mirrors: Arel::Nodes::Quoted (extends Unary; value stored in expr slot)
  */
-export class Quoted extends Node {
-  readonly value: unknown;
-
+export class Quoted extends Unary {
   constructor(value: unknown) {
-    super();
-    this.value = value;
+    super(value);
+  }
+
+  get value(): unknown {
+    return this.expr;
   }
 
   valueForDatabase(): unknown {

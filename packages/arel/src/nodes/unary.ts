@@ -2,9 +2,9 @@ import { Node, NodeVisitor } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
 export class Unary extends NodeExpression {
-  readonly expr: Node | Node[] | string | number | null;
+  readonly expr: unknown;
 
-  constructor(expr: Node | Node[] | string | number | null) {
+  constructor(expr: unknown) {
     super();
     this.expr = expr;
   }
@@ -67,11 +67,16 @@ export class Cube extends GroupingElement {
   }
 }
 
-export class Rollup extends GroupingElement {
+export class RollUp extends GroupingElement {
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
 }
+
+/** @deprecated Use RollUp (Rails casing) */
+export const Rollup = RollUp;
+/** @deprecated Use RollUp (Rails casing) */
+export type Rollup = RollUp;
 
 export class GroupingSet extends GroupingElement {
   accept<T>(visitor: NodeVisitor<T>): T {
@@ -94,4 +99,3 @@ export class OptimizerHints extends Unary {
     this.hints = hints;
   }
 }
-export class RollUp extends Rollup {}

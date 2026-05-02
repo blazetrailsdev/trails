@@ -4,14 +4,15 @@ import { Unary } from "./unary.js";
 /**
  * With — WITH clause for common table expressions.
  *
- * Mirrors: Arel::Nodes::With (extends Unary)
+ * Mirrors: Arel::Nodes::With (extends Unary; children stored in expr slot)
  */
 export class With extends Unary {
-  readonly children: Node[];
-
   constructor(children: Node[]) {
-    super(null);
-    this.children = children;
+    super(children);
+  }
+
+  get children(): Node[] {
+    return this.expr as Node[];
   }
 }
 

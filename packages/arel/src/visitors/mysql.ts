@@ -177,7 +177,7 @@ export class MySQL extends ToSql {
   protected override visitArelNodesNullsFirst(node: Nodes.NullsFirst): SQLString {
     // MySQL has no NULLS FIRST; emulate: col IS NOT NULL, col ASC/DESC
     const ordering = node.expr as Nodes.Ascending | Nodes.Descending;
-    this.visitNodeOrValue(ordering.expr);
+    this.visitNodeOrValue(ordering.expr as Nodes.NodeOrValue);
     this.collector.append(" IS NOT NULL, ");
     this.visit(ordering);
     return this.collector;
@@ -186,7 +186,7 @@ export class MySQL extends ToSql {
   protected override visitArelNodesNullsLast(node: Nodes.NullsLast): SQLString {
     // MySQL has no NULLS LAST; emulate: col IS NULL, col ASC/DESC
     const ordering = node.expr as Nodes.Ascending | Nodes.Descending;
-    this.visitNodeOrValue(ordering.expr);
+    this.visitNodeOrValue(ordering.expr as Nodes.NodeOrValue);
     this.collector.append(" IS NULL, ");
     this.visit(ordering);
     return this.collector;
