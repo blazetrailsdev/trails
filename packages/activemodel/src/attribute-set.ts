@@ -191,7 +191,7 @@ export class AttributeSet {
     }
   }
 
-  private cloneAttribute(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
+  protected cloneAttribute(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
     const existing = cache.get(attr);
     if (existing) return existing;
 
@@ -255,6 +255,11 @@ export class AttributeSet {
   isKey(name: string): boolean {
     const attr = this.attributes.get(name);
     return attr !== undefined && attr.isInitialized();
+  }
+
+  /** Whether `name` is present in the internal map (initialized or not). */
+  protected hasAttribute(name: string): boolean {
+    return this.attributes.has(name);
   }
 
   accessed(): string[] {
