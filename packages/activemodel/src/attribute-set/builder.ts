@@ -19,7 +19,7 @@ export class Builder {
 
     for (const [name, type] of this.types) {
       const effectiveType = additionalTypes.get(name) ?? type;
-      if (name in values) {
+      if (Object.prototype.hasOwnProperty.call(values, name)) {
         attrs.set(name, Attribute.fromDatabase(name, values[name], effectiveType));
       } else {
         const defaultAttr = this.defaultAttributes.get(name);
