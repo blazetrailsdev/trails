@@ -17,9 +17,13 @@ import { defaultQuoter } from "./default-quoter.js";
  * dependency-free from activerecord).
  */
 export interface ArelQuoter {
+  /** @internal */
   quoteTableName(name: string): string;
+  /** @internal */
   quoteColumnName(name: string): string;
+  /** @internal */
   quoteString(s: string): string;
+  /** @internal */
   quote(value: unknown): string;
 }
 
