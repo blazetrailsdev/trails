@@ -169,10 +169,7 @@ export function applyPendingAttributeModifications(
  * Mirrors: the PendingType push inside ActiveModel::AttributeRegistration#attribute
  */
 export function pushPendingType(cls: AnyAttributeHost, name: string, type: Type): void {
-  if (!Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")) {
-    cls._pendingAttributeModifications = [];
-  }
-  cls._pendingAttributeModifications.push(new PendingType(name, type));
+  pendingAttributeModifications.call(cls).push(new PendingType(name, type));
 }
 
 /**
@@ -182,10 +179,7 @@ export function pushPendingType(cls: AnyAttributeHost, name: string, type: Type)
  * Mirrors: the PendingDefault push inside ActiveModel::AttributeRegistration#attribute
  */
 export function pushPendingDefault(cls: AnyAttributeHost, name: string, value: unknown): void {
-  if (!Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")) {
-    cls._pendingAttributeModifications = [];
-  }
-  cls._pendingAttributeModifications.push(new PendingDefault(name, value));
+  pendingAttributeModifications.call(cls).push(new PendingDefault(name, value));
 }
 
 /**
@@ -199,10 +193,7 @@ export function pushPendingDecorator(
   names: string[] | null,
   decorator: (name: string, type: Type) => Type,
 ): void {
-  if (!Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")) {
-    cls._pendingAttributeModifications = [];
-  }
-  cls._pendingAttributeModifications.push(new PendingDecorator(names, decorator));
+  pendingAttributeModifications.call(cls).push(new PendingDecorator(names, decorator));
 }
 
 /**
