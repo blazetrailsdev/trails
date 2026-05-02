@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
-import { RecordNotSaved, RecordNotUnique, UnmodifiableRelation } from "./errors.js";
+import { RecordNotSaved, RecordNotUnique } from "./errors.js";
 import { disallowRawSqlBang } from "./sanitization.js";
 import {
   columnNameMatcher as abstractColumnNameMatcher,
@@ -3490,7 +3490,7 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Rails `Relation#assert_modifiable!`. Raises {@link UnmodifiableRelation}
+   * Rails `Relation#assert_modifiable!`. Raises `UnmodifiableRelation`
    * when the relation has already been loaded.
    * @internal
    */

@@ -1224,7 +1224,12 @@ function constructJoinDependency(
 
 // ---------------------------------------------------------------------------
 // Private helpers — mirrors ActiveRecord::QueryMethods private block.
-// Non-exported so the extractor marks them internal: true.
+// Most stay non-exported so the extractor marks them internal: true.
+// A handful are exported (assertModifiableBang, checkIfMethodHasArgumentsBang,
+// isTableNameMatches, arelColumn{,s,WithTable,sFromHash}) so Relation can
+// wire them as instance methods without re-implementing the bodies; they
+// keep `@internal` JSDoc so TypeDoc + the rails-private-jsdoc lint rule
+// continue to treat them as Rails-private.
 // ---------------------------------------------------------------------------
 
 /** @internal */

@@ -88,6 +88,24 @@ describe("Relation private build-arel helpers", () => {
     it("does not match when used as a qualifier", () => {
       expect(relation().isTableNameMatches("posts.id")).toBe(false);
     });
+
+    it("does not match when the only occurrence is immediately after FROM", () => {
+      // Mirrors Rails' (?<!FROM)\s lookbehind. If the from-target *is*
+      // our model table (e.g. via a subquery rendering SELECT * FROM
+      // \"posts\"), we don't want arelColumn to double-qualify bare
+      // refs — return false.
+      expect(relation().isTableNameMatches('SELECT * FROM "posts"')).toBe(false);
+    });
+
+    it("matches when the table also appears outside the FROM clause", () => {
+      // The hit Rails actually wants: a subquery that joins/filters on
+      // our table, so bare attribute refs must qualify back to it.
+      // Note `posts` must appear bare (no trailing dot) — the (?!\\.)
+      // negative lookahead deliberately excludes qualified usages.
+      expect(relation().isTableNameMatches('SELECT * FROM "subquery" JOIN posts ON ...')).toBe(
+        true,
+      );
+    });
   });
 
   describe("arelColumn", () => {
