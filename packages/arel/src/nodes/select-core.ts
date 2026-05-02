@@ -42,6 +42,16 @@ export class SelectCore extends Node {
     this.source.left = value;
   }
 
+  /** @internal */
+  get froms(): Node | null {
+    return this.from;
+  }
+
+  /** @internal */
+  set froms(value: Node | null) {
+    this.from = value;
+  }
+
   clone(): SelectCore {
     const c = new SelectCore();
     c.source = new JoinSource(this.source.left, [...this.source.right]);

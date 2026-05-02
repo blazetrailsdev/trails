@@ -27,6 +27,14 @@ describe("TestSelectCore", () => {
     expect(cloned.wheres).not.toBe(core.wheres);
   });
 
+  it("froms aliases from (Rails select_core.rb:32-33)", () => {
+    const core = new Nodes.SelectCore();
+    expect(core.froms).toBeNull();
+    core.froms = users;
+    expect(core.from).toBe(users);
+    expect(core.froms).toBe(users);
+  });
+
   it("set quantifier", () => {
     const mgr = new SelectManager(users);
     mgr.project(star).distinct();

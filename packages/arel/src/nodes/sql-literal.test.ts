@@ -96,5 +96,13 @@ describe("SqlLiteralTest", () => {
       const sql = new Visitors.ToSql().compile(fragments);
       expect(sql).toBe("foo bar");
     });
+
+    it("plus is an alias for join (Rails sql_literal.rb #+)", () => {
+      const a = new Nodes.SqlLiteral("foo");
+      const b = new Nodes.SqlLiteral("bar");
+      const fragments = a.plus(b);
+      expect(fragments).toBeInstanceOf(Nodes.Fragments);
+      expect(new Visitors.ToSql().compile(fragments)).toBe("foo bar");
+    });
   });
 });

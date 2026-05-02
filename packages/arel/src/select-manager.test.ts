@@ -339,6 +339,14 @@ describe("SelectManagerTest", () => {
     });
   });
 
+  describe("minus", () => {
+    it("minus aliases except", () => {
+      const q1 = users.project(star);
+      const q2 = users.project(star);
+      expect(new Visitors.ToSql().compile(q1.minus(q2))).toContain("EXCEPT");
+    });
+  });
+
   describe("with", () => {
     it("should support basic WITH", () => {
       const cte = users.project(users.get("name")).where(users.get("age").gt(21));
@@ -375,6 +383,12 @@ describe("SelectManagerTest", () => {
       const mgr = users.project(star).take(10);
       expect(mgr.limit).not.toBeNull();
     });
+
+    it("taken aliases limit", () => {
+      const mgr = users.project(star).take(5);
+      expect(mgr.taken).toBe(mgr.limit);
+      expect(mgr.taken).toBe(5);
+    });
   });
 
   describe("lock", () => {
@@ -395,6 +409,16 @@ describe("SelectManagerTest", () => {
     it("generates order clauses", () => {
       const mgr = users.project(star).order(users.get("name").asc());
       expect(mgr.toSql()).toContain("ORDER BY");
+    });
+
+    it("accepts string and wraps in SqlLiteral", () => {
+      const mgr = users.project(star).order("name ASC");
+      expect(mgr.toSql()).toContain("ORDER BY name ASC");
+    });
+
+    it("accepts symbol and uses description (Rails :sym.to_s == 'sym')", () => {
+      const mgr = users.project(star).order(Symbol("name"));
+      expect(mgr.toSql()).toContain("ORDER BY name");
     });
   });
 
@@ -435,6 +459,11 @@ describe("SelectManagerTest", () => {
   it("should hand back froms", () => {
     const mgr = users.project(star);
     expect(mgr.froms.length).toBe(1);
+  });
+
+  it("froms filters null — fromless manager returns empty array", () => {
+    const mgr = new SelectManager();
+    expect(mgr.froms).toHaveLength(0);
   });
 
   it("should create and nodes", () => {
@@ -808,6 +837,12 @@ describe("SelectManagerTest", () => {
   describe("where", () => {
     it("knows where", () => {
       const mgr = users.project(star).where(users.get("id").eq(1));
+      expect(mgr.toSql()).toContain("WHERE");
+    });
+
+    it("accepts a TreeManager and unwraps to ast", () => {
+      const sub = users.project(users.get("id")).where(users.get("active").eq(true));
+      const mgr = users.project(star).where(sub);
       expect(mgr.toSql()).toContain("WHERE");
     });
   });

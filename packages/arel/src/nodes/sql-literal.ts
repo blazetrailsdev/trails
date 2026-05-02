@@ -42,6 +42,11 @@ export class SqlLiteral extends Node {
     return new Fragments([this, other]);
   }
 
+  /** @internal */
+  plus(other: Node): Fragments {
+    return this.join(other);
+  }
+
   toYAML(): string {
     // Minimal YAML-ish representation for test parity (no external deps).
     const escaped = this.value.replace(/\n/g, "\\n");

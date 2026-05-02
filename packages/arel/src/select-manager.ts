@@ -115,16 +115,24 @@ export class SelectManager extends TreeManager {
   /**
    * Add a WHERE condition.
    */
-  where(condition: Node): this {
-    this.core.wheres.push(condition);
+  where(condition: Node | TreeManager): this {
+    this.core.wheres.push(condition instanceof TreeManager ? condition.ast : condition);
     return this;
   }
 
   /**
    * Add ORDER BY clauses.
    */
-  order(...exprs: Node[]): this {
-    this.ast.orders.push(...exprs);
+  order(...exprs: (Node | string | symbol)[]): this {
+    this.ast.orders.push(
+      ...exprs.map((x) =>
+        typeof x === "string"
+          ? new SqlLiteral(x)
+          : typeof x === "symbol"
+            ? new SqlLiteral(x.description ?? x.toString())
+            : x,
+      ),
+    );
     return this;
   }
 
@@ -315,6 +323,11 @@ export class SelectManager extends TreeManager {
     return new Except(this.ast, otherAst);
   }
 
+  /** @internal */
+  minus(other: SelectManager | SelectStatement): Node {
+    return this.except(other);
+  }
+
   /**
    * Wrap as EXISTS(subquery).
    */
@@ -349,8 +362,8 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#froms
    */
-  get froms(): (Node | null)[] {
-    return [this.core.source.left];
+  get froms(): Node[] {
+    return this.ast.cores.map((c) => c.from).filter((x): x is Node => x !== null);
   }
 
   /**
@@ -377,6 +390,11 @@ export class SelectManager extends TreeManager {
    */
   set limit(value: number | Node | null) {
     this.take(value);
+  }
+
+  /** @internal */
+  get taken(): Limit["expr"] | null {
+    return this.limit;
   }
 
   /**
