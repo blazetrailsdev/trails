@@ -7,12 +7,18 @@ import {
   NullMutationTracker,
 } from "./attribute-mutation-tracker.js";
 import { typeRegistry } from "./type/registry.js";
+import { ValueType } from "./type/value.js";
 
 function buildSet(values: Record<string, unknown>): AttributeSet {
   const attrs = new Map<string, import("./attribute.js").Attribute>();
+  const passthrough = new ValueType();
   for (const [name, value] of Object.entries(values)) {
     const type =
-      typeof value === "number" ? typeRegistry.lookup("integer") : typeRegistry.lookup("string");
+      typeof value === "number"
+        ? typeRegistry.lookup("integer")
+        : typeof value === "string"
+          ? typeRegistry.lookup("string")
+          : passthrough;
     attrs.set(name, Attribute.fromUserWithValue(name, value, value, type));
   }
   return new AttributeSet(attrs);
@@ -82,6 +88,65 @@ describe("AttributeMutationTracker", () => {
     expect(tracker.isChanged("age", { from: "30", to: "31" })).toBe(true);
     expect(tracker.isChanged("age", { from: "29" })).toBe(false);
     expect(tracker.isChanged("age", { to: "32" })).toBe(false);
+  });
+
+  it("forceChange stores the live value reference (in-place mutations are observed)", () => {
+    class ExposedTracker extends AttributeMutationTracker {
+      stored(name: string): unknown {
+        return this.forcedChanges.get(name);
+      }
+    }
+    const arr: string[] = ["a", "b"];
+    const set = buildSet({ tags: arr });
+    const tracker = new ExposedTracker(set);
+
+    tracker.forceChange("tags");
+    expect(tracker.stored("tags")).toBe(arr);
+
+    arr.push("c");
+    expect(tracker.stored("tags")).toBe(arr);
+    expect(tracker.stored("tags")).toEqual(["a", "b", "c"]);
+  });
+
+  it("forceChange overwrites any previously stored value (Rails parity)", () => {
+    class ExposedTracker extends AttributeMutationTracker {
+      stored(name: string): unknown {
+        return this.forcedChanges.get(name);
+      }
+    }
+    const set = buildSet({ name: "Alice" });
+    const tracker = new ExposedTracker(set);
+
+    tracker.forceChange("name");
+    expect(tracker.stored("name")).toBe("Alice");
+
+    set.writeFromUser("name", "Bob");
+    tracker.forceChange("name");
+    expect(tracker.stored("name")).toBe("Bob");
+  });
+
+  it("originalValue is sourced from the attribute chain, not the tracker's stored value", () => {
+    const set = buildSet({ name: "Alice" });
+    const tracker = new AttributeMutationTracker(set);
+
+    set.writeFromUser("name", "Bob");
+    tracker.forceChange("name");
+
+    expect(tracker.originalValue("name")).toBe("Alice");
+  });
+
+  it("multiple forced changes don't interfere with each other", () => {
+    const a: string[] = ["x"];
+    const b: string[] = ["y"];
+    const set = buildSet({ a, b });
+    const tracker = new AttributeMutationTracker(set);
+
+    tracker.forceChange("a");
+    tracker.forceChange("b");
+    a.push("z");
+
+    expect(tracker.changedAttributeNames().sort()).toEqual(["a", "b"]);
+    expect(set.fetchValue("b")).toBe(b);
   });
 
   it("changedValues returns original values for changed attrs", () => {
