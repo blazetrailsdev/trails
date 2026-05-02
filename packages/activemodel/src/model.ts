@@ -47,7 +47,6 @@ import {
   attributeMissing,
 } from "./attribute-methods.js";
 import {
-  assignAttributes as assignAttrs,
   _assignAttributes as attrAssign,
   _assignAttribute as attrAssignOne,
   sanitizeForMassAssignment as attrSanitize,
@@ -2018,8 +2017,25 @@ export class Model {
    *
    * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
    */
-  assignAttributes(attrs: Record<string, unknown>): void {
-    assignAttrs(this, attrs);
+  assignAttributes(newAttributes: unknown): void {
+    if (
+      typeof newAttributes !== "object" ||
+      newAttributes === null ||
+      Array.isArray(newAttributes)
+    ) {
+      const t =
+        newAttributes === null
+          ? "Null"
+          : Array.isArray(newAttributes)
+            ? "Array"
+            : typeof newAttributes;
+      throw new ArgumentError(
+        `When assigning attributes, you must pass a hash as an argument, ${t.charAt(0).toUpperCase() + t.slice(1)} passed.`,
+      );
+    }
+    const attrs = newAttributes as Record<string, unknown>;
+    if (Object.keys(attrs).length === 0) return;
+    this._assignAttributes(this.sanitizeForMassAssignment(attrs));
   }
 
   /**
