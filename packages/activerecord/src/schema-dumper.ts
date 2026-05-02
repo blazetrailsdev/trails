@@ -765,6 +765,7 @@ export class SchemaDumper {
       name?: string;
       onUpdate?: string;
       onDelete?: string;
+      deferrable?: boolean | string;
       validate?: boolean;
     };
     for (const fk of fks as Fk[]) {
@@ -776,6 +777,8 @@ export class SchemaDumper {
       if (fk.name) opts.push(`name: ${JSON.stringify(fk.name)}`);
       if (fk.onUpdate) opts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
       if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
+      if (fk.deferrable !== undefined && fk.deferrable !== false)
+        opts.push(`deferrable: ${JSON.stringify(fk.deferrable)}`);
       if (fk.validate === false) opts.push("validate: false");
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       lines.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
@@ -796,8 +799,9 @@ export class SchemaDumper {
 
   /** @internal */
   formatOptions(options: Record<string, unknown>): string {
+    const isIdent = /^[a-zA-Z_$][\w$]*$/;
     return Object.entries(options)
-      .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+      .map(([k, v]) => `${isIdent.test(k) ? k : JSON.stringify(k)}: ${JSON.stringify(v)}`)
       .join(", ");
   }
 
