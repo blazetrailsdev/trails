@@ -13,6 +13,7 @@ scripts/api-compare/.rails-source
 
 # Local SQLite test databases
 *.db
+file::memory:*
 
 # Generated from rails-api.json by scripts/build-rails-privates-manifest.ts
 eslint/rails-private-methods.json
