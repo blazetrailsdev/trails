@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Model, Types } from "./index.js";
-import { Attribute } from "./attribute.js";
+import { Attribute, FromUser, UNINITIALIZED_ORIGINAL_VALUE } from "./attribute.js";
+import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "./index.js";
 import { typeRegistry } from "./type/registry.js";
 import "./attribute/user-provided-default.js";
 
@@ -399,5 +400,69 @@ describe("AttributeTest", () => {
   it("from_database came_from_user? returns false", () => {
     const attr = Attribute.fromDatabase("name", "hello", typeRegistry.lookup("string"));
     expect(attr.cameFromUser()).toBe(false);
+  });
+
+  it("with_type preserves in-place mutations via with_value_from_user chain", () => {
+    const stringType = typeRegistry.lookup("string");
+    const otherType = typeRegistry.lookup("string");
+    class MutableFromUser extends FromUser {
+      override changedInPlace(): boolean {
+        return true;
+      }
+    }
+    const attr = new MutableFromUser("tags", ["a"], stringType, null, ["a", "b"]);
+    const retyped = attr.withType(otherType);
+    expect(retyped.valueBeforeTypeCast).toEqual(["a", "b"]);
+    expect(retyped.type).toBe(otherType);
+  });
+
+  it("with_type preserves originalAttribute when not changed in place", () => {
+    const stringType = typeRegistry.lookup("string");
+    const otherType = typeRegistry.lookup("string");
+    const original = Attribute.fromDatabase("name", "old", stringType);
+    const changed = original.withValueFromUser("new");
+    const retyped = changed.withType(otherType);
+    expect(retyped.getOriginalAttribute()).toBe(original);
+    expect(retyped.type).toBe(otherType);
+    expect(retyped.valueBeforeTypeCast).toBe("new");
+  });
+
+  it("with_value_from_user calls assert_valid_value before constructing", () => {
+    const intType = Object.create(typeRegistry.lookup("integer"));
+    intType.assertValidValue = (v: unknown) => {
+      if (typeof v === "number" && (v < 0 || v > 100)) {
+        throw new RangeError("out of range");
+      }
+    };
+    const attr = Attribute.fromUser("score", 50, intType);
+    expect(() => attr.withValueFromUser(200)).toThrow("out of range");
+    expect(() => attr.withValueFromUser(75)).not.toThrow();
+  });
+
+  it("Uninitialized#originalValue returns the UNINITIALIZED_ORIGINAL_VALUE sentinel", () => {
+    const u = Attribute.uninitialized("name", typeRegistry.lookup("string"));
+    expect(u.originalValue).toBe(UNINITIALIZED_ORIGINAL_VALUE);
+  });
+
+  it("with_type on UserProvidedDefault preserves proc defaults unevaluated", async () => {
+    const { UserProvidedDefault } = await import("./attribute/user-provided-default.js");
+    const stringType = typeRegistry.lookup("string");
+    const otherType = typeRegistry.lookup("string");
+    let calls = 0;
+    const proc = () => {
+      calls++;
+      return `value-${calls}`;
+    };
+    const upd = new UserProvidedDefault("name", proc, stringType, null);
+    const retyped = upd.withType(otherType) as InstanceType<typeof UserProvidedDefault>;
+    expect(retyped).toBeInstanceOf(UserProvidedDefault);
+    expect(retyped.userProvidedValue).toBe(proc);
+    expect(calls).toBe(0);
+    expect(retyped.valueBeforeTypeCast).toBe("value-1");
+    expect(calls).toBe(1);
+  });
+
+  it("UNINITIALIZED_ORIGINAL_VALUE is a singleton across import paths", () => {
+    expect(UNINITIALIZED_ORIGINAL_VALUE).toBe(UNINITIALIZED_FROM_INDEX);
   });
 });

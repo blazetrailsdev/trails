@@ -58,6 +58,15 @@ export class UserProvidedDefault extends FromUser {
     return new UserProvidedDefault(this.name, clonedVal, this.type, this.getOriginalAttribute());
   }
 
+  override withType(type: Type): Attribute {
+    return new UserProvidedDefault(
+      this.name,
+      this.userProvidedValue,
+      type,
+      this.getOriginalAttribute(),
+    );
+  }
+
   marshalDump(): [string, unknown, Type, Attribute | null] {
     return [this.name, this.valueBeforeTypeCast, this.type, this.getOriginalAttribute()];
   }

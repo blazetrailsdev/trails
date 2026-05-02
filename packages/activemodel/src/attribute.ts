@@ -2,6 +2,11 @@ import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 
+// Symbol so identity comparisons work across module copies and can't collide with any user value.
+export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
+  "@blazetrails/activemodel/UNINITIALIZED_ORIGINAL_VALUE",
+);
+
 // Lazy reference to avoid circular import: attribute.ts ↔ user-provided-default.ts
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _UserProvidedDefaultCtor: (new (...args: any[]) => Attribute) | null = null;
@@ -92,6 +97,7 @@ export abstract class Attribute {
   }
 
   withValueFromUser(value: unknown): Attribute {
+    this.type.assertValidValue(value);
     return Attribute.fromUser(this.name, value, this.type, this.originalAttribute ?? this);
   }
 
@@ -104,7 +110,16 @@ export abstract class Attribute {
   }
 
   withType(type: Type): Attribute {
-    return Attribute.withCastValue(this.name, this.value, type);
+    if (this.changedInPlace()) {
+      return this.withValueFromUser(this.value).withType(type);
+    }
+    const Ctor = this.constructor as new (
+      name: string,
+      valueBeforeTypeCast: unknown,
+      type: Type,
+      originalAttribute: Attribute | null,
+    ) => Attribute;
+    return new Ctor(this.name, this.valueBeforeTypeCast, type, this.originalAttribute);
   }
 
   isInitialized(): boolean {
@@ -307,6 +322,10 @@ export class Null extends Attribute {
   withValueFromUser(_value: unknown): Attribute {
     throw new MissingAttributeError(`can't write unknown attribute \`${this.name}\``);
   }
+
+  override withType(type: Type): Attribute {
+    return Attribute.withCastValue(this.name, null, type);
+  }
 }
 
 export class Uninitialized extends Attribute {
@@ -316,6 +335,10 @@ export class Uninitialized extends Attribute {
 
   get value(): unknown {
     return undefined;
+  }
+
+  override get originalValue(): unknown {
+    return UNINITIALIZED_ORIGINAL_VALUE;
   }
 
   get valueForDatabase(): unknown {
@@ -328,6 +351,10 @@ export class Uninitialized extends Attribute {
 
   forgettingAssignment(): Attribute {
     return new Uninitialized(this.name, this.type);
+  }
+
+  override withType(type: Type): Attribute {
+    return new Uninitialized(this.name, type);
   }
 
   typeCast(): unknown {
