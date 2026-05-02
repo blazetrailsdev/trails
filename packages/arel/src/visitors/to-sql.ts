@@ -640,6 +640,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   private visitArelNodesIn(node: Nodes.In): SQLString {
     let values = node.right;
     if (Array.isArray(values)) {
+      this.collector.preparable = false;
       if (values.length > 0) {
         values = values.filter((v) => this.unboundableSign(v) === 0);
       }
@@ -678,6 +679,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   private visitArelNodesNotIn(node: Nodes.NotIn): SQLString {
     let values = node.right;
     if (Array.isArray(values)) {
+      this.collector.preparable = false;
       if (values.length > 0) {
         values = values.filter((v) => this.unboundableSign(v) === 0);
       }
@@ -704,6 +706,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   private visitArelNodesHomogeneousIn(node: Nodes.HomogeneousIn): SQLString {
+    this.collector.preparable = false;
     if (node.values.length === 0) {
       this.collector.append(node.type === "in" ? "1=0" : "1=1");
       return this.collector;
@@ -1090,8 +1093,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   protected visitArelNodesFragments(node: Nodes.Fragments): SQLString {
-    for (const part of node.values) this.visit(part);
-    return this.collector;
+    return this.injectJoin(node.values, " ");
   }
 
   // -- Extract --
@@ -1129,11 +1131,17 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   protected visitArelNodesIntersect(node: Nodes.Intersect): SQLString {
-    return this.infixValueWithParen(node, " INTERSECT ");
+    this.collector.append("( ");
+    this.infixValue(node, " INTERSECT ");
+    this.collector.append(" )");
+    return this.collector;
   }
 
   protected visitArelNodesExcept(node: Nodes.Except): SQLString {
-    return this.infixValueWithParen(node, " EXCEPT ");
+    this.collector.append("( ");
+    this.infixValue(node, " EXCEPT ");
+    this.collector.append(" )");
+    return this.collector;
   }
 
   // -- CTE --
