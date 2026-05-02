@@ -35,11 +35,56 @@ export class Builder {
 }
 
 /**
- * Lazy variant of AttributeSet. Currently delegates to the base implementation.
+ * Lazy variant of AttributeSet that carries an extra `additionalTypes` map and
+ * supports on-demand materialization of those entries into the internal store.
  *
  * Mirrors: ActiveModel::LazyAttributeSet
  */
-export class LazyAttributeSet extends AttributeSet {}
+export class LazyAttributeSet extends AttributeSet {
+  private _additionalTypes: Map<string, Type>;
+
+  constructor(
+    attributes: Map<string, Attribute> = new Map(),
+    additionalTypes: Map<string, Type> = new Map(),
+  ) {
+    super(attributes);
+    this._additionalTypes = additionalTypes;
+  }
+
+  /** @internal Rails-private helper. Mirrors: LazyAttributeSet#additional_types (attr_reader) */
+  additionalTypes(): Map<string, Type> {
+    return this._additionalTypes;
+  }
+
+  /**
+   * @internal Rails-private helper. Mirrors: LazyAttributeSet#materialize (protected)
+   * Materializes the lazy set by resolving all keys into the attribute map.
+   */
+  protected materialize(): Map<string, Attribute> {
+    // Write additionalTypes-only keys into the internal store so that
+    // subsequent getAttribute/has/forEach calls can see them — mirrors
+    // Rails' @additional_types.each_key { |name| self[name] } side-effect.
+    for (const [name, type] of this._additionalTypes) {
+      if (!this.hasAttribute(name)) this.set(name, Attribute.uninitialized(name, type));
+    }
+    const result = new Map<string, Attribute>();
+    this.forEach((attr, name) => result.set(name, attr));
+    return result;
+  }
+
+  override deepDup(): LazyAttributeSet {
+    const cache = new Map<Attribute, Attribute>();
+    const newAttrs = new Map<string, Attribute>();
+    this.forEach((attr, name) => newAttrs.set(name, this.cloneAttribute(attr, cache)));
+    return new LazyAttributeSet(newAttrs, new Map(this._additionalTypes));
+  }
+
+  override map(fn: (attr: Attribute) => Attribute): LazyAttributeSet {
+    const newAttrs = new Map<string, Attribute>();
+    this.forEach((attr, name) => newAttrs.set(name, fn(attr)));
+    return new LazyAttributeSet(newAttrs, new Map(this._additionalTypes));
+  }
+}
 
 /**
  * Lazy hash of attribute objects, materializes on demand.
@@ -122,6 +167,19 @@ export class LazyAttributeHash {
 
   static marshalLoad(data: [Map<string, Type>, Record<string, unknown>]): LazyAttributeHash {
     return new LazyAttributeHash(data[0], data[1]);
+  }
+
+  /** @internal Rails-private helper. Mirrors: LazyAttributeHash#delegate_hash (attr_reader) */
+  delegateHash(): Map<string, Attribute> {
+    return this.delegate;
+  }
+
+  /**
+   * @internal Rails-private helper. Mirrors: LazyAttributeHash#assign_default_value
+   * Materializes an attribute entry for `name` from the value/type tables.
+   */
+  assignDefaultValue(name: string): Attribute {
+    return this.assignDefault(name);
   }
 
   private assignDefault(name: string): Attribute {
