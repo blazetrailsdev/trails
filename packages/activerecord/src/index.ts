@@ -213,6 +213,7 @@ export {
   TransactionIsolationError,
   IrreversibleOrderError,
   UnknownAttributeReference,
+  UnmodifiableRelation,
 } from "./errors.js";
 export {
   ReadonlyAttributeError,

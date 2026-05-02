@@ -11,6 +11,7 @@ import {
   ConfigurationError,
   IrreversibleOrderError,
   PreparedStatementInvalid,
+  UnmodifiableRelation,
 } from "../errors.js";
 import { FromClause } from "./from-clause.js";
 import { WhereClause } from "./where-clause.js";
@@ -1223,7 +1224,12 @@ function constructJoinDependency(
 
 // ---------------------------------------------------------------------------
 // Private helpers — mirrors ActiveRecord::QueryMethods private block.
-// Non-exported so the extractor marks them internal: true.
+// Most stay non-exported so the extractor marks them internal: true.
+// A handful are exported (assertModifiableBang, checkIfMethodHasArgumentsBang,
+// isTableNameMatches, arelColumn{,s,WithTable,sFromHash}) so Relation can
+// wire them as instance methods without re-implementing the bodies; they
+// keep `@internal` JSDoc so TypeDoc + the rails-private-jsdoc lint rule
+// continue to treat them as Rails-private.
 // ---------------------------------------------------------------------------
 
 /** @internal */
@@ -1240,9 +1246,9 @@ function async(this: QueryMethodsHost): QueryMethodsHost {
 }
 
 /** @internal */
-function assertModifiableBang(this: QueryMethodsHost): void {
+export function assertModifiableBang(this: QueryMethodsHost): void {
   if ((this as any)._loaded) {
-    throw new ActiveRecordError("can't modify a loaded relation");
+    throw new UnmodifiableRelation();
   }
 }
 
@@ -1255,7 +1261,7 @@ function isBlankArgument(value: unknown): boolean {
 }
 
 /** @internal */
-function checkIfMethodHasArgumentsBang(
+export function checkIfMethodHasArgumentsBang(
   this: QueryMethodsHost,
   methodName: string,
   args: unknown[],
@@ -1710,7 +1716,7 @@ function safeQuoteColumnName(modelClass: any, name: string): string {
 }
 
 /** @internal */
-function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
+export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
   const table: any = (this as any)._modelClass?.arelTable;
   if (!table) return false;
   const modelClass: any = (this as any)._modelClass;
@@ -1723,7 +1729,7 @@ function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
 }
 
 /** @internal */
-function arelColumn(
+export function arelColumn(
   this: QueryMethodsHost,
   field: string | symbol,
   fallback?: (attr: string) => unknown,
@@ -1750,7 +1756,7 @@ function arelColumn(
 }
 
 /** @internal */
-function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
+export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
   return columns.flatMap((field) => {
     if (field instanceof Nodes.Node) return [field]; // Arel nodes pass through directly
     if (typeof field === "string" || typeof field === "symbol")
@@ -1763,7 +1769,7 @@ function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
 }
 
 /** @internal */
-function arelColumnWithTable(
+export function arelColumnWithTable(
   this: QueryMethodsHost,
   tableName: string,
   columnName: string | symbol,
@@ -1791,7 +1797,10 @@ function arelColumnWithTable(
 }
 
 /** @internal */
-function arelColumnsFromHash(this: QueryMethodsHost, fields: Record<string, unknown>): unknown[] {
+export function arelColumnsFromHash(
+  this: QueryMethodsHost,
+  fields: Record<PropertyKey, unknown>,
+): unknown[] {
   return Reflect.ownKeys(fields).flatMap((key) => {
     const columns = (fields as Record<string | symbol, unknown>)[key];
     const tbl = typeof key === "symbol" ? symbolToName(key) : key;

@@ -36,6 +36,13 @@ import {
   areStructurallyCompatible,
   VALID_UNSCOPING_VALUES,
   argumentError,
+  assertModifiableBang as _assertModifiableBang,
+  checkIfMethodHasArgumentsBang as _checkIfMethodHasArgumentsBang,
+  isTableNameMatches as _isTableNameMatches,
+  arelColumn as _arelColumn,
+  arelColumns as _arelColumns,
+  arelColumnWithTable as _arelColumnWithTable,
+  arelColumnsFromHash as _arelColumnsFromHash,
   type UnscopeType,
   type AssociationSpec,
 } from "./relation/query-methods.js";
@@ -3480,6 +3487,83 @@ export class Relation<T extends Base> {
 
   private _compileArelNode(node: Nodes.Node): string {
     return this._arelVisitor().compile(node);
+  }
+
+  /**
+   * Rails `Relation#assert_modifiable!`. Raises `UnmodifiableRelation`
+   * when the relation has already been loaded.
+   * @internal
+   */
+  assertModifiableBang(): void {
+    return _assertModifiableBang.call(this as any);
+  }
+
+  /**
+   * Rails `Relation#check_if_method_has_arguments!`. Delegates to the
+   * canonical implementation in `relation/query-methods.ts` so all call
+   * sites share one definition of "blank" / flatten semantics.
+   * @internal
+   */
+  checkIfMethodHasArgumentsBang(
+    methodName: string | symbol,
+    args: unknown[],
+    message?: string,
+  ): void {
+    // Rails passes a Symbol via __callee__; we collapse it to its
+    // description so the error message reads `.select()` rather than
+    // the verbose `.Symbol(select)()`. Anonymous symbols (no
+    // description) fall through to "<anonymous>".
+    const name =
+      typeof methodName === "symbol" ? (methodName.description ?? "<anonymous>") : methodName;
+    return _checkIfMethodHasArgumentsBang.call(this as any, name, args, message);
+  }
+
+  /**
+   * Rails `Relation#table_name_matches?`. Delegates to the canonical
+   * helper in `relation/query-methods.ts` (handles arel/relation toSql
+   * conversion + adapter-quoted forms).
+   * @internal
+   */
+  isTableNameMatches(from: unknown): boolean {
+    return _isTableNameMatches.call(this as any, from);
+  }
+
+  /**
+   * Rails `Relation#arel_column_with_table`. Delegates to the canonical
+   * helper, which handles schema-qualified names and predicateBuilder
+   * resolution.
+   * @internal
+   */
+  arelColumnWithTable(tableName: string, columnName: string | symbol): unknown {
+    return _arelColumnWithTable.call(this as any, tableName, columnName);
+  }
+
+  /**
+   * Rails `Relation#arel_column`. Delegates to the canonical helper.
+   * @internal
+   */
+  arelColumn(field: string | symbol | Nodes.Node, fallback?: (attr: string) => unknown): unknown {
+    if (field instanceof Nodes.Node) return field;
+    return _arelColumn.call(this as any, field as string | symbol, fallback);
+  }
+
+  /**
+   * Rails `Relation#arel_columns_from_hash`. Delegates to the canonical
+   * helper.
+   * @internal
+   */
+  arelColumnsFromHash(fields: Record<PropertyKey, unknown>): unknown[] {
+    return _arelColumnsFromHash.call(this as any, fields);
+  }
+
+  /**
+   * Rails `Relation#arel_columns`. Delegates to the canonical helper.
+   * Returns `unknown[]` because Rails' `else` branch passes non-Arel
+   * values through unchanged (numerics, raw SQL fragments, etc.).
+   * @internal
+   */
+  arelColumns(columns: ReadonlyArray<unknown>): unknown[] {
+    return _arelColumns.call(this as any, columns as unknown[]);
   }
 
   // Returns true when `col` is a known schema attribute OR is (part of) the

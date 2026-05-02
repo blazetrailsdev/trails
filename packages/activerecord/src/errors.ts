@@ -495,6 +495,13 @@ export class TransactionIsolationError extends ActiveRecordError {
   }
 }
 
+export class UnmodifiableRelation extends ActiveRecordError {
+  constructor(message = "This relation is unmodifiable", options?: ErrorOptions) {
+    super(message, options);
+    this.name = "UnmodifiableRelation";
+  }
+}
+
 export class IrreversibleOrderError extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
