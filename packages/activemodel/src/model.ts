@@ -2133,7 +2133,7 @@ export class Model {
    *
    * Mirrors: ActiveModel::Attributes#attribute_for_inspect
    */
-  typeForAttribute(name: string): Type | null {
+  typeForAttribute(name: string): Type {
     return (this.constructor as typeof Model).typeForAttribute(name);
   }
 

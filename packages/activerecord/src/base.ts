@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Model, type Type } from "@blazetrails/activemodel";
+import { Model, type Type, typeRegistry } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
 import {
   Table,
@@ -714,9 +714,9 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::ModelSchema::ClassMethods#type_for_attribute
    */
-  static override typeForAttribute(name: string): Type | null {
+  static override typeForAttribute(name: string): Type {
     (ModelSchema.loadSchema as any).call(this);
-    return (this._attributeDefinitions as any)?.get(name)?.type ?? null;
+    return (this._attributeDefinitions as any)?.get(name)?.type ?? typeRegistry.lookup("value");
   }
 
   /**
