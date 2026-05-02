@@ -11,7 +11,7 @@
 
 import { Notifications } from "@blazetrails/activesupport";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
-import { Visitors } from "@blazetrails/arel";
+import type { Visitors } from "@blazetrails/arel";
 import { Result } from "./result.js";
 // Import under the qualified TS name so the public `QueryCacheAdapter`
 // surface (e.g. `.cache: QueryCacheStore`) doesn't leak the generic

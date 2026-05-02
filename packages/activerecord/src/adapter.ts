@@ -359,9 +359,10 @@ export interface DatabaseAdapter {
   /**
    * Return a dialect-specific Arel visitor wired to this connection's
    * quoter. Used to compile Arel ASTs to SQL with correct identifier
-   * quoting (e.g. backticks on MySQL). Optional — adapters that do not
-   * implement it fall back to `new Visitors.ToSql()` with the default
-   * quoter at call sites.
+   * quoting (e.g. backticks on MySQL). Optional — call sites fall back to
+   * `new Visitors.ToSql(adapter)`, using the adapter itself as the
+   * `ArelQuoter`, so identifier quoting remains dialect-correct even
+   * without an explicit visitor.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#arel_visitor
    * @internal
