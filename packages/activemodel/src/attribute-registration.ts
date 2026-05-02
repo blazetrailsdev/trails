@@ -281,7 +281,8 @@ export function attributeTypes(this: AnyAttributeHost): Record<string, Type> {
  * for unknown names (never null), matching Rails' Type.default_value behavior.
  */
 export function typeForAttribute(this: AnyAttributeHost, name: string): Type {
-  return attributeTypes.call(this)[name];
+  const resolved = resolveAttributeName.call(this, name);
+  return attributeTypes.call(this)[resolved];
 }
 
 /**
