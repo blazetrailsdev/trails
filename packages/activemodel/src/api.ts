@@ -22,6 +22,11 @@ import {
   raiseValidationError as validationsRaiseValidationError,
   _mergeAttributes as validationsMergeAttributes,
 } from "./validations.js";
+import {
+  _assignAttributes as attrAssign,
+  _assignAttribute as attrAssignOne,
+  sanitizeForMassAssignment as attrSanitize,
+} from "./attribute-assignment.js";
 
 /**
  * Rails: ActiveModel::API includes Validations (api.rb), so the
@@ -52,6 +57,21 @@ export const raiseValidationError = validationsRaiseValidationError;
  * @internal Rails-private helper.
  */
 export const _mergeAttributes = validationsMergeAttributes;
+
+/**
+ * @internal Rails-private helper.
+ */
+export const _assignAttributes = attrAssign;
+
+/**
+ * @internal Rails-private helper.
+ */
+export const _assignAttribute = attrAssignOne;
+
+/**
+ * @internal Rails-private helper.
+ */
+export const sanitizeForMassAssignment = attrSanitize;
 
 /**
  * Rails: ActiveModel::API includes Validations, which extends Translation,

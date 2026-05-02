@@ -206,4 +206,58 @@ describe("AttributeAssignmentTest", () => {
     p.assignAttributes({ name: "Bob" });
     expect(p.readAttribute("name")).toBe("Bob");
   });
+
+  it("subclass override of _assignAttributes is called by assignAttributes", () => {
+    const called: Record<string, unknown>[] = [];
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+      override _assignAttributes(attrs: Record<string, unknown>): void {
+        called.push(attrs);
+        super._assignAttributes(attrs);
+      }
+    }
+    const p = new Person({});
+    p.assignAttributes({ name: "Carol" });
+    expect(called).toHaveLength(1);
+    expect(called[0]).toEqual({ name: "Carol" });
+    expect(p.readAttribute("name")).toBe("Carol");
+  });
+
+  it("subclass override of sanitizeForMassAssignment is called by assignAttributes", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("role", "string");
+      }
+      override sanitizeForMassAssignment(attrs: Record<string, unknown>): Record<string, unknown> {
+        const { role: _role, ...rest } = attrs;
+        return rest;
+      }
+    }
+    const p = new Person({});
+    p.assignAttributes({ name: "Dave", role: "admin" });
+    expect(p.readAttribute("name")).toBe("Dave");
+    expect(p.readAttribute("role")).toBeNull();
+  });
+
+  it("subclass override of _assignAttribute is called by _assignAttributes", () => {
+    const seen: Array<[string, unknown]> = [];
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+      override _assignAttribute(k: string, v: unknown): void {
+        seen.push([k, v]);
+        super._assignAttribute(k, v);
+      }
+    }
+    const p = new Person({});
+    p.assignAttributes({ name: "Eve", age: 5 });
+    expect(seen).toContainEqual(["name", "Eve"]);
+    expect(seen).toContainEqual(["age", 5]);
+    expect(p.readAttribute("name")).toBe("Eve");
+  });
 });

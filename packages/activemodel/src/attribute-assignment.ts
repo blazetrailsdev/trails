@@ -5,8 +5,10 @@ interface PermittedAttributes {
   permitted?(): boolean;
 }
 
-/** @internal */
-function sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown> {
+/** @internal Rails-private helper. */
+export function sanitizeForMassAssignment(
+  attributes: Record<string, unknown>,
+): Record<string, unknown> {
   const attrs = attributes as Record<string, unknown> & PermittedAttributes;
   if (typeof attrs.permitted === "function") {
     if (!attrs.permitted()) {
@@ -39,10 +41,7 @@ export function assignAttributes(model: AttributeAssignment, newAttributes: unkn
   if (Object.keys(attrs).length === 0) return;
 
   const sanitized = sanitizeForMassAssignment(attrs);
-
-  for (const [key, value] of Object.entries(sanitized)) {
-    assignAttribute(model, key, value);
-  }
+  _assignAttributes(model, sanitized);
 }
 
 /**
@@ -83,7 +82,18 @@ function findSetter(model: object, key: string): ((this: object, value: unknown)
   return null;
 }
 
-function assignAttribute(model: AttributeAssignment, key: string, value: unknown): void {
+/** @internal Rails-private helper. */
+export function _assignAttributes(
+  model: AttributeAssignment,
+  attributes: Record<string, unknown>,
+): void {
+  for (const [k, v] of Object.entries(attributes)) {
+    _assignAttribute(model, k, v);
+  }
+}
+
+/** @internal Rails-private helper. */
+export function _assignAttribute(model: AttributeAssignment, key: string, value: unknown): void {
   const setter = findSetter(model, key);
   if (setter) {
     setter.call(model, value);

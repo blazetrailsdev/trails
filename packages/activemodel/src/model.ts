@@ -47,7 +47,8 @@ import {
   attributeMissing,
 } from "./attribute-methods.js";
 import {
-  assignAttributes as assignAttrs,
+  _assignAttribute as attrAssignOne,
+  sanitizeForMassAssignment as attrSanitize,
   attributeWriterMissing as defaultAttributeWriterMissing,
   ArgumentError,
 } from "./attribute-assignment.js";
@@ -1225,7 +1226,9 @@ export class Model {
    *
    * @internal Rails-private helper.
    */
-  static _mergeAttributes = validationsMergeAttributes;
+  static _mergeAttributes(attrNames: unknown[]): Record<string, unknown> {
+    return validationsMergeAttributes(attrNames);
+  }
 
   /**
    * Default option keys recognized by `validates(...)`. Subclasses
@@ -2013,8 +2016,48 @@ export class Model {
    *
    * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
    */
-  assignAttributes(attrs: Record<string, unknown>): void {
-    assignAttrs(this, attrs);
+  assignAttributes(newAttributes: unknown): void {
+    if (
+      typeof newAttributes !== "object" ||
+      newAttributes === null ||
+      Array.isArray(newAttributes)
+    ) {
+      const t =
+        newAttributes === null
+          ? "Null"
+          : Array.isArray(newAttributes)
+            ? "Array"
+            : typeof newAttributes;
+      throw new ArgumentError(
+        `When assigning attributes, you must pass a hash as an argument, ${t.charAt(0).toUpperCase() + t.slice(1)} passed.`,
+      );
+    }
+    const attrs = newAttributes as Record<string, unknown>;
+    if (Object.keys(attrs).length === 0) return;
+    this._assignAttributes(this.sanitizeForMassAssignment(attrs));
+  }
+
+  /**
+   * @internal Rails-private helper.
+   */
+  _assignAttributes(attributes: Record<string, unknown>): void {
+    for (const [k, v] of Object.entries(attributes)) {
+      this._assignAttribute(k, v);
+    }
+  }
+
+  /**
+   * @internal Rails-private helper.
+   */
+  _assignAttribute(k: string, v: unknown): void {
+    attrAssignOne(this, k, v);
+  }
+
+  /**
+   * @internal Rails-private helper.
+   */
+  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown> {
+    return attrSanitize(attributes);
   }
 
   /**
