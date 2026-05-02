@@ -1,5 +1,11 @@
 import { AttributeSet } from "./attribute-set.js";
-import { attributeMissing as attributeMissingDispatch } from "./attribute-methods.js";
+import {
+  attributeMissing as attributeMissingDispatch,
+  isAttributeMethod as _isAttributeMethod,
+  matchedAttributeMethod as _matchedAttributeMethod,
+  missingAttribute as _missingAttribute,
+  _readAttribute as __readAttribute,
+} from "./attribute-methods.js";
 
 /**
  * Dirty mixin contract — tracks attribute changes on a model.
@@ -105,6 +111,33 @@ export class DirtyTracker {
         }
       }
     }
+  }
+
+  /**
+   * Force-mark an attribute as changed regardless of whether from === to.
+   * Used by `attribute_will_change!` for in-place mutations (e.g. array push)
+   * where the object reference stays the same but the content has changed.
+   *
+   * `currentValue` is the value at the moment the force is requested (before
+   * the in-place mutation). Rails snapshots this via `clone_value` so the
+   * stored "was" stays stable even as the live object mutates.
+   *
+   * Mirrors: ActiveModel::AttributeMutationTracker#force_change
+   */
+  forceChange(name: string, currentValue: unknown): void {
+    if (this._changedAttributes.has(name)) return;
+    // Clone so the stored "was" side isn't mutated along with the live object.
+    // Mirrors Rails' clone_value: shallow-clone when possible, else keep as-is.
+    let cloned: unknown;
+    try {
+      cloned =
+        currentValue !== null && typeof currentValue === "object"
+          ? structuredClone(currentValue)
+          : currentValue;
+    } catch {
+      cloned = currentValue;
+    }
+    this._changedAttributes.set(name, [cloned, cloned]);
   }
 
   get changed(): boolean {
@@ -319,4 +352,82 @@ export class DirtyTracker {
       ...args,
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Rails privates surfaced by dirty.rb
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyInstanceHost = any;
+
+/** @internal Rails-private helper. Mirrors: #attribute_method? (via AttributeMethods include) */
+export function isAttributeMethod(this: AnyInstanceHost, attrName: string): boolean {
+  return _isAttributeMethod.call(this, attrName);
+}
+
+/** @internal Rails-private helper. Mirrors: #matched_attribute_method (via AttributeMethods include) */
+export function matchedAttributeMethod(
+  this: AnyInstanceHost,
+  methodName: string,
+): { proxyTarget: string; attrName: string } | null {
+  return _matchedAttributeMethod.call(this, methodName);
+}
+
+/** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
+export function missingAttribute(this: AnyInstanceHost, attrName: string): never {
+  return _missingAttribute.call(this, attrName);
+}
+
+/** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */
+export function _readAttribute(this: AnyInstanceHost, attr: string): unknown {
+  return __readAttribute.call(this, attr);
+}
+
+type DirtyDispatchHost = {
+  _dirty: DirtyTracker;
+  _attributes: AttributeSet;
+  restoreAttribute?(name: string): void;
+  attributeWas?(name: string): unknown;
+  writeAttribute?(name: string, value: unknown): void;
+  clearAttributeChange?(name: string): void;
+};
+
+/**
+ * Mirrors: ActiveModel::Dirty#attribute_previous_change
+ *
+ * Dispatch target for `*_previous_change` per-attribute methods.
+ *
+ * @internal Rails-private helper.
+ */
+export function attributePreviousChange(
+  this: DirtyDispatchHost,
+  attrName: string,
+): [unknown, unknown] | undefined {
+  return this._dirty.previousChanges[attrName];
+}
+
+/**
+ * Mirrors: ActiveModel::Dirty#attribute_will_change!
+ *
+ * Dispatch target for `*_will_change!` per-attribute methods. Force-marks
+ * an attribute as changed for in-place mutations (e.g. array push) where
+ * the object reference stays the same but the content has changed.
+ *
+ * @internal Rails-private helper.
+ */
+export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): void {
+  this._dirty.forceChange(attrName, this._attributes.fetchValue(attrName));
+}
+
+/**
+ * Mirrors: ActiveModel::Dirty#restore_attribute!
+ *
+ * Dispatch target for `restore_*!` per-attribute methods. Restores the
+ * attribute to its pre-change value and clears the dirty entry.
+ *
+ * @internal Rails-private helper.
+ */
+export function restoreAttributeBang(this: DirtyDispatchHost, attrName: string): void {
+  this._dirty.restoreAttribute(this._attributes, attrName);
 }

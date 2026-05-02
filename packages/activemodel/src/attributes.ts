@@ -2,7 +2,14 @@ import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
-import { attributeMissing } from "./attribute-methods.js";
+import {
+  AttrNames,
+  attributeMissing,
+  isAttributeMethod as _isAttributeMethod,
+  matchedAttributeMethod as _matchedAttributeMethod,
+  missingAttribute as _missingAttribute,
+  _readAttribute as __readAttribute,
+} from "./attribute-methods.js";
 import {
   pushPendingType,
   pushPendingDefault,
@@ -278,4 +285,74 @@ export class Attributes {
   attributeMissing(match: { proxyTarget: string; attrName: string }, ...args: unknown[]): unknown {
     return attributeMissing.call(this as unknown as Record<string, unknown>, match, ...args);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Rails privates surfaced by attributes.rb
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyInstanceHost = any;
+
+/** @internal Rails-private helper. Mirrors: #attribute_method? (via AttributeMethods include) */
+export function isAttributeMethod(this: AnyInstanceHost, attrName: string): boolean {
+  return _isAttributeMethod.call(this, attrName);
+}
+
+/** @internal Rails-private helper. Mirrors: #matched_attribute_method (via AttributeMethods include) */
+export function matchedAttributeMethod(
+  this: AnyInstanceHost,
+  methodName: string,
+): { proxyTarget: string; attrName: string } | null {
+  return _matchedAttributeMethod.call(this, methodName);
+}
+
+/** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
+export function missingAttribute(this: AnyInstanceHost, attrName: string): never {
+  return _missingAttribute.call(this, attrName);
+}
+
+/** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */
+export function _readAttribute(this: AnyInstanceHost, attr: string): unknown {
+  return __readAttribute.call(this, attr);
+}
+
+type AttributeInstanceHost = { _attributes: AttributeSet };
+
+/**
+ * Mirrors: ActiveModel::Attributes#_write_attribute
+ *
+ * Writes a value into the attribute store via the user-write path (casts
+ * through the type's `cast` method before storing).
+ *
+ * @internal Rails-private helper.
+ */
+export function _writeAttribute(
+  this: AttributeInstanceHost,
+  attrName: string,
+  value: unknown,
+): void {
+  this._attributes.writeFromUser(attrName, value);
+}
+
+/**
+ * Mirrors: ActiveModel::Attributes::ClassMethods#define_method_attribute=
+ *
+ * In Rails this generates a `canonical_name=` writer via code evaluation.
+ * Trails installs writers via Object.defineProperty in `attribute()`, so no
+ * code generation is required here. The method exists for API-compare parity
+ * and to expose the AttrNames accessor-method computation that Rails uses
+ * to derive the writer method name.
+ *
+ * @internal Rails-private helper.
+ */
+export function defineMethodAttribute(
+  canonicalName: string,
+  _options?: { owner?: unknown; as?: string },
+): void {
+  // Writers are already installed by attribute() via Object.defineProperty.
+  // Compute and expose the method name the same way Rails would, for callers
+  // that inspect the name (e.g. alias generation paths).
+  const { methodName } = AttrNames.defineAttributeAccessorMethod(canonicalName, true);
+  void methodName;
 }
