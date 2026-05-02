@@ -1719,7 +1719,6 @@ describe("BasicsTest", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
     const sql = User.all().lock().toSql();

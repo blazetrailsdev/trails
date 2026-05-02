@@ -802,13 +802,8 @@ class SchemaAdapter implements DatabaseAdapter {
     return s.replace(/\\/g, "\\\\").replace(/'/g, "''");
   }
 
-  get arelVisitor(): Visitors.ToSql {
-    // Use the base ToSql visitor with this adapter as quoter. The base visitor
-    // does not apply dialect-specific suppressions (e.g. SQLite silently drops
-    // FOR UPDATE), so test assertions about SQL structure remain dialect-neutral.
-    // Identifier quoting is still correct because SchemaAdapter delegates
-    // quoteTableName/quoteColumnName to the inner adapter.
-    return new Visitors.ToSql(this);
+  get arelVisitor(): Visitors.ToSql | undefined {
+    return (this.inner as { arelVisitor?: Visitors.ToSql }).arelVisitor;
   }
 
   async cleanup(): Promise<void> {
