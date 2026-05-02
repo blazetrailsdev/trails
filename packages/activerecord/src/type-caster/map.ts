@@ -48,7 +48,7 @@ export class Map {
 
     // Instance-level lookup fallback
     if (typeof klass.typeForAttribute === "function") {
-      return klass.typeForAttribute(name) ?? new ValueType();
+      return klass.typeForAttribute(name);
     }
 
     return new ValueType();

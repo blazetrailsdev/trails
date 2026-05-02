@@ -22,7 +22,7 @@ export interface AttributeRegistrationClassMethods {
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: (name: string, type: Type) => Type): void;
   attributeTypes(): Record<string, Type>;
-  typeForAttribute(name: string): Type | null;
+  typeForAttribute(name: string): Type;
 }
 
 export type AttributeRegistration = AttributeRegistrationClassMethods;
@@ -257,21 +257,32 @@ export function decorateAttributes(
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#attribute_types
  *
- * Rails: @attribute_types ||= _default_attributes.cast_types
- * Delegates to _defaultAttributes — single codepath.
+ * Rails: @attribute_types ||= _default_attributes.cast_types.tap { |h| h.default = Type.default_value }
+ * Wraps the cast-types record in a Proxy so unknown keys return a fallback
+ * ValueType — same effect as Rails setting `hash.default = Type.default_value`.
  */
 export function attributeTypes(this: AnyAttributeHost): Record<string, Type> {
-  return _defaultAttributes.call(this).castTypes();
+  const cast = _defaultAttributes.call(this).castTypes();
+  return new Proxy(cast, {
+    get(target, prop, receiver) {
+      if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
+        return typeRegistry.lookup("value");
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
 }
 
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#type_for_attribute
  *
  * Rails: attribute_types[attribute_name]
- * Delegates to attributeTypes — single codepath.
+ * Delegates to attributeTypes — single codepath. Returns a fallback ValueType
+ * for unknown names (never null), matching Rails' Type.default_value behavior.
  */
-export function typeForAttribute(this: AnyAttributeHost, name: string): Type | null {
-  return attributeTypes.call(this)[name] ?? null;
+export function typeForAttribute(this: AnyAttributeHost, name: string): Type {
+  const resolved = resolveAttributeName.call(this, name);
+  return attributeTypes.call(this)[resolved];
 }
 
 /**

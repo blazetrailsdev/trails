@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model } from "./index.js";
+import { Model, ValueType } from "./index.js";
 
 describe("AttributesTest", () => {
   // =========================================================================
@@ -376,7 +376,7 @@ describe("typeForAttribute", () => {
       }
     }
     const u = new User({ name: "Alice" });
-    expect(u.typeForAttribute("unknown")).toBeNull();
+    expect(u.typeForAttribute("unknown")).toBeInstanceOf(ValueType);
   });
 });
 

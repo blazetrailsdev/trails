@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Types } from "./index.js";
+import { Model, Types, ValueType } from "./index.js";
 
 describe("AttributeRegistrationTest", () => {
   it("attributes can be registered", () => {
@@ -48,7 +48,31 @@ describe("AttributeRegistrationTest", () => {
       }
     }
     const m = new MyModel({});
-    expect(m.typeForAttribute("unknown")).toBeNull();
+    const fallback = m.typeForAttribute("unknown");
+    expect(fallback).toBeInstanceOf(ValueType);
+    expect(fallback.cast("anything")).toBe("anything");
+  });
+
+  it("attributeTypes returns a fallback ValueType for unknown keys", () => {
+    class MyModel extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const types = MyModel.attributeTypes();
+    expect(types["unknown"]).toBeInstanceOf(ValueType);
+    expect(types["unknown"].cast("hello")).toBe("hello");
+  });
+
+  it("attributeTypes returns the registered type, not the fallback, for known keys", () => {
+    class MyModel extends Model {
+      static {
+        this.attribute("count", "integer");
+      }
+    }
+    const types = MyModel.attributeTypes();
+    expect(types["count"].name).toBe("integer");
+    expect(types["count"].cast("5")).toBe(5);
   });
 
   it("new attributes can be registered at any time", () => {
@@ -267,8 +291,8 @@ describe("AttributeRegistrationTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.typeForAttribute("name")).not.toBeNull();
-    expect(p.typeForAttribute("missing_key")).toBeNull();
+    expect(p.typeForAttribute("name").name).toBe("string");
+    expect(p.typeForAttribute("missing_key")).toBeInstanceOf(ValueType);
   });
 
   it("_pendingAttributeModifications queue is populated by attribute()", () => {
