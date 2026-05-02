@@ -44,7 +44,7 @@ export class SqlLiteral extends Node {
 
   /** @internal */
   plus(other: Node): Fragments {
-    return new Fragments([this, other]);
+    return this.join(other);
   }
 
   toYAML(): string {

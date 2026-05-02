@@ -126,7 +126,11 @@ export class SelectManager extends TreeManager {
   order(...exprs: (Node | string | symbol)[]): this {
     this.ast.orders.push(
       ...exprs.map((x) =>
-        typeof x === "string" || typeof x === "symbol" ? new SqlLiteral(x.toString()) : x,
+        typeof x === "string"
+          ? new SqlLiteral(x)
+          : typeof x === "symbol"
+            ? new SqlLiteral(x.description ?? x.toString())
+            : x,
       ),
     );
     return this;

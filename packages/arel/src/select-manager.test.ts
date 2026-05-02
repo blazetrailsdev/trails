@@ -415,6 +415,11 @@ describe("SelectManagerTest", () => {
       const mgr = users.project(star).order("name ASC");
       expect(mgr.toSql()).toContain("ORDER BY name ASC");
     });
+
+    it("accepts symbol and uses description (Rails :sym.to_s == 'sym')", () => {
+      const mgr = users.project(star).order(Symbol("name"));
+      expect(mgr.toSql()).toContain("ORDER BY name");
+    });
   });
 
   describe("order", () => {
