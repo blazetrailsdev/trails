@@ -257,6 +257,11 @@ export class AttributeSet {
     return attr !== undefined && attr.isInitialized();
   }
 
+  /** Whether `name` is present in the internal map (initialized or not). */
+  protected hasAttribute(name: string): boolean {
+    return this.attributes.has(name);
+  }
+
   accessed(): string[] {
     const result: string[] = [];
     for (const [name, attr] of this.attributes) {

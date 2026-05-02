@@ -60,6 +60,17 @@ describe("LazyAttributeSet", () => {
     expect(result.get("score")!.isInitialized()).toBe(false);
   });
 
+  it("materialize mutates the instance so additionalTypes keys are accessible via getAttribute", () => {
+    const extra = new Map([["score", intType]]);
+    const lazy = new LazyAttributeSet(new Map(), extra);
+    // Before materialize: getAttribute returns a null Attribute (unknown name).
+    expect(lazy.getAttribute("score").type.name).toBe("value");
+    (lazy as any).materialize();
+    // After materialize: entry is written into the internal map with the correct type.
+    expect(lazy.getAttribute("score").type.name).toBe("integer");
+    expect(lazy.getAttribute("score").isInitialized()).toBe(false);
+  });
+
   it("deepDup preserves additionalTypes", () => {
     const extra = new Map([["score", intType]]);
     const lazy = new LazyAttributeSet(new Map(), extra);

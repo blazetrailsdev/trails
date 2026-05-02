@@ -35,7 +35,8 @@ export class Builder {
 }
 
 /**
- * Lazy variant of AttributeSet. Currently delegates to the base implementation.
+ * Lazy variant of AttributeSet that carries an extra `additionalTypes` map and
+ * supports on-demand materialization of those entries into the internal store.
  *
  * Mirrors: ActiveModel::LazyAttributeSet
  */
@@ -60,13 +61,14 @@ export class LazyAttributeSet extends AttributeSet {
    * Materializes the lazy set by resolving all keys into the attribute map.
    */
   protected materialize(): Map<string, Attribute> {
-    const result = new Map<string, Attribute>();
-    // forEach covers all stored entries including uninitialized ones, matching
-    // Rails' @values/@types loops. Then add any additionalTypes-only keys.
-    this.forEach((attr, name) => result.set(name, attr));
+    // Write additionalTypes-only keys into the internal store so that
+    // subsequent getAttribute/has/forEach calls can see them — mirrors
+    // Rails' @additional_types.each_key { |name| self[name] } side-effect.
     for (const [name, type] of this._additionalTypes) {
-      if (!result.has(name)) result.set(name, Attribute.uninitialized(name, type));
+      if (!this.hasAttribute(name)) this.set(name, Attribute.uninitialized(name, type));
     }
+    const result = new Map<string, Attribute>();
+    this.forEach((attr, name) => result.set(name, attr));
     return result;
   }
 
