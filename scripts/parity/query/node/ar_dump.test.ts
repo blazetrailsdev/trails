@@ -67,12 +67,14 @@ function runDumpReadJson(fixture: string): {
 }
 
 describe("ar_dump.ts", () => {
-  it("dumps ar-00 (Book.all) to the expected SQL", () => {
-    const { code, stdout, stderr, json } = runDumpReadJson("ar-00");
+  it("dumps ar-06 (Customer.whereNot) to the expected SQL", () => {
+    const { code, stdout, stderr, json } = runDumpReadJson("ar-06");
     expect(code, `stdout: ${stdout}\nstderr: ${stderr}`).toBe(0);
     expect(json.version).toBe(1);
-    expect(json.fixture).toBe("ar-00");
-    expect(json.sql).toBe('SELECT "books".* FROM "books"');
+    expect(json.fixture).toBe("ar-06");
+    expect(json.sql).toBe(
+      'SELECT "customers".* FROM "customers" WHERE "customers"."orders_count" NOT IN (1, 3, 5)',
+    );
     expect(json.binds).toEqual([]);
     expect(json.frozenAt).toBe("2000-01-01T00:00:00.000Z");
   });

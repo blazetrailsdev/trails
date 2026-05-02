@@ -66,8 +66,9 @@ describe("the to_sql visitor", () => {
 
     it("is not preparable when an array", () => {
       const node = users.get("id").notIn([1, 2, 3]);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("NOT IN (1, 2, 3)");
+      const collector = new Collectors.SQLString();
+      new Visitors.ToSql().compileWithCollector(node, collector);
+      expect(collector.preparable).toBe(false);
     });
 
     it("is preparable when a subselect", () => {
@@ -336,9 +337,9 @@ describe("the to_sql visitor", () => {
   describe("Nodes::NotIn", () => {
     it("is not preparable when an array", () => {
       const node = users.get("id").notIn([1, 2, 3]);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("NOT IN");
-      expect(sql).toContain("1, 2, 3");
+      const collector = new Collectors.SQLString();
+      new Visitors.ToSql().compileWithCollector(node, collector);
+      expect(collector.preparable).toBe(false);
     });
   });
 
@@ -348,6 +349,20 @@ describe("the to_sql visitor", () => {
       const sql = new Visitors.ToSql().compile(mgr.ast);
       expect(sql).toContain("JOIN");
       expect(sql).toContain("ON");
+    });
+
+    it("interleaves a space between values", () => {
+      const node = new Nodes.Fragments([new Nodes.SqlLiteral("foo"), new Nodes.SqlLiteral("bar")]);
+      expect(new Visitors.ToSql().compile(node)).toBe("foo bar");
+    });
+  });
+
+  describe("Nodes::HomogeneousIn", () => {
+    it("is not preparable", () => {
+      const node = new Nodes.HomogeneousIn([1, 2, 3], users.get("id"), "in");
+      const collector = new Collectors.SQLString();
+      new Visitors.ToSql().compileWithCollector(node, collector);
+      expect(collector.preparable).toBe(false);
     });
   });
 
@@ -715,8 +730,9 @@ describe("the to_sql visitor", () => {
 
     it("is not preparable when an array", () => {
       const node = users.get("id").in([1, 2, 3]);
-      const sql = new Visitors.ToSql().compile(node);
-      expect(sql).toContain("IN (1, 2, 3)");
+      const collector = new Collectors.SQLString();
+      new Visitors.ToSql().compileWithCollector(node, collector);
+      expect(collector.preparable).toBe(false);
     });
 
     it("is preparable when a subselect", () => {
@@ -980,7 +996,7 @@ describe("the to_sql visitor", () => {
       const node = new Nodes.Intersect(a.ast, new Nodes.Intersect(b.ast, c.ast));
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toBe(
-        '( SELECT * FROM "users" INTERSECT SELECT * FROM "users" INTERSECT SELECT * FROM "users" )',
+        '( SELECT * FROM "users" INTERSECT ( SELECT * FROM "users" INTERSECT SELECT * FROM "users" ) )',
       );
     });
   });
@@ -993,7 +1009,7 @@ describe("the to_sql visitor", () => {
       const node = new Nodes.Except(a.ast, new Nodes.Except(b.ast, c.ast));
       const sql = new Visitors.ToSql().compile(node);
       expect(sql).toBe(
-        '( SELECT * FROM "users" EXCEPT SELECT * FROM "users" EXCEPT SELECT * FROM "users" )',
+        '( SELECT * FROM "users" EXCEPT ( SELECT * FROM "users" EXCEPT SELECT * FROM "users" ) )',
       );
     });
   });

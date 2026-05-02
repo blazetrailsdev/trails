@@ -89,13 +89,13 @@ describe("SqliteTest", () => {
     it("INTERSECT strips Grouping wrapped operands", () => {
       const node = new Nodes.Intersect(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toBe('( SELECT * FROM "users" INTERSECT SELECT * FROM "users" )');
+      expect(sql).toBe('( (SELECT * FROM "users") INTERSECT (SELECT * FROM "users") )');
     });
 
     it("EXCEPT strips Grouping wrapped operands", () => {
       const node = new Nodes.Except(new Nodes.Grouping(q1().ast), new Nodes.Grouping(q2().ast));
       const sql = new Visitors.SQLite().compile(node);
-      expect(sql).toBe('( SELECT * FROM "users" EXCEPT SELECT * FROM "users" )');
+      expect(sql).toBe('( (SELECT * FROM "users") EXCEPT (SELECT * FROM "users") )');
     });
 
     it("UNION without Grouping operands renders bare SELECTs", () => {

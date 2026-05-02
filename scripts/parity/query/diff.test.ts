@@ -24,6 +24,7 @@ const EXAMPLE = {
   fixture: "arel-xx",
   frozenAt: "2000-01-01T00:00:00.000Z",
   sql: "SELECT 1",
+  paramSql: "SELECT 1",
   binds: [] as string[],
 };
 
