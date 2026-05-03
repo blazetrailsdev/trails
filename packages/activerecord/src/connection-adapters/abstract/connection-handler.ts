@@ -12,7 +12,7 @@ import { DatabaseConfigurations } from "../../database-configurations.js";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { DatabaseAdapter } from "../../adapter.js";
-import { AdapterNotSpecified, ConnectionNotDefined, NotImplementedError } from "../../errors.js";
+import { AdapterNotSpecified, ConnectionNotDefined } from "../../errors.js";
 import type { QueryCachePool } from "./query-cache.js";
 import { Notifications } from "@blazetrails/activesupport";
 
@@ -118,11 +118,11 @@ export class ConnectionHandler {
     });
 
     const poolKey = poolConfig.connectionDescriptor.name;
-    const poolManager = this._setPoolManager(poolKey);
+    const poolManager = this.setPoolManager(poolKey);
 
     const existingPoolConfig = poolManager.getPoolConfig(role, shard);
     if (existingPoolConfig) {
-      this._disconnectPoolFromPoolManager(poolManager, role, shard);
+      this.disconnectPoolFromPoolManager(poolManager, role, shard);
     }
 
     poolManager.setPoolConfig(role, shard, poolConfig);
@@ -194,9 +194,9 @@ export class ConnectionHandler {
   removeConnectionPool(connectionName: string, options?: { role?: string; shard?: string }): void {
     const role = options?.role ?? "writing";
     const shard = options?.shard ?? "default";
-    const poolManager = this._getPoolManager(connectionName);
+    const poolManager = this.getPoolManager(connectionName);
     if (poolManager) {
-      this._disconnectPoolFromPoolManager(poolManager, role, shard);
+      this.disconnectPoolFromPoolManager(poolManager, role, shard);
       if (poolManager.roleNames.length === 0) {
         this._connectionNameToPoolManager.delete(connectionName);
       }
@@ -210,7 +210,7 @@ export class ConnectionHandler {
     const role = options?.role ?? "writing";
     const shard = options?.shard ?? "default";
     const strict = options?.strict ?? false;
-    const poolManager = this._getPoolManager(owner);
+    const poolManager = this.getPoolManager(owner);
     const pool = poolManager?.getPoolConfig(role, shard)?.pool;
 
     if (strict && !pool) {
@@ -242,11 +242,18 @@ export class ConnectionHandler {
     this.clearAllConnectionsBang();
   }
 
-  private _getPoolManager(connectionName: string): PoolManager | undefined {
+  /** @internal */
+  connectionNameToPoolManager(): Map<string, PoolManager> {
+    return this._connectionNameToPoolManager;
+  }
+
+  /** @internal */
+  getPoolManager(connectionName: string): PoolManager | undefined {
     return this._connectionNameToPoolManager.get(connectionName);
   }
 
-  private _setPoolManager(connectionName: string): PoolManager {
+  /** @internal */
+  setPoolManager(connectionName: string): PoolManager {
     let manager = this._connectionNameToPoolManager.get(connectionName);
     if (!manager) {
       manager = new PoolManager();
@@ -255,63 +262,34 @@ export class ConnectionHandler {
     return manager;
   }
 
-  private _disconnectPoolFromPoolManager(
-    poolManager: PoolManager,
-    role: string,
-    shard: string,
-  ): void {
+  /** @internal */
+  poolManagers(): PoolManager[] {
+    return [...this._connectionNameToPoolManager.values()];
+  }
+
+  /** @internal */
+  disconnectPoolFromPoolManager(poolManager: PoolManager, role: string, shard: string): void {
     const poolConfig = poolManager.removePoolConfig(role, shard);
     if (poolConfig) {
       poolConfig.disconnect();
     }
   }
-}
 
-/** @internal */
-function connectionNameToPoolManager(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionHandler#connection_name_to_pool_manager is not implemented",
-  );
-}
-
-/** @internal */
-function getPoolManager(connectionName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionHandler#get_pool_manager is not implemented",
-  );
-}
-
-/** @internal */
-function setPoolManager(connectionDescriptor: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionHandler#set_pool_manager is not implemented",
-  );
-}
-
-/** @internal */
-function poolManagers(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionHandler#pool_managers is not implemented",
-  );
-}
-
-/** @internal */
-function disconnectPoolFromPoolManager(poolManager: any, role: any, shard: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionHandler#disconnect_pool_from_pool_manager is not implemented",
-  );
-}
-
-/** @internal */
-function resolvePoolConfig(config: any, connectionName: any, role: any, shard: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionHandler#resolve_pool_config is not implemented",
-  );
-}
-
-/** @internal */
-function determineOwnerName(ownerName: any, config: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionHandler#determine_owner_name is not implemented",
-  );
+  /** @internal */
+  resolvePoolConfig(
+    config: DatabaseConfig | Record<string, unknown>,
+    connectionName: string,
+    role: string,
+    shard: string,
+  ): PoolConfig {
+    const dbConfig =
+      config instanceof DatabaseConfig
+        ? config
+        : new HashConfig(DatabaseConfigurations.defaultEnv, connectionName, config as any);
+    if (!dbConfig.adapter) {
+      throw new AdapterNotSpecified("database configuration does not specify adapter");
+    }
+    const descriptor = new ConnectionDescriptor(connectionName);
+    return new PoolConfig(descriptor, dbConfig, role, shard);
+  }
 }

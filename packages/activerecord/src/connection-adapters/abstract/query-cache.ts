@@ -345,33 +345,14 @@ export function selectAll(
         return original.call(this, sql, name, binds);
       }
 
-      const key = binds && binds.length > 0 ? JSON.stringify([sql, binds]) : sql;
-
-      // Check for cache hit first (Rails: lookup_sql_cache)
-      const cached = qc.get(key);
+      const cached = lookupSqlCache.call(this, sql, name, binds ?? []);
       if (cached !== undefined) {
-        const bindArray = binds ?? [];
-        Notifications.instrument("sql.active_record", {
-          sql,
-          name: name ?? "SQL",
-          binds: bindArray,
-          type_casted_binds: bindArray.map((b: any) => {
-            if (b && typeof b === "object" && typeof b.valueForDatabase === "function") {
-              return b.valueForDatabase();
-            }
-            return b && typeof b === "object" && "value" in b ? b.value : b;
-          }),
-          connection: this,
-          cached: true,
-          row_count: cached.length,
-        });
         return cached.map((r) => ({ ...r }));
       }
 
-      // Cache miss — execute and store
-      return qc.computeIfAbsent(key, async () => {
-        return original.call(this, sql, name, binds);
-      });
+      return cacheSql.call(this, sql, name, binds ?? [], () =>
+        original.call(this, sql, name, binds),
+      );
     }
     return original.call(this, sql, name, binds);
   };
@@ -410,36 +391,69 @@ function checkVersion(): never {
 }
 
 /** @internal */
-function unsetQueryCacheBang(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::QueryCache#unset_query_cache! is not implemented",
-  );
+function unsetQueryCacheBang(this: QueryCacheHost): void {
+  this._queryCache = null;
 }
 
 /** @internal */
-function lookupSqlCache(sql: any, name: any, binds: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::QueryCache#lookup_sql_cache is not implemented",
-  );
+function cacheNotificationInfo(
+  this: QueryCacheHost,
+  sql: string,
+  name: string | null | undefined,
+  binds: unknown[],
+): Record<string, unknown> {
+  return {
+    sql,
+    binds,
+    name: name ?? "SQL",
+    connection: this,
+    cached: true,
+  };
 }
 
 /** @internal */
-function cacheSql(sql: any, name: any, binds: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::QueryCache#cache_sql is not implemented",
-  );
+function cacheNotificationInfoResult(
+  this: QueryCacheHost,
+  sql: string,
+  name: string | null | undefined,
+  binds: unknown[],
+  result: Record<string, unknown>[],
+): Record<string, unknown> {
+  const payload = cacheNotificationInfo.call(this, sql, name, binds);
+  payload["row_count"] = result.length;
+  return payload;
 }
 
 /** @internal */
-function cacheNotificationInfoResult(sql: any, name: any, binds: any, result: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::QueryCache#cache_notification_info_result is not implemented",
-  );
+function lookupSqlCache(
+  this: QueryCacheHost,
+  sql: string,
+  name: string | null | undefined,
+  binds: unknown[],
+): Record<string, unknown>[] | undefined {
+  const qc = this._queryCache;
+  if (!qc) return undefined;
+  const key = binds && binds.length > 0 ? JSON.stringify([sql, binds]) : sql;
+  const result = qc.get(key);
+  if (result !== undefined) {
+    Notifications.instrument(
+      "sql.active_record",
+      cacheNotificationInfoResult.call(this, sql, name, binds, result),
+    );
+  }
+  return result;
 }
 
 /** @internal */
-function cacheNotificationInfo(sql: any, name: any, binds: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::QueryCache#cache_notification_info is not implemented",
-  );
+function cacheSql(
+  this: QueryCacheHost,
+  sql: string,
+  name: string | null | undefined,
+  binds: unknown[],
+  execute: () => Promise<Record<string, unknown>[]>,
+): Promise<Record<string, unknown>[]> {
+  const qc = this._queryCache;
+  if (!qc) return execute();
+  const key = binds && binds.length > 0 ? JSON.stringify([sql, binds]) : sql;
+  return qc.computeIfAbsent(key, execute).then((result) => result.map((r) => ({ ...r })));
 }
