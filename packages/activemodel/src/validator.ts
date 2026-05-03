@@ -159,7 +159,10 @@ export class EachValidator extends Validator {
    * @internal Rails-private helper.
    */
   filteredErrorOptions(additionalReserved: string[] = []): Record<string, unknown> {
-    const reserved = new Set([...(VALIDATOR_DEFAULT_KEYS as readonly string[]), ...additionalReserved]);
+    const reserved = new Set([
+      ...(VALIDATOR_DEFAULT_KEYS as readonly string[]),
+      ...additionalReserved,
+    ]);
     const filtered: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(this.options)) {
       if (!reserved.has(key)) filtered[key] = val;
