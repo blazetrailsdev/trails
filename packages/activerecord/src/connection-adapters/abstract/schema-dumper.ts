@@ -2,19 +2,21 @@
  * Connection-adapters-layer SchemaDumper. Mirrors Rails'
  * `ActiveRecord::ConnectionAdapters::SchemaDumper < SchemaDumper`
  * (connection_adapters/abstract/schema_dumper.rb) — the adapter
- * subclass of the base dumper. Rails uses this class to add
- * adapter-specific column-spec helpers (schema_type, schema_limit,
- * schema_precision, schema_default, etc.); our dump loop currently
- * inlines the equivalent logic in the base, so the subclass is
- * effectively empty. The extends edge is still what adapter-
- * specific subclasses (postgres/sqlite/mysql) build on top of, so
- * keeping it wired is important for Rails-parity and for future
- * column-spec hooks.
+ * subclass of the base dumper that adds column-spec helpers used by
+ * `schema_type`, `schema_limit`, `schema_default`, etc.
  */
 
-import { NotImplementedError } from "../../errors.js";
-import type { SchemaSource } from "../../schema-dumper.js";
+import type { SchemaSource, ColumnInfo } from "../../schema-dumper.js";
 import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
+
+/** Column-shaped interface this dumper depends on. */
+interface Column extends ColumnInfo {
+  bigint?: boolean;
+  virtual?: boolean;
+  hasDefault?: boolean;
+  defaultFunction?: string | null;
+  comment?: string | null;
+}
 
 export class SchemaDumper extends BaseSchemaDumper {
   static override create<T extends typeof BaseSchemaDumper>(
@@ -24,95 +26,110 @@ export class SchemaDumper extends BaseSchemaDumper {
   ): InstanceType<T> {
     return new this(source, options) as InstanceType<T>;
   }
-}
 
-/** @internal */
-function columnSpec(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#column_spec is not implemented",
-  );
-}
+  /** @internal */
+  protected columnSpec(column: Column): [symbol | string, Record<string, unknown>] {
+    return [this.schemaTypeWithVirtual(column), this.prepareColumnOptions(column)];
+  }
 
-/** @internal */
-function columnSpecForPrimaryKey(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#column_spec_for_primary_key is not implemented",
-  );
-}
+  /** @internal */
+  protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
+    const spec: Record<string, unknown> = {};
+    if (!this.isDefaultPrimaryKey(column)) {
+      spec["id"] = String(this.schemaType(column));
+    }
+    const colOpts = this.prepareColumnOptions(column);
+    delete colOpts["null"];
+    Object.assign(spec, colOpts);
+    if (this.isExplicitPrimaryKeyDefault(column)) {
+      spec["default"] ??= "nil";
+    }
+    return spec;
+  }
 
-/** @internal */
-function prepareColumnOptions(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#prepare_column_options is not implemented",
-  );
-}
+  /** @internal */
+  protected prepareColumnOptions(column: Column): Record<string, unknown> {
+    const spec: Record<string, unknown> = {};
+    const limit = this.schemaLimit(column);
+    if (limit !== undefined) spec["limit"] = limit;
+    const precision = this.schemaPrecision(column);
+    if (precision !== undefined) spec["precision"] = precision;
+    const scale = this.schemaScale(column);
+    if (scale !== undefined) spec["scale"] = scale;
+    const def = this.schemaDefault(column);
+    if (def !== undefined) spec["default"] = def;
+    if (column.null === false) spec["null"] = "false";
+    const collation = this.schemaCollation(column);
+    if (collation !== undefined) spec["collation"] = collation;
+    if (column.comment) spec["comment"] = JSON.stringify(column.comment);
+    return spec;
+  }
 
-/** @internal */
-function isDefaultPrimaryKey(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#default_primary_key? is not implemented",
-  );
-}
+  /** @internal */
+  protected isDefaultPrimaryKey(column: Column): boolean {
+    return this.schemaType(column) === "bigint";
+  }
 
-/** @internal */
-function isExplicitPrimaryKeyDefault(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#explicit_primary_key_default? is not implemented",
-  );
-}
+  /** @internal */
+  protected isExplicitPrimaryKeyDefault(_column: Column): boolean {
+    return false;
+  }
 
-/** @internal */
-function schemaTypeWithVirtual(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_type_with_virtual is not implemented",
-  );
-}
+  /** @internal */
+  protected schemaTypeWithVirtual(column: Column): string {
+    if (column.virtual) return "virtual";
+    return this.schemaType(column);
+  }
 
-/** @internal */
-function schemaType(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_type is not implemented",
-  );
-}
+  /** @internal */
+  protected schemaType(column: Column): string {
+    if (column.bigint || column.type === "bigint") return "bigint";
+    return column.type;
+  }
 
-/** @internal */
-function schemaLimit(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_limit is not implemented",
-  );
-}
+  /** @internal */
+  protected schemaLimit(column: Column): string | undefined {
+    if (column.bigint || column.type === "bigint") return undefined;
+    const limit = column.limit;
+    if (limit == null) return undefined;
+    return String(limit);
+  }
 
-/** @internal */
-function schemaPrecision(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_precision is not implemented",
-  );
-}
+  /** @internal */
+  protected schemaPrecision(column: Column): string | undefined {
+    if (column.type === "datetime") {
+      if (column.precision == null) return "nil";
+      if (column.precision === BaseSchemaDumper.DEFAULT_DATETIME_PRECISION) return undefined;
+      return String(column.precision);
+    }
+    if (column.precision != null) return String(column.precision);
+    return undefined;
+  }
 
-/** @internal */
-function schemaScale(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_scale is not implemented",
-  );
-}
+  /** @internal */
+  protected schemaScale(column: Column): string | undefined {
+    if (column.scale != null) return String(column.scale);
+    return undefined;
+  }
 
-/** @internal */
-function schemaDefault(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_default is not implemented",
-  );
-}
+  /** @internal */
+  protected schemaDefault(column: Column): string | undefined {
+    if (!column.hasDefault && column.default === undefined) return undefined;
+    if (column.default == null) return this.schemaExpression(column);
+    // Represent the default as its schema literal
+    if (typeof column.default === "string") return JSON.stringify(column.default);
+    return String(column.default);
+  }
 
-/** @internal */
-function schemaExpression(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_expression is not implemented",
-  );
-}
+  /** @internal */
+  protected schemaExpression(column: Column): string | undefined {
+    if (column.defaultFunction) return `-> { ${JSON.stringify(column.defaultFunction)} }`;
+    return undefined;
+  }
 
-/** @internal */
-function schemaCollation(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaDumper#schema_collation is not implemented",
-  );
+  /** @internal */
+  protected schemaCollation(column: Column): string | undefined {
+    if (column.collation) return JSON.stringify(column.collation);
+    return undefined;
+  }
 }
