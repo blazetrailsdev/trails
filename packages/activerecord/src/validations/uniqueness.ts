@@ -152,17 +152,26 @@ export class UniquenessValidator extends EachValidator {
  * @internal
  */
 function findFinderClassFor(record: any, klassOption: any): any {
+  // Rails walks upward and tracks the most-recent non-abstract class, with
+  // `@klass` (validator option) as the natural stopping point. In Trails
+  // the option is often null, so walking past it can leak into ActiveModel
+  // / Object — both of which lack a `.where` and would cause validateEach
+  // to short-circuit. Return the first non-abstract class encountered
+  // starting from record.constructor; bound the walk at klassOption when
+  // present, otherwise stop at the first ancestor missing `.where`
+  // (the AR/AM boundary).
   let current = record.constructor;
-  let found: any = null;
-  // Walk up the prototype chain. Stop when we reach `klassOption` (or top).
   while (current) {
-    if (!current.abstractClass) found = current;
-    if (current === klassOption || current === Object) break;
+    if (!current.abstractClass && typeof current.where === "function") {
+      return current;
+    }
+    if (current === klassOption) break;
     const parent = Object.getPrototypeOf(current);
-    if (!parent || parent === Function.prototype) break;
+    if (!parent || parent === Function.prototype || parent === Object) break;
+    if (typeof (parent as any).where !== "function") break;
     current = parent;
   }
-  return found ?? record.constructor;
+  return record.constructor;
 }
 
 /**
