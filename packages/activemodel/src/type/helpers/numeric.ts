@@ -47,6 +47,18 @@ export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
   );
 }
 
+// Constructor rest args must be `any[]` — idiomatic in TypeScript mixin
+// patterns; no single concrete signature covers all subclass shapes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AbstractValueTypeCtor<T = unknown> = abstract new (...args: any[]) => ValueType<T>;
+
+/** Methods added by `applyNumericMixin`. Exported for type assertions. */
+export interface NumericMixinMethods {
+  cast(value: unknown): unknown;
+  serialize(value: unknown): unknown;
+  isChanged(oldValue: unknown, newValue: unknown, newValueBeforeTypeCast?: unknown): boolean;
+}
+
 /**
  * Mirrors: ActiveModel::Type::Helpers::Numeric (numeric.rb:7-34).
  *
@@ -55,14 +67,17 @@ export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
  * - `serialize` delegates to `cast` (numeric.rb:7-9)
  * - `isChanged` uses number_to_non_number? / equal_nan? (numeric.rb:31-34)
  *
+ * The return type augments `TBase`'s prototype shape rather than
+ * intersecting a second constructor signature — that pattern avoids
+ * TS2510 ("Base constructors must all have the same return type") while
+ * still advertising the added instance methods to callers.
+ *
  * @internal Rails-private helper.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function applyNumericMixin<TBase extends abstract new (...args: any[]) => ValueType<any>>(
+export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
   Base: TBase,
-) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  class NumericType extends (Base as unknown as new (...args: any[]) => ValueType<any>) {
+): TBase & { prototype: NumericMixinMethods } {
+  class NumericType extends (Base as AbstractValueTypeCtor) {
     override cast(value: unknown) {
       let v: unknown;
       if (typeof value === "number" || typeof value === "bigint") {
@@ -95,5 +110,5 @@ export function applyNumericMixin<TBase extends abstract new (...args: any[]) =>
       );
     }
   }
-  return NumericType as unknown as TBase;
+  return NumericType as unknown as TBase & { prototype: NumericMixinMethods };
 }
