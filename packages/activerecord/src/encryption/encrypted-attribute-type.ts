@@ -340,7 +340,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     const normalized = this.deterministic ? this._applyForcedEncoding(str) : str;
     const toEncrypt =
       this.scheme.downcase || this.scheme.ignoreCase ? normalized.toLowerCase() : normalized;
-    return this.encrypt(toEncrypt);
+    return this.encryptAsText(toEncrypt);
   }
 
   /** @internal */
