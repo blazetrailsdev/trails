@@ -1,56 +1,15 @@
 /**
  * Numeric helper — shared behavior for numeric type casting.
  *
- * Mirrors: ActiveModel::Type::Helpers::Numeric
- *
- * Provides common casting logic: blank strings cast to null,
- * non-numeric strings raise errors, and changed? uses numeric comparison.
+ * Mirrors: ActiveModel::Type::Helpers::Numeric (numeric.rb:7-34)
  */
-export interface Numeric {
-  serialize(value: unknown): number | null;
-  serializeCastValue(value: unknown): number | null;
-  cast(value: unknown): number | null;
-  changed(oldValue: unknown, newValue: unknown, rawNewValue: unknown): boolean;
-}
+import { ValueType } from "../value.js";
 
-export const NumericMixin = {
-  castNumeric(value: unknown): number | null {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "number") return value;
-    if (typeof value === "boolean") return value ? 1 : 0;
-    const str = String(value).trim();
-    if (str === "") return null;
-    const num = Number(str);
-    if (isNaN(num)) {
-      throw new Error(`"${str}" is not a valid number`);
-    }
-    return num;
-  },
-
-  numericChanged(oldValue: unknown, newValue: unknown, _rawNewValue: unknown): boolean {
-    const oldNum = NumericMixin.castNumeric(oldValue);
-    const newNum = NumericMixin.castNumeric(newValue);
-    return oldNum !== newNum;
-  },
-};
-
-/**
- * Mirrors: ActiveModel::Type::Helpers::Numeric::NUMERIC_REGEX
- * (numeric.rb).
- */
+/** Mirrors: ActiveModel::Type::Helpers::Numeric::NUMERIC_REGEX */
 const NUMERIC_REGEX = /^\s*[+-]?\d/;
 
 /**
  * Mirrors: ActiveModel::Type::Helpers::Numeric#non_numeric_string?
- * (numeric.rb):
- *
- *   def non_numeric_string?(value)
- *     !NUMERIC_REGEX.match?(value)
- *   end
- *
- * Used to decide whether a string would round-trip through `to_i`/`to_d`
- * to a meaningful number — Rails treats "wibble" → 0 as a no-op when
- * comparing dirty state, so this predicate filters those out.
  *
  * @internal Rails-private helper.
  */
@@ -60,12 +19,6 @@ export function isNonNumericString(value: unknown): boolean {
 
 /**
  * Mirrors: ActiveModel::Type::Helpers::Numeric#number_to_non_number?
- * (numeric.rb):
- *
- *   def number_to_non_number?(old_value, new_value_before_type_cast)
- *     old_value != nil && !new_value_before_type_cast.is_a?(::Numeric) &&
- *       non_numeric_string?(new_value_before_type_cast.to_s)
- *   end
  *
  * @internal Rails-private helper.
  */
@@ -79,14 +32,6 @@ export function isNumberToNonNumber(oldValue: unknown, newValueBeforeTypeCast: u
 
 /**
  * Mirrors: ActiveModel::Type::Helpers::Numeric#equal_nan?
- * (numeric.rb):
- *
- *   def equal_nan?(old_value, new_value)
- *     (old_value.is_a?(::Float) || old_value.is_a?(BigDecimal)) &&
- *       old_value.nan? &&
- *       old_value.instance_of?(new_value.class) &&
- *       new_value.nan?
- *   end
  *
  * Trails has no BigDecimal class, so the constructor-equality check
  * collapses to "both are JS numbers and both are NaN".
@@ -100,4 +45,75 @@ export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
     typeof newValue === "number" &&
     Number.isNaN(newValue)
   );
+}
+
+// Constructor rest args must be `any[]` — idiomatic in TypeScript mixin
+// patterns; no single concrete signature covers all subclass shapes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AbstractValueTypeCtor<T = unknown> = abstract new (...args: any[]) => ValueType<T>;
+
+/** Methods added by `applyNumericMixin`. Exported for type assertions. */
+export interface NumericMixinMethods {
+  cast(value: unknown): unknown;
+  serialize(value: unknown): unknown;
+  serializeCastValue(value: unknown): unknown;
+  isChanged(oldValue: unknown, newValue: unknown, newValueBeforeTypeCast?: unknown): boolean;
+}
+
+/**
+ * Mirrors: ActiveModel::Type::Helpers::Numeric (numeric.rb:7-34).
+ *
+ * Applied to Integer, Float, and Decimal. Adds:
+ * - blank-string and boolean normalization in `cast` (numeric.rb:15-29)
+ * - `serialize` delegates to `cast` (numeric.rb:7-9)
+ * - `isChanged` uses number_to_non_number? / equal_nan? (numeric.rb:31-34)
+ *
+ * The return type augments `TBase`'s prototype shape rather than
+ * intersecting a second constructor signature — that pattern avoids
+ * TS2510 ("Base constructors must all have the same return type") while
+ * still advertising the added instance methods to callers.
+ *
+ * @internal Rails-private helper.
+ */
+export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
+  Base: TBase,
+): TBase & { prototype: NumericMixinMethods } {
+  class NumericType extends (Base as AbstractValueTypeCtor) {
+    override cast(value: unknown) {
+      let v: unknown;
+      if (typeof value === "number" || typeof value === "bigint") {
+        v = value;
+      } else if (value === true) {
+        v = 1;
+      } else if (value === false) {
+        v = 0;
+      } else if (typeof value === "string" && value.trim() === "") {
+        v = null;
+      } else {
+        v = value;
+      }
+      return super.cast(v);
+    }
+
+    override serialize(value: unknown): unknown {
+      return this.cast(value);
+    }
+
+    override serializeCastValue(value: unknown): unknown {
+      return value;
+    }
+
+    override isChanged(
+      oldValue: unknown,
+      newValue: unknown,
+      newValueBeforeTypeCast?: unknown,
+    ): boolean {
+      return (
+        (super.isChanged(oldValue, newValue, newValueBeforeTypeCast) ||
+          isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
+        !isEqualNan(oldValue, newValueBeforeTypeCast)
+      );
+    }
+  }
+  return NumericType as unknown as TBase & { prototype: NumericMixinMethods };
 }

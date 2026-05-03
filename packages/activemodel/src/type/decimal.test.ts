@@ -149,4 +149,21 @@ describe("DecimalType", () => {
     expect(type.cast("bad1")).toBe("0");
     expect(type.cast("bad")).toBe("0");
   });
+
+  it("blank string casts to null via Helpers::Numeric", () => {
+    const type = new Types.DecimalType();
+    expect(type.cast("   ")).toBeNull();
+  });
+
+  it("serialize delegates to cast via Helpers::Numeric", () => {
+    const type = new Types.DecimalType();
+    expect(type.serialize("1.5")).toBe("1.5");
+    expect(type.serialize("")).toBeNull();
+  });
+
+  it("casting booleans via Helpers::Numeric — true → '1', false → '0'", () => {
+    const type = new Types.DecimalType();
+    expect(type.cast(true)).toBe("1");
+    expect(type.cast(false)).toBe("0");
+  });
 });

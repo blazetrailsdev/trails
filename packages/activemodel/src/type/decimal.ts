@@ -1,6 +1,9 @@
 import { ValueType } from "./value.js";
+import { applyNumericMixin } from "./helpers/numeric.js";
 
-export class DecimalType extends ValueType<string> {
+const NumericValueType = applyNumericMixin(ValueType<string>);
+
+export class DecimalType extends NumericValueType {
   readonly name: string = "decimal";
 
   // JS has no BigDecimal, so we represent decimals as strings to avoid

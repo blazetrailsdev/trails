@@ -1,10 +1,13 @@
 import { ValueType } from "./value.js";
 import { ActiveModelRangeError } from "../errors.js";
+import { applyNumericMixin } from "./helpers/numeric.js";
 
 /** Mirrors: ActiveModel::Type::Integer::DEFAULT_LIMIT (integer.rb:43). */
 const DEFAULT_LIMIT = 4;
 
-export class IntegerType extends ValueType<number> {
+const NumericValueType = applyNumericMixin(ValueType<number>);
+
+export class IntegerType extends NumericValueType {
   readonly name: string = "integer";
 
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {

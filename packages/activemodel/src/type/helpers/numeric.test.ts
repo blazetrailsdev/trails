@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { isNonNumericString, isNumberToNonNumber, isEqualNan } from "./numeric.js";
+import {
+  isNonNumericString,
+  isNumberToNonNumber,
+  isEqualNan,
+  applyNumericMixin,
+} from "./numeric.js";
+import { ValueType } from "../value.js";
 
 describe("Helpers::Numeric private predicates", () => {
   describe("isNonNumericString", () => {
@@ -64,5 +70,44 @@ describe("Helpers::Numeric private predicates", () => {
       expect(isEqualNan("NaN", "NaN")).toBe(false);
       expect(isEqualNan(null, null)).toBe(false);
     });
+  });
+});
+
+describe("applyNumericMixin", () => {
+  class ConcreteNumeric extends applyNumericMixin(ValueType<number>) {
+    readonly name = "test_numeric";
+    type() {
+      return this.name;
+    }
+    protected castValue(value: unknown): number | null {
+      if (typeof value === "number") return value;
+      const n = Number(value);
+      return isNaN(n) ? null : n;
+    }
+  }
+
+  const type = new ConcreteNumeric();
+
+  it("cast returns null for blank strings", () => {
+    expect(type.cast("")).toBeNull();
+    expect(type.cast("   ")).toBeNull();
+  });
+
+  it("cast converts true to 1 and false to 0", () => {
+    expect(type.cast(true)).toBe(1);
+    expect(type.cast(false)).toBe(0);
+  });
+
+  it("serialize delegates to cast", () => {
+    expect(type.serialize(42)).toBe(42);
+    expect(type.serialize("")).toBeNull();
+  });
+
+  it("isChanged returns false for NaN → NaN", () => {
+    expect(type.isChanged(NaN, NaN, NaN)).toBe(false);
+  });
+
+  it("isChanged returns true for number-to-non-number — number_to_non_number? forces change", () => {
+    expect(type.isChanged(0, null, "abc")).toBe(true);
   });
 });

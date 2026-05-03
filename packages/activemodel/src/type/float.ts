@@ -1,6 +1,9 @@
 import { ValueType } from "./value.js";
+import { applyNumericMixin } from "./helpers/numeric.js";
 
-export class FloatType extends ValueType<number> {
+const NumericValueType = applyNumericMixin(ValueType<number>);
+
+export class FloatType extends NumericValueType {
   readonly name = "float";
 
   /** @internal Rails-private helper. */

@@ -41,10 +41,9 @@ describe("IntegerTest", () => {
   });
 
   it("casting booleans for database", () => {
-    // In Rails, true casts to 1 and false to 0
-    // In our implementation, parseInt("true") and parseInt("false") are NaN -> null
-    expect(type.cast(true)).toBeNull();
-    expect(type.cast(false)).toBeNull();
+    // Rails Helpers::Numeric#cast converts true → 1, false → 0 before castValue
+    expect(type.cast(true)).toBe(1);
+    expect(type.cast(false)).toBe(0);
   });
 
   it("casting duration", () => {
@@ -131,5 +130,25 @@ describe("IntegerTest", () => {
       const serialized = type.serialize(v);
       expect(serialized).toBe(cast);
     }
+  });
+
+  it("blank string casts to null via Helpers::Numeric", () => {
+    expect(type.cast("   ")).toBeNull();
+  });
+
+  it("serialize casts first via mixin — serialize(10.5) returns 10", () => {
+    expect(type.serialize(10.5)).toBe(10);
+  });
+
+  it("isChanged returns true for number-to-non-number — number_to_non_number? forces change", () => {
+    // Old value 0, new raw "wibble" casts to null in Trails (0 in Ruby): still flagged changed
+    expect(type.isChanged(0, null, "wibble")).toBe(true);
+  });
+
+  it("isChanged returns true when old and new cast values are equal but raw is non-numeric — number_to_non_number? path", () => {
+    // type.isChanged(old, new_cast, raw): old=0, new_cast=0, raw="wibble"
+    // super.isChanged returns false (0 === 0), but number_to_non_number? forces true.
+    // This is the path Rails numeric.rb:31-34 adds on top of Value#changed?.
+    expect(type.isChanged(0, 0, "wibble")).toBe(true);
   });
 });
