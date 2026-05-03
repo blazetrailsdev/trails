@@ -2065,7 +2065,7 @@ describe("Errors enhancements", () => {
     u.errors.add("name", "too_short");
     u.errors.add("email", "blank");
     const removed = u.errors.delete("name");
-    expect(removed.length).toBe(2);
+    expect(removed!.length).toBe(2);
     expect(u.errors.count).toBe(1);
   });
 
@@ -2079,7 +2079,7 @@ describe("Errors enhancements", () => {
     u.errors.add("name", "blank");
     u.errors.add("name", "too_short");
     const removed = u.errors.delete("name", "blank");
-    expect(removed.length).toBe(1);
+    expect(removed!.length).toBe(1);
     expect(u.errors.count).toBe(1);
   });
 
@@ -2122,8 +2122,8 @@ describe("Errors enhancements", () => {
     u.errors.add("name", "too_short");
     u.errors.add("email", "invalid");
     const hash = u.errors.toHash();
-    expect(hash.name.length).toBe(2);
-    expect(hash.email.length).toBe(1);
+    expect(hash.get("name")!.length).toBe(2);
+    expect(hash.get("email")!.length).toBe(1);
   });
 
   it("include?", () => {
@@ -2146,7 +2146,7 @@ describe("Errors enhancements", () => {
     }
     const u = new User({});
     u.errors.add("name", "blank");
-    expect(u.errors.messages).toEqual({ name: ["can't be blank"] });
+    expect(u.errors.messages.get("name")).toEqual(["can't be blank"]);
   });
 
   it("full_messages creates a list of error messages with the attribute name included", () => {

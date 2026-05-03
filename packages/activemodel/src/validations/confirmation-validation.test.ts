@@ -206,7 +206,7 @@ describe("confirmation options pass-through", () => {
     u.isValid();
     expect(u.errors.count).toBeGreaterThan(0);
     expect(
-      u.errors.details.find((d) => d.attribute === "titleConfirmation")?.options?.caseSensitive,
+      u.errors.objects.find((d) => d.attribute === "titleConfirmation")?.options?.caseSensitive,
     ).toBeUndefined();
   });
 });

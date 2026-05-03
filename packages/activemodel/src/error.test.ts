@@ -13,13 +13,13 @@ describe("ErrorTest", () => {
     const errors = new Errors({});
     errors.add("name", "blank");
     // Just verify it doesn't throw
-    expect(errors.details[0]).toBeDefined();
+    expect(errors.objects[0]).toBeDefined();
   });
 
   it("details which has no raw_type", () => {
     const errors = new Errors({});
     errors.add("name", "blank");
-    const detail = errors.details[0];
+    const detail = errors.objects[0];
     expect(detail.type).toBe("blank");
   });
 
@@ -44,14 +44,14 @@ describe("ErrorTest", () => {
   it("initialize", () => {
     const e = new Errors(null);
     e.add("name", "blank");
-    expect(e.details[0].attribute).toBe("name");
-    expect(e.details[0].type).toBe("blank");
+    expect(e.objects[0].attribute).toBe("name");
+    expect(e.objects[0].type).toBe("blank");
   });
 
   it("initialize without type", () => {
     const e = new Errors(null);
     e.add("name");
-    expect(e.details[0].type).toBe("invalid");
+    expect(e.objects[0].type).toBe("invalid");
   });
 
   it("match? handles attribute match", () => {
@@ -102,7 +102,7 @@ describe("ErrorTest", () => {
   it("details which ignores callback and message options", () => {
     const e = new Errors(null);
     e.add("name", "blank", { message: "custom msg" });
-    const detail = e.details[0];
+    const detail = e.objects[0];
     expect(detail.attribute).toBe("name");
     expect(detail.type).toBe("blank");
   });
@@ -110,7 +110,7 @@ describe("ErrorTest", () => {
   it("initialize without type but with options", () => {
     const e = new Errors(null);
     e.add("name", "invalid", { message: "is not valid" });
-    const detail = e.details[0];
+    const detail = e.objects[0];
     expect(detail.attribute).toBe("name");
     expect(detail.type).toBe("invalid");
     expect(detail.message).toBe("is not valid");
@@ -143,14 +143,14 @@ describe("ErrorTest", () => {
     const e = new Errors(null);
     e.add("name", "too_short", { count: 3 });
     expect(e.get("name").length).toBe(1);
-    expect(e.details[0].options?.count).toBe(3);
+    expect(e.objects[0].options?.count).toBe(3);
   });
 
   it("message returns singular interpolation", () => {
     const e = new Errors(null);
     e.add("name", "too_short", { count: 1 });
     expect(e.get("name").length).toBe(1);
-    expect(e.details[0].options?.count).toBe(1);
+    expect(e.objects[0].options?.count).toBe(1);
   });
 
   it("message returns count interpolation", () => {

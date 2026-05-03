@@ -553,7 +553,9 @@ describe("hasSecurePassword — per-attribute confirmation, challenge, and salt"
     const valid = await u.validate();
     expect(valid).toBe(false);
     // Error keyed to recovery_password_confirmation (Rails snake_case parity)
-    expect((u as any).errors.messages["recovery_password_confirmation"]).toBeDefined();
+    expect(
+      (u as any).errors.messages.get("recovery_password_confirmation")?.length,
+    ).toBeGreaterThan(0);
   });
 
   it("passes validation when confirmation matches", async () => {
@@ -577,7 +579,9 @@ describe("hasSecurePassword — per-attribute confirmation, challenge, and salt"
     const valid = await u.validate();
     expect(valid).toBe(false);
     // Error keyed to recovery_password_challenge (Rails snake_case parity)
-    expect((u as any).errors.messages["recovery_password_challenge"]).toBeDefined();
+    expect((u as any).errors.messages.get("recovery_password_challenge")?.length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("challenge validation passes with correct current password", async () => {
@@ -617,7 +621,7 @@ describe("hasSecurePassword — per-attribute confirmation, challenge, and salt"
     expect((u as any).recoveryPasswordChallenge).toBeNull();
     const valid = await u.validate();
     expect(valid).toBe(true);
-    expect((u as any).errors.messages["recovery_password_challenge"]).toBeUndefined();
+    expect((u as any).errors.messages.get("recovery_password_challenge")).toHaveLength(0);
   });
 
   it("challenge validation checks current digest after multiple saves", async () => {

@@ -58,9 +58,9 @@ describe("ErrorsTest", () => {
   it("details returns added error detail", () => {
     const e = new Errors(null);
     e.add("name", "blank");
-    expect(e.details.length).toBe(1);
-    expect(e.details[0].attribute).toBe("name");
-    expect(e.details[0].type).toBe("blank");
+    expect(e.details.size).toBe(1);
+    expect(e.details.get("name")).toHaveLength(1);
+    expect(e.details.get("name")![0].error).toBe("blank");
   });
 
   it("custom message overrides default", () => {
@@ -84,7 +84,7 @@ describe("ErrorsTest", () => {
     const errors = new Errors({});
     errors.add("name", "blank");
     errors.add("age", "invalid");
-    expect(errors.details[0].attribute).toBe("name");
+    expect(errors.objects[0].attribute).toBe("name");
   });
 
   it("dup", () => {
@@ -171,9 +171,9 @@ describe("ErrorsTest", () => {
     errors.add("name", "blank");
     errors.add("name", "invalid");
     const hash = errors.toHash();
-    expect(hash).toEqual({ name: ["can't be blank", "is invalid"] });
+    expect(hash.get("name")).toEqual(["can't be blank", "is invalid"]);
     // Accessing a non-existent key should be undefined
-    expect(hash["age"]).toBeUndefined();
+    expect(hash.get("age")).toBeUndefined();
   });
 
   it("as_json returns a hash without default proc", () => {
@@ -181,7 +181,7 @@ describe("ErrorsTest", () => {
     errors.add("name", "blank");
     const json = errors.asJson();
     expect(json).toEqual({ name: ["can't be blank"] });
-    expect(json["age"]).toBeUndefined();
+    expect(json.age).toBeUndefined();
   });
 
   it("as_json with :full_messages option creates a json formatted representation of the errors containing complete messages", () => {
@@ -264,7 +264,7 @@ describe("ErrorsTest", () => {
     errors.add("name", "invalid");
     errors.add("age", "invalid");
     const removed = errors.delete("name");
-    expect(removed.length).toBe(2);
+    expect(removed!.length).toBe(2);
     expect(errors.count).toBe(1);
   });
 
@@ -304,7 +304,7 @@ describe("ErrorsTest", () => {
     const errors1 = new Errors({});
     errors1.add("name", "blank");
     const errors2 = new Errors({});
-    errors2.import(errors1.details[0]);
+    errors2.import(errors1.objects[0]);
     expect(errors2.count).toBe(1);
     expect(errors2.get("name")).toEqual(["can't be blank"]);
   });
@@ -313,7 +313,7 @@ describe("ErrorsTest", () => {
     const errors1 = new Errors({});
     errors1.add("name", "blank");
     const errors2 = new Errors({});
-    errors2.import(errors1.details[0], { attribute: "title" });
+    errors2.import(errors1.objects[0], { attribute: "title" });
     expect(errors2.get("title")).toEqual(["can't be blank"]);
   });
 
@@ -340,7 +340,7 @@ describe("ErrorsTest", () => {
     e.add("name", "blank");
     e.add("name", "too_short");
     const removed = e.delete("name");
-    expect(removed.length).toBe(2);
+    expect(removed!.length).toBe(2);
     expect(e.count).toBe(0);
   });
 
@@ -514,8 +514,8 @@ describe("ErrorsTest", () => {
     e.add("name", "too_short");
     e.add("age", "not_a_number");
     const hash = e.toHash();
-    expect(hash.name.length).toBe(2);
-    expect(hash.age.length).toBe(1);
+    expect(hash.get("name")!.length).toBe(2);
+    expect(hash.get("age")!.length).toBe(1);
   });
 
   it("full_messages creates a list of error messages with the attribute name included", () => {
@@ -564,25 +564,26 @@ describe("ErrorsTest", () => {
     e.add("name", "blank");
     e.add("name", "too_short");
     const json = e.asJson();
-    expect(json.name.length).toBe(2);
+    expect(json["name"].length).toBe(2);
   });
 
   it("details returns added error detail with custom option", () => {
     const e = new Errors(null);
     e.add("name", "blank", { message: "custom" });
-    expect(e.details[0].type).toBe("blank");
+    expect(e.details.get("name")![0].error).toBe("blank");
   });
 
   it("details do not include message option", () => {
     const e = new Errors(null);
     e.add("name", "blank");
-    expect(e.details[0].type).toBe("blank");
+    expect(e.details.get("name")![0].error).toBe("blank");
+    expect(e.details.get("name")![0].message).toBeUndefined();
   });
 
   it("details retains original type as error", () => {
     const e = new Errors(null);
     e.add("name", "too_short", { count: 3 });
-    expect(e.details[0].type).toBe("too_short");
+    expect(e.details.get("name")![0].error).toBe("too_short");
   });
 
   it("group_by_attribute", () => {
@@ -598,7 +599,7 @@ describe("ErrorsTest", () => {
   it("delete returns nil when no errors were deleted", () => {
     const e = new Errors(null);
     const removed = e.delete("name");
-    expect(removed.length).toBe(0);
+    expect(removed).toBeNull();
   });
 
   it("delete removes details on given attribute", () => {
@@ -615,14 +616,14 @@ describe("ErrorsTest", () => {
     e.add("name", "blank");
     e.add("name", "too_short");
     const removed = e.delete("name");
-    expect(removed.length).toBe(2);
+    expect(removed!.length).toBe(2);
   });
 
   it("clear removes details", () => {
     const e = new Errors(null);
     e.add("name", "blank");
     e.clear();
-    expect(e.details.length).toBe(0);
+    expect(e.details.size).toBe(0);
   });
 
   it("details returns empty array when accessed with non-existent attribute", () => {
@@ -856,14 +857,14 @@ describe("ErrorsTest", () => {
     errors.add("name", "blank");
     const details1 = errors.details;
     const details2 = errors.details;
-    expect(details1).toEqual(details2);
+    expect(details1.get("name")).toEqual(details2.get("name"));
     expect(details1).not.toBe(details2);
   });
 
   it("errors are marshalable", () => {
     const errors = new Errors({});
     errors.add("name", "blank");
-    const json = JSON.stringify(errors.toHash());
+    const json = JSON.stringify(errors.asJson());
     const parsed = JSON.parse(json);
     expect(parsed).toEqual({ name: ["can't be blank"] });
   });
@@ -930,7 +931,7 @@ describe("ErrorsTest", () => {
   it("add, with type as symbol", () => {
     const e = new Errors(null);
     e.add("name", "blank");
-    expect(e.details[0].type).toBe("blank");
+    expect(e.details.get("name")![0].error).toBe("blank");
     expect(e.get("name")).toContain("can't be blank");
   });
 
@@ -1033,5 +1034,106 @@ describe("ErrorsTest", () => {
       expect([...errors]).toHaveLength(2);
       expect(Array.from(errors, (e) => e.attribute)).toEqual(["name", "age"]);
     });
+  });
+
+  // =========================================================================
+  // P9 — Rails shape alignment tests
+  // =========================================================================
+
+  it("delete returns array of removed errors when present", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    e.add("name", "too_short");
+    const removed = e.delete("name");
+    expect(removed).not.toBeNull();
+    expect(removed!.length).toBe(2);
+  });
+
+  it("delete returns null when nothing removed", () => {
+    const e = new Errors(null);
+    const removed = e.delete("name");
+    expect(removed).toBeNull();
+  });
+
+  it("messages.get missing key returns frozen empty array", () => {
+    const e = new Errors(null);
+    const result = e.messages.get("missing");
+    expect(result).toEqual([]);
+    expect(Object.isFrozen(result)).toBe(true);
+    expect(() => (result as string[]).push("x")).toThrow();
+  });
+
+  it("messages.get missing keys return the same singleton frozen instance", () => {
+    const e = new Errors(null);
+    const a = e.messages.get("missing");
+    const b = e.messages.get("alsoMissing");
+    expect(a).toBe(b);
+  });
+
+  it("details shape strips reserved option keys", () => {
+    const e = new Errors(null);
+    e.add("name", "blank", { custom: "x", message: "override" });
+    const detail = e.details.get("name")![0];
+    expect(detail.error).toBe("blank");
+    expect(detail.custom).toBe("x");
+    expect(detail.message).toBeUndefined();
+  });
+
+  it("details missing-key returns frozen empty array", () => {
+    const e = new Errors(null);
+    const result = e.details.get("missing");
+    expect(result).toEqual([]);
+    expect(Object.isFrozen(result)).toBe(true);
+  });
+
+  it("toHash(true) returns full messages", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    const full = e.toHash(true);
+    expect(full.get("name")![0]).toContain("Name");
+    expect(full.get("name")![0]).toContain("can't be blank");
+  });
+
+  it("toHash() with no arg returns short messages", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    const short = e.toHash();
+    expect(short.get("name")![0]).toBe("can't be blank");
+  });
+
+  it("added returns true for exact type match", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    expect(e.added("name", "blank")).toBe(true);
+  });
+
+  it("added returns true for full message string (string branch)", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    expect(e.added("name", "can't be blank")).toBe(true);
+  });
+
+  it("added returns false for nonexistent type or message", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    expect(e.added("name", "nonexistent type xyz")).toBe(false);
+  });
+
+  it("ofKind returns true for exact type match", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    expect(e.ofKind("name", "blank")).toBe(true);
+  });
+
+  it("ofKind returns true for full message string (string branch)", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    expect(e.ofKind("name", "can't be blank")).toBe(true);
+  });
+
+  it("ofKind returns false for nonexistent type or message", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    expect(e.ofKind("name", "nonexistent type xyz")).toBe(false);
   });
 });
