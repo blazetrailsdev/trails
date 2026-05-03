@@ -8,30 +8,18 @@
 
 ## nodes/
 
-Rails `nary.rb` bundles `Nary` + `And` + `Or` in one file via `Class.new(Nary)`. TS splits them:
+Rails `nary.rb` bundles `Nary` + `And` + `Or` in one file via `Class.new(Nary)`. TS splits the two subclasses out so the dependency graph stays acyclic without a registry indirection:
 
 - **`and.ts`** → Rails `Nary And` in `nary.rb`
 - **`or.ts`** → Rails `Nary Or` in `nary.rb`
 
-Rails `unary.rb` bundles many subclasses via `const_set`. TS splits some:
-
-- **`bin.ts`** → Rails `Bin` in `unary.rb`
-- **`distinct.ts`** → Rails `Distinct` (Note: Rails has `Distinct` in `terminal.rb`, not `unary.rb` — verify TS placement)
-- **`not.ts`** → Rails `Not` in `unary.rb`
-
-Rails `binary.rb` bundles via `const_set`. TS splits:
-
-- **`as.ts`** — Rails `As` is a named class in `binary.rb` with a `to_cte` method. TS splits to its own file but As is also re-exported from binary.ts. Verify there's no duplicate definition.
-
-Rails `function.rb` bundles via `const_set`. TS splits:
-
-- **`sum.ts`** → Rails `Sum` in `function.rb`. (`Max`/`Min`/`Avg`/`Exists` stay in `function.ts`.)
+All other Rails-bundled subclasses live in their Rails file in TS too: `Bin`/`Not`/`Lateral`/`GroupingElement`/`Cube`/`RollUp`/`GroupingSet`/etc. live in `unary.ts`; `As`/`Assignment`/`Join`/`Union`/etc. live in `binary.ts`; `Sum`/`Max`/`Min`/`Avg`/`Exists` live in `function.ts`; `Distinct` lives in `terminal.ts`.
 
 `equality.ts`, `in.ts`, `matches.ts`, `regexp.ts`, `count.ts`, `cte.ts`, `extract.ts`, `case.ts` — these all match Rails 1:1 (each has its own `.rb` file).
 
 ### api:compare implications
 
-`api:compare` walks Rails files and looks for matching TS files. The split-out files (`and`/`or`/`bin`/`distinct`/`not`/`sum`/`as`) need entries in the rename/skip table to map back to `nary.rb`/`unary.rb`/`binary.rb`/`function.rb`. Already done? Check `scripts/api-compare/compare.ts`.
+`api:compare` walks Rails files and looks for matching TS files. The split-out `and.ts` / `or.ts` are matched back against `nary.rb` via the existing rename/skip table — overall arel reports 884/884 (100%).
 
 ## visitors/
 

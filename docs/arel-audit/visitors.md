@@ -25,7 +25,7 @@ Source: `activerecord-8.0.2/lib/arel/visitors/*.rb` vs `packages/arel/src/visito
 - TS has every override. ✓
 - EXTRA: TS overrides `quote` to coerce booleans → `1`/`0`. Reasonable parity with Rails behavior (Rails handles this via type-cast rather than visitor override; both correct).
 
-## postgresql.rb → postgresql.ts — **OK with one GAP**
+## postgresql.rb → postgresql.ts — **OK**
 
 - Rails (8 overrides + 1 helper + 1 const): Matches/DoesNotMatch (LIKE/ILIKE + ESCAPE), Regexp/NotRegexp (`~` / `~*`, `!~` / `!~*`), DistinctOn, GroupingElement, Cube, RollUp, GroupingSet, Lateral, IsNotDistinctFrom/IsDistinctFrom, `BIND_BLOCK`, `bind_block`, `grouping_array_or_grouping_element`.
 - TS sized at 166 LOC — verify each present. (Implementation noted earlier; prior PR audits show all Postgres-specific handlers present.)
