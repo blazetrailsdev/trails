@@ -152,18 +152,16 @@ export class UniquenessValidator extends EachValidator {
  * @internal
  */
 function findFinderClassFor(record: any, klassOption: any): any {
-  // Rails walks upward and tracks the most-recent non-abstract class, with
-  // `@klass` (validator option) as the natural stopping point. In Trails
-  // the option is often null, so walking past it can leak into ActiveModel
-  // / Object — both of which lack a `.where` and would cause validateEach
-  // to short-circuit. Return the first non-abstract class encountered
-  // starting from record.constructor; bound the walk at klassOption when
-  // present, otherwise stop at the first ancestor missing `.where`
-  // (the AR/AM boundary).
+  // Rails walks from record.class up to @klass, tracking the most-recent
+  // non-abstract class; STI uses this so the existence query targets the
+  // class where the validation was declared (and its scope/table). When
+  // @klass is unset in Trails, bound the walk at the AR/AM boundary
+  // (parent class without `.where`) so we don't leak into ActiveModel.
   let current = record.constructor;
+  let lastConcrete: any = null;
   while (current) {
     if (!current.abstractClass && typeof current.where === "function") {
-      return current;
+      lastConcrete = current;
     }
     if (current === klassOption) break;
     const parent = Object.getPrototypeOf(current);
@@ -171,7 +169,7 @@ function findFinderClassFor(record: any, klassOption: any): any {
     if (typeof (parent as any).where !== "function") break;
     current = parent;
   }
-  return record.constructor;
+  return lastConcrete ?? record.constructor;
 }
 
 /**
@@ -280,26 +278,36 @@ function buildRelation(
   options: Record<string, unknown>,
 ): any {
   const base = typeof klass.unscoped === "function" ? klass.unscoped() : klass.where({});
-  if (Object.prototype.hasOwnProperty.call(options, "caseSensitive") && !options.caseSensitive) {
-    // Best-effort case-insensitive comparison via SQL LOWER(); adapters
-    // with a CI default collation will treat this as a no-op. Build the
-    // bind through predicateBuilder so the AST uses BindParam (and the
-    // prepared-statement cache stays effective) rather than an inlined
-    // Casted/Quoted literal.
-    if (typeof value === "string") {
-      const arel = klass.arelTable as { get?: (n: string) => any } | null;
-      const pb = (
-        base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } }
-      ).predicateBuilder;
-      if (
-        arel &&
-        typeof arel.get === "function" &&
-        typeof base.where === "function" &&
-        pb?.buildBindAttribute
-      ) {
-        const bind = pb.buildBindAttribute(attribute, value.toLowerCase());
-        return base.where(arel.get(attribute).lower().eq(bind));
+  const arel = klass.arelTable as { get?: (n: string) => any } | null;
+  const pb = (base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } })
+    .predicateBuilder;
+  const adapter = klass.adapter ?? klass.connection ?? null;
+  const hasCsKey = Object.prototype.hasOwnProperty.call(options, "caseSensitive");
+
+  // Rails routes the comparison through the adapter (defaultUniquenessComparison
+  // / caseSensitiveComparison / caseInsensitiveComparison) so adapters with
+  // CI collations / native ILIKE / case-insensitive types can pick the right
+  // SQL form without wrapping the column in LOWER() and defeating indexes.
+  if (arel && typeof arel.get === "function" && pb?.buildBindAttribute) {
+    const attr = arel.get(attribute);
+    const bind = pb.buildBindAttribute(attribute, value);
+    let comparison: any = null;
+    if (!hasCsKey || value == null) {
+      comparison = adapter?.defaultUniquenessComparison?.(attr, bind) ?? null;
+    } else if (options.caseSensitive) {
+      comparison = adapter?.caseSensitiveComparison?.(attr, bind) ?? null;
+    } else {
+      comparison = adapter?.caseInsensitiveComparison?.(attr, bind) ?? null;
+      if (comparison == null && typeof value === "string") {
+        // No native CI form — fall back to LOWER() with a lowercased bind.
+        // Keeps the bind parameterized so the prepared-statement cache
+        // stays effective.
+        const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
+        comparison = attr.lower().eq(lowerBind);
       }
+    }
+    if (comparison != null && typeof base.where === "function") {
+      return base.where(comparison);
     }
   }
   return base.where({ [attribute]: value });
