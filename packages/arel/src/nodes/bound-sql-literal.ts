@@ -1,6 +1,7 @@
-import { NodeVisitor } from "./node.js";
+import { Node, NodeVisitor } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { BindError } from "../errors.js";
+import { Fragments } from "./fragments.js";
 
 /**
  * BoundSqlLiteral — a SQL literal with bind parameters.
@@ -55,6 +56,19 @@ export class BoundSqlLiteral extends NodeExpression {
         throw new BindError(`missing values for ${JSON.stringify(missing)}`, sql);
       }
     }
+  }
+
+  // Mirrors Arel::Nodes::BoundSqlLiteral#+ — concatenates with another
+  // Arel node by wrapping both in a Fragments node. Method-renamed to
+  // `plus` because TS classes can't define an arithmetic operator.
+  // Rails: `raise ArgumentError, "Expected Arel node" unless Arel.arel_node?(other)`.
+  // Param widened to `unknown` so the runtime guard is reachable from typed
+  // callers too (matches Rails' runtime-validation intent).
+  plus(other: unknown): Fragments {
+    if (!(other instanceof Node)) {
+      throw new TypeError("Expected Arel node");
+    }
+    return new Fragments([this, other]);
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
