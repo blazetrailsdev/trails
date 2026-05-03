@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model } from "../index.js";
+import { Model, StrictValidationFailed } from "../index.js";
 
 describe("PresenceValidationTest", () => {
   it("accepts array arguments", () => {
@@ -87,5 +87,27 @@ describe("PresenceValidationTest", () => {
     const p = new Person({});
     p.isValid();
     expect(p.errors.get("name")).toContain("is required!");
+  });
+
+  it("passes custom interpolation vars through to errors.add", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: { message: "is %{kind}", kind: "wrong" } });
+      }
+    }
+    const p = new Person({});
+    p.isValid();
+    expect(p.errors.get("name")).toContain("is wrong");
+  });
+
+  it("strict: true raises StrictValidationFailed via filteredErrorOptions", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: { strict: true } });
+      }
+    }
+    expect(() => new Person({}).isValid()).toThrow(StrictValidationFailed);
   });
 });

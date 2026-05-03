@@ -65,4 +65,16 @@ describe("AbsenceValidationTest", () => {
     expect(p.errors.get("name").length).toBeGreaterThan(0);
     expect(p.errors.get("email").length).toBeGreaterThan(0);
   });
+
+  it("passes custom interpolation vars through to errors.add", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { absence: { message: "must be %{kind}", kind: "empty" } });
+      }
+    }
+    const p = new Person({ name: "Alice" });
+    p.isValid();
+    expect(p.errors.get("name")).toContain("must be empty");
+  });
 });

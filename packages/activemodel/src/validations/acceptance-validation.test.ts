@@ -195,3 +195,32 @@ describe("acceptance skips nil", () => {
     expect(new Terms({}).isValid()).toBe(true);
   });
 });
+
+describe("acceptance options pass-through", () => {
+  it("passes custom interpolation vars through to errors.add", () => {
+    class Terms extends Model {
+      static {
+        this.attribute("terms", "string");
+        this.validates("terms", {
+          acceptance: { accept: "yes", message: "must be %{kind}", kind: "accepted" },
+        });
+      }
+    }
+    const t = new Terms({ terms: "no" });
+    t.isValid();
+    expect(t.errors.get("terms")).toContain("must be accepted");
+  });
+
+  it("reserved key accept does not appear in error options", () => {
+    class Terms extends Model {
+      static {
+        this.attribute("terms", "string");
+        this.validates("terms", { acceptance: { accept: "yes" } });
+      }
+    }
+    const t = new Terms({ terms: "no" });
+    t.isValid();
+    expect(t.errors.count).toBeGreaterThan(0);
+    expect(t.errors.details.find((d) => d.attribute === "terms")?.options?.accept).toBeUndefined();
+  });
+});

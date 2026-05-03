@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Model } from "../index.js";
+import { WithValidator } from "./with.js";
 
 describe("ValidatesWithTest", () => {
   it("validates_with with options", () => {
@@ -279,5 +280,59 @@ describe("ValidatesWithTest", () => {
     }
     expect(new Person({ name: "ab" }).isValid()).toBe(false);
     expect(new Person({ name: "abcde" }).isValid()).toBe(true);
+  });
+});
+
+describe("WithValidator arity dispatch", () => {
+  it("calls zero-arity method without arguments", () => {
+    const spy = vi.fn();
+    const record = { myCheck: spy };
+    const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
+    validator.validateEach(record, "name", "value");
+    expect(spy).toHaveBeenCalledWith();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls one-arity method with attribute name", () => {
+    let capturedArg: unknown;
+    const record = {
+      myCheck(attr: string) {
+        capturedArg = attr;
+      },
+    };
+    const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
+    validator.validateEach(record, "name", "value");
+    expect(capturedArg).toBe("name");
+  });
+
+  // JS Function.length excludes rest and default parameters (both yield length 0),
+  // so such methods are dispatched without the attribute — unlike Ruby where
+  // *args or optional args give negative arity and Rails passes the attribute.
+  // Documented divergence; detecting these via Function.toString() is fragile.
+  it("known divergence: rest-param method called without args (JS length 0 vs Ruby arity -1)", () => {
+    const received: unknown[] = [];
+    const record = {
+      myCheck(...args: unknown[]) {
+        received.push(...args);
+      },
+    };
+    const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
+    validator.validateEach(record, "name", "value");
+    // Function.length of a rest-param function is 0, so no arg is passed
+    expect(received).toHaveLength(0);
+  });
+
+  it("known divergence: default-param method called without args (JS length 0 vs Ruby arity -1)", () => {
+    let capturedArg: unknown = "not-called";
+    const record = {
+      // eslint-disable-next-line @typescript-eslint/no-inferrable-types
+      myCheck(attr: string = "") {
+        capturedArg = attr;
+      },
+    };
+    const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
+    validator.validateEach(record, "name", "value");
+    // Function.length excludes default params, so length is 0 → called without arg
+    expect(capturedArg).toBe("");
   });
 });

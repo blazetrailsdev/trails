@@ -1,5 +1,6 @@
 import { Errors } from "./errors.js";
 import type { ConditionalOptions } from "./validator.js";
+import { VALIDATOR_DEFAULT_KEYS } from "./validator.js";
 import { I18n } from "./i18n.js";
 
 import { raiseOnMissingTranslations as translationRaise } from "./translation.js";
@@ -362,7 +363,7 @@ export function _mergeAttributes(attrNames: unknown[]): Record<string, unknown> 
  * @internal Rails-private helper.
  */
 export function _validatesDefaultKeys(): string[] {
-  return ["if", "unless", "on", "allowBlank", "allowNil", "strict", "exceptOn"];
+  return [...VALIDATOR_DEFAULT_KEYS];
 }
 
 /**

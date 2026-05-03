@@ -3,6 +3,29 @@ import { isBlank, underscore } from "@blazetrails/activesupport";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyRecord = any;
 
+/**
+ * Universal validator control keys recognised by `validates(...)`.
+ * Shared by `_validatesDefaultKeys` and `filteredErrorOptions`.
+ */
+export const VALIDATOR_DEFAULT_KEYS = [
+  "if",
+  "unless",
+  "on",
+  "allowBlank",
+  "allowNil",
+  "strict",
+  "exceptOn",
+] as const;
+
+/**
+ * Subset of `VALIDATOR_DEFAULT_KEYS` that must NOT be forwarded to
+ * `errors.add`. `strict` is intentionally absent — `errors.add` reads it
+ * to raise `StrictValidationFailed`, mirroring Rails errors.rb:342-354.
+ */
+const FILTER_FROM_ERROR_OPTIONS = VALIDATOR_DEFAULT_KEYS.filter(
+  (k) => k !== "strict",
+) as readonly string[];
+
 export type ConditionFn = ((record: AnyRecord) => boolean) | string;
 
 export interface ConditionalOptions {
@@ -132,6 +155,25 @@ export class EachValidator extends Validator {
 
   validateEach(_record: AnyRecord, _attribute: string, _value: unknown): void {
     throw new Error("Subclasses must implement validateEach(record, attribute, value)");
+  }
+
+  /**
+   * Returns `this.options` minus universal validator control keys and any
+   * additional validator-specific reserved keys, for forwarding to
+   * `errors.add` as i18n interpolation variables.
+   *
+   * Mirrors the `options.except(*RESERVED_OPTIONS)` pattern used in Rails
+   * validators (e.g. acceptance.rb:31, confirmation.rb:19).
+   *
+   * @internal Rails-private helper.
+   */
+  filteredErrorOptions(additionalReserved: string[] = []): Record<string, unknown> {
+    const reserved = new Set([...FILTER_FROM_ERROR_OPTIONS, ...additionalReserved]);
+    const filtered: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(this.options)) {
+      if (!reserved.has(key)) filtered[key] = val;
+    }
+    return filtered;
   }
 
   checkValidity(): void {

@@ -55,7 +55,7 @@ export class AcceptanceValidator extends EachValidator {
     const allowNil = this.options.allowNil ?? true;
     if (allowNil && (value === null || value === undefined)) return;
     if (!this.isAcceptableOption(value)) {
-      record.errors.add(attribute, "accepted", { message: this.options.message });
+      record.errors.add(attribute, "accepted", this.filteredErrorOptions(["accept", "allowNil"]));
     }
   }
 
