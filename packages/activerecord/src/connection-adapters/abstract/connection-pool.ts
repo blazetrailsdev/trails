@@ -673,20 +673,25 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Lifecycle ---
 
-  disconnect(): void {
-    this._pinnedConnections.clear();
-    if (this._connections) this._connections.length = 0;
-    this._available?.rejectAll(
-      new ConnectionNotEstablished("Connection pool has been disconnected"),
-    );
-    this._available?.clear();
-    this._checkedOut.clear();
-    this._leases?.clear();
-    this._lastCheckinAt.clear();
+  disconnect(raiseOnAcquisitionTimeout: boolean = true): void {
+    withExclusivelyAcquiredAllConnections(this, raiseOnAcquisitionTimeout, () => {
+      for (const conn of this._connections ?? []) {
+        (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+      }
+      this._pinnedConnections.clear();
+      if (this._connections) this._connections.length = 0;
+      this._available?.rejectAll(
+        new ConnectionNotEstablished("Connection pool has been disconnected"),
+      );
+      this._available?.clear();
+      this._checkedOut.clear();
+      this._leases?.clear();
+      this._lastCheckinAt.clear();
+    });
   }
 
   disconnectBang(): void {
-    this.disconnect();
+    this.disconnect(false);
   }
 
   discardBang(): void {
@@ -701,12 +706,38 @@ export class ConnectionPool implements ReapablePool {
     this._lastCheckinAt.clear();
   }
 
-  clearReloadableConnections(): void {
-    this.disconnect();
+  clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): void {
+    withExclusivelyAcquiredAllConnections(this, raiseOnAcquisitionTimeout, () => {
+      const ctx = String(executionContextId());
+      const reloadable = new Set<DatabaseAdapter>();
+      for (const conn of this._connections ?? []) {
+        if ((conn as unknown as { requiresReloading?: () => boolean }).requiresReloading?.()) {
+          reloadable.add(conn);
+        }
+      }
+      for (const conn of this._connections ?? []) {
+        // Mirrors Rails: `if conn.in_use? then conn.steal!; checkin conn`.
+        // The exclusive acquisition above leased every conn to us; release
+        // them now so survivors are eligible to re-enter _available via
+        // withNewConnectionsBlocked's reseed.
+        if (this._checkedOut.has(conn)) {
+          this._checkedOut.delete(conn);
+          this._leases?.peek(ctx)?.clear(conn);
+        }
+        if (reloadable.has(conn)) {
+          (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+          this._lastCheckinAt.delete(conn);
+        }
+      }
+      if (this._connections) {
+        this._connections = this._connections.filter((c) => !reloadable.has(c));
+      }
+      this._available?.clear();
+    });
   }
 
   clearReloadableConnectionsBang(): void {
-    this.clearReloadableConnections();
+    this.clearReloadableConnections(false);
   }
 
   reap(): void {

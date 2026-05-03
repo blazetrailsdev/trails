@@ -169,7 +169,7 @@ export class PoolConfig {
     if (options.automaticReconnect !== undefined) {
       (this._pool as any).automaticReconnect = options.automaticReconnect;
     }
-    this._pool.disconnect();
+    this._pool.disconnectBang();
   }
 
   disconnect(): void {
@@ -180,7 +180,7 @@ export class PoolConfig {
 
   discardPoolBang(): void {
     if (!this._pool) return;
-    this._pool.disconnect();
+    this._pool.disconnectBang();
     this._pool = null;
   }
 

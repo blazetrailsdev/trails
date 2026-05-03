@@ -422,6 +422,64 @@ it("automatic reconnect can be disabled", () => {
   expect(() => pool.withConnection(() => {})).toThrow(/automatic_reconnect is disabled/);
 });
 
+it("disconnect calls disconnectBang on each pooled connection", () => {
+  const pool = makePool(3);
+  const c1 = pool.checkout();
+  const c2 = pool.checkout();
+  pool.checkin(c1);
+  pool.checkin(c2);
+  const spy1 = vi.fn();
+  const spy2 = vi.fn();
+  (c1 as unknown as { disconnectBang: () => void }).disconnectBang = spy1;
+  (c2 as unknown as { disconnectBang: () => void }).disconnectBang = spy2;
+
+  pool.disconnectBang();
+
+  expect(spy1).toHaveBeenCalled();
+  expect(spy2).toHaveBeenCalled();
+  expect(pool.connections).toEqual([]);
+});
+
+it("disconnect under exclusive acquisition checks out idle connections during the block", () => {
+  const pool = makePool(2);
+  const c1 = pool.checkout();
+  pool.checkin(c1);
+  const stat = pool.stat();
+  expect(stat.busy).toBe(0);
+  expect(stat.idle).toBe(1);
+
+  pool.disconnectBang();
+  // After disconnect, the pool is fully drained.
+  expect(pool.stat().connections).toBe(0);
+});
+
+it("clearReloadableConnections only disconnects reloadable adapters", () => {
+  const pool = makePool(3);
+  const c1 = pool.checkout();
+  const c2 = pool.checkout();
+  pool.checkin(c1);
+  pool.checkin(c2);
+  // Mark only c1 as reloadable.
+  (c1 as unknown as { requiresReloading: () => boolean }).requiresReloading = () => true;
+  (c2 as unknown as { requiresReloading: () => boolean }).requiresReloading = () => false;
+  const spy1 = vi.fn();
+  const spy2 = vi.fn();
+  (c1 as unknown as { disconnectBang: () => void }).disconnectBang = spy1;
+  (c2 as unknown as { disconnectBang: () => void }).disconnectBang = spy2;
+
+  pool.clearReloadableConnectionsBang();
+
+  expect(spy1).toHaveBeenCalled();
+  expect(spy2).not.toHaveBeenCalled();
+  expect(pool.connections).toContain(c2);
+  expect(pool.connections).not.toContain(c1);
+  // Survivor must not stay stuck in _checkedOut — it should be reusable.
+  expect(pool.stat().busy).toBe(0);
+  const reused = pool.checkout();
+  expect(reused).toBe(c2);
+  pool.checkin(reused);
+});
+
 it.skip("pool sets connection visitor", () => {
   /* needs visitor pattern */
 });
