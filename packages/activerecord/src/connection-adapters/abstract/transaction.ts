@@ -434,26 +434,18 @@ export class Transaction {
     if (recs) {
       const ite = this.uniqueRecords(recs);
       const instanceMap = this.prepareInstancesToRunCallbacksOn(ite);
-      let idx = 0;
 
       try {
-        for (; idx < ite.length; idx++) {
-          const record = ite[idx];
-          const shouldRunCallbacks =
-            instanceMap.get(record) === record &&
-            typeof (record as any).isTriggerTransactionalCallbacks === "function" &&
-            (record as any).isTriggerTransactionalCallbacks();
-
+        await this.runActionOnRecords(ite, instanceMap, async (record, shouldRunCallbacks) => {
           if (typeof (record as any).rolledbackBang === "function") {
             await (record as any).rolledbackBang({
               forceRestoreState: this.isFullRollback(),
               shouldRunCallbacks,
             });
           }
-        }
+        });
       } finally {
-        for (; idx < ite.length; idx++) {
-          const i = ite[idx];
+        for (const i of ite) {
           if (typeof (i as any).rolledbackBang === "function") {
             await (i as any).rolledbackBang({
               forceRestoreState: this.isFullRollback(),
@@ -497,23 +489,15 @@ export class Transaction {
 
       if (this._runCommitCallbacks) {
         const instanceMap = this.prepareInstancesToRunCallbacksOn(ite);
-        let idx = 0;
 
         try {
-          for (; idx < ite.length; idx++) {
-            const record = ite[idx];
-            const shouldRunCallbacks =
-              instanceMap.get(record) === record &&
-              typeof (record as any).isTriggerTransactionalCallbacks === "function" &&
-              (record as any).isTriggerTransactionalCallbacks();
-
+          await this.runActionOnRecords(ite, instanceMap, async (record, shouldRunCallbacks) => {
             if (typeof (record as any).committedBang === "function") {
               await (record as any).committedBang({ shouldRunCallbacks });
             }
-          }
+          });
         } finally {
-          for (; idx < ite.length; idx++) {
-            const i = ite[idx];
+          for (const i of ite) {
             if (typeof (i as any).committedBang === "function") {
               await (i as any).committedBang({ shouldRunCallbacks: false });
             }
@@ -590,15 +574,15 @@ export class Transaction {
   }
 
   /** @internal */
-  private runActionOnRecords(
+  private async runActionOnRecords(
     records: unknown[],
     instancesToRunCallbacksOn: Map<unknown, unknown>,
-    action: (record: unknown, shouldRunCallbacks: boolean) => void,
-  ): void {
+    action: (record: unknown, shouldRunCallbacks: boolean) => Promise<void> | void,
+  ): Promise<void> {
     while (records.length > 0) {
       const record = records.shift()!;
       const shouldRunCallbacks = instancesToRunCallbacksOn.get(record) === record;
-      action(record, shouldRunCallbacks);
+      await action(record, shouldRunCallbacks);
     }
   }
 

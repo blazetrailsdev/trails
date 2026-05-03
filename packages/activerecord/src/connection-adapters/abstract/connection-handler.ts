@@ -94,26 +94,15 @@ export class ConnectionHandler {
       adapterFactory?: () => DatabaseAdapter;
     } = {},
   ): ConnectionPool {
-    const ownerName = options.owner != null ? this.determineOwnerName(options.owner) : null;
-
-    const dbConfig =
-      config instanceof DatabaseConfig
-        ? config
-        : new HashConfig(
-            DatabaseConfigurations.defaultEnv,
-            typeof options.owner === "string" ? options.owner : "primary",
-            config as any,
-          );
-
-    if (!dbConfig.adapter) {
-      throw new AdapterNotSpecified("database configuration does not specify adapter");
-    }
+    const ownerName =
+      options.owner != null
+        ? this.determineOwnerName(options.owner)
+        : new ConnectionDescriptor("primary");
 
     const role = options.role ?? "writing";
     const shard = options.shard ?? "default";
 
-    const connectionClass = ownerName ?? new ConnectionDescriptor(dbConfig.name);
-    const poolConfig = new PoolConfig(connectionClass, dbConfig, role, shard, {
+    const poolConfig = this.resolvePoolConfig(config, ownerName, role, shard, {
       adapterFactory: options.adapterFactory,
     });
 
@@ -131,7 +120,7 @@ export class ConnectionHandler {
       connection_name: poolKey,
       role,
       shard,
-      config: dbConfig.configuration,
+      config: poolConfig.dbConfig.configuration,
     });
 
     return poolConfig.pool;
@@ -282,10 +271,13 @@ export class ConnectionHandler {
   /** @internal */
   private resolvePoolConfig(
     config: DatabaseConfig | Record<string, unknown>,
-    connectionName: string,
+    ownerName: ConnectionDescriptor | ConnectionOwner,
     role: string,
     shard: string,
+    options?: { adapterFactory?: () => DatabaseAdapter },
   ): PoolConfig {
+    const connectionName =
+      ownerName instanceof ConnectionDescriptor ? ownerName.name : String(ownerName);
     const dbConfig =
       config instanceof DatabaseConfig
         ? config
@@ -293,7 +285,8 @@ export class ConnectionHandler {
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }
-    const descriptor = new ConnectionDescriptor(connectionName);
-    return new PoolConfig(descriptor, dbConfig, role, shard);
+    return new PoolConfig(ownerName, dbConfig, role, shard, {
+      adapterFactory: options?.adapterFactory,
+    });
   }
 }
