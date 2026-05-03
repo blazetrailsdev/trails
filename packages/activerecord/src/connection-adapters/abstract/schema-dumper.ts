@@ -30,12 +30,12 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  private columnSpec(column: Column): [symbol | string, Record<string, unknown>] {
+  protected columnSpec(column: Column): [symbol | string, Record<string, unknown>] {
     return [this.schemaTypeWithVirtual(column), this.prepareColumnOptions(column)];
   }
 
   /** @internal */
-  private columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
+  protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
     const spec: Record<string, unknown> = {};
     if (!this.isDefaultPrimaryKey(column)) {
       spec["id"] = String(this.schemaType(column));
@@ -50,7 +50,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  private prepareColumnOptions(column: Column): Record<string, unknown> {
+  protected prepareColumnOptions(column: Column): Record<string, unknown> {
     const spec: Record<string, unknown> = {};
     const limit = this.schemaLimit(column);
     if (limit !== undefined) spec["limit"] = limit;
@@ -68,29 +68,29 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  private isDefaultPrimaryKey(column: Column): boolean {
+  protected isDefaultPrimaryKey(column: Column): boolean {
     return this.schemaType(column) === "bigint";
   }
 
   /** @internal */
-  private isExplicitPrimaryKeyDefault(_column: Column): boolean {
+  protected isExplicitPrimaryKeyDefault(_column: Column): boolean {
     return false;
   }
 
   /** @internal */
-  private schemaTypeWithVirtual(column: Column): string {
+  protected schemaTypeWithVirtual(column: Column): string {
     if (column.virtual) return "virtual";
     return this.schemaType(column);
   }
 
   /** @internal */
-  private schemaType(column: Column): string {
+  protected schemaType(column: Column): string {
     if (column.bigint || column.type === "bigint") return "bigint";
     return column.type;
   }
 
   /** @internal */
-  private schemaLimit(column: Column): string | undefined {
+  protected schemaLimit(column: Column): string | undefined {
     if (column.bigint || column.type === "bigint") return undefined;
     const limit = column.limit;
     if (limit == null) return undefined;
@@ -98,7 +98,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  private schemaPrecision(column: Column): string | undefined {
+  protected schemaPrecision(column: Column): string | undefined {
     if (column.type === "datetime") {
       if (column.precision == null) return "nil";
       if (column.precision === DEFAULT_DATETIME_PRECISION) return undefined;
@@ -109,13 +109,13 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  private schemaScale(column: Column): string | undefined {
+  protected schemaScale(column: Column): string | undefined {
     if (column.scale != null) return String(column.scale);
     return undefined;
   }
 
   /** @internal */
-  private schemaDefault(column: Column): string | undefined {
+  protected schemaDefault(column: Column): string | undefined {
     if (!column.hasDefault && column.default === undefined) return undefined;
     if (column.default == null) return this.schemaExpression(column);
     // Represent the default as its schema literal
@@ -124,13 +124,13 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  private schemaExpression(column: Column): string | undefined {
+  protected schemaExpression(column: Column): string | undefined {
     if (column.defaultFunction) return `-> { ${JSON.stringify(column.defaultFunction)} }`;
     return undefined;
   }
 
   /** @internal */
-  private schemaCollation(column: Column): string | undefined {
+  protected schemaCollation(column: Column): string | undefined {
     if (column.collation) return JSON.stringify(column.collation);
     return undefined;
   }
