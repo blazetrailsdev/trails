@@ -1,5 +1,5 @@
 import { Binary, NodeOrValue } from "./binary.js";
-import { Node } from "./node.js";
+import type { Node } from "./node.js";
 import { buildQuoted } from "./casted.js";
 
 /**
