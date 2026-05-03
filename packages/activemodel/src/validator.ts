@@ -3,6 +3,20 @@ import { isBlank, underscore } from "@blazetrails/activesupport";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyRecord = any;
 
+/**
+ * Universal validator control keys that are never i18n interpolation variables.
+ * Shared by `EachValidator#filteredErrorOptions` and `_validatesDefaultKeys`.
+ */
+export const VALIDATOR_DEFAULT_KEYS = [
+  "if",
+  "unless",
+  "on",
+  "allowBlank",
+  "allowNil",
+  "strict",
+  "exceptOn",
+] as const;
+
 export type ConditionFn = ((record: AnyRecord) => boolean) | string;
 
 export interface ConditionalOptions {
@@ -145,16 +159,7 @@ export class EachValidator extends Validator {
    * @internal Rails-private helper.
    */
   filteredErrorOptions(additionalReserved: string[] = []): Record<string, unknown> {
-    const reserved = new Set([
-      "if",
-      "unless",
-      "on",
-      "allowBlank",
-      "allowNil",
-      "strict",
-      "exceptOn",
-      ...additionalReserved,
-    ]);
+    const reserved = new Set([...(VALIDATOR_DEFAULT_KEYS as readonly string[]), ...additionalReserved]);
     const filtered: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(this.options)) {
       if (!reserved.has(key)) filtered[key] = val;
