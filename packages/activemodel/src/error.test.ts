@@ -252,4 +252,74 @@ describe("ErrorTest", () => {
     const msg = ModelError.generateMessage("name", "blank", record);
     expect(msg).toBe("can't be blank");
   });
+
+  // P10: message getter dispatches on rawType shape (identifier vs literal string)
+  it("message with identifier-shaped rawType routes through i18n", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    expect(e.get("name")).toEqual(["can't be blank"]);
+  });
+
+  it("message with non-identifier rawType returns literal string", () => {
+    const e = new Errors(null);
+    e.add("name", "is really not great");
+    expect(e.get("name")).toEqual(["is really not great"]);
+  });
+
+  // P10: generateMessage merges object: base for %{object} interpolation
+  it("generateMessage interpolates %{object} with base record", () => {
+    I18n.storeTranslations("en", {
+      activemodel: { errors: { messages: { foo: "is %{object}" } } },
+    });
+    try {
+      const base = { toString: () => "BAR" } as any;
+      const msg = ModelError.generateMessage("name", "foo", base);
+      expect(msg).toBe("is BAR");
+    } finally {
+      I18n.reset();
+    }
+  });
+
+  // P10: generateMessage promotes identifier-shaped options.message to type
+  it("generateMessage with identifier options.message routes through i18n as new type", () => {
+    const e = new Errors(null);
+    e.add("name", "blank", { message: "tooShort" });
+    // "tooShort" is identifier-shaped but has no locale entry → falls back to raw key
+    expect(e.get("name")).toEqual(["tooShort"]);
+  });
+
+  // P10: fullMessage strips array notation from attribute
+  it("fullMessage strips array notation from attribute", () => {
+    const e = new Errors(null);
+    e.add("items[0].name", "blank");
+    const msg = e.fullMessages[0];
+    // Should humanize "name" not "items[0].name"
+    expect(msg).toBe("Name can't be blank");
+    expect(msg).not.toContain("[0]");
+  });
+
+  // P10: fullMessage uses last segment of dotted attribute
+  it("fullMessage uses last segment of dotted attribute", () => {
+    const e = new Errors(null);
+    e.add("profile.bio", "blank");
+    const msg = e.fullMessages[0];
+    expect(msg).toBe("Bio can't be blank");
+    expect(msg).not.toContain("Profile");
+  });
+
+  // P10: fullMessage non-nested regression guard
+  it("fullMessage non-nested attribute behaves as before", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    expect(e.fullMessages[0]).toBe("Name can't be blank");
+  });
+
+  // P10: attributesForHash is protected (accessible within the class hierarchy)
+  it("attributesForHash is accessible via equals", () => {
+    const e = new Errors(null);
+    e.add("name", "blank");
+    e.add("name", "blank");
+    // equals() uses attributesForHash internally; duplicates should be equal
+    expect(e.objects[0].equals(e.objects[1])).toBe(true);
+  });
 });

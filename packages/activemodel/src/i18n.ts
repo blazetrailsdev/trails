@@ -48,7 +48,6 @@ const RESERVED_KEYS = new Set([
   "defaultValue",
   "separator",
   "resolve",
-  "object",
   "fallback",
   "format",
   "cascade",
