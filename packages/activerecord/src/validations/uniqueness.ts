@@ -56,6 +56,15 @@ export class UniquenessValidator extends EachValidator {
         );
       }
     }
+    if (
+      Object.prototype.hasOwnProperty.call(options, "caseSensitive") &&
+      typeof options.caseSensitive !== "boolean"
+    ) {
+      throw new Error(
+        `${options.caseSensitive} is not a supported value for :caseSensitive option. ` +
+          "Pass a boolean instead: `caseSensitive: false`",
+      );
+    }
     super(options);
     this._klass = options.class ?? null;
   }
@@ -157,8 +166,13 @@ function findFinderClassFor(record: any, klassOption: any): any {
 }
 
 /**
- * Returns false when the value (and any scope columns) hasn't changed AND
- * a unique index covers them — Rails skips the round-trip in that case.
+ * Returns true if uniqueness must consult the database. Rails additionally
+ * short-circuits to `false` when the value/scope columns haven't changed
+ * AND a unique index already covers them; in Trails that branch is
+ * effectively disabled because `isCoveredByUniqueIndex` always returns
+ * false (the schema-cache index lookup is async and can't safely run from
+ * this synchronous path — see the helper's comment). The other gates
+ * (conditions/caseSensitive option, dirty/null checks) match Rails.
  *
  * Mirrors: ActiveRecord::Validations::UniquenessValidator#validation_needed?
  *
