@@ -155,6 +155,28 @@ function extractColumnsFromModels(): void {
 }
 
 /**
+ * Look up the SQL type a registered model declared for a column. Used by the
+ * recovery path so it doesn't fall back to the `_id`/`TEXT` heuristic when
+ * the model already told us the column's intended type. Returns undefined
+ * when the column isn't declared anywhere we can see.
+ *
+ * @internal
+ */
+function lookupDeclaredColumnType(tableName: string, colName: string): string | undefined {
+  const pending = _pendingModels.get(tableName)?.get(colName);
+  if (pending) return pending;
+  for (const modelClass of _registeredModelClasses) {
+    if (modelClass.abstractClass) continue;
+    if (modelClass.tableName !== tableName) continue;
+    const def = modelClass._attributeDefinitions?.get(colName);
+    if (!def) continue;
+    const innerType = (def.type as any)?.castType ?? def.type;
+    return sqlType(innerType?.name || "string");
+  }
+  return undefined;
+}
+
+/**
  * Create tables and add columns for all pending model registrations.
  */
 async function processPendingModels(inner: any): Promise<void> {
@@ -602,7 +624,18 @@ class SchemaAdapter implements DatabaseAdapter {
     }
 
     if (colTableName && colName) {
-      const colType = colName.endsWith("_id") ? "INTEGER" : "TEXT";
+      // The DB error proves this column is missing in the real schema.
+      // Drop any stale `_createdColumns` entry first, otherwise
+      // processPendingModels skips re-adding it on the next pass and we
+      // loop back into recovery on every query — which is how typed
+      // columns (e.g. `lock_version` integer) historically ended up as
+      // TEXT on PG under DDL contention.
+      _createdColumns.get(colTableName)?.delete(colName);
+
+      // Prefer the model's declared SQL type; fall back to the legacy
+      // `_id` heuristic only when no declaration is reachable.
+      let colType = lookupDeclaredColumnType(colTableName, colName);
+      if (!colType) colType = colName.endsWith("_id") ? "INTEGER" : "TEXT";
       try {
         const alterSql = isMysql()
           ? `ALTER TABLE \`${colTableName}\` ADD COLUMN \`${colName}\` ${colType}`
@@ -654,14 +687,21 @@ class SchemaAdapter implements DatabaseAdapter {
     if (insertMatch && insertMatch[1].trim()) {
       for (const c of insertMatch[1].split(",")) {
         const col = c.trim().replace(/"/g, "").replace(/`/g, "");
-        if (col !== "id") cols.set(col, col.endsWith("_id") ? "INTEGER" : "TEXT");
+        if (col === "id") continue;
+        cols.set(
+          col,
+          lookupDeclaredColumnType(tableName, col) ?? (col.endsWith("_id") ? "INTEGER" : "TEXT"),
+        );
       }
     }
     // table.column references
     const colMatches = sql.matchAll(/["`](\w+)["`]\.\s*["`](\w+)["`]/g);
     for (const m of colMatches) {
       if (m[2] === "id" || m[2] === "*") continue;
-      cols.set(m[2], m[2].endsWith("_id") ? "INTEGER" : "TEXT");
+      cols.set(
+        m[2],
+        lookupDeclaredColumnType(tableName, m[2]) ?? (m[2].endsWith("_id") ? "INTEGER" : "TEXT"),
+      );
     }
 
     _pendingModels.set(tableName, cols);
