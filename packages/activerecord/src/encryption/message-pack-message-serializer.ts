@@ -1,7 +1,5 @@
 /**
- * A message serializer that mirrors Rails'
- * ActiveRecord::Encryption::MessagePackMessageSerializer API but
- * delegates to the JSON-based MessageSerializer.
+ * A message serializer using hash-based encoding.
  *
  * Mirrors: ActiveRecord::Encryption::MessagePackMessageSerializer
  */
@@ -37,15 +35,15 @@ export class MessagePackMessageSerializer {
 
   /** @internal */
   private messageToHash(message: Message): Record<string, unknown> {
-    return {
+    return Object.assign(Object.create(null) as Record<string, unknown>, {
       p: message.payload,
       h: this.headersToHash(message.headers),
-    };
+    });
   }
 
   /** @internal */
   private headersToHash(headers: Properties): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
+    const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (const [key, value] of headers.entries()) {
       result[key] = value instanceof Message ? this.messageToHash(value) : value;
     }
@@ -58,7 +56,14 @@ export class MessagePackMessageSerializer {
     const d = data as Record<string, unknown>;
     const message = new Message(d["p"] as string | null);
     const headers = this.parseProperties(d["h"] as Record<string, unknown> | null, level);
+    let nestedCount = 0;
     for (const [key, value] of headers.entries()) {
+      if (value instanceof Message) {
+        nestedCount++;
+        if (nestedCount > 1) {
+          throw new DecryptionError("Messages can only have one nested message in their headers");
+        }
+      }
       message.headers.set(key, value);
     }
     return message;
@@ -72,7 +77,8 @@ export class MessagePackMessageSerializer {
     if (typeof data !== "object" || data === null || Array.isArray(data)) {
       throw new DecryptionError("Invalid data format: hash without payload");
     }
-    if (!("p" in (data as object))) {
+    const d = data as Record<string, unknown>;
+    if (!("p" in d) || typeof d["p"] !== "string") {
       throw new DecryptionError("Invalid data format: hash without payload");
     }
   }

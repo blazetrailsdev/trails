@@ -64,8 +64,12 @@ export class MessageSerializer {
     if (typeof data !== "object" || data === null || Array.isArray(data)) {
       throw new DecryptionError("Invalid data format: hash without payload");
     }
-    if (!("p" in (data as object))) {
+    const d = data as Record<string, unknown>;
+    if (!("p" in d) || typeof d["p"] !== "string") {
       throw new DecryptionError("Invalid data format: hash without payload");
+    }
+    if ("h" in d && d["h"] !== null && d["h"] !== undefined && typeof d["h"] !== "object") {
+      throw new DecryptionError("Invalid data format: headers must be an object");
     }
   }
 
@@ -89,15 +93,15 @@ export class MessageSerializer {
 
   /** @internal */
   private messageToJson(message: Message): Record<string, unknown> {
-    return {
+    return Object.assign(Object.create(null) as Record<string, unknown>, {
       p: this.encodeIfNeeded(message.payload),
       h: this.headersToJson(message.headers),
-    };
+    });
   }
 
   /** @internal */
   private headersToJson(headers: Properties): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
+    const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (const [key, value] of headers.entries()) {
       result[key] =
         value instanceof Message ? this.messageToJson(value) : this.encodeIfNeeded(value);
@@ -108,7 +112,7 @@ export class MessageSerializer {
   /** @internal */
   private encodeIfNeeded(value: unknown): unknown {
     if (typeof value === "string") {
-      return Buffer.from(value, "binary").toString("base64");
+      return Buffer.from(value, "utf-8").toString("base64");
     }
     return value;
   }
@@ -123,7 +127,7 @@ export class MessageSerializer {
         if (normalized !== reencoded) {
           throw new DecryptionError("Invalid base64 encoding");
         }
-        return buf.toString("binary");
+        return buf.toString("utf-8");
       } catch (e) {
         if (e instanceof DecryptionError) throw e;
         throw new DecryptionError("Invalid base64 encoding");

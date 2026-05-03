@@ -55,13 +55,10 @@ export class EnvelopeEncryptionKeyProvider {
       | string
       | undefined;
     if (!encryptedDataKey) return null;
-    const keys = this.primaryKeyProvider()
-      .decryptionKeys(encryptedMessage)
-      ?.map((k) => k.secret);
+    const kp = this.primaryKeyProvider();
+    const keys = kp.decryptionKeys(encryptedMessage)?.map((k) => k.secret);
     if (!keys || keys.length === 0) return null;
-    return new Encryptor({ compress: false }).decrypt(encryptedDataKey, {
-      keyProvider: this.primaryKeyProvider(),
-    });
+    return new Encryptor({ compress: false }).decrypt(encryptedDataKey, { keyProvider: kp });
   }
 
   /** @internal */
