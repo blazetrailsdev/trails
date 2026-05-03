@@ -1,6 +1,19 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
+import {
+  HasManyThroughCantAssociateThroughHasOneOrManyReflection,
+  HasManyThroughNestedAssociationsAreReadonly,
+} from "./errors.js";
+import { compositeQueryConstraintsList } from "../persistence.js";
+
+function safeKlass(refl: { klass?: unknown } | null | undefined): any {
+  try {
+    return refl?.klass ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation
@@ -13,12 +26,15 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
 /** @internal */
 function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Base | null {
-  const throughName = assoc.reflection.options.through as string | undefined;
-  if (!throughName) return null;
-  const throughAssoc = (assoc.owner as any).association?.(throughName);
-  if (!throughAssoc) return null;
-  const attrs = buildSourceJoinAttributes(assoc, record);
-  return typeof throughAssoc.build === "function" ? throughAssoc.build(attrs) : null;
+  // Mutability is enforced inside constructJoinAttributes — keep the
+  // precondition in one place (Rails' build_through_record calls
+  // ensure_mutable once; our equivalent inherits it via the helper).
+  const proxy = throughAssociation(assoc) as {
+    build?: (attrs: Record<string, unknown>) => Base;
+  } | null;
+  if (!proxy) return null;
+  const attrs = constructJoinAttributes(assoc, record);
+  return typeof proxy.build === "function" ? proxy.build(attrs) : null;
 }
 
 /** @internal */
@@ -143,7 +159,7 @@ function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base
 
   // Use constructJoinAttributes to get the FK → PK map for this record,
   // then filter the through-association's in-memory target by those constraints.
-  const joinAttrs = buildSourceJoinAttributes(assoc, record);
+  const joinAttrs = constructJoinAttributes(assoc, record);
   const candidates: Base[] = Array.isArray(throughAssoc.target)
     ? throughAssoc.target
     : throughAssoc.target
@@ -181,16 +197,101 @@ function deleteThroughRecords(assoc: HasManyThroughAssociation, records: Base[])
   return Promise.resolve();
 }
 
-function buildSourceJoinAttributes(
-  assoc: { owner: Base; reflection: any },
-  record: Base,
+/**
+ * Wrap `block` in a transaction on the through-reflection's class. Falls
+ * back to invoking the block directly when no through klass is available.
+ *
+ * Mirrors: ActiveRecord::Associations::ThroughAssociation#transaction
+ *
+ * @internal
+ */
+function transaction<R>(
+  assoc: HasManyThroughAssociation,
+  block: (tx?: any) => Promise<R>,
+): Promise<R | undefined> {
+  const tr = throughReflection(assoc) as { klass?: unknown } | null;
+  const klass = safeKlass(tr) as { transaction?: Function } | null;
+  if (klass && typeof klass.transaction === "function") {
+    return klass.transaction(block) as Promise<R | undefined>;
+  }
+  return block() as Promise<R | undefined>;
+}
+
+/**
+ * Resolves the AssociationReflection for the `:through` join model.
+ *
+ * Mirrors: ActiveRecord::Associations::ThroughAssociation#through_reflection
+ *
+ * @internal
+ */
+function throughReflection(assoc: HasManyThroughAssociation): unknown {
+  // Resolve the rich reflection first — assoc.reflection is the
+  // AssociationDefinition (no throughReflection getter), so we need
+  // ThroughReflection#throughReflection from the registry.
+  type Refl = {
+    throughReflection?: Refl | null;
+    isThroughReflection?: () => boolean;
+  };
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => Refl | null };
+  let refl: Refl | null =
+    (ctor._reflectOnAssociation?.(assoc.reflection.name) as Refl | null)?.throughReflection ?? null;
+  if (!refl) {
+    const throughName = assoc.reflection.options.through as string | undefined;
+    if (!throughName) return null;
+    refl = ctor._reflectOnAssociation?.(throughName) ?? null;
+  }
+  while (refl?.isThroughReflection?.() && refl.throughReflection) {
+    refl = refl.throughReflection;
+  }
+  return refl;
+}
+
+/**
+ * Returns the live Association wrapper that owns the join model — i.e.,
+ * `owner.association(throughReflection.name)`.
+ *
+ * Mirrors: ActiveRecord::Associations::ThroughAssociation#through_association
+ *
+ * @internal
+ */
+function throughAssociation(assoc: HasManyThroughAssociation): unknown {
+  const tr = throughReflection(assoc) as { name?: string } | null;
+  if (!tr?.name) return null;
+  return (assoc.owner as unknown as { association?: (n: string) => unknown }).association?.(
+    tr.name,
+  );
+}
+
+/**
+ * Build the join-table attribute hash that pairs `records` with the owner
+ * via the source reflection's foreign key (or the source association name
+ * when the join is composite-keyed). Used when constructing through
+ * records.
+ *
+ * Mirrors: ActiveRecord::Associations::ThroughAssociation#construct_join_attributes
+ *
+ * @internal
+ */
+function constructJoinAttributes(
+  assoc: HasManyThroughAssociation,
+  ...records: Base[]
 ): Record<string, unknown> {
-  const refl = assoc.reflection as any;
-  const sourceRefl = refl.sourceReflection?.() as any;
+  ensureMutable(assoc);
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const sourceRefl = refl?.sourceReflection as any;
   if (!sourceRefl) return {};
-  const assocPk = sourceRefl.associationPrimaryKey?.(refl.klass) ?? sourceRefl.primaryKey ?? "id";
+  const reflKlass = safeKlass(refl);
+  const assocPk =
+    (typeof sourceRefl.associationPrimaryKeyFor === "function"
+      ? sourceRefl.associationPrimaryKeyFor(reflKlass)
+      : sourceRefl.associationPrimaryKey) ??
+    sourceRefl.primaryKey ??
+    "id";
   const pkArr: string[] = Array.isArray(assocPk) ? assocPk : [assocPk];
-  const compositeConstraints: string[] = refl.klass?.compositeQueryConstraintsList ?? [];
+  const compositeConstraints: string[] = reflKlass
+    ? compositeQueryConstraintsList.call(reflKlass)
+    : [];
 
   let joinAttributes: Record<string, unknown>;
   if (
@@ -198,19 +299,65 @@ function buildSourceJoinAttributes(
     pkArr.every((k: string, i: number) => k === compositeConstraints[i]) &&
     !refl.options?.sourceType
   ) {
-    joinAttributes = { [sourceRefl.name]: record };
+    joinAttributes = { [sourceRefl.name]: records.length === 1 ? records[0] : records };
   } else {
     const fk: string = sourceRefl.foreignKey ?? `${sourceRefl.name}_id`;
-    const pkValues =
-      pkArr.length === 1
-        ? ((record as any).readAttribute?.(pkArr[0]) ?? (record as any).id)
-        : pkArr.map((k: string) => (record as any).readAttribute?.(k));
-    joinAttributes = { [fk]: pkValues };
+    const read = (r: any, k: string) => r._readAttribute?.(k) ?? r.readAttribute?.(k);
+    const values = records.map((r: any) =>
+      pkArr.length === 1 ? (read(r, pkArr[0]) ?? r.id) : pkArr.map((k: string) => read(r, k)),
+    );
+    joinAttributes = { [fk]: records.length === 1 ? values[0] : values };
   }
 
   if (refl.options?.sourceType) {
     const foreignType: string = sourceRefl.foreignType ?? `${sourceRefl.name}_type`;
-    joinAttributes[foreignType] = refl.options.sourceType;
+    joinAttributes[foreignType] =
+      records.length === 1 ? refl.options.sourceType : [refl.options.sourceType];
   }
   return joinAttributes;
+}
+
+/**
+ * Throws when the source reflection is not a `belongsTo` — Rails treats
+ * such through associations as read-only because mutating the source side
+ * isn't well-defined.
+ *
+ * Mirrors: ActiveRecord::Associations::ThroughAssociation#ensure_mutable
+ *
+ * @internal
+ */
+function ensureMutable(assoc: HasManyThroughAssociation): void {
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const sourceRefl = refl?.sourceReflection as
+    | { isBelongsTo?: () => boolean; macro?: string }
+    | undefined;
+  const isBelongs = sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo";
+  if (!isBelongs) {
+    throw new HasManyThroughCantAssociateThroughHasOneOrManyReflection(
+      (assoc.owner.constructor as { name: string }).name,
+      assoc.reflection.name,
+    );
+  }
+}
+
+/**
+ * Throws when this through-association points at another through-association
+ * (a "nested through"). Rails treats nested-through chains as read-only.
+ *
+ * Mirrors: ActiveRecord::Associations::ThroughAssociation#ensure_not_nested
+ *
+ * @internal
+ */
+function ensureNotNested(assoc: HasManyThroughAssociation): void {
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) as {
+    isNested?: () => boolean;
+  } | null;
+  if (refl?.isNested?.()) {
+    throw new HasManyThroughNestedAssociationsAreReadonly(
+      (assoc.owner.constructor as { name: string }).name,
+      assoc.reflection.name,
+    );
+  }
 }

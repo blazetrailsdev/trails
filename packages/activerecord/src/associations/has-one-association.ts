@@ -4,6 +4,7 @@ import { loadHasOne } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
+import { ForeignAssociation } from "./foreign-association.js";
 import { SingularAssociation } from "./singular-association.js";
 
 /**
@@ -216,23 +217,15 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private nullifyOwnerAttributes(record: Base): void {
-    const fks = Array.isArray(this.reflection.options.foreignKey)
-      ? this.reflection.options.foreignKey
-      : [this.foreignKeyColumn()];
-    for (const fk of fks) {
+    // Source the column list from the Rails-named helper so custom
+    // foreignKey/foreignType (incl. composite PKs and polymorphic `as`)
+    // honor the same derivation rules used by reflection itself.
+    const attrs = nullifiedOwnerAttributes(this);
+    for (const col of Object.keys(attrs)) {
       if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(fk, null);
+        (record as any)._writeAttribute(col, null);
       } else {
-        (record as any)[fk] = null;
-      }
-    }
-
-    if (this.reflection.options.as) {
-      const typeCol = `${underscore(this.reflection.options.as)}_type`;
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(typeCol, null);
-      } else {
-        (record as any)[typeCol] = null;
+        (record as any)[col] = null;
       }
     }
   }
@@ -267,4 +260,42 @@ function transactionIf(
     }
   }
   return block();
+}
+
+/**
+ * Build the attribute hash that nullifies the owner-side foreign key (and
+ * polymorphic type column, when applicable) on the dependent record — used
+ * by `dependent: :nullify` to drop the FK without destroying the row.
+ *
+ * Mirrors: ActiveRecord::Associations::ForeignAssociation#nullified_owner_attributes
+ *
+ * @internal
+ */
+function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null> {
+  // Resolve the rich reflection so foreignKey expansion (composite PKs,
+  // primaryKey overrides, polymorphic foreignType) matches what the
+  // association itself uses. Fall back to the HasOneAssociation's own
+  // foreignKeyColumns() derivation, then to options-based defaults.
+  const ctor = assoc.owner.constructor as {
+    name: string;
+    _reflectOnAssociation?: (n: string) => {
+      foreignKey?: string | string[];
+      foreignType?: string;
+    } | null;
+  };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) ?? null;
+  let foreignKey: string | string[] | undefined = refl?.foreignKey;
+  const reflTypeCol: string | null = refl?.foreignType ?? null;
+  if (foreignKey == null) {
+    const fks = (assoc as unknown as { foreignKeyColumns?: () => string[] }).foreignKeyColumns?.();
+    if (fks?.length) foreignKey = fks;
+  }
+  if (foreignKey == null) {
+    const opts = assoc.reflection.options as { foreignKey?: string | string[]; as?: string };
+    foreignKey =
+      opts.foreignKey ?? (opts.as ? `${underscore(opts.as)}_id` : `${underscore(ctor.name)}_id`);
+  }
+  const asName = assoc.reflection.options.as;
+  const typeCol = reflTypeCol ?? (asName ? `${underscore(asName)}_type` : null);
+  return ForeignAssociation.nullifiedOwnerAttributes({ foreignKey, type: typeCol });
 }

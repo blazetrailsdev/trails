@@ -519,7 +519,14 @@ export class CollectionAssociation extends Association {
     }
   }
 
-  private async nullifyAllRecords(): Promise<void> {
+  /**
+   * Returns the FK/type-column → null map for `dependent: :nullify` bulk
+   * updates. Subclasses (HasManyAssociation) override this to honor the
+   * rich AssociationReflection's foreignKey/foreignType.
+   *
+   * @internal
+   */
+  protected computeNullifiedOwnerAttributes(): Record<string, null> {
     const nullAttrs: Record<string, null> = {};
     for (const fk of this.foreignKeyColumns()) {
       nullAttrs[fk] = null;
@@ -527,6 +534,11 @@ export class CollectionAssociation extends Association {
     if (this.reflection.options.as) {
       nullAttrs[`${underscore(this.reflection.options.as)}_type`] = null;
     }
+    return nullAttrs;
+  }
+
+  protected async nullifyAllRecords(): Promise<void> {
+    const nullAttrs = this.computeNullifiedOwnerAttributes();
 
     // Prefer scope-based bulk update (hits DB even if target isn't loaded)
     const rel = this.scope();
