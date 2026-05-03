@@ -9,6 +9,10 @@ export class FloatType extends NumericValueType {
   /** @internal Rails-private helper. */
   protected castValue(value: unknown): number | null {
     if (typeof value === "number") return value;
+    // Case-sensitive exact match mirrors Rails float.rb:53-60; "nan"/"infinity" are not valid.
+    if (value === "Infinity") return Number.POSITIVE_INFINITY;
+    if (value === "-Infinity") return Number.NEGATIVE_INFINITY;
+    if (value === "NaN") return Number.NaN;
     const parsed = parseFloat(String(value));
     return isNaN(parsed) ? null : parsed;
   }
