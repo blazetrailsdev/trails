@@ -142,9 +142,16 @@ export class DirtyTracker {
     }
     const original = resolveValue(this._originalAttributes.get(name));
     if (type.isChanged(original, newValue, rawValue) || this._forcedNames.has(name)) {
-      // Preserve forced dirty entries — a force_change must not be silently
-      // cleared by a subsequent type-equal write.
-      this._changedAttributes.set(name, [original, newValue]);
+      // When force-dirtied, preserve the cloned pre-mutation snapshot captured
+      // by forceChange() as the "was" side. For normal writes use the snapshot
+      // original. A force_change must not be silently cleared by a type-equal write.
+      const existingFrom = this._forcedNames.has(name)
+        ? this._changedAttributes.get(name)?.[0]
+        : undefined;
+      this._changedAttributes.set(name, [
+        existingFrom !== undefined ? existingFrom : original,
+        newValue,
+      ]);
     } else {
       this._changedAttributes.delete(name);
     }

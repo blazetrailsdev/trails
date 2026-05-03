@@ -1379,7 +1379,6 @@ export class Model {
   /** @internal */
   _writeAttribute(name: string, value: unknown): void {
     const ctor = this.constructor as typeof Model;
-    const oldValue = this._attributes.has(name) ? this._attributes.fetchValue(name) : undefined;
     this._attributes.writeFromUser(name, value);
     let newValue = this._attributes.fetchValue(name);
     newValue = ctor._applyNormalization(name, newValue);

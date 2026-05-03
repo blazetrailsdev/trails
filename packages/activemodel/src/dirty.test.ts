@@ -729,6 +729,9 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     m._dirty.forceChange("ratio", NaN); // mirrors attribute_will_change!
     m.writeAttribute("ratio", "NaN"); // type-equal write
     expect(m.changedAttributes).toContain("ratio");
+    // The "was" side must be the cloned pre-mutation snapshot from forceChange,
+    // not the snapshot original, to preserve Rails' attribute_will_change! semantics.
+    expect(m.changes["ratio"]).toEqual([NaN, NaN]);
   });
 
   it("float attribute NaN-to-NaN does NOT appear in changes — equal_nan? exemption", () => {
