@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::Encryption::Cipher::Aes256Gcm
  */
 
-import { NotImplementedError } from "../../errors.js";
 import { getCrypto } from "@blazetrails/activesupport";
 import { ConfigError, DecryptionError } from "../errors.js";
 
@@ -48,16 +47,10 @@ export class Cipher {
     options?: { deterministic?: boolean },
   ): { payload: string; iv: string; authTag: string } {
     this._validateKeyLength(key);
-    const crypto = getCrypto();
     const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
     // Accept Buffer (e.g. compressed binary data) or string (UTF-8 text).
     const inputBuf = Buffer.isBuffer(data) ? data : Buffer.from(data, "utf-8");
-    let iv: Buffer;
-    if (options?.deterministic ?? this.deterministic) {
-      iv = crypto.createHmac("sha256", keyBuf).update(inputBuf).digest().subarray(0, IV_LENGTH);
-    } else {
-      iv = crypto.randomBytes(IV_LENGTH);
-    }
+    const iv = this.generateIv(keyBuf, inputBuf, options?.deterministic ?? this.deterministic);
     const cipher = getCrypto().createCipheriv("aes-256-gcm", keyBuf, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
@@ -124,18 +117,21 @@ export class Cipher {
       );
     }
   }
-}
 
-/** @internal */
-function generateIv(cipher: any, clearText: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::Cipher::Aes256Gcm#generate_iv is not implemented",
-  );
-}
+  /** @internal */
+  private generateIv(keyBuf: Buffer, inputBuf: Buffer, deterministic: boolean): Buffer {
+    if (deterministic) {
+      return this.generateDeterministicIv(keyBuf, inputBuf);
+    }
+    return getCrypto().randomBytes(IV_LENGTH);
+  }
 
-/** @internal */
-function generateDeterministicIv(clearText: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::Cipher::Aes256Gcm#generate_deterministic_iv is not implemented",
-  );
+  /** @internal */
+  private generateDeterministicIv(keyBuf: Buffer, clearText: Buffer): Buffer {
+    return getCrypto()
+      .createHmac("sha256", keyBuf)
+      .update(clearText)
+      .digest()
+      .subarray(0, IV_LENGTH);
+  }
 }

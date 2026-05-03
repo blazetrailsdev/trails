@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::Encryption::Properties
  */
 
-import { NotImplementedError } from "../errors.js";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
 const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
@@ -45,7 +44,7 @@ export class Properties {
 
   toJSON(): Record<string, unknown> {
     const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-    for (const [key, value] of this._data) {
+    for (const [key, value] of this.data) {
       result[key] = value;
     }
     return result;
@@ -94,6 +93,11 @@ export class Properties {
   private _validateType(value: unknown): void {
     this.validateValueType(value);
   }
+
+  /** @internal */
+  private get data(): Map<string, unknown> {
+    return this._data;
+  }
 }
 
 function _typeNameFor(value: unknown): string {
@@ -103,9 +107,4 @@ function _typeNameFor(value: unknown): string {
     if (name) return name;
   }
   return t;
-}
-
-/** @internal */
-function data(): never {
-  throw new NotImplementedError("ActiveRecord::Encryption::Properties#data is not implemented");
 }

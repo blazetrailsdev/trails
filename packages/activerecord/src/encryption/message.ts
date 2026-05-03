@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::Encryption::Message
  */
 
-import { NotImplementedError } from "../errors.js";
 import { Properties } from "./properties.js";
 import { ForbiddenClass } from "./errors.js";
 
@@ -13,9 +12,7 @@ export class Message {
   headers: Properties;
 
   constructor(payload?: string | null) {
-    if (payload !== undefined && payload !== null && typeof payload !== "string") {
-      throw new ForbiddenClass(`Payloads must be either nil or strings, not ${typeof payload}`);
-    }
+    this.validatePayloadType(payload);
     this.payload = payload ?? "";
     this.headers = new Properties();
   }
@@ -27,11 +24,11 @@ export class Message {
   addHeaders(props: Record<string, unknown>): void {
     this.headers.add(props);
   }
-}
 
-/** @internal */
-function validatePayloadType(payload: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::Message#validate_payload_type is not implemented",
-  );
+  /** @internal */
+  private validatePayloadType(payload: unknown): void {
+    if (payload !== undefined && payload !== null && typeof payload !== "string") {
+      throw new ForbiddenClass(`Payloads must be either nil or strings, not ${typeof payload}`);
+    }
+  }
 }

@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::Encryption::Scheme
  */
 
-import { NotImplementedError } from "../errors.js";
 import { Encryptor, type EncryptorLike } from "./encryptor.js";
 import { ConfigError } from "./errors.js";
 import type { Compressor } from "./config.js";
@@ -105,7 +104,7 @@ export class Scheme {
       });
     }
 
-    this._validate();
+    this.validateConfigBang();
   }
 
   get encryptor(): EncryptorLike {
@@ -118,9 +117,9 @@ export class Scheme {
     if (this._opts.encryptor !== undefined) return this._keyProviderParam ?? undefined;
     return (
       this._keyProviderParam ??
-      this._keyProviderFromKey() ??
-      this._deterministicKeyProvider() ??
-      this._defaultKeyProvider()
+      this.keyProviderFromKey() ??
+      this.deterministicKeyProvider() ??
+      this.defaultKeyProvider()
     );
   }
 
@@ -169,7 +168,8 @@ export class Scheme {
     return opts;
   }
 
-  private _keyProviderFromKey(): DerivedSecretKeyProvider | undefined {
+  /** @internal */
+  private keyProviderFromKey(): DerivedSecretKeyProvider | undefined {
     if (this.key != null) {
       this._cachedKeyProviderFromKey ??= new DerivedSecretKeyProvider(this.key);
       return this._cachedKeyProviderFromKey;
@@ -177,15 +177,11 @@ export class Scheme {
     return undefined;
   }
 
-  // Mirrors Rails' Scheme#default_key_provider → ActiveRecord::Encryption.key_provider.
-  // Returns the context's keyProvider if set, otherwise derives one from config.primaryKey.
-  // Memoized on the primaryKey value to avoid repeated PBKDF2 calls.
-  private _defaultKeyProvider(): unknown {
+  /** @internal */
+  private defaultKeyProvider(): unknown {
     const ctxKp = Configurable.keyProvider;
     if (ctxKp != null) return ctxKp;
     if (Configurable.config.primaryKey == null) {
-      // No primary key configured — clear any stale cached provider so old
-      // key material can be GC'd (e.g. after config reset in tests).
       clearDefaultKeyProviderCache();
       return undefined;
     }
@@ -194,7 +190,8 @@ export class Scheme {
     return getOrCreateDefaultKeyProvider(primaryKey, keyDerivationSalt, hashDigestClass);
   }
 
-  private _deterministicKeyProvider(): DeterministicKeyProvider | undefined {
+  /** @internal */
+  private deterministicKeyProvider(): DeterministicKeyProvider | undefined {
     if (this.deterministic) {
       const deterministicKey = Configurable.config.get("deterministicKey") as string;
       this._cachedDeterministicKeyProvider ??= new DeterministicKeyProvider(
@@ -205,7 +202,8 @@ export class Scheme {
     return undefined;
   }
 
-  private _validate(): void {
+  /** @internal */
+  private validateConfigBang(): void {
     if (this.ignoreCase && !this.deterministic) {
       throw new ConfigError("ignoreCase requires deterministic encryption");
     }
@@ -222,32 +220,4 @@ export class Scheme {
       throw new ConfigError("compressor can't be used with encryptor");
     }
   }
-}
-
-/** @internal */
-function validateConfigBang(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::Scheme#validate_config! is not implemented",
-  );
-}
-
-/** @internal */
-function keyProviderFromKey(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::Scheme#key_provider_from_key is not implemented",
-  );
-}
-
-/** @internal */
-function deterministicKeyProvider(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::Scheme#deterministic_key_provider is not implemented",
-  );
-}
-
-/** @internal */
-function defaultKeyProvider(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::Scheme#default_key_provider is not implemented",
-  );
 }
