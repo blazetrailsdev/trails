@@ -102,6 +102,11 @@ describe("NodesTest", () => {
         const node = new Nodes.Case(users.get("status"));
         expect(() => node.then("A")).toThrow(/Case#then called before Case#when/);
       });
+
+      it("Promise.resolve rejects rather than hanging (thenable hazard)", async () => {
+        const node = new Nodes.Case(users.get("status")).when("active").then("A");
+        await expect(Promise.resolve(node)).rejects.toThrow(/not awaitable/);
+      });
     });
 
     describe("#initialize", () => {
