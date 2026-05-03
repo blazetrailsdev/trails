@@ -56,6 +56,7 @@ type AbstractValueTypeCtor<T = unknown> = abstract new (...args: any[]) => Value
 export interface NumericMixinMethods {
   cast(value: unknown): unknown;
   serialize(value: unknown): unknown;
+  serializeCastValue(value: unknown): unknown;
   isChanged(oldValue: unknown, newValue: unknown, newValueBeforeTypeCast?: unknown): boolean;
 }
 
@@ -96,6 +97,10 @@ export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
 
     override serialize(value: unknown): unknown {
       return this.cast(value);
+    }
+
+    override serializeCastValue(value: unknown): unknown {
+      return value;
     }
 
     override isChanged(

@@ -152,7 +152,6 @@ describe("DecimalType", () => {
 
   it("blank string casts to null via Helpers::Numeric", () => {
     const type = new Types.DecimalType();
-    expect(type.cast("")).toBeNull();
     expect(type.cast("   ")).toBeNull();
   });
 

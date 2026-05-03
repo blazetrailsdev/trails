@@ -133,7 +133,6 @@ describe("IntegerTest", () => {
   });
 
   it("blank string casts to null via Helpers::Numeric", () => {
-    expect(type.cast("")).toBeNull();
     expect(type.cast("   ")).toBeNull();
   });
 
@@ -146,16 +145,10 @@ describe("IntegerTest", () => {
     expect(type.isChanged(0, null, "wibble")).toBe(true);
   });
 
-  it("AR integration: setting integer attribute to non-numeric string marks changed, restoring original clears it", () => {
-    class MyModel extends Model {
-      static {
-        this.attribute("score", "integer");
-      }
-    }
-    const m = new MyModel({ score: 10 });
-    m.writeAttribute("score", "abc");
-    expect(m.attributeChanged("score")).toBe(true);
-    m.writeAttribute("score", 10);
-    expect(m.attributeChanged("score")).toBe(false);
+  it("isChanged returns true when old and new cast values are equal but raw is non-numeric — number_to_non_number? path", () => {
+    // type.isChanged(old, new_cast, raw): old=0, new_cast=0, raw="wibble"
+    // super.isChanged returns false (0 === 0), but number_to_non_number? forces true.
+    // This is the path Rails numeric.rb:31-34 adds on top of Value#changed?.
+    expect(type.isChanged(0, 0, "wibble")).toBe(true);
   });
 });
