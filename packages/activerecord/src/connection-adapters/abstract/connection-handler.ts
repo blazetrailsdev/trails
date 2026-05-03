@@ -97,7 +97,9 @@ export class ConnectionHandler {
     const ownerName =
       options.owner != null
         ? this.determineOwnerName(options.owner)
-        : new ConnectionDescriptor("primary");
+        : config instanceof DatabaseConfig
+          ? new ConnectionDescriptor(config.name)
+          : new ConnectionDescriptor(typeof options.owner === "string" ? options.owner : "primary");
 
     const role = options.role ?? "writing";
     const shard = options.shard ?? "default";
@@ -276,8 +278,7 @@ export class ConnectionHandler {
     shard: string,
     options?: { adapterFactory?: () => DatabaseAdapter },
   ): PoolConfig {
-    const connectionName =
-      ownerName instanceof ConnectionDescriptor ? ownerName.name : String(ownerName);
+    const connectionName = ownerName.name;
     const dbConfig =
       config instanceof DatabaseConfig
         ? config
