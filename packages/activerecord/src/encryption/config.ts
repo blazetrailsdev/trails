@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::Encryption::Config
  */
 
-import { NotImplementedError } from "../errors.js";
 import { ConfigError } from "./errors.js";
 import type { SchemeOptions } from "./scheme.js";
 
@@ -32,7 +31,9 @@ export class Config {
     "keyDerivationSalt",
   ]);
 
-  constructor() {}
+  constructor() {
+    this.setDefaults();
+  }
 
   get excludedFromFilterParameters(): string[] {
     return this.excludeFromFilterParameters;
@@ -40,7 +41,7 @@ export class Config {
 
   set previous(schemes: SchemeOptions[]) {
     for (const props of schemes) {
-      this.previousSchemes.push(props);
+      this.addPreviousScheme(props);
     }
   }
 
@@ -52,6 +53,26 @@ export class Config {
       );
     }
     return value;
+  }
+
+  /** @internal */
+  private setDefaults(): void {
+    this.storeKeyReferences = false;
+    this.supportUnencryptedData = false;
+    this.encryptFixtures = false;
+    this.validateColumnSize = true;
+    this.addToFilterParameters = true;
+    this.excludeFromFilterParameters = [];
+    this.previousSchemes = [];
+    this.forcedEncodingForDeterministicEncryption = "UTF-8";
+    this.hashDigestClass = "SHA1";
+    this.compressor = defaultCompressor;
+    this.extendQueries = false;
+  }
+
+  /** @internal */
+  private addPreviousScheme(properties: SchemeOptions): void {
+    this.previousSchemes.push(properties);
   }
 }
 
@@ -70,15 +91,3 @@ export const defaultCompressor: Compressor = {
     return inflateSync(data).toString("utf-8");
   },
 };
-
-/** @internal */
-function setDefaults(): never {
-  throw new NotImplementedError("ActiveRecord::Encryption::Config#set_defaults is not implemented");
-}
-
-/** @internal */
-function addPreviousScheme(properties?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::Config#add_previous_scheme is not implemented",
-  );
-}

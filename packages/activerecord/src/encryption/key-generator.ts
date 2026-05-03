@@ -4,11 +4,8 @@
  * Mirrors: ActiveRecord::Encryption::KeyGenerator
  */
 
-import { NotImplementedError } from "../errors.js";
 import { getCrypto } from "@blazetrails/activesupport";
 import { Configurable } from "./configurable.js";
-
-const DEFAULT_KEY_LENGTH = 32; // AES-256
 
 export class KeyGenerator {
   private _hashDigestClass: string;
@@ -21,38 +18,38 @@ export class KeyGenerator {
     return this._hashDigestClass;
   }
 
-  deriveKeyFrom(password: string, length: number = DEFAULT_KEY_LENGTH): string {
-    const salt = Configurable.config.get("keyDerivationSalt") as string;
-    return this.deriveKey(password, length, salt);
+  deriveKeyFrom(password: string, length?: number): string {
+    const salt = this.keyDerivationSalt();
+    return this.deriveKey(password, length ?? this.keyLength(), salt);
   }
 
-  generateRandomKey(length: number = DEFAULT_KEY_LENGTH): string {
-    return getCrypto().randomBytes(length).toString("base64");
+  generateRandomKey(length?: number): string {
+    return getCrypto()
+      .randomBytes(length ?? this.keyLength())
+      .toString("base64");
   }
 
-  generateRandomHexKey(length: number = DEFAULT_KEY_LENGTH): string {
-    return getCrypto().randomBytes(length).toString("hex");
+  generateRandomHexKey(length?: number): string {
+    return getCrypto()
+      .randomBytes(length ?? this.keyLength())
+      .toString("hex");
   }
 
-  deriveKey(password: string, length: number = DEFAULT_KEY_LENGTH, salt?: string): string {
+  deriveKey(password: string, length: number = 32, salt?: string): string {
     const crypto = getCrypto();
     const effectiveSalt = salt ?? "";
     const digest = this._hashDigestClass.toLowerCase().replace(/-/g, "");
     const derived = crypto.pbkdf2Sync(password, effectiveSalt, 2 ** 16, length, digest);
     return derived.toString("base64");
   }
-}
 
-/** @internal */
-function keyDerivationSalt(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::KeyGenerator#key_derivation_salt is not implemented",
-  );
-}
+  /** @internal */
+  private keyDerivationSalt(): string {
+    return Configurable.config.get("keyDerivationSalt") as string;
+  }
 
-/** @internal */
-function keyLength(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::KeyGenerator#key_length is not implemented",
-  );
+  /** @internal */
+  private keyLength(): number {
+    return 32; // AES-256 key length, mirrors Cipher.key_length
+  }
 }

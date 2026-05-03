@@ -4,12 +4,12 @@
  * Mirrors: ActiveRecord::Encryption::KeyProvider
  */
 
-import { NotImplementedError } from "../errors.js";
 import { Key } from "./key.js";
 import type { Message } from "./message.js";
 
 export class KeyProvider {
   private _keys: Key[];
+  private _keysGroupedById: Map<string, Key[]> | undefined;
 
   constructor(keys: Key | Key[]) {
     this._keys = Array.isArray(keys) ? keys : [keys];
@@ -22,16 +22,23 @@ export class KeyProvider {
   decryptionKeys(message: Message): Key[] {
     const keyRef = message.headers.get("k") as string | undefined;
     if (keyRef) {
-      const found = this._keys.filter((k) => k.id === keyRef);
-      if (found.length > 0) return found;
+      const grouped = this.keysGroupedById();
+      const found = grouped.get(keyRef);
+      if (found && found.length > 0) return found;
     }
     return [...this._keys];
   }
-}
 
-/** @internal */
-function keysGroupedById(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::KeyProvider#keys_grouped_by_id is not implemented",
-  );
+  /** @internal */
+  private keysGroupedById(): Map<string, Key[]> {
+    if (!this._keysGroupedById) {
+      this._keysGroupedById = new Map();
+      for (const key of this._keys) {
+        const group = this._keysGroupedById.get(key.id) ?? [];
+        group.push(key);
+        this._keysGroupedById.set(key.id, group);
+      }
+    }
+    return this._keysGroupedById;
+  }
 }
