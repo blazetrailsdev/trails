@@ -1,12 +1,15 @@
 import { Node, NodeVisitor } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SelectCore } from "./select-core.js";
-import { Comment } from "./comment.js";
 
 /**
  * SelectStatement — the full SELECT with cores, order, limit, offset, lock.
  *
- * Mirrors: Arel::Nodes::SelectStatement
+ * Mirrors: Arel::Nodes::SelectStatement (select_statement.rb).
+ *
+ * Comment lives on `SelectCore`, not here — Rails' attr_accessor list is
+ * `:limit, :orders, :lock, :offset, :with` and only `SelectCore` carries
+ * `:comment`. The visitor emits the comment in `visit_Arel_Nodes_SelectCore`.
  */
 export class SelectStatement extends NodeExpression {
   cores: SelectCore[];
@@ -15,7 +18,6 @@ export class SelectStatement extends NodeExpression {
   offset: Node | null;
   lock: Node | null;
   with: Node | null;
-  comment: Comment | null;
 
   constructor(relation: Node | null = null) {
     super();
@@ -25,7 +27,6 @@ export class SelectStatement extends NodeExpression {
     this.offset = null;
     this.lock = null;
     this.with = null;
-    this.comment = null;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
@@ -40,7 +41,6 @@ export class SelectStatement extends NodeExpression {
     copy.offset = this.offset;
     copy.lock = this.lock;
     copy.with = this.with;
-    copy.comment = this.comment;
     return copy;
   }
 }

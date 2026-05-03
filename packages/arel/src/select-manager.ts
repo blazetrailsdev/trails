@@ -497,9 +497,10 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#comment
    */
   comment(...values: string[]): this {
-    // Mirrors Rails: `comment(*values)` constructs `Nodes::Comment.new(values)`
-    // — a single array arg, not a splat (select_manager.rb).
-    this.ast.comment = new Comment(values);
+    // Mirrors Rails: `@ctx.comment = Nodes::Comment.new(values)`
+    // (select_manager.rb) — sets on the current SelectCore, not on the
+    // statement. `Nodes::Comment.new(values)` takes a single array arg.
+    this.core.comment = new Comment(values);
     return this;
   }
 

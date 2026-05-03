@@ -882,6 +882,23 @@ describe("SelectManagerTest", () => {
       const mgr = users.project(star).comment("load users");
       expect(mgr.toSql()).toContain("/* load users */");
     });
+
+    it("stores the Comment node on the SelectCore (Rails fidelity)", () => {
+      const mgr = users.project(star).comment("trace");
+      // Rails: `@ctx.comment = Nodes::Comment.new(values)` — sets on
+      // the core, not the statement. SelectStatement no longer carries
+      // a `comment` field at all.
+      const core = mgr.ast.cores[mgr.ast.cores.length - 1];
+      expect(core.comment).toBeDefined();
+      expect(core.comment).not.toBeNull();
+      expect("comment" in mgr.ast).toBe(false);
+    });
+
+    it("emits the comment exactly once", () => {
+      const sql = users.project(star).comment("once").toSql();
+      const matches = sql.match(/\/\* once \*\//g) ?? [];
+      expect(matches.length).toBe(1);
+    });
   });
 
   it("chains where + order + limit + offset", () => {

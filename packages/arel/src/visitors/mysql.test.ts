@@ -9,6 +9,20 @@ describe("MysqlTest", () => {
     expect(mgr.toSql()).toContain("LIMIT 10");
   });
 
+  describe("comment emission", () => {
+    it("emits the SelectCore comment in MySQL output", () => {
+      const mgr = new SelectManager(users).project(star).comment("trace=mysql");
+      const sql = new Visitors.MySQL().compile(mgr.ast);
+      expect(sql).toContain("/* trace=mysql */");
+    });
+
+    it("emits the comment exactly once", () => {
+      const mgr = new SelectManager(users).project(star).comment("once");
+      const sql = new Visitors.MySQL().compile(mgr.ast);
+      expect((sql.match(/\/\* once \*\//g) ?? []).length).toBe(1);
+    });
+  });
+
   describe("Nodes::Regexp", () => {
     it("should know how to visit", () => {
       const node = users.get("name").matchesRegexp("bar");

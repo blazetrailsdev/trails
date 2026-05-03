@@ -311,8 +311,6 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       this.visit(node.lock);
     }
 
-    this.maybeVisit(node.comment ?? null);
-
     return this.collector;
   }
 

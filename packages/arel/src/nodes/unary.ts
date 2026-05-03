@@ -22,16 +22,13 @@ export class DistinctOn extends Unary {}
 export class Bin extends Unary {}
 export class On extends Unary {}
 
-export class Not extends Node {
-  readonly expr: Node;
-
+// Mirrors Rails: `Not < Unary` (unary.rb). Inherits Predications/Math/etc.
+// from NodeExpression. Field type narrowed to `Node` since callers always
+// pass an Arel node.
+export class Not extends Unary {
+  declare readonly expr: Node;
   constructor(expr: Node) {
-    super();
-    this.expr = expr;
-  }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+    super(expr);
   }
 }
 

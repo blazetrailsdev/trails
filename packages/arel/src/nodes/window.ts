@@ -1,4 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
+import { Unary } from "./unary.js";
 
 /**
  * Window — a SQL window specification for OVER clauses.
@@ -65,26 +66,20 @@ export class NamedWindow extends Window {
   }
 }
 
-/** Row-based frame bounds */
-export class Preceding extends Node {
-  readonly expr: Node | null;
+// Row-based frame bounds. Mirrors Rails (window.rb): `Preceding`,
+// `Following`, `Rows`, `Range` all extend Unary; only `CurrentRow`
+// extends Node directly (it carries no expr).
+export class Preceding extends Unary {
+  declare readonly expr: Node | null;
   constructor(expr: Node | null = null) {
-    super();
-    this.expr = expr;
-  }
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+    super(expr);
   }
 }
 
-export class Following extends Node {
-  readonly expr: Node | null;
+export class Following extends Unary {
+  declare readonly expr: Node | null;
   constructor(expr: Node | null = null) {
-    super();
-    this.expr = expr;
-  }
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+    super(expr);
   }
 }
 
@@ -94,24 +89,16 @@ export class CurrentRow extends Node {
   }
 }
 
-export class Rows extends Node {
-  readonly expr: Node | null;
+export class Rows extends Unary {
+  declare readonly expr: Node | null;
   constructor(expr: Node | null = null) {
-    super();
-    this.expr = expr;
-  }
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+    super(expr);
   }
 }
 
-export class Range extends Node {
-  readonly expr: Node | null;
+export class Range extends Unary {
+  declare readonly expr: Node | null;
   constructor(expr: Node | null = null) {
-    super();
-    this.expr = expr;
-  }
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+    super(expr);
   }
 }
