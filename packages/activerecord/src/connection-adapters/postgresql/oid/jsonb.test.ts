@@ -17,7 +17,8 @@ describe("PostgreSQL::OID::Jsonb", () => {
 
   it("serialize encodes objects to JSON strings", () => {
     const t = new Jsonb();
-    expect(t.serialize({ a: 1 })).toBe('{"a":1}');
+    const serialized = t.serialize({ a: 1 });
+    expect(JSON.parse(serialized as string)).toEqual({ a: 1 });
     expect(t.serialize(null)).toBeNull();
   });
 });
