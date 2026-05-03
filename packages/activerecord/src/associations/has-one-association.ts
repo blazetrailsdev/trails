@@ -4,6 +4,7 @@ import { loadHasOne } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
+import { ForeignAssociation } from "./foreign-association.js";
 import { SingularAssociation } from "./singular-association.js";
 
 /**
@@ -279,10 +280,14 @@ function transactionIf(
  * @internal
  */
 function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null> {
-  const refl = assoc.reflection as unknown as { foreignKey: string | string[]; type?: string };
-  const attrs: Record<string, null> = {};
-  const fks = Array.isArray(refl.foreignKey) ? refl.foreignKey : [refl.foreignKey];
-  for (const fk of fks) attrs[fk] = null;
-  if (refl.type) attrs[refl.type] = null;
-  return attrs;
+  const opts = assoc.reflection.options as {
+    foreignKey?: string | string[];
+    as?: string;
+  };
+  const ctor = assoc.owner.constructor as { name: string };
+  const asName = opts.as;
+  const foreignKey =
+    opts.foreignKey ?? (asName ? `${underscore(asName)}_id` : `${underscore(ctor.name)}_id`);
+  const typeCol = asName ? `${underscore(asName)}_type` : null;
+  return ForeignAssociation.nullifiedOwnerAttributes({ foreignKey, type: typeCol });
 }

@@ -292,8 +292,9 @@ function constructJoinAttributes(
   ...records: Base[]
 ): Record<string, unknown> {
   ensureMutable(assoc);
-  const refl = assoc.reflection as any;
-  const sourceRefl = refl.sourceReflection?.() as any;
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const sourceRefl = refl?.sourceReflection as any;
   if (!sourceRefl) return {};
   const assocPk = sourceRefl.associationPrimaryKey?.(refl.klass) ?? sourceRefl.primaryKey ?? "id";
   const pkArr: string[] = Array.isArray(assocPk) ? assocPk : [assocPk];
@@ -333,10 +334,11 @@ function constructJoinAttributes(
  * @internal
  */
 function ensureMutable(assoc: HasManyThroughAssociation): void {
-  const sourceRefl = (assoc.reflection as any).sourceReflection?.() as {
-    isBelongsTo?: () => boolean;
-    macro?: string;
-  } | null;
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const sourceRefl = refl?.sourceReflection as
+    | { isBelongsTo?: () => boolean; macro?: string }
+    | undefined;
   const isBelongs = sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo";
   if (!isBelongs) {
     throw new HasManyThroughCantAssociateThroughHasOneOrManyReflection(
@@ -355,8 +357,11 @@ function ensureMutable(assoc: HasManyThroughAssociation): void {
  * @internal
  */
 function ensureNotNested(assoc: HasManyThroughAssociation): void {
-  const refl = assoc.reflection as { isNested?: () => boolean };
-  if (refl.isNested?.()) {
+  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) as {
+    isNested?: () => boolean;
+  } | null;
+  if (refl?.isNested?.()) {
     throw new HasManyThroughNestedAssociationsAreReadonly(
       (assoc.owner.constructor as { name: string }).name,
       assoc.reflection.name,

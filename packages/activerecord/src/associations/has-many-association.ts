@@ -3,6 +3,8 @@ import type { AssociationDefinition } from "../associations.js";
 import { loadHasMany } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { CollectionAssociation } from "./collection-association.js";
+import { ForeignAssociation } from "./foreign-association.js";
+import { underscore } from "@blazetrails/activesupport";
 
 /**
  * Proxy that handles a has_many association.
@@ -176,10 +178,14 @@ function intersection(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] 
  * @internal
  */
 function nullifiedOwnerAttributes(assoc: HasManyAssociation): Record<string, null> {
-  const refl = assoc.reflection as unknown as { foreignKey: string | string[]; type?: string };
-  const attrs: Record<string, null> = {};
-  const fks = Array.isArray(refl.foreignKey) ? refl.foreignKey : [refl.foreignKey];
-  for (const fk of fks) attrs[fk] = null;
-  if (refl.type) attrs[refl.type] = null;
-  return attrs;
+  const opts = assoc.reflection.options as {
+    foreignKey?: string | string[];
+    as?: string;
+  };
+  const ctor = assoc.owner.constructor as { name: string };
+  const asName = opts.as;
+  const foreignKey =
+    opts.foreignKey ?? (asName ? `${underscore(asName)}_id` : `${underscore(ctor.name)}_id`);
+  const typeCol = asName ? `${underscore(asName)}_type` : null;
+  return ForeignAssociation.nullifiedOwnerAttributes({ foreignKey, type: typeCol });
 }

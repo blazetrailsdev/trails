@@ -2221,8 +2221,16 @@ function associationInstanceGet(record: Base, name: string): unknown {
  * @internal
  */
 function associationInstanceSet(record: Base, name: string, association: unknown): void {
-  const macro = (association as { reflection?: { macro?: string } } | null)?.reflection?.macro;
-  if (macro === "hasMany" || macro === "hasAndBelongsToMany") {
+  // AssociationDefinition uses `type` (not `macro`) for the association
+  // kind. Look it up on the record's class first; fall back to whatever
+  // the wrapper happens to expose if the definition isn't registered.
+  const ctor = record.constructor as { _associations?: AssociationDefinition[] };
+  const def = ctor._associations?.find((a) => a.name === name);
+  const kind =
+    def?.type ??
+    (association as { reflection?: { type?: string } } | null)?.reflection?.type ??
+    null;
+  if (kind === "hasMany" || kind === "hasAndBelongsToMany") {
     record._collectionProxies.set(name, association);
   } else {
     record._associationInstances.set(name, association as AssociationInstance);
