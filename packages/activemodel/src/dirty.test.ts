@@ -732,6 +732,23 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     expect(m.changes).not.toHaveProperty("ratio");
   });
 
+  it("integer same-cast-value write via boolean raw is still dirty — number_to_non_number? path at model level", () => {
+    // true casts to 1 via NumericMixin, so cast values are equal (1 === 1).
+    // Without type delegation, DirtyTracker would clear the change. With it,
+    // type.isChanged(1, 1, true) fires isNumberToNonNumber? and records dirty.
+    class Item extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Item.attribute("count", "integer");
+
+    const item = new Item({ count: 1 });
+    item.changesApplied();
+    item.writeAttribute("count", true);
+    expect(item.changedAttributes).toContain("count");
+  });
+
   it("float attribute NaN → non-NaN → NaN clears dirty state on revert", () => {
     class Metric extends Model {
       constructor(attrs: Record<string, unknown> = {}) {

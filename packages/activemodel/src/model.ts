@@ -1387,7 +1387,10 @@ export class Model {
     if (newValue !== this._attributes.fetchValue(name)) {
       this._attributes.writeCastValue(name, newValue);
     }
-    this._dirty.attributeWillChange(name, oldValue, newValue);
+    // Route through type.isChanged so numeric semantics (equal_nan?,
+    // number_to_non_number?) are respected — mirrors the Rails path where dirty
+    // tracking ultimately delegates to type.changed? (attribute.rb:155-160).
+    this._dirty.attributeWritten(name, newValue, value, this._attributes.getAttribute(name).type);
   }
 
   /**

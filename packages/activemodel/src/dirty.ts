@@ -1,3 +1,4 @@
+import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   attributeMissing as attributeMissingDispatch,
@@ -145,6 +146,32 @@ export class DirtyTracker {
       cloned = currentValue;
     }
     this._changedAttributes.set(name, [cloned, cloned]);
+  }
+
+  /**
+   * Type-aware write notification. Compares `newValue` against the snapshot
+   * original using `type.isChanged(original, newValue, rawValue)` so numeric
+   * semantics (equal_nan?, number_to_non_number?) are respected. Replaces the
+   * raw `attributeWillChange` call from `_writeAttribute`.
+   *
+   * @internal
+   */
+  attributeWritten(name: string, newValue: unknown, rawValue: unknown, type: Type): void {
+    if (!this._originalHas.has(name)) {
+      this._changedAttributes.set(name, [undefined, newValue]);
+      return;
+    }
+    const original = resolveValue(this._originalAttributes.get(name));
+    if (type.isChanged(original, newValue, rawValue)) {
+      this._changedAttributes.set(name, [original, newValue]);
+    } else {
+      this._changedAttributes.delete(name);
+    }
+  }
+
+  /** @internal */
+  clearChange(name: string): void {
+    this._changedAttributes.delete(name);
   }
 
   get changed(): boolean {
