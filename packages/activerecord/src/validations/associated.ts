@@ -8,7 +8,6 @@
  *     static { this.hasMany("pages"); this.validatesAssociated("pages"); }
  *   }
  */
-import { NotImplementedError } from "../errors.js";
 import { EachValidator } from "@blazetrails/activemodel";
 
 /**
@@ -30,41 +29,44 @@ export function validatesAssociated(
 
 export class AssociatedValidator extends EachValidator {
   validateEach(record: any, attribute: string, value: unknown): void {
-    const context = this._recordValidationContextForAssociation(record);
+    const context = recordValidationContextForAssociation(record);
     const values = Array.isArray(value) ? value : value != null ? [value] : [];
 
-    if (values.some((assoc: any) => !this._validObject(assoc, context))) {
+    if (values.some((assoc: any) => !isValidObject(assoc, context))) {
       const { attributes: _, ...errorOpts } = this.options as Record<string, unknown>;
       record.errors.add(attribute, "invalid", { ...errorOpts, value });
     }
   }
-
-  private _validObject(record: any, context: string | undefined): boolean {
-    if (typeof record?.markedForDestruction === "function" && record.markedForDestruction()) {
-      return true;
-    }
-    if (typeof record?.isValid !== "function") return true;
-    return context != null ? record.isValid(context) : record.isValid();
-  }
-
-  private _recordValidationContextForAssociation(record: any): string | undefined {
-    if (typeof record.customValidationContext === "function" && record.customValidationContext()) {
-      return record._validationContext;
-    }
-    return undefined;
-  }
 }
 
-/** @internal */
-function isValidObject(record: any, context: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Validations::AssociatedValidator#valid_object? is not implemented",
-  );
+/**
+ * Returns true if the associated `record` is valid (or has been marked for
+ * destruction). Mirrors Rails' marked_for_destruction? + valid? short-circuit.
+ *
+ * Mirrors: ActiveRecord::Validations::AssociatedValidator#valid_object?
+ *
+ * @internal
+ */
+function isValidObject(record: any, context: string | undefined): boolean {
+  if (typeof record?.markedForDestruction === "function" && record.markedForDestruction()) {
+    return true;
+  }
+  if (typeof record?.isValid !== "function") return true;
+  return context != null ? record.isValid(context) : record.isValid();
 }
 
-/** @internal */
-function recordValidationContextForAssociation(record: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Validations::AssociatedValidator#record_validation_context_for_association is not implemented",
-  );
+/**
+ * Returns the record's validation context if it is a custom (non
+ * create/update) one, else undefined — Rails forwards a custom context to
+ * cascading association validations only.
+ *
+ * Mirrors: ActiveRecord::Validations::AssociatedValidator#record_validation_context_for_association
+ *
+ * @internal
+ */
+function recordValidationContextForAssociation(record: any): string | undefined {
+  if (typeof record.customValidationContext === "function" && record.customValidationContext()) {
+    return record._validationContext;
+  }
+  return undefined;
 }

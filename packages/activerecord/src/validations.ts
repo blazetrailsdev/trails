@@ -6,7 +6,7 @@
  * and overrides save/valid? to run validations with context awareness.
  */
 import type { ValidationContext } from "@blazetrails/activemodel";
-import { ActiveRecordError, NotImplementedError } from "./errors.js";
+import { ActiveRecordError } from "./errors.js";
 
 /**
  * Anything Rails' `valid?(context = nil)` accepts — shared between
@@ -298,9 +298,14 @@ export const ClassMethods = {
   validatesUniqueness,
 };
 
-/** @internal */
-function raiseValidationError(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Validations#raise_validation_error is not implemented",
-  );
+/**
+ * Throws `RecordInvalid` for the given record. Used by `save!` / `create!`
+ * to convert a failed validation into an exception.
+ *
+ * Mirrors: ActiveRecord::Validations#raise_validation_error
+ *
+ * @internal
+ */
+export function raiseValidationError(record: unknown): never {
+  throw new RecordInvalid(record);
 }

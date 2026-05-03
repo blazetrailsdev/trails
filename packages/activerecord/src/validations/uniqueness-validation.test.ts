@@ -1604,4 +1604,22 @@ describe("UniquenessValidationTest", () => {
     const m3 = new Membership({ user_id: 1, group_id: 1 });
     expect(await m3.save()).toBe(false);
   });
+
+  it("validates uniqueness case insensitive", async () => {
+    const adp = freshAdapter();
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { caseSensitive: false });
+      }
+    }
+    await Topic.create({ title: "Hello" });
+    const t2 = new Topic({ title: "HELLO" });
+    expect(await t2.save()).toBe(false);
+    expect(t2.errors.on("title")).toBeTruthy();
+
+    const t3 = new Topic({ title: "world" });
+    expect(await t3.save()).toBe(true);
+  });
 });
