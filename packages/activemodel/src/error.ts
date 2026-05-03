@@ -21,6 +21,9 @@ const CALLBACKS_OPTIONS = new Set<string>([
 ]);
 const MESSAGE_OPTIONS = new Set<string>(["message"]);
 
+// Identifier pattern mirrors Ruby Symbol semantics: no spaces or punctuation.
+const IDENTIFIER_RE = /^[a-z][a-zA-Z0-9_]*$/;
+
 /**
  * Value equality that matches Ruby `==` for the common option shapes:
  * primitives (identity), arrays (elementwise), and plain objects (key-set +
@@ -105,15 +108,16 @@ export class Error {
   }
 
   get message(): string {
-    const msg = this.options.message;
-    if (typeof msg === "string") {
-      return Error.interpolate(msg, this.options);
+    // Rails error.rb:136-141: dispatch on raw_type shape — Symbol → generate_message, else → literal.
+    // TS has no Symbol type; identifier-shaped strings (no spaces/punctuation) are the equivalent.
+    if (IDENTIFIER_RE.test(this.rawType)) {
+      const opts: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(this.options)) {
+        if (!CALLBACKS_OPTIONS.has(k)) opts[k] = v;
+      }
+      return Error.generateMessage(this.attribute, this.rawType, this.base, opts);
     }
-    if (typeof msg === "function") {
-      const result = (msg as (base: AnyRecord) => unknown)(this.base);
-      if (typeof result === "string") return Error.interpolate(result, this.options);
-    }
-    return Error.generateMessage(this.attribute, this.type, this.base, this.options);
+    return this.rawType;
   }
 
   get details(): Record<string, unknown> {
@@ -202,7 +206,7 @@ export class Error {
    *
    * @internal Rails-private helper.
    */
-  attributesForHash(): [AnyRecord, string, string, Record<string, unknown>] {
+  protected attributesForHash(): [AnyRecord, string, string, Record<string, unknown>] {
     const own: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(this.options)) {
       if (!CALLBACKS_OPTIONS.has(k)) own[k] = v;
@@ -229,12 +233,19 @@ export class Error {
   static fullMessage(attribute: string, message: string, base: AnyRecord): string {
     if (attribute === "base") return message;
     const modelClass = base?.constructor;
-    const humanAttr = modelClass?.humanAttributeName
-      ? modelClass.humanAttributeName(attribute)
-      : humanize(attribute);
-
     const rawScope = modelClass?.i18nScope;
     const i18nScope = typeof rawScope === "string" ? rawScope : "activemodel";
+
+    // Rails error.rb:22-46: strip array notation, split on dots for nested attrs.
+    const stripped = attribute.replace(/\[\d+\]/g, "");
+    const parts = stripped.split(".");
+    const attrName = parts[parts.length - 1];
+    const namespace = parts.length > 1 ? parts.slice(0, -1).join("/") : undefined;
+
+    const humanAttr = modelClass?.humanAttributeName
+      ? modelClass.humanAttributeName(attrName)
+      : humanize(attrName);
+
     let format: string;
     if (Error.i18nCustomizeFullMessage) {
       const modelKey =
@@ -242,8 +253,9 @@ export class Error {
         (modelClass?.name ? underscore(modelClass.name) : undefined);
       const defaults: string[] = [];
       if (modelKey) {
-        defaults.push(`${i18nScope}.errors.models.${modelKey}.attributes.${attribute}.format`);
-        defaults.push(`${i18nScope}.errors.models.${modelKey}.format`);
+        const nsPrefix = namespace ? `${modelKey}/${namespace}` : modelKey;
+        defaults.push(`${i18nScope}.errors.models.${nsPrefix}.attributes.${attrName}.format`);
+        defaults.push(`${i18nScope}.errors.models.${nsPrefix}.format`);
       }
       defaults.push(`${i18nScope}.errors.format`);
       if (i18nScope !== "activemodel") defaults.push("activemodel.errors.format");
@@ -271,14 +283,31 @@ export class Error {
     return format;
   }
 
+  /**
+   * @internal Rails-private helper (activemodel/lib/active_model/error.rb:64).
+   */
   static generateMessage(
     attribute: string,
     type: string,
     base: AnyRecord,
     options: Record<string, unknown> = {},
   ): string {
-    if (typeof options.message === "string") {
-      return Error.interpolate(options.message, options);
+    const msgOpt = options.message;
+    // Proc/lambda message: call with (base, options) and return result.
+    if (typeof msgOpt === "function") {
+      const result = (msgOpt as (b: AnyRecord, o: Record<string, unknown>) => unknown)(
+        base,
+        options,
+      );
+      if (typeof result === "string") return Error.interpolate(result, options);
+    }
+    // Rails error.rb:65: identifier-shaped message: option is promoted to a new i18n type.
+    if (typeof msgOpt === "string" && IDENTIFIER_RE.test(msgOpt)) {
+      const { message: _msg, ...rest } = options;
+      type = msgOpt;
+      options = rest;
+    } else if (typeof msgOpt === "string") {
+      return Error.interpolate(msgOpt, options);
     }
 
     const modelClass = base?.constructor;
@@ -293,6 +322,7 @@ export class Error {
       model: modelKey,
       attribute: humanAttr,
       value: base && attribute !== "base" ? base[attribute] : undefined,
+      object: base,
       ...options,
     };
 
