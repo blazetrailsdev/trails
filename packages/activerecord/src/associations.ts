@@ -2221,16 +2221,25 @@ function associationInstanceGet(record: Base, name: string): unknown {
  * @internal
  */
 function associationInstanceSet(record: Base, name: string, association: unknown): void {
-  // AssociationDefinition uses `type` (not `macro`) for the association
-  // kind. Look it up on the record's class first; fall back to whatever
-  // the wrapper happens to expose if the definition isn't registered.
+  // AssociationDefinition uses `type` (e.g. "hasMany", "hasManyThrough") for
+  // the macro — look it up on the record's class. If the definition isn't
+  // registered there, fall back to the rich reflection's macro / isCollection
+  // (note: AssociationReflection's `type` field is the polymorphic type
+  // column, not the macro — don't read that).
   const ctor = record.constructor as { _associations?: AssociationDefinition[] };
   const def = ctor._associations?.find((a) => a.name === name);
-  const kind =
-    def?.type ??
-    (association as { reflection?: { type?: string } } | null)?.reflection?.type ??
-    null;
-  if (kind === "hasMany" || kind === "hasAndBelongsToMany" || kind === "hasManyThrough") {
+  const refl = (
+    association as { reflection?: { macro?: string; isCollection?: () => boolean } } | null
+  )?.reflection;
+  const defType = def?.type as string | undefined;
+  const isCollection =
+    defType === "hasMany" ||
+    defType === "hasAndBelongsToMany" ||
+    defType === "hasManyThrough" ||
+    refl?.isCollection?.() ||
+    refl?.macro === "hasMany" ||
+    refl?.macro === "hasAndBelongsToMany";
+  if (isCollection) {
     record._collectionProxies.set(name, association);
   } else {
     record._associationInstances.set(name, association as AssociationInstance);

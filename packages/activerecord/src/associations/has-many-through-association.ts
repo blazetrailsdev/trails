@@ -236,13 +236,16 @@ function buildSourceJoinAttributes(
  *
  * @internal
  */
-function transaction(assoc: HasManyThroughAssociation, block: () => Promise<void>): Promise<void> {
+function transaction<R>(
+  assoc: HasManyThroughAssociation,
+  block: (tx?: any) => Promise<R>,
+): Promise<R | undefined> {
   const tr = throughReflection(assoc) as { klass?: unknown } | null;
   const klass = safeKlass(tr) as { transaction?: Function } | null;
   if (klass && typeof klass.transaction === "function") {
-    return klass.transaction(block);
+    return klass.transaction(block) as Promise<R | undefined>;
   }
-  return block();
+  return block() as Promise<R | undefined>;
 }
 
 /**
