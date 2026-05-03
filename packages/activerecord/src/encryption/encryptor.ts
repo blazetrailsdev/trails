@@ -8,7 +8,8 @@ import { Cipher } from "./cipher/aes256-gcm.js";
 import { Message } from "./message.js";
 import { MessageSerializer } from "./message-serializer.js";
 import { Configurable } from "./configurable.js";
-import { DecryptionError, ForbiddenClass } from "./errors.js";
+import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
+import { ConfigError, DecryptionError, ForbiddenClass } from "./errors.js";
 import type { Compressor } from "./config.js";
 import { defaultCompressor } from "./config.js";
 
@@ -45,16 +46,18 @@ export class Encryptor {
     options?: { keyProvider?: KeyProviderLike; key?: string; deterministic?: boolean },
   ): string {
     this.validatePayloadType(clearText);
+    // Mirror Rails: force encoding before deterministic encryption.
+    const text = options?.deterministic ? this.forceEncodingIfNeeded(clearText) : clearText;
     const keyProvider = options?.keyProvider ?? (this.defaultKeyProvider() as KeyProviderLike);
     const encKeyObj = options?.key
       ? { secret: options.key, publicTags: undefined }
       : keyProvider?.encryptionKey();
     const key = encKeyObj?.secret;
-    if (!key) throw new DecryptionError("No encryption key provided");
+    if (!key) throw new ConfigError("No encryption key provided");
 
-    let cipherInput: string | Buffer = clearText;
+    let cipherInput: string | Buffer = text;
     let compressed = false;
-    [cipherInput, compressed] = this.compressIfWorthIt(clearText);
+    [cipherInput, compressed] = this.compressIfWorthIt(text);
 
     const cipherObj = this.cipher();
     const { payload, iv, authTag } = cipherObj.encrypt(cipherInput, key, {
@@ -125,8 +128,16 @@ export class Encryptor {
   }
 
   /** @internal */
-  private defaultKeyProvider(): unknown {
-    return Configurable.keyProvider;
+  private defaultKeyProvider(): KeyProviderLike | undefined {
+    // Mirrors Rails: ActiveRecord::Encryption.key_provider, which is the
+    // context override when set, otherwise a DerivedSecretKeyProvider from
+    // config.primary_key. Falls back so new Encryptor().encrypt/decrypt works
+    // after Configurable.configure(...) without an explicit keyProvider option.
+    const ctxKp = Configurable.keyProvider as KeyProviderLike | undefined;
+    if (ctxKp) return ctxKp;
+    const primaryKey = Configurable.config.primaryKey;
+    if (!primaryKey) return undefined;
+    return new DerivedSecretKeyProvider(primaryKey) as unknown as KeyProviderLike;
   }
 
   /** @internal */
@@ -141,27 +152,6 @@ export class Encryptor {
   /** @internal */
   private cipher(): Cipher {
     return new Cipher();
-  }
-
-  /** @internal */
-  private buildEncryptedMessage(
-    clearText: string,
-    keyProvider: KeyProviderLike,
-    cipherOptions: Record<string, unknown>,
-  ): Message {
-    const key = keyProvider.encryptionKey();
-    const [cipherInput, wasCompressed] = this.compressIfWorthIt(clearText);
-    const cipherObj = this.cipher();
-    const { payload, iv, authTag } = cipherObj.encrypt(cipherInput, key.secret, cipherOptions);
-    const message = new Message(payload);
-    message.addHeaders({ iv, at: authTag });
-    if (wasCompressed) message.addHeader("c", true);
-    if (key.publicTags) {
-      for (const [k, v] of Object.entries(key.publicTags)) {
-        message.addHeader(k, v);
-      }
-    }
-    return message;
   }
 
   /** @internal */

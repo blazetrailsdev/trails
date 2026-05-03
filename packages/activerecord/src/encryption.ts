@@ -25,6 +25,7 @@ import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Cipher as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
 import { globalPreviousSchemesFor, EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
+import { DecryptionError } from "./encryption/errors.js";
 import {
   withoutEncryption as _withoutEncryption,
   withEncryptionContext as _withEncryptionContext,
@@ -548,7 +549,8 @@ export class Cipher {
         lastError = e;
       }
     }
-    throw lastError;
+    const msg = lastError instanceof Error ? lastError.message : String(lastError);
+    throw new DecryptionError(msg);
   }
 
   /** @internal */
