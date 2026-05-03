@@ -177,3 +177,36 @@ describe("ConfirmationValidator caseSensitive", () => {
     expect(u.isValid()).toBe(false);
   });
 });
+
+describe("confirmation options pass-through", () => {
+  it("passes custom interpolation vars through to errors.add", () => {
+    class User extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", {
+          confirmation: { message: "must match %{kind}", kind: "original" },
+        });
+      }
+    }
+    const u = new User({ title: "alice" });
+    u._attributes.set("titleConfirmation", "bob");
+    u.isValid();
+    expect(u.errors.get("titleConfirmation")).toContain("must match original");
+  });
+
+  it("reserved key caseSensitive does not appear in error options", () => {
+    class User extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { confirmation: { caseSensitive: false } });
+      }
+    }
+    const u = new User({ title: "alice" });
+    u._attributes.set("titleConfirmation", "bob");
+    u.isValid();
+    expect(u.errors.count).toBeGreaterThan(0);
+    expect(
+      u.errors.details.find((d) => d.attribute === "titleConfirmation")?.options?.caseSensitive,
+    ).toBeUndefined();
+  });
+});
