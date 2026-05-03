@@ -1,49 +1,34 @@
-import { Type } from "./value.js";
+import { IntegerType } from "./integer.js";
 
-export class BigIntegerType extends Type<bigint> {
+export class BigIntegerType extends IntegerType {
   readonly name: string = "big_integer";
 
   /** @internal Rails-private helper. */
-  protected castValue(value: unknown): bigint | null {
-    if (typeof value === "bigint") return value;
+  protected castValue(value: unknown): number | null {
+    if (typeof value === "bigint") return value as unknown as number;
+    if (typeof value === "number") {
+      if (isNaN(value) || !isFinite(value)) return null;
+      return BigInt(Math.trunc(value)) as unknown as number;
+    }
     if (typeof value === "string") {
-      try {
-        return BigInt(value.trim());
-      } catch {
-        return null;
-      }
+      const trimmed = value.trim();
+      if (trimmed === "") return null;
+      if (/^-?\d+$/.test(trimmed)) return BigInt(trimmed) as unknown as number;
     }
-    if (typeof value === "number" || typeof value === "boolean") {
-      try {
-        return BigInt(value);
-      } catch {
-        return null;
-      }
-    }
-    return null;
+    return super.castValue(value);
   }
 
-  serialize(value: unknown): string | null {
-    const cast = this.cast(value);
-    return cast !== null ? cast.toString() : null;
+  serialize(value: unknown): unknown {
+    // No range check — maxValue is Infinity. Return cast value as-is (matches Rails).
+    return this.cast(value);
   }
 
-  serializeCastValue(value: bigint | null): string | null {
-    return value !== null ? value.toString() : null;
+  serializeCastValue(value: number | null): number | null {
+    return value;
   }
 
   /**
-   * Mirrors: ActiveModel::Type::BigInteger#max_value (big_integer.rb:27-29).
-   *   def max_value
-   *     ::Float::INFINITY
-   *   end
-   *
-   * Overrides Integer#max_value so range checks treat big-integer values
-   * as unbounded. trails' BigIntegerType uses native bigint so the
-   * Integer#range/ensure_in_range chain isn't inherited, but we expose
-   * the helper for parity and so subclasses see the same hook Rails does.
-   *
-   * @internal Rails-private helper.
+   * @internal Rails-private helper. Returns Infinity to bypass Integer's range check.
    */
   protected maxValue(): number {
     return Number.POSITIVE_INFINITY;
