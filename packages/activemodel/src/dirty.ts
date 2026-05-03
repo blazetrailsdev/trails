@@ -1,3 +1,4 @@
+import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
   attributeMissing as attributeMissingDispatch,
@@ -78,6 +79,20 @@ export class DirtyTracker {
   private _originalHas: Set<string> = new Set();
   private _changedAttributes: Map<string, [unknown, unknown]> = new Map();
   private _previousChanges: Map<string, [unknown, unknown]> = new Map();
+  /** Names explicitly force-dirtied via attribute_will_change!. @internal */
+  private _forcedNames: Set<string> = new Set();
+
+  /** @internal Delete a single change entry and its forced-dirty marker together. */
+  private _deleteChange(name: string): void {
+    this._changedAttributes.delete(name);
+    this._forcedNames.delete(name);
+  }
+
+  /** @internal Clear all change entries and forced-dirty markers together. */
+  private _clearChanges(): void {
+    this._changedAttributes.clear();
+    this._forcedNames.clear();
+  }
 
   /**
    * Take a snapshot of the current attributes as the "clean" state.
@@ -92,25 +107,7 @@ export class DirtyTracker {
       this._originalAttributes = attributes.snapshotValues();
       this._originalHas = new Set(this._originalAttributes.keys());
     }
-    this._changedAttributes.clear();
-  }
-
-  attributeWillChange(name: string, from: unknown, to: unknown): void {
-    if (from === to) {
-      this._changedAttributes.delete(name);
-    } else {
-      if (!this._originalHas.has(name)) {
-        // Attribute was absent/uninitialized — any write is a change
-        this._changedAttributes.set(name, [undefined, to]);
-      } else {
-        const original = resolveValue(this._originalAttributes.get(name));
-        if (to === original) {
-          this._changedAttributes.delete(name);
-        } else {
-          this._changedAttributes.set(name, [original, to]);
-        }
-      }
-    }
+    this._clearChanges();
   }
 
   /**
@@ -138,6 +135,37 @@ export class DirtyTracker {
       cloned = currentValue;
     }
     this._changedAttributes.set(name, [cloned, cloned]);
+    this._forcedNames.add(name);
+  }
+
+  /**
+   * Type-aware write notification. Compares `newValue` against the snapshot
+   * original using `type.isChanged(original, newValue, rawValue)` so numeric
+   * semantics (equal_nan?, number_to_non_number?) are respected. Replaces the
+   * raw `attributeWillChange` call from `_writeAttribute`.
+   *
+   * @internal
+   */
+  attributeWritten(name: string, newValue: unknown, rawValue: unknown, type: Type): void {
+    if (!this._originalHas.has(name)) {
+      this._changedAttributes.set(name, [undefined, newValue]);
+      return;
+    }
+    const original = resolveValue(this._originalAttributes.get(name));
+    if (type.isChanged(original, newValue, rawValue) || this._forcedNames.has(name)) {
+      // When force-dirtied, preserve the cloned pre-mutation snapshot captured
+      // by forceChange() as the "was" side. For normal writes use the snapshot
+      // original. A force_change must not be silently cleared by a type-equal write.
+      const existingFrom = this._forcedNames.has(name)
+        ? this._changedAttributes.get(name)?.[0]
+        : undefined;
+      this._changedAttributes.set(name, [
+        existingFrom !== undefined ? existingFrom : original,
+        newValue,
+      ]);
+    } else {
+      this._deleteChange(name);
+    }
   }
 
   get changed(): boolean {
@@ -181,7 +209,7 @@ export class DirtyTracker {
       this._originalAttributes = currentAttributes.snapshotValues();
       this._originalHas = new Set(this._originalAttributes.keys());
     }
-    this._changedAttributes.clear();
+    this._clearChanges();
   }
 
   get previousChanges(): Record<string, [unknown, unknown]> {
@@ -193,13 +221,13 @@ export class DirtyTracker {
   }
 
   clearChangesInformation(): void {
-    this._changedAttributes.clear();
+    this._clearChanges();
     this._previousChanges.clear();
   }
 
   clearAttributeChanges(attributes: string[]): void {
     for (const attr of attributes) {
-      this._changedAttributes.delete(attr);
+      this._deleteChange(attr);
     }
   }
 
@@ -267,7 +295,7 @@ export class DirtyTracker {
       | { snapshotValues(): Map<string, unknown> },
     name: string,
   ): void {
-    this._changedAttributes.delete(name);
+    this._deleteChange(name);
     // Fast path: avoid snapshotting every attribute when only one baseline
     // needs rebinding. AttributeSet exposes has/fetchValue per-attribute;
     // fall back to the full snapshot for plain Maps / other shapes.
@@ -312,7 +340,7 @@ export class DirtyTracker {
     for (const [name] of this._changedAttributes) {
       this._restoreOne(attributes, name);
     }
-    this._changedAttributes.clear();
+    this._clearChanges();
   }
 
   /**
@@ -325,7 +353,7 @@ export class DirtyTracker {
   ): void {
     if (!this._changedAttributes.has(name)) return;
     this._restoreOne(attributes, name);
-    this._changedAttributes.delete(name);
+    this._deleteChange(name);
   }
 
   private _restoreOne(

@@ -151,4 +151,12 @@ describe("IntegerTest", () => {
     // This is the path Rails numeric.rb:31-34 adds on top of Value#changed?.
     expect(type.isChanged(0, 0, "wibble")).toBe(true);
   });
+
+  it("isChanged returns true for a genuine numeric change — real value differs", () => {
+    expect(type.isChanged(10, 5, "5")).toBe(true);
+  });
+
+  it("isChanged returns false when old and new cast values are equal and raw is numeric", () => {
+    expect(type.isChanged(5, 5, "5")).toBe(false);
+  });
 });

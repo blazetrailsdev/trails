@@ -166,4 +166,17 @@ describe("DecimalType", () => {
     expect(type.cast(true)).toBe("1");
     expect(type.cast(false)).toBe("0");
   });
+
+  it("isChanged returns true for number_to_non_number? path — same cast value, non-numeric raw", () => {
+    // DecimalType shares applyNumericMixin with Integer/Float — verify the
+    // number_to_non_number? path is exercised on Decimal as well.
+    const type = new Types.DecimalType();
+    // old="0", new_cast="0" (same), raw="wibble" (non-numeric) → changed
+    expect(type.isChanged("0", "0", "wibble")).toBe(true);
+  });
+
+  it("isChanged returns false for genuine revert — same cast and numeric raw", () => {
+    const type = new Types.DecimalType();
+    expect(type.isChanged("5", "5", "5")).toBe(false);
+  });
 });

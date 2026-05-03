@@ -458,6 +458,28 @@ describe("clearChangesInformation", () => {
     expect(Object.keys(p.previousChanges).length).toBe(0);
   });
 });
+describe("clearAttributeChanges clears forced-dirty state", () => {
+  it("force-dirtied attribute is no longer dirty after clearAttributeChanges — forced flag must not leak", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m._dirty.forceChange("ratio", NaN);
+    expect(m.changedAttributes).toContain("ratio");
+
+    m.clearAttributeChanges(["ratio"]);
+    // After clearAttributeChanges, _forcedNames must also be cleared so a
+    // subsequent type-equal write does not re-appear as dirty.
+    m.writeAttribute("ratio", "NaN");
+    expect(m.changedAttributes).not.toContain("ratio");
+  });
+});
+
 describe("clearAttributeChanges", () => {
   it("clears changes for specific attributes only", () => {
     class Person extends Model {
@@ -696,5 +718,132 @@ describe("hasChangesToSave", () => {
     const u = new User({ name: "Alice" });
     u.writeAttribute("name", "Bob");
     expect(u.hasChangesToSave).toBe(true);
+  });
+});
+
+describe("numeric type.isChanged integration via dirty tracking", () => {
+  it("integer attribute set to non-numeric string still appears in changes — number_to_non_number? path", () => {
+    class Item extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Item.attribute("count", "integer");
+
+    const item = new Item({ count: 10 });
+    item.changesApplied();
+    item.writeAttribute("count", "abc");
+    expect(item.changedAttributes).toContain("count");
+  });
+
+  it("force-change is cleared by restoreAttributes — forced flag must not survive restore", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m._dirty.forceChange("ratio", NaN);
+    expect(m.changedAttributes).toContain("ratio");
+
+    m.restoreAttributes();
+    // After restoreAttributes(), _forcedNames must be cleared so a subsequent
+    // type-equal write does not re-appear as dirty.
+    m.writeAttribute("ratio", "NaN");
+    expect(m.changedAttributes).not.toContain("ratio");
+  });
+
+  it("force-change is cleared by changesApplied — forced state must not leak across save boundaries", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m._dirty.forceChange("ratio", NaN);
+    expect(m.changedAttributes).toContain("ratio");
+
+    m.changesApplied();
+    // After changesApplied(), _forcedNames must be cleared so the next
+    // type-equal write does not appear dirty.
+    m.writeAttribute("ratio", "NaN");
+    expect(m.changedAttributes).not.toContain("ratio");
+  });
+
+  it("force-change survives a subsequent type-equal write — NaN-to-NaN case", () => {
+    // attribute_will_change! (forceChange) must not be wiped out by a write
+    // where type.isChanged returns false.
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m._dirty.forceChange("ratio", NaN); // mirrors attribute_will_change!
+    m.writeAttribute("ratio", "NaN"); // type-equal write
+    expect(m.changedAttributes).toContain("ratio");
+    // The "was" side must be the cloned pre-mutation snapshot from forceChange,
+    // not the snapshot original, to preserve Rails' attribute_will_change! semantics.
+    expect(m.changes["ratio"]).toEqual([NaN, NaN]);
+  });
+
+  it("float attribute NaN-to-NaN does NOT appear in changes — equal_nan? exemption", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    // Write via the string "NaN" so valueBeforeTypeCast is a string — this
+    // exercises the fixed isEqualNan path (now compares against the cast value,
+    // not the raw string).
+    m.writeAttribute("ratio", "NaN");
+    expect(m.changedAttributes).not.toContain("ratio");
+    expect(m.changes).not.toHaveProperty("ratio");
+  });
+
+  it("integer same-cast-value write via boolean raw is still dirty — number_to_non_number? path at model level", () => {
+    // true casts to 1 via NumericMixin, so cast values are equal (1 === 1).
+    // Without type delegation, DirtyTracker would clear the change. With it,
+    // type.isChanged(1, 1, true) fires isNumberToNonNumber? and records dirty.
+    class Item extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Item.attribute("count", "integer");
+
+    const item = new Item({ count: 1 });
+    item.changesApplied();
+    item.writeAttribute("count", true);
+    expect(item.changedAttributes).toContain("count");
+  });
+
+  it("float attribute NaN → non-NaN → NaN clears dirty state on revert", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m.writeAttribute("ratio", 1.0);
+    expect(m.changedAttributes).toContain("ratio");
+    m.writeAttribute("ratio", "NaN");
+    expect(m.changedAttributes).not.toContain("ratio");
   });
 });

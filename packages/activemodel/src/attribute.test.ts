@@ -465,4 +465,27 @@ describe("AttributeTest", () => {
   it("UNINITIALIZED_ORIGINAL_VALUE is a singleton across import paths", () => {
     expect(UNINITIALIZED_ORIGINAL_VALUE).toBe(UNINITIALIZED_FROM_INDEX);
   });
+
+  describe("isChanged delegates to type.isChanged — numeric type integration", () => {
+    it("integer attribute changed from 10 to '5' (casts to 5) reports isChanged true", () => {
+      const intType = typeRegistry.lookup("integer");
+      const original = Attribute.fromDatabase("score", 10, intType);
+      const updated = original.withValueFromUser("5");
+      expect(updated.isChanged()).toBe(true);
+    });
+
+    it("integer attribute changed from 10 to 'abc' (non-numeric raw, casts to null) reports isChanged true via number_to_non_number?", () => {
+      const intType = typeRegistry.lookup("integer");
+      const original = Attribute.fromDatabase("score", 10, intType);
+      const updated = original.withValueFromUser("abc");
+      expect(updated.isChanged()).toBe(true);
+    });
+
+    it("float attribute NaN-to-NaN reports isChanged false — equal_nan? exemption", () => {
+      const floatType = typeRegistry.lookup("float");
+      const original = Attribute.fromDatabase("ratio", NaN, floatType);
+      const updated = original.withValueFromUser("NaN");
+      expect(updated.isChanged()).toBe(false);
+    });
+  });
 });

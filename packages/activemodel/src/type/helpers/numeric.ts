@@ -111,7 +111,7 @@ export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
       return (
         (super.isChanged(oldValue, newValue, newValueBeforeTypeCast) ||
           isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
-        !isEqualNan(oldValue, newValueBeforeTypeCast)
+        !isEqualNan(oldValue, newValue)
       );
     }
   }
