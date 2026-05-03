@@ -32,54 +32,43 @@ export class Not extends Unary {
   }
 }
 
-export class Lateral extends Node {
-  readonly subquery: Node;
-
+// Mirrors Rails: `Lateral < Unary` (unary.rb). The subquery node lives in
+// the inherited `expr` slot — Rails' visit_Arel_Nodes_Lateral reads `o.expr`
+// (postgresql.rb). Keep `subquery` as a back-compat getter for the existing
+// Trails visitor which already reads `node.subquery`.
+export class Lateral extends Unary {
+  declare readonly expr: Node;
   constructor(subquery: Node) {
-    super();
-    this.subquery = subquery;
+    super(subquery);
   }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+  get subquery(): Node {
+    return this.expr;
   }
 }
 
-export class GroupingElement extends Node {
-  readonly expressions: Node[];
-
+// Mirrors Rails: `GroupingElement < Unary` (unary.rb). Children live in the
+// inherited `expr` slot — Rails' visitors read `o.expr` (postgresql.rb).
+// `expressions` is preserved as a getter for back-compat with the existing
+// Trails visitor accessors. Trails always normalises to an array; Rails'
+// `grouping_array_or_grouping_element` then branches on `is_a? Array`.
+export class GroupingElement extends Unary {
+  declare readonly expr: Node[];
   constructor(expressions: Node | Node[]) {
-    super();
-    this.expressions = Array.isArray(expressions) ? expressions : [expressions];
+    super(Array.isArray(expressions) ? expressions : [expressions]);
   }
-
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
+  get expressions(): Node[] {
+    return this.expr;
   }
 }
 
-export class Cube extends GroupingElement {
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
-}
-
-export class RollUp extends GroupingElement {
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
-}
+export class Cube extends GroupingElement {}
+export class RollUp extends GroupingElement {}
+export class GroupingSet extends GroupingElement {}
 
 /** @deprecated Use RollUp (Rails casing) */
 export const Rollup = RollUp;
 /** @deprecated Use RollUp (Rails casing) */
 export type Rollup = RollUp;
-
-export class GroupingSet extends GroupingElement {
-  accept<T>(visitor: NodeVisitor<T>): T {
-    return visitor.visit(this);
-  }
-}
 
 export class Group extends Unary {}
 /**

@@ -25,6 +25,53 @@ describe("Unary reparenting (Rails fidelity)", () => {
     });
   });
 
+  describe("Lateral extends Unary", () => {
+    const inner = new Nodes.Quoted(1);
+    it("instanceof Unary", () => {
+      expect(new Nodes.Lateral(inner)).toBeInstanceOf(Nodes.Unary);
+    });
+
+    it("stores the subquery in expr (Rails: visit reads o.expr)", () => {
+      const lat = new Nodes.Lateral(inner);
+      expect(lat.expr).toBe(inner);
+    });
+
+    it("subquery getter returns expr (back-compat)", () => {
+      const lat = new Nodes.Lateral(inner);
+      expect(lat.subquery).toBe(lat.expr);
+    });
+  });
+
+  describe("GroupingElement / Cube / RollUp / GroupingSet extend Unary", () => {
+    it.each([
+      ["GroupingElement", (vs: Nodes.Node[]) => new Nodes.GroupingElement(vs)],
+      ["Cube", (vs: Nodes.Node[]) => new Nodes.Cube(vs)],
+      ["RollUp", (vs: Nodes.Node[]) => new Nodes.RollUp(vs)],
+      ["GroupingSet", (vs: Nodes.Node[]) => new Nodes.GroupingSet(vs)],
+    ])("%s instanceof Unary", (_name, build) => {
+      const node = build([new Nodes.Quoted(1), new Nodes.Quoted(2)]);
+      expect(node).toBeInstanceOf(Nodes.Unary);
+    });
+
+    it("stores children in expr (Rails: visit reads o.expr)", () => {
+      const a = new Nodes.Quoted(1);
+      const b = new Nodes.Quoted(2);
+      const ge = new Nodes.GroupingElement([a, b]);
+      expect(ge.expr).toEqual([a, b]);
+    });
+
+    it("expressions getter returns expr (back-compat)", () => {
+      const ge = new Nodes.GroupingElement([new Nodes.Quoted(1)]);
+      expect(ge.expressions).toBe(ge.expr);
+    });
+
+    it("normalises a single Node into an array (preserved behaviour)", () => {
+      const single = new Nodes.Quoted(1);
+      const ge = new Nodes.GroupingElement(single);
+      expect(ge.expressions).toEqual([single]);
+    });
+  });
+
   describe("Window framing nodes extend Unary", () => {
     it.each([
       ["Rows", () => new Nodes.Rows(new Nodes.Quoted(1))],
