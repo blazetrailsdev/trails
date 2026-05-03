@@ -456,5 +456,5 @@ function cacheSql(
   const qc = this._queryCache;
   if (!qc) return execute();
   const key = binds && binds.length > 0 ? JSON.stringify([sql, binds]) : sql;
-  return qc.computeIfAbsent(key, execute).then((result) => result.map((r) => ({ ...r })));
+  return qc.computeIfAbsent(key, execute);
 }

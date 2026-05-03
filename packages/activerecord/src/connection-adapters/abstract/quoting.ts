@@ -457,7 +457,9 @@ export function quotedDate(
     );
     return formatPlainDateTimeForSql(dt);
   }
-  return String(value);
+  throw new TypeError(
+    `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value} — use a Temporal type`,
+  );
 }
 
 /**
