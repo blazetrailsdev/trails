@@ -23,9 +23,9 @@ import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Cipher as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
+export { Cipher } from "./encryption/cipher.js";
 import { globalPreviousSchemesFor, EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
-import { DecryptionError } from "./encryption/errors.js";
 import {
   withoutEncryption as _withoutEncryption,
   withEncryptionContext as _withEncryptionContext,
@@ -515,46 +515,4 @@ export function ivLength(): number {
 /** Mirrors: ActiveRecord::Encryption.eager_load! */
 export function eagerLoadBang(): void {
   // No-op in TS — all encryption classes are statically imported.
-}
-
-/**
- * Outer Cipher class — wraps Aes256Gcm and provides the encryption/decryption API.
- *
- * Mirrors: ActiveRecord::Encryption::Cipher (cipher.rb)
- */
-export class Cipher {
-  static readonly keyLength = AesGcmCipher.keyLength;
-  static readonly ivLength = AesGcmCipher.ivLength;
-
-  encrypt(clearText: string, key: string, options?: { deterministic?: boolean }): string {
-    const aes = this.cipherFor(key, options?.deterministic ?? false);
-    const { payload, iv, authTag } = aes.encrypt(clearText, key, options);
-    return JSON.stringify({ p: payload, iv, at: authTag });
-  }
-
-  decrypt(encryptedText: string, key: string | string[]): string {
-    return this.tryToDecryptWithEach(encryptedText, { keys: Array.isArray(key) ? key : [key] });
-  }
-
-  /** @internal */
-  private tryToDecryptWithEach(encryptedText: string, { keys }: { keys: string[] }): string {
-    let lastError: unknown;
-    for (const key of keys) {
-      try {
-        const aes = this.cipherFor(key);
-        const data = JSON.parse(encryptedText);
-        const buf = aes.decrypt(data.p, key, data.iv, data.at);
-        return buf.toString("utf-8");
-      } catch (e) {
-        lastError = e;
-      }
-    }
-    const msg = lastError instanceof Error ? lastError.message : String(lastError);
-    throw new DecryptionError(msg);
-  }
-
-  /** @internal */
-  private cipherFor(secret: string, deterministic: boolean = false): AesGcmCipher {
-    return new AesGcmCipher(secret, { deterministic });
-  }
 }
