@@ -6,6 +6,13 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors.js";
+
+// Mirrors Arel::Visitors::UnsupportedVisitError (defined in to_sql.rb:5
+// in Rails as `class UnsupportedVisitError < StandardError`). Trails
+// declares the class in ../errors.ts so it can sit on the ArelError
+// hierarchy alongside BindError/EmptyJoinError, but re-exports it from
+// here so api:compare finds it where Rails defines it.
+export { UnsupportedVisitError };
 import { defaultQuoter } from "./default-quoter.js";
 
 /**
