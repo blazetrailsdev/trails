@@ -12,7 +12,7 @@ import type { ConnectionDescriptor } from "./connection-descriptor.js";
 import {
   ConnectionNotEstablished,
   ConnectionTimeoutError,
-  NotImplementedError,
+  ExclusiveConnectionTimeoutError,
 } from "../../errors.js";
 import { SchemaReflection, BoundSchemaReflection } from "../schema-cache.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
@@ -175,6 +175,10 @@ export class LeaseRegistry {
       this._map.set(context, lease);
     }
     return lease;
+  }
+
+  peek(context: string): Lease | undefined {
+    return this._map.get(context);
   }
 
   clear(): void {
@@ -914,99 +918,371 @@ function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConn
   );
 }
 
-/** @internal */
-function connectionLease(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#connection_lease is not implemented",
-  );
+// ---------------------------------------------------------------------------
+// Rails-named pool privates. Trails' pool runs in single-threaded JS, so a
+// number of these collapse to thinner equivalents than Rails' multi-thread
+// implementation — but the Rails surface and call shape are preserved so
+// future async/concurrent extensions can drop in without renaming. Each
+// helper takes the pool as `pool` (the Rails `self`).
+// ---------------------------------------------------------------------------
+
+// `Pool` is a structural alias used by the @internal helpers below to reach
+// private state (`_connections`, `_leases`, `_connectionLease`, etc.) on
+// the host without widening the public API. `any` is intentional — the
+// helpers mirror Rails' file-private surface and shouldn't constrain the
+// public class declaration.
+type Pool = any;
+
+/**
+ * Returns the per-execution-context lease record (the lease tracker keyed
+ * by the current isolated execution context). Wraps `_connectionLease`,
+ * matching Rails' private `connection_lease`.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#connection_lease
+ *
+ * @internal
+ */
+function connectionLease(pool: Pool): Lease {
+  return pool._connectionLease();
+}
+
+/**
+ * Builds the async-query executor. JS runs single-threaded, so a real
+ * thread pool is not applicable here — return null. Rails returns
+ * `Concurrent::ThreadPoolExecutor` or the global pool depending on
+ * `ActiveRecord.async_query_executor`.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#build_async_executor
+ *
+ * @internal
+ */
+function buildAsyncExecutor(_pool: Pool): null {
+  return null;
+}
+
+/**
+ * Sequentially attempts `numNewConnsNeeded` `try_to_checkout_new_connection`s
+ * and checks each one in. Mirrors Rails comment: "this is unfortunately
+ * not concurrent" — same here, JS is single-threaded.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#bulk_make_new_connections
+ *
+ * @internal
+ */
+function bulkMakeNewConnections(pool: Pool, numNewConnsNeeded: number): void {
+  for (let i = 0; i < numNewConnsNeeded; i++) {
+    const conn = tryToCheckoutNewConnection(pool);
+    if (conn) pool.checkin(conn);
+  }
+}
+
+/**
+ * Wraps `block` with `withNewConnectionsBlocked` and forces every existing
+ * connection to be checked out by the current context, so a "group" action
+ * (reload/disconnect) can run safely.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#with_exclusively_acquired_all_connections
+ *
+ * @internal
+ */
+function withExclusivelyAcquiredAllConnections<R>(
+  pool: Pool,
+  raiseOnAcquisitionTimeout: boolean,
+  block: () => R,
+): R {
+  return withNewConnectionsBlocked(pool, () => {
+    attemptToCheckoutAllExistingConnections(pool, raiseOnAcquisitionTimeout);
+    return block();
+  });
+}
+
+/**
+ * Walks every connection on the pool, leasing any not already owned by the
+ * current execution context. Trails has no thread/isolation queue so the
+ * "wait for owners to release" loop collapses to a single sweep. Releases
+ * newly-acquired connections on error unless `raiseOnAcquisitionTimeout`
+ * is false (then it swallows timeouts and retains held connections).
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#attempt_to_checkout_all_existing_connections
+ *
+ * @internal
+ */
+function attemptToCheckoutAllExistingConnections(
+  pool: Pool,
+  raiseOnAcquisitionTimeout: boolean,
+): void {
+  pool.reap();
+  const conns = pool._connections ? [...pool._connections] : [];
+  const newlyCheckedOut: DatabaseAdapter[] = [];
+  let release = false;
+  try {
+    for (const conn of conns) {
+      if (pool._checkedOut.has(conn)) continue;
+      try {
+        if (pool._available?.remove?.(conn) === false) {
+          // Not idle — fall back to a generic checkout to surface a timeout.
+          const acquired = checkoutForExclusiveAccess(pool, pool.checkoutTimeout);
+          if (acquired) newlyCheckedOut.push(acquired);
+          continue;
+        }
+        pool._checkedOut.add(conn);
+        (conn as unknown as PoolManagedConnection).lease?.();
+        newlyCheckedOut.push(conn);
+      } catch (innerErr) {
+        if (innerErr instanceof ConnectionTimeoutError) {
+          throw new ExclusiveConnectionTimeoutError(
+            `could not obtain ownership of all database connections in ${pool.checkoutTimeout} seconds`,
+            { connectionPool: pool },
+          );
+        }
+        throw innerErr;
+      }
+    }
+  } catch (err) {
+    if (err instanceof ExclusiveConnectionTimeoutError) {
+      if (raiseOnAcquisitionTimeout) {
+        release = true;
+        throw err;
+      }
+      return;
+    }
+    release = true;
+    throw err;
+  } finally {
+    if (release) {
+      for (const conn of newlyCheckedOut) pool.checkin(conn);
+    }
+  }
+}
+
+/**
+ * Synchronized checkout that converts a `ConnectionTimeoutError` into the
+ * more specific `ExclusiveConnectionTimeoutError` describing which other
+ * contexts hold the conflicting connections.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_for_exclusive_access
+ *
+ * @internal
+ */
+function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): DatabaseAdapter | null {
+  try {
+    return pool.checkout();
+  } catch (err) {
+    if (err instanceof ConnectionTimeoutError) {
+      throw new ExclusiveConnectionTimeoutError(
+        `could not obtain ownership of all database connections in ${checkoutTimeout} seconds`,
+        { connectionPool: pool },
+      );
+    }
+    throw err;
+  }
+}
+
+/**
+ * Increments `_threads_blocking_new_connections` for the duration of
+ * `block`, then drains the available queue and re-makes any connections
+ * needed by waiters when the count returns to zero. Trails maps Rails'
+ * thread counter to a simple per-pool integer; the available-queue
+ * draining is a no-op when no waiters exist.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#with_new_connections_blocked
+ *
+ * @internal
+ */
+function withNewConnectionsBlocked<R>(pool: Pool, block: () => R): R {
+  const p = pool as Pool & { _threadsBlockingNewConnections?: number };
+  p._threadsBlockingNewConnections = (p._threadsBlockingNewConnections ?? 0) + 1;
+  try {
+    return block();
+  } finally {
+    p._threadsBlockingNewConnections! -= 1;
+    if (p._threadsBlockingNewConnections === 0) {
+      const waiters = pool.numWaitingInQueue();
+      let need = waiters;
+      pool._available?.clear?.();
+      for (const conn of pool._connections ?? []) {
+        if (!pool._checkedOut.has(conn)) {
+          pool._available?.add(conn);
+          need -= 1;
+        }
+      }
+      if (need > 0) bulkMakeNewConnections(pool, need);
+    }
+  }
+}
+
+/**
+ * Acquires a connection by 1) polling the available queue, 2) creating a
+ * new connection if under capacity, or 3) waiting on the queue with the
+ * configured timeout. Reaps once between immediate-acquire failures and
+ * the blocking poll. Re-tagged `ConnectionTimeoutError` with this pool.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#acquire_connection
+ *
+ * @internal
+ */
+function acquireConnection(
+  pool: Pool,
+  checkoutTimeout: number,
+): DatabaseAdapter | Promise<DatabaseAdapter> {
+  const tagPool = (err: unknown) => {
+    if (err instanceof ConnectionTimeoutError) err.setPool(pool);
+    return err;
+  };
+  const ensureLive = () => {
+    if (pool.isDiscarded?.()) {
+      throw new ConnectionNotEstablished("Connection pool has been discarded", {
+        connectionPool: pool,
+      });
+    }
+  };
+  const accept = (c: DatabaseAdapter): DatabaseAdapter => {
+    pool._checkedOut.add(c);
+    return c;
+  };
+  try {
+    ensureLive();
+    let conn = pool._available?.poll() as DatabaseAdapter | undefined;
+    if (conn) return accept(conn);
+    conn = tryToCheckoutNewConnection(pool) ?? undefined;
+    if (conn) return conn; // tryToCheckoutNewConnection already adds to _checkedOut
+    pool.reap();
+    conn = pool._available?.poll() as DatabaseAdapter | undefined;
+    if (conn) return accept(conn);
+    conn = tryToCheckoutNewConnection(pool) ?? undefined;
+    if (conn) return conn;
+    const result = pool._available?.poll(checkoutTimeout);
+    if (result instanceof Promise) {
+      return result.then(
+        (c) => {
+          ensureLive();
+          return accept(c);
+        },
+        (err: unknown) => {
+          throw tagPool(err);
+        },
+      );
+    }
+    if (result == null) {
+      throw new ConnectionTimeoutError(
+        `Could not obtain a connection from the pool within ${checkoutTimeout} seconds`,
+        { connectionPool: pool },
+      );
+    }
+    return accept(result);
+  } catch (err) {
+    throw tagPool(err);
+  }
+}
+
+/**
+ * Clears the lease registry entry for `conn` on `ownerThread` (defaults to
+ * the connection's recorded owner). Trails uses execution-context ids as
+ * the registry key. Aliased as `release` to match Rails.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#remove_connection_from_thread_cache
+ *
+ * @internal
+ */
+function removeConnectionFromThreadCache(
+  pool: Pool,
+  conn: DatabaseAdapter,
+  ownerThread?: string | number,
+): void {
+  const owner = ownerThread ?? executionContextId();
+  pool._leases?.peek(String(owner))?.clear(conn);
 }
 
 /** @internal */
-function buildAsyncExecutor(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#build_async_executor is not implemented",
-  );
+function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: string | number): void {
+  removeConnectionFromThreadCache(pool, conn, ownerThread);
 }
 
-/** @internal */
-function bulkMakeNewConnections(numNewConnsNeeded: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#bulk_make_new_connections is not implemented",
-  );
+/**
+ * Establishes a new connection if the pool isn't at `_size` capacity and
+ * new-connection blocking isn't engaged; returns the leased connection or
+ * undefined when no slot is available.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#try_to_checkout_new_connection
+ *
+ * @internal
+ */
+function tryToCheckoutNewConnection(pool: Pool): DatabaseAdapter | null {
+  const p = pool as Pool & { _threadsBlockingNewConnections?: number };
+  if ((p._threadsBlockingNewConnections ?? 0) > 0) return null;
+  if (!pool._connections || pool._connections.length >= pool.size) return null;
+  if (!pool.automaticReconnect) {
+    throw new ConnectionNotEstablished(
+      "No connection available from pool and automatic_reconnect is disabled",
+      { connectionPool: pool },
+    );
+  }
+  const conn = checkoutNewConnection(pool);
+  adoptConnection(pool, conn);
+  pool._checkedOut.add(conn);
+  (conn as unknown as PoolManagedConnection).lease?.();
+  return checkoutAndVerify(pool, conn);
 }
 
-/** @internal */
-function withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#with_exclusively_acquired_all_connections is not implemented",
-  );
+/**
+ * Registers `conn` as a pool-owned connection. Sets `conn.pool = pool` and
+ * appends to `_connections`. Schema-cache lazy-load fires on the first
+ * adopted connection only.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#adopt_connection
+ *
+ * @internal
+ */
+function adoptConnection(pool: Pool, conn: DatabaseAdapter): void {
+  // Only AbstractAdapter has a `pool` slot reserved for this back-reference;
+  // concrete driver adapters use `pool` for their own driver pool. Mirror the
+  // gate already used by ConnectionPool#newConnection.
+  if (conn instanceof AbstractAdapter) {
+    (conn as unknown as { pool?: ConnectionPool }).pool = pool;
+  }
+  if (pool._connections && !pool._connections.includes(conn)) {
+    pool._connections.push(conn);
+  }
 }
 
-/** @internal */
-function attemptToCheckoutAllExistingConnections(raiseOnAcquisitionTimeout?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#attempt_to_checkout_all_existing_connections is not implemented",
-  );
+/**
+ * Establishes a new database connection (via the host's `newConnection`)
+ * after asserting `_automatic_reconnect` is enabled. Throws
+ * `ConnectionNotEstablished` when reconnects are disabled — matches Rails.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_new_connection
+ *
+ * @internal
+ */
+function checkoutNewConnection(pool: Pool): DatabaseAdapter {
+  if (!pool.automaticReconnect) {
+    throw new ConnectionNotEstablished(
+      "No connection available from pool and automatic_reconnect is disabled",
+      { connectionPool: pool },
+    );
+  }
+  return pool.newConnection();
 }
 
-/** @internal */
-function checkoutForExclusiveAccess(checkoutTimeout: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_for_exclusive_access is not implemented",
-  );
-}
-
-/** @internal */
-function withNewConnectionsBlocked(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#with_new_connections_blocked is not implemented",
-  );
-}
-
-/** @internal */
-function acquireConnection(checkoutTimeout: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#acquire_connection is not implemented",
-  );
-}
-
-/** @internal */
-function removeConnectionFromThreadCache(conn: any, ownerThread?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#remove_connection_from_thread_cache is not implemented",
-  );
-}
-
-function release(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#release is not implemented",
-  );
-}
-
-/** @internal */
-function tryToCheckoutNewConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#try_to_checkout_new_connection is not implemented",
-  );
-}
-
-/** @internal */
-function adoptConnection(conn: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#adopt_connection is not implemented",
-  );
-}
-
-/** @internal */
-function checkoutNewConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_new_connection is not implemented",
-  );
-}
-
-/** @internal */
-function checkoutAndVerify(c: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_and_verify is not implemented",
-  );
+/**
+ * Runs the connection's `_run_checkout_callbacks` block (clean! in Rails).
+ * Verifies/cleans the connection; on any error the connection is removed
+ * from the pool and disconnected, then the error is rethrown so the caller
+ * can retry from a fresh slot.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool#checkout_and_verify
+ *
+ * @internal
+ */
+function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
+  try {
+    const cleanable = c as unknown as { cleanBang?: () => void; clean?: () => void };
+    if (typeof cleanable.cleanBang === "function") cleanable.cleanBang();
+    else cleanable.clean?.();
+    return c;
+  } catch (err) {
+    pool.remove(c);
+    (c as unknown as { disconnectBang?: () => void }).disconnectBang?.();
+    throw err;
+  }
 }

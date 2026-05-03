@@ -180,6 +180,7 @@ export {
   AdapterError,
   ConnectionNotEstablished,
   ConnectionTimeoutError,
+  ExclusiveConnectionTimeoutError,
   ReadOnlyError,
   RecordNotFound,
   RecordNotSaved,
