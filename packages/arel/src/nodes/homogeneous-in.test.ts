@@ -49,6 +49,38 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     });
   });
 
+  describe("right (Rails fidelity)", () => {
+    it("non-Node values are wrapped as Casted (carrying the attribute) — not bare Quoted", () => {
+      const node = new Nodes.HomogeneousIn([1, 2, 3], users.get("id"), "in");
+      const right = node.right;
+      expect(right).toHaveLength(3);
+      for (const r of right) {
+        expect(r).toBeInstanceOf(Nodes.Casted);
+        expect((r as Nodes.Casted).attribute).toBe(node.attribute);
+      }
+    });
+
+    it("preserves existing Node values unchanged (build_quoted passthrough)", () => {
+      const inner = new Nodes.SqlLiteral("now()");
+      const node = new Nodes.HomogeneousIn([inner], users.get("created_at"), "in");
+      expect(node.right[0]).toBe(inner);
+    });
+
+    it("delegates to attribute.quotedArray when present (host override participates)", () => {
+      const calls: unknown[][] = [];
+      const fakeAttr = Object.create(users.get("id")) as Nodes.Node & {
+        quotedArray?: (vs: unknown[]) => Nodes.Node[];
+      };
+      fakeAttr.quotedArray = (vs: unknown[]): Nodes.Node[] => {
+        calls.push(vs);
+        return vs.map((v) => new Nodes.SqlLiteral(String(v)));
+      };
+      const node = new Nodes.HomogeneousIn([1, 2], fakeAttr, "in");
+      expect(node.right.every((r) => r instanceof Nodes.SqlLiteral)).toBe(true);
+      expect(calls).toEqual([[1, 2]]);
+    });
+  });
+
   describe("procForBinds", () => {
     it("wraps a value as ActiveModel::Attribute bound to the attribute name", () => {
       const node = new Nodes.HomogeneousIn([1, 2], users.get("id"), "in");

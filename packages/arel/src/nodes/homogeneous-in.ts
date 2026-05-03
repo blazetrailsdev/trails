@@ -1,5 +1,5 @@
 import { Node, NodeVisitor } from "./node.js";
-import { Quoted } from "./casted.js";
+import { buildQuoted } from "./casted.js";
 import { Attribute as AMAttribute, ValueType } from "@blazetrails/activemodel";
 
 // Rails memoizes ActiveModel::Type.default_value as `@default_value ||= Value.new`.
@@ -33,8 +33,20 @@ export class HomogeneousIn extends Node {
     return this.attribute;
   }
 
+  // Mirrors Arel::Nodes::HomogeneousIn#right (homogeneous_in.rb):
+  //   `attribute.quoted_array(values)`
+  // which routes through Predications#quoted_array → quoted_node →
+  // `Nodes.build_quoted(other, attribute)` — non-Node values become
+  // `Casted` (carrying the attribute's type-cast context), not bare
+  // Quoted. Use the attribute's own `quotedArray` when present so any
+  // host-class override participates; otherwise fall through to the
+  // shared buildQuoted with the attribute as the casting context.
   get right(): Node[] {
-    return this.values.map((v) => (v instanceof Node ? v : new Quoted(v)));
+    const attr = this.attribute as Node & { quotedArray?: (vs: unknown[]) => Node[] };
+    if (typeof attr.quotedArray === "function") {
+      return attr.quotedArray(this.values);
+    }
+    return this.values.map((v) => buildQuoted(v, this.attribute));
   }
 
   get castedValues(): unknown[] {

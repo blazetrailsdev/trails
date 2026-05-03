@@ -583,8 +583,12 @@ export class Attribute extends Node {
    *
    * Mirrors: `OVER` support on Arel expressions.
    */
+  // Mirrors Arel::Predications#quoted_array → delegates to private
+  // `quoted_node`, which is `Nodes.build_quoted(other, self)` — passing
+  // self as the attribute argument so non-Node values become `Casted`
+  // (carrying the type-cast context) rather than bare `Quoted`.
   quotedArray(others: unknown[]): Node[] {
-    return others.map((v) => buildQuoted(v));
+    return others.map((v) => buildQuoted(v, this));
   }
 
   over(window?: Window | NamedWindow | string | null): Over {
