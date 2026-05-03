@@ -31,7 +31,7 @@ import {
 import { clearAutosaveState } from "./autosave-association.js";
 import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
-import { RecordInvalid, performValidations } from "./validations.js";
+import { performValidations, raiseValidationError } from "./validations.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
 interface PersistenceHost {
@@ -578,7 +578,7 @@ export async function saveBang<
 >(this: T): Promise<true> {
   const result = await this.save();
   if (!result) {
-    throw new RecordInvalid(this as unknown as object);
+    raiseValidationError(this);
   }
   return true;
 }
