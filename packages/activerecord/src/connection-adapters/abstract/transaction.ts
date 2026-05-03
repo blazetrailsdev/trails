@@ -432,28 +432,20 @@ export class Transaction {
   async rollbackRecords(): Promise<void> {
     const recs = this.records;
     if (recs) {
-      const ite = this._uniqueRecords(recs);
-      const instanceMap = this._prepareInstancesToRunCallbacksOn(ite);
-      let idx = 0;
+      const ite = this.uniqueRecords(recs);
+      const instanceMap = this.prepareInstancesToRunCallbacksOn(ite);
 
       try {
-        for (; idx < ite.length; idx++) {
-          const record = ite[idx];
-          const shouldRunCallbacks =
-            instanceMap.get(record) === record &&
-            typeof (record as any).isTriggerTransactionalCallbacks === "function" &&
-            (record as any).isTriggerTransactionalCallbacks();
-
+        await this.runActionOnRecords(ite, instanceMap, async (record, shouldRunCallbacks) => {
           if (typeof (record as any).rolledbackBang === "function") {
             await (record as any).rolledbackBang({
               forceRestoreState: this.isFullRollback(),
               shouldRunCallbacks,
             });
           }
-        }
+        });
       } finally {
-        for (; idx < ite.length; idx++) {
-          const i = ite[idx];
+        for (const i of ite) {
           if (typeof (i as any).rolledbackBang === "function") {
             await (i as any).rolledbackBang({
               forceRestoreState: this.isFullRollback(),
@@ -475,7 +467,7 @@ export class Transaction {
     if (this._runCommitCallbacks) {
       const recs = this.records;
       if (recs) {
-        const unique = this._uniqueRecords(recs);
+        const unique = this.uniqueRecords(recs);
         for (const record of unique) {
           if (typeof (record as any).beforeCommittedBang === "function") {
             await (record as any).beforeCommittedBang();
@@ -493,27 +485,19 @@ export class Transaction {
   async commitRecords(): Promise<void> {
     const recs = this.records;
     if (recs) {
-      const ite = this._uniqueRecords(recs);
+      const ite = this.uniqueRecords(recs);
 
       if (this._runCommitCallbacks) {
-        const instanceMap = this._prepareInstancesToRunCallbacksOn(ite);
-        let idx = 0;
+        const instanceMap = this.prepareInstancesToRunCallbacksOn(ite);
 
         try {
-          for (; idx < ite.length; idx++) {
-            const record = ite[idx];
-            const shouldRunCallbacks =
-              instanceMap.get(record) === record &&
-              typeof (record as any).isTriggerTransactionalCallbacks === "function" &&
-              (record as any).isTriggerTransactionalCallbacks();
-
+          await this.runActionOnRecords(ite, instanceMap, async (record, shouldRunCallbacks) => {
             if (typeof (record as any).committedBang === "function") {
               await (record as any).committedBang({ shouldRunCallbacks });
             }
-          }
+          });
         } finally {
-          for (; idx < ite.length; idx++) {
-            const i = ite[idx];
+          for (const i of ite) {
             if (typeof (i as any).committedBang === "function") {
               await (i as any).committedBang({ shouldRunCallbacks: false });
             }
@@ -576,7 +560,8 @@ export class Transaction {
     }
   }
 
-  private _uniqueRecords(recs: unknown[]): unknown[] {
+  /** @internal */
+  private uniqueRecords(recs: unknown[]): unknown[] {
     const seen = new Set<unknown>();
     const result: unknown[] = [];
     for (const record of recs) {
@@ -588,11 +573,25 @@ export class Transaction {
     return result;
   }
 
-  private _prepareInstancesToRunCallbacksOn(records: unknown[]): Map<unknown, unknown> {
+  /** @internal */
+  private async runActionOnRecords(
+    records: unknown[],
+    instancesToRunCallbacksOn: Map<unknown, unknown>,
+    action: (record: unknown, shouldRunCallbacks: boolean) => Promise<void> | void,
+  ): Promise<void> {
+    while (records.length > 0) {
+      const record = records.shift()!;
+      const shouldRunCallbacks = instancesToRunCallbacksOn.get(record) === record;
+      await action(record, shouldRunCallbacks);
+    }
+  }
+
+  /** @internal */
+  private prepareInstancesToRunCallbacksOn(records: unknown[]): Map<unknown, unknown> {
     const candidates = new Map<unknown, unknown>();
     for (const record of records) {
       if (
-        typeof (record as any).isTriggerTransactionalCallbacks === "function" &&
+        typeof (record as any).isTriggerTransactionalCallbacks !== "function" ||
         !(record as any).isTriggerTransactionalCallbacks()
       ) {
         continue;
@@ -980,7 +979,8 @@ export class TransactionManager {
    *     return unless error.is_a?(ActiveRecord::PreparedStatementCacheExpired)
    *     @connection.clear_cache!
    */
-  private _afterFailureActions(transaction: unknown, error: unknown): void {
+  /** @internal */
+  private afterFailureActions(transaction: unknown, error: unknown): void {
     if (!(transaction instanceof RealTransaction)) return;
     if (!(error instanceof PreparedStatementCacheExpired)) return;
     this._connection.clearCacheBang?.();
@@ -1007,7 +1007,7 @@ export class TransactionManager {
       // cache-clear work runs. PG's adapter retains a WeakRef to the
       // just-released txn client so the post-rollback `clearCacheBang`
       // can still reach the StatementPool (see `_lastReleasedTxnClient`).
-      this._afterFailureActions(transaction, e);
+      this.afterFailureActions(transaction, e);
       if (!transaction.state.isCompleted()) {
         transaction.incompleteBang();
       }
@@ -1037,33 +1037,5 @@ export class TransactionManager {
 function appendCallbacks(callbacks: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Transaction#append_callbacks is not implemented",
-  );
-}
-
-/** @internal */
-function uniqueRecords(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Transaction#unique_records is not implemented",
-  );
-}
-
-/** @internal */
-function runActionOnRecords(records: any, instancesToRunCallbacksOn: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Transaction#run_action_on_records is not implemented",
-  );
-}
-
-/** @internal */
-function prepareInstancesToRunCallbacksOn(records: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Transaction#prepare_instances_to_run_callbacks_on is not implemented",
-  );
-}
-
-/** @internal */
-function afterFailureActions(transaction: any, error: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::TransactionManager#after_failure_actions is not implemented",
   );
 }

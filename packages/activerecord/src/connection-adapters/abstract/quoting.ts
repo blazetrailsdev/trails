@@ -11,6 +11,7 @@
 import { NotImplementedError } from "../../errors.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getDefaultTimezone } from "../../type/internal/timezone.js";
+import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 /**
  * Quote a SQL identifier (table name, column name, index name).
@@ -424,11 +425,77 @@ function isSqlLiteral(value: unknown): value is { value: string } {
   );
 }
 
-/** @internal */
-function typeCastedBinds(binds: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Quoting#type_casted_binds is not implemented",
+/**
+ * Format a date/time value for SQL without surrounding quotes.
+ * Temporal.Instant and ZonedDateTime respect default_timezone.
+ *
+ * @internal
+ */
+export function quotedDate(
+  value:
+    | Temporal.Instant
+    | Temporal.ZonedDateTime
+    | Temporal.PlainDateTime
+    | Temporal.PlainDate
+    | Temporal.PlainTime,
+): string {
+  if (value instanceof Temporal.Instant) return formatInstantForSql(value);
+  if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
+  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
+  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
+  if (value instanceof Temporal.PlainTime) {
+    const dt = new Temporal.PlainDateTime(
+      2000,
+      1,
+      1,
+      value.hour,
+      value.minute,
+      value.second,
+      value.millisecond,
+      value.microsecond,
+      value.nanosecond,
+    );
+    return formatPlainDateTimeForSql(dt);
+  }
+  throw new TypeError(
+    `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value} — use a Temporal type`,
   );
+}
+
+/**
+ * Format a time value for SQL, stripping the date prefix.
+ *
+ * @internal
+ */
+export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): string {
+  const dt =
+    value instanceof Temporal.PlainTime
+      ? new Temporal.PlainDateTime(
+          2000,
+          1,
+          1,
+          value.hour,
+          value.minute,
+          value.second,
+          value.millisecond,
+          value.microsecond,
+          value.nanosecond,
+        )
+      : value.with({ year: 2000, month: 1, day: 1 });
+  return formatPlainDateTimeForSql(dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
+}
+
+/** @internal */
+function typeCastedBinds(
+  this: { typeCast: (v: unknown) => unknown },
+  binds: unknown[] | null | undefined,
+): unknown[] | undefined {
+  return binds?.map((value: any) => {
+    if (value instanceof ModelAttribute) {
+      return this.typeCast(value.valueForDatabase);
+    }
+    return this.typeCast(value);
+  });
 }
 
 /** @internal */
