@@ -1,4 +1,6 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
+import { getEncryptionContext, withoutEncryption as _withoutEncryption } from "./context.js";
+import { Configuration as ConfigurationError } from "./errors.js";
 import { LengthValidator } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
@@ -287,12 +289,15 @@ export class EncryptableRecord {
   static async decryptAttributes(record: any): Promise<void> {
     this.validateEncryptionAllowed(record);
     const assignments = this.buildDecryptAttributeAssignments(record);
-    await record.updateColumns?.(assignments);
+    await _withoutEncryption(() => record.updateColumns?.(assignments));
   }
 
   /** @internal */
-  static validateEncryptionAllowed(record: any): void {
-    // No-op unless encryption is frozen (read-only mode).
+  static validateEncryptionAllowed(_record: any): void {
+    const ctx = getEncryptionContext();
+    if (ctx.frozenEncryption) {
+      throw new ConfigurationError("can't be modified because it is encrypted");
+    }
   }
 
   /** @internal */
