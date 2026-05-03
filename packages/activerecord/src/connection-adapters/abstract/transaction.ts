@@ -591,7 +591,7 @@ export class Transaction {
     const candidates = new Map<unknown, unknown>();
     for (const record of records) {
       if (
-        typeof (record as any).isTriggerTransactionalCallbacks === "function" &&
+        typeof (record as any).isTriggerTransactionalCallbacks !== "function" ||
         !(record as any).isTriggerTransactionalCallbacks()
       ) {
         continue;
