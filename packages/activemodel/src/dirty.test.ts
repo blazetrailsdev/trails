@@ -714,6 +714,26 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     expect(item.changedAttributes).toContain("count");
   });
 
+  it("force-change is cleared by changesApplied — forced state must not leak across save boundaries", () => {
+    class Metric extends Model {
+      constructor(attrs: Record<string, unknown> = {}) {
+        super(attrs);
+      }
+    }
+    Metric.attribute("ratio", "float");
+
+    const m = new Metric({ ratio: NaN });
+    m.changesApplied();
+    m._dirty.forceChange("ratio", NaN);
+    expect(m.changedAttributes).toContain("ratio");
+
+    m.changesApplied();
+    // After changesApplied(), _forcedNames must be cleared so the next
+    // type-equal write does not appear dirty.
+    m.writeAttribute("ratio", "NaN");
+    expect(m.changedAttributes).not.toContain("ratio");
+  });
+
   it("force-change survives a subsequent type-equal write — NaN-to-NaN case", () => {
     // attribute_will_change! (forceChange) must not be wiped out by a write
     // where type.isChanged returns false.

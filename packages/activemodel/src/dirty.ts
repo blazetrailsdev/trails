@@ -82,6 +82,18 @@ export class DirtyTracker {
   /** Names explicitly force-dirtied via attribute_will_change!. @internal */
   private _forcedNames: Set<string> = new Set();
 
+  /** @internal Delete a single change entry and its forced-dirty marker together. */
+  private _deleteChange(name: string): void {
+    this._changedAttributes.delete(name);
+    this._forcedNames.delete(name);
+  }
+
+  /** @internal Clear all change entries and forced-dirty markers together. */
+  private _clearChanges(): void {
+    this._changedAttributes.clear();
+    this._forcedNames.clear();
+  }
+
   /**
    * Take a snapshot of the current attributes as the "clean" state.
    * For AttributeSet, uses snapshotValues() which captures values
@@ -95,8 +107,7 @@ export class DirtyTracker {
       this._originalAttributes = attributes.snapshotValues();
       this._originalHas = new Set(this._originalAttributes.keys());
     }
-    this._changedAttributes.clear();
-    this._forcedNames.clear();
+    this._clearChanges();
   }
 
   /**
@@ -153,7 +164,7 @@ export class DirtyTracker {
         newValue,
       ]);
     } else {
-      this._changedAttributes.delete(name);
+      this._deleteChange(name);
     }
   }
 
@@ -198,8 +209,7 @@ export class DirtyTracker {
       this._originalAttributes = currentAttributes.snapshotValues();
       this._originalHas = new Set(this._originalAttributes.keys());
     }
-    this._changedAttributes.clear();
-    this._forcedNames.clear();
+    this._clearChanges();
   }
 
   get previousChanges(): Record<string, [unknown, unknown]> {
@@ -211,15 +221,13 @@ export class DirtyTracker {
   }
 
   clearChangesInformation(): void {
-    this._changedAttributes.clear();
+    this._clearChanges();
     this._previousChanges.clear();
-    this._forcedNames.clear();
   }
 
   clearAttributeChanges(attributes: string[]): void {
     for (const attr of attributes) {
-      this._changedAttributes.delete(attr);
-      this._forcedNames.delete(attr);
+      this._deleteChange(attr);
     }
   }
 
@@ -287,8 +295,7 @@ export class DirtyTracker {
       | { snapshotValues(): Map<string, unknown> },
     name: string,
   ): void {
-    this._changedAttributes.delete(name);
-    this._forcedNames.delete(name);
+    this._deleteChange(name);
     // Fast path: avoid snapshotting every attribute when only one baseline
     // needs rebinding. AttributeSet exposes has/fetchValue per-attribute;
     // fall back to the full snapshot for plain Maps / other shapes.
@@ -333,8 +340,7 @@ export class DirtyTracker {
     for (const [name] of this._changedAttributes) {
       this._restoreOne(attributes, name);
     }
-    this._changedAttributes.clear();
-    this._forcedNames.clear();
+    this._clearChanges();
   }
 
   /**
@@ -347,8 +353,7 @@ export class DirtyTracker {
   ): void {
     if (!this._changedAttributes.has(name)) return;
     this._restoreOne(attributes, name);
-    this._changedAttributes.delete(name);
-    this._forcedNames.delete(name);
+    this._deleteChange(name);
   }
 
   private _restoreOne(
