@@ -35,6 +35,36 @@ export class Case extends NodeExpression {
     return this;
   };
 
+  // Mirrors Arel::Nodes::Case#then — sets the right side of the most
+  // recent When clause. Rails: `@conditions.last.right = build_quoted(expression)`.
+  // Rails raises NoMethodError on `nil.right=` if no #when has been called;
+  // we throw a clearer error for the same condition.
+  //
+  // Thenable hazard: defining `then` on a class makes instances Promise-
+  // thenable. `Promise.resolve(caseNode)` invokes `then(onFulfilled, onRejected)`,
+  // and `await caseNode` from async code does the same. We can't safely call
+  // `onFulfilled(this)` because the Promise machinery would recursively try
+  // to assimilate `this` (still thenable), causing an infinite loop. Instead
+  // we reject with a TypeError so `await caseNode` throws clearly, rather
+  // than hanging or silently yielding a stale value.
+  // Overloads: narrow the Promise.then signature to `void` so typed Arel
+  // callers chaining `.when().then(value).when()` see `this` (and TS can
+  // resolve `this.when` without an undefined-check).
+  then(onFulfilled: (v: unknown) => unknown, onRejected: (e: unknown) => unknown): void;
+  then(result: Node | unknown): this;
+  then(result: Node | unknown, onRejected?: unknown): this | void {
+    if (typeof result === "function" && typeof onRejected === "function") {
+      (onRejected as (e: Error) => unknown)(
+        new TypeError("Arel::Nodes::Case is not awaitable; use #toSql() to render"),
+      );
+      return;
+    }
+    const last = this.conditions[this.conditions.length - 1];
+    if (!last) throw new Error("Case#then called before Case#when");
+    last.right = buildQuoted(result === undefined ? null : result);
+    return this;
+  }
+
   else(result: Node | unknown): this {
     this.default = new Else(buildQuoted(result === undefined ? null : result));
     return this;
