@@ -306,6 +306,6 @@ export const ClassMethods = {
  *
  * @internal
  */
-function raiseValidationError(record: any): never {
+export function raiseValidationError(record: unknown): never {
   throw new RecordInvalid(record);
 }

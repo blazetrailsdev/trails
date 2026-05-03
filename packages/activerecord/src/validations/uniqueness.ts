@@ -197,25 +197,19 @@ function isValidationNeeded(
  * @internal
  */
 function isCoveredByUniqueIndex(
-  klass: any,
-  record: any,
-  attribute: string,
-  scope: string[],
-  options: Record<string, unknown>,
+  _klass: any,
+  _record: any,
+  _attribute: string,
+  _scope: string[],
+  _options: Record<string, unknown>,
 ): boolean {
-  const cache = klass?.schemaCache;
-  const indexes = cache?.indexes?.(klass.tableName) ?? [];
-  const targetAttrs =
-    options.attributes && Array.isArray(options.attributes)
-      ? (options.attributes as string[])
-      : [attribute];
-  return targetAttrs.some((attr) => {
-    const cols = resolveAttributes(record, [...scope, attr]);
-    return indexes.some(
-      (ix: any) =>
-        ix.unique && ix.where == null && cols.every((c) => (ix.columns ?? []).includes(c)),
-    );
-  });
+  // Rails reads `klass.schema_cache.indexes(klass.table_name)` synchronously,
+  // but Trails' SchemaCache#indexes is async (requires a pool + I/O). Calling
+  // it from this synchronous validator path isn't safe. Conservatively return
+  // false so uniqueness always performs the existence check — correct, just
+  // skips the Rails optimization that drops a redundant SELECT when the DB
+  // already enforces uniqueness via a unique index.
+  return false;
 }
 
 /**
@@ -264,11 +258,23 @@ function buildRelation(
   const base = typeof klass.unscoped === "function" ? klass.unscoped() : klass.where({});
   if (Object.prototype.hasOwnProperty.call(options, "caseSensitive") && !options.caseSensitive) {
     // Best-effort case-insensitive comparison via SQL LOWER(); adapters
-    // with a CI default collation will treat this as a no-op.
+    // with a CI default collation will treat this as a no-op. Build the
+    // bind through predicateBuilder so the AST uses BindParam (and the
+    // prepared-statement cache stays effective) rather than an inlined
+    // Casted/Quoted literal.
     if (typeof value === "string") {
       const arel = klass.arelTable as { get?: (n: string) => any } | null;
-      if (arel && typeof arel.get === "function" && typeof base.where === "function") {
-        return base.where(arel.get(attribute).lower().eq(value.toLowerCase()));
+      const pb = (
+        base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } }
+      ).predicateBuilder;
+      if (
+        arel &&
+        typeof arel.get === "function" &&
+        typeof base.where === "function" &&
+        pb?.buildBindAttribute
+      ) {
+        const bind = pb.buildBindAttribute(attribute, value.toLowerCase());
+        return base.where(arel.get(attribute).lower().eq(bind));
       }
     }
   }
