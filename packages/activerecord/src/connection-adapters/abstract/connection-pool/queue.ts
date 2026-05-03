@@ -11,7 +11,7 @@
  */
 
 import type { DatabaseAdapter } from "../../../adapter.js";
-import { ConnectionTimeoutError, NotImplementedError } from "../../../errors.js";
+import { ConnectionTimeoutError } from "../../../errors.js";
 import { include, type Included } from "@blazetrails/activesupport";
 
 /**
@@ -345,23 +345,34 @@ export class ConnectionLeasingQueue extends Queue {
 // Rails: `include BiasableQueue` in ConnectionLeasingQueue
 include(ConnectionLeasingQueue, BiasableQueue);
 
-/** @internal */
-function synchronize(block?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#synchronize is not implemented",
-  );
+/**
+ * Runs `block` under the queue's monitor. JS is single-threaded so the
+ * critical section is implicit — invoking the block synchronously preserves
+ * Rails' `@lock.synchronize(&block)` semantics for callers that need an
+ * `enqueue`-or-`signal` window.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#synchronize
+ *
+ * @internal
+ */
+function synchronize<R>(_queue: unknown, block: () => R): R {
+  return block();
 }
 
-/** @internal */
-function isAny(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#any? is not implemented",
-  );
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#any?
+ *
+ * @internal
+ */
+function isAny(queue: Queue): boolean {
+  return queue.any;
 }
 
-/** @internal */
-function remove(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#remove is not implemented",
-  );
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#remove
+ *
+ * @internal
+ */
+function remove(queue: Queue, conn: DatabaseAdapter): boolean {
+  return queue.remove(conn);
 }

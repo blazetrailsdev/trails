@@ -72,6 +72,20 @@ export class ConnectionTimeoutError extends ConnectionNotEstablished {
   }
 }
 
+/**
+ * Raised by `ConnectionPool#with_exclusively_acquired_all_connections` when
+ * the pool can't take ownership of every existing connection within the
+ * configured timeout.
+ *
+ * Mirrors: ActiveRecord::ExclusiveConnectionTimeoutError
+ */
+export class ExclusiveConnectionTimeoutError extends ConnectionTimeoutError {
+  constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
+    super(message, options);
+    this.name = "ExclusiveConnectionTimeoutError";
+  }
+}
+
 export class ConnectionNotDefined extends ConnectionNotEstablished {
   readonly connectionName?: string;
   readonly role?: string;
