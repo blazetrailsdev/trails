@@ -50,6 +50,13 @@ const _createdColumns = new Map<string, Set<string>>();
 // Populated when Base.adapter is set. Consumed before first DB operation.
 const _pendingModels = new Map<string, Map<string, string>>();
 
+// Long-lived mirror of every declared column we've ever seen, keyed by
+// table → column → sqlType. Unlike `_pendingModels` (drained in setup) and
+// `_registeredModelClasses` (cleared in extractColumnsFromModels), this map
+// persists across cleanup so the recovery path can look up the model's
+// declared type long after the model finished registering.
+const _declaredColumns = new Map<string, Map<string, string>>();
+
 // Tables with composite primary keys: table → string[] of PK columns.
 const _pendingCpk = new Map<string, string[]>();
 
@@ -92,6 +99,27 @@ function sqlType(typeName: string): string {
 }
 
 /**
+ * Resolve the SQL column type for a single attribute definition. Centralized
+ * so both bulk extraction (extractColumnsFromModels) and the recovery-path
+ * fallback (lookupDeclaredColumnType) apply the same `limit`/PK normalization.
+ *
+ * @internal
+ */
+function sqlTypeForAttribute(def: any, isPkCol: boolean): string {
+  const innerType = def?.type?.castType ?? def?.type;
+  const innerTypeName = innerType?.name;
+  let colType = sqlType(innerTypeName || "string");
+  const limit = def?.limit;
+  const isStringType = innerTypeName === "string" || innerTypeName === "text";
+  if (limit != null && isStringType && (colType === "TEXT" || colType === "VARCHAR(255)")) {
+    colType = `VARCHAR(${limit})`;
+  } else if (isMysql() && isPkCol && colType === "TEXT") {
+    colType = "VARCHAR(255)";
+  }
+  return colType;
+}
+
+/**
  * Register a model class for table creation. Called from Base.adapter setter.
  * We store the model class reference and extract attributes lazily in
  * processPendingModels(), because some tests call this.adapter = x
@@ -124,17 +152,7 @@ function extractColumnsFromModels(): void {
     if (attrs) {
       for (const [name, def] of attrs) {
         if (name === "id" && !isCpk && !isCustomPk) continue;
-        const innerType = (def.type as any)?.castType ?? def.type;
-        let colType = sqlType(innerType?.name || "string");
-        const limit = (def as any).limit;
-        const innerTypeName = innerType?.name;
-        const isStringType = innerTypeName === "string" || innerTypeName === "text";
-        if (limit != null && isStringType && (colType === "TEXT" || colType === "VARCHAR(255)")) {
-          colType = `VARCHAR(${limit})`;
-        } else if (isMysql() && pkCols.includes(name) && colType === "TEXT") {
-          colType = "VARCHAR(255)";
-        }
-        columns.set(name, colType);
+        columns.set(name, sqlTypeForAttribute(def, pkCols.includes(name)));
       }
     }
 
@@ -150,8 +168,46 @@ function extractColumnsFromModels(): void {
     } else {
       _pendingModels.set(tableName, columns);
     }
+
+    let declared = _declaredColumns.get(tableName);
+    if (!declared) {
+      declared = new Map();
+      _declaredColumns.set(tableName, declared);
+    }
+    for (const [col, type] of columns) declared.set(col, type);
   }
   _registeredModelClasses.clear();
+}
+
+/**
+ * Look up the SQL type a registered model declared for a column. Used by the
+ * recovery path so it doesn't fall back to the `_id`/`TEXT` heuristic when
+ * the model already told us the column's intended type. Returns undefined
+ * when the column isn't declared anywhere we can see.
+ *
+ * @internal
+ */
+function lookupDeclaredColumnType(tableName: string, colName: string): string | undefined {
+  // Check the long-lived declared-column registry first — it survives the
+  // setup drain that empties _pendingModels and _registeredModelClasses.
+  const declared = _declaredColumns.get(tableName)?.get(colName);
+  if (declared) return declared;
+  const pending = _pendingModels.get(tableName)?.get(colName);
+  if (pending) return pending;
+  // Models registered but not yet extracted (e.g. recovery firing
+  // between registerModel and the next setup pass).
+  for (const modelClass of _registeredModelClasses) {
+    if (modelClass.abstractClass) continue;
+    if (modelClass.tableName !== tableName) continue;
+    const def = modelClass._attributeDefinitions?.get(colName);
+    if (!def) continue;
+    const pk = modelClass.primaryKey;
+    const isPkCol = Array.isArray(pk)
+      ? pk.includes(colName)
+      : typeof pk === "string" && pk === colName;
+    return sqlTypeForAttribute(def, isPkCol);
+  }
+  return undefined;
 }
 
 /**
@@ -602,7 +658,18 @@ class SchemaAdapter implements DatabaseAdapter {
     }
 
     if (colTableName && colName) {
-      const colType = colName.endsWith("_id") ? "INTEGER" : "TEXT";
+      // The DB error proves this column is missing in the real schema.
+      // Drop any stale `_createdColumns` entry first, otherwise
+      // processPendingModels skips re-adding it on the next pass and we
+      // loop back into recovery on every query — which is how typed
+      // columns (e.g. `lock_version` integer) historically ended up as
+      // TEXT on PG under DDL contention.
+      _createdColumns.get(colTableName)?.delete(colName);
+
+      // Prefer the model's declared SQL type; fall back to the legacy
+      // `_id` heuristic only when no declaration is reachable.
+      let colType = lookupDeclaredColumnType(colTableName, colName);
+      if (!colType) colType = colName.endsWith("_id") ? "INTEGER" : "TEXT";
       try {
         const alterSql = isMysql()
           ? `ALTER TABLE \`${colTableName}\` ADD COLUMN \`${colName}\` ${colType}`
@@ -654,14 +721,34 @@ class SchemaAdapter implements DatabaseAdapter {
     if (insertMatch && insertMatch[1].trim()) {
       for (const c of insertMatch[1].split(",")) {
         const col = c.trim().replace(/"/g, "").replace(/`/g, "");
-        if (col !== "id") cols.set(col, col.endsWith("_id") ? "INTEGER" : "TEXT");
+        if (col === "id") continue;
+        cols.set(
+          col,
+          lookupDeclaredColumnType(tableName, col) ?? (col.endsWith("_id") ? "INTEGER" : "TEXT"),
+        );
       }
     }
-    // table.column references
+    // Collect SQL aliases for the missing table (FROM/JOIN ... [AS] alias).
+    // Without this, `JOIN "posts" AS "p" ON "p"."id" = ...` wouldn't
+    // contribute any columns because all refs are qualified as "p".
+    const accepted = new Set<string>([tableName]);
+    const aliasRe = new RegExp(
+      `(?:FROM|JOIN)\\s+["\`]${tableName}["\`](?:\\s+AS)?\\s+["\`](\\w+)["\`]`,
+      "gi",
+    );
+    for (const a of sql.matchAll(aliasRe)) accepted.add(a[1]);
+
+    // table.column references — only refs qualified by the missing table or
+    // one of its aliases contribute columns. Otherwise multi-table SQL
+    // (joins/subqueries) would leak columns from other tables into this CREATE.
     const colMatches = sql.matchAll(/["`](\w+)["`]\.\s*["`](\w+)["`]/g);
     for (const m of colMatches) {
+      if (!accepted.has(m[1])) continue;
       if (m[2] === "id" || m[2] === "*") continue;
-      cols.set(m[2], m[2].endsWith("_id") ? "INTEGER" : "TEXT");
+      cols.set(
+        m[2],
+        lookupDeclaredColumnType(tableName, m[2]) ?? (m[2].endsWith("_id") ? "INTEGER" : "TEXT"),
+      );
     }
 
     _pendingModels.set(tableName, cols);
