@@ -243,13 +243,14 @@ function resolveAttributes(record: any, attributes: string[]): string[] {
     const refl = ctor._reflectOnAssociation?.(String(attr));
     if (!refl) {
       out.push(String(attr));
-    } else if (typeof refl.isPolymorphic === "function" ? refl.isPolymorphic() : refl.polymorphic) {
-      out.push(refl.foreignKey, refl.foreignType);
-    } else {
-      const fk = refl.foreignKey;
-      if (Array.isArray(fk)) out.push(...fk);
-      else out.push(fk);
+      continue;
     }
+    const fk = refl.foreignKey;
+    if (Array.isArray(fk)) out.push(...fk);
+    else if (fk != null) out.push(fk);
+    const isPoly =
+      typeof refl.isPolymorphic === "function" ? refl.isPolymorphic() : refl.polymorphic;
+    if (isPoly && refl.foreignType) out.push(refl.foreignType);
   }
   return out.filter((x) => x != null);
 }
