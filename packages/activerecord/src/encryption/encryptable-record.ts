@@ -214,12 +214,13 @@ export class EncryptableRecord {
 
   /** @internal */
   static overrideAccessorsToPreserveOriginal(
-    modelClass: any,
-    name: string,
-    originalName: string,
+    _modelClass: any,
+    _name: string,
+    _originalName: string,
   ): void {
-    // In TS we can't dynamically override accessors the way Ruby can,
-    // but we record the mapping for consumers that need it.
+    // Rails uses Ruby's `include(Module.new { define_method ... })` to dynamically
+    // override attribute accessors. TS has no equivalent; the ignoreCase
+    // read-original behaviour is handled at the EncryptedAttributeType level.
   }
 
   /** @internal */
@@ -240,10 +241,12 @@ export class EncryptableRecord {
   /** @internal */
   static isEncryptedAttribute(record: any, attributeName: string): boolean {
     const klass = record.constructor as any;
-    if (!klass._encryptedAttributes?.has(attributeName)) return false;
-    const type = getAttributeType(klass, attributeName);
+    // Resolve attribute aliases before checking encrypted set.
+    const resolvedName = klass._attributeAliases?.[attributeName] ?? attributeName;
+    if (!klass._encryptedAttributes?.has(resolvedName)) return false;
+    const type = getAttributeType(klass, resolvedName);
     if (!(type instanceof EncryptedAttributeType)) return false;
-    const raw = record.readAttributeBeforeTypeCast?.(attributeName);
+    const raw = record.readAttributeBeforeTypeCast?.(resolvedName);
     return type.isEncrypted(raw);
   }
 
@@ -252,7 +255,8 @@ export class EncryptableRecord {
     if (this.isEncryptedAttribute(record, attributeName)) {
       return record.readAttributeBeforeTypeCast?.(attributeName);
     }
-    return record.readAttribute?.(attributeName);
+    // For unencrypted attributes return the database-serialized value.
+    return record.readAttributeBeforeTypeCast?.(attributeName);
   }
 
   /** @internal */
@@ -271,11 +275,11 @@ export class EncryptableRecord {
 
   /** @internal */
   static _createRecord(record: any, attributeNames?: string[]): unknown {
-    // Ensure encrypted attributes are always included in persisted column list.
-    const names = attributeNames ?? record.attributeNames ?? [];
-    const encryptedAttrs: Set<string> = record.constructor._encryptedAttributes ?? new Set();
-    const all = [...new Set([...names, ...encryptedAttrs])];
-    return record._createRecord?.(all);
+    // Rails prepends this to force encrypted attrs into the INSERT column list.
+    // In our codebase _createRecord is the ORM callback chain entry point and
+    // ignores attributeNames; encrypted columns are included unconditionally via
+    // _performInsert. This helper exists for api:compare parity only.
+    return record._createRecord?.(attributeNames);
   }
 
   /** @internal */
@@ -305,7 +309,10 @@ export class EncryptableRecord {
     const klass = record.constructor as any;
     const result: Record<string, unknown> = {};
     for (const name of klass._encryptedAttributes ?? new Set<string>()) {
-      result[name] = record[name];
+      const type = getAttributeType(klass, name);
+      const value = record[name];
+      // Pre-serialize so updateColumns stores ciphertext, not plaintext.
+      result[name] = type instanceof EncryptedAttributeType ? type.serialize(value) : value;
     }
     return result;
   }
@@ -317,7 +324,12 @@ export class EncryptableRecord {
     for (const name of klass._encryptedAttributes ?? new Set<string>()) {
       const type = getAttributeType(klass, name);
       const raw = record.readAttributeBeforeTypeCast?.(name);
-      result[name] = type instanceof EncryptedAttributeType ? type.deserialize(raw) : raw;
+      // Only decrypt if actually encrypted — mirrors Rails' type.deserialize
+      // which returns the raw value when support_unencrypted_data is true.
+      result[name] =
+        type instanceof EncryptedAttributeType && type.isEncrypted(raw)
+          ? type.deserialize(raw)
+          : raw;
     }
     return result;
   }
@@ -325,8 +337,12 @@ export class EncryptableRecord {
   /** @internal */
   static cantModifyEncryptedAttributesWhenFrozen(record: any): void {
     const klass = record.constructor as any;
+    // changedAttributes is a string[] in this codebase (from DirtyTracker).
+    const changed: string[] = Array.isArray(record.changedAttributes)
+      ? record.changedAttributes
+      : [];
     for (const attr of klass._encryptedAttributes ?? new Set<string>()) {
-      if (Object.prototype.hasOwnProperty.call(record.changedAttributes?.() ?? {}, attr)) {
+      if (changed.includes(attr)) {
         record.errors?.add?.(attr, "can't be modified because it is encrypted");
       }
     }

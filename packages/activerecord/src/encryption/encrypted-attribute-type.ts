@@ -288,7 +288,15 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private buildPreviousTypesFor(schemes: Scheme[]): EncryptedAttributeType[] {
-    return schemes.map((s) => new EncryptedAttributeType({ scheme: s, previousType: true }));
+    return schemes.map(
+      (s) =>
+        new EncryptedAttributeType({
+          scheme: s,
+          castType: this.castType,
+          previousType: true,
+          default: this._default,
+        }),
+    );
   }
 
   /** @internal */
@@ -318,7 +326,10 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private serializeWithOldest(value: unknown): unknown {
-    return this.previousTypes[0]?.serialize(value) ?? value;
+    // Rails uses previous_types.first; our encrypt() uses the last previous scheme.
+    // Match encrypt()'s convention so both helpers stay consistent.
+    const prev = this.previousTypes;
+    return (prev[prev.length - 1] ?? this).serialize(value);
   }
 
   /** @internal */
