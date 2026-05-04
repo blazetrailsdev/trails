@@ -6,7 +6,8 @@ import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { StringKeyedHashAccessor } from "../store.js";
 
 export class Json extends ValueType<unknown> {
-  readonly name = "json";
+  // Widened to string (not literal) so Jsonb can override to "jsonb".
+  readonly name: string = "json";
 
   /**
    * Mirrors: ActiveRecord::Type::Json#type

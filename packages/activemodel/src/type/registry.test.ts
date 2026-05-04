@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Types } from "../index.js";
+import { TypeRegistry } from "./registry.js";
 
 describe("RegistryTest", () => {
   it("a block can be registered", () => {
@@ -40,6 +41,15 @@ describe("TypeRegistry", () => {
 
   it("a reasonable error is given when no type is found", () => {
     expect(() => Types.typeRegistry.lookup("imaginary")).toThrow("Unknown type: imaginary");
+  });
+
+  it("uuid, json, array are not in AM TypeRegistry defaults (PG-specific types live in AR's OID layer)", () => {
+    // Use a fresh instance — the singleton may be mutated by AR's type.ts
+    // which re-registers "json" for its own purposes.
+    const fresh = new TypeRegistry();
+    expect(() => fresh.lookup("uuid")).toThrow("Unknown type: uuid");
+    expect(() => fresh.lookup("json")).toThrow("Unknown type: json");
+    expect(() => fresh.lookup("array")).toThrow("Unknown type: array");
   });
 
   it("a class can be registered for a symbol", () => {

@@ -16,7 +16,7 @@ All findings re-verified against current source. False positives from the prior 
 
 - `register(name, factory)` is single-arg `factory: () => Type` (`type.ts:10`). Rails `type.rb:30` `register(type_name, klass = nil, &block)` accepts a class and threads constructor args at lookup time (variadic via `ruby2_keywords`); `lookup(name, **options)` config-at-lookup is therefore not supported.
 - Registry exposed read-only — frozen singleton, no setter (`type.ts:6`). Rails exposes `registry` as mutable `attr_accessor` (`type.rb:26`); used by AR for wholesale registry replacement.
-- Trails pre-registers extras (`uuid`, `json`, `array`, `value`) not in Rails activemodel.
+- Trails pre-registers `value` (sane fallback) not in Rails activemodel; `uuid`/`json`/`array` were removed in P25 (now live in AR's PG OID layer).
 
 ---
 
@@ -225,7 +225,8 @@ No JS-representable behavioral deviation. Symbol variants in Rails `FALSE_VALUES
 
 ## Trails-Only Extensions (no Rails activemodel counterpart)
 
-- `type/json.ts`, `type/array.ts`, `type/uuid.ts`, `type/internal/` (DateInfinity sentinels).
+- `type/internal/` (DateInfinity sentinels) — used by `DateType` for PG infinity handling.
+- `value` registry key — pre-registered as the sane fallback for unknown types.
 
 ---
 

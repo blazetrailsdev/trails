@@ -76,9 +76,6 @@ export { ImmutableStringType } from "./type/immutable-string.js";
 export { ValueType } from "./type/value.js";
 export { BinaryType, Data as BinaryData } from "./type/binary.js";
 export { TimeType } from "./type/time.js";
-export { UuidType } from "./type/uuid.js";
-export { JsonType } from "./type/json.js";
-export { ArrayType } from "./type/array.js";
 export {
   isUtc as isUtcTimezone,
   defaultTimezone as getDefaultTimezone,
@@ -97,9 +94,6 @@ import { ImmutableStringType } from "./type/immutable-string.js";
 import { Type as TypeBase, ValueType } from "./type/value.js";
 import { BinaryType } from "./type/binary.js";
 import { TimeType } from "./type/time.js";
-import { UuidType } from "./type/uuid.js";
-import { JsonType } from "./type/json.js";
-import { ArrayType as ArrayTypeImpl } from "./type/array.js";
 import { typeRegistry } from "./type/registry.js";
 
 export const Types = {
@@ -117,9 +111,6 @@ export const Types = {
   ValueType,
   BinaryType,
   TimeType,
-  UuidType,
-  JsonType,
-  ArrayType: ArrayTypeImpl,
 };
 
 export {

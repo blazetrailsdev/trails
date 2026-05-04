@@ -6,13 +6,10 @@ import { BooleanType } from "./boolean.js";
 import { DateType } from "./date.js";
 import { DateTimeType } from "./date-time.js";
 import { DecimalType } from "./decimal.js";
-import { UuidType } from "./uuid.js";
-import { JsonType } from "./json.js";
 import { BigIntegerType } from "./big-integer.js";
 import { ImmutableStringType } from "./immutable-string.js";
 import { BinaryType } from "./binary.js";
 import { TimeType } from "./time.js";
-import { ArrayType } from "./array.js";
 
 export class TypeRegistry {
   /**
@@ -44,14 +41,11 @@ export class TypeRegistry {
     this.register("date", () => new DateType());
     this.register("datetime", () => new DateTimeType());
     this.register("decimal", () => new DecimalType());
-    this.register("uuid", () => new UuidType());
-    this.register("json", () => new JsonType());
     this.register("big_integer", () => new BigIntegerType());
     this.register("immutable_string", () => new ImmutableStringType());
     this.register("value", () => new ValueType());
     this.register("binary", () => new BinaryType());
     this.register("time", () => new TimeType());
-    this.register("array", () => new ArrayType());
   }
 
   register(name: string, factory: () => Type): void {
