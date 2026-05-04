@@ -967,10 +967,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  translateException(
-    exception: Error,
-    opts: { message: string; sql: string; binds: unknown[] },
-  ): Error {
+  translateException(exception: unknown, opts: { sql: string; binds: unknown[] }): Error {
     return this._translateException(exception, opts.sql, opts.binds);
   }
 
@@ -1026,7 +1023,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  protected static initializeTypeMap(m: TypeMap): void {
+  protected static initializeTypeMap(this: typeof AbstractMysqlAdapter, m: TypeMap): void {
     // Base types (mirrors AbstractAdapter#initialize_type_map via super)
     m.registerType(/^boolean/i, undefined, () => new BooleanType());
     m.registerType(/^char/i, undefined, () => new StringType());
@@ -1053,11 +1050,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     m.registerType(/longblob/i, undefined, () => new BinaryType());
     m.registerType(/^float/i, undefined, () => new FloatType());
     m.registerType(/^double/i, undefined, () => new FloatType());
-    AbstractMysqlAdapter.registerIntegerType(m, /^bigint/i, { limit: 8 });
-    AbstractMysqlAdapter.registerIntegerType(m, /^int/i, { limit: 4 });
-    AbstractMysqlAdapter.registerIntegerType(m, /^mediumint/i, { limit: 3 });
-    AbstractMysqlAdapter.registerIntegerType(m, /^smallint/i, { limit: 2 });
-    AbstractMysqlAdapter.registerIntegerType(m, /^tinyint/i, { limit: 1 });
+    this.registerIntegerType(m, /^bigint/i, { limit: 8 });
+    this.registerIntegerType(m, /^int/i, { limit: 4 });
+    this.registerIntegerType(m, /^mediumint/i, { limit: 3 });
+    this.registerIntegerType(m, /^smallint/i, { limit: 2 });
+    this.registerIntegerType(m, /^tinyint/i, { limit: 1 });
     m.registerType(/^year/i, undefined, () => new IntegerType());
     m.registerType(/^bit/i, undefined, () => new BinaryType());
     m.registerType(/^timestamp/i, undefined, () => new DateTimeType());
