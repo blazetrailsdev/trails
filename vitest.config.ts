@@ -29,6 +29,7 @@ const alias = {
     "packages/activesupport/src/temporal.ts",
   ),
   "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
+  "@blazetrails/activesupport/yaml": path.resolve(__dirname, "packages/activesupport/src/yaml.ts"),
   "@blazetrails/activesupport/process-adapter": path.resolve(
     __dirname,
     "packages/activesupport/src/process-adapter.ts",
