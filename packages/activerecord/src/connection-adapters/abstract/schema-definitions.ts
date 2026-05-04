@@ -650,81 +650,66 @@ export class TableDefinition {
   }
 
   string(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "string", options));
-    return this;
+    return this.column(name, "string", options);
   }
 
   text(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "text", options));
-    return this;
+    return this.column(name, "text", options);
   }
 
   integer(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "integer", options));
-    return this;
+    return this.column(name, "integer", options);
   }
 
   bigint(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "bigint", options));
-    return this;
+    return this.column(name, "bigint", options);
   }
 
   float(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "float", options));
-    return this;
+    return this.column(name, "float", options);
   }
 
   decimal(name: string, options: ColumnOptions = {}): this {
     if (options.scale !== undefined && options.precision === undefined) {
       throw new Error("Error adding decimal column: precision is required if scale is specified");
     }
-    this.columns.push(new ColumnDefinition(name, "decimal", options));
-    return this;
+    return this.column(name, "decimal", options);
   }
 
   boolean(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "boolean", options));
-    return this;
+    return this.column(name, "boolean", options);
   }
 
   date(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "date", options));
-    return this;
+    return this.column(name, "date", options);
   }
 
   datetime(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "datetime", options));
-    return this;
+    return this.column(name, "datetime", options);
   }
 
   timestamp(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "timestamp", options));
-    return this;
+    return this.column(name, "timestamp", options);
   }
 
   binary(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "binary", options));
-    return this;
+    return this.column(name, "binary", options);
   }
 
   json(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "json", options));
-    return this;
+    return this.column(name, "json", options);
   }
 
   jsonb(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "jsonb", options));
-    return this;
+    return this.column(name, "jsonb", options);
   }
 
   char(name: string, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, "char", options));
-    return this;
+    return this.column(name, "char", options);
   }
 
   array(name: string, type: ColumnType, options: ColumnOptions = {}): this {
-    this.columns.push(new ColumnDefinition(name, type, { ...options, array: true }));
-    return this;
+    return this.column(name, type, { ...options, array: true });
   }
 
   timestamps(options: ColumnOptions = {}): this {
