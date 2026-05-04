@@ -54,6 +54,12 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(dumper.schemaType(col)).toBe("serial");
     });
 
+    it("returns bigint for bigint array columns (strips [] before returning)", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ sqlType: "bigint[]", type: "integer", array: true });
+      expect(dumper.schemaType(col)).toBe("bigint");
+    });
+
     it("returns semantic type for non-serial non-bigint columns", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       // sqlType = "character varying", but sqlTypeMetadata.type = "string" (semantic)
@@ -136,6 +142,23 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(spec["as"]).toBe(JSON.stringify("(a + b)"));
       expect(spec["stored"]).toBe(true);
       expect(spec["type"]).toBe(":integer");
+    });
+
+    it("adds enum_type even for virtual enum columns (Rails continues after virtual block)", () => {
+      const mockAdapter = {
+        tables: () => [],
+        columns: () => [],
+        indexes: () => [],
+        supportsVirtualColumns: () => true,
+      };
+      const dumper = new (SchemaDumper as any)(mockAdapter) as any;
+      const col = new Column("status", null, { sqlType: "mood", type: "enum" }, true, {
+        defaultFunction: "('happy'::mood)",
+        generated: "s",
+      });
+      const spec = dumper.prepareColumnOptions(col);
+      expect(spec["stored"]).toBe(true);
+      expect(spec["enum_type"]).toBe(JSON.stringify("mood"));
     });
 
     it("skips virtual options when adapter does not support virtual columns", () => {

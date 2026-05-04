@@ -17,6 +17,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (adapter?.supportsVirtualColumns?.() && column.isVirtual()) {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = true;
+      // enum_type must be set before the early return — Rails adds it after the virtual
+      // block but doesn't early-return, so a virtual enum column gets both attributes.
+      if (column.isEnum) spec["enum_type"] = JSON.stringify(column.sqlType);
       // Rails: { type: schema_type(column).inspect } — symbol inspect gives ":bigserial"
       return { type: `:${this.schemaType(column)}`, ...spec };
     }
@@ -39,8 +42,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected override schemaType(column: Column): string {
     if (column.isSerial) return column.isBigint() ? "bigserial" : "serial";
-    // bigint: column.type (SQL type) is "bigint" — super handles it correctly
-    if (column.isBigint()) return super.schemaType(column as any);
+    // bigint: return directly — super reads column.type which includes "[]" for bigint arrays
+    if (column.isBigint()) return "bigint";
     // Use semantic type from sqlTypeMetadata (e.g. "string" for character varying) to
     // match Rails' column.type which returns a semantic symbol (:string, :integer, etc.)
     const semantic = (column as any).sqlTypeMetadata?.type as string | undefined;
