@@ -18,7 +18,9 @@ const registries = new Map<string, WeakRef<object>>();
 const _finalizer =
   typeof FinalizationRegistry !== "undefined"
     ? new FinalizationRegistry<string>((key) => {
-        registries.delete(key);
+        if (registries.get(key)?.deref() === undefined) {
+          registries.delete(key);
+        }
       })
     : null;
 
