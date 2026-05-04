@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Column, NullColumn } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 
@@ -81,5 +81,21 @@ describe("NullColumn", () => {
   it("has null default", () => {
     const col = new NullColumn();
     expect(col.default).toBeNull();
+  });
+
+  it("deduplicate returns self and triggers sqlTypeMetadata deduplication", () => {
+    const meta = makeMetadata();
+    const col = new Column("name", null, meta);
+    const spy = vi.spyOn(meta, "deduplicate");
+    const result = col.deduplicate();
+    expect(result).toBe(col);
+    expect(spy).toHaveBeenCalledOnce();
+    spy.mockRestore();
+  });
+
+  it("deduplicate is a no-op when sqlTypeMetadata is null", () => {
+    const col = new Column("name", null, null);
+    expect(() => col.deduplicate()).not.toThrow();
+    expect(col.deduplicate()).toBe(col);
   });
 });

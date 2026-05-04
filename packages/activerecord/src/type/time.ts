@@ -5,7 +5,7 @@
  * Values are cast by ActiveModel; this type adds timezone-aware behavior
  * through the `timezone` option and `isUtc` accessor.
  */
-import { NotImplementedError } from "../errors.js";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";
 import { isUtc, type TimezoneOptions } from "./internal/timezone.js";
 
@@ -20,9 +20,16 @@ export class Time extends ActiveModelTime {
   get isUtc(): boolean {
     return isUtc(this._timezone);
   }
-}
 
-/** @internal */
-function castValue(value: any): never {
-  throw new NotImplementedError("ActiveRecord::Type::Time#cast_value is not implemented");
+  override serialize(value: unknown): string | null {
+    return super.serialize(value);
+  }
+
+  override serializeCastValue(value: Temporal.PlainTime | null): string | null {
+    return super.serializeCastValue(value);
+  }
+
+  protected override castValue(value: unknown): Temporal.PlainTime | null {
+    return super.castValue(value);
+  }
 }

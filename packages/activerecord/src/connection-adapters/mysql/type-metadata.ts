@@ -8,7 +8,6 @@
  * "VIRTUAL GENERATED", etc.
  */
 
-import { NotImplementedError } from "../../errors.js";
 export class TypeMetadata {
   readonly sqlType: string;
   readonly type: string;
@@ -56,11 +55,13 @@ export class TypeMetadata {
       this.extra,
     ]);
   }
-}
 
-/** @internal */
-function deduplicated(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata#deduplicated is not implemented",
-  );
+  deduplicate(): this {
+    return this.deduplicated();
+  }
+
+  /** @internal */
+  protected deduplicated(): this {
+    return this;
+  }
 }
