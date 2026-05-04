@@ -883,4 +883,20 @@ describe("DirtyTest", () => {
     u.name = "Bob";
     expect(u.hasChangesToSave).toBe(true);
   });
+
+  it("attributesInDatabase returns original DB values for dirty attributes", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice", age: 30 });
+    u.name = "Bob";
+    u.age = 31;
+    const inDb = u.attributesInDatabase;
+    expect(inDb["name"]).toBe("Alice");
+    expect(inDb["age"]).toBe(30);
+  });
 });
