@@ -219,12 +219,10 @@ _Component C — Deduplicable cluster (5 files)_
 - Dependencies: none (Wave 2 base)
 - Risk: `visitAddForeignKey` has a signature conflict noted in #1139 — legacy `(fromTable, toTable, options)` vs Rails `(o)`; the file-local helper workaround in #1139 must be preserved.
 
-**PR 6 — `abstract/schema_definitions.rb`**
+**PR 6 — `abstract/schema_definitions.rb`** _(merged #1174)_
 
 - Rails: `$AR/connection_adapters/abstract/schema_definitions.rb` (970 LOC)
-- TS: `$TS/connection-adapters/abstract/schema-definitions.ts` (1352 LOC, 70 matched, 16 missing, 81%)
-- Missing (16): `conciseOptions`, `asOptions`, `conditionalOptions`, `polymorphicOptions`, `polymorphicIndexName`, `indexOptions`, `foreignKeyOptions`, `columnName`, `columnNames`, `foreignTableName`, `validColumnDefinitionOptions`, `createColumnDefinition`, `integerLikePrimaryKey?`, `integerLikePrimaryKeyType`, `raiseOnDuplicateColumn`, `raiseOnIfExistOptions`
-- LOC: Rails 970 LOC, TS 1352 LOC existing → ~200 net
+- TS: `$TS/connection-adapters/abstract/schema-definitions.ts` → 100% (86/86)
 - Dependencies: PR 5 (schema-creation visitors referenced in column definitions)
 
 **PR 7 — `abstract/schema_dumper.rb`** _(covered by #1139 — verify merge)_
