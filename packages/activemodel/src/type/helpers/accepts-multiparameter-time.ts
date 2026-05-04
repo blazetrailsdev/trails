@@ -70,15 +70,16 @@ export class AcceptsMultiparameterTime {
     }
 
     // Rails guard: return unless values_hash[1] && values_hash[2] && values_hash[3]
-    // Key-based check (not positional) after defaults are applied.
-    if (!filled["1"] || !filled["2"] || !filled["3"]) return null;
+    // Ruby 0 is truthy, so only nil/"" absence counts — use explicit nil/empty check.
+    const absent = (k: string) => filled[k] === undefined || filled[k] === null || filled[k] === "";
+    if (absent("1") || absent("2") || absent("3")) return null;
 
-    // Extract each slot by key — avoids positional errors with sparse hashes.
+    // Extract each slot by key. Rails uses to_i (non-numeric → 0); mirror that for NaN.
     const num = (key: string, fallback: number): number => {
       const v = filled[key];
       if (v === undefined || v === null || v === "") return fallback;
       const n = typeof v === "number" ? v : Number(v);
-      return Number.isNaN(n) ? fallback : n;
+      return Number.isNaN(n) ? 0 : n;
     };
 
     const year = num("1", 0);
