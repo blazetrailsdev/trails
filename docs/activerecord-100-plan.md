@@ -423,14 +423,10 @@ _Component C — Deduplicable cluster (5 files)_
 
 ### Wave 7 — Core AR model files
 
-**PR 26 — `attribute_assignment.rb` (0%)**
+**PR 26 — `attribute_assignment.rb` (100%) ✓ merged #1180**
 
 - Rails: `$AR/attribute_assignment.rb` (82 LOC)
-- TS: `$TS/attribute-assignment.ts` — **file does not exist; must be created**
-- Missing (7): `assignAttributes`, `_assignAttributes`, `assignMultiparameterAttributes`, `extractCallableAttribute`, `executeCallables`, `typeCastAttributeFromMultiparameterAssignment`, `findParamNamesAndAllowedRanges`
-- LOC: Rails 82 LOC → ~180 net (multiparameter date parsing is non-trivial in TS)
-- Dependencies: none
-- Risk: `assignMultiparameterAttributes` handles Rails date/time decomposition (`(1i)`, `(2i)`, `(3i)` field suffixes) — no direct TS equivalent. Must implement a field-grouping parser.
+- TS: `$TS/attribute-assignment.ts` — created; 7/7 methods at 100%
 
 **PR 27 — `attribute_methods.rb` (56%)**
 
