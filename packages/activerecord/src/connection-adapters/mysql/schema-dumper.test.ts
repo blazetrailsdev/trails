@@ -71,20 +71,18 @@ describe("MySQL::SchemaDumper", () => {
   describe("schemaCollation", () => {
     it("returns undefined when no collation", () =>
       expect((make() as any).schemaCollation(col({ collation: null }))).toBeUndefined());
-    it("returns JSON collation with no connection", () =>
+    it("returns JSON collation when cache not populated", () =>
       expect((make() as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBe(
         '"utf8mb4_unicode_ci"',
       ));
     it("omits when matching table default", () => {
       const d = make();
-      d.connection = {};
       d.tableCollationCache["users"] = "utf8mb4_unicode_ci";
       d.tableName = "users";
       expect((d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBeUndefined();
     });
     it("emits when differing from table default", () => {
       const d = make();
-      d.connection = {};
       d.tableCollationCache["users"] = "utf8mb4_general_ci";
       d.tableName = "users";
       expect((d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBe(

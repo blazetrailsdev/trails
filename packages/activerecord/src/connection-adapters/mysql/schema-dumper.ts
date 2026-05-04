@@ -20,8 +20,15 @@ interface MysqlColumn extends ColumnInfo {
 }
 
 export class SchemaDumper extends AbstractSchemaDumper {
+  /** Injected adapter; presence signals that caches have been (or will be) populated. */
   connection?: object;
+  /** table → table-default collation. Populated by adapter before column iteration. */
   tableCollationCache: Record<string, string> = {};
+  /**
+   * table → column → pre-serialized generation expression (already `.inspect`-equivalent,
+   * i.e. a JSON string literal like `"\"CONCAT(a, b)\""` ready to emit as schema value).
+   * Populated by adapter before column iteration via `information_schema` query.
+   */
   virtualExpressionCache: Record<string, Record<string, string>> = {};
 
   defaultPrimaryKeyType(): string {
@@ -98,8 +105,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected override schemaCollation(column: MysqlColumn): string | undefined {
     if (!column.collation) return undefined;
     const tableName = this.tableName;
-    if (!this.connection || !tableName) return JSON.stringify(column.collation);
+    if (!tableName) return JSON.stringify(column.collation);
     const cached = this.tableCollationCache[tableName];
+    // If the table's default collation hasn't been loaded, always emit.
     if (cached === undefined) return JSON.stringify(column.collation);
     return column.collation !== cached ? JSON.stringify(column.collation) : undefined;
   }
