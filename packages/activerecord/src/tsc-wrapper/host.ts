@@ -6,15 +6,18 @@ import { resolveAutoImports } from "./auto-import.js";
 const STATIC_BLOCK_PATTERN = /\bstatic\s*\{/;
 // Cheap pre-filter for files using top-level `include(...)` from
 // `@blazetrails/activesupport`. The patterns are intentionally
-// conservative: false negatives are caught by users not seeing the
-// merge (loud), but false positives cost real compile time
-// (re-parsing + auto-import resolution) on every file that imports
-// from activesupport. We require:
-//   - a top-of-line `include(` (`^` with the `m` flag) to skip
-//     `.include(` method calls and occurrences in block comments
-//   - a named import line that actually binds the local name
-//     `include` from `@blazetrails/activesupport`
-// The syntactic walker enforces the same constraints exactly.
+// conservative — false positives just cost a parse the walker would
+// reject anyway, false negatives would silently lose the merge. We
+// require:
+//   - a line whose first non-whitespace token is `include(` (`^\s*` +
+//     `m` flag) — this skips `.include(` method calls but does NOT
+//     skip lines inside block comments that happen to start with
+//     `include(`. The syntactic walker drops those (commented-out
+//     calls aren't statements), so they only cost an extra parse.
+//   - a named import that binds the local name `include` from
+//     `@blazetrails/activesupport` (excluding the `include as ...`
+//     aliased form).
+// The syntactic walker enforces both constraints exactly.
 const INCLUDE_CALL_PATTERN = /^\s*include\s*\(/m;
 // `\binclude\b(?!\s+as\b)` ensures the local binding really is
 // `include` — `include as inc` rebinds to `inc`, leaving any
