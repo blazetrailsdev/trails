@@ -38,6 +38,12 @@ import { SchemaDumper } from "./schema-dumper.js";
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
+/** @internal */
+function expandIndexOption<T>(opt: Record<string, T> | T, columns: string[]): Record<string, T> {
+  if (typeof opt === "object" && opt !== null) return opt as Record<string, T>;
+  return Object.fromEntries(columns.map((c) => [c, opt])) as Record<string, T>;
+}
+
 export class SchemaStatements {
   private _schemaCreation?: SchemaCreation;
 
@@ -115,12 +121,12 @@ export class SchemaStatements {
         unique: idx.unique,
         name: idx.name,
         where: idx.where,
-        order: idx.orders,
+        order: expandIndexOption(idx.orders, idx.columns) as Record<string, string>,
         using: idx.using,
         type: idx.type,
         comment: idx.comment,
-        length: idx.lengths,
-        opclass: idx.opclasses,
+        length: expandIndexOption(idx.lengths, idx.columns) as Record<string, number>,
+        opclass: expandIndexOption(idx.opclasses, idx.columns) as Record<string, string>,
         include: idx.include,
         nullsNotDistinct: idx.nullsNotDistinct,
         algorithm: idx.algorithm,
