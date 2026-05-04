@@ -83,4 +83,42 @@ describe("TimeTest", () => {
     const zdt = Temporal.ZonedDateTime.from("2024-01-15T14:30:00[America/New_York]");
     expect(type.userInputInTimeZone(zdt)).toBe(zdt);
   });
+
+  it("cast 3pm returns PlainTime 15:00", () => {
+    const result = type.cast("3pm");
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect((result as Temporal.PlainTime).hour).toBe(15);
+    expect((result as Temporal.PlainTime).minute).toBe(0);
+  });
+
+  it("cast 3:30 PM returns PlainTime 15:30", () => {
+    const result = type.cast("3:30 PM");
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect((result as Temporal.PlainTime).hour).toBe(15);
+    expect((result as Temporal.PlainTime).minute).toBe(30);
+  });
+
+  it("cast 15:30 returns PlainTime 15:30", () => {
+    const result = type.cast("15:30");
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect((result as Temporal.PlainTime).hour).toBe(15);
+    expect((result as Temporal.PlainTime).minute).toBe(30);
+  });
+
+  it("cast garbage string returns null", () => {
+    expect(type.cast("garbage")).toBe(null);
+  });
+
+  it("cast ISO time string still works (regression guard)", () => {
+    const result = type.cast("19:45:54");
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect((result as Temporal.PlainTime).hour).toBe(19);
+  });
+
+  it("cast datetime with non-zero offset preserves local time (not UTC-normalized)", () => {
+    // Ruby Time._parse reports the local hour written in the string, not the UTC hour.
+    const result = type.cast("2015-02-09T19:45:54+02:00");
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect((result as Temporal.PlainTime).hour).toBe(19);
+  });
 });

@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { looseDateParse } from "./helpers/loose-date-parse.js";
 import {
   DateInfinity,
   DateNegativeInfinity,
@@ -34,11 +35,7 @@ export class DateType extends ValueType<DateCastResult> {
     }
     const str = String(value).trim();
     if (str === "") return null;
-    try {
-      return Temporal.PlainDate.from(str, { overflow: "reject" });
-    } catch {
-      return null;
-    }
+    return this.fastStringToDate(str) ?? this.fallbackStringToDate(str);
   }
 
   serialize(value: unknown): string | null {
@@ -94,20 +91,17 @@ export class DateType extends ValueType<DateCastResult> {
    *     new_date(*parts.values_at(:year, :mon, :mday)) if parts
    *   end
    *
-   * Trails has no `Date._parse` equivalent; reuses Temporal's
-   * permissive parser, which already accepts the same ISO-leading
-   * forms Rails extracts year/mon/mday from. Falls through to `null`
-   * on parse failure, matching Rails' rescued path.
+   * Trails mirrors `Date._parse` breadth via `looseDateParse`: layered
+   * Temporal ISO parsing followed by regex coverage for US-slash, year-first
+   * slash, month-name, and space-separated Postgres wire formats. Falls
+   * through to `null` on parse failure, matching Rails' rescued path.
    *
    * @internal Rails-private helper.
    */
   protected fallbackStringToDate(s: string): Temporal.PlainDate | null {
-    try {
-      const pd = Temporal.PlainDate.from(s, { overflow: "reject" });
-      return this.newDate(pd.year, pd.month, pd.day);
-    } catch {
-      return null;
-    }
+    const parts = looseDateParse(s);
+    if (!parts) return null;
+    return this.newDate(parts.year, parts.month, parts.day);
   }
 
   /**
