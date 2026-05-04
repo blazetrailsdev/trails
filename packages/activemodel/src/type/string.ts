@@ -31,6 +31,8 @@ export class StringType extends ImmutableStringType {
       precision: this.precision,
       scale: this.scale,
       limit: this.limit,
+      trueString: this.trueString,
+      falseString: this.falseString,
     });
   }
 }
