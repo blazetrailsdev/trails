@@ -10,9 +10,12 @@ import {
   _validatesDefaultKeys as validationsValidatesDefaultKeys,
   _parseValidatesOptions as validationsParseValidatesOptions,
 } from "./validations.js";
-import { humanize, underscore, dasherize, htmlEscape } from "@blazetrails/activesupport";
+import { dasherize, htmlEscape } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { I18n } from "./i18n.js";
+import {
+  humanAttributeName as translationHumanAttributeName,
+  lookupAncestors as translationLookupAncestors,
+} from "./translation.js";
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import { ModelName } from "./naming.js";
@@ -1169,31 +1172,7 @@ export class Model {
    */
   static defineModelCallbacks = defineModelCallbacks;
 
-  /**
-   * Convert an attribute name to a human-readable form.
-   *
-   * Mirrors: ActiveModel::Translation.human_attribute_name
-   */
-  static humanAttributeName(attr: string): string {
-    const fallback = humanize(attr);
-    const scope = this.i18nScope;
-
-    const defaults: Array<{ key: string } | { message: string }> = [];
-    const ancestors = typeof this.lookupAncestors === "function" ? this.lookupAncestors() : [this];
-    for (const klass of ancestors) {
-      const key = klass.name ? underscore(klass.name) : undefined;
-      if (key) {
-        defaults.push({ key: `${scope}.attributes.${key}.${attr}` });
-      }
-    }
-    defaults.push({ key: `attributes.${attr}` });
-    defaults.push({ message: fallback });
-
-    const [primary, ...rest] = defaults;
-    const primaryKey = "key" in primary ? primary.key : `attributes.${attr}`;
-
-    return I18n.t(primaryKey, { defaults: rest });
-  }
+  static humanAttributeName = translationHumanAttributeName;
 
   /**
    * The i18n scope for translation lookups.
@@ -1211,8 +1190,8 @@ export class Model {
 
   // -- Naming (Phase 1300) --
 
-  static lookupAncestors(): Array<typeof Model> {
-    return [this];
+  static lookupAncestors(): Array<{ new (...args: never[]): unknown; modelName: ModelName }> {
+    return translationLookupAncestors.call(this);
   }
 
   static get modelName(): ModelName {

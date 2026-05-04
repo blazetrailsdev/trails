@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Model } from "./index.js";
+import { I18n } from "./i18n.js";
+import { raiseOnMissingTranslations } from "./translation.js";
 
 describe("ActiveModelI18nTests", () => {
   it("translated model attributes", () => {
@@ -158,6 +160,106 @@ describe("ActiveModelI18nTests", () => {
     class Parent extends Model {}
     class Child extends Parent {}
     expect(Child.humanAttributeName("first_name")).toBe("First name");
+  });
+});
+
+describe("P11 humanAttributeName — dotted attributes, options, ancestor walk", () => {
+  beforeEach(() => {
+    I18n.reset();
+    raiseOnMissingTranslations(false);
+  });
+  afterEach(() => {
+    raiseOnMissingTranslations(false);
+    I18n.reset();
+  });
+
+  it("humanizes flat attribute with no locale entry", () => {
+    class Person extends Model {}
+    expect(Person.humanAttributeName("first_name")).toBe("First name");
+  });
+
+  it("returns locale entry for a flat attribute", () => {
+    class User extends Model {}
+    I18n.storeTranslations("en", {
+      activemodel: { attributes: { user: { first_name: "Given Name" } } },
+    });
+    expect(User.humanAttributeName("first_name")).toBe("Given Name");
+  });
+
+  it("humanizes the tail segment of a dotted attribute when not found", () => {
+    class User extends Model {}
+    expect(User.humanAttributeName("address.street")).toBe("Street");
+  });
+
+  it("looks up dotted attribute in i18n before falling back", () => {
+    class User extends Model {}
+    // Rails key: "activemodel.attributes.user/address.street"
+    // I18n path: ["activemodel", "attributes", "user/address", "street"]
+    I18n.storeTranslations("en", {
+      activemodel: { attributes: { "user/address": { street: "Street Address" } } },
+    });
+    expect(User.humanAttributeName("address.street")).toBe("Street Address");
+  });
+
+  it("uses options.default when no locale entry resolves", () => {
+    class User extends Model {}
+    expect(User.humanAttributeName("foo", { default: "Custom Foo" })).toBe("Custom Foo");
+  });
+
+  it("throws with options.raise when no key resolves", () => {
+    class User extends Model {}
+    expect(() => User.humanAttributeName("foo", { raise: true })).toThrow();
+  });
+
+  it("does not throw with options.raise when a locale entry resolves", () => {
+    class User extends Model {}
+    I18n.storeTranslations("en", {
+      activemodel: { attributes: { user: { foo: "Foo" } } },
+    });
+    expect(User.humanAttributeName("foo", { raise: true })).toBe("Foo");
+  });
+
+  it("throws when raiseOnMissingTranslations is enabled globally", () => {
+    class User extends Model {}
+    raiseOnMissingTranslations(true);
+    expect(() => User.humanAttributeName("foo")).toThrow();
+  });
+
+  it("explicit raise:false suppresses the global raiseOnMissingTranslations toggle", () => {
+    class User extends Model {}
+    raiseOnMissingTranslations(true);
+    expect(User.humanAttributeName("foo", { raise: false })).toBe("Foo");
+  });
+
+  it("inherits humanAttributeName from parent class via ancestor walk", () => {
+    class Parent extends Model {}
+    class Child extends Parent {}
+    I18n.storeTranslations("en", {
+      activemodel: { attributes: { parent: { foo: "Parent Foo" } } },
+    });
+    expect(Child.humanAttributeName("foo")).toBe("Parent Foo");
+  });
+
+  it("prefers subclass locale entry over parent", () => {
+    class Parent extends Model {}
+    class Child extends Parent {}
+    I18n.storeTranslations("en", {
+      activemodel: {
+        attributes: {
+          parent: { foo: "Parent Foo" },
+          child: { foo: "Child Foo" },
+        },
+      },
+    });
+    expect(Child.humanAttributeName("foo")).toBe("Child Foo");
+  });
+
+  it("passes through interpolation options to I18n", () => {
+    class User extends Model {}
+    I18n.storeTranslations("en", {
+      activemodel: { attributes: { user: { items: "%{count} item(s)" } } },
+    });
+    expect(User.humanAttributeName("items", { count: 2 })).toBe("2 item(s)");
   });
 });
 
