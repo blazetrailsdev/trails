@@ -326,9 +326,9 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private serializeWithOldest(value: unknown): unknown {
-    // Rails uses previous_types.first; our encrypt() uses the last previous scheme.
-    // Match encrypt()'s convention so both helpers stay consistent.
-    const prev = this.previousTypes;
+    // Use previousTypesWithoutCleanText to avoid the clean-text fallback scheme
+    // being selected when supportUnencryptedData is true.
+    const prev = this.previousTypesWithoutCleanText();
     return (prev[prev.length - 1] ?? this).serialize(value);
   }
 
