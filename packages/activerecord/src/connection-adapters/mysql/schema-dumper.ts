@@ -8,7 +8,7 @@ import type { ColumnInfo } from "../../schema-dumper.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 
 interface MysqlColumn extends ColumnInfo {
-  sqlType?: string;
+  sqlType?: string | null;
   bigint?: boolean;
   virtual?: boolean;
   hasDefault?: boolean;
@@ -16,7 +16,7 @@ interface MysqlColumn extends ColumnInfo {
   comment?: string | null;
   unsigned?: boolean;
   autoIncrement?: boolean;
-  extra?: string;
+  extra?: string | null;
 }
 
 export class SchemaDumper extends AbstractSchemaDumper {

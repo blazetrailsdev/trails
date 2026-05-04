@@ -127,6 +127,25 @@ describe("MySQL::SchemaDumper", () => {
       expect(Object.keys(opts)[0]).toBe("size");
       expect(opts["size"]).toBe(":tiny");
     });
+    it("virtual column: emits type prefix, as, and stored", () => {
+      const d = make();
+      d.tableName = "t";
+      d.virtualExpressionCache["t"] = { full_name: '"CONCAT(a, b)"' };
+      const opts = (d as any).prepareColumnOptions(
+        col({
+          name: "full_name",
+          type: "string",
+          sqlType: "varchar(255)",
+          virtual: true,
+          extra: "STORED",
+        }),
+      );
+      const keys = Object.keys(opts);
+      expect(keys[0]).toBe("type");
+      expect(opts["type"]).toBe('"string"');
+      expect(opts["as"]).toBe('"CONCAT(a, b)"');
+      expect(opts["stored"]).toBe("true");
+    });
   });
 
   describe("columnSpecForPrimaryKey", () => {
