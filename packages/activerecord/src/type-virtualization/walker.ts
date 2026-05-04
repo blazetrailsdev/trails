@@ -395,11 +395,14 @@ export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
     const named = stmt.importClause?.namedBindings;
     if (named && ts.isNamedImports(named)) {
       for (const el of named.elements) {
-        // Require the unaliased local binding to be `include`. An
-        // aliased import (`include as inc`) leaves the local name `inc`,
-        // and any `include(...)` call in the file would then be a
-        // separate user-defined helper, not the activesupport one.
-        if (!el.propertyName && el.name.text === "include") includeImported = true;
+        // Local binding must be `include` AND the imported export must
+        // be `include`. Accepts both the bare form and the rare
+        // `include as include`; rejects `include as inc` (local is `inc`,
+        // any `include(...)` call is a separate helper) and
+        // `foo as include` (local is `include` but bound to a different
+        // export — calling it would invoke the wrong function).
+        const importedName = el.propertyName?.text ?? el.name.text;
+        if (importedName === "include" && el.name.text === "include") includeImported = true;
       }
     }
   }

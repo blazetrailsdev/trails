@@ -19,12 +19,13 @@ const STATIC_BLOCK_PATTERN = /\bstatic\s*\{/;
 //     aliased form).
 // The syntactic walker enforces both constraints exactly.
 const INCLUDE_CALL_PATTERN = /^\s*include\s*\(/m;
-// `\binclude\b(?!\s+as\b)` ensures the local binding really is
-// `include` — `include as inc` rebinds to `inc`, leaving any
-// `include(...)` call in the file as a separate user-defined helper
-// that the walker would (correctly) skip.
+// Local binding must be `include`. Accepts `include` (no `as`) and
+// the rare `include as include`; rejects `include as inc` (local
+// rebinds to `inc`). The negative lookahead `(?!\s+as\s+(?!include\b))`
+// fails the match when `include` is followed by `as <something-other-
+// than-include>`.
 const ACTIVESUPPORT_INCLUDE_IMPORT_PATTERN =
-  /import\s*\{[^}]*\binclude\b(?!\s+as\b)[^}]*\}\s*from\s*["']@blazetrails\/activesupport["']/;
+  /import\s*\{[^}]*\binclude\b(?!\s+as\s+(?!include\b))[^}]*\}\s*from\s*["']@blazetrails\/activesupport["']/;
 
 export interface TrailsCompilerHost extends ts.CompilerHost {
   getDeltasForFile(fileName: string): VirtualizeResult["deltas"] | undefined;
