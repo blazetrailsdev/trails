@@ -283,7 +283,7 @@ export interface SchemaStatements {
   /** @internal */
   createAlterTable(name: string): unknown;
   /** @internal */
-  newColumnFromField(tableName: string, field: unknown[], definitions: unknown): unknown;
+  newColumnFromField(tableName: string, field: unknown[], definitions: unknown): Promise<unknown>;
   /** @internal */
   fetchTypeMetadata(
     columnName: string,

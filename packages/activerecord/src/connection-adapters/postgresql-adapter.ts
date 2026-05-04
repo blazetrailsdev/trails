@@ -3935,7 +3935,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     );
     if (rows.length === 0) return undefined;
     const row = rows[0] as Record<string, string>;
-    const parts = (row.constraintdef as string).match(/EXCLUDE(?:\s+USING\s+\w+)?\s+\((.+)\)/s);
+    // Split on WHERE first (Rails approach), then extract expression from EXCLUDE clause.
+    const [excludePart] = (row.constraintdef as string).split(/ WHERE /i);
+    const parts = excludePart.match(/EXCLUDE(?:\s+USING\s+\w+)?\s+\((.+)\)/s);
     return new ExclusionConstraintDefinition(tableName, parts?.[1] ?? "", { name });
   }
 
