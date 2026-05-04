@@ -9,10 +9,7 @@
  */
 
 import { NotImplementedError } from "../../errors.js";
-import {
-  findJoinTableName as _findJoinTableName,
-  joinTableName as _joinTableName,
-} from "../../migration/join-table.js";
+import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { tableNameLength, indexNameLength } from "./database-limits.js";
 import type { DatabaseAdapter } from "../../adapter.js";
@@ -1909,7 +1906,7 @@ export class SchemaStatements {
 
   /** @internal */
   findJoinTableName(table1: string, table2: string, options: { tableName?: string } = {}): string {
-    return _findJoinTableName(table1, table2, options);
+    return options.tableName ?? this.joinTableName(table1, table2);
   }
 
   /** @internal */
