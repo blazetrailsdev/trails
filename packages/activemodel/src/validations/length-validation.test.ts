@@ -543,7 +543,7 @@ describe("LengthValidationTest", () => {
     expect(new Person({ title: "abcde" }).isValid()).toBe(false);
   });
 
-  it("does not leak reserved keys into errors.add options", () => {
+  it("does not leak reserved keys into errors.add options (minimum/maximum path)", () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -551,6 +551,28 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "ab" });
+    p.isValid();
+    const err = p.errors.objects[0];
+    expect(err).toBeDefined();
+    expect(err.options).not.toHaveProperty("minimum");
+    expect(err.options).not.toHaveProperty("maximum");
+    expect(err.options).not.toHaveProperty("tooShort");
+    expect(err.options).not.toHaveProperty("tooLong");
+    expect(err.options).not.toHaveProperty("within");
+    expect(err.options).not.toHaveProperty("is");
+    expect(err.options).toHaveProperty("count");
+  });
+
+  it("does not leak reserved keys into errors.add options (is path)", () => {
+    // Rails RESERVED_OPTIONS omits :wrong_length intentionally, so wrongLength
+    // does appear in error options — matching length.rb:13 behaviour.
+    class Person extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { length: { is: 5, wrongLength: "bad length!" } });
+      }
+    }
+    const p = new Person({ title: "abc" });
     p.isValid();
     const err = p.errors.objects[0];
     expect(err).toBeDefined();
