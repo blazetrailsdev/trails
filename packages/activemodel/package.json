@@ -5,6 +5,20 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./yaml": {
+      "types": "./dist/attribute-set/codecs/yaml.d.ts",
+      "default": "./dist/attribute-set/codecs/yaml.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
   "scripts": {
     "build": "tsc"
   },
@@ -14,7 +28,6 @@
   "license": "MIT",
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
-    "bcryptjs": "^3.0.3",
-    "yaml": "^2.8.3"
+    "bcryptjs": "^3.0.3"
   }
 }

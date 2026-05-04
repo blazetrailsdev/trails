@@ -108,9 +108,6 @@ importers:
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
-      yaml:
-        specifier: ^2.8.3
-        version: 2.8.3
 
   packages/activerecord:
     dependencies:

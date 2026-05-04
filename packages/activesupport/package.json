@@ -58,6 +58,10 @@
       "types": "./dist/cache/*.d.ts",
       "default": "./dist/cache/*.js"
     },
+    "./yaml": {
+      "types": "./dist/yaml.d.ts",
+      "default": "./dist/yaml.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

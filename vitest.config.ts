@@ -29,6 +29,7 @@ const alias = {
     "packages/activesupport/src/temporal.ts",
   ),
   "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
+  "@blazetrails/activesupport/yaml": path.resolve(__dirname, "packages/activesupport/src/yaml.ts"),
   "@blazetrails/activesupport/process-adapter": path.resolve(
     __dirname,
     "packages/activesupport/src/process-adapter.ts",
@@ -40,6 +41,10 @@ const alias = {
   "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/src/index.ts"),
   "@blazetrails/arel/src": path.resolve(__dirname, "packages/arel/src"),
   "@blazetrails/arel": path.resolve(__dirname, "packages/arel/src/index.ts"),
+  "@blazetrails/activemodel/yaml": path.resolve(
+    __dirname,
+    "packages/activemodel/src/attribute-set/codecs/yaml.ts",
+  ),
   "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/src/index.ts"),
   "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js": path.resolve(
     __dirname,
