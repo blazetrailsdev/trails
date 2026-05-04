@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { looseDateParse } from "./helpers/loose-date-parse.js";
 import { ValueType } from "./value.js";
 
 export class TimeType extends ValueType<Temporal.PlainTime> {
@@ -11,10 +12,19 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
     if (value instanceof Temporal.PlainDateTime) return value.toPlainTime();
     const str = String(value).trim();
     if (str === "") return null;
-    const timeStr = extractTimePortion(str);
-    if (!timeStr) return null;
+    const parts = looseDateParse(str);
+    if (!parts || parts.hour === undefined) return null;
     try {
-      return Temporal.PlainTime.from(timeStr, { overflow: "reject" });
+      return Temporal.PlainTime.from(
+        {
+          hour: parts.hour,
+          minute: parts.minute ?? 0,
+          second: parts.second ?? 0,
+          millisecond: parts.millisecond ?? 0,
+          microsecond: parts.microsecond ?? 0,
+        },
+        { overflow: "reject" },
+      );
     } catch {
       return null;
     }
@@ -70,13 +80,4 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
       return null;
     }
   }
-}
-
-/** Extract the `HH:MM:SS[.ffffff]` portion from a datetime or time-only string. */
-function extractTimePortion(str: string): string | null {
-  // Time-only: "HH:MM" or "HH:MM:SS..." forms
-  if (/^\d{2}:\d{2}/.test(str)) return str;
-  // Full datetime: find the time part after T or space separator
-  const m = /[T ](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)(?:[Z+-]|$)/.exec(str);
-  return m ? m[1] : null;
 }
