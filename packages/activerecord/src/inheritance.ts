@@ -190,6 +190,18 @@ export function setAbstractClass(this: typeof Base, value: boolean): void {
 }
 
 /**
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class,
+ * abstract_class=, abstract_class?
+ */
+export function abstractClass(this: typeof Base, value?: boolean): boolean {
+  if (value !== undefined) {
+    setAbstractClass.call(this, value);
+    return value;
+  }
+  return getAbstractClass.call(this);
+}
+
+/**
  * Get the STI base class for a model.
  */
 export function getStiBase(modelClass: typeof Base): typeof Base {

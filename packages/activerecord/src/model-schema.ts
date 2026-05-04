@@ -357,6 +357,7 @@ interface SchemaHost {
   _ignoredColumns?: string[];
   _protectedEnvironments?: string[];
   _attributeDefinitions: Map<string, any>;
+  _defaultAttributes(): { deepDup(): { toHash(): Record<string, unknown> } };
   _columnsHash?: Record<string, any>;
   _columns?: any[];
   _attributesBuilder?: any;
@@ -956,6 +957,11 @@ export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
   return this._ignoredColumns ?? [];
 }
 
+/** Mirrors: ActiveRecord::ModelSchema::ClassMethods#column_defaults */
+export function columnDefaults(this: SchemaHost): Record<string, unknown> {
+  return this._defaultAttributes().deepDup().toHash();
+}
+
 export async function tableExists(this: SchemaHost): Promise<boolean> {
   const { adapter } = this;
   const cache = adapter.schemaCache;
@@ -982,6 +988,12 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
  *   `inheritanceColumn` as a getter/setter.
  * - `loadSchema` — private lifecycle hook in Rails; called automatically
  *   rather than by user code.
+ * - `tableName`, `sequenceName`, `protectedEnvironments`, `ignoredColumns`,
+ *   `inheritanceColumn` — implemented as static getter/setter pairs on `Base`
+ *   directly; `columnDefaults` is a getter-only property on `Base`. Adding
+ *   these to `ClassMethods` would cause `extend()` to overwrite the getter
+ *   descriptor with a plain property assignment, breaking lazy-evaluation
+ *   semantics.
  */
 export const ClassMethods = {
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods

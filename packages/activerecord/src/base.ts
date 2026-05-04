@@ -2513,7 +2513,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.column_defaults
    */
   static get columnDefaults(): Record<string, unknown> {
-    return this._defaultAttributes().deepDup().toHash();
+    return ModelSchema.columnDefaults.call(this as any);
   }
 
   // -- Strict loading class-level default --

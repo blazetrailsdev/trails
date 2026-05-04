@@ -6,6 +6,16 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { resolveAliasName } from "@blazetrails/activemodel";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
+import { attributeForInspect as _attrForInspect } from "./core.js";
+import { writeAttribute as _writeAttribute } from "./readonly-attributes.js";
+import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
+// toKey/id: inline to avoid a circular dependency (primary-key.ts imports
+// dangerousAttributeMethods from this file)
+import { reload as _reload } from "./persistence.js";
+import {
+  serializableHash as _serializableHash,
+  attributeNamesForSerialization as _attrNamesForSerialization,
+} from "./serialization.js";
 // ActiveModel provides aliasAttribute and undefineAttributeMethods on Model.
 // aliasAttribute delegates via the prototype chain. defineAttributeMethods
 // is implemented here since AM doesn't expose it as a static on Model.
@@ -356,4 +366,80 @@ interface AttributeNamesHost {
  */
 export function attributeNames(this: AttributeNamesHost): string[] {
   return [...this._attributeDefinitions.keys()];
+}
+
+// ---------------------------------------------------------------------------
+// Instance methods mirrored from attribute_methods.rb
+// ---------------------------------------------------------------------------
+
+/** Mirrors: ActiveRecord::AttributeMethods#attribute_for_inspect */
+export function attributeForInspect(this: any, attr: string): string {
+  return _attrForInspect.call(this, attr);
+}
+
+/** Mirrors: ActiveRecord::AttributeMethods#read_attribute */
+export function readAttribute(this: any, name: string): unknown {
+  const aliases = (this.constructor as any)?._attributeAliases ?? {};
+  const resolved = (aliases[name] as string | undefined) ?? name;
+  return this._readAttribute(resolved);
+}
+
+/** Mirrors: ActiveRecord::AttributeMethods#write_attribute */
+export function writeAttribute(this: any, name: string, value: unknown): void {
+  const aliases = (this.constructor as any)?._attributeAliases ?? {};
+  const resolved = (aliases[name] as string | undefined) ?? name;
+  _writeAttribute.call(this, resolved, value);
+}
+
+/** Mirrors: ActiveRecord::AttributeMethods#query_attribute */
+export function queryAttribute(this: any, name: string): boolean {
+  return _queryAttribute.call(this, name);
+}
+
+/** Mirrors: ActiveRecord::AttributeMethods#to_key */
+export function toKey(this: any): unknown[] | null {
+  const pk = this.id;
+  if (pk == null) return null;
+  const arr = Array.isArray(pk) ? pk : [pk];
+  return arr.some((v: unknown) => v == null) ? null : arr;
+}
+
+/** Mirrors: ActiveRecord::AttributeMethods#id, id= */
+export function id(this: any, value?: unknown): unknown {
+  const ctor = this.constructor as any;
+  const pk = ctor.primaryKey as string | string[];
+  if (value !== undefined) {
+    if (Array.isArray(pk)) {
+      if (!Array.isArray(value)) {
+        throw new TypeError(
+          `Expected an array for composite primary key [${pk.join(", ")}], got ${value === null ? "null" : typeof value}`,
+        );
+      }
+      pk.forEach((col: string, i: number) => this._writeAttribute(col, (value as unknown[])[i]));
+    } else {
+      this._writeAttribute(pk, value);
+    }
+    return value;
+  }
+  if (Array.isArray(pk)) return pk.map((col: string) => this._readAttribute(col));
+  return this._readAttribute(pk);
+}
+
+/** Mirrors: ActiveRecord::AttributeMethods#reload */
+export async function reload<T>(this: T): Promise<T> {
+  return _reload.call(this as any) as unknown as Promise<T>;
+}
+
+/** Mirrors: ActiveRecord::AttributeMethods#serializable_hash */
+export function serializableHash(this: any, options?: unknown): Record<string, unknown> {
+  return _serializableHash.call(this, options as any);
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods#attribute_names_for_serialization
+ *
+ * @internal
+ */
+export function attributeNamesForSerialization(this: any): string[] {
+  return _attrNamesForSerialization.call(this);
 }

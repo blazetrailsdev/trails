@@ -159,6 +159,29 @@ export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
   return Array.isArray(this._primaryKey ?? "id");
 }
 
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key,
+ * primary_key=
+ */
+export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): string | string[] {
+  if (value !== undefined) {
+    setPrimaryKeyAttr.call(this, value);
+    return value;
+  }
+  return getPrimaryKeyAttr.call(this);
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id, id=
+ */
+export function id(this: PrimaryKeyInstance, value?: unknown): unknown {
+  if (value !== undefined) {
+    setId.call(this, value);
+    return value;
+  }
+  return getId.call(this);
+}
+
 export function isInstanceMethodAlreadyImplemented(
   this: PrimaryKeyHost & { prototype: any },
   methodName: string,
