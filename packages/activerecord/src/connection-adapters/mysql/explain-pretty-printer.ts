@@ -11,6 +11,7 @@ export interface ExplainResult {
 
 export class ExplainPrettyPrinter {
   pp(result: ExplainResult, elapsed: number): string {
+    if (result.columns.length === 0) return "";
     const widths = this.computeColumnWidths(result);
     const separator = this.buildSeparator(widths);
     const lines = [separator, this.buildCells(result.columns, widths), separator];

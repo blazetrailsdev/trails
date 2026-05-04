@@ -18,10 +18,10 @@ import {
   TableDefinition,
 } from "../abstract/schema-definitions.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
-import { quoteColumnName, quoteTableName } from "./quoting.js";
+import { quoteColumnName, quoteTableName, quoteString as mysqlQuoteString } from "./quoting.js";
 
 interface MysqlColumnOptions extends Record<string, unknown> {
-  column?: { sqlType?: string; null?: boolean };
+  column?: { sqlType?: string; type?: string; null?: boolean };
   charset?: string;
   collation?: string;
   as?: string;
@@ -94,7 +94,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.default == null && o.column.options.null === false) {
       sql += "DROP DEFAULT";
     } else {
-      sql += `SET DEFAULT ${this.adapter.quoteDefaultExpression(o.default)}`;
+      sql += `SET${this.adapter.quoteDefaultExpression(o.default)}`;
     }
     return sql;
   }
@@ -132,7 +132,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
     const mo = options as MysqlColumnOptions;
     const col = mo.column;
-    if (col && /^\btimestamp\b/.test(col.sqlType ?? "") && !mo.primaryKey) {
+    if (col && /^\btimestamp\b/.test(col.sqlType ?? col.type ?? "") && !mo.primaryKey) {
       if (mo.null !== false && !this.optionsIncludeDefault(mo)) {
         sql += " NULL";
       }
@@ -173,7 +173,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected addSqlCommentBang(sql: string, comment: string | undefined): string {
     if (!comment) return sql;
-    return `${sql} COMMENT '${comment.replace(/'/g, "''")}'`;
+    return `${sql} COMMENT ${mysqlQuoteString(comment)}`;
   }
 
   /** @internal */
