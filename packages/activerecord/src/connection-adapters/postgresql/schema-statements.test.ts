@@ -515,5 +515,42 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Array.isArray(names)).toBe(true);
       expect(names.length).toBe(2);
     });
+
+    it("extractSchemaQualifiedName splits schema-qualified name", () => {
+      expect(adapter.extractSchemaQualifiedName("public.things")).toEqual(["public", "things"]);
+      expect(adapter.extractSchemaQualifiedName("things")).toEqual([null, "things"]);
+    });
+
+    it("exclusionConstraintName is deterministic and uses name option", () => {
+      const name = adapter.exclusionConstraintName("products", { expression: "price WITH =" });
+      expect(name).toMatch(/^excl_rails_[0-9a-f]{10}$/);
+      expect(adapter.exclusionConstraintName("products", { expression: "price WITH =" })).toBe(
+        name,
+      );
+      expect(adapter.exclusionConstraintName("t", { name: "my_excl" })).toBe("my_excl");
+    });
+
+    it("uniqueConstraintName is deterministic and uses name option", () => {
+      const name = adapter.uniqueConstraintName("sections", { column: "position" });
+      expect(name).toMatch(/^uniq_rails_[0-9a-f]{10}$/);
+      expect(adapter.uniqueConstraintName("t", { name: "my_uniq" })).toBe("my_uniq");
+    });
+
+    it("createTableDefinition creates a PG TableDefinition", () => {
+      const td = adapter.createTableDefinition("products");
+      expect(td).toBeDefined();
+      expect(typeof td.column).toBe("function");
+    });
+
+    it("createAlterTable creates a PG AlterTable wrapping the table definition", () => {
+      const at = adapter.createAlterTable("products");
+      expect(at).toBeDefined();
+    });
+
+    it("fetchTypeMetadata returns TypeMetadata for a known OID", async () => {
+      const meta = await adapter.fetchTypeMetadata("id", "bigint", 20, -1);
+      expect(meta.sqlType).toBe("bigint");
+      expect(meta.oid).toBe(20);
+    });
   });
 });

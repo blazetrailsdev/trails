@@ -60,11 +60,14 @@ import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/sche
 import {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,
+  TableDefinition as PgTableDefinition,
+  AlterTable as PgAlterTable,
   Table as PgTable,
   type ExclusionConstraintOptions,
   type UniqueConstraintOptions,
   type SchemaStatementsConstraintLike,
 } from "./postgresql/schema-definitions.js";
+import { TypeMetadata as PgTypeMetadata } from "./postgresql/type-metadata.js";
 import {
   CheckConstraintDefinition,
   ChangeColumnDefinition,
@@ -3628,7 +3631,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this.assertValidDeferrable(options.deferrable);
     const opts = { ...options };
     if (!opts.name) {
-      opts.name = this.exclusionConstraintName(tableName, expression, opts);
+      opts.name = this.exclusionConstraintName(tableName, { expression, ...opts });
     }
     return opts;
   }
@@ -3683,7 +3686,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     const opts = { ...options };
     if (!opts.name) {
-      opts.name = this.uniqueConstraintName(tableName, columnName, opts);
+      opts.name = this.uniqueConstraintName(tableName, { column: columnName, ...opts });
     }
     return opts;
   }
@@ -3767,53 +3770,239 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return new PgSchemaDumper(this);
   }
 
-  private exclusionConstraintName(
+  /** @internal */
+  createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
+    return new PgTableDefinition(name, options);
+  }
+
+  /** @internal */
+  createAlterTable(name: string): PgAlterTable {
+    return new PgAlterTable(this.createTableDefinition(name));
+  }
+
+  /** @internal */
+  async fetchTypeMetadata(
+    columnName: string,
+    sqlType: string,
+    oid: number,
+    fmod: number,
+  ): Promise<PgTypeMetadata> {
+    const castType = await this.getOidType(oid, fmod, columnName, sqlType);
+    return new PgTypeMetadata({
+      sqlType,
+      type: castType.type(),
+      oid,
+      fmod,
+      limit: (castType as { limit?: number | null }).limit ?? null,
+      precision: (castType as { precision?: number | null }).precision ?? null,
+      scale: (castType as { scale?: number | null }).scale ?? null,
+    });
+  }
+
+  /** @internal */
+  async newColumnFromField(
     tableName: string,
-    expression: string,
-    _options: Record<string, unknown>,
-  ): string {
+    field: unknown[],
+    _definitions: unknown,
+  ): Promise<Column> {
+    void tableName;
+    const [col, type, raw, notnull, oid, fmod, , , identity, gen] = field as [
+      string,
+      string,
+      string | null,
+      boolean,
+      number,
+      number,
+      unknown,
+      unknown,
+      string | null,
+      string | null,
+    ];
+    const meta = await this.fetchTypeMetadata(col, type, Number(oid), Number(fmod));
+    const split = gen ? null : splitPgDefault(raw);
+    return new Column(
+      col,
+      gen ? null : (split?.literal ?? null),
+      { sqlType: meta.sqlType, type: meta.type, oid: Number(oid), fmod: Number(fmod) },
+      !notnull,
+      {
+        defaultFunction: (gen ? raw : split?.fn) ?? undefined,
+        serial: typeof raw === "string" && raw.startsWith("nextval("),
+        array: type.endsWith("[]"),
+        identity: identity || null,
+        generated: gen || null,
+      },
+    );
+  }
+
+  /** @internal */
+  addColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options: Record<string, unknown> = {},
+  ): unknown {
+    const col = this.createTableDefinition(tableName).newColumnDefinition(
+      columnName,
+      type,
+      options,
+    );
+    const sql = `ADD COLUMN ${this.schemaCreation().accept(col)}`;
+    return "comment" in options
+      ? [
+          sql,
+          () => this.changeColumnComment(tableName, columnName, options.comment as string | null),
+        ]
+      : sql;
+  }
+
+  /** @internal */
+  changeColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options: Record<string, unknown> = {},
+  ): unknown[] {
+    const changeDef = this.buildChangeColumnDefinition(
+      tableName,
+      columnName,
+      type,
+      options as Parameters<typeof this.buildChangeColumnDefinition>[3],
+    );
+    const sqls: unknown[] = [this.schemaCreation().accept(changeDef)];
+    if ("comment" in options)
+      sqls.push(() =>
+        this.changeColumnComment(tableName, columnName, options.comment as string | null),
+      );
+    return sqls;
+  }
+
+  /** @internal */
+  changeColumnNullForAlter(
+    tableName: string,
+    columnName: string,
+    nullable: boolean,
+    defaultValue?: unknown,
+  ): unknown {
+    if (defaultValue == null)
+      return `ALTER COLUMN ${this.quoteIdentifier(columnName)} ${nullable ? "DROP" : "SET"} NOT NULL`;
+    return () => this.changeColumnNull(tableName, columnName, nullable, defaultValue);
+  }
+
+  /** @internal */
+  addIndexOpclass(
+    quotedColumns: Record<string, string>,
+    options: Record<string, unknown> = {},
+  ): void {
+    const opclasses = options.opclass as Record<string, string> | undefined;
+    if (!opclasses) return;
+    for (const [name] of Object.entries(quotedColumns)) {
+      const opclass = opclasses[name];
+      if (opclass) quotedColumns[name] += ` ${opclass}`;
+    }
+  }
+
+  /** @internal */
+  addOptionsForIndexColumns(
+    quotedColumns: Record<string, string>,
+    options: Record<string, unknown> = {},
+  ): Record<string, string> {
+    this.addIndexOpclass(quotedColumns, options);
+    return quotedColumns;
+  }
+
+  /** @internal */
+  exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
+    if (options.name) return options.name as string;
+    const expression = (options.expression as string | undefined) ?? "";
     const identifier = `${tableName}_${expression}_excl`;
     const hashed = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
     return `excl_rails_${hashed}`;
   }
 
-  private exclusionConstraintForBang(
+  /** @internal */
+  async exclusionConstraintFor(
     tableName: string,
-    expression: string | null,
-    options: Record<string, unknown>,
+    options: Record<string, unknown> = {},
+  ): Promise<ExclusionConstraintDefinition | undefined> {
+    const name = this.exclusionConstraintName(tableName, options);
+    const scope = this.quotedScope(tableName);
+    const rows = await this.schemaQuery(
+      `SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef FROM pg_constraint c
+       JOIN pg_class t ON c.conrelid = t.oid JOIN pg_namespace n ON n.oid = c.connamespace
+       WHERE c.contype = 'x' AND c.conname = $1 AND t.relname = ${scope.name} AND n.nspname = ${scope.schema}`,
+      [name],
+    );
+    if (rows.length === 0) return undefined;
+    const row = rows[0] as Record<string, string>;
+    const parts = (row.constraintdef as string).match(/EXCLUDE(?:\s+USING\s+\w+)?\s+\((.+)\)/);
+    return new ExclusionConstraintDefinition(tableName, parts?.[1] ?? "", { name });
+  }
+
+  /** @internal */
+  exclusionConstraintForBang(
+    tableName: string,
+    expression?: string | null,
+    options: Record<string, unknown> = {},
   ): ExclusionConstraintDefinition {
     const name =
       (options.name as string | undefined) ??
-      this.exclusionConstraintName(tableName, expression ?? "", options);
+      this.exclusionConstraintName(tableName, { expression: expression ?? "", ...options });
     return new ExclusionConstraintDefinition(tableName, expression ?? "", { ...options, name });
   }
 
-  private uniqueConstraintName(
-    tableName: string,
-    columnName: string | string[] | null | undefined,
-    options: Record<string, unknown>,
-  ): string {
-    const cols = Array.isArray(columnName)
-      ? columnName
-      : columnName
-        ? [columnName as string]
+  /** @internal */
+  uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
+    if (options.name) return options.name as string;
+    const columnOrIndex = Array.isArray(options.column)
+      ? (options.column as string[])
+      : options.column
+        ? [options.column as string]
         : options.usingIndex
           ? [options.usingIndex as string]
           : [];
-    const identifier = `${tableName}_${cols.join("_and_")}_unique`;
+    const identifier = `${tableName}_${columnOrIndex.join("_and_")}_unique`;
     const hashed = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
     return `uniq_rails_${hashed}`;
   }
 
-  private uniqueConstraintForBang(
+  /** @internal */
+  async uniqueConstraintFor(
     tableName: string,
-    columnName: string | string[] | null | undefined,
-    options: Record<string, unknown>,
+    options: Record<string, unknown> = {},
+  ): Promise<UniqueConstraintDefinition | undefined> {
+    const name = "column" in options ? undefined : this.uniqueConstraintName(tableName, options);
+    if (!name) return undefined;
+    const scope = this.quotedScope(tableName);
+    const rows = await this.schemaQuery(
+      `SELECT c.conname, c.conrelid, c.conkey FROM pg_constraint c
+       JOIN pg_class t ON c.conrelid = t.oid JOIN pg_namespace n ON n.oid = c.connamespace
+       WHERE c.contype = 'u' AND c.conname = $1 AND t.relname = ${scope.name} AND n.nspname = ${scope.schema}`,
+      [name],
+    );
+    if (rows.length === 0) return undefined;
+    const row = rows[0] as Record<string, unknown>;
+    const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
+    const cols = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
+    return new UniqueConstraintDefinition(tableName, cols, { name });
+  }
+
+  /** @internal */
+  uniqueConstraintForBang(
+    tableName: string,
+    column?: string | string[] | null,
+    options: Record<string, unknown> = {},
   ): UniqueConstraintDefinition {
     const name =
       (options.name as string | undefined) ??
-      this.uniqueConstraintName(tableName, columnName, options);
-    return new UniqueConstraintDefinition(tableName, columnName ?? [], { ...options, name });
+      this.uniqueConstraintName(tableName, { column, ...options });
+    return new UniqueConstraintDefinition(tableName, column ?? [], { ...options, name });
+  }
+
+  /** @internal */
+  extractSchemaQualifiedName(string: string): [string | null, string] {
+    const name = Utils.extractSchemaQualifiedName(string);
+    return [name.schema, name.identifier];
   }
 
   private deferrable(deferrable: "immediate" | "deferred" | undefined): string {
