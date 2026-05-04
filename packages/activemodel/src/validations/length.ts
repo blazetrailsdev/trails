@@ -46,8 +46,12 @@ export class LengthValidator extends EachValidator {
   declare skipNilCheck: typeof skipNilCheck;
 
   constructor(options: Record<string, unknown>) {
+    // Shallow-clone so we don't mutate the caller's object — mirrors Rails
+    // validates_with.rb:93 which passes `options.dup` to each validator.
+    options = { ...options };
+
     // Normalize :in / :within to :minimum / :maximum before super() calls
-    // checkValidity(). We mutate `options` in place, mirroring length.rb:16-20.
+    // checkValidity(), mirroring length.rb:16-20.
     const range = options["in"] ?? options["within"];
     if (range !== undefined) {
       delete options["in"];
@@ -58,8 +62,7 @@ export class LengthValidator extends EachValidator {
       } else if (
         range !== null &&
         typeof range === "object" &&
-        "begin" in range &&
-        "end" in range
+        ("begin" in range || "end" in range)
       ) {
         const r = range as LengthRange;
         if (r.begin !== undefined) options["minimum"] = r.begin;
