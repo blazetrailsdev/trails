@@ -29,4 +29,9 @@ describe("StringTest", () => {
     const cast = type.cast(s);
     expect(cast).toBe("foo");
   });
+
+  it("toImmutableString propagates trueString and falseString", () => {
+    const type = new Types.StringType({ trueString: "aye" });
+    expect(type.toImmutableString().cast(true)).toBe("aye");
+  });
 });
