@@ -146,9 +146,10 @@ describe("MySQL::SchemaStatements", () => {
     expect(fetchTypeMetadata("int").extra).toBe("");
   });
 
-  it("extractForeignKeyAction: RESTRICT → undefined, others pass through", () => {
+  it("extractForeignKeyAction: RESTRICT → undefined, others normalized", () => {
     expect(extractForeignKeyAction("RESTRICT")).toBeUndefined();
-    expect(extractForeignKeyAction("CASCADE")).toBe("CASCADE");
+    expect(extractForeignKeyAction("CASCADE")).toBe("cascade");
+    expect(extractForeignKeyAction("SET NULL")).toBe("nullify");
   });
 
   it("addIndexLength appends (N) prefix length to column", () => {
