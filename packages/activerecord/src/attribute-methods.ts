@@ -410,8 +410,8 @@ export function id(this: any, value?: unknown): unknown {
 }
 
 /** Mirrors: ActiveRecord::AttributeMethods#reload */
-export async function reload(this: any): Promise<typeof this> {
-  return _reload.call(this);
+export async function reload<T>(this: T): Promise<T> {
+  return _reload.call(this as any) as unknown as Promise<T>;
 }
 
 /** Mirrors: ActiveRecord::AttributeMethods#serializable_hash */
