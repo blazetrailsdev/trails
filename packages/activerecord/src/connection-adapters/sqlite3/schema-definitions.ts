@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::TableDefinition
  */
 
-import { NotImplementedError } from "../../errors.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -14,6 +13,14 @@ import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.j
 export class TableDefinition extends AbstractTableDefinition {
   constructor(tableName: string, options: { id?: boolean | "uuid" } = {}) {
     super(tableName, { ...options, adapterName: "sqlite" });
+  }
+
+  override references(name: string, options: Record<string, unknown> = {}): this {
+    return super.references(name, { type: "integer", ...options } as any);
+  }
+
+  belongsTo(name: string, options: Record<string, unknown> = {}): this {
+    return this.references(name, options);
   }
 
   changeColumn(columnName: string, type: ColumnType, options: ColumnOptions = {}): void {
@@ -26,29 +33,28 @@ export class TableDefinition extends AbstractTableDefinition {
     }
   }
 
-  newColumnDefinition(
+  override newColumnDefinition(
     name: string,
     type: ColumnType,
     options: ColumnOptions = {},
   ): ColumnDefinition {
-    if (type === ("virtual" as ColumnType) && (options as Record<string, unknown>).as) {
-      const actualType = (options as any).type ?? "string";
-      return new ColumnDefinition(name, actualType as ColumnType, options);
+    if (type === ("virtual" as ColumnType)) {
+      type =
+        ((options as Record<string, unknown>)["type"] as ColumnType) ?? ("string" as ColumnType);
     }
-    return new ColumnDefinition(name, type, options);
+    return super.newColumnDefinition(name, type, options);
   }
-}
 
-/** @internal */
-function integerLikePrimaryKeyType(type: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::TableDefinition#integer_like_primary_key_type is not implemented",
-  );
-}
+  /** @internal */
+  protected override integerLikePrimaryKeyType(
+    _type: ColumnType,
+    _options: ColumnOptions,
+  ): ColumnType {
+    return "primary_key";
+  }
 
-/** @internal */
-function validColumnDefinitionOptions(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::TableDefinition#valid_column_definition_options is not implemented",
-  );
+  /** @internal */
+  protected override validColumnDefinitionOptions(): string[] {
+    return [...super.validColumnDefinitionOptions(), "as", "type", "stored"];
+  }
 }

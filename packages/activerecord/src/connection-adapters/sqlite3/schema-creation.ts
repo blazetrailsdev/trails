@@ -4,8 +4,9 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaCreation
  */
 
-import { NotImplementedError } from "../../errors.js";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
+import type { ForeignKeyDefinition } from "../abstract/schema-definitions.js";
+import type { ColumnOptions } from "../abstract/schema-definitions.js";
 
 export class SchemaCreation extends AbstractSchemaCreation {
   visitAddForeignKey(
@@ -18,25 +19,36 @@ export class SchemaCreation extends AbstractSchemaCreation {
         "Use `foreignKey: true` on references when creating the table.",
     );
   }
-}
 
-/** @internal */
-function visit_ForeignKeyDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaCreation#visit_ForeignKeyDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected override visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
+    let sql = super.visitForeignKeyDefinition(o);
+    if (o.deferrable) {
+      sql += ` DEFERRABLE INITIALLY ${o.deferrable.toUpperCase()}`;
+    }
+    return sql;
+  }
 
-/** @internal */
-function supportsIndexUsing(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaCreation#supports_index_using? is not implemented",
-  );
-}
+  /** @internal */
+  protected override supportsIndexUsing(): boolean {
+    return false;
+  }
 
-/** @internal */
-function addColumnOptionsBang(sql: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaCreation#add_column_options! is not implemented",
-  );
+  /** @internal */
+  override addColumnOptions(sql: string, options: ColumnOptions): string {
+    const opts = options as Record<string, unknown>;
+    if (opts["collation"]) {
+      sql += ` COLLATE "${opts["collation"]}"`;
+    }
+    if (opts["as"]) {
+      sql += ` GENERATED ALWAYS AS (${opts["as"]})`;
+      sql += opts["stored"] ? " STORED" : " VIRTUAL";
+    }
+    return super.addColumnOptions(sql, options);
+  }
+
+  /** @internal */
+  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
+    return this.addColumnOptions(sql, options);
+  }
 }

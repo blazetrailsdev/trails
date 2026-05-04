@@ -4,46 +4,47 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaDumper
  */
 
-import { NotImplementedError } from "../../errors.js";
+import type { ColumnInfo } from "../../schema-dumper.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 
+interface Column extends ColumnInfo {
+  bigint?: boolean;
+  virtual?: boolean;
+  virtualStored?: boolean;
+  hasDefault?: boolean;
+  defaultFunction?: string | null;
+  comment?: string | null;
+}
+
 export class SchemaDumper extends AbstractSchemaDumper {
-  defaultPrimaryKeyType(): string {
-    return "integer";
+  /** @internal */
+  protected override virtualTables(lines: string[]): void | Promise<void> {
+    return super.virtualTables(lines);
   }
-}
 
-/** @internal */
-function virtualTables(stream: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaDumper#virtual_tables is not implemented",
-  );
-}
+  /** @internal */
+  protected override isDefaultPrimaryKey(column: Column): boolean {
+    return this.schemaType(column) === "integer";
+  }
 
-/** @internal */
-function isDefaultPrimaryKey(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaDumper#default_primary_key? is not implemented",
-  );
-}
+  /** @internal */
+  protected override isExplicitPrimaryKeyDefault(column: Column): boolean {
+    return !!column.bigint;
+  }
 
-/** @internal */
-function isExplicitPrimaryKeyDefault(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaDumper#explicit_primary_key_default? is not implemented",
-  );
-}
+  /** @internal */
+  protected override prepareColumnOptions(column: Column): Record<string, unknown> {
+    const spec = super.prepareColumnOptions(column);
+    if (column.virtual) {
+      spec["as"] = this.extractExpressionForVirtualColumn(column);
+      spec["stored"] = !!column.virtualStored;
+      return { type: JSON.stringify(this.schemaType(column)), ...spec };
+    }
+    return spec;
+  }
 
-/** @internal */
-function prepareColumnOptions(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaDumper#prepare_column_options is not implemented",
-  );
-}
-
-/** @internal */
-function extractExpressionForVirtualColumn(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaDumper#extract_expression_for_virtual_column is not implemented",
-  );
+  /** @internal */
+  protected extractExpressionForVirtualColumn(column: Column): string {
+    return JSON.stringify(column.defaultFunction ?? null);
+  }
 }
