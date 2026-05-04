@@ -415,6 +415,224 @@ describe("virtualize — multiple classes", () => {
   });
 });
 
+function indexOfNthNewline(text: string, n: number): number {
+  let idx = 0;
+  for (let i = 0; i < n; i++) {
+    const next = text.indexOf("\n", idx);
+    if (next === -1) return text.length;
+    idx = next + 1;
+  }
+  return idx;
+}
+
+describe("virtualize — include() interface bridge", () => {
+  test("emits interface-merge for include() of a local class", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QueryMethods } from "./query-methods.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QueryMethods);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).toMatch(
+      /import type \{ Included as __TrailsIncluded \} from "@blazetrails\/activesupport";/,
+    );
+    expect(text).toMatch(/interface Relation extends __TrailsIncluded<typeof QueryMethods> \{\}/);
+  });
+
+  test("groups multiple include() calls on the same class into one heritage list", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { A, B } from "./mods.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, A);\n" +
+      "include(Relation, B);\n";
+    const { text } = virtualize(src, "relation.ts");
+    const m = text.match(/interface Relation extends ([^{]+) \{\}/);
+    expect(m).not.toBeNull();
+    expect(m![1]).toContain("__TrailsIncluded<typeof A>");
+    expect(m![1]).toContain("__TrailsIncluded<typeof B>");
+    expect(text.match(/interface Relation extends/g)?.length).toBe(1);
+  });
+
+  test("ignores include() when not imported from activesupport", () => {
+    const src =
+      'import { include } from "./local-helper.js";\n' +
+      "export class Foo {}\n" +
+      "include(Foo, Bar);\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).not.toMatch(/interface Foo extends/);
+  });
+
+  test("ignores include() when target class is not declared in this file", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { External } from "./external.js";\n' +
+      "include(External, Mod);\n";
+    const { text } = virtualize(src, "x.ts");
+    expect(text).not.toMatch(/interface External/);
+  });
+
+  test("preserves export modifier and generic type params on the merged interface", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation<T extends Base> {}\n" +
+      "include(Relation, QM);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).toMatch(
+      /export interface Relation<T extends Base> extends __TrailsIncluded<typeof QM> \{\}/,
+    );
+  });
+
+  test("skips include() with non-typeof-queryable module expressions (object literals)", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      "export class Foo {}\n" +
+      "include(Foo, { bar() {} });\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).not.toMatch(/interface Foo extends/);
+  });
+
+  test("accepts property-access module expressions (typeof Mod.InstanceMethods)", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import * as Persistence from "./persistence.js";\n' +
+      "export class Foo {}\n" +
+      "include(Foo, Persistence.InstanceMethods);\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).toMatch(
+      /interface Foo extends __TrailsIncluded<typeof Persistence\.InstanceMethods> \{\}/,
+    );
+  });
+
+  test("aliased include import (`include as inc`) is not picked up", () => {
+    // The aliased binding is `inc`, so a local user-defined `include(...)`
+    // helper in the same file must not be misclassified as the
+    // activesupport one.
+    const src =
+      'import { include as inc } from "@blazetrails/activesupport";\n' +
+      "function include(c: any, m: any) {}\n" +
+      "export class Foo {}\n" +
+      "include(Foo, Bar);\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).not.toMatch(/interface Foo extends/);
+    expect(text).not.toMatch(/__TrailsIncluded/);
+  });
+
+  test("multi-line module expression — delta math survives embedded newlines", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import * as Persistence from "./persistence.js";\n' +
+      "export class Foo {}\n" +
+      "include(\n  Foo,\n  Persistence\n    .InstanceMethods,\n);\n" +
+      "const target = 42;\n";
+    const { text, deltas } = virtualize(src, "foo.ts");
+    // The synthesized declare must round-trip the multi-line text without losing newlines.
+    expect(text).toMatch(/__TrailsIncluded<typeof Persistence[\s\S]*\.InstanceMethods>/);
+    // Delta line count must reflect ACTUAL physical lines in the
+    // prepended block, not the entry count.
+    const headDelta = deltas[0]!;
+    const headLines = text
+      .slice(0, indexOfNthNewline(text, headDelta.insertedAtLine + headDelta.lineCount + 1))
+      .split(/\r?\n/);
+    // The line at insertedAtLine+1 (start of injection) should be the first prepend line.
+    expect(headLines[headDelta.insertedAtLine + 1]).toMatch(/import type \{ Included as/);
+  });
+
+  test("reuses existing `Included as __TrailsIncluded` import — emits interfaces but not a duplicate import", () => {
+    // Single-quoted, no semicolon: AST detection sees the import
+    // regardless of formatting. The bridge reuses the existing alias
+    // and still injects the interface declaration.
+    const src =
+      "import type { Included as __TrailsIncluded } from '@blazetrails/activesupport'\n" +
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text.match(/import type \{ Included as __TrailsIncluded \}/g)?.length).toBe(1);
+    expect(text).toMatch(/interface Relation extends __TrailsIncluded<typeof QM>/);
+  });
+
+  test("bails entirely when __TrailsIncluded is bound by something else", () => {
+    const src =
+      'import { __TrailsIncluded } from "./local.js";\n' +
+      'import { include } from "@blazetrails/activesupport";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const { text } = virtualize(src, "relation.ts");
+    // No injected import (existing one is from a different module).
+    expect(text).not.toMatch(/import type \{ Included as __TrailsIncluded \}/);
+    // No interface either — would type against the wrong symbol.
+    expect(text).not.toMatch(/interface Relation extends/);
+  });
+
+  test("skips auto-bridge for classes the user hand-declares an interface for", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { FinderMethods } from "./finder-methods.js";\n' +
+      "export class Relation<T> {}\n" +
+      "export interface Relation<T> { find(...args: unknown[]): Promise<T>; }\n" +
+      "include(Relation, FinderMethods);\n";
+    const { text } = virtualize(src, "relation.ts");
+    // No auto-bridge for Relation — user has refined typings.
+    expect(text).not.toMatch(/interface Relation<T> extends __TrailsIncluded/);
+  });
+
+  test("bails when __TrailsIncluded is bound by an enum or namespace", () => {
+    for (const decl of [
+      "enum __TrailsIncluded { A }",
+      "namespace __TrailsIncluded { export const x = 1; }",
+    ]) {
+      const src =
+        decl +
+        "\n" +
+        'import { include } from "@blazetrails/activesupport";\n' +
+        "export class Relation {}\n" +
+        "include(Relation, QM);\n";
+      const { text } = virtualize(src, "relation.ts");
+      expect(text).not.toMatch(/import type \{ Included as __TrailsIncluded \}/);
+      expect(text).not.toMatch(/interface Relation extends __TrailsIncluded/);
+    }
+  });
+
+  test("does not inject the __TrailsIncluded import when every target has a user interface", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { FinderMethods } from "./finder-methods.js";\n' +
+      "export class Relation<T> {}\n" +
+      "export interface Relation<T> { find(...args: unknown[]): Promise<T>; }\n" +
+      "include(Relation, FinderMethods);\n";
+    const { text } = virtualize(src, "relation.ts");
+    // No interface emitted (user has one), and no dangling alias import.
+    expect(text).not.toMatch(/__TrailsIncluded/);
+  });
+
+  test("accepts `include as include` (local binding still `include`)", () => {
+    const src =
+      'import { include as include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).toMatch(/interface Relation extends __TrailsIncluded<typeof QM>/);
+  });
+
+  test("re-virtualizing already-virtualized output does not re-inject", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const once = virtualize(src, "relation.ts").text;
+    const twice = virtualize(once, "relation.ts").text;
+    expect(twice).toBe(once);
+    expect(once.match(/__TrailsIncluded/g)?.length).toBeGreaterThan(0);
+    expect(twice.match(/import type \{ Included as __TrailsIncluded \}/g)?.length).toBe(1);
+    expect(twice.match(/interface Relation extends __TrailsIncluded<typeof QM>/g)?.length).toBe(1);
+  });
+});
+
 describe("virtualize — idempotence", () => {
   test("re-virtualizing the output skips members already declared", () => {
     const src =
