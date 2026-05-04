@@ -163,6 +163,22 @@ describe("PostgreSQL::SchemaDumper", () => {
     });
   });
 
+  describe("schemaTypeWithVirtual", () => {
+    it("returns virtual for generated (stored) PG columns", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = new Column("computed", null, { sqlType: "integer", type: "integer" }, true, {
+        generated: "s",
+      });
+      expect(dumper.schemaTypeWithVirtual(col)).toBe("virtual");
+    });
+
+    it("returns schemaType for non-virtual columns", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
+      expect(dumper.schemaTypeWithVirtual(col)).toBe("serial");
+    });
+  });
+
   describe("extractExpressionForVirtualColumn", () => {
     it("returns JSON-stringified defaultFunction", () => {
       const dumper = SchemaDumper.create(emptySource) as any;

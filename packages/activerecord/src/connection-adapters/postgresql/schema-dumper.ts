@@ -50,6 +50,13 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
+  protected override schemaTypeWithVirtual(column: Column): string {
+    // Abstract base checks column.virtual (property); PG Column exposes isVirtual() instead
+    if (column.isVirtual()) return "virtual";
+    return this.schemaType(column);
+  }
+
+  /** @internal */
   protected override schemaExpression(column: Column): string | undefined {
     if (column.isSerial) return undefined;
     return super.schemaExpression(column as any);
