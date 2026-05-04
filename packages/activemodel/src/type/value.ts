@@ -190,6 +190,11 @@ export class ValueType<T = unknown> extends Type<T> {
   readonly name: string = "value";
 
   equals(other: Type): boolean {
-    return this.constructor === other.constructor;
+    return (
+      this.constructor === other.constructor &&
+      this.precision === other.precision &&
+      this.scale === other.scale &&
+      this.limit === other.limit
+    );
   }
 }
