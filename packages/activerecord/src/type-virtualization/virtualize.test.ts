@@ -539,6 +539,22 @@ describe("virtualize — include() interface bridge", () => {
     expect(headLines[headDelta.insertedAtLine + 1]).toMatch(/import type \{ Included as/);
   });
 
+  test("skips injection when __TrailsIncluded is already bound (any formatting)", () => {
+    // Single-quoted, no semicolon — text-includes wouldn't catch this,
+    // but the AST walk does.
+    const src =
+      "import type { Included as __TrailsIncluded } from '@blazetrails/activesupport'\n" +
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const { text } = virtualize(src, "relation.ts");
+    // No second `import type { Included as __TrailsIncluded }` injected.
+    expect(text.match(/import type \{ Included as __TrailsIncluded \}/g)?.length).toBe(1);
+    // No interface emitted either, since we skip the whole include path.
+    expect(text).not.toMatch(/interface Relation extends/);
+  });
+
   test("re-virtualizing already-virtualized output does not re-inject", () => {
     const src =
       'import { include } from "@blazetrails/activesupport";\n' +

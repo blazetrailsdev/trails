@@ -144,10 +144,14 @@ export function virtualize(
   const includes = findIncludeCalls(sf);
   const effectivePrepends: string[] = [];
   if (options.prependImports) effectivePrepends.push(...options.prependImports);
-  // Skip re-injection when the input was already virtualized (e.g. the
-  // virtualizer is run on its own previous output). Detected by the
-  // marker import line, which only the virtualizer ever emits.
-  const alreadyInjected = originalText.includes(INCLUDED_IMPORT_LINE);
+  // Skip re-injection when any top-level declaration already binds the
+  // local name `__TrailsIncluded` — covers re-virtualizing prior
+  // output (the virtualizer's own marker import) AND the unlikely
+  // case of a user file that already binds the alias under different
+  // formatting (different quotes, missing semicolon, etc.). Walking
+  // the parsed AST is more robust than the previous text-includes
+  // check, which was sensitive to whitespace / quote style.
+  const alreadyInjected = hasTopLevelBinding(sf, INCLUDED_ALIAS);
   if (includes.length > 0 && !alreadyInjected) {
     effectivePrepends.push(INCLUDED_IMPORT_LINE);
     interface Group {
@@ -213,6 +217,44 @@ export function virtualize(
   }
 
   return { text, deltas };
+}
+
+/**
+ * Returns true if any top-level statement in `sf` introduces a local
+ * binding (import alias, type alias, interface, variable, function,
+ * class) with the given name. Used to avoid colliding with a name the
+ * virtualizer is about to inject.
+ */
+function hasTopLevelBinding(sf: ts.SourceFile, name: string): boolean {
+  for (const stmt of sf.statements) {
+    if (ts.isImportDeclaration(stmt)) {
+      const clause = stmt.importClause;
+      if (!clause) continue;
+      if (clause.name?.text === name) return true;
+      const named = clause.namedBindings;
+      if (!named) continue;
+      if (ts.isNamespaceImport(named) && named.name.text === name) return true;
+      if (ts.isNamedImports(named)) {
+        for (const el of named.elements) if (el.name.text === name) return true;
+      }
+      continue;
+    }
+    if (
+      (ts.isTypeAliasDeclaration(stmt) ||
+        ts.isInterfaceDeclaration(stmt) ||
+        ts.isClassDeclaration(stmt) ||
+        ts.isFunctionDeclaration(stmt)) &&
+      stmt.name?.text === name
+    ) {
+      return true;
+    }
+    if (ts.isVariableStatement(stmt)) {
+      for (const decl of stmt.declarationList.declarations) {
+        if (ts.isIdentifier(decl.name) && decl.name.text === name) return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**
