@@ -1,13 +1,20 @@
 import { describe, it, expect } from "vitest";
+import { ActiveModelRangeError } from "@blazetrails/activemodel";
 import { UnsignedInteger } from "./unsigned-integer.js";
 
 describe("UnsignedIntegerTest", () => {
-  it.skip("serialize_cast_value enforces range", () => {});
+  it("unsigned int max value is in range", () => {
+    expect(new UnsignedInteger().serialize(4294967295)).toBe(4294967295);
+  });
+
+  it("serialize_cast_value enforces range", () => {
+    const type = new UnsignedInteger();
+    expect(() => type.serializeCastValue(-1)).toThrow(ActiveModelRangeError);
+    expect(() => type.serializeCastValue(4294967296)).toThrow(ActiveModelRangeError);
+  });
 
   it("cast rejects negative values (returns null)", () => {
-    // Rails' UnsignedInteger raises ActiveModel::RangeError when a
-    // negative value hits `ensure_in_range`; TS mirrors that as null so
-    // callers don't silently see a clamped zero.
+    // Rails raises ActiveModel::RangeError; TS returns null (documented divergence).
     const t = new UnsignedInteger();
     expect(t.cast(-1)).toBeNull();
     expect(t.cast("-7")).toBeNull();
