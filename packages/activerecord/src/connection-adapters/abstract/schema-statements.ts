@@ -9,6 +9,7 @@
  */
 
 import { NotImplementedError } from "../../errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { DatabaseAdapter } from "../../adapter.js";
 import {
   TableDefinition,
@@ -1339,9 +1340,7 @@ export class SchemaStatements {
     const adapter = this.adapter as any;
     const supportsForeignKeys =
       typeof adapter.supportsForeignKeys === "function" ? adapter.supportsForeignKeys() : true;
-    const foreignKeysEnabled =
-      typeof adapter.foreignKeysEnabled === "function" ? adapter.foreignKeysEnabled() : true;
-    return supportsForeignKeys && foreignKeysEnabled;
+    return supportsForeignKeys && this.isForeignKeysEnabled();
   }
 
   async bulkChangeTable(
@@ -1424,181 +1423,362 @@ export class SchemaStatements {
       );
     }
   }
-}
 
-/** @internal */
-function generateIndexName(tableName: any, column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#generate_index_name is not implemented",
-  );
-}
+  /** @internal */
+  generateIndexName(tableName: string, column: string | string[]): string {
+    const cols = Array.isArray(column) ? column : [column];
+    const name = `index_${tableName}_on_${cols.join("_and_")}`;
+    const limit = this.maxIndexNameSize();
+    if (name.length <= limit) return name;
+    const hashed = "_" + getCrypto().createHash("sha256").update(name).digest("hex").slice(0, 10);
+    const shortName = `idx_on_${cols.join("_")}`.slice(0, limit - hashed.length);
+    return `${shortName}${hashed}`;
+  }
 
-/** @internal */
-function validateChangeColumnNullArgumentBang(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#validate_change_column_null_argument! is not implemented",
-  );
-}
+  /** @internal */
+  validateChangeColumnNullArgumentBang(value: unknown): void {
+    if (value !== true && value !== false) {
+      throw new ArgumentError(
+        `change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: ${String(value)}`,
+      );
+    }
+  }
 
-/** @internal */
-function columnOptionsKeys(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#column_options_keys is not implemented",
-  );
-}
+  /** @internal */
+  columnOptionsKeys(): string[] {
+    return ["limit", "precision", "scale", "default", "null", "collation", "comment"];
+  }
 
-/** @internal */
-function addIndexSortOrder(quotedColumns: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#add_index_sort_order is not implemented",
-  );
-}
+  /** @internal */
+  addIndexSortOrder(
+    quotedColumns: Map<string, string>,
+    options: { order?: string | Record<string, string> },
+  ): Map<string, string> {
+    const orders = this.optionsForIndexColumns(options.order);
+    for (const [name, _col] of quotedColumns) {
+      const dir = orders(name);
+      if (dir) quotedColumns.set(name, `${quotedColumns.get(name)} ${dir.toUpperCase()}`);
+    }
+    return quotedColumns;
+  }
 
-/** @internal */
-function optionsForIndexColumns(options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#options_for_index_columns is not implemented",
-  );
-}
+  /** @internal */
+  optionsForIndexColumns(
+    options: string | Record<string, string> | undefined,
+  ): (col: string) => string | undefined {
+    if (options && typeof options === "object") {
+      return (col: string) => options[col];
+    }
+    return (_col: string) => (options as string | undefined) ?? undefined;
+  }
 
-/** @internal */
-function addOptionsForIndexColumns(quotedColumns: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#add_options_for_index_columns is not implemented",
-  );
-}
+  /** @internal */
+  addOptionsForIndexColumns(
+    quotedColumns: Map<string, string>,
+    options: { order?: string | Record<string, string> } = {},
+  ): Map<string, string> {
+    const adapter = this.adapter as any;
+    if (typeof adapter.supportsIndexSortOrder === "function" && adapter.supportsIndexSortOrder()) {
+      quotedColumns = this.addIndexSortOrder(quotedColumns, options);
+    }
+    return quotedColumns;
+  }
 
-/** @internal */
-function indexNameForRemove(tableName: any, columnName: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#index_name_for_remove is not implemented",
-  );
-}
+  /** @internal */
+  async indexNameForRemove(
+    tableName: string,
+    columnName: string | null | undefined,
+    options: { name?: string; column?: string | string[] },
+  ): Promise<string> {
+    if (columnName == null && options.name && Object.keys(options).length === 1) {
+      return options.name;
+    }
 
-/** @internal */
-function renameTableIndexes(tableName: any, newName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#rename_table_indexes is not implemented",
-  );
-}
+    const checks: Array<(idx: { name: string; columns: string[] }) => boolean> = [];
+    let columnNames: string[];
 
-/** @internal */
-function renameColumnIndexes(tableName: any, columnName: any, newColumnName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#rename_column_indexes is not implemented",
-  );
-}
+    if (!options.name && this.isExpressionColumnName(columnName ?? "")) {
+      options = { ...options, name: this.indexName(tableName, { column: columnName! }) };
+      columnNames = [];
+    } else {
+      const rawColumn = columnName ?? options.column;
+      columnNames =
+        rawColumn !== undefined && rawColumn !== "" ? this.indexColumnNames(rawColumn) : [];
+    }
 
-/** @internal */
-function createTableDefinition(name: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#create_table_definition is not implemented",
-  );
-}
+    if (options.name) {
+      const n = options.name;
+      checks.push((i) => i.name === n);
+    }
 
-/** @internal */
-function createAlterTable(name: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#create_alter_table is not implemented",
-  );
-}
+    if (
+      columnNames.length > 0 &&
+      !(options.name && this.isExpressionColumnName(columnNames as unknown as string))
+    ) {
+      checks.push(
+        (i) =>
+          this.indexName(tableName, { column: i.columns }) ===
+          this.indexName(tableName, { column: columnNames }),
+      );
+    }
 
-/** @internal */
-function validateCreateTableOptionsBang(options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#validate_create_table_options! is not implemented",
-  );
-}
+    if (checks.length === 0) throw new ArgumentError("No name or columns specified");
 
-/** @internal */
-function fetchTypeMetadata(sqlType: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#fetch_type_metadata is not implemented",
-  );
-}
+    const allIndexes = await this.indexes(tableName);
+    const matching = allIndexes.filter((i) => checks.every((c) => c(i)));
 
-/** @internal */
-function indexColumnNames(columnNames: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#index_column_names is not implemented",
-  );
-}
+    if (matching.length > 1) {
+      throw new ArgumentError(
+        `Multiple indexes found on ${tableName} columns ${columnNames}. Specify an index name from ${matching.map((i) => i.name).join(", ")}`,
+      );
+    } else if (matching.length === 0) {
+      throw new ArgumentError(`No indexes found on ${tableName} with the options provided.`);
+    }
+    return matching[0].name;
+  }
 
-/** @internal */
-function indexNameOptions(columnNames: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#index_name_options is not implemented",
-  );
-}
+  /** @internal */
+  async renameTableIndexes(
+    tableName: string,
+    newName: string,
+    options: Record<string, unknown> = {},
+  ): Promise<void> {
+    const idxs = await this.indexes(newName);
+    for (const index of idxs) {
+      const generatedName = this.indexName(tableName, { column: index.columns, ...options } as any);
+      if (generatedName === index.name) {
+        await this.renameIndex(
+          newName,
+          generatedName,
+          this.indexName(newName, { column: index.columns, ...options } as any),
+        );
+      }
+    }
+  }
 
-/** @internal */
-function isExpressionColumnName(columnName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#expression_column_name? is not implemented",
-  );
-}
+  /** @internal */
+  async renameColumnIndexes(
+    tableName: string,
+    columnName: string,
+    newColumnName: string,
+  ): Promise<void> {
+    const colName = String(columnName);
+    const newColName = String(newColumnName);
+    const idxs = await this.indexes(tableName);
+    for (const index of idxs) {
+      if (!index.columns.includes(newColName)) continue;
+      const oldColumns = [...index.columns];
+      const pos = oldColumns.indexOf(newColName);
+      oldColumns[pos] = colName;
+      const generatedName = this.indexName(tableName, { column: oldColumns });
+      if (generatedName === index.name) {
+        await this.renameIndex(
+          tableName,
+          generatedName,
+          this.indexName(tableName, { column: index.columns }),
+        );
+      }
+    }
+  }
 
-/** @internal */
-function stripTableNamePrefixAndSuffix(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#strip_table_name_prefix_and_suffix is not implemented",
-  );
-}
+  /** @internal */
+  createTableDefinition(name: string, options: Record<string, unknown> = {}): TableDefinition {
+    return new TableDefinition(name, {
+      ...options,
+      adapterName: this.adapterName as any,
+      adapter: this.adapter,
+    });
+  }
 
-/** @internal */
-function foreignKeyName(tableName: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_key_name is not implemented",
-  );
-}
+  /**
+   * @internal
+   * Diverges from Rails: Rails wraps `AlterTable.new(create_table_definition(name))` so the
+   * alter table has access to the underlying TableDefinition. The TS AlterTable constructor
+   * was designed to take a name string directly; wrap a TableDefinition here once AlterTable
+   * is updated to match Rails' shape.
+   */
+  createAlterTable(name: string): AlterTable {
+    return new AlterTable(name);
+  }
 
-/** @internal */
-function foreignKeyFor(fromTable: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_key_for is not implemented",
-  );
-}
+  /** @internal */
+  validateCreateTableOptionsBang(options: Record<string, unknown>): void {
+    if (options._skipValidateOptions) return;
+    const { _usesLegacyTableName: _l, _skipValidateOptions: _s, ...rest } = options;
+    const valid = new Set([
+      ...this.validTableDefinitionOptions(),
+      ...this.validPrimaryKeyOptions(),
+    ]);
+    for (const key of Object.keys(rest)) {
+      if (!valid.has(key)) {
+        throw new ArgumentError(`Unknown key: ${key}. Valid keys are: ${[...valid].join(", ")}`);
+      }
+    }
+  }
 
-/** @internal */
-function foreignKeyForBang(fromTable: any, toTable?: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_key_for! is not implemented",
-  );
-}
+  /** @internal */
+  fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
+    const adapter = this.adapter as any;
+    const castType =
+      typeof adapter.lookupCastType === "function" ? adapter.lookupCastType(sqlType) : null;
+    return new SqlTypeMetadata({
+      sqlType,
+      type: castType?.type ?? "string",
+      limit: castType?.limit ?? null,
+      precision: castType?.precision ?? null,
+      scale: castType?.scale ?? null,
+    });
+  }
 
-/** @internal */
-function extractForeignKeyAction(specifier: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#extract_foreign_key_action is not implemented",
-  );
-}
+  /** @internal */
+  indexColumnNames(columnNames: string | string[]): string[] {
+    if (this.isExpressionColumnName(columnNames as string)) {
+      return columnNames as unknown as string[];
+    }
+    return Array.isArray(columnNames) ? columnNames : [columnNames];
+  }
 
-/** @internal */
-function isForeignKeysEnabled(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#foreign_keys_enabled? is not implemented",
-  );
-}
+  /** @internal */
+  indexNameOptions(columnNames: string | string[]): { column: string | string[] } {
+    if (this.isExpressionColumnName(columnNames as string)) {
+      const joined = (columnNames as string).match(/\w+/g)?.join("_") ?? String(columnNames);
+      return { column: joined };
+    }
+    return { column: columnNames };
+  }
 
-/** @internal */
-function checkConstraintName(tableName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#check_constraint_name is not implemented",
-  );
-}
+  /** @internal */
+  isExpressionColumnName(columnName: string): boolean {
+    return typeof columnName === "string" && /\W/.test(columnName);
+  }
 
-/** @internal */
-function checkConstraintFor(tableName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#check_constraint_for is not implemented",
-  );
-}
+  /**
+   * @internal
+   * Diverges from Rails: Rails reads `Base.table_name_prefix` / `Base.table_name_suffix`
+   * (model-class globals). Importing Base here creates a circular dependency
+   * (base.ts → connection-adapters/abstract/connection-handler.ts). Instead, we read from
+   * the adapter, which callers can populate from `Base.tableNamePrefix` at the connection
+   * layer if needed.
+   */
+  stripTableNamePrefixAndSuffix(tableName: string): string {
+    const adapter = this.adapter as any;
+    const prefix: string = adapter.tableNamePrefix ?? "";
+    const suffix: string = adapter.tableNameSuffix ?? "";
+    const str = String(tableName);
+    if (prefix || suffix) {
+      const re = new RegExp(`^${prefix}(.+)${suffix}$`);
+      const m = str.match(re);
+      if (m) return m[1];
+    }
+    return str;
+  }
 
-/** @internal */
-function checkConstraintForBang(tableName: any, expression?: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#check_constraint_for! is not implemented",
-  );
+  /** @internal */
+  foreignKeyName(
+    tableName: string,
+    options: { name?: string; column?: string | string[] },
+  ): string {
+    if (options.name) return options.name;
+    if (options.column === undefined) {
+      throw new ArgumentError(`foreign_key_name requires either :name or :column to be specified`);
+    }
+    const cols = Array.isArray(options.column) ? options.column : [options.column];
+    const identifier = `${tableName}_${cols.join("_and_")}_fk`;
+    const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    return `fk_rails_${hex}`;
+  }
+
+  /** @internal */
+  async foreignKeyFor(
+    fromTable: string,
+    options: { toTable?: string; column?: string; name?: string } = {},
+  ): Promise<ForeignKeyDefinition | undefined> {
+    if (!this.isUseForeignKeys()) return undefined;
+    const fks = await this.foreignKeys(fromTable);
+    return fks.find((fk) => fk.isDefinedFor(options));
+  }
+
+  /** @internal */
+  async foreignKeyForBang(
+    fromTable: string,
+    options: { toTable?: string; column?: string; name?: string } = {},
+  ): Promise<ForeignKeyDefinition> {
+    const fk = await this.foreignKeyFor(fromTable, options);
+    if (!fk) {
+      throw new ArgumentError(
+        `Table '${fromTable}' has no foreign key for ${options.toTable ?? JSON.stringify(options)}`,
+      );
+    }
+    return fk;
+  }
+
+  /** @internal */
+  extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined {
+    switch (specifier) {
+      case "CASCADE":
+        return "cascade";
+      case "SET NULL":
+        return "nullify";
+      case "RESTRICT":
+        return "restrict";
+      default:
+        return undefined;
+    }
+  }
+
+  /** @internal */
+  isForeignKeysEnabled(): boolean {
+    const adapter = this.adapter as any;
+    return adapter.config?.foreignKeys !== false;
+  }
+
+  /** @internal */
+  checkConstraintName(
+    tableName: string,
+    options: { name?: string; expression?: string } = {},
+  ): string {
+    if (options.name) return options.name;
+    if (options.expression === undefined) {
+      throw new ArgumentError(
+        `check_constraint_name requires either :name or :expression to be specified`,
+      );
+    }
+    const expression = options.expression;
+    const identifier = `${tableName}_${expression}_chk`;
+    const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    return `chk_rails_${hex}`;
+  }
+
+  /** @internal */
+  async checkConstraintFor(
+    tableName: string,
+    options: { name?: string; expression?: string } = {},
+  ): Promise<CheckConstraintDefinition | undefined> {
+    const adapter = this.adapter as any;
+    if (
+      typeof adapter.supportsCheckConstraints === "function" &&
+      !adapter.supportsCheckConstraints()
+    ) {
+      return undefined;
+    }
+    const chkName = this.checkConstraintName(tableName, options);
+    const constraints = await this.checkConstraints(tableName);
+    return constraints.find((chk) => chk.isDefinedFor({ name: chkName, ...options }));
+  }
+
+  /** @internal */
+  async checkConstraintForBang(
+    tableName: string,
+    options: { name?: string; expression?: string } = {},
+  ): Promise<CheckConstraintDefinition> {
+    const chk = await this.checkConstraintFor(tableName, options);
+    if (!chk) {
+      throw new ArgumentError(
+        `Table '${tableName}' has no check constraint for ${options.expression ?? JSON.stringify(options)}`,
+      );
+    }
+    return chk;
+  }
 }
 
 /** @internal */
