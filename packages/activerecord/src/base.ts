@@ -59,7 +59,6 @@ import {
 } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
-import { Map as TypeCasterMap } from "./type-caster/map.js";
 import {
   defineAttribute as _defineAttribute,
   _defaultAttributes as _arDefaultAttributes,
@@ -138,7 +137,6 @@ import {
   isPresent as _isPresent,
   isBlank as _isBlank,
   filterAttributes as _coreFilterAttributes,
-  inspectionFilter as _coreInspectionFilter,
 } from "./core.js";
 import * as _Core from "./core.js";
 import * as _Persistence from "./persistence.js";
@@ -472,7 +470,7 @@ export class Base extends Model {
   }
 
   static inspectionFilter(): ParameterFilter {
-    return _coreInspectionFilter.call(this);
+    return _Core.inspectionFilter.call(this);
   }
 
   static _adapter: DatabaseAdapter | null = null;
@@ -491,17 +489,12 @@ export class Base extends Model {
   static _protectedEnvironments: string[] = ["production"];
   static _lockingColumn: string = "lock_version";
 
-  /**
-   * List of environments where destructive actions are prohibited.
-   *
-   * Mirrors: ActiveRecord::Base.protected_environments
-   */
   static get protectedEnvironments(): string[] {
-    return this._protectedEnvironments;
+    return ModelSchema.protectedEnvironments.call(this);
   }
 
   static set protectedEnvironments(envs: string[]) {
-    this._protectedEnvironments = envs.map(String);
+    ModelSchema.protectedEnvironments.call(this, envs);
   }
 
   /**
@@ -610,17 +603,12 @@ export class Base extends Model {
     this._tableNameSuffix = suffix;
   }
 
-  /**
-   * Set or get the table name. Inferred from class name if not set.
-   *
-   * Mirrors: ActiveRecord::Base.table_name
-   */
   static get tableName(): string {
-    return ModelSchema.resolveTableName.call(this);
+    return ModelSchema.tableName.call(this);
   }
 
   static set tableName(name: string) {
-    this._tableName = name;
+    ModelSchema.tableName.call(this, name);
   }
 
   /**
@@ -733,7 +721,7 @@ export class Base extends Model {
    * call since Table is cheap).
    */
   static get arelTable(): Table {
-    return new Table(this.tableName, { typeCaster: new TypeCasterMap(this), klass: this });
+    return _Core.arelTable.call(this);
   }
 
   /**
@@ -855,7 +843,7 @@ export class Base extends Model {
   }
 
   static get connectionHandler(): ConnectionHandler {
-    return this._connectionHandler;
+    return _Core.connectionHandler.call(this);
   }
 
   /**
@@ -953,10 +941,11 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.inheritance_column
    */
   static get inheritanceColumn(): string | null {
-    return (this as any)._inheritanceColumn ?? null;
+    return ModelSchema.inheritanceColumn.call(this);
   }
+
   static set inheritanceColumn(col: string | null) {
-    (this as any)._inheritanceColumn = col;
+    ModelSchema.inheritanceColumn.call(this, col);
   }
 
   /**
@@ -1089,46 +1078,23 @@ export class Base extends Model {
   // -- Sequence name --
   static _sequenceName: string | null = null;
 
-  /**
-   * The sequence name used for auto-incrementing the primary key.
-   * Defaults to "${tableName}_${primaryKey}_seq" for PostgreSQL.
-   *
-   * Mirrors: ActiveRecord::Base.sequence_name
-   */
   static get sequenceName(): string | null {
-    const pk = this.primaryKey;
-    if (Array.isArray(pk)) return this._sequenceName;
-    return this._sequenceName ?? `${this.tableName}_${pk}_seq`;
+    return ModelSchema.sequenceName.call(this);
   }
+
   static set sequenceName(name: string | null) {
-    this._sequenceName = name;
+    ModelSchema.sequenceName.call(this, name);
   }
 
   // -- Ignored columns --
   static _ignoredColumns: string[] = [];
 
-  /**
-   * Columns that should be ignored (not loaded from the database).
-   *
-   * Mirrors: ActiveRecord::Base.ignored_columns
-   */
   static get ignoredColumns(): string[] {
-    return this._ignoredColumns;
+    return ModelSchema.ignoredColumns.call(this);
   }
 
   static set ignoredColumns(columns: string[]) {
-    this._ignoredColumns = columns;
-    for (const col of columns) {
-      // Delete own accessor or shadow inherited one with undefined descriptor
-      if (col in this.prototype) {
-        Object.defineProperty(this.prototype, col, {
-          get: undefined,
-          set: undefined,
-          configurable: true,
-        });
-        delete (this.prototype as any)[col];
-      }
-    }
+    ModelSchema.ignoredColumns.call(this, columns);
   }
 
   // -- Readonly attributes --
@@ -1928,27 +1894,9 @@ export class Base extends Model {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    if (Array.isArray(attrs)) {
-      // Sequential, matching Rails' `attributes.collect { create(attr, &block) }`.
-      // Promise.all would interleave saves and fire callbacks out of order.
-      const records: InstanceType<T>[] = [];
-      for (const a of attrs) {
-        records.push((await (this as T).create(a, block)) as InstanceType<T>);
-      }
-      return records;
-    }
-    const record = new this(this._mergeCurrentScopeAttrs(attrs)) as InstanceType<T>;
-    if (block) block(record);
-    await record.save();
-    return record;
+    return _Persistence.create.call(this, attrs, block);
   }
 
-  /**
-   * Create a record or throw if validation fails.
-   *
-   * Rails: `Base.create!(attributes = nil, &block)` — recurses on arrays
-   * and yields each record to the block before `saveBang()`.
-   */
   static async createBang<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>[],
@@ -1964,20 +1912,7 @@ export class Base extends Model {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    if (Array.isArray(attrs)) {
-      // Sequential + short-circuit on failure: Rails' create! stops at the
-      // first exception, so later elements are never attempted. Promise.all
-      // would fire every save concurrently and partial-write.
-      const records: InstanceType<T>[] = [];
-      for (const a of attrs) {
-        records.push((await (this as T).createBang(a, block)) as InstanceType<T>);
-      }
-      return records;
-    }
-    const record = new this(this._mergeCurrentScopeAttrs(attrs)) as InstanceType<T>;
-    if (block) block(record);
-    await record.saveBang();
-    return record;
+    return _Persistence.createBang.call(this, attrs, block);
   }
 
   // --- Querying mixin (static methods, wired via extend() after class) ---
@@ -2928,12 +2863,7 @@ export class Base extends Model {
   // (bivariant) rather than properties (invariant).
 
   static async tableExists(): Promise<boolean> {
-    const adapter = this.adapter;
-    const cache = adapter.schemaCache;
-    if (!cache || typeof cache.dataSourceExists !== "function") return true;
-    const pool = adapter.pool ?? adapter;
-    const exists = await cache.dataSourceExists(pool, this.tableName);
-    return exists !== false;
+    return ModelSchema.tableExists.call(this);
   }
 
   static hasAttribute(name: string): boolean {

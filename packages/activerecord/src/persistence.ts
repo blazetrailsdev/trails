@@ -46,6 +46,50 @@ interface PersistenceHost {
 }
 
 /**
+ * Create and save a new record (or array of records).
+ * Mirrors: ActiveRecord::Persistence::ClassMethods#create
+ */
+export async function create(
+  this: PersistenceHost,
+  attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+  block?: (record: any) => void,
+): Promise<any> {
+  if (Array.isArray(attrs)) {
+    const records: any[] = [];
+    for (const a of attrs) {
+      records.push(await (this as any).create(a, block));
+    }
+    return records;
+  }
+  const record = new this((this as any)._mergeCurrentScopeAttrs(attrs));
+  if (block) block(record);
+  await record.save();
+  return record;
+}
+
+/**
+ * Create and save, raising on validation failure.
+ * Mirrors: ActiveRecord::Persistence::ClassMethods#create!
+ */
+export async function createBang(
+  this: PersistenceHost,
+  attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+  block?: (record: any) => void,
+): Promise<any> {
+  if (Array.isArray(attrs)) {
+    const records: any[] = [];
+    for (const a of attrs) {
+      records.push(await (this as any).createBang(a, block));
+    }
+    return records;
+  }
+  const record = new this((this as any)._mergeCurrentScopeAttrs(attrs));
+  if (block) block(record);
+  await record.saveBang();
+  return record;
+}
+
+/**
  * Build a new instance (or array of instances) without saving.
  * Mirrors: ActiveRecord::Persistence::ClassMethods#build
  */

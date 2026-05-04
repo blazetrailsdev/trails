@@ -355,12 +355,14 @@ interface SchemaHost {
   _inheritanceColumn?: string;
   _abstractClass?: boolean;
   _ignoredColumns?: string[];
+  _protectedEnvironments?: string[];
   _attributeDefinitions: Map<string, any>;
   _columnsHash?: Record<string, any>;
   _columns?: any[];
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
   adapter: any;
+  prototype: any;
   superclass?: SchemaHost;
 }
 
@@ -910,6 +912,57 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   if (!hash) return false;
   applyColumnsHash(schemaHost, adapter, hash, host);
   return true;
+}
+
+export function tableName(this: SchemaHost, value?: string): string {
+  if (value !== undefined) this._tableName = value;
+  return resolveTableName.call(this as any);
+}
+
+export function protectedEnvironments(this: SchemaHost, value?: string[]): string[] {
+  if (value !== undefined) this._protectedEnvironments = value.map(String);
+  return this._protectedEnvironments ?? ["production"];
+}
+
+export function inheritanceColumn(this: SchemaHost, value?: string | null): string | null {
+  if (value !== undefined) this._inheritanceColumn = value ?? undefined;
+  return this._inheritanceColumn ?? null;
+}
+
+export function sequenceName(this: SchemaHost, value?: string | null): string | null {
+  if (value !== undefined) {
+    this._sequenceName = value;
+    return value;
+  }
+  const pk = this.primaryKey;
+  if (Array.isArray(pk)) return this._sequenceName;
+  return this._sequenceName ?? `${this.tableName}_${pk}_seq`;
+}
+
+export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
+  if (value !== undefined) {
+    this._ignoredColumns = value;
+    for (const col of value) {
+      if (col in this.prototype) {
+        Object.defineProperty(this.prototype, col, {
+          get: undefined,
+          set: undefined,
+          configurable: true,
+        });
+        delete (this.prototype as any)[col];
+      }
+    }
+  }
+  return this._ignoredColumns ?? [];
+}
+
+export async function tableExists(this: SchemaHost): Promise<boolean> {
+  const { adapter } = this;
+  const cache = adapter.schemaCache;
+  if (!cache || typeof cache.dataSourceExists !== "function") return true;
+  const pool = adapter.pool ?? adapter;
+  const exists = await cache.dataSourceExists(pool, this.tableName);
+  return exists !== false;
 }
 
 /**

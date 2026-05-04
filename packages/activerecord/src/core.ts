@@ -5,11 +5,13 @@
  */
 
 import { NotImplementedError } from "./errors.js";
-import { Notifications, getAsyncContext } from "@blazetrails/activesupport";
+import { Notifications, getAsyncContext, ParameterFilter } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
+import { Table } from "@blazetrails/arel";
+import { Map as TypeCasterMap } from "./type-caster/map.js";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -33,9 +35,8 @@ export interface Core {
   freeze(): this;
 }
 
-// InspectionMask and inspectionFilter live in attribute-inspection.ts.
-// Re-export so existing importers of core.ts keep working.
-export { InspectionMask, inspectionFilter } from "./attribute-inspection.js";
+export { InspectionMask } from "./attribute-inspection.js";
+import { inspectionFilter as _inspectionFilterImpl } from "./attribute-inspection.js";
 
 // ---------------------------------------------------------------------------
 // Instance-level behavior
@@ -245,9 +246,11 @@ export function fullInspect(this: CoreRecord): string {
 
 interface CoreHost {
   name: string;
+  tableName?: string;
   _filterAttributes?: (string | RegExp | ((key: string, value: unknown) => unknown))[];
   _inspectionFilter?: any;
   _connectionClass?: boolean;
+  _connectionHandler?: any;
   _destroyAssociationAsyncJob?: any;
   _findByStatementCache?: Map<boolean, Map<string, any>>;
   _generatedAssociationMethods?: Set<string>;
@@ -534,6 +537,25 @@ export function cachedFindByStatement(
     cache.set(key, block());
   }
   return cache.get(key);
+}
+
+export function inspectionFilter(this: CoreHost): ParameterFilter {
+  return _inspectionFilterImpl.call(this);
+}
+
+export function connectionHandler(this: CoreHost, value?: any): any {
+  if (value !== undefined) {
+    this._connectionHandler = value;
+    return value;
+  }
+  return this._connectionHandler;
+}
+
+export function arelTable(this: CoreHost): Table {
+  return new Table((this as any).tableName, {
+    typeCaster: new TypeCasterMap(this),
+    klass: this as any,
+  });
 }
 
 /** @internal */
