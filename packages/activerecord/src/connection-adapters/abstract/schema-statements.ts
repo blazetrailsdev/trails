@@ -1883,7 +1883,8 @@ export class SchemaStatements {
 
   /** @internal */
   addTimestampsForAlter(tableName: string, options: ColumnOptions = {}): string[] {
-    const opts: ColumnOptions = { null: false, ...options };
+    const opts: ColumnOptions = { ...options };
+    if (opts.null == null) opts.null = false;
     if (!("precision" in opts) && (this.adapter as any).supportsDatetimeWithPrecision?.()) {
       opts.precision = 6;
     }
@@ -1900,7 +1901,9 @@ export class SchemaStatements {
 
   /** @internal */
   insertVersionsSql(versions: string | string[]): string {
-    return this._insertVersionsSql("schema_migrations", versions);
+    const smTableName =
+      (this.adapter as any).pool?.schemaMigration?.tableName ?? "schema_migrations";
+    return this._insertVersionsSql(smTableName, versions);
   }
 
   /** @internal */
@@ -1924,6 +1927,10 @@ export class SchemaStatements {
 
   /** @internal */
   joinTableName(table1: string, table2: string): string {
-    return this._findJoinTableName(table1, table2);
+    // Mirrors ModelSchema.derive_join_table_name:
+    // sort, join with NUL, deduplicate common word+separator prefix, replace NUL with _
+    const joined = [String(table1), String(table2)].sort().join("\0");
+    const deduped = joined.replace(/^(.*[_.])(.+)\0\1(.+)/, "$1$2_$3");
+    return deduped.replace("\0", "_");
   }
 }
