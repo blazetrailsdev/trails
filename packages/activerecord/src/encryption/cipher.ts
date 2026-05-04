@@ -24,12 +24,16 @@ export class Cipher {
 
   /** @internal */
   private tryToDecryptWithEach(encryptedText: string, { keys }: { keys: string[] }): string {
+    let data: { p: string; iv: string; at: string };
+    try {
+      data = JSON.parse(encryptedText) as { p: string; iv: string; at: string };
+    } catch {
+      throw new DecryptionError("Failed to parse encrypted text");
+    }
     let lastError: unknown;
     for (const key of keys) {
       try {
-        const aes = this.cipherFor(key);
-        const data = JSON.parse(encryptedText) as { p: string; iv: string; at: string };
-        const buf = aes.decrypt(data.p, key, data.iv, data.at);
+        const buf = this.cipherFor(key).decrypt(data.p, key, data.iv, data.at);
         return buf.toString("utf-8");
       } catch (e) {
         lastError = e;
