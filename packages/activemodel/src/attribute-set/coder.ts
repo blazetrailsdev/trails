@@ -5,9 +5,18 @@ import { jsonCodec } from "./codecs/json.js";
 
 export interface AttributeSetEnvelope {
   v: 1;
+  /** attr → registry type key (e.g. "string", "integer", "decimal") */
   types: Record<string, string>;
+  /** attr → raw value before type-cast (valueBeforeTypeCast) */
   values: Record<string, unknown>;
+  /**
+   * Reserved for future use: type keys for attrs that existed in the envelope
+   * but were absent from the schema at decode time. Not written by encode() in
+   * this release — such attrs are stored in `types` alongside schema-matched
+   * ones and kept as additional attributes on the decoded set.
+   */
   additionalTypes?: Record<string, string>;
+  /** attrs that should resolve to the schema default on decode */
   defaultAttributes?: string[];
 }
 
