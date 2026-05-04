@@ -1,4 +1,4 @@
-import YAML from "yaml";
+import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { AttributeSetCoderError } from "../coder.js";
 import type { AttributeSetCodec, AttributeSetEnvelope } from "../coder.js";
 
@@ -8,10 +8,10 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 export const yamlCodec: AttributeSetCodec = {
   encode(envelope: AttributeSetEnvelope): string {
-    return YAML.stringify(envelope);
+    return yamlStringify(envelope);
   },
   decode(input: string): AttributeSetEnvelope {
-    const parsed: unknown = YAML.parse(input);
+    const parsed: unknown = yamlParse(input);
     if (
       !isPlainObject(parsed) ||
       !("v" in parsed) ||

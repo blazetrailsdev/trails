@@ -42,6 +42,20 @@ describe("yamlCodec", () => {
     expect(yamlCodec.decode(yamlCodec.encode(driftEnvelope))).toEqual(driftEnvelope);
   });
 
+  it("encodes bigint values without throwing; decoded as number (precision note)", () => {
+    const bigintEnvelope: AttributeSetEnvelope = {
+      v: 1,
+      types: { id: "big_integer" },
+      values: { id: BigInt("9007199254740993") as unknown as unknown },
+    };
+    // yaml serializes BigInt as a plain integer literal; on parse it comes back
+    // as a JS number, which loses precision beyond MAX_SAFE_INTEGER.
+    const encoded = yamlCodec.encode(bigintEnvelope);
+    expect(encoded).toContain("9007199254740993");
+    const decoded = yamlCodec.decode(encoded);
+    expect(typeof decoded.values.id).toBe("number");
+  });
+
   it("envelope shape snapshot", () => {
     expect(yamlCodec.encode(envelope)).toMatchInlineSnapshot(`
       "v: 1
