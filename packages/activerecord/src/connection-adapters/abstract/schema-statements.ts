@@ -932,29 +932,6 @@ export class SchemaStatements {
     });
   }
 
-  private _findJoinTableName(table1: string, table2: string): string {
-    const unqualify = (name: string) => (name.split(".").at(-1) ?? name).replace(/\./g, "_");
-    const [t1, t2] = [unqualify(table1), unqualify(table2)].sort();
-    const parts1 = t1.split("_");
-    const parts2 = t2.split("_");
-    // Remove common prefix (Rails dedup: music_artists + music_records → music_artists_records)
-    let commonLen = 0;
-    while (
-      commonLen < parts1.length - 1 &&
-      commonLen < parts2.length - 1 &&
-      parts1[commonLen] === parts2[commonLen]
-    ) {
-      commonLen++;
-    }
-    if (commonLen > 0) {
-      const prefix = parts1.slice(0, commonLen).join("_");
-      const suffix1 = parts1.slice(commonLen).join("_");
-      const suffix2 = parts2.slice(commonLen).join("_");
-      return `${prefix}_${suffix1}_${suffix2}`;
-    }
-    return `${t1}_${t2}`;
-  }
-
   async buildAddColumnDefinition(
     tableName: string,
     columnName: string,
