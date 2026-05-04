@@ -988,6 +988,11 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
  *   `inheritanceColumn` as a getter/setter.
  * - `loadSchema` — private lifecycle hook in Rails; called automatically
  *   rather than by user code.
+ * - `tableName`, `sequenceName`, `protectedEnvironments`, `ignoredColumns`,
+ *   `inheritanceColumn`, `columnDefaults` — implemented as static
+ *   getter/setter pairs on `Base` directly; adding these to `ClassMethods`
+ *   would cause `extend()` to overwrite the getter descriptor with a plain
+ *   property assignment, breaking lazy-evaluation semantics.
  */
 export const ClassMethods = {
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
