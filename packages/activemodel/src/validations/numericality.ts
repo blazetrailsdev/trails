@@ -203,10 +203,10 @@ export class NumericalityValidator extends EachValidator {
         record.errors.add(attribute, "in", withCount(`${min}..${max}`));
       }
     }
-    if (this.options.odd && num % 2 === 0) {
+    if (this.options.odd && Math.trunc(num) % 2 === 0) {
       record.errors.add(attribute, "odd", this.filteredOptions(value));
     }
-    if (this.options.even && num % 2 !== 0) {
+    if (this.options.even && Math.trunc(num) % 2 !== 0) {
       record.errors.add(attribute, "even", this.filteredOptions(value));
     }
   }
@@ -500,6 +500,7 @@ export function isAllowOnlyInteger(
 
 interface RecordWithRawAttribute {
   attributeChangedInPlace?: (name: string) => boolean;
+  cameFromUser?: (name: string) => boolean;
   readAttribute?: (name: string) => unknown;
   readAttributeBeforeTypeCast?: (name: string) => unknown;
   [key: string]: unknown;
@@ -557,10 +558,22 @@ export function prepareValueForValidation(
   // Duck-type the lookup so other hosts implementing the same shape
   // (or AR Base subclasses) work too.
   const r = record as RecordWithRawAttribute;
-  const rawValue =
-    typeof r.readAttributeBeforeTypeCast === "function"
-      ? r.readAttributeBeforeTypeCast(attrName)
-      : undefined;
+  let rawValue: unknown;
+  if (typeof r.cameFromUser === "function") {
+    if (r.cameFromUser(attrName)) {
+      rawValue =
+        typeof r.readAttributeBeforeTypeCast === "function"
+          ? r.readAttributeBeforeTypeCast(attrName)
+          : undefined;
+    } else if (typeof r.readAttribute === "function") {
+      rawValue = r.readAttribute(attrName);
+    }
+  } else {
+    rawValue =
+      typeof r.readAttributeBeforeTypeCast === "function"
+        ? r.readAttributeBeforeTypeCast(attrName)
+        : undefined;
+  }
   // Rails: raw_value || value — Ruby `||` falls back on nil/false. Use
   // the same semantic so `false`/`null` raw values fall through to
   // the cast value rather than being treated as "I read the raw".

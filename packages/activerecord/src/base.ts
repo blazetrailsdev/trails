@@ -120,6 +120,7 @@ import {
   isCompositePrimaryKey as _isCompositePrimaryKey,
 } from "./attribute-methods/primary-key.js";
 import { _readAttribute as _readAttributeFn } from "./attribute-methods/read.js";
+import { isAttributeCameFromUser as _isAttributeCameFromUser } from "./attribute-methods/before-type-cast.js";
 import {
   queryAttribute as _queryAttribute,
   _queryAttribute as _queryAttributeFn,
@@ -2495,6 +2496,8 @@ export class Base extends Model {
   /** @internal */
   declare _readAttribute: (name: string) => unknown;
   declare _writeAttribute: (name: string, value: unknown) => void;
+  /** @internal */
+  declare cameFromUser: (name: string) => boolean;
 
   get attributeNamesList(): string[] {
     return _attributeNamesList.call(this as any);
@@ -2845,6 +2848,7 @@ include(Base, {
   _queryAttribute: _queryAttributeFn,
   _readAttribute: _readAttributeFn,
   _writeAttribute: ReadonlyAttributes._writeAttribute,
+  cameFromUser: _isAttributeCameFromUser,
   // PrimaryKey
   toKey: _toKey,
 });

@@ -140,6 +140,40 @@ describe("ValidationsTest", () => {
     expect(t.score).toBe(5);
   });
 
+  it("numericality validates cast value when record loaded from database (cameFromUser false)", async () => {
+    // When an AR record is loaded via writeFromDatabase, cameFromUser returns
+    // false and the validator uses readAttribute (cast value), not the raw
+    // string column. A numeric column loaded as the integer 42 must pass.
+    class Item extends Base {
+      static {
+        this.attribute("price", "integer");
+        this.validates("price", { numericality: { greaterThan: 0 } });
+        this.adapter = adapter;
+      }
+    }
+    const item = Item.new({}) as any;
+    item._attributes.writeFromDatabase("price", 42);
+    expect(item.cameFromUser("price")).toBe(false);
+    expect(await item.isValid()).toBe(true);
+  });
+
+  it("numericality validates raw input when attribute came from user (cameFromUser true)", async () => {
+    // User-assigned string "abc" on an integer column casts to null but the
+    // validator must see the raw "abc" via readAttributeBeforeTypeCast and
+    // reject it — not silently pass because the cast value is null.
+    class Item extends Base {
+      static {
+        this.attribute("price", "integer");
+        this.validates("price", { numericality: true });
+        this.adapter = adapter;
+      }
+    }
+    const item = Item.new({ price: "abc" }) as any;
+    expect(item.cameFromUser("price")).toBe(true);
+    expect(await item.isValid()).toBe(false);
+    expect(item.errors.get("price")).toContain("is not a number");
+  });
+
   it("numericality validator wont be affected by custom getter", async () => {
     const { Topic } = makeModel();
     const t = new Topic({ title: "getter", score: 10 });
