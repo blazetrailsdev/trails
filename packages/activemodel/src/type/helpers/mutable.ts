@@ -2,24 +2,35 @@
  * Mutable helper — marks a type as mutable for in-place change detection.
  *
  * Mirrors: ActiveModel::Type::Helpers::Mutable
- *
- * Types that include Mutable report mutable?=true, meaning their
- * values can change in-place (e.g. arrays, hashes). changed_in_place?
- * always returns true for mutable types since we can't cheaply detect
- * in-place mutations.
  */
-export interface Mutable {
-  cast(value: unknown): unknown;
-  changedInPlace(rawOldValue: unknown, newValue: unknown): boolean;
-  isMutable(): boolean;
-}
+import { type Included } from "@blazetrails/activesupport";
+import { Type } from "../value.js";
 
-export const MutableMixin = {
-  isMutable(): boolean {
-    return true;
+/**
+ * Mirrors: ActiveModel::Type::Helpers::Mutable (mutable.rb:1-23).
+ *
+ * Include into a type class via `include(MyType, MutableModule)`:
+ * - `cast` round-trips through serialize/deserialize so the returned value
+ *   is detached from the input reference (mutable.rb:7-9)
+ * - `isChangedInPlace` compares serialized forms instead of always returning
+ *   true (mutable.rb:14-16)
+ * - `isMutable` returns true (mutable.rb:18-20)
+ *
+ * @internal Rails-private helper.
+ */
+export const MutableModule = {
+  cast(this: Type, value: unknown): unknown {
+    return this.deserialize(this.serialize(value));
   },
 
-  changedInPlace(_rawOldValue: unknown, _newValue: unknown): boolean {
+  isChangedInPlace(this: Type, rawOldValue: unknown, newValue: unknown): boolean {
+    return rawOldValue !== this.serialize(newValue);
+  },
+
+  isMutable(this: Type): boolean {
     return true;
   },
 };
+
+/** Structural type for types that include MutableModule. */
+export type Mutable = Included<typeof MutableModule>;
