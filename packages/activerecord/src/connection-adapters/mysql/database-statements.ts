@@ -49,7 +49,7 @@ export function buildExplainClause(
   options: ExplainOption[] = [],
 ): string {
   if (options.length === 0) return "EXPLAIN";
-  const clause = `EXPLAIN ${options.map((o) => String(o).toUpperCase()).join(" ")}`;
+  const clause = `EXPLAIN ${options.map((o) => (typeof o === "string" ? o.toUpperCase() : `FORMAT=${(o as { format: string }).format.toUpperCase()}`)).join(" ")}`;
   // analyzeWithoutExplain? = mariadb? && database_version >= "10.1.0" — not yet wired
   const analyzeWithoutExplain = (this as BuildExplainClauseHost | null)?.analyzeWithoutExplain?.();
   if (analyzeWithoutExplain && clause.includes("ANALYZE")) {

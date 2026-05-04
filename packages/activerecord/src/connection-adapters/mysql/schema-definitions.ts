@@ -148,8 +148,8 @@ export class TableDefinition extends AbstractTableDefinition {
   /** @internal */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {
-      if (!(type in TableDefinition.prototype)) {
-        (TableDefinition.prototype as any)[type] = function (
+      if (!(type in this.prototype)) {
+        (this.prototype as any)[type] = function (
           this: TableDefinition,
           name: string,
           options: ColumnOptions = {},
@@ -181,7 +181,7 @@ export class Table extends AbstractTable {
   /**
    * Returns the primary key column name for this table.
    *
-   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#primary_key
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Table#primary_key
    */
   async primaryKey(): Promise<string | null> {
     return super.primaryKey();

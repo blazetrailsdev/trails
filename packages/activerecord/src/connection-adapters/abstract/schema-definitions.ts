@@ -566,7 +566,7 @@ export class TableDefinition {
     options: Omit<ColumnOptions, "index"> & { index?: boolean | AddIndexOptions } = {},
   ): this {
     const { index, ...colOpts } = options;
-    this.columns.push(new ColumnDefinition(name, type, colOpts as ColumnOptions));
+    this.columns.push(this.newColumnDefinition(name, type, colOpts as ColumnOptions));
     if (index) {
       const indexOpts: AddIndexOptions = typeof index === "object" ? index : {};
       this.index([name], indexOpts);

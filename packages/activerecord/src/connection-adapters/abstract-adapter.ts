@@ -1001,7 +1001,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   checkVersion(): void {
-    checkVersionMixin();
+    checkVersionMixin.call(this as any);
   }
 
   async schemaVersion(): Promise<number> {

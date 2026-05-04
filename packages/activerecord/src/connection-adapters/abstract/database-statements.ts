@@ -674,6 +674,10 @@ export function resetTransaction(this: DatabaseStatementsHost): void;
 export function resetTransaction(
   this: DatabaseStatementsHost,
   options: { restore?: boolean },
+): Promise<void>;
+export function resetTransaction(
+  this: DatabaseStatementsHost,
+  options: { restore?: boolean },
   callback: () => Promise<unknown>,
 ): Promise<unknown>;
 export function resetTransaction(
@@ -1280,6 +1284,7 @@ interface DatabaseStatementsDefaultsHost {
 }
 
 export const DatabaseStatements = {
+  resetTransaction,
   async selectAll(
     this: DatabaseStatementsDefaultsHost,
     sql: string,

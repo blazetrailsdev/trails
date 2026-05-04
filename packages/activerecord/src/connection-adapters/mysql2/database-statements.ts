@@ -14,8 +14,8 @@ export interface DatabaseStatementsHost {
 
 /**
  * Returns an ActiveRecord::Result instance.
- * When collecting EXPLAIN and using prepared statements, runs the query
- * without prepared-statement mode to allow explain collection.
+ * Rails also wraps in `unprepared_statement` when collecting EXPLAIN with
+ * prepared statements, but that path is deferred pending ExplainRegistry wiring.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#select_all
  */

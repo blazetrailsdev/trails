@@ -233,8 +233,8 @@ export class TableDefinition extends AbstractTableDefinition {
   /** @internal */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {
-      if (!(type in TableDefinition.prototype)) {
-        (TableDefinition.prototype as any)[type] = function (
+      if (!(type in this.prototype)) {
+        (this.prototype as any)[type] = function (
           this: TableDefinition,
           name: string,
           options: ColumnOptions = {},

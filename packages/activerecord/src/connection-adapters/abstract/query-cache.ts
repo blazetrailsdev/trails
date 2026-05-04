@@ -383,13 +383,13 @@ export function dirtiesQueryCache(
 }
 
 /**
- * Checks that the adapter version is compatible with the current schema.
- * Subclasses override to raise when incompatible.
+ * No-op base implementation. Each concrete adapter overrides
+ * `AbstractAdapter#checkVersion` directly to raise when incompatible.
  *
  * @internal
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache::Store#check_version
+ * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#check_version
  */
-export function checkVersion(): void {}
+export function checkVersion(this: QueryCacheHost): void {}
 
 /** @internal */
 function unsetQueryCacheBang(this: QueryCacheHost): void {
