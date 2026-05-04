@@ -211,8 +211,9 @@ export class Encryptor {
     const normalized = enc.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (normalized === "utf8" || normalized === "utf16" || normalized === "utf16le") return value;
     // For ASCII/binary encodings, replace characters outside the safe range.
+    // Use "?" to match _replaceUnencodable in EncryptedAttributeType.
     const limit = normalized === "ascii" ? 0x7f : 0xff;
-    return value.replace(/[\s\S]/g, (ch) => (ch.codePointAt(0)! < limit ? ch : "�"));
+    return value.replace(/[\s\S]/g, (ch) => (ch.codePointAt(0)! < limit ? ch : "?"));
   }
 
   /** @internal */

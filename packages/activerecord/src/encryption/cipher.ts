@@ -30,6 +30,7 @@ export class Cipher {
     } catch {
       throw new DecryptionError("Failed to parse encrypted text");
     }
+    if (keys.length === 0) throw new DecryptionError("No decryption keys provided");
     let lastError: unknown;
     for (const key of keys) {
       try {

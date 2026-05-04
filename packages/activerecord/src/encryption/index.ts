@@ -56,6 +56,7 @@ export {
   ivLength,
   eagerLoadBang,
   context,
+  currentCustomContext,
   configure,
   onEncryptedAttributeDeclared,
   encryptedAttributeWasDeclared,
