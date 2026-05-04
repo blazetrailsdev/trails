@@ -374,9 +374,11 @@ function readRecordLiteral(node: ts.Expression | undefined): RecordLiteral {
  * - The first argument must be a bare identifier referencing a class
  *   declared in the same file (otherwise we'd be augmenting a foreign
  *   module without a `declare module "..."` boundary).
- * - The second argument is captured verbatim — any expression usable in
- *   a `typeof` query (identifier, property access, `as const` literal)
- *   works.
+ * - The second argument is captured verbatim and must be usable inside
+ *   a `typeof` type query — currently restricted to bare identifiers
+ *   and property-access chains. Inline object literals, calls, and
+ *   `as const` expressions are skipped (they'd produce parse errors
+ *   in the synthesized `typeof <expr>`).
  *
  * @internal
  */
@@ -392,7 +394,11 @@ export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
     const named = stmt.importClause?.namedBindings;
     if (named && ts.isNamedImports(named)) {
       for (const el of named.elements) {
-        if ((el.propertyName?.text ?? el.name.text) === "include") includeImported = true;
+        // Require the unaliased local binding to be `include`. An
+        // aliased import (`include as inc`) leaves the local name `inc`,
+        // and any `include(...)` call in the file would then be a
+        // separate user-defined helper, not the activesupport one.
+        if (!el.propertyName && el.name.text === "include") includeImported = true;
       }
     }
   }

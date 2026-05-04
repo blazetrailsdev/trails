@@ -496,14 +496,31 @@ describe("virtualize — include() interface bridge", () => {
   });
 
   test("aliased include import (`include as inc`) is not picked up", () => {
-    // Conservative: we only match the unqualified `include` name. An
-    // aliased import would fall through to be treated as a no-op.
+    // The aliased binding is `inc`, so a local user-defined `include(...)`
+    // helper in the same file must not be misclassified as the
+    // activesupport one.
     const src =
       'import { include as inc } from "@blazetrails/activesupport";\n' +
+      "function include(c: any, m: any) {}\n" +
       "export class Foo {}\n" +
-      "inc(Foo, Bar);\n";
+      "include(Foo, Bar);\n";
     const { text } = virtualize(src, "foo.ts");
     expect(text).not.toMatch(/interface Foo extends/);
+    expect(text).not.toMatch(/__TrailsIncluded/);
+  });
+
+  test("re-virtualizing already-virtualized output does not re-inject", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const once = virtualize(src, "relation.ts").text;
+    const twice = virtualize(once, "relation.ts").text;
+    expect(twice).toBe(once);
+    expect(once.match(/__TrailsIncluded/g)?.length).toBeGreaterThan(0);
+    expect(twice.match(/import type \{ Included as __TrailsIncluded \}/g)?.length).toBe(1);
+    expect(twice.match(/interface Relation extends __TrailsIncluded<typeof QM>/g)?.length).toBe(1);
   });
 });
 

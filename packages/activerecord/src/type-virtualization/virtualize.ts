@@ -144,7 +144,11 @@ export function virtualize(
   const includes = findIncludeCalls(sf);
   const effectivePrepends: string[] = [];
   if (options.prependImports) effectivePrepends.push(...options.prependImports);
-  if (includes.length > 0) {
+  // Skip re-injection when the input was already virtualized (e.g. the
+  // virtualizer is run on its own previous output). Detected by the
+  // marker import line, which only the virtualizer ever emits.
+  const alreadyInjected = originalText.includes(INCLUDED_IMPORT_LINE);
+  if (includes.length > 0 && !alreadyInjected) {
     effectivePrepends.push(INCLUDED_IMPORT_LINE);
     interface Group {
       mods: string[];
