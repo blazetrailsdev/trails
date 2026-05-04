@@ -75,4 +75,26 @@ describe("DateTest", () => {
     expect(p.newDateFor(0, 0, 0)).toBe(null);
     expect(p.newDateFor(2024, 1, 15)?.toString()).toBe("2024-01-15");
   });
+
+  it("cast month-name string", () => {
+    const result = type.cast("July 4, 2020");
+    expect(result).toBeInstanceOf(Temporal.PlainDate);
+    expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
+  });
+
+  it("cast US-slash string", () => {
+    const result = type.cast("7/4/2020");
+    expect(result).toBeInstanceOf(Temporal.PlainDate);
+    expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
+  });
+
+  it("cast garbage string returns null", () => {
+    expect(type.cast("garbage")).toBe(null);
+  });
+
+  it("cast ISO string still works (regression guard)", () => {
+    const result = type.cast("2020-07-04");
+    expect(result).toBeInstanceOf(Temporal.PlainDate);
+    expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
+  });
 });
