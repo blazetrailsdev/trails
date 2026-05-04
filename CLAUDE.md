@@ -79,11 +79,15 @@ When NOT to use this:
   PR body.
 - Do NOT use subagents unless explicitly requested.
 - Do use worktrees for any changes; leave the default worktree for the user.
+  Always use `scripts/start-worktree.sh` to start a worktree.
 - Open new PRs in **draft** status.
 - After opening a PR, run the `/link` skill with the PR number so webhook
   notifications (Copilot reviews, CI failures) are delivered to this pane.
   Copilot auto-reviews every PR and push; reviews land at
   `~/.btwhooks/data/github/blazetrailsdev/trails/$PR` — no need to request.
+- Do NOT reply to Copilot PR comments with text — replies are invisible to
+  Copilot. Address feedback via code changes or PR description edits instead,
+  or discuss with the user in conversation.
 - Do NOT add code comments that just describe what a line does. Only add
   comments for non-obvious context (hidden bug, broader invariant, etc.).
 - Do NOT add empty stubs or placeholder interfaces. If a feature isn't

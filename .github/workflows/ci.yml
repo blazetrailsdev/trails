@@ -74,7 +74,7 @@ jobs:
             # full matrix.
             if [ -z "$files" ]; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            elif echo "$files" | grep -qvE '^docs/|^README\.md$'; then
+            elif echo "$files" | grep -qvE '^docs/|^README\.md$|^CLAUDE\.md$'; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
             else
               echo "docs_only=true" >> "$GITHUB_OUTPUT"
