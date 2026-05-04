@@ -133,9 +133,9 @@ export function defaultType(
 
 /** @internal */
 export function newColumnFromField(
+  tableName: string,
   field: Record<string, string>,
   createTableInfoFn: (tableName: string) => string | null,
-  tableName: string,
 ): Column {
   const fieldName = field["Field"] ?? "";
   const meta = fetchTypeMetadata(field["Type"] ?? "", field["Extra"] ?? "");

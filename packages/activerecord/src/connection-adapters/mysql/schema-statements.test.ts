@@ -61,6 +61,7 @@ describe("MySQL::SchemaStatements", () => {
   it("newColumnFromField: builds Column from SHOW COLUMNS field hash", () => {
     const noInfo = () => null;
     const col = newColumnFromField(
+      "users",
       {
         Field: "name",
         Type: "varchar(255)",
@@ -70,7 +71,6 @@ describe("MySQL::SchemaStatements", () => {
         Collation: "utf8_general_ci",
       },
       noInfo,
-      "users",
     );
     expect(col.name).toBe("name");
     expect(col.default).toBe("Dean");
@@ -81,6 +81,7 @@ describe("MySQL::SchemaStatements", () => {
   it("newColumnFromField: CURRENT_TIMESTAMP default becomes defaultFunction on datetime", () => {
     const noInfo = () => null;
     const col = newColumnFromField(
+      "events",
       {
         Field: "created_at",
         Type: "datetime",
@@ -89,7 +90,6 @@ describe("MySQL::SchemaStatements", () => {
         Extra: "",
       },
       noInfo,
-      "events",
     );
     expect(col.default).toBeNull();
     expect(col.defaultFunction).toBe("CURRENT_TIMESTAMP");
@@ -98,6 +98,7 @@ describe("MySQL::SchemaStatements", () => {
   it("newColumnFromField: DEFAULT_GENERATED extra becomes defaultFunction", () => {
     const noInfo = () => null;
     const col = newColumnFromField(
+      "orders",
       {
         Field: "total",
         Type: "decimal(10,2)",
@@ -106,7 +107,6 @@ describe("MySQL::SchemaStatements", () => {
         Extra: "DEFAULT_GENERATED",
       },
       noInfo,
-      "orders",
     );
     expect(col.default).toBeNull();
     expect(col.defaultFunction).toBe("(price * qty)");
@@ -115,9 +115,9 @@ describe("MySQL::SchemaStatements", () => {
   it("newColumnFromField: text default strips surrounding quotes", () => {
     const noInfo = () => null;
     const col = newColumnFromField(
+      "users",
       { Field: "bio", Type: "text", Null: "YES", Default: "'hello world'", Extra: "" },
       noInfo,
-      "users",
     );
     expect(col.default).toBe("hello world");
   });
