@@ -47,20 +47,23 @@ export class SchemaCreation extends AbstractSchemaCreation {
       const separator = sql.trimEnd() === `ALTER TABLE ${table}` ? " " : ", ";
       sql = sql.trimEnd() + separator + fkParts.join(", ");
     }
+    const pgParts: string[] = [];
     if (Array.isArray(o.constraintValidations)) {
-      sql += o.constraintValidations
-        .map((name: string) => " " + this.visitValidateConstraint(name))
-        .join("");
+      for (const name of o.constraintValidations) pgParts.push(this.visitValidateConstraint(name));
     }
     if (Array.isArray(o.exclusionConstraintAdds)) {
-      sql += o.exclusionConstraintAdds
-        .map((con: ExclusionConstraintDefinition) => " " + this.visitAddExclusionConstraint(con))
-        .join("");
+      for (const con of o.exclusionConstraintAdds as ExclusionConstraintDefinition[])
+        pgParts.push(this.visitAddExclusionConstraint(con));
     }
     if (Array.isArray(o.uniqueConstraintAdds)) {
-      sql += o.uniqueConstraintAdds
-        .map((con: UniqueConstraintDefinition) => " " + this.visitAddUniqueConstraint(con))
-        .join("");
+      for (const con of o.uniqueConstraintAdds as UniqueConstraintDefinition[])
+        pgParts.push(this.visitAddUniqueConstraint(con));
+    }
+    if (pgParts.length > 0) {
+      const table = this.adapter.quoteTableName(o.name);
+      const trimmed = sql.trimEnd();
+      const separator = trimmed === `ALTER TABLE ${table}` ? " " : ", ";
+      sql = trimmed + separator + pgParts.join(", ");
     }
     return sql;
   }
@@ -94,7 +97,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   protected override visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
     let sql = super.visitForeignKeyDefinition(o);
-    if (o.deferrable) sql += ` DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`;
+    if (o.deferrable) sql += ` DEFERRABLE INITIALLY ${o.deferrable.toUpperCase()}`;
     return sql;
   }
 
@@ -105,17 +108,27 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected visitExclusionConstraintDefinition(o: ExclusionConstraintDefinition): string {
-    const p = ["CONSTRAINT", this.adapter.quoteIdentifier(o.name!), "EXCLUDE"];
+    const p: string[] = [];
+    if (o.name) p.push("CONSTRAINT", this.adapter.quoteIdentifier(o.name));
+    p.push("EXCLUDE");
     if (o.using) p.push(`USING ${o.using}`);
     p.push(`(${o.expression})`);
     if (o.where) p.push(`WHERE (${o.where})`);
-    if (o.deferrable) p.push(`DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`);
+    if (o.deferrable) {
+      p.push(
+        o.deferrable === true
+          ? "DEFERRABLE"
+          : `DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`,
+      );
+    }
     return p.join(" ");
   }
 
   /** @internal */
   protected visitUniqueConstraintDefinition(o: UniqueConstraintDefinition): string {
-    const p = ["CONSTRAINT", this.adapter.quoteIdentifier(o.name!), "UNIQUE"];
+    const p: string[] = [];
+    if (o.name) p.push("CONSTRAINT", this.adapter.quoteIdentifier(o.name));
+    p.push("UNIQUE");
     if (this.supportsNullsNotDistinct() && o.nullsNotDistinct) p.push("NULLS NOT DISTINCT");
     if (o.usingIndex) {
       p.push(`USING INDEX ${this.adapter.quoteIdentifier(o.usingIndex)}`);
@@ -125,7 +138,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
         .join(", ");
       p.push(`(${cols})`);
     }
-    if (o.deferrable) p.push(`DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`);
+    if (o.deferrable) {
+      p.push(
+        o.deferrable === true
+          ? "DEFERRABLE"
+          : `DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`,
+      );
+    }
     return p.join(" ");
   }
 
@@ -150,7 +169,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const options = this.columnOptions(column) as Record<string, unknown>;
 
     if (options["collation"]) {
-      sql += ` COLLATE "${options["collation"]}"`;
+      sql += ` COLLATE ${this.adapter.quoteIdentifier(String(options["collation"]))}`;
     }
     if (options["using"]) {
       sql += ` USING ${options["using"]}`;
@@ -163,8 +182,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       if (options["default"] == null) {
         sql += `, ALTER COLUMN ${quotedName} DROP DEFAULT`;
       } else {
-        const quoted = this.adapter.quoteDefaultExpression(options["default"]);
-        sql += `, ALTER COLUMN ${quotedName} SET DEFAULT ${quoted}`;
+        sql += `, ALTER COLUMN ${quotedName} SET${this.adapter.quoteDefaultExpression(options["default"])}`;
       }
     }
 
@@ -179,9 +197,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected visitChangeColumnDefaultDefinition(o: ChangeColumnDefaultDefinition): string {
     const col = this.adapter.quoteIdentifier(o.column.name);
     const action =
-      o.default == null
-        ? "DROP DEFAULT"
-        : `SET DEFAULT ${this.adapter.quoteDefaultExpression(o.default)}`;
+      o.default == null ? "DROP DEFAULT" : `SET${this.adapter.quoteDefaultExpression(o.default)}`;
     return `ALTER COLUMN ${col} ${action}`;
   }
 
@@ -189,7 +205,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
     const opts = options as Record<string, unknown>;
     if (opts["collation"]) {
-      sql += ` COLLATE "${opts["collation"]}"`;
+      sql += ` COLLATE ${this.adapter.quoteIdentifier(String(opts["collation"]))}`;
     }
     if (opts["as"]) {
       sql += ` GENERATED ALWAYS AS (${opts["as"]})`;

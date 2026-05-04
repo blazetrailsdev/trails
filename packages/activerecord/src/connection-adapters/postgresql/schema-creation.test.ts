@@ -6,6 +6,7 @@ import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   ColumnDefinition,
+  AlterTable,
 } from "../abstract/schema-definitions.js";
 
 const s = () => new SchemaCreation() as any;
@@ -113,6 +114,50 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(() => s().addColumnOptionsBang("n", { as: "a||b", stored: false, column: col })).toThrow(
       "VIRTUAL",
     );
+  });
+
+  it("visitExclusionConstraintDefinition: deferrable true → DEFERRABLE without INITIALLY", () => {
+    const ec = new ExclusionConstraintDefinition("t", "e WITH &&", {
+      name: "c",
+      deferrable: true,
+    });
+    const sql = s().visitExclusionConstraintDefinition(ec);
+    expect(sql).toMatch(/DEFERRABLE$/);
+    expect(sql).not.toContain("INITIALLY");
+  });
+
+  it("visitExclusionConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", () => {
+    const ec = new ExclusionConstraintDefinition("t", "e WITH &&", {});
+    const sql = s().visitExclusionConstraintDefinition(ec);
+    expect(sql).toMatch(/^EXCLUDE/);
+    expect(sql).not.toContain("CONSTRAINT");
+  });
+
+  it("visitUniqueConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", () => {
+    const uc = new UniqueConstraintDefinition("t", "col", {});
+    const sql = s().visitUniqueConstraintDefinition(uc);
+    expect(sql).toMatch(/^UNIQUE/);
+    expect(sql).not.toContain("CONSTRAINT");
+  });
+
+  it("visitAlterTable: constraint validations and exclusion adds are comma-separated from FK adds", () => {
+    const fk = new ForeignKeyDefinition(
+      "users",
+      "posts",
+      "post_id",
+      "id",
+      "fk_users_post_id",
+      undefined,
+      undefined,
+      undefined,
+      true,
+    );
+    const at = new AlterTable("users") as any;
+    at.foreignKeyAdds.push(fk);
+    at.constraintValidations = ["some_constraint"];
+    const sql = s().visitAlterTable(at);
+    expect(sql).toContain("ADD CONSTRAINT");
+    expect(sql).toContain(", VALIDATE CONSTRAINT");
   });
 
   it("quotedIncludeColumns + tableModifierInCreate", () => {
