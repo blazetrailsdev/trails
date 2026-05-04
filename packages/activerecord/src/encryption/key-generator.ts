@@ -35,11 +35,12 @@ export class KeyGenerator {
       .toString("hex");
   }
 
-  deriveKey(password: string, length: number = 32, salt?: string): string {
+  deriveKey(password: string, length?: number, salt?: string): string {
+    const effectiveLength = length ?? this.keyLength();
     const crypto = getCrypto();
     const effectiveSalt = salt ?? "";
     const digest = this._hashDigestClass.toLowerCase().replace(/-/g, "");
-    const derived = crypto.pbkdf2Sync(password, effectiveSalt, 2 ** 16, length, digest);
+    const derived = crypto.pbkdf2Sync(password, effectiveSalt, 2 ** 16, effectiveLength, digest);
     return derived.toString("base64");
   }
 

@@ -1,4 +1,3 @@
-import { NotImplementedError } from "../errors.js";
 import { prepend } from "@blazetrails/activesupport";
 import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { getAttributeType } from "./encryptable-record.js";
@@ -159,6 +158,14 @@ export class EncryptedQuery {
     return this.allCiphertextsFor(value, type);
   }
 
+  /** @internal */
+  private static additionalValuesFor(
+    value: unknown,
+    type: EncryptedAttributeType,
+  ): AdditionalValue[] {
+    return type.previousTypes.map((additionalType) => new AdditionalValue(value, additionalType));
+  }
+
   private static allCiphertextsFor(
     plaintext: unknown,
     type: EncryptedAttributeType,
@@ -249,7 +256,12 @@ export class AdditionalValue {
 
   constructor(value: unknown, type: EncryptedAttributeType) {
     this.type = type;
-    this.value = type.serialize(value);
+    this.value = this.process(value);
+  }
+
+  /** @internal */
+  private process(value: unknown): unknown {
+    return this.type.serialize(value);
   }
 
   toString(): string {
@@ -282,18 +294,4 @@ export class ExtendedEncryptableType {
     }
     return originalSerialize(data);
   }
-}
-
-/** @internal */
-function process(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::ExtendedDeterministicQueries::AdditionalValue#process is not implemented",
-  );
-}
-
-/** @internal */
-function additionalValuesFor(value: any, type: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery#additional_values_for is not implemented",
-  );
 }

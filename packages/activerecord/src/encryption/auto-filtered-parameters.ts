@@ -1,4 +1,3 @@
-import { NotImplementedError } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
 import { Configurable } from "./configurable.js";
 
@@ -9,12 +8,19 @@ import { Configurable } from "./configurable.js";
  * Mirrors: ActiveRecord::Encryption::AutoFilteredParameters
  */
 export class AutoFilteredParameters {
+  private _filterParameters: string[];
   private _attributesByClass: Map<any, string[]> = new Map();
   private _collecting = true;
-  private _filterParameters: string[];
+  private _hookDisposer?: () => void;
 
   constructor(filterParameters: string[]) {
     this._filterParameters = filterParameters;
+    this.installCollectingHook();
+  }
+
+  dispose(): void {
+    this._hookDisposer?.();
+    this._hookDisposer = undefined;
   }
 
   enable(): void {
@@ -25,13 +31,37 @@ export class AutoFilteredParameters {
 
   /** @internal */
   attributeWasDeclared(klass: any, attribute: string): void {
-    if (!Configurable.config.addToFilterParameters) return;
-    if (Configurable.config.excludeFromFilterParameters.includes(attribute)) return;
-    if (this._collecting) {
+    if (this.isCollecting()) {
       this.collectForLater(klass, attribute);
     } else {
       this.applyFilter(klass, attribute);
     }
+  }
+
+  /** @internal */
+  private get app(): { config: { filter_parameters: string[] } } {
+    return { config: { filter_parameters: this._filterParameters } };
+  }
+
+  /** @internal */
+  private installCollectingHook(): void {
+    this._hookDisposer = Configurable.onEncryptedAttributeDeclared(
+      (klass: any, attribute: string) => {
+        this.attributeWasDeclared(klass, attribute);
+      },
+    );
+  }
+
+  /** @internal */
+  private isCollecting(): boolean {
+    return this._collecting;
+  }
+
+  /** @internal */
+  private isExcludedFromFilterParameters(filterParameter: string): boolean {
+    return Configurable.config.excludeFromFilterParameters.some(
+      (excluded) => excluded === filterParameter,
+    );
   }
 
   private collectForLater(klass: any, attribute: string): void {
@@ -50,45 +80,16 @@ export class AutoFilteredParameters {
   }
 
   private applyFilter(klass: any, attribute: string): void {
-    const prefix = klass.name ? underscore(klass.name) : "";
+    if (!Configurable.config.addToFilterParameters) return;
+    const prefix = klass?.name ? underscore(klass.name) : "";
     const filter = prefix ? `${prefix}.${attribute}` : attribute;
-    if (!this._filterParameters.includes(filter)) {
-      this._filterParameters.push(filter);
+    if (
+      !this.isExcludedFromFilterParameters(filter) &&
+      !this.isExcludedFromFilterParameters(attribute)
+    ) {
+      if (!this._filterParameters.includes(filter)) {
+        this._filterParameters.push(filter);
+      }
     }
   }
-}
-
-/** @internal */
-function app(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::AutoFilteredParameters#app is not implemented",
-  );
-}
-
-/** @internal */
-function installCollectingHook(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::AutoFilteredParameters#install_collecting_hook is not implemented",
-  );
-}
-
-/** @internal */
-function attributeWasDeclared(klass: any, attribute: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::AutoFilteredParameters#attribute_was_declared is not implemented",
-  );
-}
-
-/** @internal */
-function isCollecting(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::AutoFilteredParameters#collecting? is not implemented",
-  );
-}
-
-/** @internal */
-function isExcludedFromFilterParameters(filterParameter: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::AutoFilteredParameters#excluded_from_filter_parameters? is not implemented",
-  );
 }

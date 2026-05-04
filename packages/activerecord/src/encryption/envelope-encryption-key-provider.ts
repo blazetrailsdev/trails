@@ -5,79 +5,79 @@
  * Mirrors: ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider
  */
 
-import { NotImplementedError } from "../errors.js";
 import { getCrypto } from "@blazetrails/activesupport";
 import { Key } from "./key.js";
 import { Encryptor } from "./encryptor.js";
 import { KeyProvider } from "./key-provider.js";
+import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
+import { Configurable } from "./configurable.js";
+import { DecryptionError } from "./errors.js";
 import type { Message } from "./message.js";
 
 export class EnvelopeEncryptionKeyProvider {
-  private _primaryKeyProvider: KeyProvider;
-  private _encryptor: Encryptor;
+  private _primaryKeyProviderOverride?: KeyProvider;
+  private _primaryKeyProviderCache?: KeyProvider;
   private _activePrimaryKey?: Key;
 
-  constructor(primaryKeyProvider: KeyProvider) {
-    this._primaryKeyProvider = primaryKeyProvider;
-    this._encryptor = new Encryptor({ compress: false });
+  constructor(primaryKeyProvider?: KeyProvider) {
+    this._primaryKeyProviderOverride = primaryKeyProvider;
   }
 
   encryptionKey(): Key {
-    const randomSecret = this.generateRandomEncryptionKey();
+    const randomSecret = this.generateRandomSecret();
     const key = new Key(randomSecret);
-    const primaryKey = this._primaryKeyProvider.encryptionKey();
-    const encryptedSecret = this._encryptor.encrypt(randomSecret, {
-      key: primaryKey.secret,
-    });
-    key.publicTags = { encrypted_data_key: encryptedSecret };
+    key.publicTags = { encrypted_data_key: this.encryptDataKey(randomSecret) };
     return key;
   }
 
   decryptionKeys(message: Message): Key[] {
-    const encryptedDataKey = message.headers.get("encrypted_data_key") as string;
-    if (!encryptedDataKey) {
-      return [];
-    }
-    const secret = this._encryptor.decrypt(encryptedDataKey, {
-      keyProvider: this._primaryKeyProvider,
-    });
-    return [new Key(secret)];
+    const secret = this.decryptDataKey(message);
+    return secret ? [new Key(secret)] : [];
   }
 
   get activePrimaryKey(): Key {
-    this._activePrimaryKey ??= this._primaryKeyProvider.encryptionKey();
+    this._activePrimaryKey ??= this.primaryKeyProvider().encryptionKey();
     return this._activePrimaryKey;
   }
 
   generateRandomEncryptionKey(): string {
+    return this.generateRandomSecret();
+  }
+
+  /** @internal */
+  private encryptDataKey(randomSecret: string): string {
+    return new Encryptor({ compress: false }).encrypt(randomSecret, {
+      key: this.activePrimaryKey.secret,
+    });
+  }
+
+  /** @internal */
+  private decryptDataKey(encryptedMessage: Message): string | null {
+    const encryptedDataKey = encryptedMessage.headers.get("encrypted_data_key") as
+      | string
+      | undefined;
+    if (!encryptedDataKey) return null;
+    try {
+      return new Encryptor({ compress: false }).decrypt(encryptedDataKey, {
+        keyProvider: this.primaryKeyProvider(),
+      });
+    } catch (e) {
+      if (e instanceof DecryptionError) return null;
+      throw e;
+    }
+  }
+
+  /** @internal */
+  private primaryKeyProvider(): KeyProvider {
+    if (this._primaryKeyProviderOverride) return this._primaryKeyProviderOverride;
+    this._primaryKeyProviderCache ??= new DerivedSecretKeyProvider(
+      Configurable.config.get("primaryKey") as string,
+    );
+    return this._primaryKeyProviderCache;
+  }
+
+  /** @internal */
+  private generateRandomSecret(): string {
     return getCrypto().randomBytes(32).toString("base64");
   }
-}
-
-/** @internal */
-function encryptDataKey(randomSecret: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#encrypt_data_key is not implemented",
-  );
-}
-
-/** @internal */
-function decryptDataKey(encryptedMessage: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#decrypt_data_key is not implemented",
-  );
-}
-
-/** @internal */
-function primaryKeyProvider(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#primary_key_provider is not implemented",
-  );
-}
-
-/** @internal */
-function generateRandomSecret(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider#generate_random_secret is not implemented",
-  );
 }
