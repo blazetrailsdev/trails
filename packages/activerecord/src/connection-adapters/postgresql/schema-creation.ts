@@ -4,10 +4,19 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation
  */
 
-import { NotImplementedError } from "../../errors.js";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
-import type { ForeignKeyDefinition, ReferentialAction } from "../abstract/schema-definitions.js";
+import {
+  type ForeignKeyDefinition,
+  type ReferentialAction,
+  type ColumnOptions,
+  ChangeColumnDefinition,
+  ChangeColumnDefaultDefinition,
+} from "../abstract/schema-definitions.js";
 import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
+import type {
+  ExclusionConstraintDefinition,
+  UniqueConstraintDefinition,
+} from "./schema-definitions.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
 import { Utils } from "./utils.js";
 
@@ -16,10 +25,50 @@ export class SchemaCreation extends AbstractSchemaCreation {
     super("postgres", adapter);
   }
 
-  protected override visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
-    let sql = super.visitForeignKeyDefinition(o);
-    if (o.deferrable) sql += ` DEFERRABLE INITIALLY ${o.deferrable.toUpperCase()}`;
-    if (!o.isValidate) sql += " NOT VALID";
+  /** @internal */
+  protected override visitAlterTable(o: any): string {
+    // Pull out FK adds so super doesn't process them — we re-add them below
+    // with NOT VALID appended when validate is false.
+    const fkAdds: ForeignKeyDefinition[] = Array.isArray(o.foreignKeyAdds)
+      ? o.foreignKeyAdds.splice(0)
+      : [];
+    let sql: string;
+    try {
+      sql = super.visitAlterTable(o);
+    } finally {
+      // Restore so the object is left in its original state even if super throws.
+      if (fkAdds.length > 0) o.foreignKeyAdds.push(...fkAdds);
+    }
+    if (fkAdds.length > 0) {
+      const table = this.adapter.quoteTableName(o.name);
+      const fkParts = fkAdds.map((fk) => {
+        let part = `ADD ${this.visitForeignKeyDefinition(fk)}`;
+        if (!fk.validate) part += " NOT VALID";
+        return part;
+      });
+      // super already emitted "ALTER TABLE <t> " — if there were no other
+      // parts, sql ends with a trailing space; otherwise append with ", ".
+      const separator = sql.trimEnd() === `ALTER TABLE ${table}` ? " " : ", ";
+      sql = sql.trimEnd() + separator + fkParts.join(", ");
+    }
+    const pgParts: string[] = [];
+    if (Array.isArray(o.constraintValidations)) {
+      for (const name of o.constraintValidations) pgParts.push(this.visitValidateConstraint(name));
+    }
+    if (Array.isArray(o.exclusionConstraintAdds)) {
+      for (const con of o.exclusionConstraintAdds as ExclusionConstraintDefinition[])
+        pgParts.push(this.visitAddExclusionConstraint(con));
+    }
+    if (Array.isArray(o.uniqueConstraintAdds)) {
+      for (const con of o.uniqueConstraintAdds as UniqueConstraintDefinition[])
+        pgParts.push(this.visitAddUniqueConstraint(con));
+    }
+    if (pgParts.length > 0) {
+      const table = this.adapter.quoteTableName(o.name);
+      const trimmed = sql.trimEnd();
+      const separator = trimmed === `ALTER TABLE ${table}` ? " " : ", ";
+      sql = trimmed + separator + pgParts.join(", ");
+    }
     return sql;
   }
 
@@ -49,102 +98,144 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
     return sql;
   }
-}
 
-/** @internal */
-function visit_AlterTable(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_AlterTable is not implemented",
-  );
-}
+  protected override visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
+    let sql = super.visitForeignKeyDefinition(o);
+    if (o.deferrable) sql += ` DEFERRABLE INITIALLY ${o.deferrable.toUpperCase()}`;
+    return sql;
+  }
 
-/** @internal */
-function visit_AddForeignKey(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_AddForeignKey is not implemented",
-  );
-}
+  /** @internal */
+  protected visitValidateConstraint(name: string): string {
+    return `VALIDATE CONSTRAINT ${this.adapter.quoteIdentifier(name)}`;
+  }
 
-/** @internal */
-function visit_ForeignKeyDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ForeignKeyDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected visitExclusionConstraintDefinition(o: ExclusionConstraintDefinition): string {
+    const p: string[] = [];
+    if (o.name) p.push("CONSTRAINT", this.adapter.quoteIdentifier(o.name));
+    p.push("EXCLUDE");
+    if (o.using) p.push(`USING ${o.using}`);
+    p.push(`(${o.expression})`);
+    if (o.where) p.push(`WHERE (${o.where})`);
+    if (o.deferrable) {
+      p.push(
+        o.deferrable === true
+          ? "DEFERRABLE"
+          : `DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`,
+      );
+    }
+    return p.join(" ");
+  }
 
-/** @internal */
-function visit_CheckConstraintDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_CheckConstraintDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected visitUniqueConstraintDefinition(o: UniqueConstraintDefinition): string {
+    const p: string[] = [];
+    if (o.name) p.push("CONSTRAINT", this.adapter.quoteIdentifier(o.name));
+    p.push("UNIQUE");
+    if (this.supportsNullsNotDistinct() && o.nullsNotDistinct) p.push("NULLS NOT DISTINCT");
+    if (o.usingIndex) {
+      p.push(`USING INDEX ${this.adapter.quoteIdentifier(o.usingIndex)}`);
+    } else {
+      const cols = (Array.isArray(o.column) ? o.column : [o.column])
+        .map((c) => this.adapter.quoteIdentifier(c))
+        .join(", ");
+      p.push(`(${cols})`);
+    }
+    if (o.deferrable) {
+      p.push(
+        o.deferrable === true
+          ? "DEFERRABLE"
+          : `DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`,
+      );
+    }
+    return p.join(" ");
+  }
 
-/** @internal */
-function visit_ValidateConstraint(name: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ValidateConstraint is not implemented",
-  );
-}
+  /** @internal */
+  protected visitAddExclusionConstraint(o: ExclusionConstraintDefinition): string {
+    return `ADD ${this.visitExclusionConstraintDefinition(o)}`;
+  }
 
-/** @internal */
-function visit_ExclusionConstraintDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ExclusionConstraintDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected visitAddUniqueConstraint(o: UniqueConstraintDefinition): string {
+    return `ADD ${this.visitUniqueConstraintDefinition(o)}`;
+  }
 
-/** @internal */
-function visit_UniqueConstraintDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_UniqueConstraintDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected visitChangeColumnDefinition(o: ChangeColumnDefinition): string {
+    const column = o.column;
+    column.sqlType = this.typeToSql(column.type, column.options);
+    const quotedName = this.adapter.quoteIdentifier(o.name);
 
-/** @internal */
-function visit_AddExclusionConstraint(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_AddExclusionConstraint is not implemented",
-  );
-}
+    let sql = `ALTER COLUMN ${quotedName} TYPE ${column.sqlType}`;
 
-/** @internal */
-function visit_AddUniqueConstraint(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_AddUniqueConstraint is not implemented",
-  );
-}
+    const options = this.columnOptions(column) as Record<string, unknown>;
 
-/** @internal */
-function visit_ChangeColumnDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ChangeColumnDefinition is not implemented",
-  );
-}
+    if (options["collation"]) {
+      sql += ` COLLATE ${this.adapter.quoteIdentifier(String(options["collation"]))}`;
+    }
+    if (options["using"]) {
+      sql += ` USING ${options["using"]}`;
+    } else if (options["castAs"]) {
+      const castType = this.typeToSql(options["castAs"] as any, options as ColumnOptions);
+      sql += ` USING CAST(${quotedName} AS ${castType})`;
+    }
 
-/** @internal */
-function visit_ChangeColumnDefaultDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#visit_ChangeColumnDefaultDefinition is not implemented",
-  );
-}
+    if ("default" in options) {
+      if (options["default"] == null) {
+        sql += `, ALTER COLUMN ${quotedName} DROP DEFAULT`;
+      } else {
+        sql += `, ALTER COLUMN ${quotedName} SET${this.adapter.quoteDefaultExpression(options["default"])}`;
+      }
+    }
 
-/** @internal */
-function addColumnOptionsBang(sql: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#add_column_options! is not implemented",
-  );
-}
+    if ("null" in options) {
+      sql += `, ALTER COLUMN ${quotedName} ${options["null"] ? "DROP" : "SET"} NOT NULL`;
+    }
 
-/** @internal */
-function quotedIncludeColumns(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#quoted_include_columns is not implemented",
-  );
-}
+    return sql;
+  }
 
-/** @internal */
-function tableModifierInCreate(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation#table_modifier_in_create is not implemented",
-  );
+  /** @internal */
+  protected visitChangeColumnDefaultDefinition(o: ChangeColumnDefaultDefinition): string {
+    const col = this.adapter.quoteIdentifier(o.column.name);
+    const action =
+      o.default == null ? "DROP DEFAULT" : `SET${this.adapter.quoteDefaultExpression(o.default)}`;
+    return `ALTER COLUMN ${col} ${action}`;
+  }
+
+  /** @internal */
+  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
+    const opts = options as Record<string, unknown>;
+    if (opts["collation"]) {
+      sql += ` COLLATE ${this.adapter.quoteIdentifier(String(opts["collation"]))}`;
+    }
+    if (opts["as"]) {
+      sql += ` GENERATED ALWAYS AS (${opts["as"]})`;
+      if (opts["stored"]) {
+        sql += " STORED";
+      } else {
+        const colName = opts["column"] ? (opts["column"] as any).name : "unknown";
+        throw new Error(
+          `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
+            `Specify 'stored: true' option for '${colName}'`,
+        );
+      }
+    }
+    return super.addColumnOptionsBang(sql, options);
+  }
+
+  /** @internal */
+  protected quotedIncludeColumns(o: string | string[]): string {
+    if (typeof o === "string") return o;
+    return o.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
+  }
+
+  /** @internal */
+  protected override tableModifierInCreate(o: any): string {
+    if (o.temporary) return " TEMPORARY";
+    if (o.unlogged) return " UNLOGGED";
+    return "";
+  }
 }
