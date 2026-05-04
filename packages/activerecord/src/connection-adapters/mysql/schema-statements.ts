@@ -136,9 +136,15 @@ export function newColumnFromField(
   tableName: string,
   field: Record<string, string | null>,
   createTableInfoFn: (tableName: string) => string | null,
+  lookupCastType?: (sqlType: string) => {
+    type?: string;
+    limit?: number | null;
+    precision?: number | null;
+    scale?: number | null;
+  },
 ): Column {
   const fieldName = field["Field"] ?? "";
-  const meta = fetchTypeMetadata(field["Type"] ?? "", field["Extra"] ?? "");
+  const meta = fetchTypeMetadata(field["Type"] ?? "", field["Extra"] ?? "", lookupCastType);
   let def: string | null = field["Default"] ?? null;
   let defFn: string | null = null;
 
@@ -165,15 +171,39 @@ export function newColumnFromField(
 }
 
 /** @internal */
-export function fetchTypeMetadata(sqlType: string, extra: string = ""): TypeMetadata {
-  // Strip modifiers and normalize: "datetime(6)" → "datetime", "timestamp(3)" → "datetime"
-  // (MySQL alias_type maps timestamp → datetime in the abstract type map).
-  let baseType = sqlType
-    .replace(/\(.*\).*$/, "")
-    .trim()
-    .toLowerCase();
-  if (/^timestamp/.test(baseType)) baseType = "datetime";
-  const meta = new SqlTypeMetadata({ sqlType, type: baseType });
+export function fetchTypeMetadata(
+  sqlType: string,
+  extra: string = "",
+  lookupCastType?: (sqlType: string) => {
+    type?: string;
+    limit?: number | null;
+    precision?: number | null;
+    scale?: number | null;
+  },
+): TypeMetadata {
+  let baseType: string;
+  let limit: number | null = null;
+  let precision: number | null = null;
+  let scale: number | null = null;
+
+  if (lookupCastType) {
+    const castType = lookupCastType(sqlType);
+    // Normalize timestamp → datetime to match abstract type map alias_type.
+    const raw = (castType.type ?? sqlType).toLowerCase();
+    baseType = /^timestamp/.test(raw) ? "datetime" : raw;
+    limit = castType.limit ?? null;
+    precision = castType.precision ?? null;
+    scale = castType.scale ?? null;
+  } else {
+    // Fallback: strip modifiers and normalize without adapter context.
+    baseType = sqlType
+      .replace(/\(.*\).*$/, "")
+      .trim()
+      .toLowerCase();
+    if (/^timestamp/.test(baseType)) baseType = "datetime";
+  }
+
+  const meta = new SqlTypeMetadata({ sqlType, type: baseType, limit, precision, scale });
   return new TypeMetadata(meta, { extra });
 }
 

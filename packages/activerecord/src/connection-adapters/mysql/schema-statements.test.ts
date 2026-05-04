@@ -148,6 +148,19 @@ describe("MySQL::SchemaStatements", () => {
     expect(fetchTypeMetadata("int").extra).toBe("");
   });
 
+  it("fetchTypeMetadata: uses lookupCastType for limit/precision/scale", () => {
+    const lookup = (s: string) => ({ type: "integer", limit: 8, precision: null, scale: null });
+    const meta = fetchTypeMetadata("bigint unsigned", "", lookup);
+    expect(meta.type).toBe("integer");
+    expect(meta.limit).toBe(8);
+  });
+
+  it("fetchTypeMetadata: lookupCastType boolean mapping (tinyint(1) emulation)", () => {
+    const lookup = (s: string) => ({ type: "boolean", limit: null, precision: null, scale: null });
+    const meta = fetchTypeMetadata("tinyint(1)", "", lookup);
+    expect(meta.type).toBe("boolean");
+  });
+
   it("extractForeignKeyAction: RESTRICT → undefined, others normalized", () => {
     expect(extractForeignKeyAction("RESTRICT")).toBeUndefined();
     expect(extractForeignKeyAction("CASCADE")).toBe("cascade");
