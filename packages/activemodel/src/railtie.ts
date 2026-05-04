@@ -45,10 +45,9 @@ export class Railtie extends BaseRailtie {
     });
 
     this.initializer("active_model.i18n_customize_full_message", () => {
-      const cfg = Railtie.config as RailtieConfig;
-      const value =
-        cfg.activeModel?.i18nCustomizeFullMessage ?? cfg.i18nCustomizeFullMessage ?? false;
-      ActiveModelError.i18nCustomizeFullMessage = value;
+      ActiveModelError.i18nCustomizeFullMessage = Railtie.resolveI18nCustomizeFullMessage(
+        Railtie.config as RailtieConfig,
+      );
     });
   }
 
@@ -59,8 +58,11 @@ export class Railtie extends BaseRailtie {
   static initialize(config?: RailtieConfig): void {
     const env = config?.env ?? Railtie.detectEnv();
     SecurePassword.minCost = env === "test";
-    ActiveModelError.i18nCustomizeFullMessage =
-      config?.activeModel?.i18nCustomizeFullMessage ?? config?.i18nCustomizeFullMessage ?? false;
+    ActiveModelError.i18nCustomizeFullMessage = Railtie.resolveI18nCustomizeFullMessage(config);
+  }
+
+  private static resolveI18nCustomizeFullMessage(cfg?: RailtieConfig): boolean {
+    return cfg?.activeModel?.i18nCustomizeFullMessage ?? cfg?.i18nCustomizeFullMessage ?? false;
   }
 
   private static detectEnv(): string {
