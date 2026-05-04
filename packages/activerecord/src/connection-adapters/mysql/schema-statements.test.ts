@@ -22,6 +22,8 @@ describe("MySQL::SchemaStatements", () => {
   it("isRowFormatDynamicByDefault: MariaDB >= 10.2.2 is true", () => {
     expect(isRowFormatDynamicByDefault(true, "10.2.2")).toBe(true);
     expect(isRowFormatDynamicByDefault(true, "10.10.0")).toBe(true); // numeric, not lexicographic
+    expect(isRowFormatDynamicByDefault(true, "10.2.2-MariaDB")).toBe(true); // suffix stripped
+    expect(isRowFormatDynamicByDefault(true, "10.2.1-MariaDB")).toBe(false);
     expect(isRowFormatDynamicByDefault(true, "10.2.1")).toBe(false);
   });
 

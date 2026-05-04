@@ -87,7 +87,7 @@ export interface SchemaStatements {
 
 /** @internal */
 export function isRowFormatDynamicByDefault(isMariaDb: boolean, databaseVersion: string): boolean {
-  const v = new Version(databaseVersion);
+  const v = new Version(databaseVersion.replace(/-.*$/, ""));
   return isMariaDb ? v.gte("10.2.2") : v.gte("5.7.9");
 }
 
@@ -134,7 +134,7 @@ export function defaultType(
 /** @internal */
 export function newColumnFromField(
   tableName: string,
-  field: Record<string, string>,
+  field: Record<string, string | null>,
   createTableInfoFn: (tableName: string) => string | null,
 ): Column {
   const fieldName = field["Field"] ?? "";
