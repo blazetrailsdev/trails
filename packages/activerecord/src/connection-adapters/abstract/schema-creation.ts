@@ -173,12 +173,23 @@ export class SchemaCreation {
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
     const columnsSql = index.columns.map((c) => {
       let col = this.adapter.quoteIdentifier(c);
-      if (index.lengths[c]) col += `(${index.lengths[c]})`;
+      const len =
+        typeof index.lengths === "number"
+          ? index.lengths
+          : (index.lengths as Record<string, number>)[c];
+      if (len) col += `(${len})`;
       if (this.supportsIndexSortOrder()) {
-        const order = index.orders[c];
+        const order =
+          typeof index.orders === "string"
+            ? index.orders
+            : (index.orders as Record<string, string>)[c];
         if (order) col += ` ${order.toUpperCase()}`;
       }
-      if (this.adapterName === "postgres" && index.opclasses[c]) col += ` ${index.opclasses[c]}`;
+      const opc =
+        typeof index.opclasses === "string"
+          ? index.opclasses
+          : (index.opclasses as Record<string, string>)[c];
+      if (this.adapterName === "postgres" && opc) col += ` ${opc}`;
       return col;
     });
     parts.push(`(${columnsSql.join(", ")})`);

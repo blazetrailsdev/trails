@@ -16,17 +16,6 @@ export class TableDefinition extends AbstractTableDefinition {
     super(tableName, { ...options, adapterName: "sqlite" });
   }
 
-  override references(
-    name: string,
-    options: ColumnOptions & {
-      polymorphic?: boolean;
-      foreignKey?: boolean;
-    } = {},
-  ): this {
-    super.references(name, options);
-    return this;
-  }
-
   changeColumn(columnName: string, type: ColumnType, options: ColumnOptions = {}): void {
     const col = this.newColumnDefinition(columnName, type, options);
     const idx = this.columns.findIndex((c) => c.name === columnName);
