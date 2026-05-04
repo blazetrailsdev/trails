@@ -177,8 +177,8 @@ Ruby-to-TypeScript translation table.
 
 **Active focus** — these packages are where development effort is concentrated:
 
-| Package                      | Rails Equivalent                                                        | API       | Tests     | Description                                                |
-| ---------------------------- | ----------------------------------------------------------------------- | --------- | --------- | ---------------------------------------------------------- |
+| Package                     | Rails Equivalent                                                      | API       | Tests     | Description                                              |
+| --------------------------- | --------------------------------------------------------------------- | --------- | --------- | -------------------------------------------------------- |
 | `@blazetrails/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **91.0%** | **72.6%** | ORM — persistence, querying, associations, migrations    |
 | `@blazetrails/arel`         | [Arel](https://api.rubyonrails.org/classes/Arel.html)                 | **100%**  | **99.4%** | SQL AST builder and query generation                     |
 | `@blazetrails/activemodel`  | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)   | **99.6%** | **99.6%** | Attributes, validations, callbacks, dirty tracking, i18n |
@@ -192,8 +192,8 @@ from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/act
 
 **ActionPack & friends** — started but not the current priority:
 
-| Package                      | Rails Equivalent                                                              | API       | Tests     | Description                                            |
-| ---------------------------- | ----------------------------------------------------------------------------- | --------- | --------- | ------------------------------------------------------ |
+| Package                      | Rails Equivalent                                                              | API       | Tests     | Description                                                |
+| ---------------------------- | ----------------------------------------------------------------------------- | --------- | --------- | ---------------------------------------------------------- |
 | `@blazetrails/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html)       | **28.5%** | **78.5%** | Core utilities, inflection, caching, notifications         |
 | `@blazetrails/rack`          | [Rack](https://rack.github.io/)                                               | —         | **100%**  | Modular web server interface, request/response, middleware |
 | `@blazetrails/actionpack`    | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **57.0%** | **28.3%** | Controller layer, rendering, filters, parameters           |
