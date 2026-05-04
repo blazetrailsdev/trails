@@ -77,7 +77,7 @@ export function humanAttributeName(
 
     const result = _callI18n(defaults, raiseOnMissing, options);
     if (result === MISSING_TRANSLATION) {
-      return tail.length > 0 ? humanize(tail) : humanize(namespace.replace(/\//g, "_"));
+      return tail.length > 0 ? humanize(tail) : humanize(namespace);
     }
     return result;
   } else {
