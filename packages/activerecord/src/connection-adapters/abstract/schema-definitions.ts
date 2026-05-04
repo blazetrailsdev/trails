@@ -224,6 +224,9 @@ export interface ColumnOptions {
   primaryKey?: boolean;
   array?: boolean;
   collation?: string;
+  comment?: string;
+  ifExists?: boolean;
+  ifNotExists?: boolean;
 }
 
 export interface AddIndexOptions {
@@ -393,7 +396,7 @@ export class ReferenceDefinition {
   readonly index: boolean | AddIndexOptions;
   readonly foreignKey: boolean | ReferenceForeignKeyOptions;
   readonly type: ColumnType;
-  readonly options: Omit<ColumnOptions, "index"> & { ifExists?: boolean; ifNotExists?: boolean };
+  readonly options: Omit<ColumnOptions, "index">;
 
   constructor(
     name: string,
@@ -402,8 +405,6 @@ export class ReferenceDefinition {
       foreignKey?: boolean | ReferenceForeignKeyOptions;
       index?: boolean | AddIndexOptions;
       type?: ColumnType;
-      ifExists?: boolean;
-      ifNotExists?: boolean;
     } = {},
   ) {
     if (options.polymorphic && options.foreignKey) {
@@ -438,8 +439,8 @@ export class ReferenceDefinition {
   }
 
   /** @internal */
-  private conditionalOptions(): { ifExists?: boolean; ifNotExists?: boolean } {
-    const result: { ifExists?: boolean; ifNotExists?: boolean } = {};
+  private conditionalOptions(): Pick<ColumnOptions, "ifExists" | "ifNotExists"> {
+    const result: Pick<ColumnOptions, "ifExists" | "ifNotExists"> = {};
     if (this.options.ifExists !== undefined) result.ifExists = this.options.ifExists;
     if (this.options.ifNotExists !== undefined) result.ifNotExists = this.options.ifNotExists;
     return result;
@@ -472,15 +473,12 @@ export class ReferenceDefinition {
   }
 
   /** @internal */
-  private foreignKeyOptions(): ReferenceForeignKeyOptions & {
-    ifExists?: boolean;
-    ifNotExists?: boolean;
-  } {
+  private foreignKeyOptions(): ReferenceForeignKeyOptions {
     return {
       ...this.asOptions(this.foreignKey),
       column: this.columnName(),
       ...this.conditionalOptions(),
-    } as ReferenceForeignKeyOptions & { ifExists?: boolean; ifNotExists?: boolean };
+    } as ReferenceForeignKeyOptions;
   }
 
   /** @internal */
@@ -885,8 +883,6 @@ export class TableDefinition {
       foreignKey?: boolean | ReferenceForeignKeyOptions;
       index?: boolean | AddIndexOptions;
       type?: ColumnType;
-      ifExists?: boolean;
-      ifNotExists?: boolean;
     } = {},
   ): this {
     new ReferenceDefinition(name, options).addTo(this);
