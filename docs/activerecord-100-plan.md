@@ -432,12 +432,12 @@ _Component C — Deduplicable cluster (5 files)_
 - Dependencies: none
 - Risk: `assignMultiparameterAttributes` handles Rails date/time decomposition (`(1i)`, `(2i)`, `(3i)` field suffixes) — no direct TS equivalent. Must implement a field-grouping parser.
 
-**PR 27 — `attribute_methods.rb` (56%)**
+**PR 27 — `attribute_methods.rb` (56% → 100%) ✅ merged #1185**
 
 - Rails: `$AR/attribute_methods.rb` (547 LOC)
-- TS: `$TS/attribute-methods.ts` (346 LOC, 40 matched, 31 missing, 56%)
-- Missing (31): `dangerousAttributeMethods`, `initializeGeneratedModules`, `aliasAttribute`, `eagerlyGenerateAliasAttributeMethods`, `generateAliasAttributeMethods`, `aliasAttributeMethodDefinition`, `attributeMethodsGenerated?`, `defineAttributeMethods`, `generateAliasAttributes`, `undefineAttributeMethods`, `instanceMethodAlreadyImplemented?`, `dangerousAttributeMethod?`, `methodDefinedWithin?`, `dangerousClassMethod?`, `attributeMethod?`, `attributeNames`, `hasAttribute?`, `_hasAttribute?`, `inherited`, `respondTo?`, `hasAttribute?` (instance), `_hasAttribute?` (instance), `attributeNames` (instance), `attributes`, `attributeForInspect`, `attributePresent?`, `[]`, `[]=`, `accessedFields`, `respondToMissing?`, `methodMissing`, `attributeMethodQ`, `attributesWithValues`, `attributesForUpdate`, `attributesForCreate`, `formatForInspect`, `pkAttribute?`
-- LOC: Rails 547 LOC, TS 346 LOC → ~280 net
+- TS: `$TS/attribute-methods.ts` — 71/71 (100%)
+- Also fixed `attributesInDatabase` bug (was returning new values; should return original DB values per Rails spec)
+- Also broke circular import: primary-key.ts imports dangerousAttributeMethods from attribute-methods.ts, so the 5 id\* methods are inlined instead of imported
 - Dependencies: none
 
 **PR 28 — `attributes.rb` + `aggregations.rb` (combined)** _(~250 net LOC)_
