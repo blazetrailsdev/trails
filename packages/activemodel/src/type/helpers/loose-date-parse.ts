@@ -33,10 +33,12 @@ export function looseDateParse(input: string): LooseDateParts | null {
   const s = input.trim();
   if (s === "") return null;
 
-  // Layer 1: ISO datetime (with or without timezone offset)
-  if (/Z$|[+-]\d{2}:\d{2}$/.test(s)) {
+  // Layer 1: ISO datetime — strip offset/Z to preserve local components, matching
+  // Ruby Date._parse which reports the fields as written (offset stored separately).
+  const withoutOffset = stripOffset(s);
+  if (withoutOffset !== null) {
     try {
-      const pdt = Temporal.Instant.from(s).toZonedDateTimeISO("UTC").toPlainDateTime();
+      const pdt = Temporal.PlainDateTime.from(withoutOffset, { overflow: "reject" });
       return toDateTimeParts(pdt);
     } catch {
       // fall through
@@ -44,7 +46,7 @@ export function looseDateParse(input: string): LooseDateParts | null {
   }
 
   try {
-    const pdt = Temporal.PlainDateTime.from(s);
+    const pdt = Temporal.PlainDateTime.from(s, { overflow: "reject" });
     return toDateTimeParts(pdt);
   } catch {
     // fall through
@@ -52,7 +54,7 @@ export function looseDateParse(input: string): LooseDateParts | null {
 
   // Layer 2: ISO date only
   try {
-    const pd = Temporal.PlainDate.from(s);
+    const pd = Temporal.PlainDate.from(s, { overflow: "reject" });
     return { year: pd.year, month: pd.month, day: pd.day };
   } catch {
     // fall through
@@ -60,7 +62,7 @@ export function looseDateParse(input: string): LooseDateParts | null {
 
   // Layer 3: ISO time only
   try {
-    const pt = Temporal.PlainTime.from(s);
+    const pt = Temporal.PlainTime.from(s, { overflow: "reject" });
     return toTimeParts(pt);
   } catch {
     // fall through
@@ -102,11 +104,15 @@ export function looseDateParse(input: string): LooseDateParts | null {
     return parts;
   }
 
-  // 24-hour time: "15:30" or "15:30:45"
+  // 24-hour time: "15:30" or "15:30:45" — validate ranges to reject "25:61"
   m = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s);
   if (m) {
-    const parts: LooseDateParts = { hour: int(m[1]), minute: int(m[2]) };
-    if (m[3] !== undefined) parts.second = int(m[3]);
+    const hour = int(m[1]);
+    const minute = int(m[2]);
+    const second = m[3] !== undefined ? int(m[3]) : 0;
+    if (hour > 23 || minute > 59 || second > 59) return null;
+    const parts: LooseDateParts = { hour, minute };
+    if (m[3] !== undefined) parts.second = second;
     return parts;
   }
 
@@ -157,4 +163,10 @@ const MONTH_NAMES: Record<string, number> = {
 
 function monthNumber(name: string): number | null {
   return MONTH_NAMES[name.toLowerCase()] ?? null;
+}
+
+/** Strip a trailing Z or numeric offset (+HH:MM / -HH:MM) from an ISO datetime string. */
+function stripOffset(s: string): string | null {
+  const m = /^(.+?)(Z|[+-]\d{2}:\d{2})$/.exec(s);
+  return m ? m[1] : null;
 }

@@ -67,8 +67,22 @@ describe("looseDateParse", () => {
     expect(looseDateParse("")).toBeNull();
   });
 
-  it("ISO datetime with timezone Z", () => {
+  it("ISO datetime with timezone Z preserves local fields", () => {
     const result = looseDateParse("2020-07-04T15:30:00Z");
     expect(result).toMatchObject({ year: 2020, month: 7, day: 4, hour: 15, minute: 30 });
+  });
+
+  it("ISO datetime with non-zero offset preserves local fields (not UTC-normalized)", () => {
+    // Ruby Date._parse reports the fields as written; 2020-07-04T00:30:00+02:00 stays day=4, hour=0
+    const result = looseDateParse("2020-07-04T00:30:00+02:00");
+    expect(result).toMatchObject({ year: 2020, month: 7, day: 4, hour: 0, minute: 30 });
+  });
+
+  it("out-of-range ISO date returns null", () => {
+    expect(looseDateParse("2020-13-40")).toBeNull();
+  });
+
+  it("out-of-range ISO time returns null", () => {
+    expect(looseDateParse("25:61")).toBeNull();
   });
 });

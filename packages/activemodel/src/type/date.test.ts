@@ -97,4 +97,11 @@ describe("DateTest", () => {
     expect(result).toBeInstanceOf(Temporal.PlainDate);
     expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
   });
+
+  it("cast datetime with non-zero offset near midnight preserves local date", () => {
+    // Ruby Date._parse("2020-07-04T00:30:00+02:00") reports mday=4, not the UTC day (3).
+    const result = type.cast("2020-07-04T00:30:00+02:00");
+    expect(result).toBeInstanceOf(Temporal.PlainDate);
+    expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
+  });
 });

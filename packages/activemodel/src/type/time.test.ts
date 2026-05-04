@@ -114,4 +114,11 @@ describe("TimeTest", () => {
     expect(result).toBeInstanceOf(Temporal.PlainTime);
     expect((result as Temporal.PlainTime).hour).toBe(19);
   });
+
+  it("cast datetime with non-zero offset preserves local time (not UTC-normalized)", () => {
+    // Ruby Time._parse reports the local hour written in the string, not the UTC hour.
+    const result = type.cast("2015-02-09T19:45:54+02:00");
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect((result as Temporal.PlainTime).hour).toBe(19);
+  });
 });
