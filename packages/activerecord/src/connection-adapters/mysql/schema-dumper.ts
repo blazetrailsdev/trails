@@ -39,7 +39,10 @@ export interface MysqlConnection {
 export class SchemaDumper extends AbstractSchemaDumper {
   /** Injected adapter connection; used by schemaCollation and extractExpressionForVirtualColumn. */
   connection?: MysqlConnection;
-  private _tableCollationCache: Record<string, string> = {};
+  /** Keyed by table name; populated by adapter before column iteration. */
+  tableCollationCache: Record<string, string> = {};
+  /** table → column → generation expression; populated by adapter before column iteration. */
+  virtualExpressionCache: Record<string, Record<string, string>> = {};
 
   defaultPrimaryKeyType(): string {
     return "bigint";
@@ -54,20 +57,18 @@ export class SchemaDumper extends AbstractSchemaDumper {
     const sizeMatch = /^(?<size>tiny|medium|long)(?:text|blob)/.exec(column.sqlType ?? "");
     if (sizeMatch?.groups) {
       const size = sizeMatch.groups["size"] as string;
-      const withSize: Record<string, unknown> = { size: `:${size}` };
       const rest = { ...spec };
       Object.keys(spec).forEach((k) => delete spec[k]);
-      Object.assign(spec, withSize, rest);
+      Object.assign(spec, { size: `:${size}` }, rest);
     }
 
     if (column.virtual) {
       const as = this.extractExpressionForVirtualColumn(column);
       if (as !== undefined) spec["as"] = as;
       if (/\b(?:STORED|PERSISTENT)\b/.test(column.extra ?? "")) spec["stored"] = "true";
-      const withType: Record<string, unknown> = { type: JSON.stringify(this.schemaType(column)) };
       const rest = { ...spec };
       Object.keys(spec).forEach((k) => delete spec[k]);
-      Object.assign(spec, withType, rest);
+      Object.assign(spec, { type: JSON.stringify(this.schemaType(column)) }, rest);
     }
 
     return spec;
@@ -76,9 +77,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected override columnSpecForPrimaryKey(column: MysqlColumn): Record<string, unknown> {
     const spec = super.columnSpecForPrimaryKey(column);
-    if (column.type === "integer" && column.autoIncrement) {
-      delete spec["autoIncrement"];
-    }
+    if (column.type === "integer" && column.autoIncrement) delete spec["autoIncrement"];
     return spec;
   }
 
@@ -110,9 +109,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected override schemaPrecision(column: MysqlColumn): string | undefined {
     const sqlType = column.sqlType ?? "";
     if (/^time(?:stamp)?\b/.test(sqlType) && column.precision === 0) return undefined;
-    if (column.type === "datetime") {
+    if (column.type === "datetime")
       return column.precision === 0 ? "nil" : super.schemaPrecision(column);
-    }
     return super.schemaPrecision(column);
   }
 
@@ -121,15 +119,20 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (!column.collation) return undefined;
     const tableName = this.tableName;
     if (!this.connection || !tableName) return JSON.stringify(column.collation);
-    const cached = this._tableCollationCache[tableName];
+    const cached = this.tableCollationCache[tableName];
     if (cached === undefined) return JSON.stringify(column.collation);
     return column.collation !== cached ? JSON.stringify(column.collation) : undefined;
   }
 
-  /** @internal */
-  protected extractExpressionForVirtualColumn(_column: MysqlColumn): string | undefined {
-    // Requires a live connection to query information_schema; returns undefined
-    // in offline/test contexts. Full wiring requires an injected MysqlConnection.
-    return undefined;
+  /**
+   * Returns the generation expression for a virtual column from `virtualExpressionCache`,
+   * which the adapter populates before iterating columns. Mirrors Rails'
+   * `extract_expression_for_virtual_column` (queries `information_schema` or CREATE TABLE).
+   * @internal
+   */
+  protected extractExpressionForVirtualColumn(column: MysqlColumn): string | undefined {
+    const tableName = this.tableName;
+    if (!tableName) return undefined;
+    return this.virtualExpressionCache[tableName]?.[column.name];
   }
 }
