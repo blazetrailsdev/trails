@@ -177,15 +177,13 @@ Ruby-to-TypeScript translation table.
 
 **Active focus** — these packages are where development effort is concentrated:
 
-| Package                      | Rails Equivalent                                                        | API       | Tests     | Description                                                |
-| ---------------------------- | ----------------------------------------------------------------------- | --------- | --------- | ---------------------------------------------------------- |
-| `@blazetrails/activerecord`  | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html)   | **91.5%** | **65.3%** | ORM — persistence, querying, associations, migrations      |
-| `@blazetrails/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html) | **24.8%** | **29.3%** | Core utilities, inflection, caching, notifications         |
-| `@blazetrails/arel`          | [Arel](https://api.rubyonrails.org/classes/Arel.html)                   | **100%**  | **91.2%** | SQL AST builder and query generation                       |
-| `@blazetrails/activemodel`   | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)     | **99.7%** | **93.4%** | Attributes, validations, callbacks, dirty tracking, i18n   |
-| `@blazetrails/rack`          | [Rack](https://rack.github.io/)                                         | —         | **98.7%** | Modular web server interface, request/response, middleware |
+| Package                     | Rails Equivalent                                                      | API       | Tests     | Description                                              |
+| --------------------------- | --------------------------------------------------------------------- | --------- | --------- | -------------------------------------------------------- |
+| `@blazetrails/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **91.0%** | **72.6%** | ORM — persistence, querying, associations, migrations    |
+| `@blazetrails/arel`         | [Arel](https://api.rubyonrails.org/classes/Arel.html)                 | **100%**  | **99.4%** | SQL AST builder and query generation                     |
+| `@blazetrails/activemodel`  | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)   | **99.6%** | **99.6%** | Attributes, validations, callbacks, dirty tracking, i18n |
 
-**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **93.1% API** | **70.6% Tests**
+**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **93.2% API** | **77.2% Tests**
 
 Per-package deviation guides catalog the places where Trails diverges
 from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/activerecord-rails-deviations.md)
@@ -194,16 +192,18 @@ from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/act
 
 **ActionPack & friends** — started but not the current priority:
 
-| Package                   | Rails Equivalent                                                              | API       | Tests     | Description                                            |
-| ------------------------- | ----------------------------------------------------------------------------- | --------- | --------- | ------------------------------------------------------ |
-| `@blazetrails/actionpack` | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **66.4%** | **17.9%** | Controller layer, rendering, filters, parameters       |
-|                           | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **6.1%**  | **30.9%** | Routing, middleware stack, cookies, sessions, security |
-| `@blazetrails/actionview` | [ActionView](https://api.rubyonrails.org/classes/ActionView.html)             | **3.6%**  | **5.1%**  | Templates, rendering, view helpers                     |
-| `@blazetrails/trailties`  | [Railties](https://api.rubyonrails.org/classes/Rails.html)                    | **0.1%**  | **3.9%**  | CLI, generators, application bootstrap                 |
+| Package                      | Rails Equivalent                                                              | API       | Tests     | Description                                                |
+| ---------------------------- | ----------------------------------------------------------------------------- | --------- | --------- | ---------------------------------------------------------- |
+| `@blazetrails/activesupport` | [ActiveSupport](https://api.rubyonrails.org/classes/ActiveSupport.html)       | **28.5%** | **78.5%** | Core utilities, inflection, caching, notifications         |
+| `@blazetrails/rack`          | [Rack](https://rack.github.io/)                                               | —         | **100%**  | Modular web server interface, request/response, middleware |
+| `@blazetrails/actionpack`    | [ActionController](https://api.rubyonrails.org/classes/ActionController.html) | **57.0%** | **28.3%** | Controller layer, rendering, filters, parameters           |
+|                              | [ActionDispatch](https://api.rubyonrails.org/classes/ActionDispatch.html)     | **5.3%**  | **37.3%** | Routing, middleware stack, cookies, sessions, security     |
+| `@blazetrails/actionview`    | [ActionView](https://api.rubyonrails.org/classes/ActionView.html)             | **1.2%**  | **5.1%**  | Templates, rendering, view helpers                         |
+| `@blazetrails/trailties`     | [Railties](https://api.rubyonrails.org/classes/Rails.html)                    | —         | **3.9%**  | CLI, generators, application bootstrap                     |
 
-**Tests** = `test:compare` — matches our test names against the Rails test suite. **API** = `api:compare` — matches individual public methods against Rails source (method-level, not class/module wrappers). Rack doesn't have API comparison yet (it's not a Rails gem).
+**Tests** = `test:compare` — matches our test names against the Rails test suite. **API** = `pnpm api:compare -- --public-only` — matches individual public methods against Rails source (method-level, not class/module wrappers). The default `api:compare` mode also includes Rails-private/internal helpers; this README reports the public-surface filter so the headline percentages reflect contract coverage. Rack doesn't have API comparison yet (it's not a Rails gem). Trailties' API column is em-dashed because `api:compare` finds no public-method overlap between our `packages/trailties/src/` files and the bundled `railties/lib/rails` source yet, so the package summary is omitted from the report.
 
-**52.3%** overall API coverage (3,877 / 7,415 methods). CI runs both comparisons on every push.
+**52.6%** overall public API coverage (4,977 / 9,465 methods). CI runs both comparisons on every push.
 
 ## Design Principles
 
@@ -232,8 +232,11 @@ pnpm run build
 # Matches our test file names and it()/it.skip() descriptions against Ruby test names
 pnpm run test:compare
 
-# Compare public API surface against Rails
+# Compare full API surface against Rails (public + private/protected)
 pnpm run api:compare
+
+# Public-surface only (matches the percentages reported in this README)
+pnpm run api:compare -- --public-only
 
 # Generate stub tests for any unmatched Rails tests
 pnpm run test:stubs
