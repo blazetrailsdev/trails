@@ -26,6 +26,9 @@ import {
   stiClassFor,
   polymorphicClassFor,
   initializeInternalsCallback as inheritanceInitializeInternalsCallback,
+  baseClass as _inheritanceBaseClass,
+  getAbstractClass as _getAbstractClass,
+  setAbstractClass as _setAbstractClass,
 } from "./inheritance.js";
 import {
   NotImplementedError,
@@ -106,8 +109,16 @@ import {
   accessedFields as _accessedFields,
   attributesForCreate as _attributesForCreate,
   attributesForUpdate as _attributesForUpdate,
+  attributeNames as _attributeNames,
 } from "./attribute-methods.js";
-import { toKey as _toKey } from "./attribute-methods/primary-key.js";
+import {
+  toKey as _toKey,
+  getId as _getId,
+  setId as _setId,
+  getPrimaryKeyAttr as _getPrimaryKeyAttr,
+  setPrimaryKeyAttr as _setPrimaryKeyAttr,
+  isCompositePrimaryKey as _isCompositePrimaryKey,
+} from "./attribute-methods/primary-key.js";
 import { _readAttribute as _readAttributeFn } from "./attribute-methods/read.js";
 import {
   queryAttribute as _queryAttribute,
@@ -497,20 +508,12 @@ export class Base extends Model {
     ModelSchema.protectedEnvironments.call(this, envs);
   }
 
-  /**
-   * Mark this class as abstract — it won't have its own table.
-   * Does not inherit from parent: only true if explicitly set on this class.
-   *
-   * Mirrors: ActiveRecord::Base.abstract_class
-   */
   static get abstractClass(): boolean {
-    return Object.prototype.hasOwnProperty.call(this, "_abstractClass")
-      ? this._abstractClass
-      : false;
+    return _getAbstractClass.call(this);
   }
 
   static set abstractClass(value: boolean) {
-    this._abstractClass = value;
+    _setAbstractClass.call(this, value);
   }
 
   static _requireConcreteClass(): void {
@@ -611,17 +614,12 @@ export class Base extends Model {
     ModelSchema.tableName.call(this, name);
   }
 
-  /**
-   * Set or get the primary key. Defaults to "id".
-   *
-   * Mirrors: ActiveRecord::Base.primary_key
-   */
   static get primaryKey(): string | string[] {
-    return this._primaryKey;
+    return _getPrimaryKeyAttr.call(this);
   }
 
   static set primaryKey(key: string | string[]) {
-    this._primaryKey = key;
+    _setPrimaryKeyAttr.call(this, key);
   }
 
   /**
@@ -641,13 +639,8 @@ export class Base extends Model {
     return LockingOptimistic.lockingEnabled(this);
   }
 
-  /**
-   * Returns true if this model uses a composite primary key.
-   *
-   * Mirrors: ActiveRecord::Base.composite_primary_key?
-   */
   static get compositePrimaryKey(): boolean {
-    return Array.isArray(this._primaryKey);
+    return _isCompositePrimaryKey.call(this);
   }
 
   /**
@@ -948,13 +941,8 @@ export class Base extends Model {
     ModelSchema.inheritanceColumn.call(this, col);
   }
 
-  /**
-   * Return the base class in an STI hierarchy.
-   *
-   * Mirrors: ActiveRecord::Base.base_class
-   */
   static get baseClass(): typeof Base {
-    return getStiBase(this);
+    return _inheritanceBaseClass.call(this);
   }
 
   /** @internal */
@@ -2215,36 +2203,12 @@ export class Base extends Model {
 
   declare writeAttribute: typeof ReadonlyAttributes.writeAttribute;
 
-  /**
-   * The primary key value. When the concrete PK type is known, narrow it at
-   * the use site (e.g. `record.id as number`) rather than redeclaring `id`
-   * on a subclass — `id` is defined here as an accessor and TS forbids
-   * overriding an accessor with a differently-typed instance property.
-   *
-   * Mirrors: ActiveRecord::Base#id
-   */
   get id(): PrimaryKeyValue {
-    const ctor = this.constructor as typeof Base;
-    const pk = ctor.primaryKey;
-    if (Array.isArray(pk)) {
-      return pk.map((col) => this._readAttribute(col)) as PrimaryKeyValue;
-    }
-    return this._readAttribute(pk) as PrimaryKeyValue;
+    return _getId.call(this) as PrimaryKeyValue;
   }
 
   set id(value: PrimaryKeyValue) {
-    const ctor = this.constructor as typeof Base;
-    const pk = ctor.primaryKey;
-    if (Array.isArray(pk)) {
-      if (!Array.isArray(value)) {
-        throw new TypeError(
-          `Expected an array for composite primary key [${pk.join(", ")}], got ${value === null ? "null" : typeof value}`,
-        );
-      }
-      pk.forEach((col, i) => this._writeAttribute(col, value[i]));
-    } else {
-      this._writeAttribute(pk, value);
-    }
+    _setId.call(this, value);
   }
 
   // increment/decrement/toggle + bang variants wired via include() below;
@@ -2672,13 +2636,8 @@ export class Base extends Model {
     return _attributeNamesList.call(this as any);
   }
 
-  /**
-   * Returns the list of attribute names.
-   *
-   * Mirrors: ActiveRecord::Base.attribute_names
-   */
   static attributeNames(): string[] {
-    return [...this._attributeDefinitions.keys()];
+    return _attributeNames.call(this);
   }
 
   /**

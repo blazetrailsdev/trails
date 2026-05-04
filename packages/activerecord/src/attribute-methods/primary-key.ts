@@ -86,6 +86,46 @@ export function idForDatabase(this: PrimaryKeyRecord): unknown {
 }
 
 // ---------------------------------------------------------------------------
+// Instance accessor methods
+// ---------------------------------------------------------------------------
+
+interface PrimaryKeyInstance {
+  constructor: unknown;
+  _readAttribute(name: string): unknown;
+  _writeAttribute(name: string, value: unknown): void;
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id
+ * @internal
+ */
+export function getId(this: PrimaryKeyInstance): unknown {
+  const ctor = this.constructor as any;
+  const pk = ctor.primaryKey as string | string[];
+  if (Array.isArray(pk)) return pk.map((col) => this._readAttribute(col));
+  return this._readAttribute(pk);
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey#id=
+ * @internal
+ */
+export function setId(this: PrimaryKeyInstance, value: unknown): void {
+  const ctor = this.constructor as any;
+  const pk = ctor.primaryKey as string | string[];
+  if (Array.isArray(pk)) {
+    if (!Array.isArray(value)) {
+      throw new TypeError(
+        `Expected an array for composite primary key [${pk.join(", ")}], got ${value === null ? "null" : typeof value}`,
+      );
+    }
+    pk.forEach((col, i) => this._writeAttribute(col, (value as unknown[])[i]));
+  } else {
+    this._writeAttribute(pk, value);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Class methods
 // ---------------------------------------------------------------------------
 
@@ -93,6 +133,30 @@ interface PrimaryKeyHost {
   primaryKey: string | string[];
   _primaryKey?: string | string[];
   name: string;
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key
+ * @internal
+ */
+export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] {
+  return this._primaryKey ?? "id";
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key=
+ * @internal
+ */
+export function setPrimaryKeyAttr(this: PrimaryKeyHost, key: string | string[]): void {
+  this._primaryKey = key;
+}
+
+/**
+ * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#composite_primary_key?
+ * @internal
+ */
+export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
+  return Array.isArray(this._primaryKey ?? "id");
 }
 
 export function isInstanceMethodAlreadyImplemented(
