@@ -21,9 +21,9 @@ export class StringType extends ImmutableStringType {
   }
 
   isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
-    if (rawOldValue === null || rawOldValue === undefined)
-      return newValue !== null && newValue !== undefined;
-    return String(rawOldValue) !== String(newValue);
+    if (typeof newValue !== "string") return false;
+    if (rawOldValue === null || rawOldValue === undefined) return true;
+    return rawOldValue !== newValue;
   }
 
   toImmutableString(): ImmutableStringType {
