@@ -1,4 +1,4 @@
-import { parse as yamlParse, stringify as yamlStringify } from "yaml";
+import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
 import { AttributeSetCoderError } from "../coder.js";
 import type { AttributeSetCodec, AttributeSetEnvelope } from "../coder.js";
 
