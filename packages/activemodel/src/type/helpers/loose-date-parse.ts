@@ -15,7 +15,8 @@ export interface LooseDateParts {
  * Loosely parse a date/time string, mirroring Ruby's `Date._parse(string, false)`.
  *
  * Supported formats (in evaluation order):
- *   - ISO 8601 datetime:   "2020-07-04T15:30:00", "2020-07-04T15:30:00Z"
+ *   - ISO 8601 datetime:   "2020-07-04T15:30:00", "2020-07-04T15:30:00Z", "2020-07-04T15:30:00+02:00"
+ *   - Space-separated:     "2020-07-04 15:30:00", "2020-07-04 15:30:00.123456+00" (Postgres wire format)
  *   - ISO 8601 date:       "2020-07-04"
  *   - ISO 8601 time:       "15:30", "15:30:45"
  *   - US slashes:          "7/4/2020" (MM/DD/YYYY)
@@ -33,9 +34,13 @@ export function looseDateParse(input: string): LooseDateParts | null {
   const s = input.trim();
   if (s === "") return null;
 
+  // Normalize space separator to T and expand short offsets (+00 → +00:00) so
+  // Temporal can parse Postgres wire-format strings ("2026-04-26 14:23:55.123456+00").
+  const normalized = normalizeDateTime(s);
+
   // Layer 1: ISO datetime — strip offset/Z to preserve local components, matching
   // Ruby Date._parse which reports the fields as written (offset stored separately).
-  const withoutOffset = stripOffset(s);
+  const withoutOffset = stripOffset(normalized);
   if (withoutOffset !== null) {
     try {
       const pdt = Temporal.PlainDateTime.from(withoutOffset, { overflow: "reject" });
@@ -46,7 +51,7 @@ export function looseDateParse(input: string): LooseDateParts | null {
   }
 
   try {
-    const pdt = Temporal.PlainDateTime.from(s, { overflow: "reject" });
+    const pdt = Temporal.PlainDateTime.from(normalized, { overflow: "reject" });
     return toDateTimeParts(pdt);
   } catch {
     // fall through
@@ -92,13 +97,15 @@ export function looseDateParse(input: string): LooseDateParts | null {
     if (month) return { year: int(m[3]), month, day: int(m[1]) };
   }
 
-  // 12-hour time: "3pm", "3:30 PM", "12 AM"
+  // 12-hour time: "3pm", "3:30 PM", "12 AM" — valid hours are 1–12
   m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i.exec(s);
   if (m) {
-    let hour = int(m[1]);
+    const rawHour = int(m[1]);
     const minute = m[2] !== undefined ? int(m[2]) : undefined;
+    if (rawHour < 1 || rawHour > 12 || (minute !== undefined && minute > 59)) return null;
     const ampm = m[3].toLowerCase();
-    hour = ampm === "am" ? (hour === 12 ? 0 : hour) : hour === 12 ? 12 : hour + 12;
+    const hour =
+      ampm === "am" ? (rawHour === 12 ? 0 : rawHour) : rawHour === 12 ? 12 : rawHour + 12;
     const parts: LooseDateParts = { hour };
     if (minute !== undefined) parts.minute = minute;
     return parts;
@@ -165,8 +172,19 @@ function monthNumber(name: string): number | null {
   return MONTH_NAMES[name.toLowerCase()] ?? null;
 }
 
-/** Strip a trailing Z or numeric offset (+HH:MM / -HH:MM) from an ISO datetime string. */
+/**
+ * Normalize a datetime string so Temporal can parse it:
+ * - space separator → T
+ * - short numeric offset (+HH / -HH) → +HH:00
+ */
+function normalizeDateTime(s: string): string {
+  return s
+    .replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T")
+    .replace(/(T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)([-+]\d{2})$/, "$1$2:00");
+}
+
+/** Strip a trailing Z or numeric offset (+HH:MM / +HH / -HH:MM / -HH) from an ISO datetime string. */
 function stripOffset(s: string): string | null {
-  const m = /^(.+?)(Z|[+-]\d{2}:\d{2})$/.exec(s);
+  const m = /^(.+?)(Z|[+-]\d{2}(?::\d{2})?)$/.exec(s);
   return m ? m[1] : null;
 }

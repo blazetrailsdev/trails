@@ -91,10 +91,10 @@ export class DateType extends ValueType<DateCastResult> {
    *     new_date(*parts.values_at(:year, :mon, :mday)) if parts
    *   end
    *
-   * Trails has no `Date._parse` equivalent; reuses Temporal's
-   * permissive parser, which already accepts the same ISO-leading
-   * forms Rails extracts year/mon/mday from. Falls through to `null`
-   * on parse failure, matching Rails' rescued path.
+   * Trails mirrors `Date._parse` breadth via `looseDateParse`: layered
+   * Temporal ISO parsing followed by regex coverage for US-slash, year-first
+   * slash, month-name, and space-separated Postgres wire formats. Falls
+   * through to `null` on parse failure, matching Rails' rescued path.
    *
    * @internal Rails-private helper.
    */

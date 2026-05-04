@@ -85,4 +85,33 @@ describe("looseDateParse", () => {
   it("out-of-range ISO time returns null", () => {
     expect(looseDateParse("25:61")).toBeNull();
   });
+
+  it("space-separated Postgres wire datetime", () => {
+    const result = looseDateParse("2026-04-26 14:23:55.123456");
+    expect(result).toMatchObject({
+      year: 2026,
+      month: 4,
+      day: 26,
+      hour: 14,
+      minute: 23,
+      second: 55,
+    });
+  });
+
+  it("space-separated Postgres wire datetime with short offset", () => {
+    const result = looseDateParse("2026-04-26 14:23:55.123456+00");
+    expect(result).toMatchObject({
+      year: 2026,
+      month: 4,
+      day: 26,
+      hour: 14,
+      minute: 23,
+      second: 55,
+    });
+  });
+
+  it("out-of-range 12-hour time returns null", () => {
+    expect(looseDateParse("13pm")).toBeNull();
+    expect(looseDateParse("0am")).toBeNull();
+  });
 });
