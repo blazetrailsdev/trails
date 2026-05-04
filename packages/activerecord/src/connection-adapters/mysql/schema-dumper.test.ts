@@ -143,18 +143,12 @@ describe("MySQL::SchemaDumper", () => {
     });
   });
 
-  describe("extractExpressionForVirtualColumn", () => {
-    it("undefined when no tableName", () =>
-      expect(
-        (make() as any).extractExpressionForVirtualColumn(col({ virtual: true })),
-      ).toBeUndefined());
-    it("returns cached expression", () => {
-      const d = make();
-      d.tableName = "users";
-      d.virtualExpressionCache["users"] = { col: '"expr"' };
-      expect(
-        (d as any).extractExpressionForVirtualColumn(col({ name: "col", virtual: true })),
-      ).toBe('"expr"');
-    });
+  it("extractExpressionForVirtualColumn returns cached expression", () => {
+    const d = make();
+    d.tableName = "t";
+    d.virtualExpressionCache["t"] = { col: '"e"' };
+    expect((d as any).extractExpressionForVirtualColumn(col({ name: "col", virtual: true }))).toBe(
+      '"e"',
+    );
   });
 });
