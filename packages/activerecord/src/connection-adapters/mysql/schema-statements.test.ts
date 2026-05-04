@@ -8,6 +8,8 @@ import {
   fetchTypeMetadata,
   extractForeignKeyAction,
   addIndexLength,
+  addOptionsForIndexColumns,
+  dataSourceSql,
   quotedScope,
   extractSchemaQualifiedName,
   typeWithSizeToSql,
@@ -18,11 +20,13 @@ import {
 describe("MySQL::SchemaStatements", () => {
   it("isRowFormatDynamicByDefault: MariaDB >= 10.2.2 is true", () => {
     expect(isRowFormatDynamicByDefault(true, "10.2.2")).toBe(true);
+    expect(isRowFormatDynamicByDefault(true, "10.10.0")).toBe(true); // numeric, not lexicographic
     expect(isRowFormatDynamicByDefault(true, "10.2.1")).toBe(false);
   });
 
   it("isRowFormatDynamicByDefault: MySQL >= 5.7.9 is true", () => {
     expect(isRowFormatDynamicByDefault(false, "5.7.9")).toBe(true);
+    expect(isRowFormatDynamicByDefault(false, "5.11.0")).toBe(true); // numeric: 11 > 7
     expect(isRowFormatDynamicByDefault(false, "5.7.8")).toBe(false);
   });
 
@@ -75,11 +79,49 @@ describe("MySQL::SchemaStatements", () => {
     expect(result.get("email")).toBe("`email`(20)");
   });
 
+  it("addIndexLength applies scalar length to all columns", () => {
+    const cols = new Map([
+      ["name", "`name`"],
+      ["email", "`email`"],
+    ]);
+    const result = addIndexLength(cols, { length: 10 });
+    expect(result.get("name")).toBe("`name`(10)");
+    expect(result.get("email")).toBe("`email`(10)");
+  });
+
+  it("addOptionsForIndexColumns: applies length and per-column order", () => {
+    const cols = new Map([["name", "`name`"]]);
+    expect(
+      addOptionsForIndexColumns(cols, { length: { name: 5 }, order: { name: "desc" } }).get("name"),
+    ).toBe("`name`(5) DESC");
+  });
+
+  it("addOptionsForIndexColumns: string order applies to all columns", () => {
+    const cols = new Map([
+      ["a", "`a`"],
+      ["b", "`b`"],
+    ]);
+    const result = addOptionsForIndexColumns(cols, { order: "asc" });
+    expect(result.get("a")).toBe("`a` ASC");
+    expect(result.get("b")).toBe("`b` ASC");
+  });
+
   it("extractSchemaQualifiedName splits schema.table", () => {
     expect(extractSchemaQualifiedName("mydb.users")).toEqual(["mydb", "users"]);
     expect(extractSchemaQualifiedName("`mydb`.`users`")).toEqual(["mydb", "users"]);
     expect(extractSchemaQualifiedName("users")).toEqual([null, "users"]);
     expect(extractSchemaQualifiedName(null)).toEqual([null, null]);
+  });
+
+  it("dataSourceSql: generates information_schema query", () => {
+    const sql = dataSourceSql();
+    expect(sql).toContain("SELECT table_name FROM information_schema.tables");
+    expect(sql).toContain("WHERE table_schema = database()");
+    expect(dataSourceSql("users")).toContain("AND table_name = 'users'");
+    expect(dataSourceSql(undefined, "BASE TABLE")).toContain("AND table_type = 'BASE TABLE'");
+    const qualified = dataSourceSql("mydb.users");
+    expect(qualified).toContain("table_schema = 'mydb'");
+    expect(qualified).toContain("table_name = 'users'");
   });
 
   it("quotedScope builds scope hash", () => {

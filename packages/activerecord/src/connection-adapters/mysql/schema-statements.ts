@@ -85,11 +85,21 @@ export interface SchemaStatements {
 }
 
 /** @internal */
-export function isRowFormatDynamicByDefault(isMariaDb: boolean, databaseVersion: string): boolean {
-  if (isMariaDb) {
-    return databaseVersion >= "10.2.2";
+function versionGte(version: string, threshold: string): boolean {
+  const parse = (v: string) => v.split(".").map(Number);
+  const a = parse(version);
+  const b = parse(threshold);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    if (av !== bv) return av > bv;
   }
-  return databaseVersion >= "5.7.9";
+  return true;
+}
+
+/** @internal */
+export function isRowFormatDynamicByDefault(isMariaDb: boolean, databaseVersion: string): boolean {
+  return isMariaDb ? versionGte(databaseVersion, "10.2.2") : versionGte(databaseVersion, "5.7.9");
 }
 
 /** @internal */
@@ -123,9 +133,8 @@ export function defaultType(
   fieldName: string,
 ): "string" | "integer" | "function" | undefined {
   if (!createTableInfo) return undefined;
-  const match = createTableInfo.match(
-    new RegExp("`" + fieldName + "` (.+) DEFAULT ('|\\d+|[A-Za-z]+)"),
-  );
+  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = createTableInfo.match(new RegExp("`" + escaped + "` (.+) DEFAULT ('|\\d+|[A-z]+)"));
   const defaultPre = match?.[2];
   if (defaultPre === "'") return "string";
   if (defaultPre?.match(/^\d+$/)) return "integer";
@@ -184,11 +193,11 @@ export function addIndexLength(
   options: { length?: Record<string, number> | number } = {},
 ): Map<string, string> {
   if (!options.length) return quotedColumns;
-  const lengths = typeof options.length === "object" ? options.length : {};
+  const lengthMap = typeof options.length === "object" ? options.length : null;
+  const scalar = typeof options.length === "number" ? options.length : null;
   for (const [name, col] of quotedColumns) {
-    if (lengths[name] != null) {
-      quotedColumns.set(name, `${col}(${lengths[name]})`);
-    }
+    const len = lengthMap ? lengthMap[name] : scalar;
+    if (len != null) quotedColumns.set(name, `${col}(${len})`);
   }
   return quotedColumns;
 }
