@@ -14,9 +14,12 @@ import { Type } from "../value.js";
  */
 export class AcceptsMultiparameterTime {
   readonly type: Type;
+  /** @internal */
+  readonly defaults: Record<string, number>;
 
-  constructor(type: Type) {
+  constructor(type: Type, defaults: Record<string, number> = {}) {
     this.type = type;
+    this.defaults = defaults;
   }
 
   cast(value: unknown): unknown {
@@ -57,18 +60,34 @@ export class AcceptsMultiparameterTime {
   }
 
   private castFromMultiparameter(hash: Record<string, unknown>): unknown {
-    const parts = Object.keys(hash)
-      .sort((a, b) => Number(a) - Number(b))
-      .map((k) => {
-        const v = hash[k];
-        if (v === undefined || v === null || v === "") return 0;
-        return typeof v === "number" ? v : Number(v);
-      });
+    // Apply per-type defaults before the year/month/day guard — mirrors
+    // AcceptsMultiparameterTime#initialize's defaults.each { |k,v| values_hash[k] ||= v }.
+    const filled: Record<string, unknown> = { ...hash };
+    for (const [k, v] of Object.entries(this.defaults)) {
+      if (filled[k] === undefined || filled[k] === null || filled[k] === "") {
+        filled[k] = v;
+      }
+    }
 
-    if (parts.some((p) => Number.isNaN(p))) return null;
+    // Rails guard: return unless values_hash[1] && values_hash[2] && values_hash[3]
+    // Ruby 0 is truthy, so only nil/"" absence counts — use explicit nil/empty check.
+    const absent = (k: string) => filled[k] === undefined || filled[k] === null || filled[k] === "";
+    if (absent("1") || absent("2") || absent("3")) return null;
 
-    const [year = 0, month = 1, day = 1, hour = 0, minute = 0, second = 0] = parts;
-    if (year === 0 && month <= 1 && day <= 1) return null;
+    // Extract each slot by key. Rails uses to_i (non-numeric → 0); mirror that for NaN.
+    const num = (key: string, fallback: number): number => {
+      const v = filled[key];
+      if (v === undefined || v === null || v === "") return fallback;
+      const n = typeof v === "number" ? v : Number(v);
+      return Number.isNaN(n) ? 0 : n;
+    };
+
+    const year = num("1", 0);
+    const month = num("2", 1);
+    const day = num("3", 1);
+    const hour = num("4", 0);
+    const minute = num("5", 0);
+    const second = num("6", 0);
 
     try {
       // Decompose fractional seconds into the three Temporal sub-second
