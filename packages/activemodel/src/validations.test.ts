@@ -2260,6 +2260,17 @@ describe("validates_*_of shorthand methods", () => {
     expect(new User({ name: "ABC" }).isValid()).toBe(true);
   });
 
+  it("validatesSizeOf is an alias for validatesLengthOf", () => {
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+        this.validatesSizeOf("name", { minimum: 3 });
+      }
+    }
+    expect(new User({ name: "AB" }).isValid()).toBe(false);
+    expect(new User({ name: "ABC" }).isValid()).toBe(true);
+  });
+
   it("validatesNumericalityOf validates numericality", () => {
     class Item extends Model {
       static {

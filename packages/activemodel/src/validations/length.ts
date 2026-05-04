@@ -11,6 +11,30 @@ import { resolveValue } from "./resolve-value.js";
  *     CHECKS = { is: :==, minimum: :>=, maximum: :<= }.freeze
  *     ...
  */
+
+/** Rails-style range object accepted by the `:in` / `:within` option. */
+export interface LengthRange {
+  begin?: number;
+  end?: number;
+  excludeEnd?: boolean;
+}
+
+/**
+ * Keys stripped from options before forwarding to `errors.add` so they
+ * don't leak as i18n interpolation variables.
+ *
+ * Mirrors: LengthValidator::RESERVED_OPTIONS
+ * @internal
+ */
+export const RESERVED_OPTIONS = [
+  "minimum",
+  "maximum",
+  "within",
+  "is",
+  "tooShort",
+  "tooLong",
+] as const;
+
 export class LengthValidator extends EachValidator {
   // Declarations only — actual functions attached to the prototype below.
   // Prototype attachment (not class fields) so the helpers are present
@@ -21,15 +45,74 @@ export class LengthValidator extends EachValidator {
   /** @internal Rails-private helper. */
   declare skipNilCheck: typeof skipNilCheck;
 
-  override checkValidity(): void {
+  constructor(options: Record<string, unknown>) {
+    // Shallow-clone so we don't mutate the caller's object — mirrors Rails
+    // validates_with.rb:93 which passes `options.dup` to each validator.
+    options = { ...options };
+
+    // Normalize :in / :within to :minimum / :maximum before super() calls
+    // checkValidity(), mirroring length.rb:16-20.
+    const range = options["in"] ?? options["within"];
+    if (range !== undefined) {
+      delete options["in"];
+      delete options["within"];
+      if (Array.isArray(range) && range.length === 2) {
+        options["minimum"] = range[0];
+        options["maximum"] = range[1];
+      } else if (
+        range !== null &&
+        typeof range === "object" &&
+        ("begin" in range || "end" in range)
+      ) {
+        const r = range as LengthRange;
+        if (r.begin !== undefined) options["minimum"] = r.begin;
+        if (r.end !== undefined) {
+          options["maximum"] = r.excludeEnd ? r.end - 1 : r.end;
+        }
+      } else {
+        throw new Error(
+          ":in and :within must be a [min, max] tuple or { begin, end, excludeEnd? } object",
+        );
+      }
+    }
+
+    // allowBlank: false with no minimum/is → minimum defaults to 1 (length.rb:22-24).
     if (
-      this.options.minimum === undefined &&
-      this.options.maximum === undefined &&
-      this.options.is === undefined &&
-      this.options.in === undefined
+      options["allowBlank"] === false &&
+      options["minimum"] === undefined &&
+      options["is"] === undefined
     ) {
+      options["minimum"] = 1;
+    }
+
+    super(options);
+  }
+
+  override checkValidity(): void {
+    const hasCheck =
+      this.options.minimum !== undefined ||
+      this.options.maximum !== undefined ||
+      this.options.is !== undefined;
+
+    if (!hasCheck) {
       throw new Error(
         "Range unspecified. Specify the :in, :within, :maximum, :minimum, or :is option.",
+      );
+    }
+
+    for (const key of ["minimum", "maximum", "is"] as const) {
+      const value = this.options[key];
+      if (value === undefined) continue;
+      if (
+        (Number.isInteger(value as number) && (value as number) >= 0) ||
+        value === Infinity ||
+        typeof value === "function" ||
+        typeof value === "string"
+      ) {
+        continue;
+      }
+      throw new Error(
+        `:${key} must be a non-negative Integer, Infinity, string (method name), or Proc`,
       );
     }
   }
@@ -54,62 +137,43 @@ export class LengthValidator extends EachValidator {
       length = String(value).length;
     }
 
-    const inOpt = this.options.in as [number, number] | undefined;
-    const rawMin = inOpt ? inOpt[0] : (this.options.minimum as unknown);
-    const rawMax = inOpt ? inOpt[1] : (this.options.maximum as unknown);
+    // Rails length.rb:49 — `errors_options = options.except(*RESERVED_OPTIONS)`
+    const baseOptions = this.filteredErrorOptions([...RESERVED_OPTIONS]);
+
+    // Rails length.rb:51-65 — iterate CHECKS, skip absent constraints.
+    const valueIsNil = value === null || value === undefined;
+
+    const rawMin = this.options.minimum as unknown;
+    const rawMax = this.options.maximum as unknown;
     const rawIs = this.options.is as unknown;
 
     // Rails length.rb:55 — `check_value = resolve_value(record, check_value)`
-    // — so a Proc / method-name option is resolved per-record.
     const min = resolveLengthOpt.call(this, record, rawMin);
     const max = resolveLengthOpt.call(this, record, rawMax);
     const is = resolveLengthOpt.call(this, record, rawIs);
 
-    let effectiveMin = min;
-    if (
-      effectiveMin === undefined &&
-      max === undefined &&
-      this.options.allowBlank === false &&
-      is === undefined &&
-      inOpt === undefined
-    ) {
-      effectiveMin = 1;
-    }
-
-    // Rails length.rb:54 — `!value.nil? || skip_nil_check?(key)`.
-    // Each branch fires the constraint check unless the value is nil AND
-    // skip_nil_check?(key) returns false (meaning Rails would skip nil
-    // for that key). EachValidator's dispatch only short-circuits on
-    // allowNil === true / allowBlank === true; the explicit-false case
-    // and the default case both reach here, so the per-key guard below
-    // is the load-bearing path.
-    const valueIsNil = value === null || value === undefined;
-
-    if (effectiveMin !== undefined && length < effectiveMin) {
+    if (min !== undefined && length < min) {
       if (!valueIsNil || this.skipNilCheck("minimum")) {
-        record.errors.add(attribute, "too_short", {
-          message: (this.options.tooShort ?? this.options.message) as string | undefined,
-          count: effectiveMin,
-          value,
-        });
+        const opts = { ...baseOptions, count: min } as Record<string, unknown>;
+        const defaultMsg = this.options.tooShort ?? this.options.message;
+        if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
+        record.errors.add(attribute, "too_short", opts);
       }
     }
     if (max !== undefined && length > max) {
       if (!valueIsNil || this.skipNilCheck("maximum")) {
-        record.errors.add(attribute, "too_long", {
-          message: (this.options.tooLong ?? this.options.message) as string | undefined,
-          count: max,
-          value,
-        });
+        const opts = { ...baseOptions, count: max } as Record<string, unknown>;
+        const defaultMsg = this.options.tooLong ?? this.options.message;
+        if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
+        record.errors.add(attribute, "too_long", opts);
       }
     }
     if (is !== undefined && length !== is) {
       if (!valueIsNil || this.skipNilCheck("is")) {
-        record.errors.add(attribute, "wrong_length", {
-          message: (this.options.wrongLength ?? this.options.message) as string | undefined,
-          count: is,
-          value,
-        });
+        const opts = { ...baseOptions, count: is } as Record<string, unknown>;
+        const defaultMsg = this.options.wrongLength ?? this.options.message;
+        if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
+        record.errors.add(attribute, "wrong_length", opts);
       }
     }
   }

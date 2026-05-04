@@ -18,6 +18,7 @@ export interface HelperMethods {
   validatesFormatOf(attribute: string, options: Record<string, unknown>): void;
   validatesInclusionOf(attribute: string, options: Record<string, unknown>): void;
   validatesLengthOf(attribute: string, options: Record<string, unknown>): void;
+  validatesSizeOf(attribute: string, options: Record<string, unknown>): void;
   validatesNumericalityOf(attribute: string, options?: Record<string, unknown> | boolean): void;
   validatesPresenceOf(...attributes: string[]): void;
 }
