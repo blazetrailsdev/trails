@@ -14,9 +14,12 @@ import { Type } from "../value.js";
  */
 export class AcceptsMultiparameterTime {
   readonly type: Type;
+  /** @internal */
+  readonly defaults: Record<string, number>;
 
-  constructor(type: Type) {
+  constructor(type: Type, defaults: Record<string, number> = {}) {
     this.type = type;
+    this.defaults = defaults;
   }
 
   cast(value: unknown): unknown {
@@ -57,10 +60,18 @@ export class AcceptsMultiparameterTime {
   }
 
   private castFromMultiparameter(hash: Record<string, unknown>): unknown {
-    const parts = Object.keys(hash)
+    // Apply per-type defaults before the year/month/day guard — mirrors
+    // AcceptsMultiparameterTime#initialize's defaults.each { |k,v| values_hash[k] ||= v }.
+    const filled: Record<string, unknown> = { ...hash };
+    for (const [k, v] of Object.entries(this.defaults)) {
+      if (filled[k] === undefined || filled[k] === null || filled[k] === "") {
+        filled[k] = v;
+      }
+    }
+    const parts = Object.keys(filled)
       .sort((a, b) => Number(a) - Number(b))
       .map((k) => {
-        const v = hash[k];
+        const v = filled[k];
         if (v === undefined || v === null || v === "") return 0;
         return typeof v === "number" ? v : Number(v);
       });

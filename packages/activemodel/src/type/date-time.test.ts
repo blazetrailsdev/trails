@@ -129,4 +129,20 @@ describe("DateTimeTest", () => {
       expect.objectContaining({ name: "ArgumentError" }),
     );
   });
+
+  it("valueFromMultiparameterAssignment defaults hour/minute to 0 when only date parts given (P21)", () => {
+    class Probe extends Types.DateTimeType {
+      call(values: Record<number, unknown>) {
+        return this.valueFromMultiparameterAssignment(values);
+      }
+    }
+    const result = new Probe().call({ 1: 2025, 2: 7, 3: 4 }) as Temporal.Instant;
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    const zdt = result.toZonedDateTimeISO("UTC");
+    expect(zdt.year).toBe(2025);
+    expect(zdt.month).toBe(7);
+    expect(zdt.day).toBe(4);
+    expect(zdt.hour).toBe(0);
+    expect(zdt.minute).toBe(0);
+  });
 });

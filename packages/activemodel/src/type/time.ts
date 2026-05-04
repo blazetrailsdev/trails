@@ -1,5 +1,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { looseDateParse } from "./helpers/loose-date-parse.js";
+import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
 import { ValueType } from "./value.js";
 
 export class TimeType extends ValueType<Temporal.PlainTime> {
@@ -54,6 +55,24 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
 
   type(): string {
     return this.name;
+  }
+
+  /**
+   * Mirrors: ActiveModel::Type::Time includes AcceptsMultiparameterTime.new(defaults: { 1 => 2000, 2 => 1, 3 => 1, 4 => 0, 5 => 0 }).
+   * Rails' base date 2000-01-01 lets hour-only form inputs (e.g. { "4": 15 }) produce a valid Time.
+   *
+   * @internal Rails-private helper.
+   */
+  protected valueFromMultiparameterAssignment(
+    values: Record<string, unknown>,
+  ): Temporal.PlainTime | null {
+    return new AcceptsMultiparameterTime(this, {
+      "1": 2000,
+      "2": 1,
+      "3": 1,
+      "4": 0,
+      "5": 0,
+    }).cast(values) as Temporal.PlainTime | null;
   }
 
   userInputInTimeZone(value: unknown, zone: string = "UTC"): Temporal.ZonedDateTime | null {
