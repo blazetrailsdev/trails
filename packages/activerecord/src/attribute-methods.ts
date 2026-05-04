@@ -461,13 +461,9 @@ import {
   isAttributeCameFromUser as _isAttributeCameFromUser,
 } from "./attribute-methods/before-type-cast.js";
 import { queryCastAttribute as _queryCastAttribute } from "./attribute-methods/query.js";
-import {
-  isPrimaryKeyValuesPresent as _isPrimaryKeyValuesPresent,
-  idBeforeTypeCast as _idBeforeTypeCast,
-  idWas as _idWas,
-  idInDatabase as _idInDatabase,
-  idForDatabase as _idForDatabase,
-} from "./attribute-methods/primary-key.js";
+// primary-key.ts imports dangerousAttributeMethods from this file, so we cannot
+// import from it here (cycle). These 5 delegates are inlined the same way
+// toKey/id are inlined above (see comment near line 12).
 import {
   isSavedChangeToAttribute as _isSavedChangeToAttribute,
   savedChangeToAttribute as _savedChangeToAttribute,
@@ -523,23 +519,57 @@ export function queryCastAttribute(this: any, attrName: string, value: unknown):
 }
 /** @internal */
 export function isPrimaryKeyValuesPresent(this: any): boolean {
-  return _isPrimaryKeyValuesPresent.call(this);
+  const pk = (this.constructor as any).primaryKey;
+  if (Array.isArray(pk)) {
+    return pk.every((col: string) => {
+      const v = this._readAttribute(col);
+      return v !== null && v !== undefined;
+    });
+  }
+  return this.id != null;
 }
+
+function _readPkWith(record: any, method: string): unknown {
+  const pk = (record.constructor as any).primaryKey;
+  const fn = record[method];
+  if (typeof fn === "function") {
+    if (Array.isArray(pk)) return pk.map((k: string) => fn.call(record, k));
+    return fn.call(record, pk);
+  }
+  if (Array.isArray(pk)) return pk.map((k: string) => record._readAttribute(k));
+  return record._readAttribute(pk);
+}
+
 /** @internal */
 export function idBeforeTypeCast(this: any): unknown {
-  return _idBeforeTypeCast.call(this);
+  return _readPkWith(this, "readAttributeBeforeTypeCast");
 }
 /** @internal */
 export function idWas(this: any): unknown {
-  return _idWas.call(this);
+  return _readPkWith(this, "attributeWas");
 }
 /** @internal */
 export function idInDatabase(this: any): unknown {
-  return _idInDatabase.call(this);
+  return _readPkWith(this, "attributeInDatabase");
 }
 /** @internal */
 export function idForDatabase(this: any): unknown {
-  return _idForDatabase.call(this);
+  const pk = (this.constructor as any).primaryKey;
+  const attrs = this._attributes;
+  if (attrs?.getAttribute) {
+    if (Array.isArray(pk)) {
+      return pk.map((k: string) => {
+        const attr = attrs.getAttribute(k);
+        return attr != null && "valueForDatabase" in attr
+          ? attr.valueForDatabase
+          : this._readAttribute(k);
+      });
+    }
+    const attr = attrs.getAttribute(pk);
+    if (attr != null && "valueForDatabase" in attr) return attr.valueForDatabase;
+  }
+  if (Array.isArray(pk)) return pk.map((k: string) => this._readAttribute(k));
+  return this._readAttribute(pk);
 }
 /** @internal */
 export function isSavedChangeToAttribute(this: any, attr: string): boolean {
