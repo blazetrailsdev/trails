@@ -415,6 +415,65 @@ describe("virtualize — multiple classes", () => {
   });
 });
 
+describe("virtualize — include() interface bridge", () => {
+  test("emits interface-merge for include() of a local class", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QueryMethods } from "./query-methods.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QueryMethods);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).toMatch(
+      /import type \{ Included as __TrailsIncluded \} from "@blazetrails\/activesupport";/,
+    );
+    expect(text).toMatch(/interface Relation extends __TrailsIncluded<typeof QueryMethods> \{\}/);
+  });
+
+  test("groups multiple include() calls on the same class into one heritage list", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { A, B } from "./mods.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, A);\n" +
+      "include(Relation, B);\n";
+    const { text } = virtualize(src, "relation.ts");
+    const m = text.match(/interface Relation extends ([^{]+) \{\}/);
+    expect(m).not.toBeNull();
+    expect(m![1]).toContain("__TrailsIncluded<typeof A>");
+    expect(m![1]).toContain("__TrailsIncluded<typeof B>");
+    expect(text.match(/interface Relation extends/g)?.length).toBe(1);
+  });
+
+  test("ignores include() when not imported from activesupport", () => {
+    const src =
+      'import { include } from "./local-helper.js";\n' +
+      "export class Foo {}\n" +
+      "include(Foo, Bar);\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).not.toMatch(/interface Foo extends/);
+  });
+
+  test("ignores include() when target class is not declared in this file", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { External } from "./external.js";\n' +
+      "include(External, Mod);\n";
+    const { text } = virtualize(src, "x.ts");
+    expect(text).not.toMatch(/interface External/);
+  });
+
+  test("aliased include import (`include as inc`) is not picked up", () => {
+    // Conservative: we only match the unqualified `include` name. An
+    // aliased import would fall through to be treated as a no-op.
+    const src =
+      'import { include as inc } from "@blazetrails/activesupport";\n' +
+      "export class Foo {}\n" +
+      "inc(Foo, Bar);\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).not.toMatch(/interface Foo extends/);
+  });
+});
+
 describe("virtualize — idempotence", () => {
   test("re-virtualizing the output skips members already declared", () => {
     const src =

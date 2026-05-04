@@ -53,6 +53,21 @@ export interface DefineEnumCall {
 
 export type RuntimeCall = AttributeCall | AssociationCall | ScopeCall | EnumCall | DefineEnumCall;
 
+/**
+ * A top-level `include(ClassName, ModuleExpr)` call from
+ * `@blazetrails/activesupport`. The synthesizer turns each call into an
+ * interface-merge declaration so the methods mixed in at runtime become
+ * visible to the type checker without the user writing
+ * `interface Foo extends Included<typeof Mod> {}` by hand.
+ *
+ * @internal
+ */
+export interface IncludeCall {
+  className: string;
+  /** Raw source text of the module expression — spliced verbatim into `typeof <expr>`. */
+  moduleExpr: string;
+}
+
 export type RecordLiteral = Record<string, string>;
 
 export interface ClassInfo {
@@ -331,6 +346,60 @@ function readRecordLiteral(node: ts.Expression | undefined): RecordLiteral {
         : null;
     if (!key) continue;
     out[key] = prop.initializer.getText();
+  }
+  return out;
+}
+
+/**
+ * Find every top-level `include(ClassName, ModuleExpr)` call where
+ * `include` is imported from `@blazetrails/activesupport`. The returned
+ * pairs are grouped by the synthesizer into interface-merge declarations
+ * that surface the mixed-in instance methods to the type checker.
+ *
+ * Constraints:
+ * - The first argument must be a bare identifier referencing a class
+ *   declared in the same file (otherwise we'd be augmenting a foreign
+ *   module without a `declare module "..."` boundary).
+ * - The second argument is captured verbatim — any expression usable in
+ *   a `typeof` query (identifier, property access, `as const` literal)
+ *   works.
+ *
+ * @internal
+ */
+export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
+  // Only fire when `include` is imported from activesupport — the symbol
+  // is unqualified at the call site, so we need the import to disambiguate
+  // from any local helper named `include`.
+  let includeImported = false;
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isImportDeclaration(stmt)) continue;
+    if (!ts.isStringLiteralLike(stmt.moduleSpecifier)) continue;
+    if (stmt.moduleSpecifier.text !== "@blazetrails/activesupport") continue;
+    const named = stmt.importClause?.namedBindings;
+    if (named && ts.isNamedImports(named)) {
+      for (const el of named.elements) {
+        if ((el.propertyName?.text ?? el.name.text) === "include") includeImported = true;
+      }
+    }
+  }
+  if (!includeImported) return [];
+
+  const declaredClasses = new Set<string>();
+  for (const stmt of sourceFile.statements) {
+    if (ts.isClassDeclaration(stmt) && stmt.name) declaredClasses.add(stmt.name.text);
+  }
+
+  const out: IncludeCall[] = [];
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isExpressionStatement(stmt)) continue;
+    const call = stmt.expression;
+    if (!ts.isCallExpression(call)) continue;
+    if (!ts.isIdentifier(call.expression) || call.expression.text !== "include") continue;
+    const [classArg, modArg] = call.arguments;
+    if (!classArg || !modArg) continue;
+    if (!ts.isIdentifier(classArg)) continue;
+    if (!declaredClasses.has(classArg.text)) continue;
+    out.push({ className: classArg.text, moduleExpr: modArg.getText() });
   }
   return out;
 }

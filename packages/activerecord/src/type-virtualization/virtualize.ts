@@ -8,8 +8,15 @@
 // directly against fixture pairs.
 
 import ts from "typescript";
-import { walk, type WalkOptions } from "./walker.js";
+import { walk, findIncludeCalls, type WalkOptions } from "./walker.js";
 import { synthesizeDeclares } from "./synthesize.js";
+
+// Aliased name used in the auto-injected `import type` line and the
+// generated interface-merge heritage. Aliasing (rather than importing
+// `Included` bare) avoids `Cannot redeclare block-scoped variable`
+// when the user file already imports `Included` themselves.
+const INCLUDED_ALIAS = "__TrailsIncluded";
+const INCLUDED_IMPORT_LINE = `import type { Included as ${INCLUDED_ALIAS} } from "@blazetrails/activesupport";`;
 
 export interface LineDelta {
   /**
@@ -125,10 +132,18 @@ export function virtualize(
     return d;
   });
 
+  // Detect `include(...)` calls early so we can fold the auxiliary
+  // `import type { Included as ... }` line into the same prepend pass
+  // (otherwise we'd double-shift deltas).
+  const includes = findIncludeCalls(sf);
+  const effectivePrepends: string[] = [];
+  if (options.prependImports) effectivePrepends.push(...options.prependImports);
+  if (includes.length > 0) effectivePrepends.push(INCLUDED_IMPORT_LINE);
+
   // Insert auto-imported `import type` lines AFTER any leading
   // directives (shebangs, triple-slash refs, @ts-nocheck) that must
   // stay at the top of the file. Erased at runtime (type-only).
-  const prependImports = options.prependImports;
+  const prependImports = effectivePrepends.length > 0 ? effectivePrepends : undefined;
   if (prependImports && prependImports.length > 0) {
     const importBlock = prependImports.join("\n") + "\n";
     const insertPos = findDirectiveEnd(text);
@@ -151,6 +166,31 @@ export function virtualize(
       d.insertedAtLine += prependedLines;
     }
     deltas.unshift({ insertedAtLine, lineCount: prependedLines });
+  }
+
+  // Append interface-merge declarations for every
+  // `include(ClassName, ModuleExpr)` call. The mixed-in instance
+  // methods are runtime-copied onto the prototype by `include()`; this
+  // appendix makes them visible to TypeScript via declaration merging
+  // — replacing the manual
+  // `interface ClassName extends Included<typeof Mod> {}` line users
+  // would otherwise write themselves. The aliased
+  // `__TrailsIncluded` import is prepended above so this never collides
+  // with a user-imported `Included`.
+  if (includes.length > 0) {
+    const grouped = new Map<string, string[]>();
+    for (const inc of includes) {
+      const arr = grouped.get(inc.className);
+      if (arr) arr.push(inc.moduleExpr);
+      else grouped.set(inc.className, [inc.moduleExpr]);
+    }
+    const lines: string[] = [];
+    for (const [className, mods] of grouped) {
+      const heritage = mods.map((m) => `${INCLUDED_ALIAS}<typeof ${m}>`).join(", ");
+      lines.push(`interface ${className} extends ${heritage} {}`);
+    }
+    const appendix = (text.endsWith("\n") ? "" : "\n") + lines.join("\n") + "\n";
+    text += appendix;
   }
 
   return { text, deltas };

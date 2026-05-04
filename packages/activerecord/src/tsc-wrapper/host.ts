@@ -4,6 +4,12 @@ import { virtualize, type VirtualizeResult } from "../type-virtualization/virtua
 import { resolveAutoImports } from "./auto-import.js";
 
 const STATIC_BLOCK_PATTERN = /\bstatic\s*\{/;
+// Cheap pre-filter for files using `include(...)` from
+// `@blazetrails/activesupport`. Both substrings must appear before the
+// virtualizer parses the file — the syntactic walker enforces the
+// stricter import-source check.
+const INCLUDE_CALL_PATTERN = /\binclude\s*\(/;
+const ACTIVESUPPORT_IMPORT_PATTERN = /@blazetrails\/activesupport/;
 
 export interface TrailsCompilerHost extends ts.CompilerHost {
   getDeltasForFile(fileName: string): VirtualizeResult["deltas"] | undefined;
@@ -46,6 +52,12 @@ export function buildCompilerHost(
     extra.schemaColumnsByTable && Object.keys(extra.schemaColumnsByTable).length > 0;
 
   function shouldVirtualize(text: string): boolean {
+    // Files using `include()` from activesupport need the
+    // interface-merge appendix even if they don't extend Base — e.g.
+    // utility classes that mix in plain modules.
+    const hasIncludeCall =
+      INCLUDE_CALL_PATTERN.test(text) && ACTIVESUPPORT_IMPORT_PATTERN.test(text);
+    if (hasIncludeCall) return true;
     // Fast-path skip for files that don't reference a Base-like class.
     // When schema columns are available, a class extending Base may
     // need declares even without a `static {}` block — so the static-
