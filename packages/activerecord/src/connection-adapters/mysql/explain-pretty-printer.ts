@@ -2,85 +2,48 @@
  * MySQL explain pretty printer — formats EXPLAIN output as a table.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter
- *
- * MySQL's EXPLAIN returns tabular data with columns like id, select_type,
- * table, type, possible_keys, key, key_len, ref, rows, Extra. This
- * printer formats that data into an ASCII table, similar to how the
- * mysql CLI displays results.
  */
 
-import { NotImplementedError } from "../../errors.js";
+export interface ExplainResult {
+  columns: string[];
+  rows: Array<Array<unknown>>;
+}
+
 export class ExplainPrettyPrinter {
-  pp(result: Array<Record<string, unknown>>, elapsed: number): string {
-    if (result.length === 0) return "";
-
-    const columns = Object.keys(result[0]);
-    const widths = new Map<string, number>();
-
-    for (const col of columns) {
-      widths.set(col, col.length);
-    }
-
-    for (const row of result) {
-      for (const col of columns) {
-        const val = String(row[col] ?? "NULL");
-        const current = widths.get(col)!;
-        if (val.length > current) {
-          widths.set(col, val.length);
-        }
-      }
-    }
-
-    const separator = "+" + columns.map((col) => "-".repeat(widths.get(col)! + 2)).join("+") + "+";
-
-    const header = "|" + columns.map((col) => ` ${col.padEnd(widths.get(col)!)} `).join("|") + "|";
-
-    const rows = result.map(
-      (row) =>
-        "|" +
-        columns
-          .map((col) => {
-            const val = String(row[col] ?? "NULL");
-            return ` ${val.padEnd(widths.get(col)!)} `;
-          })
-          .join("|") +
-        "|",
-    );
-
-    const lines = [separator, header, separator, ...rows, separator];
-
-    const rowCount = result.length;
-    const rowWord = rowCount === 1 ? "row" : "rows";
-    lines.push(`${rowCount} ${rowWord} in set (${elapsed.toFixed(2)} sec)`);
-
-    return lines.join("\n");
+  pp(result: ExplainResult, elapsed: number): string {
+    if (result.columns.length === 0) return "";
+    const widths = this.computeColumnWidths(result);
+    const separator = this.buildSeparator(widths);
+    const lines = [separator, this.buildCells(result.columns, widths), separator];
+    for (const row of result.rows) lines.push(this.buildCells(row, widths));
+    lines.push(separator, this.buildFooter(result.rows.length, elapsed));
+    return lines.join("\n") + "\n";
   }
-}
 
-/** @internal */
-function computeColumnWidths(result: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#compute_column_widths is not implemented",
-  );
-}
+  /** @internal */
+  protected computeColumnWidths(result: ExplainResult): number[] {
+    return result.columns.map((col, i) => {
+      const cells = [col, ...result.rows.map((r) => (r[i] == null ? "NULL" : String(r[i])))];
+      return Math.max(...cells.map((s) => s.length));
+    });
+  }
 
-/** @internal */
-function buildSeparator(widths: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#build_separator is not implemented",
-  );
-}
+  /** @internal */
+  protected buildSeparator(widths: number[]): string {
+    return "+" + widths.map((w) => "-".repeat(w + 2)).join("+") + "+";
+  }
 
-/** @internal */
-function buildCells(items: any, widths: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#build_cells is not implemented",
-  );
-}
+  /** @internal */
+  protected buildCells(items: Array<unknown>, widths: number[]): string {
+    const cells = items.map((item, i) => {
+      const s = item == null ? "NULL" : String(item);
+      return typeof item === "number" ? s.padStart(widths[i]) : s.padEnd(widths[i]);
+    });
+    return "| " + cells.join(" | ") + " |";
+  }
 
-/** @internal */
-function buildFooter(nrows: any, elapsed: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::ExplainPrettyPrinter#build_footer is not implemented",
-  );
+  /** @internal */
+  protected buildFooter(nrows: number, elapsed: number): string {
+    return `${nrows} ${nrows === 1 ? "row" : "rows"} in set (${elapsed.toFixed(2)} sec)`;
+  }
 }

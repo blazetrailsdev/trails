@@ -4,13 +4,42 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation
  */
 
-import { NotImplementedError } from "../../errors.js";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
-import type { ReferentialAction } from "../abstract/schema-definitions.js";
+import type {
+  ReferentialAction,
+  ColumnOptions,
+  AddColumnDefinition,
+} from "../abstract/schema-definitions.js";
+import {
+  ChangeColumnDefinition,
+  ChangeColumnDefaultDefinition,
+  CreateIndexDefinition,
+  IndexDefinition,
+  TableDefinition,
+} from "../abstract/schema-definitions.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
-import { quoteColumnName, quoteTableName } from "./quoting.js";
+import { quoteColumnName, quoteTableName, quoteString as mysqlQuoteString } from "./quoting.js";
+
+interface MysqlColumnOptions extends Record<string, unknown> {
+  column?: { sqlType?: string; type?: string; null?: boolean };
+  charset?: string;
+  collation?: string;
+  as?: string;
+  stored?: boolean;
+  first?: boolean;
+  after?: string;
+  primaryKey?: boolean;
+  null?: boolean;
+  default?: unknown;
+  comment?: string;
+}
+
+type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 
 export class SchemaCreation extends AbstractSchemaCreation {
+  /** @internal Whether this is a MariaDB connection. */
+  protected _mariadb = false;
+
   constructor() {
     super("mysql");
   }
@@ -34,81 +63,121 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
     return sql;
   }
-}
 
-/** @internal */
-function visit_DropForeignKey(name: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_DropForeignKey is not implemented",
-  );
-}
+  /** @internal */
+  protected visitDropForeignKey(name: string): string {
+    return `DROP FOREIGN KEY ${name}`;
+  }
 
-/** @internal */
-function visit_DropCheckConstraint(name: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_DropCheckConstraint is not implemented",
-  );
-}
+  /** @internal */
+  protected visitDropCheckConstraint(name: string): string {
+    return `DROP ${this._mariadb ? "CONSTRAINT" : "CHECK"} ${name}`;
+  }
 
-/** @internal */
-function visit_AddColumnDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_AddColumnDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected override visitAddColumnDefinition(o: AddColumnDefinition): string {
+    return this.addColumnPositionBang(
+      super.visitAddColumnDefinition(o),
+      this.columnOptions(o.column) as MysqlColumnOptions,
+    );
+  }
 
-/** @internal */
-function visit_ChangeColumnDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_ChangeColumnDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected visitChangeColumnDefinition(o: ChangeColumnDefinition): string {
+    const sql = `CHANGE ${this.adapter.quoteIdentifier(o.name)} ${this.accept(o.column)}`;
+    return this.addColumnPositionBang(sql, this.columnOptions(o.column) as MysqlColumnOptions);
+  }
 
-/** @internal */
-function visit_ChangeColumnDefaultDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_ChangeColumnDefaultDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected visitChangeColumnDefaultDefinition(o: ChangeColumnDefaultDefinition): string {
+    let sql = `ALTER COLUMN ${this.adapter.quoteIdentifier(o.column.name)} `;
+    if (o.default == null && o.column.options.null === false) {
+      sql += "DROP DEFAULT";
+    } else {
+      sql += `SET${this.adapter.quoteDefaultExpression(o.default)}`;
+    }
+    return sql;
+  }
 
-/** @internal */
-function visit_CreateIndexDefinition(o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_CreateIndexDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected override visitCreateIndexDefinition(o: CreateIndexDefinition): string {
+    const sql = this.visitIndexDefinition(o.index, true);
+    return o.algorithm ? `${sql} ${o.algorithm}` : sql;
+  }
 
-/** @internal */
-function visit_IndexDefinition(o: any, create?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#visit_IndexDefinition is not implemented",
-  );
-}
+  /** @internal */
+  protected visitIndexDefinition(o: IndexDefinition, create = false): string {
+    const indexType = o.type?.toUpperCase() ?? (o.unique ? "UNIQUE" : undefined);
 
-/** @internal */
-function addTableOptionsBang(createSql: any, o: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#add_table_options! is not implemented",
-  );
-}
+    const parts: string[] = create ? ["CREATE"] : [];
+    if (indexType) parts.push(indexType);
+    parts.push("INDEX");
+    parts.push(this.adapter.quoteIdentifier(o.name));
+    if (o.using) parts.push(`USING ${o.using}`);
+    if (create) parts.push(`ON ${this.adapter.quoteTableName(o.table)}`);
+    parts.push(`(${this.quotedColumns(o)})`);
 
-/** @internal */
-function addColumnOptionsBang(sql: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#add_column_options! is not implemented",
-  );
-}
+    return this.addSqlCommentBang(parts.join(" "), o.comment);
+  }
 
-/** @internal */
-function addColumnPositionBang(sql: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#add_column_position! is not implemented",
-  );
-}
+  /** @internal */
+  protected override addTableOptionsBang(sql: string, o: TableDefinition): string {
+    const mo = o as MysqlTableDef;
+    if (mo.charset) sql += ` DEFAULT CHARSET=${mo.charset}`;
+    if (mo.collation) sql += ` COLLATE=${mo.collation}`;
+    return this.addSqlCommentBang(super.addTableOptionsBang(sql, o), o.comment);
+  }
 
-/** @internal */
-function indexInCreate(tableName: any, columnName: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaCreation#index_in_create is not implemented",
-  );
+  /** @internal */
+  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
+    const mo = options as MysqlColumnOptions;
+    const col = mo.column;
+    if (col && /^\btimestamp\b/.test(col.sqlType ?? col.type ?? "") && !mo.primaryKey) {
+      if (mo.null !== false && !this.optionsIncludeDefault(mo)) {
+        sql += " NULL";
+      }
+    }
+    if (mo.charset) sql += ` CHARACTER SET ${mo.charset}`;
+    if (mo.collation) sql += ` COLLATE ${mo.collation}`;
+    if (mo.as) {
+      sql += ` AS (${mo.as})`;
+      if (mo.stored) sql += this._mariadb ? " PERSISTENT" : " STORED";
+    }
+    return this.addSqlCommentBang(super.addColumnOptionsBang(sql, options), mo.comment);
+  }
+
+  /** @internal */
+  protected addColumnPositionBang(sql: string, options: MysqlColumnOptions): string {
+    if (options.first) return `${sql} FIRST`;
+    if (options.after) return `${sql} AFTER ${this.adapter.quoteIdentifier(options.after)}`;
+    return sql;
+  }
+
+  /** @internal */
+  protected indexInCreate(
+    tableName: string,
+    columnName: string | string[],
+    options: Record<string, unknown> = {},
+  ): string {
+    const cols = Array.isArray(columnName) ? columnName : [columnName];
+    const name =
+      (options.name as string | undefined) ?? `index_${tableName}_on_${cols.join("_and_")}`;
+    const index = new IndexDefinition(tableName, name, !!options.unique, cols, {
+      using: options.using as string | undefined,
+      comment: options.comment as string | undefined,
+      type: options.type as string | undefined,
+    });
+    return this.visitIndexDefinition(index, false);
+  }
+
+  /** @internal */
+  protected addSqlCommentBang(sql: string, comment: string | undefined): string {
+    if (!comment) return sql;
+    return `${sql} COMMENT ${mysqlQuoteString(comment)}`;
+  }
+
+  /** @internal */
+  private optionsIncludeDefault(options: MysqlColumnOptions): boolean {
+    return options.default !== undefined;
+  }
 }

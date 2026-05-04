@@ -497,7 +497,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       const [rows] = await conn.query(`${clause} ${this.mysqlQuote(sql)}`, this.mysqlBinds(binds));
       const elapsed = (Date.now() - start) / 1000;
       const printer = new ExplainPrettyPrinter();
-      return printer.pp(rows as Array<Record<string, unknown>>, elapsed);
+      const typedRows = rows as Array<Record<string, unknown>>;
+      const columns = typedRows.length > 0 ? Object.keys(typedRows[0]) : [];
+      const result = { columns, rows: typedRows.map((r) => columns.map((c) => r[c])) };
+      return printer.pp(result, elapsed);
     } finally {
       this.releaseConn(conn);
     }
