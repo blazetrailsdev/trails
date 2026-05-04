@@ -9,7 +9,6 @@ import {
   type ForeignKeyDefinition,
   type ReferentialAction,
   type ColumnOptions,
-  CheckConstraintDefinition,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
 } from "../abstract/schema-definitions.js";
@@ -28,7 +27,26 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected override visitAlterTable(o: any): string {
+    // Pull out FK adds so super doesn't process them — we re-add them below
+    // with NOT VALID appended when validate is false.
+    const fkAdds: ForeignKeyDefinition[] = Array.isArray(o.foreignKeyAdds)
+      ? o.foreignKeyAdds.splice(0)
+      : [];
     let sql = super.visitAlterTable(o);
+    if (fkAdds.length > 0) {
+      const table = this.adapter.quoteTableName(o.name);
+      const fkParts = fkAdds.map((fk) => {
+        let part = `ADD ${this.visitForeignKeyDefinition(fk)}`;
+        if (!fk.validate) part += " NOT VALID";
+        return part;
+      });
+      // Reinsert so the object is left in its original state.
+      o.foreignKeyAdds.push(...fkAdds);
+      // super already emitted "ALTER TABLE <t> " — if there were no other
+      // parts, sql ends with a trailing space; otherwise append with ", ".
+      const separator = sql.trimEnd() === `ALTER TABLE ${table}` ? " " : ", ";
+      sql = sql.trimEnd() + separator + fkParts.join(", ");
+    }
     if (Array.isArray(o.constraintValidations)) {
       sql += o.constraintValidations
         .map((name: string) => " " + this.visitValidateConstraint(name))
@@ -77,13 +95,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
     let sql = super.visitForeignKeyDefinition(o);
     if (o.deferrable) sql += ` DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`;
-    if (!o.validate) sql += " NOT VALID";
     return sql;
-  }
-
-  /** @internal */
-  protected override visitCheckConstraintDefinition(o: CheckConstraintDefinition): string {
-    return super.visitCheckConstraintDefinition(o);
   }
 
   /** @internal */

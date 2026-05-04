@@ -23,7 +23,7 @@ describe("PostgreSQL SchemaCreation", () => {
       undefined,
       false,
     );
-    expect(s().visitForeignKeyDefinition(fk1)).toContain("NOT VALID");
+    expect(s().visitForeignKeyDefinition(fk1)).not.toContain("NOT VALID");
     const fk2 = new ForeignKeyDefinition(
       "a",
       "b",
