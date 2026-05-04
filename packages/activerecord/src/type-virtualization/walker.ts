@@ -53,6 +53,35 @@ export interface DefineEnumCall {
 
 export type RuntimeCall = AttributeCall | AssociationCall | ScopeCall | EnumCall | DefineEnumCall;
 
+/**
+ * A top-level `include(ClassName, ModuleExpr)` call from
+ * `@blazetrails/activesupport`. The synthesizer turns each call into an
+ * interface-merge declaration so the methods mixed in at runtime become
+ * visible to the type checker without the user writing
+ * `interface Foo extends Included<typeof Mod> {}` by hand.
+ *
+ * @internal
+ */
+export interface IncludeCall {
+  className: string;
+  /** Raw source text of the module expression — spliced verbatim into `typeof <expr>`. */
+  moduleExpr: string;
+  /**
+   * Whether the target class declaration is `export`-ed in the file.
+   * The synthesized interface must carry the same modifier or
+   * TypeScript rejects the merge with "Individual declarations in
+   * merged declaration must be all exported or all local."
+   */
+  classExported: boolean;
+  /**
+   * Raw text of the class's type parameter list (e.g. `<T extends Base>`)
+   * or the empty string when the class is non-generic. Declaration
+   * merging requires the merged interface to repeat the class's type
+   * parameters verbatim.
+   */
+  classTypeParams: string;
+}
+
 export type RecordLiteral = Record<string, string>;
 
 export interface ClassInfo {
@@ -333,6 +362,102 @@ function readRecordLiteral(node: ts.Expression | undefined): RecordLiteral {
     out[key] = prop.initializer.getText();
   }
   return out;
+}
+
+/**
+ * Find every top-level `include(ClassName, ModuleExpr)` call where
+ * `include` is imported from `@blazetrails/activesupport`. Returns a
+ * flat list — `virtualize()` is responsible for grouping by class name
+ * and emitting one interface-merge declaration per class that surfaces
+ * the mixed-in instance methods to the type checker.
+ *
+ * Constraints:
+ * - The first argument must be a bare identifier referencing a class
+ *   declared in the same file (otherwise we'd be augmenting a foreign
+ *   module without a `declare module "..."` boundary).
+ * - The second argument is captured verbatim and must be usable inside
+ *   a `typeof` type query — currently restricted to bare identifiers
+ *   and property-access chains. Inline object literals, calls, and
+ *   `as const` expressions are skipped (they'd produce parse errors
+ *   in the synthesized `typeof <expr>`).
+ *
+ * @internal
+ */
+export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
+  // Only fire when `include` is imported from activesupport — the symbol
+  // is unqualified at the call site, so we need the import to disambiguate
+  // from any local helper named `include`.
+  let includeImported = false;
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isImportDeclaration(stmt)) continue;
+    if (!ts.isStringLiteralLike(stmt.moduleSpecifier)) continue;
+    if (stmt.moduleSpecifier.text !== "@blazetrails/activesupport") continue;
+    const named = stmt.importClause?.namedBindings;
+    if (named && ts.isNamedImports(named)) {
+      for (const el of named.elements) {
+        // Local binding must be `include` AND the imported export must
+        // be `include`. Accepts both the bare form and the rare
+        // `include as include`; rejects `include as inc` (local is `inc`,
+        // any `include(...)` call is a separate helper) and
+        // `foo as include` (local is `include` but bound to a different
+        // export — calling it would invoke the wrong function).
+        const importedName = el.propertyName?.text ?? el.name.text;
+        if (importedName === "include" && el.name.text === "include") includeImported = true;
+      }
+    }
+  }
+  if (!includeImported) return [];
+
+  interface DeclaredClass {
+    exported: boolean;
+    typeParams: string;
+  }
+  const declaredClasses = new Map<string, DeclaredClass>();
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
+    const exported = (ts.getModifiers(stmt) ?? []).some(
+      (m) => m.kind === ts.SyntaxKind.ExportKeyword,
+    );
+    let typeParams = "";
+    if (stmt.typeParameters && stmt.typeParameters.length > 0) {
+      const first = stmt.typeParameters[0]!.pos;
+      const last = stmt.typeParameters[stmt.typeParameters.length - 1]!.end;
+      typeParams = `<${sourceFile.text.slice(first, last)}>`;
+    }
+    declaredClasses.set(stmt.name.text, { exported, typeParams });
+  }
+
+  const out: IncludeCall[] = [];
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isExpressionStatement(stmt)) continue;
+    const call = stmt.expression;
+    if (!ts.isCallExpression(call)) continue;
+    if (!ts.isIdentifier(call.expression) || call.expression.text !== "include") continue;
+    const [classArg, modArg] = call.arguments;
+    if (!classArg || !modArg) continue;
+    if (!ts.isIdentifier(classArg)) continue;
+    const meta = declaredClasses.get(classArg.text);
+    if (!meta) continue;
+    // Only accept module expressions usable inside a `typeof` type
+    // query: bare identifiers and (chains of) property access. Inline
+    // object literals, calls, and other expressions can't be queried
+    // by `typeof`, so skip those calls — declaration merging there
+    // would just produce parse errors.
+    if (!isTypeofQueryable(modArg)) continue;
+    out.push({
+      className: classArg.text,
+      moduleExpr: modArg.getText(),
+      classExported: meta.exported,
+      classTypeParams: meta.typeParams,
+    });
+  }
+  return out;
+}
+
+function isTypeofQueryable(expr: ts.Expression): boolean {
+  if (ts.isIdentifier(expr)) return true;
+  if (ts.isPropertyAccessExpression(expr)) return isTypeofQueryable(expr.expression);
+  return false;
 }
 
 function objectKeys(obj: ts.ObjectLiteralExpression): string[] {

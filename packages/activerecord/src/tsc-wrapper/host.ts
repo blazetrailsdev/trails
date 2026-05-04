@@ -4,6 +4,28 @@ import { virtualize, type VirtualizeResult } from "../type-virtualization/virtua
 import { resolveAutoImports } from "./auto-import.js";
 
 const STATIC_BLOCK_PATTERN = /\bstatic\s*\{/;
+// Cheap pre-filter for files using top-level `include(...)` from
+// `@blazetrails/activesupport`. The patterns are intentionally
+// conservative — false positives just cost a parse the walker would
+// reject anyway, false negatives would silently lose the merge. We
+// require:
+//   - a line whose first non-whitespace token is `include(` (`^\s*` +
+//     `m` flag) — this skips `.include(` method calls but does NOT
+//     skip lines inside block comments that happen to start with
+//     `include(`. The syntactic walker drops those (commented-out
+//     calls aren't statements), so they only cost an extra parse.
+//   - a named import that binds the local name `include` from
+//     `@blazetrails/activesupport` (excluding the `include as ...`
+//     aliased form).
+// The syntactic walker enforces both constraints exactly.
+const INCLUDE_CALL_PATTERN = /^\s*include\s*\(/m;
+// Local binding must be `include`. Accepts `include` (no `as`) and
+// the rare `include as include`; rejects `include as inc` (local
+// rebinds to `inc`). The negative lookahead `(?!\s+as\s+(?!include\b))`
+// fails the match when `include` is followed by `as <something-other-
+// than-include>`.
+const ACTIVESUPPORT_INCLUDE_IMPORT_PATTERN =
+  /import\s*\{[^}]*\binclude\b(?!\s+as\s+(?!include\b))[^}]*\}\s*from\s*["']@blazetrails\/activesupport["']/;
 
 export interface TrailsCompilerHost extends ts.CompilerHost {
   getDeltasForFile(fileName: string): VirtualizeResult["deltas"] | undefined;
@@ -46,6 +68,12 @@ export function buildCompilerHost(
     extra.schemaColumnsByTable && Object.keys(extra.schemaColumnsByTable).length > 0;
 
   function shouldVirtualize(text: string): boolean {
+    // Files using `include()` from activesupport need the
+    // interface-merge appendix even if they don't extend Base — e.g.
+    // utility classes that mix in plain modules.
+    const hasIncludeCall =
+      INCLUDE_CALL_PATTERN.test(text) && ACTIVESUPPORT_INCLUDE_IMPORT_PATTERN.test(text);
+    if (hasIncludeCall) return true;
     // Fast-path skip for files that don't reference a Base-like class.
     // When schema columns are available, a class extending Base may
     // need declares even without a `static {}` block — so the static-
