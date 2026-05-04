@@ -36,12 +36,19 @@ describe("AttributeSetCoder", () => {
   });
 
   it("uninitialized attributes round-trip via defaultAttributes", () => {
-    const uninit = Attribute.uninitialized("score", typeRegistry.lookup("integer"));
-    const attrs = new Map<string, Attribute>([["score", uninit]]);
-    const set = makeSet(attrs);
+    const intType = typeRegistry.lookup("integer");
+    const uninit = Attribute.uninitialized("score", intType);
+    const schemaAttr = Attribute.fromUser("score", 99, intType);
+    const schema = new Map<string, Attribute>([["score", schemaAttr]]);
+    const set = makeSet(new Map([["score", uninit]]));
+
     const encoded = coder.encode(set);
-    const envelope = JSON.parse(encoded);
-    expect(envelope.defaultAttributes).toContain("score");
+    expect(JSON.parse(encoded).defaultAttributes).toContain("score");
+
+    // decode with schema: score should be restored from the schema default (99)
+    const decoded = coder.decode(encoded, schema);
+    expect(decoded.has("score")).toBe(true);
+    expect(decoded.fetchValue("score")).toBe(99);
   });
 
   it("unknown type key falls back to value type and warns once", () => {
@@ -141,10 +148,11 @@ describe("AttributeSetCoder", () => {
     expect(encoded[0].types.x).toBe("string");
   });
 
-  it("schema attr not in envelope resolves to Uninitialized", () => {
+  it("schema attr not in envelope resolves to Uninitialized (retained in map, not initialized)", () => {
+    const stringType = typeRegistry.lookup("string");
     const schema = new Map<string, Attribute>([
       ["name", stringAttr("name", "Bob")],
-      ["missing", Attribute.uninitialized("missing", typeRegistry.lookup("string"))],
+      ["missing", Attribute.uninitialized("missing", stringType)],
     ]);
     const json = JSON.stringify({
       v: 1,
@@ -152,6 +160,11 @@ describe("AttributeSetCoder", () => {
       values: { name: "Bob" },
     });
     const decoded = coder.decode(json, schema);
+    // has() returns false for Uninitialized (not initialized)
     expect(decoded.has("missing")).toBe(false);
+    // but the attr IS retained in the map — castTypes() iterates all attrs including Uninitialized
+    const types = decoded.castTypes();
+    expect(types["missing"]).toBeDefined();
+    expect(types["missing"].name).toBe("string");
   });
 });
