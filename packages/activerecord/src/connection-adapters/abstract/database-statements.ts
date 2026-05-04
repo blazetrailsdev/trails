@@ -63,6 +63,16 @@ export interface DatabaseStatementsHost {
   emptyInsertStatementValue?(pk?: string | null): string;
   transaction?<T>(fn: (tx?: unknown) => Promise<T> | T, opts?: unknown): Promise<T | undefined>;
   pool?: { schemaMigration?: { tableName: string }; internalMetadata?: { tableName: string } };
+  /** @internal */
+  checkIfWriteQuery?(sql: string): void;
+  /** @internal */
+  supportsInsertReturning?(): boolean;
+  /** @internal */
+  quoteColumnName?(col: string): string;
+  /** @internal */
+  primaryKey?(table: string): string | null;
+  /** @internal */
+  preprocessQuery?(sql: string): string;
 }
 
 // --- Query conversion ---
@@ -1345,15 +1355,19 @@ function rawExecute(
   );
 }
 
-/** @internal */
-function performQuery(
-  rawConnection: any,
-  sql: any,
-  binds: any,
-  typeCastedBinds: any,
-  prepare?: any,
-  notificationPayload?: any,
-  batch?: any,
+/**
+ * Lowest-level query dispatch. Adapter subclasses must override.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#perform_query
+ * @internal
+ */
+export function performQuery(
+  this: DatabaseStatementsHost,
+  _rawConnection: unknown,
+  _sql: string,
+  _binds: unknown[],
+  _typeCastedBinds: unknown[],
+  _options?: { prepare?: boolean; notificationPayload?: unknown; batch?: boolean },
 ): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#perform_query is not implemented",
@@ -1374,11 +1388,16 @@ function affectedRows(rawResult: any): never {
   );
 }
 
-/** @internal */
-function preprocessQuery(sql: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#preprocess_query is not implemented",
-  );
+/**
+ * Checks write guards, marks the transaction written, and returns the sql unchanged.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#preprocess_query
+ * @internal
+ */
+export function preprocessQuery(this: DatabaseStatementsHost, sql: string): string {
+  this.checkIfWriteQuery?.(sql);
+  markTransactionWrittenIfWrite.call(this, sql);
+  return sql;
 }
 
 /** @internal */
@@ -1404,11 +1423,14 @@ function executeBatch(statements: any, name?: any, kwargs?: any): never {
   );
 }
 
-/** @internal */
-function defaultInsertValue(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#default_insert_value is not implemented",
-  );
+/**
+ * SQL fragment used when no value is supplied for a column in a fixture insert.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#default_insert_value
+ * @internal
+ */
+export function defaultInsertValue(_column: unknown): Nodes.SqlLiteral {
+  return arelSql("DEFAULT");
 }
 
 /** @internal */
@@ -1446,25 +1468,50 @@ function combineMultiStatements(totalSql: any): never {
   );
 }
 
-/** @internal */
-function select(
-  sql: any,
-  name?: any,
-  binds?: any,
-  prepare?: any,
-  async?: any,
-  allowRetry?: any,
-): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#select is not implemented",
-  );
+/**
+ * Executes a SELECT and returns an ActiveRecord::Result.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select
+ * @internal
+ */
+export async function select(
+  this: DatabaseStatementsHost,
+  sql: string,
+  name?: string | null,
+  binds: unknown[] = [],
+  _options?: { prepare?: boolean; async?: unknown; allowRetry?: boolean },
+): Promise<Result> {
+  return internalExecQuery.call(this, sql, name, binds);
 }
 
-/** @internal */
-function sqlForInsert(sql: any, pk: any, binds: any, returning: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#sql_for_insert is not implemented",
-  );
+/**
+ * Appends a RETURNING clause when the adapter supports it, then returns [sql, binds].
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#sql_for_insert
+ * @internal
+ */
+export function sqlForInsert(
+  this: DatabaseStatementsHost,
+  sql: string,
+  pk: string | null | undefined,
+  binds: unknown[],
+  returning: string[] | null | undefined,
+): [string, unknown[]] {
+  if (this.supportsInsertReturning?.()) {
+    let resolvedPk = pk;
+    if (resolvedPk == null) {
+      const tableRef = extractTableRefFromInsertSql.call(this, sql);
+      if (tableRef) resolvedPk = this.primaryKey?.(tableRef) ?? null;
+    }
+    const returningColumns = returning ?? (resolvedPk != null ? [resolvedPk] : []);
+    if (returningColumns.length > 0) {
+      const cols = returningColumns
+        .map((c) => (this.quoteColumnName ? this.quoteColumnName(c) : `"${c}"`))
+        .join(", ");
+      sql = `${sql} RETURNING ${cols}`;
+    }
+  }
+  return [sql, binds];
 }
 
 /** @internal */
@@ -1474,23 +1521,40 @@ function lastInsertedId(result: any): never {
   );
 }
 
-/** @internal */
-function returningColumnValues(result: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#returning_column_values is not implemented",
-  );
+/**
+ * Extracts the inserted column values from a RETURNING result.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#returning_column_values
+ * @internal
+ */
+export function returningColumnValues(this: DatabaseStatementsHost, result: Result): unknown[] {
+  return [singleValueFromRows(result.rows as unknown[][])];
 }
 
-/** @internal */
-function arelFromRelation(relation: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#arel_from_relation is not implemented",
-  );
+/**
+ * Returns the Arel AST for a Relation, or the value as-is if it is already an AST node.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#arel_from_relation
+ * @internal
+ */
+export function arelFromRelation(relation: unknown): unknown {
+  if (relation != null && typeof (relation as any).arel === "function") {
+    return (relation as any).arel();
+  }
+  return relation;
 }
 
-/** @internal */
-function extractTableRefFromInsertSql(sql: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#extract_table_ref_from_insert_sql is not implemented",
-  );
+/**
+ * Extracts the table name from an INSERT SQL string for RETURNING clause resolution.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#extract_table_ref_from_insert_sql
+ * @internal
+ */
+export function extractTableRefFromInsertSql(
+  this: DatabaseStatementsHost,
+  sql: string,
+): string | null {
+  const match = sql.match(/into\s("[ A-Za-z0-9_."[\]]+"|[A-Za-z0-9_.[\]"]+)\s*/im);
+  if (!match) return null;
+  return match[1].replace(/"/g, "").trim();
 }

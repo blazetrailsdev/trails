@@ -24,8 +24,17 @@ import {
   highPrecisionCurrentTimestamp,
   markTransactionWrittenIfWrite,
   isTransactionOpen,
+  performQuery,
+  preprocessQuery,
+  select,
+  sqlForInsert,
+  arelFromRelation,
+  extractTableRefFromInsertSql,
+  defaultInsertValue,
+  returningColumnValues,
   type DatabaseStatementsHost,
 } from "./database-statements.js";
+import { Result } from "../../result.js";
 import type { Quoting } from "./quoting-interface.js";
 
 describe("DatabaseStatements", () => {
@@ -379,5 +388,130 @@ describe("DatabaseStatements", () => {
       const result = highPrecisionCurrentTimestamp();
       expect(result.toSql()).toBe("CURRENT_TIMESTAMP");
     });
+  });
+});
+
+describe("performQuery", () => {
+  it("raises NotImplementedError — subclasses must override", () => {
+    expect(() => performQuery.call({} as DatabaseStatementsHost, null, "SELECT 1", [], [])).toThrow(
+      /perform_query is not implemented/,
+    );
+  });
+});
+
+describe("preprocessQuery", () => {
+  it("returns sql unchanged when no write guard or transaction", () => {
+    const host: DatabaseStatementsHost = {};
+    expect(preprocessQuery.call(host, "SELECT 1")).toBe("SELECT 1");
+  });
+
+  it("calls checkIfWriteQuery on the host", () => {
+    let checked: string | undefined;
+    const host: DatabaseStatementsHost = {
+      checkIfWriteQuery(sql) {
+        checked = sql;
+      },
+    };
+    preprocessQuery.call(host, "DELETE FROM users");
+    expect(checked).toBe("DELETE FROM users");
+  });
+});
+
+describe("select", () => {
+  it("delegates to internalExecQuery and returns a Result", async () => {
+    const host: DatabaseStatementsHost = {
+      async internalExecute(_sql, _name, _binds) {
+        return [{ id: 1 }];
+      },
+    };
+    const result = await select.call(host, "SELECT 1");
+    expect(result).toBeInstanceOf(Result);
+  });
+});
+
+describe("sqlForInsert", () => {
+  it("returns sql and binds unchanged when adapter does not support RETURNING", () => {
+    const host: DatabaseStatementsHost = { supportsInsertReturning: () => false };
+    const [sql, binds] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
+    expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
+    expect(binds).toEqual([]);
+  });
+
+  it("appends RETURNING clause when pk is supplied and adapter supports it", () => {
+    const host: DatabaseStatementsHost = {
+      supportsInsertReturning: () => true,
+      quoteColumnName: (c) => `"${c}"`,
+    };
+    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", "id", [], null);
+    expect(sql).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "id"`);
+  });
+
+  it("uses explicit returning list when provided", () => {
+    const host: DatabaseStatementsHost = {
+      supportsInsertReturning: () => true,
+      quoteColumnName: (c) => `"${c}"`,
+    };
+    const [sql] = sqlForInsert.call(
+      host,
+      "INSERT INTO t (x) VALUES (1)",
+      null,
+      [],
+      ["id", "created_at"],
+    );
+    expect(sql).toContain('RETURNING "id", "created_at"');
+  });
+});
+
+describe("arelFromRelation", () => {
+  it("returns non-relation values unchanged", () => {
+    expect(arelFromRelation("some sql")).toBe("some sql");
+    expect(arelFromRelation(null)).toBeNull();
+  });
+
+  it("calls .arel() on Relation-like objects", () => {
+    const fakeAst = { type: "select" };
+    const relation = { arel: () => fakeAst };
+    expect(arelFromRelation(relation)).toBe(fakeAst);
+  });
+});
+
+describe("extractTableRefFromInsertSql", () => {
+  it("extracts unquoted table name", () => {
+    const host = {} as DatabaseStatementsHost;
+    expect(extractTableRefFromInsertSql.call(host, "INSERT INTO users (name) VALUES ('a')")).toBe(
+      "users",
+    );
+  });
+
+  it("extracts quoted table name", () => {
+    const host = {} as DatabaseStatementsHost;
+    expect(extractTableRefFromInsertSql.call(host, 'INSERT INTO "my_table" (x) VALUES (1)')).toBe(
+      "my_table",
+    );
+  });
+
+  it("returns null when no match", () => {
+    const host = {} as DatabaseStatementsHost;
+    expect(extractTableRefFromInsertSql.call(host, "SELECT 1")).toBeNull();
+  });
+});
+
+describe("defaultInsertValue", () => {
+  it("returns DEFAULT SQL literal", () => {
+    const result = defaultInsertValue(null);
+    expect(result.toSql()).toBe("DEFAULT");
+  });
+});
+
+describe("returningColumnValues", () => {
+  it("returns [first value of first row] from result", () => {
+    const host: DatabaseStatementsHost = {};
+    const result = new Result(["id"], [[42]]);
+    expect(returningColumnValues.call(host, result)).toEqual([42]);
+  });
+
+  it("returns [undefined] for empty result", () => {
+    const host: DatabaseStatementsHost = {};
+    expect(returningColumnValues.call(host, Result.empty())).toEqual([undefined]);
   });
 });
