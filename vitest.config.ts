@@ -85,10 +85,12 @@ export default defineConfig({
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
           ],
-          // Real-DB tests share a per-worker DB and the module-level test
-          // adapter has known race windows (see project_test_adapter_drift_fix).
-          // Retry intermittent failures on PG/MySQL only; SQLite (:memory:)
-          // is deterministic per fork so retries there would mask real bugs.
+          // Real-DB tests share a per-worker DB; the module-level state in
+          // test-adapter.ts has known race windows (see
+          // project_test_adapter_drift_fix). Retry intermittents on PG/MySQL
+          // only. The SQLite job (retry=0) covers every AR test file too, so
+          // a deterministic regression in a SQLite-only unit test still fails
+          // there — retries here can mask it on PG/MySQL but not in the matrix.
           retry: process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 2 : 0,
           pool: "forks",
           // minForks = maxForks so VITEST_WORKER_ID stays within [1, AR_DB_MAX_FORKS].
