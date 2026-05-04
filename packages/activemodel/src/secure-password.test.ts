@@ -363,8 +363,11 @@ describe("SecurePasswordTest", () => {
 
   it("password_challenge validates against existing digest", () => {
     const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
+    // Simulate a DB-loaded record: digest is in attributes at snapshot time.
+    const builder = new User({ name: "test" });
+    (builder as any).password = "secret";
+    const digest = builder.readAttribute("password_digest");
+    const u = new User({ name: "test", password_digest: digest });
     expect(u.isValid()).toBe(true);
     (u as any).passwordChallenge = "secret";
     expect(u.isValid()).toBe(true);
@@ -382,8 +385,11 @@ describe("SecurePasswordTest", () => {
 
   it("password_challenge validates against existing digest before allowing changes", () => {
     const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
+    // Simulate a DB-loaded record with an existing digest as baseline.
+    const builder = new User({ name: "test" });
+    (builder as any).password = "secret";
+    const digest = builder.readAttribute("password_digest");
+    const u = new User({ name: "test", password_digest: digest });
     expect(u.isValid()).toBe(true);
     (u as any).password = "newpassword";
     (u as any).passwordChallenge = "secret";
@@ -409,6 +415,62 @@ describe("SecurePasswordTest", () => {
     (u as any).password = "secret";
     (u as any).passwordChallenge = null;
     expect(u.isValid()).toBe(true);
+  });
+
+  it("password_challenge succeeds against db-loaded digest without setter call", () => {
+    const User = createUserClass();
+    const builder = new User({ name: "test" });
+    (builder as any).password = "secret";
+    const digest = builder.readAttribute("password_digest");
+    // No setter call on this instance — digest loaded as baseline attribute.
+    const u = new User({ name: "test", password_digest: digest });
+    (u as any).passwordChallenge = "secret";
+    expect(u.isValid()).toBe(true);
+  });
+
+  it("password_challenge fails against wrong db-loaded digest", () => {
+    const User = createUserClass();
+    const builder = new User({ name: "test" });
+    (builder as any).password = "secret";
+    const digest = builder.readAttribute("password_digest");
+    const u = new User({ name: "test", password_digest: digest });
+    (u as any).passwordChallenge = "wrong";
+    expect(u.isValid()).toBe(false);
+    expect(u.errors.get("passwordChallenge")).toContain("is invalid");
+  });
+
+  it("password_challenge fails when no prior digest exists", () => {
+    const User = createUserClass();
+    const u = new User({ name: "test" });
+    // No password set — password_digest baseline is null.
+    (u as any).passwordChallenge = "anything";
+    expect(u.isValid()).toBe(false);
+    expect(u.errors.get("passwordChallenge")).toContain("is invalid");
+  });
+
+  it("password too long emits passwordTooLong error type", () => {
+    const User = createUserClass();
+    const u = new User({ name: "test" });
+    (u as any).password = "a".repeat(73);
+    u.isValid();
+    expect(u.errors.where("password", "passwordTooLong").length).toBeGreaterThan(0);
+  });
+
+  it("password too long resolves to locale entry", () => {
+    const User = createUserClass();
+    const u = new User({ name: "test" });
+    (u as any).password = "a".repeat(73);
+    u.isValid();
+    const msgs = u.errors.fullMessages;
+    expect(msgs.some((m) => m.includes("is too long"))).toBe(true);
+  });
+
+  it("whitespace-only password digest treated as blank", () => {
+    const User = createUserClass();
+    const u = new User({ name: "test" });
+    u.writeAttribute("password_digest", "   ");
+    expect(u.isValid()).toBe(false);
+    expect(u.errors.get("password")).toContain("can't be blank");
   });
 
   it("password_salt returns the bcrypt salt from the digest", () => {

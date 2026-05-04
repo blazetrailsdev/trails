@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { humanize, camelize } from "@blazetrails/activesupport";
+import { humanize, camelize, isBlank } from "@blazetrails/activesupport";
 import { Model } from "./model.js";
 
 const MIN_COST = 4;
@@ -66,7 +66,6 @@ export function hasSecurePassword(
   }
 
   const passwordCache = new WeakMap<object, string | null>();
-  const previousDigestCache = new WeakMap<object, string | null>();
   const challengeCache = new WeakMap<object, string | null>();
 
   Object.defineProperty(modelClass.prototype, attribute, {
@@ -74,15 +73,6 @@ export function hasSecurePassword(
       return passwordCache.get(this) ?? null;
     },
     set(this: Model, value: unknown) {
-      const willUpdateDigest = value === null || value === undefined || String(value) !== "";
-      if (willUpdateDigest) {
-        const currentDigest = this.readAttribute(digestAttr) as string | null;
-        if (currentDigest) {
-          previousDigestCache.set(this, currentDigest);
-        } else {
-          previousDigestCache.delete(this);
-        }
-      }
       setPassword(this, value, attribute, digestAttr, passwordCache);
     },
     configurable: true,
@@ -146,13 +136,13 @@ export function hasSecurePassword(
       const pwd = passwordCache.get(record);
       const digest = record.readAttribute(digestAttr);
 
-      if (!digest && (pwd === undefined || pwd === null)) {
+      if (isBlank(digest) && (pwd === undefined || pwd === null)) {
         record.errors.add(attribute, "blank");
       }
 
       if (pwd !== null && pwd !== undefined) {
         if (textEncoder.encode(pwd).length > 72) {
-          record.errors.add(attribute, "too_long", { count: 72 });
+          record.errors.add(attribute, "passwordTooLong", { count: 72 });
         }
 
         const humanAttr = modelClass.humanAttributeName
@@ -166,11 +156,11 @@ export function hasSecurePassword(
 
       const challenge = challengeCache.get(record) ?? null;
       if (challenge !== null) {
-        const currentDigest = record.readAttribute(digestAttr) as string | null;
-        const digestToCheck = passwordCache.has(record)
-          ? (previousDigestCache.get(record) ?? currentDigest)
-          : currentDigest;
-        if (!digestToCheck || !bcrypt.compareSync(challenge, digestToCheck)) {
+        // Rails secure_password.rb:141-147: read digest_was from dirty tracking
+        // so DB-loaded records (no setter call) work correctly.
+        // Error fires when digestWas is blank OR doesn't match challenge.
+        const digestWas = record.attributeWas(digestAttr) as string | null | undefined;
+        if (!digestWas || !bcrypt.compareSync(challenge, digestWas)) {
           record.errors.add(challengeAttr, "invalid");
         }
       }
