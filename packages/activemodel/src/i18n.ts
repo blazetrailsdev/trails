@@ -17,6 +17,7 @@ interface TranslateOptions {
   defaults?: Array<{ key: string } | { message: string }>;
   defaultValue?: string;
   locale?: string;
+  raise?: boolean;
   [key: string]: unknown;
 }
 
@@ -138,7 +139,7 @@ class I18nService {
       return interpolate(options.defaultValue, this._interpolationOptions(options));
     }
 
-    if (raiseOnMissingTranslations()) {
+    if (options?.raise ?? raiseOnMissingTranslations()) {
       throw new Error(`Translation missing: ${key}`);
     }
     return key;
