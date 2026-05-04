@@ -184,6 +184,14 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.findJoinTableName("cats", "dogs")).toBe("cats_dogs");
   });
 
+  it("joinTableName with schema-qualified names passes through dot (Rails-faithful)", () => {
+    // Rails derive_join_table_name does not strip schema qualifiers; neither do we.
+    // The [_.] in the regex covers '.' so common schema prefixes are still deduped.
+    const ss = makeStatements();
+    expect(ss.joinTableName("public.users", "public.roles")).toBe("public.roles_users");
+    expect(ss.joinTableName("public.users", "posts")).toBe("posts_public.users");
+  });
+
   it("createTableDefinition returns TableDefinition", () => {
     expect(makeStatements().createTableDefinition("orders").tableName).toBe("orders");
   });
