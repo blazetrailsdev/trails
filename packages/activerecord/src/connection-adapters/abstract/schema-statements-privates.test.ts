@@ -96,6 +96,116 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(() => ss.checkConstraintName("users", {})).toThrow(/expression/);
   });
 
+  // PR 8b helpers
+  it("validateIndexLengthBang throws when name too long", () => {
+    const ss = makeStatements();
+    expect(() => ss.validateIndexLengthBang("users", "a".repeat(65))).toThrow(/too long/);
+    expect(() => ss.validateIndexLengthBang("users", "a".repeat(64))).not.toThrow();
+  });
+
+  it("validateTableLengthBang throws when name too long", () => {
+    const ss = makeStatements();
+    expect(() => ss.validateTableLengthBang("a".repeat(65))).toThrow(/too long/);
+    expect(() => ss.validateTableLengthBang("a".repeat(64))).not.toThrow();
+  });
+
+  it("extractNewDefaultValue unwraps {from,to} hash", () => {
+    const ss = makeStatements();
+    expect(ss.extractNewDefaultValue({ from: 0, to: 42 })).toBe(42);
+    expect(ss.extractNewDefaultValue({ to: 42 })).toEqual({ to: 42 });
+    expect(ss.extractNewDefaultValue(99)).toBe(99);
+    expect(ss.extractNewDefaultValue(null)).toBeNull();
+  });
+
+  it("canRemoveIndexByName", () => {
+    const ss = makeStatements();
+    expect(ss.canRemoveIndexByName(null, { name: "idx" })).toBe(true);
+    expect(ss.canRemoveIndexByName("email", { name: "idx" })).toBe(false);
+    expect(ss.canRemoveIndexByName(null, { name: "idx", algorithm: "concurrently" })).toBe(true);
+    expect(ss.canRemoveIndexByName(null, { name: "idx", unique: true })).toBe(false);
+  });
+
+  it("referenceNameForTable singularizes", () => {
+    const ss = makeStatements();
+    expect(ss.referenceNameForTable("users")).toBe("user");
+    expect(ss.referenceNameForTable("public.users")).toBe("user");
+  });
+
+  it("renameColumnSql produces RENAME COLUMN fragment", () => {
+    const ss = makeStatements();
+    expect(ss.renameColumnSql("users", "name", "full_name")).toBe(
+      `RENAME COLUMN "name" TO "full_name"`,
+    );
+  });
+
+  it("removeColumnForAlter produces DROP COLUMN fragment", () => {
+    const ss = makeStatements();
+    expect(ss.removeColumnForAlter("users", "email")).toBe(`DROP COLUMN "email"`);
+  });
+
+  it("removeColumnsForAlter produces multiple DROP COLUMN fragments", () => {
+    const ss = makeStatements();
+    expect(ss.removeColumnsForAlter("users", ["a", "b"])).toEqual([
+      `DROP COLUMN "a"`,
+      `DROP COLUMN "b"`,
+    ]);
+  });
+
+  it("removeTimestampsForAlter removes updated_at then created_at", () => {
+    const ss = makeStatements();
+    const frags = ss.removeTimestampsForAlter("users");
+    expect(frags).toEqual([`DROP COLUMN "updated_at"`, `DROP COLUMN "created_at"`]);
+  });
+
+  it("changeColumnDefaultForAlter DROP DEFAULT when null", () => {
+    const ss = makeStatements();
+    expect(ss.changeColumnDefaultForAlter("users", "status", null)).toBe(
+      `ALTER COLUMN "status" DROP DEFAULT`,
+    );
+  });
+
+  it("changeColumnDefaultForAlter SET DEFAULT for value", () => {
+    const ss = makeStatements();
+    expect(ss.changeColumnDefaultForAlter("users", "status", "active")).toBe(
+      `ALTER COLUMN "status" SET DEFAULT active`,
+    );
+  });
+
+  it("joinTableName derives name via Rails regex", () => {
+    const ss = makeStatements();
+    expect(ss.joinTableName("assemblies", "parts")).toBe("assemblies_parts");
+    expect(ss.joinTableName("music_artists", "music_records")).toBe("music_artists_records");
+    expect(ss.joinTableName("cats", "dogs")).toBe("cats_dogs");
+  });
+
+  it("findJoinTableName respects tableName option", () => {
+    const ss = makeStatements();
+    expect(ss.findJoinTableName("a", "b", { tableName: "overridden" })).toBe("overridden");
+    expect(ss.findJoinTableName("cats", "dogs")).toBe("cats_dogs");
+  });
+
+  it("addTimestampsForAlter produces ADD fragments with precision when adapter supports it", () => {
+    const ss = makeStatements({ supportsDatetimeWithPrecision: () => true });
+    const frags = ss.addTimestampsForAlter("users");
+    expect(frags).toHaveLength(2);
+    expect(frags[0]).toContain("DATETIME(6)");
+    expect(frags[1]).toContain("DATETIME(6)");
+  });
+
+  it("addTimestampsForAlter respects explicit null option", () => {
+    const ss = makeStatements();
+    const frags = ss.addTimestampsForAlter("users", { null: true });
+    expect(frags[0]).not.toContain("NOT NULL");
+  });
+
+  it("joinTableName with schema-qualified names passes through dot (Rails-faithful)", () => {
+    // Rails derive_join_table_name does not strip schema qualifiers; neither do we.
+    // The [_.] in the regex covers '.' so common schema prefixes are still deduped.
+    const ss = makeStatements();
+    expect(ss.joinTableName("public.users", "public.roles")).toBe("public.roles_users");
+    expect(ss.joinTableName("public.users", "posts")).toBe("posts_public.users");
+  });
+
   it("createTableDefinition returns TableDefinition", () => {
     expect(makeStatements().createTableDefinition("orders").tableName).toBe("orders");
   });

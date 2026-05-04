@@ -10,6 +10,7 @@
 
 import { NotImplementedError } from "../../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { tableNameLength, indexNameLength } from "./database-limits.js";
 import type { DatabaseAdapter } from "../../adapter.js";
 import {
   TableDefinition,
@@ -917,46 +918,18 @@ export class SchemaStatements {
     } = {},
     fn?: (td: TableDefinition) => void,
   ): TableDefinition {
-    const joinTableName = options.tableName ?? this._findJoinTableName(table1, table2);
+    const joinTableName = this.findJoinTableName(table1, table2, options);
     const { columnOptions = {}, tableName: _, ...rest } = options;
     const mergedColOpts = { null: false, index: false, ...columnOptions };
 
-    const t1Ref = this._referenceNameForTable(table1);
-    const t2Ref = this._referenceNameForTable(table2);
+    const t1Ref = this.referenceNameForTable(table1);
+    const t2Ref = this.referenceNameForTable(table2);
 
     return this.buildCreateTableDefinition(joinTableName, { ...rest, id: false }, (td) => {
       td.references(t1Ref, mergedColOpts);
       td.references(t2Ref, mergedColOpts);
       if (fn) fn(td);
     });
-  }
-
-  private _findJoinTableName(table1: string, table2: string): string {
-    const unqualify = (name: string) => (name.split(".").at(-1) ?? name).replace(/\./g, "_");
-    const [t1, t2] = [unqualify(table1), unqualify(table2)].sort();
-    const parts1 = t1.split("_");
-    const parts2 = t2.split("_");
-    // Remove common prefix (Rails dedup: music_artists + music_records → music_artists_records)
-    let commonLen = 0;
-    while (
-      commonLen < parts1.length - 1 &&
-      commonLen < parts2.length - 1 &&
-      parts1[commonLen] === parts2[commonLen]
-    ) {
-      commonLen++;
-    }
-    if (commonLen > 0) {
-      const prefix = parts1.slice(0, commonLen).join("_");
-      const suffix1 = parts1.slice(commonLen).join("_");
-      const suffix2 = parts2.slice(commonLen).join("_");
-      return `${prefix}_${suffix1}_${suffix2}`;
-    }
-    return `${t1}_${t2}`;
-  }
-
-  private _referenceNameForTable(tableName: string): string {
-    const unqualified = tableName.split(".").at(-1) ?? tableName;
-    return singularize(unqualified);
   }
 
   async buildAddColumnDefinition(
@@ -1779,113 +1752,162 @@ export class SchemaStatements {
     }
     return chk;
   }
-}
 
-/** @internal */
-function validateIndexLengthBang(tableName: any, newName: any, internal?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#validate_index_length! is not implemented",
-  );
-}
+  /** @internal */
+  validateIndexLengthBang(tableName: string, newName: string, _internal = false): void {
+    const limit = indexNameLength();
+    if (newName.length > limit) {
+      throw new ArgumentError(
+        `Index name '${newName}' on table '${tableName}' is too long; the limit is ${limit} characters`,
+      );
+    }
+  }
 
-/** @internal */
-function validateTableLengthBang(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#validate_table_length! is not implemented",
-  );
-}
+  /** @internal */
+  validateTableLengthBang(tableName: string): void {
+    const limit = tableNameLength();
+    if (tableName.length > limit) {
+      throw new ArgumentError(
+        `Table name '${tableName}' is too long; the limit is ${limit} characters`,
+      );
+    }
+  }
 
-/** @internal */
-function extractNewDefaultValue(defaultOrChanges: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#extract_new_default_value is not implemented",
-  );
-}
+  /** @internal */
+  extractNewDefaultValue(defaultOrChanges: unknown): unknown {
+    if (
+      defaultOrChanges !== null &&
+      typeof defaultOrChanges === "object" &&
+      "from" in (defaultOrChanges as Record<string, unknown>) &&
+      "to" in (defaultOrChanges as Record<string, unknown>)
+    ) {
+      return (defaultOrChanges as { to: unknown }).to;
+    }
+    return defaultOrChanges;
+  }
 
-/** @internal */
-function canRemoveIndexByName(columnName: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#can_remove_index_by_name? is not implemented",
-  );
-}
+  /** @internal alias */
+  extractNewCommentValue(defaultOrChanges: unknown): unknown {
+    return this.extractNewDefaultValue(defaultOrChanges);
+  }
 
-/** @internal */
-function referenceNameForTable(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#reference_name_for_table is not implemented",
-  );
-}
+  /** @internal */
+  canRemoveIndexByName(
+    columnName: string | undefined | null,
+    options: Record<string, unknown>,
+  ): boolean {
+    return (
+      columnName == null &&
+      "name" in options &&
+      Object.keys(options).filter((k) => k !== "name" && k !== "algorithm").length === 0
+    );
+  }
 
-/** @internal */
-function addColumnForAlter(tableName: any, columnName: any, type: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#add_column_for_alter is not implemented",
-  );
-}
+  /** @internal */
+  referenceNameForTable(tableName: string): string {
+    return singularize(tableName.split(".").at(-1) ?? tableName);
+  }
 
-/** @internal */
-function changeColumnDefaultForAlter(
-  tableName: any,
-  columnName: any,
-  defaultOrChanges: any,
-): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#change_column_default_for_alter is not implemented",
-  );
-}
+  /** @internal */
+  addColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): string {
+    const td = this.createTableDefinition(tableName);
+    const cd = td.newColumnDefinition(columnName, type, options);
+    return this.schemaCreation.accept(new AddColumnDefinition(cd));
+  }
 
-/** @internal */
-function renameColumnSql(tableName: any, columnName: any, newColumnName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#rename_column_sql is not implemented",
-  );
-}
+  /** @internal */
+  changeColumnDefaultForAlter(
+    _tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): string {
+    const newDefault = this.extractNewDefaultValue(defaultOrChanges);
+    const col = this.adapter.quoteIdentifier(columnName);
+    if (newDefault == null) {
+      return `ALTER COLUMN ${col} DROP DEFAULT`;
+    }
+    return `ALTER COLUMN ${col} SET${this.adapter.quoteDefaultExpression(newDefault)}`;
+  }
 
-/** @internal */
-function removeColumnForAlter(tableName: any, columnName: any, type?: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#remove_column_for_alter is not implemented",
-  );
-}
+  /** @internal */
+  renameColumnSql(_tableName: string, columnName: string, newColumnName: string): string {
+    return `RENAME COLUMN ${this.adapter.quoteIdentifier(columnName)} TO ${this.adapter.quoteIdentifier(newColumnName)}`;
+  }
 
-/** @internal */
-function removeColumnsForAlter(tableName: any, columnNames?: any[], options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#remove_columns_for_alter is not implemented",
-  );
-}
+  /** @internal */
+  removeColumnForAlter(
+    _tableName: string,
+    columnName: string,
+    _type?: ColumnType,
+    _options: ColumnOptions = {},
+  ): string {
+    return `DROP COLUMN ${this.adapter.quoteIdentifier(columnName)}`;
+  }
 
-/** @internal */
-function addTimestampsForAlter(tableName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#add_timestamps_for_alter is not implemented",
-  );
-}
+  /** @internal */
+  removeColumnsForAlter(
+    tableName: string,
+    columnNames: string[],
+    _options: Record<string, unknown> = {},
+  ): string[] {
+    return columnNames.map((col) => this.removeColumnForAlter(tableName, col));
+  }
 
-/** @internal */
-function removeTimestampsForAlter(tableName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#remove_timestamps_for_alter is not implemented",
-  );
-}
+  /** @internal */
+  addTimestampsForAlter(tableName: string, options: ColumnOptions = {}): string[] {
+    const opts: ColumnOptions = { ...options };
+    if (opts.null == null) opts.null = false;
+    if (!("precision" in opts) && (this.adapter as any).supportsDatetimeWithPrecision?.()) {
+      opts.precision = 6;
+    }
+    return [
+      this.addColumnForAlter(tableName, "created_at", "datetime", opts),
+      this.addColumnForAlter(tableName, "updated_at", "datetime", opts),
+    ];
+  }
 
-/** @internal */
-function insertVersionsSql(versions: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#insert_versions_sql is not implemented",
-  );
-}
+  /** @internal */
+  removeTimestampsForAlter(tableName: string, _options: Record<string, unknown> = {}): string[] {
+    return this.removeColumnsForAlter(tableName, ["updated_at", "created_at"]);
+  }
 
-/** @internal */
-function dataSourceSql(name?: any, type?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#data_source_sql is not implemented",
-  );
-}
+  /** @internal */
+  insertVersionsSql(versions: string | string[]): string {
+    const smTableName =
+      (this.adapter as any).pool?.schemaMigration?.tableName ?? "schema_migrations";
+    return this._insertVersionsSql(smTableName, versions);
+  }
 
-/** @internal */
-function quotedScope(name?: any, type?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaStatements#quoted_scope is not implemented",
-  );
+  /** @internal */
+  dataSourceSql(_name?: string, _options?: { type?: string }): string {
+    throw new NotImplementedError(
+      "ActiveRecord::ConnectionAdapters::SchemaStatements#data_source_sql is not implemented",
+    );
+  }
+
+  /** @internal */
+  quotedScope(_name?: string, _options?: { type?: string }): Record<string, string> {
+    throw new NotImplementedError(
+      "ActiveRecord::ConnectionAdapters::SchemaStatements#quoted_scope is not implemented",
+    );
+  }
+
+  /** @internal */
+  findJoinTableName(table1: string, table2: string, options: { tableName?: string } = {}): string {
+    return options.tableName ?? this.joinTableName(table1, table2);
+  }
+
+  /** @internal */
+  joinTableName(table1: string, table2: string): string {
+    // Mirrors ModelSchema.derive_join_table_name:
+    // sort, join with NUL, deduplicate common word+separator prefix, replace NUL with _
+    const joined = [String(table1), String(table2)].sort().join("\0");
+    const deduped = joined.replace(/^(.*[_.])(.+)\0\1(.+)/, "$1$2_$3");
+    return deduped.replace("\0", "_");
+  }
 }

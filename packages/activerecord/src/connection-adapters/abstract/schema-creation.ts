@@ -252,9 +252,12 @@ export class SchemaCreation {
         sql = "DATE";
         break;
       case "datetime":
-      case "timestamp":
-        sql = this.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
+      case "timestamp": {
+        const base = this.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
+        const p = options.precision;
+        sql = p != null && p >= 0 && p <= 6 ? `${base}(${p})` : base;
         break;
+      }
       case "binary":
         sql = this.adapterName === "postgres" ? "BYTEA" : "BLOB";
         break;
