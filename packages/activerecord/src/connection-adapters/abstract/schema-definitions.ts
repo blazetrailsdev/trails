@@ -1,4 +1,3 @@
-import { NotImplementedError } from "../../errors.js";
 import {
   quoteIdentifier as abstractQuoteIdentifier,
   quoteTableName as abstractQuoteTableName,
@@ -9,7 +8,7 @@ import {
   quoteTableName as mysqlQuoteTableName,
 } from "../mysql/quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
-import { singularize } from "@blazetrails/activesupport";
+import { singularize, pluralize } from "@blazetrails/activesupport";
 
 /** @internal */
 function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
@@ -243,6 +242,8 @@ export interface AddReferenceOptions extends ColumnOptions {
   foreignKey?: boolean;
   type?: ColumnType;
   index?: boolean;
+  ifExists?: boolean;
+  ifNotExists?: boolean;
 }
 
 /**
@@ -346,6 +347,15 @@ export class IndexDefinition {
     }
     return true;
   }
+
+  /** @internal */
+  private conciseOptions<T>(options: Record<string, T>): Record<string, T> | T {
+    const values = Object.values(options);
+    if (this.columns.length === values.length && new Set(values).size === 1) {
+      return values[0] as T;
+    }
+    return options;
+  }
 }
 
 /**
@@ -375,23 +385,25 @@ export class ReferenceDefinition {
   readonly name: string;
   /** @internal */
   readonly polymorphic: boolean;
-  readonly index: boolean;
-  readonly foreignKey: boolean;
+  readonly index: boolean | AddIndexOptions;
+  readonly foreignKey: boolean | AddForeignKeyOptions;
   readonly type: ColumnType;
-  readonly options: ColumnOptions;
+  readonly options: ColumnOptions & { ifExists?: boolean; ifNotExists?: boolean };
 
   constructor(
     name: string,
     options: ColumnOptions & {
       polymorphic?: boolean;
-      foreignKey?: boolean;
-      index?: boolean;
+      foreignKey?: boolean | AddForeignKeyOptions;
+      index?: boolean | AddIndexOptions;
       type?: ColumnType;
+      ifExists?: boolean;
+      ifNotExists?: boolean;
     } = {},
   ) {
     this.name = name;
     this.polymorphic = options.polymorphic ?? false;
-    this.index = options.index !== false;
+    this.index = options.index !== false ? (options.index ?? true) : false;
     this.foreignKey = options.foreignKey ?? false;
     this.type = options.type ?? "integer";
     const { polymorphic: _, foreignKey: _fk, index: _idx, type: _t, ...rest } = options;
@@ -399,20 +411,95 @@ export class ReferenceDefinition {
   }
 
   addTo(table: TableDefinition): void {
-    const method = this.type as keyof ColumnMethods;
-    (table[method] as (name: string, options?: ColumnOptions) => unknown)(
-      `${this.name}_id`,
-      this.options,
-    );
-    if (this.polymorphic) {
-      table.string(`${this.name}_type`, this.options);
+    for (const [colName, colType, colOpts] of this._columns()) {
+      table.column(colName, colType as ColumnType, colOpts as ColumnOptions);
     }
     if (this.index) {
-      const columns = this.polymorphic
-        ? [`${this.name}_type`, `${this.name}_id`]
-        : [`${this.name}_id`];
-      table.index(columns);
+      table.index(this.columnNames(), this.indexOptions(table.tableName));
     }
+    if (this.foreignKey) {
+      table.foreignKey(this.foreignTableName(), this.foreignKeyOptions() as AddForeignKeyOptions);
+    }
+  }
+
+  /** @internal */
+  private asOptions(value: unknown): Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  }
+
+  /** @internal */
+  private conditionalOptions(): { ifExists?: boolean; ifNotExists?: boolean } {
+    const result: { ifExists?: boolean; ifNotExists?: boolean } = {};
+    if (this.options.ifExists !== undefined) result.ifExists = this.options.ifExists;
+    if (this.options.ifNotExists !== undefined) result.ifNotExists = this.options.ifNotExists;
+    return result;
+  }
+
+  /** @internal */
+  private polymorphicOptions(): ColumnOptions {
+    return {
+      ...this.asOptions(this.polymorphic),
+      ...this.conditionalOptions(),
+      ...(this.options.null !== undefined ? { null: this.options.null } : {}),
+    };
+  }
+
+  /** @internal */
+  private polymorphicIndexName(tableName: string): string {
+    return `index_${tableName}_on_${this.name}`;
+  }
+
+  /** @internal */
+  private indexOptions(tableName: string): AddIndexOptions {
+    const opts: AddIndexOptions = {
+      ...this.asOptions(this.index),
+      ...this.conditionalOptions(),
+    };
+    if (this.polymorphic && !opts.name) {
+      opts.name = this.polymorphicIndexName(tableName);
+    }
+    return opts;
+  }
+
+  /** @internal */
+  private foreignKeyOptions(): AddForeignKeyOptions & {
+    ifExists?: boolean;
+    ifNotExists?: boolean;
+  } {
+    return {
+      ...this.asOptions(this.foreignKey),
+      column: this.columnName(),
+      ...this.conditionalOptions(),
+    } as AddForeignKeyOptions & { ifExists?: boolean; ifNotExists?: boolean };
+  }
+
+  /** @internal */
+  private columnName(): string {
+    return `${this.name}_id`;
+  }
+
+  /** @internal */
+  private columnNames(): string[] {
+    return this._columns().map(([n]) => n);
+  }
+
+  /** @internal */
+  private foreignTableName(): string {
+    const fkOpts = this.foreignKeyOptions();
+    return (fkOpts as any).toTable ?? pluralize(this.name);
+  }
+
+  /** @internal */
+  private _columns(): [string, ColumnType, ColumnOptions][] {
+    const result: [string, ColumnType, ColumnOptions][] = [
+      [this.columnName(), this.type, this.options],
+    ];
+    if (this.polymorphic) {
+      result.unshift([`${this.name}_type`, "string", this.polymorphicOptions()]);
+    }
+    return result;
   }
 }
 
@@ -552,12 +639,18 @@ export class TableDefinition {
     type: ColumnType,
     options: ColumnOptions = {},
   ): ColumnDefinition {
-    return new ColumnDefinition(name, type, options);
+    if (this.isIntegerLikePrimaryKey(type, options)) {
+      type = this.integerLikePrimaryKeyType(type, options);
+    }
+    type = this.aliasedTypes(type, type) as ColumnType;
+    options.primaryKey ||= type === "primary_key";
+    if (options.primaryKey) options.null = false;
+    return this.createColumnDefinition(name, type, options);
   }
 
   /** @internal */
   aliasedTypes(name: string, fallback: string): string {
-    return name === "bigint" ? "integer" : fallback;
+    return name === "timestamp" ? "datetime" : fallback;
   }
 
   column(
@@ -566,12 +659,69 @@ export class TableDefinition {
     options: Omit<ColumnOptions, "index"> & { index?: boolean | AddIndexOptions } = {},
   ): this {
     const { index, ...colOpts } = options;
+    this.raiseOnDuplicateColumn(name);
     this.columns.push(this.newColumnDefinition(name, type, colOpts as ColumnOptions));
     if (index) {
       const indexOpts: AddIndexOptions = typeof index === "object" ? index : {};
       this.index([name], indexOpts);
     }
     return this;
+  }
+
+  /** @internal */
+  protected validColumnDefinitionOptions(): string[] {
+    return [
+      "limit",
+      "precision",
+      "scale",
+      "default",
+      "null",
+      "collation",
+      "comment",
+      "primaryKey",
+      "ifExists",
+      "ifNotExists",
+      "array",
+    ];
+  }
+
+  /** @internal */
+  protected createColumnDefinition(
+    name: string,
+    type: ColumnType,
+    options: ColumnOptions,
+  ): ColumnDefinition {
+    return new ColumnDefinition(name, type, options);
+  }
+
+  /** @internal */
+  protected isIntegerLikePrimaryKey(type: ColumnType, options: ColumnOptions): boolean {
+    return (
+      !!options.primaryKey &&
+      (type === "integer" || type === "bigint") &&
+      options.default === undefined
+    );
+  }
+
+  /** @internal */
+  protected integerLikePrimaryKeyType(type: ColumnType, _options: ColumnOptions): ColumnType {
+    return type;
+  }
+
+  /** @internal */
+  protected raiseOnDuplicateColumn(name: string): void {
+    const existing = this.columns.find((c) => c.name === name);
+    if (existing) {
+      if (existing.options.primaryKey) {
+        throw new Error(
+          `you can't redefine the primary key column '${name}' on '${this.tableName}'. To define a custom primary key, pass { id: false } to create_table.`,
+        );
+      } else {
+        throw new Error(
+          `you can't define an already defined column '${name}' on '${this.tableName}'.`,
+        );
+      }
+    }
   }
 
   checkConstraint(expression: string, options: { name?: string; validate?: boolean } = {}): this {
@@ -1114,6 +1264,21 @@ export class Table {
   async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<void> {
     return this._schema.addColumn(this._tableName, columnName, type, options);
   }
+
+  /** @internal */
+  protected raiseOnIfExistOptions(options: Record<string, unknown>): void {
+    const key =
+      "ifExists" in options ? "ifExists" : "ifNotExists" in options ? "ifNotExists" : null;
+    if (key) {
+      const conditional = key === "ifExists" ? "if" : "unless";
+      const railsKey = key === "ifExists" ? "if_exists" : "if_not_exists";
+      throw new Error(
+        `Option ${railsKey} will be ignored. If you are calling an expression like\n` +
+          `\`t.column(.., ${railsKey}: true)\` from inside a change_table block, try a\n` +
+          `conditional clause instead, as in \`t.column(..) ${conditional} t.column_exists?(..)\``,
+      );
+    }
+  }
 }
 
 /**
@@ -1192,161 +1357,4 @@ export interface SchemaStatementsLike {
   ): Promise<void>;
   isCheckConstraintExists?(tableName: string, options?: Record<string, unknown>): Promise<boolean>;
   primaryKey?(tableName: string): Promise<string | null>;
-}
-
-/** @internal */
-function conciseOptions(options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::IndexDefinition#concise_options is not implemented",
-  );
-}
-
-/** @internal */
-function polymorphic(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#polymorphic is not implemented",
-  );
-}
-
-function index(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#index is not implemented",
-  );
-}
-
-function foreignKey(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#foreign_key is not implemented",
-  );
-}
-
-function type(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#type is not implemented",
-  );
-}
-
-function options(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#options is not implemented",
-  );
-}
-
-/** @internal */
-function asOptions(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#as_options is not implemented",
-  );
-}
-
-/** @internal */
-function conditionalOptions(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#conditional_options is not implemented",
-  );
-}
-
-/** @internal */
-function polymorphicOptions(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#polymorphic_options is not implemented",
-  );
-}
-
-/** @internal */
-function polymorphicIndexName(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#polymorphic_index_name is not implemented",
-  );
-}
-
-/** @internal */
-function indexOptions(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#index_options is not implemented",
-  );
-}
-
-/** @internal */
-function foreignKeyOptions(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#foreign_key_options is not implemented",
-  );
-}
-
-/** @internal */
-function columnName(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#column_name is not implemented",
-  );
-}
-
-/** @internal */
-function columnNames(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#column_names is not implemented",
-  );
-}
-
-/** @internal */
-function foreignTableName(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ReferenceDefinition#foreign_table_name is not implemented",
-  );
-}
-
-/** @internal */
-function validColumnDefinitionOptions(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::TableDefinition#valid_column_definition_options is not implemented",
-  );
-}
-
-/** @internal */
-function createColumnDefinition(name: any, type: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::TableDefinition#create_column_definition is not implemented",
-  );
-}
-
-/** @internal */
-function aliasedTypes(name: any, fallback: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::TableDefinition#aliased_types is not implemented",
-  );
-}
-
-/** @internal */
-function isIntegerLikePrimaryKey(type: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::TableDefinition#integer_like_primary_key? is not implemented",
-  );
-}
-
-/** @internal */
-function integerLikePrimaryKeyType(type: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::TableDefinition#integer_like_primary_key_type is not implemented",
-  );
-}
-
-/** @internal */
-function raiseOnDuplicateColumn(name: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::TableDefinition#raise_on_duplicate_column is not implemented",
-  );
-}
-
-/** @internal */
-function raiseOnIfExistOptions(options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Table#raise_on_if_exist_options is not implemented",
-  );
-}
-
-/** @internal */
-function defineColumnMethods(...columnTypes: any[]): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::ColumnMethods#define_column_methods is not implemented",
-  );
 }

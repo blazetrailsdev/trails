@@ -1,0 +1,138 @@
+import { describe, it, expect } from "vitest";
+import {
+  IndexDefinition,
+  ReferenceDefinition,
+  TableDefinition,
+  Table,
+} from "./schema-definitions.js";
+
+describe("IndexDefinition#concise_options", () => {
+  it("keeps hash when values differ", () => {
+    const idx = new IndexDefinition("t", "i", false, ["a", "b"], {
+      orders: { a: "asc", b: "desc" },
+    });
+    expect(idx.orders).toEqual({ a: "asc", b: "desc" });
+  });
+
+  it("keeps hash when column count differs from options count", () => {
+    const idx = new IndexDefinition("t", "i", false, ["a", "b", "c"], {
+      orders: { a: "asc", b: "asc" },
+    });
+    expect(idx.orders).toEqual({ a: "asc", b: "asc" });
+  });
+
+  it("conciseOptions method collapses uniform values to scalar", () => {
+    const idx = new IndexDefinition("t", "i", false, ["a", "b"], {});
+    expect((idx as any).conciseOptions({ a: "asc", b: "asc" })).toBe("asc");
+    expect((idx as any).conciseOptions({ a: "asc", b: "desc" })).toEqual({
+      a: "asc",
+      b: "desc",
+    });
+  });
+});
+
+describe("ReferenceDefinition helpers", () => {
+  it("addTo adds id column by default", () => {
+    const ref = new ReferenceDefinition("user", { index: false });
+    const td = new TableDefinition("posts", { id: false });
+    ref.addTo(td);
+    expect(td.columns.map((c) => c.name)).toContain("user_id");
+  });
+
+  it("addTo adds type column when polymorphic", () => {
+    const ref = new ReferenceDefinition("taggable", { polymorphic: true, index: false });
+    const td = new TableDefinition("taggings", { id: false });
+    ref.addTo(td);
+    const names = td.columns.map((c) => c.name);
+    expect(names).toContain("taggable_id");
+    expect(names).toContain("taggable_type");
+  });
+
+  it("addTo adds index with polymorphic name", () => {
+    const ref = new ReferenceDefinition("taggable", { polymorphic: true });
+    const td = new TableDefinition("taggings", { id: false });
+    ref.addTo(td);
+    expect(td.indexes[0].name).toBe("index_taggings_on_taggable");
+  });
+
+  it("addTo adds foreign key when foreignKey: true", () => {
+    const ref = new ReferenceDefinition("user", { foreignKey: true, index: false });
+    const td = new TableDefinition("posts", { id: false });
+    ref.addTo(td);
+    expect(td.foreignKeys).toHaveLength(1);
+    expect(td.foreignKeys[0].toTable).toBe("users");
+  });
+
+  it("polymorphic columns are ordered type before id", () => {
+    const ref = new ReferenceDefinition("taggable", { polymorphic: true, index: false });
+    const td = new TableDefinition("taggings", { id: false });
+    ref.addTo(td);
+    expect(td.columns[0].name).toBe("taggable_type");
+    expect(td.columns[1].name).toBe("taggable_id");
+  });
+});
+
+describe("TableDefinition#raise_on_duplicate_column", () => {
+  it("raises when adding a duplicate non-pk column", () => {
+    const td = new TableDefinition("t", { id: false });
+    td.string("name");
+    expect(() => td.string("name")).toThrow("already defined column");
+  });
+
+  it("raises with pk-specific message for primary key columns", () => {
+    const td = new TableDefinition("t");
+    expect(() => td.column("id", "integer", { primaryKey: true })).toThrow(
+      "redefine the primary key",
+    );
+  });
+});
+
+describe("TableDefinition#integer_like_primary_key?", () => {
+  it("newColumnDefinition preserves integer pk type in base class", () => {
+    const td = new TableDefinition("t", { id: false });
+    const col = td.newColumnDefinition("id", "integer", { primaryKey: true });
+    expect(col.type).toBe("integer");
+  });
+});
+
+describe("TableDefinition#aliased_types", () => {
+  it("maps timestamp to datetime", () => {
+    const td = new TableDefinition("t", { id: false });
+    td.column("ts", "timestamp");
+    expect(td.columns[0].type).toBe("datetime");
+  });
+});
+
+describe("Table#raise_on_if_exist_options", () => {
+  it("raises when ifExists is passed", () => {
+    const fakeSchema: any = {
+      addColumn: async () => {},
+      removeColumn: async () => {},
+      renameColumn: async () => {},
+      addIndex: async () => {},
+      removeIndex: async () => {},
+      addReference: async () => {},
+      removeReference: async () => {},
+      addTimestamps: async () => {},
+      removeTimestamps: async () => {},
+    };
+    const t = new Table("users", fakeSchema);
+    expect(() => (t as any).raiseOnIfExistOptions({ ifExists: true })).toThrow("if_exists");
+  });
+
+  it("raises when ifNotExists is passed", () => {
+    const fakeSchema: any = {
+      addColumn: async () => {},
+      removeColumn: async () => {},
+      renameColumn: async () => {},
+      addIndex: async () => {},
+      removeIndex: async () => {},
+      addReference: async () => {},
+      removeReference: async () => {},
+      addTimestamps: async () => {},
+      removeTimestamps: async () => {},
+    };
+    const t = new Table("users", fakeSchema);
+    expect(() => (t as any).raiseOnIfExistOptions({ ifNotExists: true })).toThrow("if_not_exists");
+  });
+});
