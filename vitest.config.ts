@@ -81,6 +81,7 @@ export default defineConfig({
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
             "./packages/activerecord/src/test-setup.ts",
+            "./packages/activerecord/src/test-setup-ar.ts",
             ...(process.env.MYSQL_TEST_URL
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
