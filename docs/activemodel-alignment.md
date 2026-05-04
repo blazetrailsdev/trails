@@ -48,7 +48,7 @@ P19 Value#equals precision/scale/limit (independent)
 P20 SecurePassword challenge via _was + password_too_long type (independent)
 P21 Multiparameter time defaults per-type (independent)
 P22 Lint testToKey/testToParam unpersisted-nil + testModelNaming instance↔class (independent)
-P23 Railtie: deprecator initializer + auto-i18n_customize_full_message (independent)
+P23 Railtie: deprecator initializer + auto-i18n_customize_full_message (independent) ✅ #1172
 P24 AttributeSetCoder pluggable codec (JSON default, YAML opt-in) (depends on P1, P2)
 P25 OID layering refactor — drop activemodel uuid/json/array, redirect to AR PG OIDs (independent; touches multiple packages)
 ```
@@ -408,7 +408,7 @@ Suggested merge order (one cluster at a time): **P1 → P2 → P3 → P4** (attr
    **Depends on**: none.
    **Blocks**: none.
 
-### P23 — Railtie: deprecator initializer + auto i18n customize
+### P23 — Railtie: deprecator initializer + auto i18n customize ✅ #1172
 
 **Audit ref**: lifecycle §15.
 **Files**:
