@@ -159,6 +159,8 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
         `Provided hash ${JSON.stringify(values)} doesn't contain necessary keys: ${JSON.stringify(missing)}`,
       );
     }
-    return new AcceptsMultiparameterTime(this, { "4": 0, "5": 0 }).cast(values) as DateTimeCastResult | null;
+    return new AcceptsMultiparameterTime(this, { "4": 0, "5": 0 }).cast(
+      values,
+    ) as DateTimeCastResult | null;
   }
 }

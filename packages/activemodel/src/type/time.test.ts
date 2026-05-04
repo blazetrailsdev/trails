@@ -138,7 +138,13 @@ describe("TimeTest", () => {
   });
 
   it("valueFromMultiparameterAssignment: full hash with year/month/day/hour still works", () => {
-    const result = (type as any).valueFromMultiparameterAssignment({ "1": 2025, "2": 6, "3": 15, "4": 10, "5": 20 });
+    const result = (type as any).valueFromMultiparameterAssignment({
+      "1": 2025,
+      "2": 6,
+      "3": 15,
+      "4": 10,
+      "5": 20,
+    });
     expect(result).toBeInstanceOf(Temporal.PlainTime);
     expect((result as Temporal.PlainTime).hour).toBe(10);
   });
