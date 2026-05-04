@@ -973,7 +973,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   protected stripWhitespaceCharacters(expression: string): string {
-    return expression.replace(/\\\n/g, "").replace(/x0A/g, "").replace(/\s+/g, " ").trim();
+    return expression.replace(/\\n/g, "").replace(/x0A/g, "").replace(/\s+/g, " ").trim();
   }
 
   /** @internal */
