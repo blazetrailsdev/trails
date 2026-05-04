@@ -1194,8 +1194,9 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const t = Topic.new({ title: "user-set" }) as any;
-    // newly set attributes come from user
-    expect(t.title).toBe("user-set");
+    expect(t.cameFromUser("title")).toBe(true);
+    t._attributes.writeFromDatabase("title", "db-loaded");
+    expect(t.cameFromUser("title")).toBe(false);
   });
 
   it("accessed_fields", async () => {

@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Model } from "../index.js";
+import { prepareValueForValidation } from "./numericality.js";
 
 describe("NumericalityValidationTest", () => {
   it("validates numericality with greater than or equal using string value", () => {
@@ -746,5 +747,106 @@ describe("numericality with in: range", () => {
     const f = new Person({ score: "5.5" });
     expect(f.isValid()).toBe(false);
     expect(f.errors.get("score")).toContain("must be an integer");
+  });
+
+  it("odd/even truncates float via Math.trunc before checking parity (2.5 → 2, even)", () => {
+    // Rails: value.to_i.even? — truncates toward zero, so 2.5.to_i == 2
+    class Person extends Model {
+      static {
+        this.attribute("score", "float");
+        this.validates("score", { numericality: { even: true } });
+      }
+    }
+    expect(new Person({ score: 2.5 }).isValid()).toBe(true); // trunc(2.5)=2, even
+    expect(new Person({ score: 3.5 }).isValid()).toBe(false); // trunc(3.5)=3, odd
+  });
+
+  it("odd/even truncates negative float via Math.trunc (-2.5 → -2, even)", () => {
+    // Ruby: -2.5.to_i == -2 (toward zero), not -3 (Math.floor would give wrong answer)
+    class Person extends Model {
+      static {
+        this.attribute("score", "float");
+        this.validates("score", { numericality: { odd: true } });
+      }
+    }
+    expect(new Person({ score: -3.5 }).isValid()).toBe(true); // trunc(-3.5)=-3, odd
+    expect(new Person({ score: -2.5 }).isValid()).toBe(false); // trunc(-2.5)=-2, even
+  });
+
+  it("odd/even truncation: 2.9 is even (truncates to 2, not rounds to 3)", () => {
+    class Person extends Model {
+      static {
+        this.attribute("score", "float");
+        this.validates("score", { numericality: { even: true } });
+      }
+    }
+    expect(new Person({ score: 2.9 }).isValid()).toBe(true); // trunc(2.9)=2, even
+    expect(new Person({ score: 3.9 }).isValid()).toBe(false); // trunc(3.9)=3, odd
+  });
+
+  it("cameFromUser absent (AM Model) → falls back to readAttributeBeforeTypeCast, catches raw string", () => {
+    // AM's Model has no cameFromUser — prepareValueForValidation degrades to
+    // the readAttributeBeforeTypeCast path and still catches bad raw input.
+    class Person extends Model {
+      static {
+        this.attribute("age", "integer");
+        this.validates("age", { numericality: true });
+      }
+    }
+    const p = new Person({ age: "abc" });
+    // AM Model does not expose cameFromUser
+    expect(typeof (p as any).cameFromUser).toBe("undefined");
+    // Validator sees "abc" (raw via readAttributeBeforeTypeCast), reports not_a_number
+    expect(p.isValid()).toBe(false);
+    expect(p.errors.get("age")).toContain("is not a number");
+  });
+
+  it("cameFromUser false → validates cast value (readAttribute)", () => {
+    // Mock: cameFromUser returns false, but cast value (readAttribute) is
+    // a valid number — validation should pass.
+    class MockRecord {
+      errors = { add: vi.fn() };
+      cameFromUser(_name: string) {
+        return false;
+      }
+      readAttribute(_name: string) {
+        return 42;
+      }
+      readAttributeBeforeTypeCast(_name: string) {
+        return "not-a-number-string";
+      }
+    }
+    const rec = new MockRecord();
+    const result = prepareValueForValidation.call(undefined, "initial", rec as any, "score");
+    // Should return the cast value (42), not the raw string
+    expect(result).toBe(42);
+  });
+
+  it("cameFromUser absent → falls back to readAttributeBeforeTypeCast", () => {
+    // Non-AR hosts that don't implement cameFromUser degrade gracefully.
+    class MockRecord {
+      errors = { add: vi.fn() };
+      readAttributeBeforeTypeCast(_name: string) {
+        return "raw-value";
+      }
+    }
+    const rec = new MockRecord();
+    const result = prepareValueForValidation.call(undefined, "fallback", rec as any, "score");
+    expect(result).toBe("raw-value");
+  });
+
+  it("cameFromUser false + no readAttributeBeforeTypeCast → readAttribute fallback", () => {
+    class MockRecord {
+      errors = { add: vi.fn() };
+      cameFromUser(_name: string) {
+        return false;
+      }
+      readAttribute(_name: string) {
+        return 99;
+      }
+    }
+    const rec = new MockRecord();
+    const result = prepareValueForValidation.call(undefined, "initial", rec as any, "score");
+    expect(result).toBe(99);
   });
 });
