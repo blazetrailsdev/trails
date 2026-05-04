@@ -54,15 +54,38 @@ export namespace Tests {
     if (persisted && key === null) {
       throw new Error("toKey must not return null when the model is persisted");
     }
+
+    withPatchedPersistedFalse(m, () => {
+      if (m.toKey() !== null) {
+        throw new Error("toKey should return null when `isPersisted` returns false");
+      }
+    });
   }
 
-  type ToParamHost = { toParam(): string | null; toKey(): unknown[] | null };
+  type ToParamHost = {
+    toParam(): string | null;
+    toKey(): unknown[] | null;
+    isPersisted(): boolean;
+  };
   export function testToParam(input: ToParamHost | { toModel(): ToParamHost }): void {
     const m = model(input);
     const param = m.toParam();
     if (param !== null && typeof param !== "string") {
       throw new Error("toParam must return null or a string");
     }
+
+    withPatched(
+      m,
+      "toKey",
+      () => [1],
+      () => {
+        withPatchedPersistedFalse(m, () => {
+          if (m.toParam() !== null) {
+            throw new Error("toParam should return null when `isPersisted` returns false");
+          }
+        });
+      },
+    );
   }
 
   type ToPartialPathHost = { toPartialPath(): string };
@@ -88,30 +111,74 @@ export namespace Tests {
     }
   }
 
-  export function testModelNaming(model: {
+  type ModelNamingHost = {
+    modelName: { human: string; singular: string; plural: string };
     constructor: { modelName?: { human: string; singular: string; plural: string } };
-  }): void {
-    const modelName = model.constructor.modelName;
-    if (!modelName) {
+  };
+  export function testModelNaming(model: ModelNamingHost): void {
+    const classModelName = model.constructor.modelName;
+    if (!classModelName) {
       throw new Error("model.constructor.modelName must be defined");
     }
-    if (typeof modelName.human !== "string") {
+    if (typeof classModelName.human !== "string") {
       throw new Error("modelName.human must return a string");
     }
-    if (typeof modelName.singular !== "string") {
+    if (typeof classModelName.singular !== "string") {
       throw new Error("modelName.singular must return a string");
     }
-    if (typeof modelName.plural !== "string") {
+    if (typeof classModelName.plural !== "string") {
       throw new Error("modelName.plural must return a string");
+    }
+    if (model.modelName !== classModelName) {
+      throw new Error("model.modelName must equal model.constructor.modelName");
     }
   }
 
+  /**
+   * Trails uses `errors.get(name)` rather than Ruby's `errors[:name]`
+   * array-access syntax. Behavior matches Rails: must return an array
+   * (empty when no errors are present for the attribute).
+   */
   export function testErrorsAref(model: { errors: { get(attribute: string): string[] } }): void {
     const result = model.errors.get("attribute");
     if (!Array.isArray(result)) {
       throw new Error("errors.get(attribute) must return an array");
     }
   }
+}
+
+/**
+ * Temporarily replace a method on `target` with `fn` for the duration of `body`.
+ * Restores the original property descriptor in a `finally`.
+ *
+ * @internal Rails-private helper — mirrors `def model.foo() ... end` patches in lint.rb.
+ */
+function withPatched<T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+  fn: T[K],
+  body: () => void,
+): void {
+  const original = Object.getOwnPropertyDescriptor(target, key);
+  Object.defineProperty(target, key, {
+    value: fn,
+    configurable: true,
+    writable: true,
+  });
+  try {
+    body();
+  } finally {
+    if (original) {
+      Object.defineProperty(target, key, original);
+    } else {
+      delete (target as Record<PropertyKey, unknown>)[key as PropertyKey];
+    }
+  }
+}
+
+/** @internal Rails-private helper. */
+function withPatchedPersistedFalse(target: { isPersisted(): boolean }, body: () => void): void {
+  withPatched(target, "isPersisted", () => false, body);
 }
 
 export const {
