@@ -5,7 +5,7 @@ import { pluralize, underscore } from "@blazetrails/activesupport";
 import {
   Attribute,
   AttributeSetBuilder,
-  YAMLEncoder,
+  AttributeSetCoder,
   typeRegistry,
   type Type,
 } from "@blazetrails/activemodel";
@@ -483,8 +483,8 @@ export function columns(this: SchemaHost): any[] {
   return cacheHost._columns!;
 }
 
-export function yamlEncoder(this: SchemaHost): YAMLEncoder {
-  return new YAMLEncoder();
+export function attributeSetCoder(this: SchemaHost): AttributeSetCoder {
+  return new AttributeSetCoder(typeRegistry);
 }
 
 /**
@@ -1012,7 +1012,7 @@ export const ClassMethods = {
   nextSequenceValue,
   attributesBuilder,
   columns,
-  yamlEncoder,
+  attributeSetCoder,
   columnForAttribute,
   symbolColumnToString,
   resetColumnInformation,

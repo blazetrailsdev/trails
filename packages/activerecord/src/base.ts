@@ -924,7 +924,7 @@ export class Base extends Model {
   declare static nextSequenceValue: typeof ModelSchema.nextSequenceValue;
   declare static attributesBuilder: typeof ModelSchema.attributesBuilder;
   declare static columns: typeof ModelSchema.columns;
-  declare static yamlEncoder: typeof ModelSchema.yamlEncoder;
+  declare static attributeSetCoder: typeof ModelSchema.attributeSetCoder;
   declare static columnForAttribute: typeof ModelSchema.columnForAttribute;
   declare static symbolColumnToString: typeof ModelSchema.symbolColumnToString;
   declare static resetColumnInformation: typeof ModelSchema.resetColumnInformation;
