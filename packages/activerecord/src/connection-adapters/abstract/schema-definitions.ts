@@ -93,11 +93,15 @@ export interface AddForeignKeyOptions {
   column?: string;
   primaryKey?: string;
   name?: string;
-  toTable?: string;
   onDelete?: ReferentialAction;
   onUpdate?: ReferentialAction;
   deferrable?: "immediate" | "deferred" | false;
   validate?: boolean;
+}
+
+/** Options accepted by the `foreignKey` field of `ReferenceDefinition`. */
+export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
+  toTable?: string;
 }
 
 export class ForeignKeyDefinition {
@@ -387,7 +391,7 @@ export class ReferenceDefinition {
   /** @internal */
   readonly polymorphic: boolean | Record<string, unknown>;
   readonly index: boolean | AddIndexOptions;
-  readonly foreignKey: boolean | AddForeignKeyOptions;
+  readonly foreignKey: boolean | ReferenceForeignKeyOptions;
   readonly type: ColumnType;
   readonly options: Omit<ColumnOptions, "index"> & { ifExists?: boolean; ifNotExists?: boolean };
 
@@ -395,7 +399,7 @@ export class ReferenceDefinition {
     name: string,
     options: Omit<ColumnOptions, "index"> & {
       polymorphic?: boolean | Record<string, unknown>;
-      foreignKey?: boolean | AddForeignKeyOptions;
+      foreignKey?: boolean | ReferenceForeignKeyOptions;
       index?: boolean | AddIndexOptions;
       type?: ColumnType;
       ifExists?: boolean;
@@ -468,7 +472,7 @@ export class ReferenceDefinition {
   }
 
   /** @internal */
-  private foreignKeyOptions(): AddForeignKeyOptions & {
+  private foreignKeyOptions(): ReferenceForeignKeyOptions & {
     ifExists?: boolean;
     ifNotExists?: boolean;
   } {
@@ -476,7 +480,7 @@ export class ReferenceDefinition {
       ...this.asOptions(this.foreignKey),
       column: this.columnName(),
       ...this.conditionalOptions(),
-    } as AddForeignKeyOptions & { ifExists?: boolean; ifNotExists?: boolean };
+    } as ReferenceForeignKeyOptions & { ifExists?: boolean; ifNotExists?: boolean };
   }
 
   /** @internal */
@@ -878,7 +882,7 @@ export class TableDefinition {
     name: string,
     options: Omit<ColumnOptions, "index"> & {
       polymorphic?: boolean | Record<string, unknown>;
-      foreignKey?: boolean | AddForeignKeyOptions;
+      foreignKey?: boolean | ReferenceForeignKeyOptions;
       index?: boolean | AddIndexOptions;
       type?: ColumnType;
       ifExists?: boolean;
