@@ -691,44 +691,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return args;
   }
 
-  // Mirrors: AbstractMysqlAdapter::initialize_type_map + extended_type_map
-  static buildTypeMap(options: { emulateBooleans?: boolean } = {}): TypeMap {
+  static buildTypeMap(
+    this: typeof AbstractMysqlAdapter,
+    options: { emulateBooleans?: boolean } = {},
+  ): TypeMap {
     const map = new TypeMap();
-    const intType = (limit: number) => (sql: string) =>
-      /\bunsigned\b/i.test(sql) ? new UnsignedInteger({ limit }) : new IntegerType({ limit });
-
-    map.registerType(/tinytext/i, undefined, () => new TextType());
-    map.registerType(/tinyblob/i, undefined, () => new BinaryType());
-    map.registerType(/mediumtext/i, undefined, () => new TextType());
-    map.registerType(/mediumblob/i, undefined, () => new BinaryType());
-    map.registerType(/longtext/i, undefined, () => new TextType());
-    map.registerType(/longblob/i, undefined, () => new BinaryType());
-    map.registerType(/text/i, undefined, () => new TextType());
-    map.registerType(/blob/i, undefined, () => new BinaryType());
-    map.registerType(/^float/i, undefined, () => new FloatType());
-    map.registerType(/^double/i, undefined, () => new FloatType());
-    map.registerType(/^bigint/i, undefined, intType(8));
-    map.registerType(/^mediumint/i, undefined, intType(3));
-    map.registerType(/^smallint/i, undefined, intType(2));
-    map.registerType(/^tinyint/i, undefined, intType(1));
-    map.registerType(/^int/i, undefined, intType(4));
-    map.registerType(/^year/i, undefined, () => new IntegerType());
-    map.registerType(/^bit/i, undefined, () => new BinaryType());
-    map.registerType(/^binary/i, undefined, () => new BinaryType());
-    map.registerType(/^varbinary/i, undefined, () => new BinaryType());
-    map.registerType(/^enum/i, undefined, () => new StringType());
-    map.registerType(/^set/i, undefined, () => new StringType());
-    map.registerType(/^char/i, undefined, () => new StringType());
-    map.registerType(/^varchar/i, undefined, () => new StringType());
-    map.registerType(/decimal/i, undefined, () => new DecimalType());
-    map.registerType(/numeric/i, undefined, () => new DecimalType());
-    map.registerType("boolean", new BooleanType());
-    map.registerType("date", new DateType());
-    map.registerType(/^datetime/i, undefined, () => new DateTimeType());
-    map.registerType(/^timestamp/i, undefined, () => new DateTimeType());
-    map.registerType(/^time\b/i, undefined, () => new TimeType());
-    map.registerType("json", new JsonType());
-    // emulate_booleans: tinyint(1) → boolean
+    this.initializeTypeMap(map);
     if (options.emulateBooleans) {
       map.registerType(/^tinyint\(1\)/i, undefined, () => new BooleanType());
     }
@@ -997,6 +965,122 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
           : e;
     }
   }
+
+  /** @internal */
+  translateException(exception: unknown, opts: { sql: string; binds: unknown[] }): Error {
+    return this._translateException(exception, opts.sql, opts.binds);
+  }
+
+  /** @internal */
+  protected stripWhitespaceCharacters(expression: string): string {
+    return expression.replace(/\\n/g, "").replace(/x0A/g, "").replace(/\s+/g, " ").trim();
+  }
+
+  /** @internal */
+  protected extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
+    if (this._emulateBooleans) return { emulateBooleans: true };
+    return null;
+  }
+
+  /** @internal */
+  protected async handleWarnings(sql: string): Promise<void> {
+    await this._handleWarnings(sql);
+  }
+
+  /** @internal */
+  protected _handleWarnings(_sql: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /** @internal */
+  protected isWarningIgnored(warning: { level?: string }): boolean {
+    return warning.level === "Note";
+  }
+
+  /** @internal */
+  supportsInsertRawAliasSyntax(): boolean {
+    if (this._mariadb) return false;
+    return this._databaseVersion?.gte("8.0.19") === true;
+  }
+
+  /** @internal */
+  supportsRenameIndex(): boolean {
+    if (this._mariadb) return this._databaseVersion?.gte("10.5.2") === true;
+    return this._databaseVersion?.gte("5.7.6") === true;
+  }
+
+  /** @internal */
+  supportsRenameColumn(): boolean {
+    if (this._mariadb) return this._databaseVersion?.gte("10.5.2") === true;
+    return this._databaseVersion?.gte("8.0.3") === true;
+  }
+
+  /** @internal */
+  protected versionString(fullVersionString: string): string {
+    const matches = fullVersionString.match(/^(?:5\.5\.5-)?(\d+\.\d+\.\d+)/);
+    if (matches) return matches[1];
+    throw new Error(`Unable to parse MySQL version from ${JSON.stringify(fullVersionString)}`);
+  }
+
+  /** @internal */
+  protected static initializeTypeMap(this: typeof AbstractMysqlAdapter, m: TypeMap): void {
+    // Base types (mirrors AbstractAdapter#initialize_type_map via super)
+    m.registerType(/^boolean/i, undefined, () => new BooleanType());
+    m.registerType(/^char/i, undefined, () => new StringType());
+    m.registerType(/^varchar/i, undefined, () => new StringType());
+    m.registerType(/^enum/i, undefined, () => new StringType());
+    m.registerType(/^set/i, undefined, () => new StringType());
+    m.registerType(/^binary/i, undefined, () => new BinaryType());
+    m.registerType(/^varbinary/i, undefined, () => new BinaryType());
+    m.registerType(/^date$/i, new DateType());
+    m.registerType(/^time\b/i, undefined, () => new TimeType());
+    m.registerType(/^datetime/i, undefined, () => new DateTimeType());
+    m.registerType(/decimal/i, undefined, () => new DecimalType());
+    m.registerType(/numeric/i, undefined, () => new DecimalType());
+    m.registerType("json", new JsonType());
+
+    // MySQL-specific overrides (mirrors MySQL's initialize_type_map additions)
+    m.registerType(/tinytext/i, undefined, () => new TextType());
+    m.registerType(/tinyblob/i, undefined, () => new BinaryType());
+    m.registerType(/text/i, undefined, () => new TextType());
+    m.registerType(/blob/i, undefined, () => new BinaryType());
+    m.registerType(/mediumtext/i, undefined, () => new TextType());
+    m.registerType(/mediumblob/i, undefined, () => new BinaryType());
+    m.registerType(/longtext/i, undefined, () => new TextType());
+    m.registerType(/longblob/i, undefined, () => new BinaryType());
+    m.registerType(/^float/i, undefined, () => new FloatType());
+    m.registerType(/^double/i, undefined, () => new FloatType());
+    this.registerIntegerType(m, /^bigint/i, { limit: 8 });
+    this.registerIntegerType(m, /^int/i, { limit: 4 });
+    this.registerIntegerType(m, /^mediumint/i, { limit: 3 });
+    this.registerIntegerType(m, /^smallint/i, { limit: 2 });
+    this.registerIntegerType(m, /^tinyint/i, { limit: 1 });
+    m.registerType(/^year/i, undefined, () => new IntegerType());
+    m.registerType(/^bit/i, undefined, () => new BinaryType());
+    m.registerType(/^timestamp/i, undefined, () => new DateTimeType());
+  }
+
+  /** @internal */
+  protected static registerIntegerType(
+    mapping: TypeMap,
+    key: RegExp | string,
+    options: { limit: number },
+  ): void {
+    mapping.registerType(key, undefined, (sqlType: string) => {
+      if (/\bunsigned\b/i.test(sqlType)) return new UnsignedInteger(options);
+      return new IntegerType(options);
+    });
+  }
+
+  /** @internal */
+  protected extractPrecision(sqlType: string): number | null {
+    const match = /\((\d+)(?:,\d+)?\)/.exec(sqlType);
+    const parsed = match ? parseInt(match[1], 10) : null;
+    if (/^(?:date)?time(?:stamp)?\b/i.test(sqlType)) {
+      return parsed ?? 0;
+    }
+    return parsed;
+  }
 }
 
 /**
@@ -1037,48 +1121,6 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
 }
 
 /** @internal */
-function canPerformCaseInsensitiveComparisonFor(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#can_perform_case_insensitive_comparison_for? is not implemented",
-  );
-}
-
-/** @internal */
-function stripWhitespaceCharacters(expression: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#strip_whitespace_characters is not implemented",
-  );
-}
-
-/** @internal */
-function extendedTypeMapKey(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#extended_type_map_key is not implemented",
-  );
-}
-
-/** @internal */
-function handleWarnings(sql: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#handle_warnings is not implemented",
-  );
-}
-
-/** @internal */
-function isWarningIgnored(warning: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#warning_ignored? is not implemented",
-  );
-}
-
-/** @internal */
-function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#translate_exception is not implemented",
-  );
-}
-
-/** @internal */
 function changeColumnForAlter(tableName: any, columnName: any, type: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#change_column_for_alter is not implemented",
@@ -1107,27 +1149,6 @@ function removeIndexForAlter(tableName: any, columnName?: any, options?: any): n
 }
 
 /** @internal */
-function supportsInsertRawAliasSyntax(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#supports_insert_raw_alias_syntax? is not implemented",
-  );
-}
-
-/** @internal */
-function supportsRenameIndex(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#supports_rename_index? is not implemented",
-  );
-}
-
-/** @internal */
-function supportsRenameColumn(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#supports_rename_column? is not implemented",
-  );
-}
-
-/** @internal */
 function configureConnection(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#configure_connection is not implemented",
@@ -1149,13 +1170,6 @@ function createTableInfo(tableName: any): never {
 }
 
 /** @internal */
-function arelVisitor(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#arel_visitor is not implemented",
-  );
-}
-
-/** @internal */
 function buildStatementPool(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#build_statement_pool is not implemented",
@@ -1173,33 +1187,5 @@ function mismatchedForeignKeyDetails(message?: any, sql?: any): never {
 function mismatchedForeignKey(message: any, sql?: any, binds?: any, connectionPool?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#mismatched_foreign_key is not implemented",
-  );
-}
-
-/** @internal */
-function versionString(fullVersionString: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#version_string is not implemented",
-  );
-}
-
-/** @internal */
-function initializeTypeMap(m: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#initialize_type_map is not implemented",
-  );
-}
-
-/** @internal */
-function registerIntegerType(mapping: any, key: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#register_integer_type is not implemented",
-  );
-}
-
-/** @internal */
-function extractPrecision(sqlType: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#extract_precision is not implemented",
   );
 }
