@@ -123,12 +123,21 @@ export class TableDefinition extends AbstractTableDefinition {
     type: ColumnType,
     options: ColumnOptions = {},
   ): ColumnDefinition {
-    if ((type as string) === "primary_key") {
+    let resolvedType = type as string;
+    if (resolvedType === "primary_key") {
       (options as any).limit = (options as any).limit ?? 8;
       (options as any).primaryKey = true;
       return new ColumnDefinition(name, "integer" as ColumnType, options);
     }
-    return new ColumnDefinition(name, type, options);
+    if (resolvedType === "virtual") {
+      resolvedType = (options as any).type ?? resolvedType;
+    }
+    const unsignedMatch = /^unsigned_(.+)$/.exec(resolvedType);
+    if (unsignedMatch) {
+      resolvedType = unsignedMatch[1];
+      (options as any).unsigned = true;
+    }
+    return new ColumnDefinition(name, resolvedType as ColumnType, options);
   }
 
   /** @internal */

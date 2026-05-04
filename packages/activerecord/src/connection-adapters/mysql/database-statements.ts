@@ -21,7 +21,7 @@ export interface DatabaseStatements {
 
 // MySQL-specific read-query pattern.
 // Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements::READ_QUERY
-const READ_QUERY = /^\s*(SELECT|SHOW|EXPLAIN|DESCRIBE|DESC|SET|USE|KILL|PRAGMA)\b/i;
+const READ_QUERY = /^\s*(SELECT|SHOW|EXPLAIN|DESCRIBE|DESC|SET|USE|KILL)\b/i;
 
 /**
  * Returns true when sql is NOT a read query (i.e., is a write).
@@ -30,11 +30,13 @@ const READ_QUERY = /^\s*(SELECT|SHOW|EXPLAIN|DESCRIBE|DESC|SET|USE|KILL|PRAGMA)\
  * @internal
  */
 export function isWriteQuery(sql: string): boolean {
-  try {
-    return !READ_QUERY.test(sql);
-  } catch {
-    return !READ_QUERY.test(sql);
-  }
+  // Rails rescues ArgumentError from invalid encoding and retries with .b (binary); JS has no equivalent
+  return !READ_QUERY.test(sql);
+}
+
+export interface BuildExplainClauseHost {
+  /** @internal */
+  analyzeWithoutExplain?(): boolean;
 }
 
 /**
@@ -42,16 +44,18 @@ export function isWriteQuery(sql: string): boolean {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#build_explain_clause
  */
-export function buildExplainClause(options: ExplainOption[] = []): string {
-  if (options.length === 0) return "EXPLAIN for:";
-  const parts = options.map((o) => {
-    if (typeof o === "string") return o.toUpperCase();
-    if (o && typeof o === "object" && "format" in o && typeof o.format === "string") {
-      return `FORMAT=${o.format.toUpperCase()}`;
-    }
-    return String(o).toUpperCase();
-  });
-  return `EXPLAIN ${parts.join(" ")} for:`;
+export function buildExplainClause(
+  this: BuildExplainClauseHost | void,
+  options: ExplainOption[] = [],
+): string {
+  if (options.length === 0) return "EXPLAIN";
+  const clause = `EXPLAIN ${options.map((o) => String(o).toUpperCase()).join(" ")}`;
+  // analyzeWithoutExplain? = mariadb? && database_version >= "10.1.0" — not yet wired
+  const analyzeWithoutExplain = (this as BuildExplainClauseHost | null)?.analyzeWithoutExplain?.();
+  if (analyzeWithoutExplain && clause.includes("ANALYZE")) {
+    return clause.replace("EXPLAIN ", "");
+  }
+  return clause;
 }
 
 /** @internal */

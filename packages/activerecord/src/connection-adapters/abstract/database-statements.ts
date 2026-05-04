@@ -665,23 +665,42 @@ export function transactionManager(this: DatabaseStatementsHost): TransactionMan
 
 /**
  * Resets the transaction manager, discarding any open transactions.
- * When called with `{ restore: true }`, attempts to restore restorable
- * transactions first, then replaces the manager.
+ * When called with a callback, saves the current manager (if restorable),
+ * yields to the callback in a fresh transaction context, then restores.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#reset_transaction
  */
 export function resetTransaction(this: DatabaseStatementsHost): void;
 export function resetTransaction(
   this: DatabaseStatementsHost,
-  options: { restore: true },
-): Promise<void>;
+  options: { restore?: boolean },
+  callback: () => Promise<unknown>,
+): Promise<unknown>;
 export function resetTransaction(
   this: DatabaseStatementsHost,
   options?: { restore?: boolean },
-): void | Promise<void> {
+  callback?: () => Promise<unknown>,
+): void | Promise<unknown> {
   const self = this as any;
+  if (callback) {
+    const oldState =
+      options?.restore && self._transactionManager?.isRestorable?.()
+        ? self._transactionManager
+        : null;
+    self._transactionManager = new TransactionManager(self);
+    return (async () => {
+      try {
+        return await callback();
+      } finally {
+        if (oldState) {
+          self._transactionManager = oldState;
+          await self._transactionManager.restoreTransactions();
+        }
+      }
+    })();
+  }
   if (options?.restore) {
-    if (self._transactionManager?.isRestorable()) {
+    if (self._transactionManager?.isRestorable?.()) {
       return self._transactionManager.restoreTransactions().then(() => {});
     }
     self._transactionManager = new TransactionManager(self);
