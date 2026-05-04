@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   # Preflight that sets `docs_only=true` when every changed path is under
-  # top-level `docs/`. Downstream jobs gate on this via `if:` so they're
+  # top-level `docs/` or is the top-level `README.md`. Downstream jobs gate on this via `if:` so they're
   # reported as skipped on docs-only PRs. Skipped required checks in
   # branch protection DO block merges, so point branch protection at the
   # aggregate `CI` job at the bottom of this file instead of individual
@@ -68,10 +68,13 @@ jobs:
           else
             echo "Changed files:"
             echo "$files"
-            # docs_only: any line NOT starting with `docs/` flips the switch.
+            # docs_only: any line NOT under `docs/` and not the top-level
+            # `README.md` flips the switch. README is markdown-only and
+            # only ever runs through prettier, so it doesn't need the
+            # full matrix.
             if [ -z "$files" ]; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            elif echo "$files" | grep -qv '^docs/'; then
+            elif echo "$files" | grep -qvE '^docs/|^README\.md$'; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
             else
               echo "docs_only=true" >> "$GITHUB_OUTPUT"
