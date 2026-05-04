@@ -27,26 +27,24 @@ describe("ValueTest", () => {
 
     it("same class, same precision and scale: equal", () => {
       expect(
-        new DecimalType({ precision: 8, scale: 2 }).equals(new DecimalType({ precision: 8, scale: 2 }))
+        new DecimalType({ precision: 8, scale: 2 }).equals(
+          new DecimalType({ precision: 8, scale: 2 }),
+        ),
       ).toBe(true);
     });
 
     it("same class, different precision: not equal", () => {
-      expect(
-        new DecimalType({ precision: 8 }).equals(new DecimalType({ precision: 4 }))
-      ).toBe(false);
+      expect(new DecimalType({ precision: 8 }).equals(new DecimalType({ precision: 4 }))).toBe(
+        false,
+      );
     });
 
     it("same class, different scale: not equal", () => {
-      expect(
-        new DecimalType({ scale: 2 }).equals(new DecimalType({ scale: 4 }))
-      ).toBe(false);
+      expect(new DecimalType({ scale: 2 }).equals(new DecimalType({ scale: 4 }))).toBe(false);
     });
 
     it("same class, different limit: not equal", () => {
-      expect(
-        new IntegerType({ limit: 8 }).equals(new IntegerType({ limit: 4 }))
-      ).toBe(false);
+      expect(new IntegerType({ limit: 8 }).equals(new IntegerType({ limit: 4 }))).toBe(false);
     });
 
     it("subclass and parent: not equal", () => {
