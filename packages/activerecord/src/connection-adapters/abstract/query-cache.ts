@@ -1,4 +1,3 @@
-import { NotImplementedError } from "../../errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { typeCastedBinds, type DatabaseStatementsHost } from "./database-statements.js";
 
@@ -383,12 +382,14 @@ export function dirtiesQueryCache(
   }
 }
 
-/** @internal */
-function checkVersion(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::QueryCache::Store#check_version is not implemented",
-  );
-}
+/**
+ * No-op base implementation. Each concrete adapter overrides
+ * `AbstractAdapter#checkVersion` directly to raise when incompatible.
+ *
+ * @internal
+ * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#check_version
+ */
+export function checkVersion(this: QueryCacheHost): void {}
 
 /** @internal */
 function unsetQueryCacheBang(this: QueryCacheHost): void {

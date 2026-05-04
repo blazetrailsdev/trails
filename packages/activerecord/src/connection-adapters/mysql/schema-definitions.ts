@@ -118,12 +118,46 @@ export class TableDefinition extends AbstractTableDefinition {
     );
   }
 
-  newColumnDefinition(
+  override newColumnDefinition(
     name: string,
     type: ColumnType,
     options: ColumnOptions = {},
   ): ColumnDefinition {
-    return new ColumnDefinition(name, type, options);
+    let resolvedType = type as string;
+    if (resolvedType === "primary_key") {
+      (options as any).limit = (options as any).limit ?? 8;
+      (options as any).primaryKey = true;
+      return new ColumnDefinition(name, "integer" as ColumnType, options);
+    }
+    if (resolvedType === "virtual") {
+      resolvedType = (options as any).type ?? resolvedType;
+    }
+    const unsignedMatch = /^unsigned_(.+)$/.exec(resolvedType);
+    if (unsignedMatch) {
+      resolvedType = unsignedMatch[1];
+      (options as any).unsigned = true;
+    }
+    return new ColumnDefinition(name, resolvedType as ColumnType, options);
+  }
+
+  /** @internal */
+  override aliasedTypes(_name: string, fallback: string): string {
+    return fallback;
+  }
+
+  /** @internal */
+  static override defineColumnMethods(...columnTypes: string[]): void {
+    for (const type of columnTypes) {
+      if (!(type in this.prototype)) {
+        (this.prototype as any)[type] = function (
+          this: TableDefinition,
+          name: string,
+          options: ColumnOptions = {},
+        ) {
+          return this.column(name, type as ColumnType, options);
+        };
+      }
+    }
   }
 
   private mysqlColumn(
@@ -142,6 +176,15 @@ export class TableDefinition extends AbstractTableDefinition {
 export class Table extends AbstractTable {
   constructor(tableName: string, schema: SchemaStatementsLike) {
     super(tableName, schema);
+  }
+
+  /**
+   * Returns the primary key column name for this table.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Table#primary_key
+   */
+  override async primaryKey(): Promise<string | null> {
+    return super.primaryKey();
   }
 }
 
