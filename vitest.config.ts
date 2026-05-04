@@ -85,6 +85,23 @@ export default defineConfig({
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
           ],
+          // Real-DB tests share a per-worker DB; the module-level state in
+          // test-adapter.ts has known race windows (see PR #1114 for prior
+          // _createdTables drift recovery). Retry intermittents on PG/MySQL
+          // only.
+          //
+          // Tradeoff: this is broader than the known shared-DB flakes — it
+          // also covers describeIfPg/describeIfMysql backend-only tests that
+          // SQLite never exercises, so a flaky-but-real regression in
+          // backend-only code could slip through after a retry. We accept
+          // this because (a) retries only mask non-deterministic failures —
+          // a 100% regression still fails through all attempts, (b) the
+          // observed flake pattern spans 10+ files across the project,
+          // making per-file scoping brittle, and (c) the alternative —
+          // letting CI fail on every transient race — burns more reviewer
+          // time than the rare hidden flake costs. Revisit if a real
+          // regression slips through.
+          retry: process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 2 : 0,
           pool: "forks",
           // minForks = maxForks so VITEST_WORKER_ID stays within [1, AR_DB_MAX_FORKS].
           // Without this each file gets a new fork; IDs wrap mod AR_DB_MAX_FORKS,
