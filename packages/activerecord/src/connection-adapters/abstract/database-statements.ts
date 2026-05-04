@@ -75,6 +75,19 @@ export interface DatabaseStatementsHost {
   preprocessQuery?(sql: string): string;
 }
 
+/**
+ * Base class for connection adapters that include DatabaseStatements.
+ * The constructor resets the transaction state, mirroring Rails'
+ * `DatabaseStatements#initialize` which calls `reset_transaction`.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements (initialize)
+ */
+export class DatabaseStatementsBase {
+  constructor() {
+    (this as any)._transactionManager = new TransactionManager(this as any);
+  }
+}
+
 // --- Query conversion ---
 
 /**
@@ -651,6 +664,56 @@ export function transactionManager(this: DatabaseStatementsHost): TransactionMan
 }
 
 /**
+ * Resets the transaction manager, discarding any open transactions.
+ * When called with a callback, saves the current manager (if restorable),
+ * yields to the callback in a fresh transaction context, then restores.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#reset_transaction
+ */
+export function resetTransaction(this: DatabaseStatementsHost): void;
+export function resetTransaction(
+  this: DatabaseStatementsHost,
+  options: { restore: true },
+): Promise<void>;
+export function resetTransaction(
+  this: DatabaseStatementsHost,
+  options: { restore?: boolean },
+  callback: () => Promise<unknown>,
+): Promise<unknown>;
+export function resetTransaction(
+  this: DatabaseStatementsHost,
+  options?: { restore?: boolean },
+  callback?: () => Promise<unknown>,
+): void | Promise<unknown> {
+  const self = this as any;
+  if (callback) {
+    const oldState =
+      options?.restore && self._transactionManager?.isRestorable?.()
+        ? self._transactionManager
+        : null;
+    self._transactionManager = new TransactionManager(self);
+    return (async () => {
+      try {
+        return await callback();
+      } finally {
+        if (oldState) {
+          self._transactionManager = oldState;
+          await self._transactionManager.restoreTransactions();
+        }
+      }
+    })();
+  }
+  if (options?.restore) {
+    if (self._transactionManager?.isRestorable?.()) {
+      return self._transactionManager.restoreTransactions().then(() => {});
+    }
+    self._transactionManager = new TransactionManager(self);
+    return Promise.resolve();
+  }
+  self._transactionManager = new TransactionManager(self);
+}
+
+/**
  * Marks the current transaction as written if the SQL is a write query.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#mark_transaction_written_if_write
@@ -1221,6 +1284,7 @@ interface DatabaseStatementsDefaultsHost {
 }
 
 export const DatabaseStatements = {
+  resetTransaction,
   async selectAll(
     this: DatabaseStatementsDefaultsHost,
     sql: string,

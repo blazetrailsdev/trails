@@ -5,6 +5,7 @@
  */
 
 import { NotImplementedError } from "../../errors.js";
+import type { ExplainOption } from "../../adapter.js";
 import type { Nodes } from "@blazetrails/arel";
 import type { Result } from "../../result.js";
 
@@ -16,6 +17,45 @@ export interface DatabaseStatements {
   explain(sql: string, binds?: unknown[], options?: { extended?: boolean }): Promise<string>;
   lastInsertedId(result: unknown): number;
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
+}
+
+// MySQL-specific read-query pattern.
+// Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements::READ_QUERY
+const READ_QUERY = /^\s*(SELECT|SHOW|EXPLAIN|DESCRIBE|DESC|SET|USE|KILL)\b/i;
+
+/**
+ * Returns true when sql is NOT a read query (i.e., is a write).
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#write_query?
+ * @internal
+ */
+export function isWriteQuery(sql: string): boolean {
+  // Rails rescues ArgumentError from invalid encoding and retries with .b (binary); JS has no equivalent
+  return !READ_QUERY.test(sql);
+}
+
+export interface BuildExplainClauseHost {
+  /** @internal */
+  analyzeWithoutExplain?(): boolean;
+}
+
+/**
+ * Build the EXPLAIN prefix clause for MySQL.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#build_explain_clause
+ */
+export function buildExplainClause(
+  this: BuildExplainClauseHost | void,
+  options: ExplainOption[] = [],
+): string {
+  if (options.length === 0) return "EXPLAIN";
+  const clause = `EXPLAIN ${options.map((o) => (typeof o === "string" ? o.toUpperCase() : `FORMAT=${(o as { format: string }).format.toUpperCase()}`)).join(" ")}`;
+  // analyzeWithoutExplain? = mariadb? && database_version >= "10.1.0" — not yet wired
+  const analyzeWithoutExplain = (this as BuildExplainClauseHost | null)?.analyzeWithoutExplain?.();
+  if (analyzeWithoutExplain && clause.includes("ANALYZE")) {
+    return clause.replace("EXPLAIN ", "");
+  }
+  return clause;
 }
 
 /** @internal */

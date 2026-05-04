@@ -207,6 +207,44 @@ export class TableDefinition extends AbstractTableDefinition {
     return new UniqueConstraintDefinition(this.tableName, columnName, options);
   }
 
+  /**
+   * Creates a new ColumnDefinition with PostgreSQL-specific type normalization.
+   * Handles the :virtual type alias.
+   *
+   * @internal
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#new_column_definition
+   */
+  override newColumnDefinition(
+    name: string,
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): ColumnDefinition {
+    if ((type as string) === "virtual") {
+      type = (options as any).type ?? type;
+    }
+    return super.newColumnDefinition(name, type, options);
+  }
+
+  /** @internal */
+  override aliasedTypes(_name: string, fallback: string): string {
+    return fallback;
+  }
+
+  /** @internal */
+  static override defineColumnMethods(...columnTypes: string[]): void {
+    for (const type of columnTypes) {
+      if (!(type in this.prototype)) {
+        (this.prototype as any)[type] = function (
+          this: TableDefinition,
+          name: string,
+          options: ColumnOptions = {},
+        ) {
+          return this.column(name, type as ColumnType, options);
+        };
+      }
+    }
+  }
+
   override toSql(): string {
     let sql = super.toSql();
 

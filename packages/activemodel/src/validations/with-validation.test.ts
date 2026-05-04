@@ -325,7 +325,6 @@ describe("WithValidator arity dispatch", () => {
   it("known divergence: default-param method called without args (JS length 0 vs Ruby arity -1)", () => {
     let capturedArg: unknown = "not-called";
     const record = {
-      // eslint-disable-next-line @typescript-eslint/no-inferrable-types
       myCheck(attr: string = "") {
         capturedArg = attr;
       },

@@ -23,6 +23,7 @@ import {
   uncached as uncachedMixin,
   disableQueryCacheBang as disableQueryCacheBangMixin,
   clearQueryCache as clearQueryCacheMixin,
+  checkVersion as checkVersionMixin,
   type QueryCacheHost,
 } from "./abstract/query-cache.js";
 import {
@@ -999,7 +1000,9 @@ export class AbstractAdapter implements Quoting {
     return v;
   }
 
-  checkVersion(): void {}
+  checkVersion(): void {
+    checkVersionMixin.call(this as any);
+  }
 
   async schemaVersion(): Promise<number> {
     return 0;
