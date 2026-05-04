@@ -597,6 +597,18 @@ describe("LengthValidationTest", () => {
     expect(new Person({ title: "a" }).isValid()).toBe(true);
   });
 
+  it("throws at definition time when :in is not a tuple or range object", () => {
+    expect(() => {
+      class Person extends Model {
+        static {
+          this.attribute("title", "string");
+          this.validates("title", { length: { in: "3..10" as unknown as [number, number] } });
+        }
+      }
+      return Person;
+    }).toThrow(/must be a \[min, max\] tuple/);
+  });
+
   it("throws at definition time when constraint is a non-integer", () => {
     expect(() => {
       class Person extends Model {
