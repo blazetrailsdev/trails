@@ -3935,7 +3935,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     );
     if (rows.length === 0) return undefined;
     const row = rows[0] as Record<string, string>;
-    const parts = (row.constraintdef as string).match(/EXCLUDE(?:\s+USING\s+\w+)?\s+\((.+)\)/);
+    const parts = (row.constraintdef as string).match(/EXCLUDE(?:\s+USING\s+\w+)?\s+\((.+)\)/s);
     return new ExclusionConstraintDefinition(tableName, parts?.[1] ?? "", { name });
   }
 
@@ -3971,8 +3971,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     tableName: string,
     options: Record<string, unknown> = {},
   ): Promise<UniqueConstraintDefinition | undefined> {
-    const name = "column" in options ? undefined : this.uniqueConstraintName(tableName, options);
-    if (!name) return undefined;
+    const name = this.uniqueConstraintName(tableName, options);
     const scope = this.quotedScope(tableName);
     const rows = await this.schemaQuery(
       `SELECT c.conname, c.conrelid, c.conkey FROM pg_constraint c
