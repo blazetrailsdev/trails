@@ -7,7 +7,20 @@
 import type { ColumnInfo } from "../../schema-dumper.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 
+/**
+ * Column shape expected by this dumper.
+ *
+ * Mirrors Rails' column contract: `column.type` is the DSL cast type (`:string`,
+ * `:integer`, `:datetime` …) and `column.sqlType` is the raw SQL type from the
+ * adapter (`"varchar(255)"`, `"timestamp"`, `"enum('a','b')"` …).
+ *
+ * Note: `AdapterSchemaSource.columns()` currently maps `col.sqlType` into
+ * `ColumnInfo.type` and does not pass `sqlType` separately; extending that
+ * mapping to also include `sqlType` is a follow-up task required to wire this
+ * dumper to live adapter output.
+ */
 interface MysqlColumn extends ColumnInfo {
+  /** Raw SQL type from the adapter (e.g. `"varchar(255)"`, `"timestamp"`). */
   sqlType?: string | null;
   bigint?: boolean;
   virtual?: boolean;
@@ -43,7 +56,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
     const sizeMatch = /^(?<size>tiny|medium|long)(?:text|blob)/i.exec(column.sqlType ?? "");
     if (sizeMatch?.groups) {
-      const size = sizeMatch.groups["size"] as string;
+      const size = (sizeMatch.groups["size"] as string).toLowerCase();
       const rest = { ...spec };
       Object.keys(spec).forEach((k) => delete spec[k]);
       Object.assign(spec, { size: `:${size}` }, rest);
