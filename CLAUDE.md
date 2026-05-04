@@ -84,9 +84,9 @@ When NOT to use this:
   notifications (Copilot reviews, CI failures) are delivered to this pane.
   Copilot auto-reviews every PR and push; reviews land at
   `~/.btwhooks/data/github/blazetrailsdev/trails/$PR` — no need to request.
-- Do NOT reply to Copilot PR comments with text. Address feedback via code
-  changes or PR description edits, or discuss in session. Text replies are
-  invisible to Copilot and waste a review cycle.
+- Do NOT reply to Copilot PR comments with text — replies are invisible to
+  Copilot. Address feedback via code changes or PR description edits instead,
+  or discuss in session.
 - Do NOT add code comments that just describe what a line does. Only add
   comments for non-obvious context (hidden bug, broader invariant, etc.).
 - Do NOT add empty stubs or placeholder interfaces. If a feature isn't
