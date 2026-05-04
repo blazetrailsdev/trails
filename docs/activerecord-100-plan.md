@@ -243,7 +243,7 @@ _Component C — Deduplicable cluster (5 files)_
 - LOC: ~250 net (each method ~5–15 LOC)
 - Dependencies: PR 6
 
-**PR 8b — `abstract/schema_statements.rb` privates (part B)**
+**PR 8b — `abstract/schema_statements.rb` privates (part B)** ✅ #1175
 
 - Missing B (17): `validateIndexLength!`, `validateTableLength!`, `extractNewDefaultValue`, `canRemoveIndexByName?`, `referenceNameForTable`, `addColumnForAlter`, `changeColumnDefaultForAlter`, `renameColumnSql`, `removeColumnForAlter`, `removeColumnsForAlter`, `addTimestampsForAlter`, `removeTimestampsForAlter`, `insertVersionsSql`, `dataSourceSql`, `quotedScope`, `findJoinTableName`, `joinTableName`
 - LOC: ~250 net
