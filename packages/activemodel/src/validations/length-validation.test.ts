@@ -517,6 +517,19 @@ describe("LengthValidationTest", () => {
     expect(new Person({ title: "abcdefghijk" }).isValid()).toBe(false);
   });
 
+  it("accepts :within as a range object { begin, end }", () => {
+    class Person extends Model {
+      static {
+        this.attribute("title", "string");
+        this.validates("title", { length: { within: { begin: 3, end: 10 } } });
+      }
+    }
+    expect(new Person({ title: "ab" }).isValid()).toBe(false);
+    expect(new Person({ title: "abc" }).isValid()).toBe(true);
+    expect(new Person({ title: "abcdefghij" }).isValid()).toBe(true);
+    expect(new Person({ title: "abcdefghijk" }).isValid()).toBe(false);
+  });
+
   it("accepts :in as a range object with excludeEnd", () => {
     class Person extends Model {
       static {

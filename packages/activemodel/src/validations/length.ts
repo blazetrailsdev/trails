@@ -149,7 +149,7 @@ export class LengthValidator extends EachValidator {
       if (!valueIsNil || this.skipNilCheck("minimum")) {
         const opts = { ...baseOptions, count: min } as Record<string, unknown>;
         const defaultMsg = this.options.tooShort ?? this.options.message;
-        if (defaultMsg && !opts["message"]) opts["message"] = defaultMsg;
+        if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
         record.errors.add(attribute, "too_short", opts);
       }
     }
@@ -157,7 +157,7 @@ export class LengthValidator extends EachValidator {
       if (!valueIsNil || this.skipNilCheck("maximum")) {
         const opts = { ...baseOptions, count: max } as Record<string, unknown>;
         const defaultMsg = this.options.tooLong ?? this.options.message;
-        if (defaultMsg && !opts["message"]) opts["message"] = defaultMsg;
+        if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
         record.errors.add(attribute, "too_long", opts);
       }
     }
@@ -165,7 +165,7 @@ export class LengthValidator extends EachValidator {
       if (!valueIsNil || this.skipNilCheck("is")) {
         const opts = { ...baseOptions, count: is } as Record<string, unknown>;
         const defaultMsg = this.options.wrongLength ?? this.options.message;
-        if (defaultMsg && !opts["message"]) opts["message"] = defaultMsg;
+        if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
         record.errors.add(attribute, "wrong_length", opts);
       }
     }
