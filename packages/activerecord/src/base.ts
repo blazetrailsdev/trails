@@ -1335,11 +1335,6 @@ export class Base extends Model {
 
   // -- Finders (class methods) --
 
-  /**
-   * Find a record by primary key, or an array of records by primary keys.
-   *
-   * Mirrors: ActiveRecord::Base.find
-   */
   /** @internal Cast a value through an attribute's type, with parseInt fallback for the default PK. */
   static _castAttributeValue(key: string, value: unknown): unknown {
     if (typeof value !== "string") return value;
@@ -1361,159 +1356,28 @@ export class Base extends Model {
   //                       `primaryKey` at the type level, the return is a
   //                       union: callers narrow with `Array.isArray` or cast.
   //   find(id, id, ...) → variadic → array of records
-  static find<T extends typeof Base>(
-    this: T,
-    ids: [unknown, ...unknown[]],
-  ): Promise<InstanceType<T> | InstanceType<T>[]>;
-  static find<T extends typeof Base>(this: T, id: unknown): Promise<InstanceType<T>>;
-  static find<T extends typeof Base>(
-    this: T,
-    id: unknown,
-    ...ids: [unknown, ...unknown[]]
-  ): Promise<InstanceType<T>[]>;
-  static async find(...ids: unknown[]): Promise<any> {
-    if (ids.length === 0) {
-      throw new RecordNotFound(
-        `Couldn't find ${this.name} with an empty list of ids`,
-        this.name,
-        String(this.primaryKey),
-        [],
-      );
-    }
-    // Variadic: User.find(1, 2, 3)
-    if (ids.length > 1) {
-      // Composite primary keys are ambiguous in the variadic-scalar form
-      // (`Model.find(1, 42)` could mean "tuple [1,42]" or "two scalar ids",
-      // neither of which matches the CPK tuple contract). Require an
-      // explicit array form so intent is unambiguous.
-      if (this.compositePrimaryKey && ids.some((i) => !Array.isArray(i))) {
-        throw argumentError(
-          `${this.name} has a composite primary key (${String(this.primaryKey)}); ` +
-            `call find([...tuple]) or find([[...], [...]]) rather than variadic scalars.`,
-        );
-      }
-      return this.find(ids);
-    }
-    const id = ids[0];
+  declare static find: {
+    <T extends typeof Base>(
+      this: T,
+      ids: [unknown, ...unknown[]],
+    ): Promise<InstanceType<T> | InstanceType<T>[]>;
+    <T extends typeof Base>(this: T, id: unknown): Promise<InstanceType<T>>;
+    <T extends typeof Base>(
+      this: T,
+      id: unknown,
+      ...ids: [unknown, ...unknown[]]
+    ): Promise<InstanceType<T>[]>;
+  };
 
-    // CPK: find([shop_id, id]) finds a single record by composite tuple
-    if (this.compositePrimaryKey && Array.isArray(id)) {
-      // Check if this is a single tuple or array of tuples
-      if (id.length > 0 && Array.isArray(id[0])) {
-        // Array of tuples: find([[1,2], [3,4]])
-        const tuples = id as unknown[][];
-        if (tuples.length === 0) {
-          throw new RecordNotFound(
-            `${this.name}: couldn't find all with an empty list of ids`,
-            this.name,
-            String(this.primaryKey),
-            [],
-          );
-        }
-        const whereNodes = tuples.map((tuple) => ModelSchema.buildPkWhereNode.call(this, tuple));
-        const orCondition = whereNodes.reduce((left, right) => new Nodes.Or(left, right));
-        const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();
-        if (records.length !== tuples.length) {
-          throw new RecordNotFound(
-            `${this.name}: couldn't find all with composite primary key`,
-            this.name,
-            String(this.primaryKey),
-            id,
-          );
-        }
-        return records;
-      }
-      // Single tuple: find([shop_id, id])
-      const pk = this.primaryKey as string[];
-      const whereConditions: Record<string, unknown> = {};
-      pk.forEach((col, i) => {
-        whereConditions[col] = (id as unknown[])[i];
-      });
-      const record = await this.all().where(whereConditions).first();
-      if (!record) {
-        throw new RecordNotFound(
-          `${this.name} with ${this.primaryKey}=[${id}] not found`,
-          this.name,
-          String(this.primaryKey),
-          id,
-        );
-      }
-      return record;
-    }
-
-    // Multiple IDs — return an array
-    if (Array.isArray(id)) {
-      if (id.length === 0) {
-        throw new RecordNotFound(
-          `${this.name}: couldn't find all with an empty list of ids`,
-          this.name,
-          String(this.primaryKey),
-          [],
-        );
-      }
-      const castIds = id.map((i) => this._castAttributeValue(this.primaryKey as string, i));
-      const records = await this.all()
-        .where({ [this.primaryKey as string]: castIds })
-        .toArray();
-      // Ensure all IDs were found
-      if (records.length !== castIds.length) {
-        const foundIds = new Set<unknown>(records.map((r: Base) => r.id));
-        const missing = castIds.filter((i) => !foundIds.has(i));
-        throw new RecordNotFound(
-          `${this.name} with ${this.primaryKey} in [${missing.join(", ")}] not found`,
-          this.name,
-          String(this.primaryKey),
-          id,
-        );
-      }
-      // Return in input order, matching Rails' in_order_of behavior
-      const idToRecord = new Map<unknown, Base>();
-      for (const r of records) idToRecord.set(r.id, r);
-      return castIds.map((cid) => idToRecord.get(cid)!);
-    }
-    // Single ID — cast through PK type, then use all() so STI type filter is applied
-    const castId = this._castAttributeValue(this.primaryKey as string, id);
-    const record = await this.all()
-      .where({ [this.primaryKey as string]: castId })
-      .first();
-    if (!record) {
-      throw new RecordNotFound(
-        `${this.name} with ${this.primaryKey}=${id} not found`,
-        this.name,
-        String(this.primaryKey),
-        id,
-      );
-    }
-    return record;
-  }
-
-  /**
-   * Find the first record matching conditions.
-   *
-   * Mirrors: ActiveRecord::Base.find_by — `delegate :find_by, to: :all`
-   * (querying.rb QUERYING_METHODS). Routing through `all()` picks up
-   * the default scope, current scope (from `scoping()`), and STI type
-   * filter. `createWith` doesn't affect lookups — it's applied only
-   * on downstream create paths like `findOrCreateBy`.
-   */
-  static findBy<T extends typeof Base>(
+  declare static findBy: <T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
-  ): Promise<InstanceType<T> | null> {
-    return this.all().findBy(conditions);
-  }
+  ) => Promise<InstanceType<T> | null>;
 
-  /**
-   * Find the first record matching conditions, or throw.
-   *
-   * Mirrors: ActiveRecord::Base.find_by! — `delegate :find_by!, to: :all`.
-   */
-  static findByBang<T extends typeof Base>(
+  declare static findByBang: <T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
-  ): Promise<InstanceType<T>> {
-    return this.all().findByBang(conditions);
-  }
+  ) => Promise<InstanceType<T>>;
 
   /**
    * Dynamic finder by a single attribute name.
@@ -2890,6 +2754,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
 
 extend(Base, ConnectionHandling.ClassMethods);
 extend(Base, { collectionCacheKey: _collectionCacheKey });
+extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
 extend(Base, Querying);
 extend(Base, {
   belongsTo: _Associations.belongsTo,

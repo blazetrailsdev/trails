@@ -5,13 +5,15 @@
  */
 
 import { NotImplementedError } from "./errors.js";
+import { RecordNotFound } from "./errors.js";
 import { Notifications, getAsyncContext, ParameterFilter } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
-import { Table } from "@blazetrails/arel";
+import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
+import { buildPkWhereNode } from "./model-schema.js";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -247,6 +249,8 @@ export function fullInspect(this: CoreRecord): string {
 interface CoreHost {
   name: string;
   tableName?: string;
+  primaryKey?: string | string[];
+  compositePrimaryKey?: boolean;
   _filterAttributes?: (string | RegExp | ((key: string, value: unknown) => unknown))[];
   _inspectionFilter?: any;
   _connectionClass?: boolean;
@@ -258,6 +262,8 @@ interface CoreHost {
   _predicateBuilder?: any;
   arelTable?: any;
   prototype: any;
+  all(): any;
+  _castAttributeValue(key: string, value: unknown): unknown;
 }
 
 function parentClass(klass: CoreHost): CoreHost | null {
@@ -600,4 +606,117 @@ function relation(): never {
 /** @internal */
 function cachedFindBy(): never {
   throw new NotImplementedError("ActiveRecord::Core#cached_find_by is not implemented");
+}
+
+export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
+  if (ids.length === 0) {
+    throw new RecordNotFound(
+      `Couldn't find ${this.name} with an empty list of ids`,
+      this.name,
+      String(this.primaryKey),
+      [],
+    );
+  }
+  if (ids.length > 1) {
+    // CPK variadic scalars are ambiguous — require explicit array form
+    if (this.compositePrimaryKey && ids.some((i) => !Array.isArray(i))) {
+      throw argumentError(
+        `${this.name} has a composite primary key (${String(this.primaryKey)}); ` +
+          `call find([...tuple]) or find([[...], [...]]) rather than variadic scalars.`,
+      );
+    }
+    return (this as any).find(ids);
+  }
+  const id = ids[0];
+
+  if (this.compositePrimaryKey && Array.isArray(id)) {
+    if (id.length > 0 && Array.isArray(id[0])) {
+      const tuples = id as unknown[][];
+      if (tuples.length === 0) {
+        throw new RecordNotFound(
+          `${this.name}: couldn't find all with an empty list of ids`,
+          this.name,
+          String(this.primaryKey),
+          [],
+        );
+      }
+      const whereNodes = tuples.map((tuple) => buildPkWhereNode.call(this as any, tuple));
+      const orCondition = whereNodes.reduce((left, right) => new Nodes.Or(left, right));
+      const records = await this.all().where(new Nodes.Grouping(orCondition)).toArray();
+      if (records.length !== tuples.length) {
+        throw new RecordNotFound(
+          `${this.name}: couldn't find all with composite primary key`,
+          this.name,
+          String(this.primaryKey),
+          id,
+        );
+      }
+      return records;
+    }
+    const pk = this.primaryKey as string[];
+    const whereConditions: Record<string, unknown> = {};
+    pk.forEach((col, i) => {
+      whereConditions[col] = (id as unknown[])[i];
+    });
+    const record = await this.all().where(whereConditions).first();
+    if (!record) {
+      throw new RecordNotFound(
+        `${this.name} with ${this.primaryKey}=[${id}] not found`,
+        this.name,
+        String(this.primaryKey),
+        id,
+      );
+    }
+    return record;
+  }
+
+  if (Array.isArray(id)) {
+    if (id.length === 0) {
+      throw new RecordNotFound(
+        `${this.name}: couldn't find all with an empty list of ids`,
+        this.name,
+        String(this.primaryKey),
+        [],
+      );
+    }
+    const castIds = id.map((i) => this._castAttributeValue(this.primaryKey as string, i));
+    const records = await this.all()
+      .where({ [this.primaryKey as string]: castIds })
+      .toArray();
+    if (records.length !== castIds.length) {
+      const foundIds = new Set<unknown>(records.map((r: any) => r.id));
+      const missing = castIds.filter((i) => !foundIds.has(i));
+      throw new RecordNotFound(
+        `${this.name} with ${this.primaryKey} in [${missing.join(", ")}] not found`,
+        this.name,
+        String(this.primaryKey),
+        id,
+      );
+    }
+    // in_order_of: return in input order
+    const idToRecord = new Map<unknown, any>();
+    for (const r of records) idToRecord.set(r.id, r);
+    return castIds.map((cid) => idToRecord.get(cid)!);
+  }
+  const castId = this._castAttributeValue(this.primaryKey as string, id);
+  const record = await this.all()
+    .where({ [this.primaryKey as string]: castId })
+    .first();
+  if (!record) {
+    throw new RecordNotFound(
+      `${this.name} with ${this.primaryKey}=${id} not found`,
+      this.name,
+      String(this.primaryKey),
+      id,
+    );
+  }
+  return record;
+}
+
+export function findBy(this: CoreHost, conditions: Record<string, unknown>): Promise<any> {
+  return this.all().findBy(conditions);
+}
+
+export function findByBang(this: CoreHost, conditions: Record<string, unknown>): Promise<any> {
+  return this.all().findByBang(conditions);
 }
