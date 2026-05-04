@@ -32,7 +32,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const fkAdds: ForeignKeyDefinition[] = Array.isArray(o.foreignKeyAdds)
       ? o.foreignKeyAdds.splice(0)
       : [];
-    let sql = super.visitAlterTable(o);
+    let sql: string;
+    try {
+      sql = super.visitAlterTable(o);
+    } finally {
+      // Restore so the object is left in its original state even if super throws.
+      if (fkAdds.length > 0) o.foreignKeyAdds.push(...fkAdds);
+    }
     if (fkAdds.length > 0) {
       const table = this.adapter.quoteTableName(o.name);
       const fkParts = fkAdds.map((fk) => {
@@ -40,8 +46,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
         if (!fk.validate) part += " NOT VALID";
         return part;
       });
-      // Reinsert so the object is left in its original state.
-      o.foreignKeyAdds.push(...fkAdds);
       // super already emitted "ALTER TABLE <t> " — if there were no other
       // parts, sql ends with a trailing space; otherwise append with ", ".
       const separator = sql.trimEnd() === `ALTER TABLE ${table}` ? " " : ", ";
