@@ -104,4 +104,16 @@ describe("DateTest", () => {
     expect(result).toBeInstanceOf(Temporal.PlainDate);
     expect((result as Temporal.PlainDate).toString()).toBe("2020-07-04");
   });
+
+  it("multiparameter hash missing day returns null (no defaults for DateType — P21 regression guard)", () => {
+    // Date has no defaults; year/month/day are all required.
+    const result = (type as any).valueFromMultiparameterAssignment({ 1: 2025, 2: 7 });
+    expect(result).toBeNull();
+  });
+
+  it("multiparameter hash with all date parts returns PlainDate (P21 regression guard)", () => {
+    const result = (type as any).valueFromMultiparameterAssignment({ 1: 2025, 2: 7, 3: 4 });
+    expect(result).toBeInstanceOf(Temporal.PlainDate);
+    expect((result as Temporal.PlainDate).toString()).toBe("2025-07-04");
+  });
 });

@@ -121,4 +121,31 @@ describe("TimeTest", () => {
     expect(result).toBeInstanceOf(Temporal.PlainTime);
     expect((result as Temporal.PlainTime).hour).toBe(19);
   });
+
+  it("valueFromMultiparameterAssignment: hour-only hash returns Time on 2000-01-01 base (P21)", () => {
+    // Regression: was null before P21 because year defaulted to 0 and hit the short-circuit.
+    const result = (type as any).valueFromMultiparameterAssignment({ "4": 15 });
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect((result as Temporal.PlainTime).hour).toBe(15);
+    expect((result as Temporal.PlainTime).minute).toBe(0);
+  });
+
+  it("valueFromMultiparameterAssignment: hour and minute hash returns Time", () => {
+    const result = (type as any).valueFromMultiparameterAssignment({ "4": 15, "5": 30 });
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect((result as Temporal.PlainTime).hour).toBe(15);
+    expect((result as Temporal.PlainTime).minute).toBe(30);
+  });
+
+  it("valueFromMultiparameterAssignment: full hash with year/month/day/hour still works", () => {
+    const result = (type as any).valueFromMultiparameterAssignment({
+      "1": 2025,
+      "2": 6,
+      "3": 15,
+      "4": 10,
+      "5": 20,
+    });
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect((result as Temporal.PlainTime).hour).toBe(10);
+  });
 });
