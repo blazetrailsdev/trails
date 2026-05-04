@@ -344,3 +344,16 @@ function pkAttribute(this: any, name: string): boolean {
   const pk = (this.constructor as any)?.primaryKey ?? this._primaryKey;
   return Array.isArray(pk) ? pk.includes(name) : name === pk;
 }
+
+interface AttributeNamesHost {
+  _attributeDefinitions: { keys(): Iterable<string> };
+}
+
+/**
+ * Returns the list of attribute names for the model class.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::ClassMethods#attribute_names
+ */
+export function attributeNames(this: AttributeNamesHost): string[] {
+  return [...this._attributeDefinitions.keys()];
+}

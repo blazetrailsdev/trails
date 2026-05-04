@@ -164,6 +164,32 @@ export function isStiSubclass(modelClass: typeof Base): boolean {
 }
 
 /**
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#base_class
+ * @internal
+ */
+export function baseClass(this: typeof Base): typeof Base {
+  return getStiBase(this);
+}
+
+/**
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class
+ * @internal
+ */
+export function getAbstractClass(this: typeof Base): boolean {
+  return Object.prototype.hasOwnProperty.call(this, "_abstractClass")
+    ? (this as any)._abstractClass
+    : false;
+}
+
+/**
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#abstract_class=
+ * @internal
+ */
+export function setAbstractClass(this: typeof Base, value: boolean): void {
+  (this as any)._abstractClass = value;
+}
+
+/**
  * Get the STI base class for a model.
  */
 export function getStiBase(modelClass: typeof Base): typeof Base {
