@@ -4,74 +4,135 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper
  */
 
-import { NotImplementedError } from "../../errors.js";
+import type { ColumnInfo } from "../../schema-dumper.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 
+/**
+ * Column shape expected by this dumper.
+ *
+ * Mirrors Rails' column contract: `column.type` is the DSL cast type (`:string`,
+ * `:integer`, `:datetime` …) and `column.sqlType` is the raw SQL type from the
+ * adapter (`"varchar(255)"`, `"timestamp"`, `"enum('a','b')"` …).
+ *
+ * Note: `AdapterSchemaSource.columns()` currently maps `col.sqlType` into
+ * `ColumnInfo.type` and does not pass `sqlType` separately; extending that
+ * mapping to also include `sqlType` is a follow-up task required to wire this
+ * dumper to live adapter output.
+ */
+interface MysqlColumn extends ColumnInfo {
+  /** Raw SQL type from the adapter (e.g. `"varchar(255)"`, `"timestamp"`). */
+  sqlType?: string | null;
+  bigint?: boolean;
+  virtual?: boolean;
+  hasDefault?: boolean;
+  defaultFunction?: string | null;
+  comment?: string | null;
+  unsigned?: boolean;
+  autoIncrement?: boolean;
+  extra?: string | null;
+}
+
 export class SchemaDumper extends AbstractSchemaDumper {
+  /** Injected adapter; presence signals that caches have been (or will be) populated. */
+  connection?: object;
+  /** table → table-default collation. Populated by adapter before column iteration. */
+  tableCollationCache: Record<string, string | undefined> = Object.create(null);
+  /**
+   * table → column → pre-serialized generation expression (already `.inspect`-equivalent,
+   * i.e. a JSON string literal like `"\"CONCAT(a, b)\""` ready to emit as schema value).
+   * Populated by adapter before column iteration via `information_schema` query.
+   */
+  virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
+
   defaultPrimaryKeyType(): string {
     return "bigint";
   }
-}
 
-/** @internal */
-function prepareColumnOptions(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper#prepare_column_options is not implemented",
-  );
-}
+  /** @internal */
+  protected override prepareColumnOptions(column: MysqlColumn): Record<string, unknown> {
+    const spec = super.prepareColumnOptions(column);
+    if (column.unsigned) spec["unsigned"] = "true";
+    if (column.autoIncrement) spec["autoIncrement"] = "true";
 
-/** @internal */
-function columnSpecForPrimaryKey(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper#column_spec_for_primary_key is not implemented",
-  );
-}
+    const sizeMatch = /^(?<size>tiny|medium|long)(?:text|blob)/i.exec(column.sqlType ?? "");
+    if (sizeMatch?.groups) {
+      const size = (sizeMatch.groups["size"] as string).toLowerCase();
+      const rest = { ...spec };
+      Object.keys(spec).forEach((k) => delete spec[k]);
+      Object.assign(spec, { size: `:${size}` }, rest);
+    }
 
-/** @internal */
-function isDefaultPrimaryKey(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper#default_primary_key? is not implemented",
-  );
-}
+    if (column.virtual) {
+      const as = this.extractExpressionForVirtualColumn(column);
+      if (as !== undefined) spec["as"] = as;
+      if (/\b(?:STORED|PERSISTENT)\b/i.test(column.extra ?? "")) spec["stored"] = "true";
+      const rest = { ...spec };
+      Object.keys(spec).forEach((k) => delete spec[k]);
+      Object.assign(spec, { type: JSON.stringify(this.schemaType(column)) }, rest);
+    }
 
-/** @internal */
-function isExplicitPrimaryKeyDefault(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper#explicit_primary_key_default? is not implemented",
-  );
-}
+    return spec;
+  }
 
-/** @internal */
-function schemaType(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper#schema_type is not implemented",
-  );
-}
+  /** @internal */
+  protected override columnSpecForPrimaryKey(column: MysqlColumn): Record<string, unknown> {
+    const spec = super.columnSpecForPrimaryKey(column);
+    if (column.type === "integer" && column.autoIncrement) delete spec["autoIncrement"];
+    return spec;
+  }
 
-/** @internal */
-function schemaLimit(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper#schema_limit is not implemented",
-  );
-}
+  /** @internal */
+  protected override isDefaultPrimaryKey(column: MysqlColumn): boolean {
+    return super.isDefaultPrimaryKey(column) && !!column.autoIncrement && !column.unsigned;
+  }
 
-/** @internal */
-function schemaPrecision(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper#schema_precision is not implemented",
-  );
-}
+  /** @internal */
+  protected override isExplicitPrimaryKeyDefault(column: MysqlColumn): boolean {
+    return column.type === "integer" && column.autoIncrement === false;
+  }
 
-/** @internal */
-function schemaCollation(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper#schema_collation is not implemented",
-  );
-}
+  /** @internal */
+  protected override schemaType(column: MysqlColumn): string {
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    if (/^timestamp\b/.test(sqlType)) return "timestamp";
+    if (/^(?:enum|set)\b/.test(sqlType)) return column.sqlType ?? sqlType;
+    return super.schemaType(column);
+  }
 
-/** @internal */
-function extractExpressionForVirtualColumn(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaDumper#extract_expression_for_virtual_column is not implemented",
-  );
+  /** @internal */
+  protected override schemaLimit(column: MysqlColumn): string | undefined {
+    if (/^(?:tiny|medium|long)?(?:text|blob)\b/i.test(column.sqlType ?? "")) return undefined;
+    return super.schemaLimit(column);
+  }
+
+  /** @internal */
+  protected override schemaPrecision(column: MysqlColumn): string | undefined {
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    if (/^time(?:stamp)?\b/.test(sqlType) && column.precision === 0) return undefined;
+    if (column.type === "datetime")
+      return column.precision === 0 ? "nil" : super.schemaPrecision(column);
+    return super.schemaPrecision(column);
+  }
+
+  /** @internal */
+  protected override schemaCollation(column: MysqlColumn): string | undefined {
+    if (!column.collation) return undefined;
+    const tableName = this.tableName;
+    if (!tableName) return JSON.stringify(column.collation);
+    if (!Object.hasOwn(this.tableCollationCache, tableName))
+      return JSON.stringify(column.collation);
+    const cached = this.tableCollationCache[tableName];
+    return column.collation !== cached ? JSON.stringify(column.collation) : undefined;
+  }
+
+  /**
+   * Returns the generation expression for a virtual column from `virtualExpressionCache`.
+   * The adapter populates the cache before iterating columns (queries `information_schema`).
+   * @internal
+   */
+  protected extractExpressionForVirtualColumn(column: MysqlColumn): string | undefined {
+    const tableName = this.tableName;
+    if (!tableName) return undefined;
+    return this.virtualExpressionCache[tableName]?.[column.name];
+  }
 }
