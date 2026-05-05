@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -17,8 +18,11 @@ describe("SerializationTest", () => {
   let adapter: DatabaseAdapter;
   let Contact: typeof Base;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      contacts: { name: "string", age: "integer", created_at: "string" },
+    });
     Contact = class extends Base {};
     Contact._tableName = "contacts";
     Contact.attribute("id", "integer");
@@ -169,6 +173,7 @@ describe("toXml() on Base", () => {
 describe("serializableHash with include", () => {
   it("includes nested associations when preloaded", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { authors: { name: "string" } });
     class Author extends Base {
       static {
         this.attribute("id", "integer");

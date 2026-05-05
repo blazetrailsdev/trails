@@ -9,6 +9,7 @@ import { Base, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -18,8 +19,13 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", updated_at: "string", created_at: "string" },
+      simples: { name: "string" },
+      authors: { name: "string", updated_at: "string" },
+    });
   });
 
   function makePost() {
@@ -305,6 +311,7 @@ describe("TimestampTest", () => {
 describe("TimestampsWithoutTransactionTest", () => {
   it("do not write timestamps on save if they are not attributes", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -324,6 +331,9 @@ describe("TimestampsWithoutTransactionTest", () => {
 describe("TimestampTest", () => {
   it("auto-sets created_at and updated_at on insert", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", created_at: "string", updated_at: "string" },
+    });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -352,6 +362,9 @@ describe("TimestampTest", () => {
 
   it("created_at round-trips through the database as Temporal.Instant", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", created_at: "string", updated_at: "string" },
+    });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -370,6 +383,9 @@ describe("TimestampTest", () => {
 
   it("does not overwrite explicitly set timestamps on insert", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", created_at: "string", updated_at: "string" },
+    });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -392,6 +408,9 @@ describe("TimestampTest", () => {
 
   it("saving a changed record updates its timestamp", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", created_at: "string", updated_at: "string" },
+    });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -415,6 +434,7 @@ describe("TimestampTest", () => {
 
   it("does not touch timestamps when model has no timestamp attributes", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { simples: { name: "string" } });
     class Simple extends Base {
       static {
         this.attribute("name", "string");
@@ -430,6 +450,7 @@ describe("TimestampTest", () => {
 describe("TimestampTest", () => {
   it("touching a record updates its timestamp", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string", updated_at: "string" } });
 
     class Post extends Base {
       static {
@@ -453,6 +474,9 @@ describe("TimestampTest", () => {
 
   it("touching an attribute updates it", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", updated_at: "string", published_at: "string" },
+    });
 
     class Post extends Base {
       static {
@@ -472,6 +496,7 @@ describe("TimestampTest", () => {
 
   it("touch returns false on new record", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string", updated_at: "string" } });
 
     class Post extends Base {
       static {
@@ -487,6 +512,7 @@ describe("TimestampTest", () => {
 
   it("touch skips callbacks", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string", updated_at: "string" } });
     const log: string[] = [];
 
     class Post extends Base {
@@ -511,6 +537,7 @@ describe("TimestampTest", () => {
 describe("TimestampTest", () => {
   it("touch persists to database", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string", updated_at: "string" } });
 
     class Post extends Base {
       static {
@@ -529,6 +556,14 @@ describe("TimestampTest", () => {
 
   it("touch with multiple attribute names", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: {
+        title: "string",
+        updated_at: "string",
+        replied_at: "string",
+        viewed_at: "string",
+      },
+    });
 
     class Post extends Base {
       static {
@@ -550,6 +585,7 @@ describe("TimestampTest", () => {
 
   it("touch on model without updated_at returns false", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { simples: { name: "string" } });
 
     class Simple extends Base {
       static {
@@ -565,8 +601,9 @@ describe("TimestampTest", () => {
 
 describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { updated_at: "string" } });
   });
 
   it("updates timestamps on all matching records", async () => {
@@ -626,8 +663,12 @@ describe("TimestampTest", () => {
 
 describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", created_at: "string", updated_at: "string" },
+      simples: { name: "string" },
+    });
   });
 
   it("sets created_at and updated_at on create", async () => {
@@ -770,8 +811,9 @@ describe("TimestampTest", () => {
 
 describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { updated_at: "string" } });
   });
 
   it("touchAll updates timestamps on all records", async () => {
@@ -800,8 +842,11 @@ describe("TimestampTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      articles: { title: "string", body: "string", created_at: "string", updated_at: "string" },
+    });
     Article.adapter = adapter;
   });
 
@@ -851,8 +896,12 @@ describe("TimestampTest", () => {
 describe("TimestampTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", updated_at: "string" },
+      comments: { body: "string", post_id: "integer" },
+    });
   });
 
   // Rails: test "touch parent on save"
