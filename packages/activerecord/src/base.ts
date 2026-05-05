@@ -254,6 +254,22 @@ export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): 
   _onAdapterSet = hook;
 }
 
+/**
+ * @internal
+ *
+ * Manually fire the adapter-set hook for a model that didn't go through the
+ * usual `Base.adapter = …` assignment path. Used by HABTM join-model
+ * creation, where the JoinModel delegates adapter access to the LHS model
+ * via a getter — so its setter is a no-op and the hook never fires
+ * automatically. The test-adapter relies on this hook to learn which
+ * tables/columns to create, so a JoinModel that skips the hook leaves its
+ * join table unregistered and the test-adapter's regex-recovery path has
+ * to fix it on the first INSERT.
+ */
+export function _fireAdapterSetHook(modelClass: any): void {
+  if (_onAdapterSet) _onAdapterSet(modelClass);
+}
+
 // Mirrors Rails' AbstractAdapter#arel_visitor — routes Node#toSql() through the
 // dialect-specific visitor (e.g. SQLite booleans as 1/0, no FOR UPDATE, etc.).
 // This is process-global: the last-assigned adapter's visitor wins, matching
