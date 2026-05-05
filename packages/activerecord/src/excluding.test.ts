@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -19,8 +20,9 @@ function freshAdapter(): DatabaseAdapter {
 describe("ExcludingTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
   });
 
   it("result set does not include single excluded record", async () => {
@@ -50,8 +52,9 @@ describe("ExcludingTest", () => {
 
 describe("ExcludingTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string", score: "integer" } });
   });
 
   function makeModel() {
@@ -145,8 +148,9 @@ describe("ExcludingTest", () => {
 
 describe("excluding() / without()", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { name: "string" } });
   });
 
   it("excludes specific records by PK", async () => {
@@ -184,8 +188,9 @@ describe("excluding() / without()", () => {
 
 describe("Excluding (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { name: "string" } });
   });
 
   it("excluding removes specific records", async () => {

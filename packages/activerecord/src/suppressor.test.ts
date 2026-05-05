@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -16,6 +17,7 @@ function freshAdapter(): DatabaseAdapter {
 describe("SuppressorTest", () => {
   it("suppresses create", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -30,6 +32,7 @@ describe("SuppressorTest", () => {
 
   it("suppresses update", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -47,6 +50,7 @@ describe("SuppressorTest", () => {
 
   it("suppresses create in callback", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" }, comments: { body: "string" } });
     class Comment extends Base {
       static {
         this.attribute("body", "string");
@@ -70,6 +74,7 @@ describe("SuppressorTest", () => {
 
   it("resumes saving after suppression complete", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -85,6 +90,7 @@ describe("SuppressorTest", () => {
 
   it("suppresses validations on create", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -101,6 +107,7 @@ describe("SuppressorTest", () => {
 
   it("suppresses when nested multiple times", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -119,6 +126,7 @@ describe("SuppressorTest", () => {
 describe("suppress()", () => {
   it("prevents records from being persisted to database", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { users: { name: "string" } });
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -148,6 +156,7 @@ describe("Suppressor.registry", () => {
 
   it("registry reflects active suppression by class name", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { widgets: { name: "string" } });
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -171,6 +180,7 @@ describe("Suppressor.registry", () => {
 
   it("a held reference inside the scope observes the active suppression", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { holdables: { name: "string" } });
     class Holdable extends Base {
       static {
         this.attribute("name", "string");
@@ -187,6 +197,10 @@ describe("Suppressor.registry", () => {
 
   it("isolates registry state across concurrent suppress blocks", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, {
+      concurrent_alphas: { name: "string" },
+      concurrent_betas: { name: "string" },
+    });
     class ConcurrentAlpha extends Base {
       static {
         this.attribute("name", "string");
@@ -222,6 +236,7 @@ describe("Suppressor.registry", () => {
 
   it("registry stays truthy across nested suppress blocks", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { gizmos: { name: "string" } });
     class Gizmo extends Base {
       static {
         this.attribute("name", "string");

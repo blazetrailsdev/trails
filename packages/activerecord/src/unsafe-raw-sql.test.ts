@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, UnknownAttributeReference } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 function freshAdapter(): DatabaseAdapter {
@@ -17,6 +18,9 @@ describe("UnsafeRawSqlTest", () => {
 
   beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      urs_posts: { title: "string", author_id: "integer", type: "string", tags_count: "integer" },
+    });
 
     class UrsPost extends Base {
       static {

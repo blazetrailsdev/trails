@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -15,8 +16,9 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("DupTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { topics: { title: "string", body: "string" } });
   });
 
   function makeModel() {
@@ -167,8 +169,9 @@ describe("DupTest", () => {
 
 describe("DupTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { name: "string" } });
   });
 
   it("creates an unsaved copy without primary key", async () => {
@@ -189,8 +192,9 @@ describe("DupTest", () => {
 
 describe("DupTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { animals: { name: "string" }, users: { name: "string" } });
   });
 
   it("transforms a record to another class", async () => {
