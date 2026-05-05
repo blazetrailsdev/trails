@@ -1,70 +1,109 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { SQLCounter, assertQueries, assertNoQueries } from "../testing/query-assertions.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { describe, it, expect } from "vitest";
+import {
+  SQLCounter,
+  assertQueriesCount,
+  assertNoQueries,
+  assertQueriesMatch,
+  assertNoQueriesMatch,
+} from "../testing/query-assertions.js";
+import { Notifications } from "@blazetrails/activesupport";
+
+function publishSql(sql: string, name = "SELECT"): void {
+  Notifications.publish("sql.active_record", { sql, name, cached: false, binds: [] });
+}
 
 describe("QueryAssertionsTest", () => {
-  let adapter: DatabaseAdapter;
-  let counter: SQLCounter;
-  let wrapped: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = createTestAdapter();
-    counter = new SQLCounter();
-    wrapped = counter.wrap(adapter);
-  });
-
   it("assert queries count any", async () => {
-    await assertQueries(counter, 1, async () => {
-      await wrapped.execute("SELECT 1");
+    await assertQueriesCount(1, async () => {
+      publishSql("SELECT 1");
     });
   });
 
   it("assert no queries", async () => {
-    await assertNoQueries(counter, async () => {
+    await assertNoQueries(async () => {
       // no queries
     });
   });
 
   it("assert queries count fails on mismatch", async () => {
     await expect(
-      assertQueries(counter, 2, async () => {
-        await wrapped.execute("SELECT 1");
+      assertQueriesCount(2, async () => {
+        publishSql("SELECT 1");
       }),
-    ).rejects.toThrow("Expected 2 queries, but got 1");
+    ).rejects.toThrow("instead of 2 queries");
   });
 
   it("assert no queries fails when queries are made", async () => {
     await expect(
-      assertNoQueries(counter, async () => {
-        await wrapped.execute("SELECT 1");
+      assertNoQueries(async () => {
+        publishSql("SELECT 1");
       }),
-    ).rejects.toThrow("Expected 0 queries, but got 1");
+    ).rejects.toThrow("instead of 0 queries");
   });
 
   it("counter records multiple queries", async () => {
-    await assertQueries(counter, 3, async () => {
-      await wrapped.execute("SELECT 1");
-      await wrapped.execute("SELECT 2");
-      await wrapped.executeMutation('CREATE TABLE IF NOT EXISTS "t" ("id" INTEGER PRIMARY KEY)');
+    const counter = new SQLCounter();
+    counter.call("", new Date(), new Date(), "", {
+      sql: "SELECT 1",
+      name: "SELECT",
+      cached: false,
+      binds: [],
     });
-    expect(counter.queries).toEqual([
-      "SELECT 1",
-      "SELECT 2",
-      'CREATE TABLE IF NOT EXISTS "t" ("id" INTEGER PRIMARY KEY)',
-    ]);
+    counter.call("", new Date(), new Date(), "", {
+      sql: "SELECT 2",
+      name: "SELECT",
+      cached: false,
+      binds: [],
+    });
+    expect(counter.log).toEqual(["SELECT 1", "SELECT 2"]);
+    expect(counter.logAll).toEqual(["SELECT 1", "SELECT 2"]);
   });
 
-  it("counter does not record when not listening", async () => {
-    await wrapped.execute("SELECT 1");
-    expect(counter.count).toBe(0);
+  it("counter does not record cached queries", async () => {
+    const counter = new SQLCounter();
+    counter.call("", new Date(), new Date(), "", {
+      sql: "SELECT 1",
+      name: "SELECT",
+      cached: true,
+      binds: [],
+    });
+    expect(counter.log).toEqual([]);
   });
 
-  it.skip("assert queries match", () => {});
-  it.skip("assert queries match with matcher", () => {});
-  it.skip("assert queries match when there are no queries", () => {});
-  it.skip("assert no queries match", () => {});
-  it.skip("assert no queries match matcher", () => {});
+  it("assert queries match", async () => {
+    await assertQueriesMatch(/SELECT/, async () => {
+      publishSql("SELECT 1");
+    });
+  });
+
+  it("assert queries match with matcher", async () => {
+    await assertQueriesMatch(/LIMIT/, { count: 1 }, async () => {
+      publishSql("SELECT * FROM t LIMIT 1");
+    });
+  });
+
+  it("assert queries match when there are no queries", async () => {
+    await expect(
+      assertQueriesMatch(/SELECT/, async () => {
+        // no queries
+      }),
+    ).rejects.toThrow("1 or more queries expected");
+  });
+
+  it("assert no queries match", async () => {
+    await assertNoQueriesMatch(/DELETE/, async () => {
+      publishSql("SELECT 1");
+    });
+  });
+
+  it("assert no queries match matcher", async () => {
+    await expect(
+      assertNoQueriesMatch(/SELECT/, async () => {
+        publishSql("SELECT 1");
+      }),
+    ).rejects.toThrow("instead of 0 queries");
+  });
+
   it.skip("assert queries count include schema", () => {});
   it.skip("assert no queries include schema", () => {});
   it.skip("assert queries match include schema", () => {});

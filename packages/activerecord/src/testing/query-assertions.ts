@@ -1,115 +1,136 @@
 /**
  * Query assertions — test helpers for asserting SQL query behavior.
  *
- * Mirrors: ActiveRecord::Assertions::QueryAssertions
+ * Mirrors: ActiveRecord::Assertions::QueryAssertions (testing/query_assertions.rb)
  */
 
-import type { DatabaseAdapter } from "../adapter.js";
+import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 
 /**
  * Mirrors: ActiveRecord::Assertions::QueryAssertions::SQLCounter
- *
- * Counts SQL queries executed during a block. Wraps a DatabaseAdapter
- * to intercept execute/executeMutation calls.
  */
 export class SQLCounter {
-  private _queries: string[] = [];
-  private _listening = false;
+  logFull: Array<[string, unknown[]]> = [];
+  logAll: string[] = [];
 
-  get queries(): readonly string[] {
-    return this._queries;
+  constructor() {
+    this.logFull = [];
+    this.logAll = [];
   }
 
-  get count(): number {
-    return this._queries.length;
+  get log(): string[] {
+    return this.logFull.map(([sql]) => sql);
   }
 
-  record(sql: string): void {
-    if (this._listening) {
-      this._queries.push(sql);
+  call(
+    _name: string,
+    _started: Date | null,
+    _finished: Date | null,
+    _id: string,
+    payload: Record<string, unknown>,
+  ): void {
+    if (payload["cached"]) return;
+    const sql = payload["sql"] as string;
+    this.logAll.push(sql);
+    if (payload["name"] !== "SCHEMA") {
+      this.logFull.push([sql, (payload["binds"] as unknown[] | undefined) ?? []]);
     }
   }
-
-  start(): void {
-    this._queries = [];
-    this._listening = true;
-  }
-
-  stop(): void {
-    this._listening = false;
-  }
-
-  reset(): void {
-    this._queries = [];
-  }
-
-  /**
-   * Wrap a DatabaseAdapter so all queries are recorded by this counter.
-   */
-  wrap(adapter: DatabaseAdapter): DatabaseAdapter {
-    const counter = this;
-    return new Proxy(adapter as object, {
-      get(target, prop, receiver) {
-        if (prop === "execute") {
-          return async (sql: string, binds?: unknown[]) => {
-            counter.record(sql);
-            return (target as DatabaseAdapter).execute(sql, binds);
-          };
-        }
-        if (prop === "executeMutation") {
-          return async (sql: string, binds?: unknown[]) => {
-            counter.record(sql);
-            return (target as DatabaseAdapter).executeMutation(sql, binds);
-          };
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-    }) as DatabaseAdapter;
-  }
 }
 
-/**
- * Mirrors: ActiveRecord::Assertions::QueryAssertions
- */
-export interface QueryAssertions {
-  assertQueries(expected: number, fn: () => void | Promise<void>): Promise<void>;
-  assertNoQueries(fn: () => void | Promise<void>): Promise<void>;
-}
-
-/**
- * Mirrors: ActiveRecord::Assertions
- */
-export interface Assertions {
-  queryAssertions: QueryAssertions;
-}
-
-/**
- * Assert that exactly `expected` queries are executed during `fn`.
- */
-export async function assertQueries(
-  counter: SQLCounter,
-  expected: number,
-  fn: () => void | Promise<void>,
-): Promise<void> {
-  counter.start();
+function withSubscribed<T>(counter: SQLCounter, fn: () => T): T {
+  const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
+    counter.call(event.name, null!, null!, "", event.payload as Record<string, unknown>);
+  });
   try {
-    await fn();
+    return fn();
   } finally {
-    counter.stop();
+    Notifications.unsubscribe(sub);
   }
-  if (counter.count !== expected) {
+}
+
+/**
+ * Asserts that `count` SQL queries (or ≥1 if count is null) are executed.
+ *
+ * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_queries_count
+ */
+export async function assertQueriesCount(
+  count: number | null,
+  optsOrFn: { includeSchema?: boolean } | (() => void | Promise<void>),
+  fn?: () => void | Promise<void>,
+): Promise<void> {
+  const includeSchema = typeof optsOrFn !== "function" ? (optsOrFn.includeSchema ?? false) : false;
+  const block = typeof optsOrFn === "function" ? optsOrFn : fn!;
+  const counter = new SQLCounter();
+  const result = withSubscribed(counter, block);
+  if (result instanceof Promise) await result;
+  const queries = includeSchema ? counter.logAll : counter.log;
+  if (count !== null && count !== undefined) {
+    if (queries.length !== count)
+      throw new Error(
+        `${queries.length} instead of ${count} queries were executed. Queries:\n${queries.join("\n\n")}`,
+      );
+  } else if (queries.length < 1) {
+    throw new Error("1 or more queries expected, but none were executed.");
+  }
+}
+
+/**
+ * Asserts that no SQL queries are executed.
+ *
+ * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_no_queries
+ */
+export async function assertNoQueries(
+  optsOrFn: { includeSchema?: boolean } | (() => void | Promise<void>),
+  fn?: () => void | Promise<void>,
+): Promise<void> {
+  return typeof optsOrFn === "function"
+    ? assertQueriesCount(0, optsOrFn)
+    : assertQueriesCount(0, optsOrFn, fn!);
+}
+
+/**
+ * Asserts that SQL queries matching `match` are executed (or ≥1 if count is null).
+ *
+ * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_queries_match
+ */
+export async function assertQueriesMatch(
+  match: RegExp | string,
+  optsOrFn: { count?: number | null; includeSchema?: boolean } | (() => void | Promise<void>),
+  fn?: () => void | Promise<void>,
+): Promise<void> {
+  const opts = typeof optsOrFn !== "function" ? optsOrFn : {};
+  const block = typeof optsOrFn === "function" ? optsOrFn : fn!;
+  const counter = new SQLCounter();
+  const result = withSubscribed(counter, block);
+  if (result instanceof Promise) await result;
+  const queries = opts.includeSchema ? counter.logAll : counter.log;
+  const re = match instanceof RegExp ? match : new RegExp(match);
+  const matched = queries.filter((q) => re.test(q));
+  const count = opts.count;
+  if (count !== null && count !== undefined) {
+    if (matched.length !== count)
+      throw new Error(
+        `${matched.length} instead of ${count} queries were executed.\nQueries:\n${queries.join("\n")}`,
+      );
+  } else if (matched.length < 1) {
     throw new Error(
-      `Expected ${expected} queries, but got ${counter.count}:\n${counter.queries.join("\n")}`,
+      `1 or more queries expected, but none were executed.\nQueries:\n${queries.join("\n")}`,
     );
   }
 }
 
 /**
- * Assert that no queries are executed during `fn`.
+ * Asserts that no SQL queries matching `match` are executed.
+ *
+ * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_no_queries_match
  */
-export async function assertNoQueries(
-  counter: SQLCounter,
-  fn: () => void | Promise<void>,
+export async function assertNoQueriesMatch(
+  match: RegExp | string,
+  optsOrFn: { includeSchema?: boolean } | (() => void | Promise<void>),
+  fn?: () => void | Promise<void>,
 ): Promise<void> {
-  await assertQueries(counter, 0, fn);
+  return typeof optsOrFn === "function"
+    ? assertQueriesMatch(match, { count: 0 }, optsOrFn)
+    : assertQueriesMatch(match, { count: 0, includeSchema: optsOrFn.includeSchema }, fn!);
 }
