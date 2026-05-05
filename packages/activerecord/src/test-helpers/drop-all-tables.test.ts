@@ -29,7 +29,9 @@ async function tableCount(a: DatabaseAdapter): Promise<number> {
 }
 
 beforeAll(() => {
-  adapter = (createTestAdapter() as any).inner ?? createTestAdapter();
+  const sa = createTestAdapter();
+
+  adapter = (sa as any).inner ?? sa;
 });
 
 describe("dropAllTables", () => {
