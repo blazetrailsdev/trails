@@ -20,7 +20,7 @@ beforeAll(() => {
   adapter = createTestAdapter();
 });
 beforeEach(async () => {
-  await defineSchema(adapter, { metrics: { score: "string", label: "string" } });
+  await defineSchema(adapter, { metrics: { score: "big_integer", label: "string" } });
 });
 afterAll(async () => {
   await dropAllTables(adapter);
