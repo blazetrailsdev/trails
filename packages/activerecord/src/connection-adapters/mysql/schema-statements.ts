@@ -4,7 +4,14 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (module)
  */
 
-import { NotImplementedError } from "../../errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { Version } from "../abstract-adapter.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
+import { TypeMetadata } from "./type-metadata.js";
+import { TableDefinition } from "./schema-definitions.js";
+import { Column } from "./column.js";
+import { quoteString } from "./quoting.js";
+
 export interface SchemaStatements {
   createDatabase(name: string, options?: Record<string, unknown>): Promise<void>;
   dropDatabase(name: string): Promise<void>;
@@ -79,113 +86,262 @@ export interface SchemaStatements {
 }
 
 /** @internal */
-function isRowFormatDynamicByDefault(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#row_format_dynamic_by_default? is not implemented",
+export function isRowFormatDynamicByDefault(isMariaDb: boolean, databaseVersion: string): boolean {
+  const v = new Version(databaseVersion.replace(/-.*$/, ""));
+  return isMariaDb ? v.gte("10.2.2") : v.gte("5.7.9");
+}
+
+/** @internal */
+export function defaultRowFormat(
+  isMariaDb: boolean,
+  databaseVersion: string,
+  innodbFilePerTable: boolean,
+  innodbFileFormatBarracuda: boolean,
+): string | null {
+  if (isRowFormatDynamicByDefault(isMariaDb, databaseVersion)) return null;
+  if (innodbFilePerTable && innodbFileFormatBarracuda) return "ROW_FORMAT=DYNAMIC";
+  return null;
+}
+
+/** @internal */
+export function validPrimaryKeyOptions(): string[] {
+  return ["limit", "default", "precision", "unsigned", "autoIncrement"];
+}
+
+/** @internal */
+export function createTableDefinition(
+  name: string,
+  options: { id?: boolean | "uuid"; charset?: string | null; collation?: string | null } = {},
+): TableDefinition {
+  return new TableDefinition(name, options);
+}
+
+/** @internal */
+export function defaultType(
+  createTableInfo: string | null,
+  fieldName: string,
+): "string" | "integer" | "function" | undefined {
+  if (!createTableInfo) return undefined;
+  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = createTableInfo.match(new RegExp("`" + escaped + "` (.+) DEFAULT ('|\\d+|[A-z]+)"));
+  const defaultPre = match?.[2];
+  if (defaultPre === "'") return "string";
+  if (defaultPre?.match(/^\d+$/)) return "integer";
+  if (defaultPre?.match(/^[A-z]+$/)) return "function";
+  return undefined;
+}
+
+/** @internal */
+export function newColumnFromField(
+  tableName: string,
+  field: Record<string, string | null>,
+  createTableInfoFn: (tableName: string) => string | null,
+  lookupCastType?: (sqlType: string) => {
+    name: string;
+    limit?: number | null;
+    precision?: number | null;
+    scale?: number | null;
+  },
+): Column {
+  const fieldName = field["Field"] ?? "";
+  const meta = fetchTypeMetadata(field["Type"] ?? "", field["Extra"] ?? "", lookupCastType);
+  let def: string | null = field["Default"] ?? null;
+  let defFn: string | null = null;
+
+  if (meta.type === "datetime" && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def ?? "")) {
+    if (/on update CURRENT_TIMESTAMP/i.test(field["Extra"] ?? "")) def = `${def} ON UPDATE ${def}`;
+    [def, defFn] = [null, def];
+  } else if (meta.extra === "DEFAULT_GENERATED") {
+    if (def != null && !def.startsWith("(")) def = `(${def})`;
+    [def, defFn] = [null, def?.replace(/\\'/g, "'") ?? null];
+  } else if (meta.type === "text" && def?.startsWith("'")) {
+    def = def.slice(1, -1).replace(/\\'/g, "'");
+  } else if (def != null && !/^\d/.test(def)) {
+    if (defaultType(createTableInfoFn(tableName), fieldName) === "function")
+      [def, defFn] = [null, def];
+  }
+
+  return new Column(fieldName, def, meta, field["Null"] === "YES", {
+    defaultFunction: defFn ?? undefined,
+    collation: field["Collation"] ?? null,
+    unsigned: /unsigned/i.test(field["Type"] ?? ""),
+    autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
+    virtual: /VIRTUAL GENERATED|STORED GENERATED/i.test(field["Extra"] ?? ""),
+  });
+}
+
+/** @internal */
+export function fetchTypeMetadata(
+  sqlType: string,
+  extra: string = "",
+  lookupCastType?: (sqlType: string) => {
+    name: string;
+    limit?: number | null;
+    precision?: number | null;
+    scale?: number | null;
+  },
+): TypeMetadata {
+  let baseType: string;
+  let limit: number | null = null;
+  let precision: number | null = null;
+  let scale: number | null = null;
+
+  if (lookupCastType) {
+    const castType = lookupCastType(sqlType);
+    // Use .name (plain string property on ActiveModel Type).
+    const raw = castType.name.toLowerCase();
+    baseType = /^timestamp/.test(raw) ? "datetime" : raw;
+    limit = castType.limit ?? null;
+    precision = castType.precision ?? null;
+    scale = castType.scale ?? null;
+  } else {
+    // Fallback: strip (N) modifiers, then take first whitespace token to drop
+    // trailing modifiers like "unsigned" or "zerofill".
+    baseType = sqlType
+      .replace(/\(.*\).*$/, "")
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)[0]!;
+    if (/^timestamp/.test(baseType)) baseType = "datetime";
+  }
+
+  const meta = new SqlTypeMetadata({ sqlType, type: baseType, limit, precision, scale });
+  return new TypeMetadata(meta, { extra });
+}
+
+/** @internal */
+export function extractForeignKeyAction(specifier: string): "cascade" | "nullify" | undefined {
+  // RESTRICT is MySQL's default; omit it so FK definitions stay clean.
+  if (specifier === "RESTRICT") return undefined;
+  switch (specifier) {
+    case "CASCADE":
+      return "cascade";
+    case "SET NULL":
+      return "nullify";
+    default:
+      return undefined;
+  }
+}
+
+/** @internal */
+export function addIndexLength(
+  quotedColumns: Map<string, string>,
+  options: { length?: Record<string, number> | number } = {},
+): Map<string, string> {
+  if (options.length == null) return quotedColumns;
+  const lengthMap = typeof options.length === "object" ? options.length : null;
+  const scalar = typeof options.length === "number" ? options.length : null;
+  for (const [name, col] of quotedColumns) {
+    const len = lengthMap ? lengthMap[name] : scalar;
+    if (len != null) quotedColumns.set(name, `${col}(${len})`);
+  }
+  return quotedColumns;
+}
+
+/** @internal */
+export function addOptionsForIndexColumns(
+  quotedColumns: Map<string, string>,
+  options: {
+    length?: Record<string, number> | number;
+    order?: Record<string, string> | string;
+  } = {},
+): Map<string, string> {
+  quotedColumns = addIndexLength(quotedColumns, options);
+  if (options.order) {
+    const orders = typeof options.order === "object" ? options.order : {};
+    for (const [name, col] of quotedColumns) {
+      const dir = typeof options.order === "string" ? options.order : orders[name];
+      if (dir) quotedColumns.set(name, `${col} ${dir.toUpperCase()}`);
+    }
+  }
+  return quotedColumns;
+}
+
+/** @internal */
+export function dataSourceSql(name?: string | null, options: { type?: string } = {}): string {
+  const scope = quotedScope(name, options);
+  let sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = ${scope.schema}`;
+  if (scope.name) {
+    sql += ` AND table_name = ${scope.name}`;
+    sql += ` AND table_name IN (SELECT table_name FROM information_schema.tables WHERE table_schema = ${scope.schema})`;
+  }
+  if (scope.type) sql += ` AND table_type = ${scope.type}`;
+  return sql;
+}
+
+/** @internal */
+export function quotedScope(
+  name?: string | null,
+  options: { type?: string } = {},
+): { schema: string; name?: string; type?: string } {
+  const [schema, tableName] = extractSchemaQualifiedName(name);
+  const scope: { schema: string; name?: string; type?: string } = {
+    schema: schema ? quoteString(schema) : "database()",
+  };
+  if (tableName) scope.name = quoteString(tableName);
+  if (options.type) scope.type = quoteString(options.type);
+  return scope;
+}
+
+/** @internal */
+export function extractSchemaQualifiedName(
+  str: string | null | undefined,
+): [string | null, string | null] {
+  const parts = (str ?? "").match(/[^`.\s]+|`[^`]*`/g) ?? [];
+  if (parts.length >= 2) {
+    return [parts[0]!.replace(/^`|`$/g, ""), parts[1]!.replace(/^`|`$/g, "")];
+  }
+  if (parts.length === 1) {
+    return [null, parts[0].replace(/^`|`$/g, "")];
+  }
+  return [null, null];
+}
+
+/** @internal */
+export function typeWithSizeToSql(type: string, size: string | null | undefined): string {
+  const s = size?.toString();
+  if (s === undefined || s === "tiny" || s === "medium" || s === "long") {
+    return `${s ?? ""}${type}`;
+  }
+  throw new ArgumentError(
+    `${JSON.stringify(size)} is invalid :size value. Only :tiny, :medium, and :long are allowed.`,
   );
 }
 
 /** @internal */
-function defaultRowFormat(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#default_row_format is not implemented",
-  );
+export function limitToSize(limit: number | null | undefined, type: string): string | undefined {
+  switch (type) {
+    case "text":
+    case "blob":
+    case "binary": {
+      if (limit == null || (limit >= 0x100 && limit <= 0xffff)) return undefined;
+      if (limit >= 0 && limit <= 0xff) return "tiny";
+      if (limit >= 0x10000 && limit <= 0xffffff) return "medium";
+      if (limit >= 0x1000000 && limit <= 0xffffffff) return "long";
+      throw new ArgumentError(`No ${type} type has byte size ${limit}`);
+    }
+    default:
+      return undefined;
+  }
 }
 
 /** @internal */
-function validPrimaryKeyOptions(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#valid_primary_key_options is not implemented",
-  );
-}
-
-/** @internal */
-function createTableDefinition(name: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#create_table_definition is not implemented",
-  );
-}
-
-/** @internal */
-function defaultType(tableName: any, fieldName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#default_type is not implemented",
-  );
-}
-
-/** @internal */
-function newColumnFromField(tableName: any, field: any, Definitions: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#new_column_from_field is not implemented",
-  );
-}
-
-/** @internal */
-function fetchTypeMetadata(sqlType: any, extra?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#fetch_type_metadata is not implemented",
-  );
-}
-
-/** @internal */
-function extractForeignKeyAction(specifier: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#extract_foreign_key_action is not implemented",
-  );
-}
-
-/** @internal */
-function addIndexLength(quotedColumns: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#add_index_length is not implemented",
-  );
-}
-
-/** @internal */
-function addOptionsForIndexColumns(quotedColumns: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#add_options_for_index_columns is not implemented",
-  );
-}
-
-/** @internal */
-function dataSourceSql(name?: any, type?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#data_source_sql is not implemented",
-  );
-}
-
-/** @internal */
-function quotedScope(name?: any, type?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#quoted_scope is not implemented",
-  );
-}
-
-/** @internal */
-function extractSchemaQualifiedName(string: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#extract_schema_qualified_name is not implemented",
-  );
-}
-
-/** @internal */
-function typeWithSizeToSql(type: any, size: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#type_with_size_to_sql is not implemented",
-  );
-}
-
-/** @internal */
-function limitToSize(limit: any, type: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#limit_to_size is not implemented",
-  );
-}
-
-/** @internal */
-function integerToSql(limit: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#integer_to_sql is not implemented",
-  );
+export function integerToSql(limit: number | null | undefined): string {
+  switch (limit) {
+    case 1:
+      return "tinyint";
+    case 2:
+      return "smallint";
+    case 3:
+      return "mediumint";
+    case null:
+    case undefined:
+    case 4:
+      return "int";
+    default:
+      if (limit >= 5 && limit <= 8) return "bigint";
+      throw new ArgumentError(
+        `No integer type has byte size ${limit}. Use a decimal with scale 0 instead.`,
+      );
+  }
 }

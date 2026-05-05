@@ -15,7 +15,13 @@ export class Column extends BaseColumn {
   constructor(
     name: string,
     defaultValue: unknown,
-    sqlTypeMetadata: { sqlType?: string | null; type?: string } = {},
+    sqlTypeMetadata: {
+      sqlType?: string | null;
+      type?: string;
+      limit?: number | null;
+      precision?: number | null;
+      scale?: number | null;
+    } = {},
     null_: boolean = true,
     options: {
       collation?: string | null;
@@ -29,6 +35,9 @@ export class Column extends BaseColumn {
     const meta = new SqlTypeMetadata({
       sqlType: sqlTypeMetadata.sqlType ?? undefined,
       type: sqlTypeMetadata.type,
+      limit: sqlTypeMetadata.limit ?? null,
+      precision: sqlTypeMetadata.precision ?? null,
+      scale: sqlTypeMetadata.scale ?? null,
     });
     super(name, defaultValue, meta, null_, {
       collation: options.collation,
