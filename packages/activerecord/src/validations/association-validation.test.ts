@@ -2,22 +2,38 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { dropAllTables } from "../test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "../adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
 
 describe("AssociationValidationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeAll(() => {
+    adapter = createTestAdapter();
+  });
+  beforeEach(async () => {
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+      comments: { body: "string", post_id: "integer" },
+      widgets: { name: "string" },
+      missing_children: { name: "string", parent_id: "integer" },
+      val_bt_parents: { name: "string" },
+      val_bt_children: { title: "string", val_bt_parent_id: "integer" },
+      val_bt_parent2s: { name: "string" },
+      val_bt_child2s: { title: "string", val_bt_parent2_id: "integer" },
+      topic_m_ds: { title: "string" },
+      topic_w_a_ds: { title: "string" },
+      reply_msgs: { title: "string" },
+      reply_ctxs: { title: "string" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("validates associated many", async () => {
