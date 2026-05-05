@@ -33,7 +33,7 @@ describe("TokenForTest", () => {
       parents: { name: "string", digest: "string" },
       children: { name: "string", digest: "string" },
       custom_pk_items: { uuid: "string", name: "string" },
-      cpk_items: { shop_id: "integer", id: "integer", name: "string" },
+      cpk_items: { shop_id: "integer", name: "string" },
       no_pk_items: { name: "string" },
     });
     setSignedIdVerifierSecret("blazetrails-test-secret");
