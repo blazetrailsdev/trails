@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/join_model_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { Base, registerModel, association, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
@@ -44,16 +44,17 @@ async function registerSchemaFor(adapter: DatabaseAdapter, ...models: any[]): Pr
   for (const M of models) registerModel(M);
 }
 
+// Disable the dynamic-adapter auto-schema path for this entire file.
+// Must be set before any describe/beforeEach runs so that createTestAdapter()
+// and all SchemaAdapter.setup() calls see the flag immediately.
+vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+
 // ==========================================================================
 // AssociationsJoinModelTest — mirrors join_model_test.rb
 // ==========================================================================
 
 describe("AssociationsJoinModelTest", () => {
   let adapter: DatabaseAdapter;
-
-  beforeAll(() => {
-    vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-  });
 
   afterAll(async () => {
     try {
