@@ -71,7 +71,7 @@ function resolveReferences(schema: Schema): string[] {
 }
 
 /** @internal */
-const COLUMN_TYPE_MAP: Record<PrimitiveColumnSpec, string> = {
+const COLUMN_TYPE_MAP_PG: Record<PrimitiveColumnSpec, string> = {
   string: "string",
   text: "text",
   integer: "integer",
@@ -85,6 +85,18 @@ const COLUMN_TYPE_MAP: Record<PrimitiveColumnSpec, string> = {
   json: "json",
 };
 
+// Non-PG adapters (SQLite, MySQL/MariaDB) store temporal and binary types as
+// TEXT, matching test-adapter.ts's sqlType() mapping. Using the typed column
+// names causes MariaDB to reject ISO 8601 Z-suffix strings.
+/** @internal */
+const COLUMN_TYPE_MAP_OTHER: Record<PrimitiveColumnSpec, string> = {
+  ...COLUMN_TYPE_MAP_PG,
+  datetime: "string",
+  date: "string",
+  binary: "string",
+  json: "string",
+};
+
 export async function defineSchema(
   adapter: DatabaseAdapter,
   schema: Schema,
@@ -92,6 +104,7 @@ export async function defineSchema(
 ): Promise<void> {
   const ss = new SchemaStatements(adapter);
   const order = resolveReferences(schema);
+  const typeMap = adapter.adapterName === "postgres" ? COLUMN_TYPE_MAP_PG : COLUMN_TYPE_MAP_OTHER;
 
   if (opts?.dropExisting) {
     for (const table of [...order].reverse()) {
@@ -104,7 +117,7 @@ export async function defineSchema(
     await ss.createTable(table, (t) => {
       for (const [colName, spec] of Object.entries(columns)) {
         const primitive: PrimitiveColumnSpec = typeof spec === "string" ? spec : spec.type;
-        const arType = COLUMN_TYPE_MAP[primitive];
+        const arType = typeMap[primitive];
         const options: Record<string, unknown> = {};
         if (typeof spec === "object") {
           if (spec.limit !== undefined) options["limit"] = spec.limit;

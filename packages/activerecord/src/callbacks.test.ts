@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import {
   Base,
   transaction,
@@ -14,6 +14,8 @@ import {
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -26,8 +28,16 @@ function freshAdapter(): DatabaseAdapter {
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      topics: { title: "string" },
+      animals: { name: "string", type: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("create", async () => {
@@ -89,8 +99,18 @@ describe("CallbacksTest", () => {
 
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      people: { name: "string" },
+      animals: { name: "string", type: "string" },
+      topics: { title: "string" },
+      cb_posts: { title: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("save person", async () => {
@@ -422,8 +442,19 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { topics: { title: "string" } });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("trigger once on multiple deletion within transaction 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
@@ -442,7 +473,7 @@ describe("CallbacksTest", () => {
   });
 
   it("trigger once on multiple deletions 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
@@ -461,7 +492,7 @@ describe("CallbacksTest", () => {
   });
 
   it("trigger once on multiple deletions in a transaction 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
@@ -482,7 +513,7 @@ describe("CallbacksTest", () => {
   });
 
   it("rollback on multiple deletions 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -504,7 +535,7 @@ describe("CallbacksTest", () => {
   });
 
   it("trigger on update where row was deleted 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
@@ -522,8 +553,19 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { topics: { title: "string" } });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("created callback called on last to save of separate instances in a transaction 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
@@ -542,7 +584,7 @@ describe("CallbacksTest", () => {
   });
 
   it("created callback called on first to save in transaction with old configuration 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     const log: string[] = [];
     class Topic extends Base {
       static {
@@ -561,7 +603,7 @@ describe("CallbacksTest", () => {
   });
 
   it("updated callback called on last to save of separate instances in a transaction 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -582,7 +624,7 @@ describe("CallbacksTest", () => {
   });
 
   it("updated callback called on first to save in transaction with old configuration 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -603,7 +645,7 @@ describe("CallbacksTest", () => {
   });
 
   it("destroyed callback called on destroyed instance when preceded in transaction by save from separate instance 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -628,7 +670,7 @@ describe("CallbacksTest", () => {
   });
 
   it("destroyed callbacks called on destroyed instance even when followed by update from separate instances in a transaction 2", async () => {
-    const adp = freshAdapter();
+    const adp = adapter;
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -654,8 +696,18 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { trackeds: { name: "string" } });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("runs after_create and after_update at correct times", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
 
     class Tracked extends Base {
@@ -683,7 +735,6 @@ describe("CallbacksTest", () => {
   });
 
   it("destroy", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
 
     class Tracked extends Base {
@@ -726,8 +777,16 @@ describe("CallbacksTest", () => {
 
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      things: { name: "string", status: "string" },
+      records: { name: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("fires after_initialize on new records", () => {
@@ -769,8 +828,15 @@ describe("CallbacksTest", () => {
 
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      tasks: { name: "string", important: "boolean", skip: "boolean" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("supports if: condition on callbacks", async () => {
@@ -822,8 +888,13 @@ describe("CallbacksTest", () => {
 
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { blocked: { name: "string" } });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("halts save when before_save returns false", async () => {
@@ -843,8 +914,18 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { users: { name: "string", updated_at: "datetime" } });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("fires after touch() is called", async () => {
-    const adapter = freshAdapter();
     const touched: string[] = [];
     class User extends Base {
       static _tableName = "users";
@@ -865,8 +946,19 @@ describe("CallbacksTest", () => {
 
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      trackeds: { name: "string" },
+      guardeds: { name: "string" },
+      auto_slugs: { title: "string", slug: "string" },
+      counteds: { name: "string" },
+      multis: { name: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("create callback order", async () => {
@@ -1071,8 +1163,19 @@ describe("CallbacksTest", () => {
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      trackeds: { name: "string" },
+      guardeds: { name: "string" },
+      auto_slugs: { title: "string", slug: "string" },
+      counteds: { name: "string" },
+      multis: { name: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("create lifecycle: before_validation → after_validation → before_save → before_create → after_create → after_save", async () => {
@@ -1408,8 +1511,16 @@ describe("CallbacksTest", () => {
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      developers: { name: "string", salary: "integer" },
+      animals: { name: "string", type: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   // Rails: test "after_initialize is called on new"
@@ -1561,8 +1672,24 @@ describe("CallbacksTest", () => {
 describe("CallbacksTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      orders: { total: "integer", discount_code: "string", silent: "boolean" },
+      widgets: { name: "string" },
+      gadgets: { value: "integer" },
+      lockeds: { allowed: "boolean" },
+      envelopes: { label: "string" },
+      protecteds: { sealed: "boolean" },
+      items: { name: "string", updated_at: "datetime", updated_on: "datetime" },
+      no_ts_items: { name: "string", updated_at: "datetime" },
+      no_change_items: { name: "string", updated_at: "datetime" },
+      immutables: { locked: "boolean" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   // Rails: test "before_save callback with if condition"
