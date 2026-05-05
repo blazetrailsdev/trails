@@ -18,6 +18,7 @@
 
 import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { Visitors } from "@blazetrails/arel";
 import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
 import { include } from "@blazetrails/activesupport";
@@ -349,9 +350,9 @@ async function execDdlWithSavepoint(inner: any, sql: string): Promise<void> {
 }
 
 /**
- * Drop all known tables and reset tracking state.
+ * Drop tables that were created via the SchemaAdapter and reset tracking state.
  */
-async function dropAllTables(inner: any): Promise<void> {
+async function dropTrackedTables(inner: any): Promise<void> {
   // Wait for any in-flight cleanup to finish, then run our own. The previous
   // early-return-after-await pattern was unsound: if another setup() had
   // already re-populated _createdTables between the moment we started waiting
@@ -378,63 +379,6 @@ async function dropAllTables(inner: any): Promise<void> {
   } finally {
     _cleanupPromise = null;
     resolve();
-  }
-}
-
-/**
- * MySQL drop-all using a single pinned pool connection so
- * FOREIGN_KEY_CHECKS=0 covers the whole drop sequence. The flag is
- * restored in `finally`; if anything between the SET and the restore
- * throws, we destroy the connection rather than releasing it back to
- * the pool — releasing a connection that still has FOREIGN_KEY_CHECKS=0
- * would silently disable FK enforcement for the next borrower.
- *
- * @internal
- */
-async function dropAllMysqlTables(adapter: any): Promise<void> {
-  const driverPool = adapter._driverPool;
-  if (!driverPool) return;
-  const conn = await driverPool.getConnection();
-  let restored = false;
-  try {
-    await conn.query(`SET FOREIGN_KEY_CHECKS=0`);
-    const [tableRows] = (await conn.query(
-      `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
-    )) as [Array<{ table_name?: string; TABLE_NAME?: string }>, unknown];
-    const [viewRows] = (await conn.query(
-      `SELECT table_name FROM information_schema.views WHERE table_schema = DATABASE()`,
-    )) as [Array<{ table_name?: string; TABLE_NAME?: string }>, unknown];
-    for (const r of viewRows) {
-      const name = r.table_name ?? r.TABLE_NAME;
-      if (!name) continue;
-      try {
-        await conn.query(`DROP VIEW IF EXISTS \`${name}\``);
-      } catch {}
-    }
-    for (const r of tableRows) {
-      const name = r.table_name ?? r.TABLE_NAME;
-      if (!name) continue;
-      try {
-        await conn.query(`DROP TABLE IF EXISTS \`${name}\``);
-      } catch {}
-    }
-    await conn.query(`SET FOREIGN_KEY_CHECKS=1`);
-    restored = true;
-  } finally {
-    if (restored) {
-      conn.release();
-    } else {
-      // Connection state may be stale (FK_CHECKS=0, half-finished txn).
-      // Destroy instead of release so the pool opens a fresh session.
-      try {
-        await conn.query(`SET FOREIGN_KEY_CHECKS=1`);
-        conn.release();
-      } catch {
-        try {
-          conn.destroy();
-        } catch {}
-      }
-    }
   }
 }
 
@@ -533,65 +477,8 @@ export async function resetTestAdapterState(): Promise<void> {
     resolveLock = r;
   });
   try {
-    if (!_sharedAdapter) {
-      // No DB to clean — only clear in-memory state below.
-    } else if (isPg()) {
-      // current_schemas(false) returns the search path with system schemas
-      // (pg_catalog, information_schema) excluded — the same scope the
-      // adapter's tables() method uses. Drop materialized views and views
-      // before tables; standalone views that don't depend on a dropped
-      // table wouldn't be reached by CASCADE.
-      const matviews = (await _sharedAdapter.execute(
-        `SELECT schemaname, matviewname AS name FROM pg_matviews
-         WHERE schemaname = ANY(current_schemas(false))`,
-      )) as { schemaname: string; name: string }[];
-      for (const { schemaname, name } of matviews) {
-        try {
-          await _sharedAdapter.exec(
-            `DROP MATERIALIZED VIEW IF EXISTS "${schemaname}"."${name}" CASCADE`,
-          );
-        } catch {}
-      }
-      const views = (await _sharedAdapter.execute(
-        `SELECT schemaname, viewname AS name FROM pg_views
-         WHERE schemaname = ANY(current_schemas(false))`,
-      )) as { schemaname: string; name: string }[];
-      for (const { schemaname, name } of views) {
-        try {
-          await _sharedAdapter.exec(`DROP VIEW IF EXISTS "${schemaname}"."${name}" CASCADE`);
-        } catch {}
-      }
-      const rows = (await _sharedAdapter.execute(
-        `SELECT schemaname, tablename FROM pg_tables
-         WHERE schemaname = ANY(current_schemas(false))`,
-      )) as { schemaname: string; tablename: string }[];
-      for (const { schemaname, tablename } of rows) {
-        try {
-          await _sharedAdapter.exec(`DROP TABLE IF EXISTS "${schemaname}"."${tablename}" CASCADE`);
-        } catch {}
-      }
-    } else if (isMysql()) {
-      await dropAllMysqlTables(_sharedAdapter);
-    } else {
-      // SQLite :memory: — query sqlite_master so objects created via raw
-      // adapter.exec() (which bypass _createdTables) also get dropped.
-      // Drop views first since SQLite has no CASCADE.
-      const views = (await _sharedAdapter.execute(
-        `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
-      )) as { name: string }[];
-      for (const { name } of views) {
-        try {
-          await _sharedAdapter.exec(`DROP VIEW IF EXISTS "${name}"`);
-        } catch {}
-      }
-      const rows = (await _sharedAdapter.execute(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
-      )) as { name: string }[];
-      for (const { name } of rows) {
-        try {
-          await _sharedAdapter.exec(`DROP TABLE IF EXISTS "${name}"`);
-        } catch {}
-      }
+    if (_sharedAdapter) {
+      await dropAllTables(_sharedAdapter);
     }
     _createdTables.clear();
     _createdColumns.clear();
@@ -672,7 +559,7 @@ class SchemaAdapter implements DatabaseAdapter {
         if (_needsCleanup) {
           if (_cleanupPromise) await _cleanupPromise;
           _needsCleanup = false;
-          await dropAllTables(this.inner);
+          await dropTrackedTables(this.inner);
         }
         if (_registeredModelClasses.size > 0) {
           extractColumnsFromModels();
@@ -1099,7 +986,7 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   async cleanup(): Promise<void> {
-    await dropAllTables(this.inner);
+    await dropTrackedTables(this.inner);
   }
 }
 include(SchemaAdapter, DatabaseStatements);
