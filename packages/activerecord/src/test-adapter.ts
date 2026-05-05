@@ -31,6 +31,11 @@ import { _setOnAdapterSetHook } from "./base.js";
 const PG_TEST_URL = process.env.PG_TEST_URL;
 const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
 
+// When set, the dynamic schema management (setter hook, auto-table creation,
+// error recovery) is disabled. Tests opt in via vi.stubEnv or vitest.config.ts.
+// Read once at module load so per-call overhead is zero.
+const NO_AUTO_SCHEMA = process.env.AR_NO_AUTO_SCHEMA === "1";
+
 /** Which adapter backend is active. */
 export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
   ? "postgres"
@@ -144,6 +149,7 @@ function registerModel(modelClass: any): void {
  * columns and applies CPK only when no non-CPK claimant exists.
  */
 function extractColumnsFromModels(): void {
+  if (NO_AUTO_SCHEMA) return;
   const tablesWithNonCpk = new Set<string>();
   for (const modelClass of _registeredModelClasses) {
     if (modelClass.abstractClass) continue;
@@ -235,6 +241,7 @@ function lookupDeclaredColumnType(tableName: string, colName: string): string | 
  * Create tables and add columns for all pending model registrations.
  */
 async function processPendingModels(inner: any): Promise<void> {
+  if (NO_AUTO_SCHEMA) return;
   for (const [tableName, columns] of _pendingModels) {
     if (!_createdTables.has(tableName)) {
       const cpkCols = _pendingCpk.get(tableName);
@@ -413,8 +420,11 @@ if (PG_TEST_URL) {
   _factory = () => new SchemaAdapter(_sharedAdapter);
 }
 
-// Register hook so Base.adapter = x triggers model registration
-_setOnAdapterSetHook(registerModel);
+// Register hook so Base.adapter = x triggers model registration.
+// Skip when AR_NO_AUTO_SCHEMA=1 — tests manage their own schema explicitly.
+if (!NO_AUTO_SCHEMA) {
+  _setOnAdapterSetHook(registerModel);
+}
 
 /**
  * Create a fresh adapter for testing.
@@ -428,6 +438,10 @@ export function createTestAdapter(): DatabaseAdapter {
  * Clean up test data.
  */
 export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void> {
+  if (NO_AUTO_SCHEMA && _sharedAdapter) {
+    await dropAllTables(_sharedAdapter);
+    return;
+  }
   if (adapter instanceof SchemaAdapter) {
     await adapter.cleanup();
   }
@@ -714,6 +728,7 @@ class SchemaAdapter implements DatabaseAdapter {
    * the table or adding the column. Returns true if recovery succeeded.
    */
   private async handleMissingSchemaError(e: any, sql: string): Promise<boolean> {
+    if (NO_AUTO_SCHEMA) return false;
     const msg = e?.message || e?.sqlMessage || "";
 
     // Handle missing column: add the column and retry
