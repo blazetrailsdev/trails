@@ -2,11 +2,15 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+
+vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -19,8 +23,16 @@ function freshAdapter(): DatabaseAdapter {
 describe("DirtyTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      topics: { title: "string" },
+      people: { first_name: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("attribute changes", () => {
@@ -182,13 +194,32 @@ describe("DirtyTest", () => {
 // DirtyTest2 — more targets for dirty_test.rb
 // ==========================================================================
 describe("DirtyTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: {
+        title: "string",
+        views: "integer",
+        count: "integer",
+        meta: "string",
+        author_id: "integer",
+      },
+      authors: { name: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("attribute changes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("views", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "hello", views: 0 })) as any;
@@ -200,11 +231,10 @@ describe("DirtyTest", () => {
   });
 
   it("attribute will change!", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "hello" })) as any;
@@ -213,11 +243,10 @@ describe("DirtyTest", () => {
   });
 
   it("restore attribute!", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -229,11 +258,10 @@ describe("DirtyTest", () => {
   });
 
   it("clear attribute change", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "hello" })) as any;
@@ -245,12 +273,11 @@ describe("DirtyTest", () => {
   });
 
   it("partial update", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("views", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original", views: 0 })) as any;
@@ -261,11 +288,10 @@ describe("DirtyTest", () => {
   });
 
   it("dup objects should not copy dirty flag from creator", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -276,11 +302,10 @@ describe("DirtyTest", () => {
   });
 
   it("previous changes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -290,11 +315,10 @@ describe("DirtyTest", () => {
   });
 
   it("changed attributes should be preserved if save failure", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     Post.validates("title", { presence: true });
@@ -307,11 +331,10 @@ describe("DirtyTest", () => {
   });
 
   it("nullable number not marked as changed if new value is blank", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("views", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ views: null })) as any;
@@ -320,11 +343,10 @@ describe("DirtyTest", () => {
   });
 
   it("integer zero to string zero not marked as changed", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("count", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ count: 0 })) as any;
@@ -333,11 +355,10 @@ describe("DirtyTest", () => {
   });
 
   it("string attribute should compare with typecast symbol after update", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "hello" })) as any;
@@ -346,12 +367,11 @@ describe("DirtyTest", () => {
   });
 
   it("save should store serialized attributes even with partial writes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("meta", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "test", meta: "data" })) as any;
@@ -362,11 +382,10 @@ describe("DirtyTest", () => {
   });
 
   it("saved changes returns a hash of all the changes that occurred", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -378,18 +397,17 @@ describe("DirtyTest", () => {
   });
 
   it("association assignment changes foreign key", async () => {
-    const adp = freshAdapter();
     class Author extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const author = (await Author.create({ name: "Alice" })) as any;
@@ -399,11 +417,10 @@ describe("DirtyTest", () => {
   });
 
   it("reverted changes are not dirty after multiple changes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -414,11 +431,10 @@ describe("DirtyTest", () => {
   });
 
   it("reload should clear changed attributes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -434,8 +450,15 @@ describe("DirtyTest", () => {
 // ==========================================================================
 describe("DirtyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("time attributes changes with time zone", () => {
@@ -577,8 +600,15 @@ describe("DirtyTest", () => {
 
 describe("DirtyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      items: { name: "string", age: "integer" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("tracks changes from the last save", async () => {
@@ -613,8 +643,19 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", age: "integer" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("attributeInDatabase returns the pre-change value", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -628,7 +669,6 @@ describe("DirtyTest", () => {
   });
 
   it("attributeBeforeLastSave returns value from before last save", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -642,7 +682,6 @@ describe("DirtyTest", () => {
   });
 
   it("changedAttributeNamesToSave returns pending changes", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -659,8 +698,19 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("returns true for new records", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -673,7 +723,6 @@ describe("DirtyTest", () => {
   });
 
   it("returns false for persisted unchanged records", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -686,7 +735,6 @@ describe("DirtyTest", () => {
   });
 
   it("returns true for changed records", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -701,9 +749,19 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  it("attributeChanged with from and to after save", async () => {
-    const adapter = freshAdapter();
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string" },
+    });
+  });
 
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
+  it("attributeChanged with from and to after save", async () => {
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -720,8 +778,6 @@ describe("DirtyTest", () => {
   });
 
   it("savedChangeToAttribute with from/to after save", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -741,8 +797,16 @@ describe("DirtyTest", () => {
 
 describe("DirtyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", email: "string", age: "integer" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+    vi.unstubAllEnvs();
   });
 
   it("attribute changes", async () => {

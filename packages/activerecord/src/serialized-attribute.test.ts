@@ -2,11 +2,15 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { Base, serialize, SerializationTypeMismatch } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+
+vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -14,8 +18,29 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("SerializedAttributeTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", preferences: "string" },
+      parents: { name: "string", data: "string" },
+      topics: { title: "string", content: "string" },
+      posts: {
+        title: "string",
+        settings: "string",
+        tags: "string",
+        meta: "string",
+        data: "string",
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   function makeModel() {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -24,12 +49,11 @@ describe("SerializedAttributeTest", () => {
       }
     }
     serialize(User, "preferences");
-    return { User, adapter };
+    return { User };
   }
 
   it("serialize does not eagerly load columns", () => {
     // Calling serialize should not force column loading; it just registers the serialization
-    const adapter = freshAdapter();
     class LazyUser extends Base {
       static {
         this.attribute("name", "string");
@@ -52,7 +76,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attribute on alias attribute", () => {
-    const adapter = freshAdapter();
     class AliasUser extends Base {
       static {
         this.attribute("name", "string");
@@ -74,7 +97,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attribute with default", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -89,7 +111,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attribute on custom attribute with default", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -104,7 +125,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attribute in base class", () => {
-    const adapter = freshAdapter();
     class Parent extends Base {
       static {
         this.attribute("name", "string");
@@ -120,7 +140,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attributes from database on subclass", async () => {
-    const adapter = freshAdapter();
     class Parent extends Base {
       static {
         this.attribute("name", "string");
@@ -167,7 +186,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attribute declared in subclass", () => {
-    const adapter = freshAdapter();
     class Parent extends Base {
       static {
         this.attribute("name", "string");
@@ -228,7 +246,6 @@ describe("SerializedAttributeTest", () => {
     /* needs write-time type validation in serialize (assert_valid_value on dump) */
   });
   it("should raise exception on serialized attribute with type mismatch", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -261,7 +278,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized default class", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -295,7 +311,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialize with coder", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -317,7 +332,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("regression serialized default on text column with null false", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -331,7 +345,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("unexpected serialized type", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -402,7 +415,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attribute can be defined in abstract classes", () => {
-    const adapter = freshAdapter();
     class AbstractBase extends Base {
       static {
         this.attribute("name", "string");
@@ -425,7 +437,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("hash coder returns empty hash for null", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -440,7 +451,6 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("array coder returns empty array for null", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -492,9 +502,22 @@ describe("SerializedAttributeTest", () => {
 // and re-runs the same tests with use_yaml_unsafe_load=false. In trails we use
 // JSON serialization regardless, so the same assertions apply.
 describe("SerializedAttributeTestWithYamlSafeLoad", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      topics: { title: "string", content: "string" },
+      very_important_topics: { title: "string", content: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   // Rails test_serialized_attribute: create, assert content, reload, assert again
   it("serialized attribute", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -512,7 +535,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   // Rails test_serialized_attribute_on_alias_attribute: create, reload via alias reads deserialized
   it("serialized attribute on alias attribute", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -531,7 +553,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   // Rails test_serialized_attribute_with_default
   it("serialized attribute with default", () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -546,7 +567,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   // Rails test_serialized_attribute_on_custom_attribute_with_default
   it("serialized attribute on custom attribute with default", () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -561,7 +581,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   // Rails test_serialized_attributes_from_database_on_subclass: save + reload via subclass
   it("serialized attributes from database on subclass", async () => {
-    const adapter = freshAdapter();
     class ImportantTopic extends Base {
       static {
         this.attribute("title", "string");
@@ -588,7 +607,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   // Rails test_should_raise_exception_on_serialized_attribute_with_type_mismatch
   it("should raise exception on serialized attribute with type mismatch", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -608,7 +626,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   // Rails test_serialize_attribute_via_select_method_when_time_zone_available
   it("serialize attribute via select method when time zone available", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -625,7 +642,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   // Rails test_unexpected_serialized_type: create Hash, switch to Array, reload → mismatch
   it("unexpected serialized type", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -645,7 +661,6 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   // Rails test_nil_is_always_persisted_as_null: create with data, update to nil, where(content: nil)
   it("nil is always persisted as null", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -670,8 +685,16 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
 describe("serialize", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      settings: { data: "string" },
+      prefs: { tags: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("serializes and deserializes JSON data", async () => {
@@ -708,8 +731,15 @@ describe("serialize", () => {
 describe("serialize (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { preferences: "string", roles: "string", settings: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   // Rails: test "serialized attribute"
@@ -775,6 +805,10 @@ describe("SerializedAttributeTest", () => {
 
   beforeEach(() => {
     adapter = freshAdapter();
+  });
+
+  afterAll(() => {
+    vi.unstubAllEnvs();
   });
 
   it("serialized attribute — stores and retrieves JSON", async () => {

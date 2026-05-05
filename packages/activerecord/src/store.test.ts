@@ -2,11 +2,15 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { Base, registerModel, store, storedAttributes } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+
+vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -15,8 +19,15 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("StoreTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", settings: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   function makeModel() {
@@ -599,8 +610,15 @@ describe("StoreTest", () => {
 describe("StoreTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { settings: "json" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("reading store attributes through accessors", () => {
@@ -713,8 +731,16 @@ describe("StoreTest", () => {
 describe("StoreTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { settings: "json" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+    vi.unstubAllEnvs();
   });
 
   // Rails: test "reading store attributes through accessors"
