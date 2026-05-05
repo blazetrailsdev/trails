@@ -3,23 +3,17 @@
  * database suffix to PG_TEST_URL and MYSQL_TEST_URL before any test code
  * or import runs.
  *
- * Two modes (selected by AR_DB_LOCK_MODE):
- *
- * "advisory" (PG + MariaDB): open a bootstrap connection to the base DB and
- *   try an advisory lock for slot N=1..AR_DB_FORKS. Claim the first free slot,
- *   rewrite the URL to that slot's DB, and hold the bootstrap connection for
- *   the life of the process (lock released automatically on disconnect).
- *   Removes the VITEST_WORKER_ID dependency.
+ * Opens a bootstrap connection to the base DB and tries an advisory lock for
+ * slot N=1..AR_DB_FORKS. Claims the first free slot, rewrites the URL to that
+ * slot's DB, and holds the bootstrap connection for the life of the process
+ * (lock released automatically on disconnect).
  *
  *   PG:      pg_try_advisory_lock(N)
  *   MariaDB: GET_LOCK('ar_test_slot_N', 0)  — 0-second timeout = non-blocking
  *
- *   Idempotent: the claimed slot is cached on globalThis so re-evaluation
- *   (e.g. hot-module reloading in vitest watch mode) returns the same slot
- *   without opening a second connection or consuming an additional lock.
- *
- * default: legacy modulo formula — (VITEST_WORKER_ID-1) % AR_DB_FORKS + 1.
- *   Used as the fallback when AR_DB_LOCK_MODE is unset.
+ * Idempotent: the claimed slot is cached on globalThis so re-evaluation
+ * (e.g. hot-module reloading in vitest watch mode) returns the same slot
+ * without opening a second connection or consuming an additional lock.
  *
  * AR_DB_FORKS: number of parallel DB slots provisioned in CI (default: 1).
  */
@@ -115,29 +109,9 @@ async function acquireAdvisorySlotMysql(baseUrl: string): Promise<string> {
   );
 }
 
-function legacyWorkerDbUrl(baseUrl: string): string {
-  const forks = parseInt(process.env.AR_DB_FORKS ?? "1", 10);
-  if (!Number.isFinite(forks) || forks <= 1) return baseUrl;
-
-  const raw = parseInt(process.env.VITEST_WORKER_ID ?? "1", 10);
-  const slot = ((raw - 1) % forks) + 1;
-  return slotDbUrl(baseUrl, slot);
+if (process.env.PG_TEST_URL) {
+  process.env.PG_TEST_URL = await acquireAdvisorySlotPg(process.env.PG_TEST_URL);
 }
-
-const lockMode = process.env.AR_DB_LOCK_MODE;
-
-if (lockMode === "advisory") {
-  if (process.env.PG_TEST_URL) {
-    process.env.PG_TEST_URL = await acquireAdvisorySlotPg(process.env.PG_TEST_URL);
-  }
-  if (process.env.MYSQL_TEST_URL) {
-    process.env.MYSQL_TEST_URL = await acquireAdvisorySlotMysql(process.env.MYSQL_TEST_URL);
-  }
-} else {
-  if (process.env.PG_TEST_URL) {
-    process.env.PG_TEST_URL = legacyWorkerDbUrl(process.env.PG_TEST_URL);
-  }
-  if (process.env.MYSQL_TEST_URL) {
-    process.env.MYSQL_TEST_URL = legacyWorkerDbUrl(process.env.MYSQL_TEST_URL);
-  }
+if (process.env.MYSQL_TEST_URL) {
+  process.env.MYSQL_TEST_URL = await acquireAdvisorySlotMysql(process.env.MYSQL_TEST_URL);
 }
