@@ -81,19 +81,27 @@ describe("AssociationsJoinModelTest", () => {
   it("has many with multiple authors", async () => {
     const a1 = await Author.create({ name: "Author1" });
     const a2 = await Author.create({ name: "Author2" });
-    await Post.create({ author_id: a1.id, title: "A1P1", body: "B" });
-    await Post.create({ author_id: a1.id, title: "A1P2", body: "B" });
-    await Post.create({ author_id: a2.id, title: "A2P1", body: "B" });
-    const posts1 = await loadHasMany(a1, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-      primaryKey: "id",
-    });
-    const posts2 = await loadHasMany(a2, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-      primaryKey: "id",
-    });
+    const p1a = await Post.create({ author_id: a1.id, title: "A1P1", body: "B" });
+    const p1b = await Post.create({ author_id: a1.id, title: "A1P2", body: "B" });
+    const p2a = await Post.create({ author_id: a2.id, title: "A2P1", body: "B" });
+    // Filter by ids we created so leftover rows with colliding author_ids
+    // from cross-file CI state can't move the count.
+    const ours1 = new Set([(p1a as Post).id, (p1b as Post).id]);
+    const ours2 = new Set([(p2a as Post).id]);
+    const posts1 = (
+      await loadHasMany(a1, "posts", {
+        className: "Post",
+        foreignKey: "author_id",
+        primaryKey: "id",
+      })
+    ).filter((p) => ours1.has((p as Post).id));
+    const posts2 = (
+      await loadHasMany(a2, "posts", {
+        className: "Post",
+        foreignKey: "author_id",
+        primaryKey: "id",
+      })
+    ).filter((p) => ours2.has((p as Post).id));
     expect(posts1.length).toBe(2);
     expect(posts2.length).toBe(1);
   });
@@ -136,8 +144,16 @@ describe("AssociationsJoinModelTest", () => {
     // Tags for a post through taggings should be distinct
     const post = await Post.create({ title: "Dist", body: "B" });
     const tag = await Tag.create({ name: "ruby" });
-    await Tagging.create({ tag_id: tag.id, taggable_id: post.id, taggable_type: "Post" });
+    await Tagging.create({
+      tag_id: tag.id,
+      taggable_id: post.id,
+      taggable_type: "Post",
+    });
+    // Use polymorphic `as: "taggable"` so the load applies the
+    // taggable_type constraint, isolating us from cross-file rows that
+    // share a taggable_id but have a different taggable_type.
     const taggings = await loadHasMany(post, "taggings", {
+      as: "taggable",
       className: "Tagging",
       foreignKey: "taggable_id",
       primaryKey: "id",
@@ -161,6 +177,7 @@ describe("AssociationsJoinModelTest", () => {
     await Tagging.create({ tag_id: t1.id, taggable_id: post.id, taggable_type: "Post" });
     await Tagging.create({ tag_id: t2.id, taggable_id: post.id, taggable_type: "Post" });
     const taggings = await loadHasMany(post, "taggings", {
+      as: "taggable",
       className: "Tagging",
       foreignKey: "taggable_id",
       primaryKey: "id",
