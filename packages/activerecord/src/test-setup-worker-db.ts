@@ -36,6 +36,16 @@ function slotDbUrl(baseUrl: string, slot: number): string {
   return url.toString();
 }
 
+// Bounded retry policy: when all slots are held (possible now that vitest
+// worker count is uncapped), retry with linear backoff. Workers that can't
+// acquire within the window fail loudly rather than silently sharing a DB.
+const SLOT_RETRY_ATTEMPTS = 20;
+const SLOT_RETRY_DELAY_MS = 250; // 20 × 250ms = 5s max wait
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function acquireAdvisorySlotPg(baseUrl: string): Promise<string> {
   const forks = parseInt(process.env.AR_DB_FORKS ?? "1", 10);
   if (!Number.isFinite(forks) || forks <= 1) return baseUrl;
@@ -48,24 +58,28 @@ async function acquireAdvisorySlotPg(baseUrl: string): Promise<string> {
   const client = new pg.Client(baseUrl);
   await client.connect();
 
-  for (let slot = 1; slot <= forks; slot++) {
-    const res = await client.query<{ locked: boolean }>(
-      "SELECT pg_try_advisory_lock($1) AS locked",
-      [slot],
-    );
-    if (res.rows[0]?.locked) {
-      g.__arAdvisorySlotPg = slot;
-      // Keep client open for the process lifetime; PG drops session locks on
-      // disconnect, so no explicit release is needed on clean exit.
-      process.on("exit", () => void client.end());
-      return slotDbUrl(baseUrl, slot);
+  for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
+    for (let slot = 1; slot <= forks; slot++) {
+      const res = await client.query<{ locked: boolean }>(
+        "SELECT pg_try_advisory_lock($1) AS locked",
+        [slot],
+      );
+      if (res.rows[0]?.locked) {
+        g.__arAdvisorySlotPg = slot;
+        // Keep client open for the process lifetime; PG drops session locks on
+        // disconnect, so no explicit release is needed on clean exit.
+        process.on("exit", () => void client.end());
+        return slotDbUrl(baseUrl, slot);
+      }
     }
+    if (attempt < SLOT_RETRY_ATTEMPTS - 1) await sleep(SLOT_RETRY_DELAY_MS);
   }
 
   await client.end();
   throw new Error(
-    `acquireAdvisorySlotPg: all ${forks} advisory lock slots are held by other workers. ` +
-      `Increase AR_DB_FORKS or wait for a slot to become available.`,
+    `acquireAdvisorySlotPg: all ${forks} advisory lock slots are held after ` +
+      `${SLOT_RETRY_ATTEMPTS} attempts (${(SLOT_RETRY_ATTEMPTS * SLOT_RETRY_DELAY_MS) / 1000}s). ` +
+      `Increase AR_DB_FORKS or check for stuck workers.`,
   );
 }
 
@@ -88,24 +102,28 @@ async function acquireAdvisorySlotMysql(baseUrl: string): Promise<string> {
     database: u.pathname.replace(/^\//, "") || undefined,
   });
 
-  for (let slot = 1; slot <= forks; slot++) {
-    const lockName = `ar_test_slot_${slot}`;
-    // GET_LOCK returns 1 when acquired, 0 when timeout (0 s = non-blocking).
-    const [rows] = await conn.query<mysql.RowDataPacket[]>("SELECT GET_LOCK(?, 0) AS acquired", [
-      lockName,
-    ]);
-    if ((rows[0] as { acquired: number }).acquired === 1) {
-      g.__arAdvisorySlotMysql = slot;
-      // Hold the connection open; MariaDB releases GET_LOCK on disconnect.
-      process.on("exit", () => void conn.end());
-      return slotDbUrl(baseUrl, slot);
+  for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
+    for (let slot = 1; slot <= forks; slot++) {
+      const lockName = `ar_test_slot_${slot}`;
+      // GET_LOCK returns 1 when acquired, 0 when timeout (0 s = non-blocking).
+      const [rows] = await conn.query<mysql.RowDataPacket[]>("SELECT GET_LOCK(?, 0) AS acquired", [
+        lockName,
+      ]);
+      if ((rows[0] as { acquired: number }).acquired === 1) {
+        g.__arAdvisorySlotMysql = slot;
+        // Hold the connection open; MariaDB releases GET_LOCK on disconnect.
+        process.on("exit", () => void conn.end());
+        return slotDbUrl(baseUrl, slot);
+      }
     }
+    if (attempt < SLOT_RETRY_ATTEMPTS - 1) await sleep(SLOT_RETRY_DELAY_MS);
   }
 
   await conn.end();
   throw new Error(
-    `acquireAdvisorySlotMysql: all ${forks} GET_LOCK slots are held by other workers. ` +
-      `Increase AR_DB_FORKS or wait for a slot to become available.`,
+    `acquireAdvisorySlotMysql: all ${forks} GET_LOCK slots are held after ` +
+      `${SLOT_RETRY_ATTEMPTS} attempts (${(SLOT_RETRY_ATTEMPTS * SLOT_RETRY_DELAY_MS) / 1000}s). ` +
+      `Increase AR_DB_FORKS or check for stuck workers.`,
   );
 }
 
