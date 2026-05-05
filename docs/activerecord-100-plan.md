@@ -389,15 +389,13 @@ _Component C — Deduplicable cluster (5 files)_
 - LOC: ~250 net each
 - Dependencies: PR 14, PR 18b
 
-**PR 24 — `sqlite3_adapter.rb` (75%)**
+**PR 24 — `sqlite3_adapter.rb` (75% → 86%) — table-rebuild cluster ✓ MERGED**
 
 - Rails: `$AR/connection_adapters/sqlite3_adapter.rb` (849 LOC)
-- TS: `$TS/connection-adapters/sqlite3-adapter.ts` (2035 LOC, 54 matched, 18 missing, 75%)
-- Missing (18): `moveTable`, `copyTable`, `copyTableIndexes`, `copyTableContents`, `tableStructureSql`, `columnDefinitionsInCreateTable`, `extractTableRef`, `translateException`, `reconnect!`, `disconnect!`, `discard!`, `connectWithoutRetry`, `configure`, `defaultPreparedStatements`, `buildTableDefinition`, `initializeTypeMap`, `registerDateTimeTypes`, `registerDecimalTypes`
-- Split:
-  - PR 24 (8): `moveTable`, `copyTable`, `copyTableIndexes`, `copyTableContents`, `tableStructureSql`, `columnDefinitionsInCreateTable`, `extractTableRef`, `buildTableDefinition`
-  - PR 24b (10): `translateException`, `reconnect!`, `disconnect!`, `discard!`, `connectWithoutRetry`, `configure`, `defaultPreparedStatements`, `initializeTypeMap`, `registerDateTimeTypes`, `registerDecimalTypes`
-- LOC: ~280 net each
+- TS: `$TS/connection-adapters/sqlite3-adapter.ts` (62 matched, 10 missing, 86%)
+- PR 24 (8, merged): `tableInfo`, `tableStructureSql`, `tableStructureWithCollation`, `tableStructure`, `moveTable`, `copyTable`, `copyTableIndexes`, `copyTableContents`
+- PR 24b (10 remaining): `bindParamsLength`, `extractValueFromDefault`, `extractDefaultFunction`, `hasDefaultFunction`, `isInvalidAlterTableType`, `translateException`, `buildStatementPool`, `connect`, `configureConnection`, `initializeTypeMap`
+- LOC: ~274 net (PR 24)
 - Dependencies: PR 16, PR 17
 
 ---
