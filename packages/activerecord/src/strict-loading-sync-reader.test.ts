@@ -6,10 +6,20 @@
 //
 // Preserves Rails default (off) — strict loading is opt-in.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { Base, registerModel, StrictLoadingViolationError } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("strict loading — sync singular reader (Phase R.3)", () => {
   let adapter: DatabaseAdapter;
@@ -42,8 +52,14 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
   SrAuthor.hasOne("srProfile", { className: "SrProfile" });
   SrPost.belongsTo("srAuthor", { className: "SrAuthor" });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      sr_authors: { name: "string" },
+      sr_posts: { title: "string", sr_author_id: "integer" },
+      sr_profiles: { bio: "string", sr_author_id: "integer" },
+      strict_posts: { title: "string", sr_author_id: "integer" },
+    });
     SrAuthor.adapter = adapter;
     SrPost.adapter = adapter;
     SrProfile.adapter = adapter;
@@ -192,5 +208,9 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     expect(((post as any).srAuthor as SrAuthor).name).toBe("dean");
     // Reader should have marked it loaded as a side effect.
     expect(assoc.loaded).toBe(true);
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 });

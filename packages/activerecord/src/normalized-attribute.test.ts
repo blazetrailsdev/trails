@@ -2,16 +2,26 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("NormalizedAttributeTest", () => {
   function titlecase(s: string): string {
@@ -24,6 +34,9 @@ describe("NormalizedAttributeTest", () => {
 
   beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      aircrafts: { name: "string", manufactured_at: "string" },
+    });
 
     Aircraft = class extends Base {};
     Aircraft._tableName = "aircrafts";
@@ -39,6 +52,10 @@ describe("NormalizedAttributeTest", () => {
     NormalizedAircraft.normalizes("manufactured_at", (v: unknown) =>
       typeof v === "string" ? "noon:" + v : v,
     );
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("normalizes value from create", async () => {
@@ -178,8 +195,16 @@ describe("NormalizedAttributeTest", () => {
 });
 
 describe("normalizes on Base", () => {
+  let _adapter: DatabaseAdapter;
+
+  afterAll(async () => {
+    if (_adapter) await dropAllTables(_adapter);
+  });
+
   it("normalizes attributes before persistence", async () => {
     const adapter = freshAdapter();
+    _adapter = adapter;
+    await defineSchema(adapter, { users: { email: "string" } });
     class User extends Base {
       static _tableName = "users";
     }

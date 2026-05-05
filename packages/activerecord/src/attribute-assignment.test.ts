@@ -2,7 +2,7 @@
  * Tests for ActiveRecord::AttributeAssignment
  * Mirrors: activerecord/test/cases/attribute_assignment_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
 import { typeCastAttributeValue, findParameterPosition } from "./attribute-assignment.js";
@@ -12,6 +12,14 @@ import type { DatabaseAdapter } from "./adapter.js";
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 // ==========================================================================
 // AttributeAssignmentTest — targets attribute_assignment_test.rb

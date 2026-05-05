@@ -2,16 +2,26 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { Base, composedOf } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 // ==========================================================================
 // AggregationsTest — targets aggregations_test.rb
@@ -19,8 +29,22 @@ function freshAdapter(): DatabaseAdapter {
 describe("AggregationsTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      customers: { name: "string", address_street: "string", address_city: "string" },
+      locations: { name: "string", lat: "float", lng: "float" },
+      orders: { label: "string", price_amount: "float", price_currency: "string" },
+      readings: { label: "string", temp_degrees: "float" },
+      waypoints: { name: "string", latitude: "float", longitude: "float" },
+      articles: { title: "string", tag_name: "string" },
+      accounts: { name: "string", balance_amount: "float" },
+      shapes: { name: "string", coord_x: "float", coord_y: "float" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   // Rails: test_find_multiple_value_object
@@ -513,6 +537,7 @@ describe("OverridingAggregationsTest", () => {
 describe("Aggregations", () => {
   it("should sum field", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { orders: { amount: "integer" } });
 
     class Order extends Base {
       static {
@@ -530,6 +555,7 @@ describe("Aggregations", () => {
 
   it("should average field", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { orders: { amount: "integer" } });
 
     class Order extends Base {
       static {
@@ -547,6 +573,7 @@ describe("Aggregations", () => {
 
   it("should get minimum of field", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { orders: { amount: "integer" } });
 
     class Order extends Base {
       static {
@@ -564,6 +591,7 @@ describe("Aggregations", () => {
 
   it("should get maximum of field", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { orders: { amount: "integer" } });
 
     class Order extends Base {
       static {
@@ -581,6 +609,7 @@ describe("Aggregations", () => {
 
   it("should sum field with conditions", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { orders: { amount: "integer", status: "string" } });
 
     class Order extends Base {
       static {
@@ -627,6 +656,7 @@ describe("Aggregations", () => {
 describe("Aggregation edge cases", () => {
   it("no queries for empty relation on minimum", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { orders: { amount: "integer" } });
 
     class Order extends Base {
       static {
@@ -640,6 +670,7 @@ describe("Aggregation edge cases", () => {
 
   it("no queries for empty relation on maximum", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { orders: { amount: "integer" } });
 
     class Order extends Base {
       static {
@@ -653,6 +684,7 @@ describe("Aggregation edge cases", () => {
 
   it("minimum on none() returns null", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { orders: { amount: "integer" } });
 
     class Order extends Base {
       static {
@@ -667,6 +699,7 @@ describe("Aggregation edge cases", () => {
 
   it("maximum on none() returns null", async () => {
     const adapter = freshAdapter();
+    await defineSchema(adapter, { orders: { amount: "integer" } });
 
     class Order extends Base {
       static {
@@ -682,8 +715,15 @@ describe("Aggregation edge cases", () => {
 
 describe("composed_of", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      customers: { address_street: "string", address_city: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("composes value objects from multiple attributes", async () => {
@@ -750,8 +790,15 @@ describe("composed_of", () => {
 describe("composed_of (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      products: { price_amount: "integer", price_currency: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   // Rails: test "reading a composed-of attribute"
