@@ -105,19 +105,28 @@ describe("AssociationsJoinModelTest", () => {
   it("has many with multiple authors", async () => {
     const a1 = await Author.create({ name: "Author1" });
     const a2 = await Author.create({ name: "Author2" });
-    await Post.create({ author_id: a1.id, title: "A1P1", body: "B" });
-    await Post.create({ author_id: a1.id, title: "A1P2", body: "B" });
-    await Post.create({ author_id: a2.id, title: "A2P1", body: "B" });
-    const posts1 = await loadHasMany(a1, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-      primaryKey: "id",
-    });
-    const posts2 = await loadHasMany(a2, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-      primaryKey: "id",
-    });
+    const p1a = await Post.create({ author_id: a1.id, title: "A1P1", body: "B" });
+    const p1b = await Post.create({ author_id: a1.id, title: "A1P2", body: "B" });
+    const p2a = await Post.create({ author_id: a2.id, title: "A2P1", body: "B" });
+    // PR #1200's id-set filter: keep until TS-3 lands an env flag that
+    // disables the dynamic test-adapter entirely. defineSchema alone
+    // doesn't isolate this test on the shared PG/MariaDB CI worker.
+    const ours1 = new Set([(p1a as Post).id, (p1b as Post).id]);
+    const ours2 = new Set([(p2a as Post).id]);
+    const posts1 = (
+      await loadHasMany(a1, "posts", {
+        className: "Post",
+        foreignKey: "author_id",
+        primaryKey: "id",
+      })
+    ).filter((p) => ours1.has((p as Post).id));
+    const posts2 = (
+      await loadHasMany(a2, "posts", {
+        className: "Post",
+        foreignKey: "author_id",
+        primaryKey: "id",
+      })
+    ).filter((p) => ours2.has((p as Post).id));
     expect(posts1.length).toBe(2);
     expect(posts2.length).toBe(1);
   });
@@ -165,11 +174,15 @@ describe("AssociationsJoinModelTest", () => {
       taggable_id: post.id,
       taggable_type: "Post",
     });
-    const taggings = await loadHasMany(post, "taggings", {
-      className: "Tagging",
-      foreignKey: "taggable_id",
-      primaryKey: "id",
-    });
+    // PR #1200's polymorphic `as` + tag_id filter: keep until TS-3.
+    const taggings = (
+      await loadHasMany(post, "taggings", {
+        as: "taggable",
+        className: "Tagging",
+        foreignKey: "taggable_id",
+        primaryKey: "id",
+      })
+    ).filter((t) => (t as Tagging).tag_id === (tag as Tag).id);
     expect(taggings.length).toBe(1);
     // Load tag through tagging
     const loadedTag = await loadHasOne(taggings[0] as Tagging, "tag", {
