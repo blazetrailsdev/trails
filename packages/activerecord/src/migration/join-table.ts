@@ -17,5 +17,5 @@ export function findJoinTableName(
 export function joinTableName(table1: string, table2: string): string {
   const joined = [String(table1), String(table2)].sort().join("\0");
   const deduped = joined.replace(/^(.*[_.])(.+)\0\1(.+)/, "$1$2_$3");
-  return deduped.replace("\0", "_");
+  return deduped.replaceAll("\0", "_");
 }
