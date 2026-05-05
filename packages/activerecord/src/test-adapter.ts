@@ -440,65 +440,32 @@ async function dropAllMysqlTables(adapter: any): Promise<void> {
 
 let _factory: () => DatabaseAdapter;
 
-// Vitest uses pool: forks + isolate: true by default — every test file in a
-// fork reloads this module fresh. If we built a new pg.Pool / mysql.Pool per
-// reload, the previous file's pool would leak open connections (and possibly
-// uncommitted transactions) and the new file's "DROP TABLE … CASCADE" cleanup
-// would race those locks. Pin the underlying adapter on globalThis so it
-// survives module reloads within a fork process. Only one pool per fork DB,
-// no cross-file lock contention.
-//
-// SQLite (:memory:) is also pinned: pinning gives a single in-memory DB that
-// every reloaded module shares within the fork, which is what tests expect
-// when they create models in module-load context (vs each reload getting an
-// independent empty DB and seeing different state).
-const _adapterCacheKey = `__trails_test_adapter_${PG_TEST_URL ?? MYSQL_TEST_URL ?? "sqlite_memory"}`;
-const _g = globalThis as unknown as Record<string, any>;
-
 if (PG_TEST_URL) {
-  if (!_g[_adapterCacheKey]) {
-    const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
-    _g[_adapterCacheKey] = new PostgreSQLAdapter(PG_TEST_URL);
-  }
-  _sharedAdapter = _g[_adapterCacheKey];
-  // Initial drop-all only on the first module load per fork; subsequent
-  // reloads find the adapter in the cache and skip this block. Per-test
-  // cleanup is handled by resetTestAdapterState (test-setup-ar.ts).
-  if (!_g[`${_adapterCacheKey}__init_done`]) {
-    const rows = await _sharedAdapter.execute(
-      `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,
-    );
-    for (const r of rows) {
-      try {
-        await _sharedAdapter.exec(`DROP TABLE IF EXISTS "${(r as any).tablename}" CASCADE`);
-      } catch {}
-    }
-    _g[`${_adapterCacheKey}__init_done`] = true;
+  const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
+  _sharedAdapter = new PostgreSQLAdapter(PG_TEST_URL);
+  const rows = await _sharedAdapter.execute(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,
+  );
+  for (const r of rows) {
+    try {
+      await _sharedAdapter.exec(`DROP TABLE IF EXISTS "${(r as any).tablename}" CASCADE`);
+    } catch {}
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else if (MYSQL_TEST_URL) {
-  if (!_g[_adapterCacheKey]) {
-    const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
-    _g[_adapterCacheKey] = new Mysql2Adapter(MYSQL_TEST_URL);
-  }
-  _sharedAdapter = _g[_adapterCacheKey];
-  if (!_g[`${_adapterCacheKey}__init_done`]) {
-    const rows = await _sharedAdapter.execute(`SHOW TABLES`);
-    for (const r of rows) {
-      const table = Object.values(r)[0] as string;
-      try {
-        await _sharedAdapter.exec(`DROP TABLE IF EXISTS \`${table}\``);
-      } catch {}
-    }
-    _g[`${_adapterCacheKey}__init_done`] = true;
+  const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
+  _sharedAdapter = new Mysql2Adapter(MYSQL_TEST_URL);
+  const rows = await _sharedAdapter.execute(`SHOW TABLES`);
+  for (const r of rows) {
+    const table = Object.values(r)[0] as string;
+    try {
+      await _sharedAdapter.exec(`DROP TABLE IF EXISTS \`${table}\``);
+    } catch {}
   }
   _factory = () => new SchemaAdapter(_sharedAdapter);
 } else {
-  if (!_g[_adapterCacheKey]) {
-    const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
-    _g[_adapterCacheKey] = new SQLite3Adapter(":memory:");
-  }
-  _sharedAdapter = _g[_adapterCacheKey];
+  const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
+  _sharedAdapter = new SQLite3Adapter(":memory:");
   _factory = () => new SchemaAdapter(_sharedAdapter);
 }
 
