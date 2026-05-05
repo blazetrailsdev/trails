@@ -1,10 +1,11 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/join_model_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { Base, registerModel, association, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { dropAllTables } from "../test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import {
   Associations,
@@ -26,6 +27,15 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("AssociationsJoinModelTest", () => {
   let adapter: DatabaseAdapter;
+
+  beforeAll(() => {
+    vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+    vi.unstubAllEnvs();
+  });
 
   class Author extends Base {
     static {
@@ -58,14 +68,8 @@ describe("AssociationsJoinModelTest", () => {
 
   beforeEach(async () => {
     adapter = freshAdapter();
-    // Pre-create the schema explicitly. The dynamic test-adapter still runs
-    // its normal CREATE-TABLE-IF-NOT-EXISTS / ADD-COLUMN setup on the first
-    // query (defineSchema doesn't update its `_createdTables` tracking — see
-    // docs/explicit-test-schema-plan.md for the deferred-to-TS-3 limitation),
-    // but with the columns already created by defineSchema, the recovery
-    // path's `_id`/`TEXT` fallback can no longer mistype `author_id` under
-    // DDL contention on PG/MariaDB. The PR #1200 id-set filter below is
-    // retained until TS-3 lets us disable the dynamic adapter outright.
+    // Pre-create the schema explicitly. AR_NO_AUTO_SCHEMA=1 (stubbed in
+    // beforeAll) disables the dynamic adapter path so no DDL races occur.
     await defineSchema(adapter, {
       authors: { name: "string" },
       posts: {
@@ -108,25 +112,16 @@ describe("AssociationsJoinModelTest", () => {
     const p1a = await Post.create({ author_id: a1.id, title: "A1P1", body: "B" });
     const p1b = await Post.create({ author_id: a1.id, title: "A1P2", body: "B" });
     const p2a = await Post.create({ author_id: a2.id, title: "A2P1", body: "B" });
-    // PR #1200's id-set filter: keep until TS-3 lands an env flag that
-    // disables the dynamic test-adapter entirely. defineSchema alone
-    // doesn't isolate this test on the shared PG/MariaDB CI worker.
-    const ours1 = new Set([(p1a as Post).id, (p1b as Post).id]);
-    const ours2 = new Set([(p2a as Post).id]);
-    const posts1 = (
-      await loadHasMany(a1, "posts", {
-        className: "Post",
-        foreignKey: "author_id",
-        primaryKey: "id",
-      })
-    ).filter((p) => ours1.has((p as Post).id));
-    const posts2 = (
-      await loadHasMany(a2, "posts", {
-        className: "Post",
-        foreignKey: "author_id",
-        primaryKey: "id",
-      })
-    ).filter((p) => ours2.has((p as Post).id));
+    const posts1 = await loadHasMany(a1, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      primaryKey: "id",
+    });
+    const posts2 = await loadHasMany(a2, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      primaryKey: "id",
+    });
     expect(posts1.length).toBe(2);
     expect(posts2.length).toBe(1);
   });
@@ -174,15 +169,11 @@ describe("AssociationsJoinModelTest", () => {
       taggable_id: post.id,
       taggable_type: "Post",
     });
-    // PR #1200's polymorphic `as` + tag_id filter: keep until TS-3.
-    const taggings = (
-      await loadHasMany(post, "taggings", {
-        as: "taggable",
-        className: "Tagging",
-        foreignKey: "taggable_id",
-        primaryKey: "id",
-      })
-    ).filter((t) => (t as Tagging).tag_id === (tag as Tag).id);
+    const taggings = await loadHasMany(post, "taggings", {
+      className: "Tagging",
+      foreignKey: "taggable_id",
+      primaryKey: "id",
+    });
     expect(taggings.length).toBe(1);
     // Load tag through tagging
     const loadedTag = await loadHasOne(taggings[0] as Tagging, "tag", {
