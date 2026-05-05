@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { createAndMigrate, eachDatabase, createAndLoadSchema } from "./test-databases.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { MigrationProxy } from "./migration.js";
@@ -16,6 +16,13 @@ const stubConfigurations = (configs: unknown[]): DatabaseConfigurations => {
   vi.spyOn(dc, "configsFor").mockReturnValue(configs as never);
   return dc;
 };
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("TestDatabasesTest", () => {
   let priorCurrent: DatabaseConfigurations | null;

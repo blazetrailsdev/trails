@@ -2,11 +2,20 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base, registerModel } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -15,8 +24,16 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("ExplainTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", score: "integer" },
+      blogs: { name: "string" },
+      articles: { title: "string", blog_id: "integer" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   function makeModel() {

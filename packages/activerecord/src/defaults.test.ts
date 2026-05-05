@@ -2,11 +2,20 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -27,8 +36,12 @@ describe("MysqlDefaultExpressionTest", () => {
 
 describe("DefaultNumbersTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { counters: { value: "integer" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   function makeModel() {
@@ -61,8 +74,15 @@ describe("DefaultNumbersTest", () => {
 });
 
 describe("DefaultBinaryTest", () => {
+  let adp: DatabaseAdapter;
+  beforeEach(async () => {
+    adp = freshAdapter();
+    await defineSchema(adp, { bin_records: { data: "string" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adp);
+  });
   it("default varbinary string", async () => {
-    const adp = freshAdapter();
     class BinRecord extends Base {
       static {
         this.attribute("data", "string");
@@ -73,7 +93,6 @@ describe("DefaultBinaryTest", () => {
     expect(r.data).toBe("binary_data");
   });
   it("default binary string", async () => {
-    const adp = freshAdapter();
     class BinRecord extends Base {
       static {
         this.attribute("data", "string", { default: "" });
@@ -84,7 +103,6 @@ describe("DefaultBinaryTest", () => {
     expect(r.data).toBe("");
   });
   it("default varbinary string that looks like hex", async () => {
-    const adp = freshAdapter();
     class BinRecord extends Base {
       static {
         this.attribute("data", "string");
@@ -133,8 +151,12 @@ describe("DefaultsTestWithoutTransactionalFixtures", () => {
 
 describe("DefaultTextTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { body: "string", title: "string" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
   it("default texts", async () => {
     class Post extends Base {
@@ -160,8 +182,12 @@ describe("DefaultTextTest", () => {
 
 describe("DefaultStringsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string", body: "string" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
   it("default strings", async () => {
     class Post extends Base {

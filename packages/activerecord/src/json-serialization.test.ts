@@ -2,11 +2,20 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -17,8 +26,11 @@ describe("JsonSerializationTest", () => {
   let adapter: DatabaseAdapter;
   let Contact: typeof Base;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      contacts: { name: "string", age: "integer", created_at: "string", type: "string" },
+    });
     Contact = class extends Base {};
     Contact._tableName = "contacts";
     Contact.attribute("id", "integer");
@@ -124,12 +136,40 @@ describe("JsonSerializationTest", () => {
     contact.serializableHash(options);
     expect(options.only).toEqual(optionsBefore.only);
   });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
 });
 
 describe("DatabaseConnectedJsonEncodingTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      post_j1s: { title: "string" },
+      comment_j1s: { body: "string", post_id: "integer" },
+      post_j2s: { title: "string" },
+      comment_j2s: { body: "string", post_id: "integer" },
+      post_j3s: { title: "string" },
+      comment_j3s: { body: "string", post_id: "integer" },
+      reply_j3s: { text: "string", comment_id: "integer" },
+      top_j4s: { val: "string" },
+      mid_j4s: { val: "string" },
+      deep_j4s: { val: "string" },
+      post_j5s: { title: "string", author: "string" },
+      comment_j5s: { body: "string", post_id: "integer" },
+      post_j6s: { title: "string" },
+      author_j7s: { name: "string", age: "integer" },
+      author_j8s: { name: "string", age: "integer" },
+      author_j9s: { name: "string" },
+      book_j9s: { title: "string", author_id: "integer" },
+      author_j10s: { name: "string", age: "integer" },
+      book_j10s: { title: "string", author_id: "integer" },
+      post_j11s: { title: "string" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("includes uses association name", async () => {

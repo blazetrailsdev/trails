@@ -1,9 +1,17 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import { hexdigest } from "@blazetrails/activesupport";
+import { defineSchema } from "./test-helpers/define-schema.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 function expectedUsec(ts: Temporal.Instant): string {
   const dt = ts.toZonedDateTimeISO("UTC");
@@ -25,8 +33,11 @@ function withCollectionCacheVersioning(klass: typeof Base, fn: () => Promise<voi
   });
 }
 
-function makeDeveloper() {
+async function makeDeveloper() {
   const adapter = createTestAdapter();
+  await defineSchema(adapter, {
+    developers: { name: "string", salary: "integer", updated_at: "datetime" },
+  });
   class Developer extends Base {
     static {
       this.attribute("name", "string");
@@ -40,14 +51,14 @@ function makeDeveloper() {
 
 describe("CollectionCacheKeyTest", () => {
   it("collection_cache_key on model", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice", salary: 100000 });
     const key = await Developer.collectionCacheKey();
     expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
   });
 
   it("cache_key for relation", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
@@ -58,7 +69,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key for relation with limit", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
@@ -68,7 +79,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key for relation with custom select and limit", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
@@ -79,7 +90,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key for loaded relation", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = await Developer.where({ salary: 100000 })
@@ -93,7 +104,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key for relation with table alias", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const devs = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
@@ -102,14 +113,14 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key for relation with includes", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice", salary: 100000 });
     const key = await Developer.where({ salary: 100000 }).cacheKey();
     expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+/);
   });
 
   it("cache_key for loaded relation with includes", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice" });
     const devs = await Developer.all().load();
     const key = await devs.cacheKey();
@@ -117,7 +128,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("update_all will update cache_key", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "David", salary: 80000 });
     const devs = Developer.where({ name: "David" });
     const key1 = await devs.cacheKey();
@@ -126,7 +137,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("update_all with includes will update cache_key", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "David", salary: 80000 });
     const devs = Developer.where({ name: "David" });
     const key1 = await devs.cacheKey();
@@ -135,7 +146,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("delete_all will update cache_key", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "David" });
     await Developer.create({ name: "David" });
     const devs = Developer.where({ name: "David" });
@@ -145,7 +156,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("delete_all with includes will update cache_key", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "David" });
     const devs = Developer.where({ name: "David" });
     const key1 = await devs.cacheKey();
@@ -154,7 +165,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("destroy_all will update cache_key", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "David" });
     const devs = Developer.where({ name: "David" });
     const key1 = await devs.cacheKey();
@@ -163,7 +174,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("it triggers at most one query", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "David" });
     const devs = Developer.where({ name: "David" });
     const key1 = await devs.cacheKey();
@@ -172,7 +183,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("it doesn't trigger any query if the relation is already loaded", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "David" });
     const devs = await Developer.where({ name: "David" }).load();
     const key = await devs.cacheKey();
@@ -180,7 +191,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("it doesn't trigger any query if collection_cache_versioning is enabled", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "David" });
     await withCollectionCacheVersioning(Developer, async () => {
       const devs = Developer.where({ name: "David" });
@@ -191,7 +202,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("relation cache_key changes when the sql query changes", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "David" });
     const devs = Developer.where({ name: "David" });
     const other = Developer.where({ name: "David" }).where("1 = 1");
@@ -199,13 +210,13 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key for empty relation", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const key = await Developer.where({ name: "Non Existent Developer" }).cacheKey();
     expect(key).toMatch(/^developers\/query-[0-9a-f]+-0$/);
   });
 
   it("cache_key with custom timestamp column", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const t = instant("2024-06-15T08:00:00.000Z");
     await Developer.create({ name: "Alice", updated_at: t });
     const key = await Developer.all().cacheKey("updated_at");
@@ -213,7 +224,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key with unknown timestamp column", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice" });
     // Falls back to count-only key when column doesn't exist
     const key = await Developer.all().cacheKey("published_at");
@@ -221,34 +232,34 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("collection proxy provides a cache_key", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice", salary: 100000 });
     const key = await Developer.where({ salary: 100000 }).cacheKey();
     expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
   });
 
   it("cache_key for loaded collection with zero size", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const devs = await Developer.where({ name: "Nobody" }).load();
     const key = await devs.cacheKey();
     expect(key).toMatch(/^developers\/query-[0-9a-f]+-0$/);
   });
 
   it("cache_key for queries with offset which return 0 rows", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const key = await Developer.offset(20).cacheKey();
     expect(key).toMatch(/^developers\/query-[0-9a-f]+-0$/);
   });
 
   it("cache_key with a relation having selected columns", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice", salary: 80000 });
     const key = await Developer.select("salary").cacheKey();
     expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
   });
 
   it("cache_key with a relation having distinct and order", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice", salary: 80000 });
     const devs = Developer.distinct().order("salary").limit(5);
     const key = await devs.cacheKey();
@@ -257,14 +268,14 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key with a relation having custom select and order", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice", salary: 80000 });
     const key = await Developer.select("name").order("name DESC").limit(5).cacheKey();
     expect(key).toMatch(/^developers\/query-[0-9a-f]+-\d+-/);
   });
 
   it("cache_key should be stable when using collection_cache_versioning", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice", salary: 100000 });
     await withCollectionCacheVersioning(Developer, async () => {
       const devs = Developer.where({ salary: 100000 });
@@ -275,7 +286,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_version for relation", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     await withCollectionCacheVersioning(Developer, async () => {
@@ -287,7 +298,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("reset will reset cache_version", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     await Developer.create({ name: "Alice" });
     await withCollectionCacheVersioning(Developer, async () => {
       const devs = Developer.all();
@@ -300,7 +311,7 @@ describe("CollectionCacheKeyTest", () => {
   });
 
   it("cache_key_with_version contains key and version regardless of collection_cache_versioning setting", async () => {
-    const Developer = makeDeveloper();
+    const Developer = await makeDeveloper();
     const t = instant("2024-01-15T10:00:00.000Z");
     await Developer.create({ name: "Alice", salary: 100000, updated_at: t });
     const kv1 = await Developer.all().cacheKeyWithVersion();

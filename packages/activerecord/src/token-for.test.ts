@@ -2,13 +2,22 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { generatesTokenFor, setTokenForSecret } from "./generates-token-for.js";
 import { setSignedIdVerifierSecret } from "./signed-id.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -17,14 +26,28 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("TokenForTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", password_digest: "string" },
+      user_short_expiries: { name: "string", password_digest: "string" },
+      user2s: { name: "string" },
+      user_xes: { name: "string" },
+      parents: { name: "string", digest: "string" },
+      children: { name: "string", digest: "string" },
+      custom_pk_items: { uuid: "string", name: "string" },
+      cpk_items: { shop_id: "integer", name: "string" },
+      no_pk_items: { name: "string" },
+    });
     setSignedIdVerifierSecret("blazetrails-test-secret");
     setTokenForSecret("blazetrails-test-token-secret");
   });
 
   afterEach(() => {
     setTokenForSecret(null);
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   function makeModel() {
@@ -186,7 +209,6 @@ describe("TokenForTest", () => {
   });
 
   it("finds record with a custom primary key", async () => {
-    const adapter = freshAdapter();
     class CustomPkItem extends Base {
       static {
         this._primaryKey = "uuid";
@@ -207,7 +229,6 @@ describe("TokenForTest", () => {
     expect(found!.name).toBe("test");
   });
   it("finds record with a composite primary key", async () => {
-    const adapter = freshAdapter();
     class CpkItem extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -225,7 +246,6 @@ describe("TokenForTest", () => {
     expect(found!.id).toEqual([1, 42]);
   });
   it("raises when no primary key has been declared", async () => {
-    const adapter = freshAdapter();
     class NoPkItem extends Base {
       static {
         this._primaryKey = "";
@@ -239,17 +259,25 @@ describe("TokenForTest", () => {
 });
 
 describe("TokenForTest", () => {
-  beforeEach(() => {
+  let adapter2: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter2 = freshAdapter();
+    await defineSchema(adapter2, {
+      users: { name: "string", password_digest: "string" },
+    });
     setTokenForSecret("blazetrails-test-token-secret");
   });
 
   afterEach(() => {
     setTokenForSecret(null);
   });
+  afterAll(async () => {
+    await dropAllTables(adapter2);
+  });
 
   it("generates and resolves a token", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
-    const adapter = freshAdapter();
+    const adapter = adapter2;
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -275,7 +303,7 @@ describe("TokenForTest", () => {
 
   it("returns null for invalid token", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
-    const adapter = freshAdapter();
+    const adapter = adapter2;
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -290,7 +318,7 @@ describe("TokenForTest", () => {
   });
   it("finds record by token", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
-    const adapter = freshAdapter();
+    const adapter = adapter2;
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -307,7 +335,7 @@ describe("TokenForTest", () => {
 
   it("does not find record when token is invalid", async () => {
     const { generatesTokenFor } = await import("./generates-token-for.js");
-    const adapter = freshAdapter();
+    const adapter = adapter2;
     class User extends Base {
       static {
         this.attribute("name", "string");
