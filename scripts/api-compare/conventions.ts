@@ -20,14 +20,16 @@ export function snakeToCamel(name: string): string {
 }
 
 /**
- * File-level overrides: Ruby file path → TS file path.
+ * Package-scoped file overrides: `"pkg:ruby/file.rb"` → TS file path.
  *
  * Used for cases where the TS file intentionally uses a different name
- * than the Rails convention would produce (e.g. railtie → trailtie to
- * signal that trails railties are not Rails railties).
+ * than the Rails convention would produce (e.g. activerecord's railtie →
+ * trailtie to signal that trails railties are not Rails::Railtie subclasses).
+ * Keyed by `pkg:rubyFile` to avoid collisions across packages that each
+ * have their own `railtie.rb`.
  */
 const FILE_OVERRIDES: Record<string, string> = {
-  "railtie.rb": "trailtie.ts",
+  "activerecord:railtie.rb": "trailtie.ts",
 };
 
 /**
@@ -38,8 +40,11 @@ const FILE_OVERRIDES: Record<string, string> = {
  * POSIX paths, and the default `path.join` would return backslashes
  * on Windows.
  */
-export function rubyFileToTs(rubyFile: string): string {
-  if (FILE_OVERRIDES[rubyFile]) return FILE_OVERRIDES[rubyFile];
+export function rubyFileToTs(rubyFile: string, pkg?: string): string {
+  if (pkg) {
+    const override = FILE_OVERRIDES[`${pkg}:${rubyFile}`];
+    if (override) return override;
+  }
   const dir = path.posix.dirname(rubyFile);
   const base = path.posix.basename(rubyFile, ".rb");
   const kebab = base.replace(/_/g, "-");
