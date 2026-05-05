@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, association, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import {
   Associations,
@@ -55,8 +56,31 @@ describe("AssociationsJoinModelTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    // Pre-create the schema explicitly. The dynamic test-adapter still runs
+    // its normal CREATE-TABLE-IF-NOT-EXISTS / ADD-COLUMN setup on the first
+    // query (defineSchema doesn't update its `_createdTables` tracking — see
+    // docs/explicit-test-schema-plan.md for the deferred-to-TS-3 limitation),
+    // but with the columns already created by defineSchema, the recovery
+    // path's `_id`/`TEXT` fallback can no longer mistype `author_id` under
+    // DDL contention on PG/MariaDB. The PR #1200 id-set filter below is
+    // retained until TS-3 lets us disable the dynamic adapter outright.
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      posts: {
+        author_id: "integer",
+        title: "string",
+        body: "string",
+        type: "string",
+      },
+      tags: { name: "string" },
+      taggings: {
+        tag_id: "integer",
+        taggable_id: "integer",
+        taggable_type: "string",
+      },
+    });
     Author.adapter = adapter;
     Post.adapter = adapter;
     Tag.adapter = adapter;
@@ -84,8 +108,9 @@ describe("AssociationsJoinModelTest", () => {
     const p1a = await Post.create({ author_id: a1.id, title: "A1P1", body: "B" });
     const p1b = await Post.create({ author_id: a1.id, title: "A1P2", body: "B" });
     const p2a = await Post.create({ author_id: a2.id, title: "A2P1", body: "B" });
-    // Filter by ids we created so leftover rows with colliding author_ids
-    // from cross-file CI state can't move the count.
+    // PR #1200's id-set filter: keep until TS-3 lands an env flag that
+    // disables the dynamic test-adapter entirely. defineSchema alone
+    // doesn't isolate this test on the shared PG/MariaDB CI worker.
     const ours1 = new Set([(p1a as Post).id, (p1b as Post).id]);
     const ours2 = new Set([(p2a as Post).id]);
     const posts1 = (
@@ -149,11 +174,7 @@ describe("AssociationsJoinModelTest", () => {
       taggable_id: post.id,
       taggable_type: "Post",
     });
-    // Use polymorphic `as: "taggable"` so the load applies the
-    // taggable_type constraint, then filter to the tagging whose tag_id
-    // matches the tag we created. Cross-file leakage on shared CI DBs
-    // can leave taggings whose tag_id points to a since-dropped tag,
-    // which would make the downstream loadHasOne return null.
+    // PR #1200's polymorphic `as` + tag_id filter: keep until TS-3.
     const taggings = (
       await loadHasMany(post, "taggings", {
         as: "taggable",
