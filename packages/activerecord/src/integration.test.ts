@@ -83,7 +83,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "Flamboyant Software" });
     expect(firm.toParam()).toBe(`${firm.id}-flamboyant-software`);
   });
@@ -96,7 +96,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "Flamboyant Software, Inc." });
     expect(firm.toParam()).toBe(`${firm.id}-flamboyant-software`);
   });
@@ -109,7 +109,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "Huey, Dewey, & Louie LLC" });
     expect(firm.toParam()).toBe(`${firm.id}-huey-dewey-louie-llc`);
   });
@@ -122,7 +122,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "Door-to-Door Wash-n-Fold Service" });
     expect(firm.toParam()).toBe(`${firm.id}-door-to-door-wash-n`);
   });
@@ -135,7 +135,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "a ".repeat(100) });
     expect(firm.toParam()).toBe(`${firm.id}-a-a-a-a-a-a-a-a-a-a`);
   });
@@ -148,7 +148,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "David HeinemeierHansson" });
     expect(firm.toParam()).toBe(`${firm.id}-david`);
   });
@@ -161,7 +161,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "David Heinemeier Hansson" });
     expect(firm.toParam()).toBe(`${firm.id}-david-heinemeier`);
   });
@@ -174,7 +174,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "ab \n".repeat(100) });
     expect(firm.toParam()).toBe(`${firm.id}-ab-ab-ab-ab-ab-ab-ab`);
   });
@@ -187,7 +187,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({ name: "戦場ヶ原 ひたぎ" });
     expect(firm.toParam()).toBe(`${firm.id}`);
   });
@@ -200,7 +200,7 @@ describe("IntegrationTest", () => {
         this.toParam("name");
       }
     }
-    await defineSchema(Firm.adapter, { firms: { name: "string" } });
+    await defineSchema(Firm.adapter, { firms: { name: "text" } });
     const firm = await Firm.create({});
     expect(firm.toParam()).toBe(`${firm.id}`);
     firm.writeAttribute("name", " ");
