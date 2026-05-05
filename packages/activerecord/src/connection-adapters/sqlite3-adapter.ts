@@ -1468,7 +1468,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // constraints — Rails' schema cache records user-defined indexes
     // only, and the auto ones are redundant with the CREATE TABLE sql.
     const userIndexes = rows.filter((r) => r.origin === "c");
-    const result: Array<{ name: string; columns: string[]; unique: boolean }> = [];
+    const sqliteMaster = schema ? `${quoteColumnName(schema)}.sqlite_master` : "sqlite_master";
+    const result: Array<{ name: string; columns: string[]; unique: boolean; where?: string }> = [];
     for (const idx of userIndexes) {
       // index_info takes the bare index name; the schema qualifier, if
       // any, comes before the PRAGMA keyword — same shape as above.
@@ -1477,10 +1478,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         [],
         "SCHEMA",
       )) as Array<{ name: string; seqno: number }>;
+      const idxSqlRow = this.db
+        .prepare(
+          `SELECT sql FROM ${sqliteMaster} WHERE type='index' AND name=${sqliteQuoteStringLiteral(idx.name)}`,
+        )
+        .get() as { sql: string } | undefined;
+      const whereMatch = idxSqlRow?.sql ? /\bWHERE\b\s+(.+)$/i.exec(idxSqlRow.sql) : null;
       result.push({
         name: idx.name,
         columns: cols.sort((a, b) => a.seqno - b.seqno).map((c) => c.name),
         unique: idx.unique === 1,
+        ...(whereMatch ? { where: whereMatch[1].trim() } : {}),
       });
     }
     return result;
@@ -1829,6 +1837,172 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this.schemaCache.clear();
   }
 
+  // --- Rails: table-rebuild helpers (move_table / copy_table family) ---
+
+  /** @internal */
+  private async tableInfo(tableName: string): Promise<Record<string, unknown>[]> {
+    const pragma = this.supportsVirtualColumns() ? "table_xinfo" : "table_info";
+    return this.execute(`PRAGMA ${pragma}(${quoteTableName(tableName)})`, [], "SCHEMA");
+  }
+
+  /** @internal */
+  private tableStructureSql(tableName: string, columnNames?: string[]): string[] {
+    const querySql = `SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = ${sqliteQuoteStringLiteral(tableName)}`;
+    const row = this.db.prepare(querySql).get() as { sql: string } | undefined;
+    if (!row?.sql) return [];
+    const body = row.sql.replace(/\);\s*$/, "").replace(/^[^(]*\(/, "");
+    const names = columnNames ?? [];
+    let splitter: RegExp;
+    if (names.length > 0) {
+      const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+      splitter = new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${escaped})"))`, "i");
+    } else {
+      splitter = /,(?=\s(?:CONSTRAINT|"))/;
+    }
+    return body.split(splitter).map((s) => s.trim());
+  }
+
+  /** @internal */
+  private tableStructureWithCollation(
+    tableName: string,
+    basicStructure: Record<string, unknown>[],
+  ): Record<string, unknown>[] {
+    const COLLATE_REGEX = /.*"(\w+)".*collate\s+"(\w+)".*/i;
+    const AI_REGEX = /.*"(\w+)".+PRIMARY KEY AUTOINCREMENT/i;
+    const GENERATED_REGEX = /.*"(\w+)".+GENERATED ALWAYS AS \((.+)\) (?:STORED|VIRTUAL)/i;
+    const colNames = basicStructure.map((c) => String(c["name"]));
+    const strings = this.tableStructureSql(tableName, colNames);
+    if (!strings.length) return basicStructure.map((c) => ({ ...c }));
+    const collations: Record<string, string> = {};
+    const autoIncrements: Record<string, boolean> = {};
+    const generated: Record<string, string> = {};
+    for (const s of strings) {
+      const cm = COLLATE_REGEX.exec(s);
+      if (cm) collations[cm[1]] = cm[2];
+      const aim = AI_REGEX.exec(s);
+      if (aim) autoIncrements[aim[1]] = true;
+      const gm = GENERATED_REGEX.exec(s);
+      if (gm) generated[gm[1]] = gm[2];
+    }
+    return basicStructure.map((col) => {
+      const name = String(col["name"]);
+      const out: Record<string, unknown> = { ...col };
+      if (collations[name] !== undefined) out["collation"] = collations[name];
+      if (autoIncrements[name]) out["auto_increment"] = true;
+      if (generated[name] !== undefined) out["dflt_value"] = generated[name];
+      return out;
+    });
+  }
+
+  /** @internal */
+  private async tableStructure(tableName: string): Promise<Record<string, unknown>[]> {
+    const structure = await this.tableInfo(tableName);
+    if (!structure.length) {
+      throw new StatementInvalid(`Could not find table '${tableName}'`, { sql: "", binds: [] });
+    }
+    return this.tableStructureWithCollation(tableName, structure);
+  }
+
+  /** @internal */
+  private async moveTable(
+    from: string,
+    to: string,
+    options: { rename?: Record<string, string>; temporary?: boolean } = {},
+    block?: (colDefs: string[]) => void,
+  ): Promise<void> {
+    await this.copyTable(from, to, options, block);
+    this.db.exec(`DROP TABLE ${quoteTableName(from)}`);
+  }
+
+  /** @internal */
+  private async copyTable(
+    from: string,
+    to: string,
+    options: { rename?: Record<string, string>; temporary?: boolean } = {},
+    block?: (colDefs: string[]) => void,
+  ): Promise<void> {
+    const fromPk = await this.primaryKey(from);
+    const fromCols = await this.columns(from);
+    const rename = options.rename ?? {};
+    const pkCols: string[] = Array.isArray(fromPk) ? fromPk : fromPk ? [fromPk] : [];
+    const compositePk = pkCols.length > 1;
+    const colDefs: string[] = [];
+    const contentCols: string[] = [];
+    for (const col of fromCols) {
+      const sqlite3Col = col as Sqlite3Column;
+      const destName = rename[col.name] ?? col.name;
+      const sqlType = col.sqlTypeMetadata?.sqlType ?? "TEXT";
+      let def = `${quoteColumnName(destName)} ${sqlType}`;
+      if (col.collation) def += ` COLLATE ${quoteColumnName(col.collation)}`;
+      if (!compositePk && pkCols.includes(col.name)) def += " PRIMARY KEY";
+      if (!col.null) def += " NOT NULL";
+      if (!sqlite3Col.autoIncrement && col.default !== null && col.default !== undefined) {
+        def += ` DEFAULT ${this.quoteDefault(col.default)}`;
+      }
+      colDefs.push(def);
+      if (!sqlite3Col.isVirtual()) contentCols.push(destName);
+    }
+    if (compositePk) {
+      const renamedPks = pkCols.map((c) => rename[c] ?? c);
+      colDefs.push(`PRIMARY KEY(${renamedPks.map((n) => quoteColumnName(n)).join(", ")})`);
+    }
+    if (block) block(colDefs);
+    const prefix = options.temporary ? "CREATE TEMPORARY TABLE" : "CREATE TABLE";
+    this.db.exec(`${prefix} ${quoteTableName(to)} (${colDefs.join(", ")})`);
+    await this.copyTableIndexes(from, to, rename);
+    await this.copyTableContents(from, to, contentCols, rename);
+  }
+
+  /** @internal */
+  private async copyTableIndexes(
+    from: string,
+    to: string,
+    rename: Record<string, string> = {},
+  ): Promise<void> {
+    const idxRows = (await this.indexes(from)) as Array<{
+      name: string;
+      columns: string[];
+      unique: boolean;
+      where?: string;
+    }>;
+    const { bare: bareFrom } = this._splitTableName(from);
+    const { bare: bareTo } = this._splitTableName(to);
+    const toCols = (await this.columns(to)).map((c) => c.name);
+    for (const idx of idxRows) {
+      let name = idx.name;
+      if (to === `a${from}`) name = `t${name}`;
+      else if (from === `a${to}`) name = name.slice(1);
+      const cols = idx.columns.map((c) => rename[c] ?? c).filter((c) => toCols.includes(c));
+      if (!cols.length) continue;
+      const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
+      let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${cols.map((c) => quoteColumnName(c)).join(", ")})`;
+      if (idx.where) sql += ` WHERE ${idx.where}`;
+      this.db.exec(sql);
+    }
+  }
+
+  /** @internal */
+  private async copyTableContents(
+    from: string,
+    to: string,
+    columns: string[],
+    rename: Record<string, string> = {},
+  ): Promise<void> {
+    // rename maps {srcCol: destCol}; build dest→src for lookup
+    const destToSrc: Record<string, string> = Object.fromEntries(columns.map((n) => [n, n]));
+    for (const [srcCol, destCol] of Object.entries(rename)) destToSrc[destCol] = srcCol;
+    const fromCols = (await this.columns(from)).map((c) => c.name);
+    const validCols = columns.filter((col) => fromCols.includes(destToSrc[col]));
+    if (!validCols.length) return;
+    const fromColsToCopy = validCols.map((col) => destToSrc[col]);
+    const quotedDest = validCols.map((c) => quoteColumnName(c)).join(", ");
+    const quotedSrc = fromColsToCopy.map((c) => quoteColumnName(c)).join(", ");
+    this.db.exec(
+      `INSERT INTO ${quoteTableName(to)} (${quotedDest}) SELECT ${quotedSrc} FROM ${quoteTableName(from)}`,
+    );
+  }
+
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     const msg = e instanceof Error ? e.message : String(e);
     const code = (e as any)?.code as string | undefined;
@@ -1896,13 +2070,6 @@ function bindParamsLength(): never {
 }
 
 /** @internal */
-function tableStructure(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#table_structure is not implemented",
-  );
-}
-
-/** @internal */
 function extractValueFromDefault(default_: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3Adapter#extract_value_from_default is not implemented",
@@ -1931,51 +2098,9 @@ function isInvalidAlterTableType(type: any, options: any): never {
 }
 
 /** @internal */
-function moveTable(from: any, to: any, options?: any, block?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#move_table is not implemented",
-  );
-}
-
-/** @internal */
-function copyTable(from: any, to: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#copy_table is not implemented",
-  );
-}
-
-/** @internal */
-function copyTableIndexes(from: any, to: any, rename?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#copy_table_indexes is not implemented",
-  );
-}
-
-/** @internal */
-function copyTableContents(from: any, to: any, columns: any, rename?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#copy_table_contents is not implemented",
-  );
-}
-
-/** @internal */
 function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3Adapter#translate_exception is not implemented",
-  );
-}
-
-/** @internal */
-function tableStructureWithCollation(tableName: any, basicStructure: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#table_structure_with_collation is not implemented",
-  );
-}
-
-/** @internal */
-function tableStructureSql(tableName: any, columnNames?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#table_structure_sql is not implemented",
   );
 }
 
