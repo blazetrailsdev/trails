@@ -190,6 +190,58 @@ describeIfPg("PostgresqlConnectionTest", () => {
       await a.close();
     }
   });
+
+  it("disconnectBang closes pool", async () => {
+    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    expect(a.active).toBe(true);
+    a.disconnectBang();
+    expect(a.active).toBe(false);
+    expect(a.isConnected()).toBe(false);
+  });
+
+  it("discardBang abandons pool without draining", async () => {
+    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    expect(a.active).toBe(true);
+    a.discardBang();
+    expect(a.active).toBe(false);
+    expect(a.isConnected()).toBe(false);
+  });
+
+  it("reconnect resets connection so queries work again", async () => {
+    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    try {
+      a.reconnect();
+      expect(a.active).toBe(true);
+      const rows = await a.execute("SELECT 1 AS n");
+      expect(rows[0]?.n).toBe(1);
+    } finally {
+      await a.close();
+    }
+  });
+
+  it("disconnectBang then reconnect restores query capability", async () => {
+    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    try {
+      a.disconnectBang();
+      expect(a.active).toBe(false);
+      a.reconnect();
+      expect(a.active).toBe(true);
+      const rows = await a.execute("SELECT 2 AS n");
+      expect(rows[0]?.n).toBe(2);
+    } finally {
+      await a.close();
+    }
+  });
+
+  it("configureConnection applies min_messages setting", async () => {
+    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, minMessages: "notice" });
+    try {
+      const level = await a.clientMinMessages();
+      expect(level).toBe("notice");
+    } finally {
+      await a.close();
+    }
+  });
 });
 
 describe("PostgreSQLAdapter constructor validation", () => {
