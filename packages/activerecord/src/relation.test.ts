@@ -2,18 +2,27 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 import { sql, Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, IrreversibleOrderError } from "./index.js";
 import { Associations, registerModel, modelRegistry } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("isBlank / isPresent", () => {
   it("isBlank returns true when no records exist", async () => {
@@ -24,6 +33,7 @@ describe("isBlank / isPresent", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
+    await defineSchema(adapter, { users: { name: "string" } });
 
     expect(await User.all().isBlank()).toBe(true);
     expect(await User.all().isPresent()).toBe(false);
@@ -40,8 +50,28 @@ describe("isBlank / isPresent", () => {
 describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", body: "string", status: "string", author_id: "integer" },
+      developers: { commits: "integer" },
+      orders: { created_at: "string", total: "integer" },
+      books: {
+        author_id: "integer",
+        published_year: "integer",
+        title: "string",
+        active: "boolean",
+      },
+      authors: { name: "string" },
+      comments: { post_id: "integer", author_id: "integer" },
+      users: { name: "string" },
+      eager_comments: { body: "string", eager_article_id: "integer" },
+      eager_articles: { title: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("reload", async () => {
@@ -1170,6 +1200,7 @@ describe("RelationTest", () => {
 
   it("find_by with multi-arg conditions returns the first matching record", async () => {
     const adp = freshAdapter();
+    await defineSchema(adp, { posts: { title: "string", body: "string" } });
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1486,23 +1517,22 @@ describe("RelationTest", () => {
     expect(matches).not.toBeNull();
   });
 
-  let Post: typeof Base;
+  let SharedPost: typeof Base;
   beforeEach(() => {
-    const adp = createTestAdapter();
     class PostClass extends Base {
       static {
         this.tableName = "posts";
-        this.adapter = adp;
+        this.adapter = adapter;
         this.attribute("title", "string");
         this.attribute("body", "string");
       }
     }
-    Post = PostClass;
+    SharedPost = PostClass;
   });
 
   it("find_by! with multi-arg conditions returns the first matching record", async () => {
-    await Post.create({ title: "multi-arg" });
-    const found = await Post.findByBang({ title: "multi-arg" });
+    await SharedPost.create({ title: "multi-arg" });
+    const found = await SharedPost.findByBang({ title: "multi-arg" });
     expect(found).not.toBeNull();
   });
 
