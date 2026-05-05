@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import {
   Base,
   transaction,
@@ -16,10 +16,6 @@ import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -109,6 +105,7 @@ describe("CallbacksTest", () => {
       people: { name: "string" },
       animals: { name: "string", type: "string" },
       topics: { title: "string" },
+      cb_posts: { title: "string" },
     });
   });
 
