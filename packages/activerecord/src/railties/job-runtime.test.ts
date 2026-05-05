@@ -10,7 +10,7 @@ describe("JobRuntimeTest", () => {
     instrument.call({}, "perform", payload, () => {
       RuntimeRegistry.record("SELECT", 5.0);
     });
-    expect(payload["dbRuntime"]).toBeGreaterThan(0);
+    expect(payload["dbRuntime"]).toBe(5.0);
   });
 
   it("does not set dbRuntime for non-perform operations", () => {
