@@ -190,6 +190,62 @@ describeIfPg("PostgresqlConnectionTest", () => {
       await a.close();
     }
   });
+
+  it("disconnectBang closes pool", async () => {
+    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    const pool = a._driverPoolForTest();
+    try {
+      expect(a.active).toBe(true);
+      a.disconnectBang();
+      expect(a.active).toBe(false);
+      expect(a.isConnected()).toBe(false);
+    } finally {
+      // disconnectBang fires pool.end() internally; await here so the
+      // handle is drained before the test exits.
+      await pool?.end().catch(() => {});
+    }
+  });
+
+  it("discardBang fires async pool cleanup", async () => {
+    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    const pool = a._driverPoolForTest();
+    try {
+      expect(a.active).toBe(true);
+      a.discardBang();
+      expect(a.active).toBe(false);
+      expect(a.isConnected()).toBe(false);
+    } finally {
+      // discardBang fires pool.end() internally; await the same handle
+      // here so the test doesn't exit with open sockets.
+      await pool?.end().catch(() => {});
+    }
+  });
+
+  it("reconnect resets connection so queries work again", async () => {
+    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    try {
+      a.reconnect();
+      expect(a.active).toBe(true);
+      const rows = await a.execute("SELECT 1 AS n");
+      expect(rows[0]?.n).toBe(1);
+    } finally {
+      await a.close();
+    }
+  });
+
+  it("disconnectBang then reconnect restores query capability", async () => {
+    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    try {
+      a.disconnectBang();
+      expect(a.active).toBe(false);
+      a.reconnect();
+      expect(a.active).toBe(true);
+      const rows = await a.execute("SELECT 2 AS n");
+      expect(rows[0]?.n).toBe(2);
+    } finally {
+      await a.close();
+    }
+  });
 });
 
 describe("PostgreSQLAdapter constructor validation", () => {
