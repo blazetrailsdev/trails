@@ -7,6 +7,7 @@ import { Base } from "./index.js";
 import { hasSecureToken, MinimumLengthError } from "./secure-token.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -16,8 +17,12 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("SecureTokenTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", token: "string" },
+      user_with_tokens: { name: "string", token: "string" },
+    });
   });
 
   function makeModel() {
@@ -112,8 +117,12 @@ describe("SecureTokenTest", () => {
 
 describe("has_secure_token", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      api_keys: { token: "string" },
+      sessions: { auth_token: "string" },
+    });
   });
 
   it("auto-generates a token on create", async () => {
@@ -165,8 +174,14 @@ describe("has_secure_token", () => {
 describe("has_secure_token (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { token: "string" },
+      sessions: { session_token: "string" },
+      user1s: { token: "string" },
+      user2s: { token: "string" },
+    });
   });
 
   // Rails: test "generates a token on create"

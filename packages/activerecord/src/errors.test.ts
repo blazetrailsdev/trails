@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, RecordNotFound, RecordInvalid, ReadOnlyRecord } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -15,8 +16,9 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("ErrorsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
   });
   it("can be instantiated with no args", () => {
     class Post extends Base {
@@ -33,8 +35,14 @@ describe("ErrorsTest", () => {
 
 describe("error classes", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      items: {},
+      widgets: { name: "string" },
+      things: { name: "string" },
+      empties: {},
+    });
   });
 
   it("find throws RecordNotFound with metadata", async () => {
@@ -112,8 +120,9 @@ describe("error classes", () => {
 describe("Error Classes (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { people: { name: "string" } });
   });
 
   // Rails: test "RecordNotFound"
