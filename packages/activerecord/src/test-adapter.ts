@@ -33,8 +33,10 @@ const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
 
 // When set, the dynamic schema management (setter hook, auto-table creation,
 // error recovery) is disabled. Tests opt in via vi.stubEnv or vitest.config.ts.
-// Read once at module load so per-call overhead is zero.
-const NO_AUTO_SCHEMA = process.env.AR_NO_AUTO_SCHEMA === "1";
+/** @internal Read fresh on each call so vi.stubEnv works in tests. */
+function noAutoSchema(): boolean {
+  return process.env.AR_NO_AUTO_SCHEMA === "1";
+}
 
 /** Which adapter backend is active. */
 export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
@@ -130,8 +132,10 @@ function sqlTypeForAttribute(def: any, isPkCol: boolean): string {
  * We store the model class reference and extract attributes lazily in
  * processPendingModels(), because some tests call this.adapter = x
  * before this.attribute() in their static {} blocks.
+ * Checks noAutoSchema() at call time so vi.stubEnv works after module load.
  */
 function registerModel(modelClass: any): void {
+  if (noAutoSchema()) return;
   _registeredModelClasses.add(modelClass);
 }
 
@@ -149,7 +153,7 @@ function registerModel(modelClass: any): void {
  * columns and applies CPK only when no non-CPK claimant exists.
  */
 function extractColumnsFromModels(): void {
-  if (NO_AUTO_SCHEMA) return;
+  if (noAutoSchema()) return;
   const tablesWithNonCpk = new Set<string>();
   for (const modelClass of _registeredModelClasses) {
     if (modelClass.abstractClass) continue;
@@ -241,7 +245,7 @@ function lookupDeclaredColumnType(tableName: string, colName: string): string | 
  * Create tables and add columns for all pending model registrations.
  */
 async function processPendingModels(inner: any): Promise<void> {
-  if (NO_AUTO_SCHEMA) return;
+  if (noAutoSchema()) return;
   for (const [tableName, columns] of _pendingModels) {
     if (!_createdTables.has(tableName)) {
       const cpkCols = _pendingCpk.get(tableName);
@@ -421,10 +425,9 @@ if (PG_TEST_URL) {
 }
 
 // Register hook so Base.adapter = x triggers model registration.
-// Skip when AR_NO_AUTO_SCHEMA=1 — tests manage their own schema explicitly.
-if (!NO_AUTO_SCHEMA) {
-  _setOnAdapterSetHook(registerModel);
-}
+// The hook itself checks noAutoSchema() on each invocation, so vi.stubEnv
+// works even though _setOnAdapterSetHook runs at module load.
+_setOnAdapterSetHook(registerModel);
 
 /**
  * Create a fresh adapter for testing.
@@ -438,7 +441,7 @@ export function createTestAdapter(): DatabaseAdapter {
  * Clean up test data.
  */
 export async function cleanupTestAdapter(adapter: DatabaseAdapter): Promise<void> {
-  if (NO_AUTO_SCHEMA && _sharedAdapter) {
+  if (noAutoSchema() && _sharedAdapter) {
     await dropAllTables(_sharedAdapter);
     return;
   }
@@ -728,7 +731,7 @@ class SchemaAdapter implements DatabaseAdapter {
    * the table or adding the column. Returns true if recovery succeeded.
    */
   private async handleMissingSchemaError(e: any, sql: string): Promise<boolean> {
-    if (NO_AUTO_SCHEMA) return false;
+    if (noAutoSchema()) return false;
     const msg = e?.message || e?.sqlMessage || "";
 
     // Handle missing column: add the column and retry

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { createTestAdapter, cleanupTestAdapter, resetTestAdapterState } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -29,6 +29,44 @@ describe("AR_NO_AUTO_SCHEMA unset (control)", () => {
     const rows = await adapter.execute(`SELECT * FROM "widgets"`);
     expect(rows.length).toBeGreaterThan(0);
     void Widget;
+  });
+});
+
+// This suite proves the per-call read works WITHOUT vi.resetModules().
+// Before the TS-3-fix, vi.stubEnv in beforeAll was a no-op because
+// NO_AUTO_SCHEMA was captured at module load.
+describe("AR_NO_AUTO_SCHEMA=1 via beforeAll (no module reload)", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeAll(() => {
+    vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+  });
+
+  afterAll(() => {
+    vi.unstubAllEnvs();
+  });
+
+  beforeEach(async () => {
+    await resetTestAdapterState();
+    adapter = createTestAdapter();
+  });
+
+  afterEach(async () => {
+    await cleanupTestAdapter(adapter);
+  });
+
+  it("Base.adapter = x does NOT auto-create table when flag is set post-import", async () => {
+    const { Base } = await import("./base.js");
+    class Sprocket extends Base {
+      static {
+        this.tableName = "sprockets";
+        this.attribute("size", "integer");
+        this.adapter = adapter;
+      }
+    }
+    void Sprocket;
+
+    await expect(adapter.execute(`SELECT * FROM "sprockets"`)).rejects.toThrow();
   });
 });
 
