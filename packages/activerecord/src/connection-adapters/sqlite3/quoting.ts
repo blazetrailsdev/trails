@@ -328,3 +328,20 @@ export function columnNameMatcher(): RegExp {
 export function columnNameWithOrderMatcher(): RegExp {
   return COLUMN_NAME_WITH_ORDER_MATCHER;
 }
+
+/**
+ * Mirrors: SQLite3Adapter#extract_value_from_default
+ * @internal
+ */
+export function extractValueFromDefault(dfltValue: string | null): unknown {
+  if (dfltValue === null) return null;
+  if (/^null$/i.test(dfltValue)) return null;
+  const single = /^'([\s\S]*)'$/.exec(dfltValue);
+  if (single) return single[1].replace(/''/g, "'");
+  const double = /^"([\s\S]*)"$/.exec(dfltValue);
+  if (double) return double[1].replace(/""/g, '"');
+  if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
+  const hex = /^x'([0-9a-fA-F]*)'$/i.exec(dfltValue);
+  if (hex) return Buffer.from(hex[1], "hex");
+  return null;
+}

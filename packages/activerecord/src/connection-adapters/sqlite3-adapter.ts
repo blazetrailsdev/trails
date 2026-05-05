@@ -60,6 +60,7 @@ import {
   quotedFalse as sqliteQuotedFalse,
   unquotedFalse as sqliteUnquotedFalse,
   quotedBinary as sqliteQuotedBinary,
+  extractValueFromDefault as sqliteExtractValueFromDefault,
 } from "./sqlite3/quoting.js";
 import {
   CheckConstraintDefinition,
@@ -1431,26 +1432,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         precision: null,
         scale: null,
       });
-      const defaultValue = this._extractValueFromDefault(r.dflt_value);
+      const defaultValue = sqliteExtractValueFromDefault(r.dflt_value);
       return new Sqlite3Column(r.name, defaultValue, meta, r.notnull === 0, {
         primaryKey: r.pk > 0,
         collation: collationMap.get(r.name) ?? null,
       });
     });
-  }
-
-  // Mirrors: SQLite3Adapter#extract_value_from_default
-  private _extractValueFromDefault(dfltValue: string | null): unknown {
-    if (dfltValue === null) return null;
-    if (/^null$/i.test(dfltValue)) return null;
-    const singleQuoted = /^'([\s\S]*)'$/.exec(dfltValue);
-    if (singleQuoted) return singleQuoted[1].replace(/''/g, "'");
-    const doubleQuoted = /^"([\s\S]*)"$/.exec(dfltValue);
-    if (doubleQuoted) return doubleQuoted[1].replace(/""/g, '"');
-    if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
-    const hexMatch = /^x'(.*)'$/i.exec(dfltValue);
-    if (hexMatch) return Buffer.from(hexMatch[1], "hex");
-    return null;
   }
 
   // Mirrors: SQLite3Adapter#table_structure_with_collation

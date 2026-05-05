@@ -8,13 +8,15 @@
  * (via alterTable rebuild). The functions below delegate to the adapter.
  */
 
-import { NotImplementedError } from "../../errors.js";
 import type { DatabaseAdapter } from "../../adapter.js";
 import type { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
-import { quoteColumnName } from "./quoting.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
+import { quoteColumnName, extractValueFromDefault } from "./quoting.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
+import { Column } from "./column.js";
+import { TableDefinition } from "./schema-definitions.js";
 
 export interface SchemaStatements {
   dataSources(): Promise<string[]>;
@@ -45,6 +47,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
     tableName: string,
     expressionOrOptions?: string | Record<string, unknown>,
   ): Promise<void>;
+  fetchTypeMetadata(sqlType: string): SqlTypeMetadata;
 }
 
 export async function addForeignKey(
@@ -121,64 +124,132 @@ export function schemaCreation(): SchemaCreation {
 }
 
 /** @internal */
-function validTableDefinitionOptions(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#valid_table_definition_options is not implemented",
+function validTableDefinitionOptions(): string[] {
+  return ["rename"];
+}
+
+/** @internal */
+function createTableDefinition(
+  name: string,
+  options: Record<string, unknown> = {},
+): TableDefinition {
+  return new TableDefinition(name, options as any);
+}
+
+/** @internal */
+function validateIndexLengthBang(_tableName: string, _newName: string, internal = false): void {
+  // SQLite skips index name length validation for internal indexes
+  if (internal) return;
+}
+
+/** @internal */
+export function newColumnFromField(
+  adapter: SQLite3SchemaAdapter,
+  _tableName: string,
+  field: Record<string, unknown>,
+  definitions: Record<string, unknown>[],
+): Column {
+  const dfltValue = (field["dflt_value"] as string | null) ?? null;
+  const sqlType = String(field["type"] ?? "");
+  const typeMetadata = adapter.fetchTypeMetadata(sqlType);
+  const defaultValue = extractValueFromDefault(dfltValue);
+  const generatedType = extractGeneratedType(field);
+
+  let defaultFunction: string | null = null;
+  if (generatedType) {
+    defaultFunction = dfltValue;
+  } else {
+    defaultFunction = _extractDefaultFunction(defaultValue, dfltValue);
+  }
+
+  const rowid = isColumnTheRowid(field, definitions);
+
+  return new Column(
+    String(field["name"]),
+    defaultValue,
+    typeMetadata,
+    Number(field["notnull"]) === 0,
+    {
+      defaultFunction: defaultFunction ?? undefined,
+      collation: field["collation"] as string | undefined,
+      autoIncrement: Boolean(field["auto_increment"]),
+      rowid,
+      generatedType,
+    },
+  );
+}
+
+const INTEGER_REGEX = /integer/i;
+
+/** @internal */
+export function isColumnTheRowid(
+  field: Record<string, unknown>,
+  columnDefinitions: Record<string, unknown>[],
+): boolean {
+  if (!INTEGER_REGEX.test(String(field["type"] ?? "")) || field["pk"] !== 1) return false;
+  return columnDefinitions.filter((c) => Number(c["pk"]) > 0).length === 1;
+}
+
+/** @internal */
+export function dataSourceSql(name?: string, type?: string): string {
+  const scope = quotedScope(name, type);
+  if (!scope.type) scope.type = "'table','view'";
+  let sql = "SELECT name FROM pragma_table_list WHERE schema <> 'temp'";
+  sql += " AND name NOT IN ('sqlite_sequence', 'sqlite_schema')";
+  if (scope.name) sql += ` AND name = ${scope.name}`;
+  sql += ` AND type IN (${scope.type})`;
+  return sql;
+}
+
+/** @internal */
+export function quotedScope(name?: string, type?: string): { name?: string; type?: string } {
+  const resolvedType =
+    type === "BASE TABLE"
+      ? "'table'"
+      : type === "VIEW"
+        ? "'view'"
+        : type === "VIRTUAL TABLE"
+          ? "'virtual'"
+          : undefined;
+  const scope: { name?: string; type?: string } = {};
+  if (name != null) scope.name = `'${name.replace(/'/g, "''")}'`;
+  if (resolvedType) scope.type = resolvedType;
+  return scope;
+}
+
+/** @internal */
+export function assertValidDeferrable(deferrable: unknown): void {
+  if (
+    deferrable == null ||
+    deferrable === false ||
+    deferrable === "immediate" ||
+    deferrable === "deferred"
+  )
+    return;
+  throw new Error(
+    `deferrable must be "immediate" or "deferred", got: ${JSON.stringify(deferrable)}`,
   );
 }
 
 /** @internal */
-function createTableDefinition(name: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#create_table_definition is not implemented",
-  );
+export function extractGeneratedType(
+  field: Record<string, unknown>,
+): "virtual" | "stored" | undefined {
+  switch (field["hidden"]) {
+    case 2:
+      return "virtual";
+    case 3:
+      return "stored";
+    default:
+      return undefined;
+  }
 }
 
-/** @internal */
-function validateIndexLengthBang(tableName: any, newName: any, internal?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#validate_index_length! is not implemented",
-  );
-}
+export { extractValueFromDefault as _extractValueFromDefault };
 
-/** @internal */
-function newColumnFromField(tableName: any, field: any, definitions: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#new_column_from_field is not implemented",
-  );
-}
-
-/** @internal */
-function isColumnTheRowid(field: any, columnDefinitions: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#is_column_the_rowid? is not implemented",
-  );
-}
-
-/** @internal */
-function dataSourceSql(name?: any, type?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#data_source_sql is not implemented",
-  );
-}
-
-/** @internal */
-function quotedScope(name?: any, type?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#quoted_scope is not implemented",
-  );
-}
-
-/** @internal */
-function assertValidDeferrable(deferrable: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#assert_valid_deferrable is not implemented",
-  );
-}
-
-/** @internal */
-function extractGeneratedType(field: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#extract_generated_type is not implemented",
-  );
+function _extractDefaultFunction(defaultValue: unknown, dflt: string | null): string | null {
+  if (defaultValue == null && dflt != null && /\w+\(.*\)|CURRENT_DATE|CURRENT_TIME/i.test(dflt)) {
+    return dflt;
+  }
+  return null;
 }
