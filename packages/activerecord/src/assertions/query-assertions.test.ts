@@ -16,8 +16,9 @@ describe("QueryAssertionsTest", () => {
   afterEach(() => Notifications.unsubscribeAll());
 
   it("assert queries count any", async () => {
-    await assertQueriesCount(1, async () => {
+    await assertQueriesCount(null, async () => {
       publishSql("SELECT 1");
+      publishSql("SELECT 2");
     });
   });
 
