@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base, transaction, savepoint, Rollback, afterAllTransactionsCommit } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 
@@ -45,8 +46,9 @@ afterEach(() => {
 describe("TransactionTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { topics: { title: "string" } });
   });
 
   it("transaction commits on success", async () => {
@@ -77,12 +79,17 @@ describe("TransactionTest", () => {
 // TransactionTest — targets transactions_test.rb
 // ==========================================================================
 describe("TransactionTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
+  });
+
   it("blank?", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     // A new relation is not blank when records exist
@@ -91,11 +98,10 @@ describe("TransactionTest", () => {
   });
 
   it("rollback dirty changes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = (await Post.create({ title: "original" })) as any;
@@ -112,11 +118,10 @@ describe("TransactionTest", () => {
   });
 
   it("transaction does not apply default scope", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ title: "in-tx" });
@@ -127,11 +132,10 @@ describe("TransactionTest", () => {
   });
 
   it("successful with instance method", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let created: any;
@@ -144,11 +148,10 @@ describe("TransactionTest", () => {
   });
 
   it("return from transaction commits", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(Post, async () => {
@@ -158,11 +161,10 @@ describe("TransactionTest", () => {
   });
 
   it("rollback dirty changes multiple saves", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = (await Post.create({ title: "start" })) as any;
@@ -170,11 +172,10 @@ describe("TransactionTest", () => {
   });
 
   it("raise after destroy", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = (await Post.create({ title: "destroy-test" })) as any;
@@ -183,11 +184,10 @@ describe("TransactionTest", () => {
   });
 
   it("persisted in a model with custom primary key after failed save", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = (await Post.create({ title: "persisted" })) as any;
@@ -199,12 +199,21 @@ describe("TransactionTest", () => {
 // TransactionTest — more targets for transactions_test.rb
 // ==========================================================================
 describe("TransactionTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+      topics: { title: "string", approved: "boolean" },
+      tx_posts: { title: "string" },
+    });
+  });
+
   it("successful", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(Post, async () => {
@@ -214,11 +223,10 @@ describe("TransactionTest", () => {
   });
 
   it("failing on exception", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     try {
@@ -233,11 +241,10 @@ describe("TransactionTest", () => {
   });
 
   it("nested explicit transactions", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(Post, async () => {
@@ -249,11 +256,10 @@ describe("TransactionTest", () => {
   });
 
   it("restore active record state for all records in a transaction", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = new Post({ title: "before-tx" });
@@ -265,11 +271,10 @@ describe("TransactionTest", () => {
   });
 
   it("rollback for freshly persisted records", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = (await Post.create({ title: "persisted" })) as any;
@@ -286,11 +291,10 @@ describe("TransactionTest", () => {
   });
 
   it("transactions state from rollback", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let caughtError = false;
@@ -305,11 +309,10 @@ describe("TransactionTest", () => {
   });
 
   it("transactions state from commit", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let completed = false;
@@ -321,11 +324,10 @@ describe("TransactionTest", () => {
   });
 
   it("restore id after rollback", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = new Post({ title: "no-id-yet" });
@@ -342,11 +344,10 @@ describe("TransactionTest", () => {
   });
 
   it("rollback on composite key model", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ title: "before" });
@@ -362,11 +363,10 @@ describe("TransactionTest", () => {
   });
 
   it("empty transaction is not materialized", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(Post, async () => {
@@ -376,11 +376,10 @@ describe("TransactionTest", () => {
   });
 
   it("update should rollback on failure", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = (await Post.create({ title: "original" })) as any;
@@ -396,11 +395,10 @@ describe("TransactionTest", () => {
   });
 
   it("callback rollback in create", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     try {
@@ -415,11 +413,10 @@ describe("TransactionTest", () => {
   });
 
   it("transaction after commit callback", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let afterCommitCalled = false;
@@ -432,11 +429,10 @@ describe("TransactionTest", () => {
   });
 
   it("nested transactions after disable lazy transactions", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(Post, async () => {
@@ -448,11 +444,10 @@ describe("TransactionTest", () => {
   });
 
   it("transaction open?", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let insideTransaction = false;
@@ -464,11 +459,10 @@ describe("TransactionTest", () => {
   });
 
   it("successful with return outside inner transaction", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(Post, async () => {
@@ -478,12 +472,11 @@ describe("TransactionTest", () => {
   });
 
   it("after_commit on update", async () => {
-    const adp = freshAdapter();
     const log: string[] = [];
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterCommit((record: any) => {
           log.push("committed:" + record.title);
         });
@@ -497,12 +490,11 @@ describe("TransactionTest", () => {
   });
 
   it("after_commit on destroy", async () => {
-    const adp = freshAdapter();
     const log: string[] = [];
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterCommit(() => {
           log.push("committed");
         });
@@ -515,12 +507,11 @@ describe("TransactionTest", () => {
   });
 
   it("after commit fires in correct order", async () => {
-    const adp = freshAdapter();
     const log: string[] = [];
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterCommit(() => {
           log.push("first");
         });
@@ -534,12 +525,11 @@ describe("TransactionTest", () => {
   });
 
   it("after_commit_on_create_in_transaction", async () => {
-    const adp = freshAdapter();
     const log: string[] = [];
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterCommit(() => {
           log.push("committed");
         });
@@ -552,12 +542,11 @@ describe("TransactionTest", () => {
   });
 
   it("after_rollback on create", async () => {
-    const adp = freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterRollback(
           (r: any) => {
             history.push("rollback:" + r.title);
@@ -574,12 +563,11 @@ describe("TransactionTest", () => {
   });
 
   it("after_rollback on update", async () => {
-    const adp = freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterRollback(
           () => {
             history.push("rollback_on_update");
@@ -604,12 +592,11 @@ describe("TransactionTest", () => {
   });
 
   it("after_rollback on destroy", async () => {
-    const adp = freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterRollback(
           () => {
             history.push("rollback_on_destroy");
@@ -634,12 +621,11 @@ describe("TransactionTest", () => {
   });
 
   it("after commit callback ordering", async () => {
-    const adp = freshAdapter();
     const log: string[] = [];
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterCommit(() => {
           log.push("a");
         });
@@ -656,12 +642,11 @@ describe("TransactionTest", () => {
   });
 
   it("after_commit_returns_record_with_save", async () => {
-    const adp = freshAdapter();
     let savedRecord: any = null;
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterCommit((record: any) => {
           savedRecord = record;
         });
@@ -677,12 +662,11 @@ describe("TransactionTest", () => {
   });
 
   it("rollback triggers after_rollback", async () => {
-    const adp = freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterRollback(() => {
           history.push("rolled_back");
         });
@@ -696,12 +680,11 @@ describe("TransactionTest", () => {
   });
 
   it("after_commit_on_destroy_in_transaction", async () => {
-    const adp = freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterDestroyCommit(() => {
           history.push("commit_on_destroy");
         });
@@ -717,12 +700,11 @@ describe("TransactionTest", () => {
     /* needs nested transaction / savepoint support */
   });
   it("after_commit_not_called_on_rollback", async () => {
-    const adp = freshAdapter();
     const history: string[] = [];
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
         this.afterCommit(() => {
           history.push("committed");
         });
@@ -741,11 +723,10 @@ describe("TransactionTest", () => {
     /* needs readonly check in commit callbacks */
   });
   it("transaction within transaction", async () => {
-    const adp = freshAdapter();
     class TxPost extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(TxPost, async () => {
@@ -781,11 +762,10 @@ describe("TransactionTest", () => {
   });
 
   it("after all transactions commit", async () => {
-    const adp = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let called = 0;
@@ -820,11 +800,10 @@ describe("TransactionTest", () => {
   });
 
   it("transaction after rollback callback", async () => {
-    const adp = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let called = 0;
@@ -889,12 +868,11 @@ describe("TransactionTest", () => {
     // Requires has_many associations and validation-triggered rollback.
   });
   it("manually rolling back a transaction", async () => {
-    const adp = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("approved", "boolean");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const t1 = await Topic.create({ title: "First", approved: false });
@@ -961,11 +939,10 @@ describe("TransactionTest", () => {
     // because writeAttribute is called to set the id after INSERT. The test is
     // about frozen-record protection, not transactional rollback — the test
     // adapter is correct here (no real DB transaction needed).
-    const adp = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const topic = new Topic({ title: "test" });
@@ -1015,12 +992,17 @@ describe("TransactionTest", () => {
 // TransactionTest2 — more targets for transactions_test.rb
 // ==========================================================================
 describe("TransactionTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
+  });
+
   it("successful", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(Post, async () => {
@@ -1030,11 +1012,10 @@ describe("TransactionTest", () => {
   });
 
   it("failing on exception", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let threw = false;
@@ -1049,11 +1030,10 @@ describe("TransactionTest", () => {
   });
 
   it("nested explicit transactions", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(Post, async () => {
@@ -1065,11 +1045,10 @@ describe("TransactionTest", () => {
   });
 
   it("raise after destroy", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "to destroy" })) as any;
@@ -1078,11 +1057,10 @@ describe("TransactionTest", () => {
   });
 
   it("rollback dirty changes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -1099,11 +1077,10 @@ describe("TransactionTest", () => {
   });
 
   it("rollback dirty changes multiple saves", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "v1" })) as any;
@@ -1115,11 +1092,10 @@ describe("TransactionTest", () => {
   });
 
   it("update should rollback on failure", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     Post.validates("title", { presence: true });
@@ -1129,11 +1105,10 @@ describe("TransactionTest", () => {
   });
 
   it("rollback of frozen records", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "test" })) as any;
@@ -1142,11 +1117,10 @@ describe("TransactionTest", () => {
   });
 
   it("restore active record state for all records in a transaction", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post1 = (await Post.create({ title: "p1" })) as any;
@@ -1165,11 +1139,10 @@ describe("TransactionTest", () => {
   });
 
   it("persisted in a model with custom primary key after failed save", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     Post.validates("title", { presence: true });
@@ -1179,11 +1152,10 @@ describe("TransactionTest", () => {
   });
 
   it("callback rollback in create", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "created" })) as any;
@@ -1191,33 +1163,30 @@ describe("TransactionTest", () => {
   });
 
   it("transactions state from rollback", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     expect(Post.new({ title: "new" }).isNewRecord()).toBe(true);
   });
 
   it("transactions state from commit", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     expect(((await Post.create({ title: "created" })) as any).isPersisted()).toBe(true);
   });
 
   it("restore id after rollback", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = Post.new({ title: "no id" }) as any;
@@ -1227,11 +1196,10 @@ describe("TransactionTest", () => {
   });
 
   it("read attribute after rollback", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -1240,11 +1208,10 @@ describe("TransactionTest", () => {
   });
 
   it("write attribute after rollback", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -1253,11 +1220,10 @@ describe("TransactionTest", () => {
   });
 
   it("rollback for freshly persisted records", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "fresh" })) as any;
@@ -1266,11 +1232,10 @@ describe("TransactionTest", () => {
   });
 
   it("empty transaction is not materialized", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await transaction(Post, async () => {
@@ -1280,11 +1245,10 @@ describe("TransactionTest", () => {
   });
 
   it("transaction after commit callback", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let called = false;
@@ -1296,11 +1260,10 @@ describe("TransactionTest", () => {
   });
 
   it("restore new record after double save", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = Post.new({ title: "double" }) as any;
@@ -1310,11 +1273,10 @@ describe("TransactionTest", () => {
   });
 
   it("rollback dirty changes then retry save", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const post = (await Post.create({ title: "original" })) as any;
@@ -1324,11 +1286,10 @@ describe("TransactionTest", () => {
   });
 
   it("transaction commits on success", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let committed = false;
@@ -1341,11 +1302,10 @@ describe("TransactionTest", () => {
   });
 
   it("transaction rolls back on error", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     let threw = false;
@@ -1368,8 +1328,9 @@ describe("TransactionTest", () => {
 // ==========================================================================
 describe("TransactionTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { posts: { title: "string" } });
   });
 
   it("rollback dirty changes even with raise during rollback removes from pool", () => {
@@ -1571,9 +1532,10 @@ describe("TransactionTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Account.adapter = adapter;
+    await defineSchema(adapter, { accounts: { name: "string", balance: "integer" } });
   });
 
   it("successful", async () => {
@@ -1653,8 +1615,9 @@ describe("TransactionTest", () => {
 
 describe("TransactionTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { accounts: { name: "string", balance: "integer" } });
   });
 
   it("successful transaction commits", async () => {
@@ -1742,9 +1705,10 @@ describe("TransactionTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Account.adapter = adapter;
+    await defineSchema(adapter, { accounts: { name: "string", balance: "integer" } });
   });
 
   it("successful", async () => {
