@@ -1,10 +1,24 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import type { DatabaseAdapter } from "./adapter.js";
+
+let adapter: DatabaseAdapter;
+
+beforeAll(() => {
+  adapter = createTestAdapter();
+});
+beforeEach(async () => {
+  await defineSchema(adapter, { parents: { name: "string" } });
+});
+afterAll(async () => {
+  await dropAllTables(adapter);
+});
 
 describe("InheritedTest", () => {
   it("super before filter attributes", async () => {
-    const adapter = createTestAdapter();
     const log: string[] = [];
     class Parent extends Base {
       static {
@@ -29,7 +43,6 @@ describe("InheritedTest", () => {
   });
 
   it("super after filter attributes", async () => {
-    const adapter = createTestAdapter();
     const log: string[] = [];
     class Parent extends Base {
       static {

@@ -1,11 +1,25 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import type { DatabaseAdapter } from "./adapter.js";
+
+let adapter: DatabaseAdapter;
+
+beforeAll(() => {
+  adapter = createTestAdapter();
+});
+beforeEach(async () => {
+  await defineSchema(adapter, { events: { start_date: "date" } });
+});
+afterAll(async () => {
+  await dropAllTables(adapter);
+});
 
 describe("DateTest", () => {
   it("date with time value", async () => {
-    const adapter = createTestAdapter();
     class Event extends Base {
       static {
         this.attribute("start_date", "date");
@@ -18,7 +32,6 @@ describe("DateTest", () => {
   });
 
   it("date with string value", async () => {
-    const adapter = createTestAdapter();
     class Event extends Base {
       static {
         this.attribute("start_date", "date");

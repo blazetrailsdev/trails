@@ -1,20 +1,27 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+let adapter: DatabaseAdapter;
+
+beforeAll(() => {
+  adapter = createTestAdapter();
+});
+beforeEach(async () => {
+  await defineSchema(adapter, {
+    authors: { name: "string", city: "string" },
+    posts: { title: "string", author_id: "integer" },
+  });
+});
+afterAll(async () => {
+  await dropAllTables(adapter);
+});
 
 describe("Delegate (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   // Rails: test "delegate to association"
   it("delegates attribute reads to a belongs_to association", async () => {
     class Author extends Base {

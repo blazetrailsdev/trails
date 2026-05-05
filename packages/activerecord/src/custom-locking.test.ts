@@ -1,14 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
-function freshAdapter() {
-  return createTestAdapter();
-}
+let adapter: DatabaseAdapter;
+
+beforeAll(() => {
+  adapter = createTestAdapter();
+});
+beforeEach(async () => {
+  await defineSchema(adapter, {
+    posts: { title: "string", lock_version: "integer" },
+  });
+});
+afterAll(async () => {
+  await dropAllTables(adapter);
+});
 
 describe("CustomLockingTest", () => {
   it("custom lock", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this._tableName = "posts";

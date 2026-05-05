@@ -1,10 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
+
+let adapter: DatabaseAdapter;
+
+beforeAll(() => {
+  adapter = createTestAdapter();
+});
 
 describe("AnnotateTest", () => {
   it("annotate wraps content in an inline comment", () => {
-    const adapter = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -16,7 +22,6 @@ describe("AnnotateTest", () => {
   });
 
   it("annotate is sanitized", () => {
-    const adapter = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");

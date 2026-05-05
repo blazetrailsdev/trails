@@ -1,23 +1,31 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+let adapter: DatabaseAdapter;
+let Topic: typeof Base;
+
+beforeAll(() => {
+  adapter = createTestAdapter();
+});
+beforeEach(async () => {
+  await defineSchema(adapter, { topics: { title: "string", author_name: "string" } });
+  Topic = class extends Base {
+    static {
+      this.attribute("title", "string");
+      this.attribute("author_name", "string");
+      this.adapter = adapter;
+    }
+  };
+});
+afterAll(async () => {
+  await dropAllTables(adapter);
+});
+
 describe("FinderRespondToTest", () => {
-  let adapter: DatabaseAdapter;
-  let Topic: typeof Base;
-
-  beforeEach(() => {
-    adapter = createTestAdapter();
-    Topic = class extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_name", "string");
-        this.adapter = adapter;
-      }
-    };
-  });
-
   it("should preserve normal respond to behavior on base", () => {
     expect(typeof Base.create).toBe("function");
     expect(typeof Base.find).toBe("function");

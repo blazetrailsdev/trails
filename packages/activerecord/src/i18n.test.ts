@@ -1,17 +1,25 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { I18n } from "@blazetrails/activemodel";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+let adapter: DatabaseAdapter;
+
+beforeAll(() => {
+  adapter = createTestAdapter();
+});
+beforeEach(async () => {
+  I18n.reset();
+  await defineSchema(adapter, { topics: { title: "string" } });
+});
+afterAll(async () => {
+  await dropAllTables(adapter);
+});
+
 describe("ActiveRecordI18nTests", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    I18n.reset();
-    adapter = createTestAdapter();
-  });
-
   it("translated model attributes", () => {
     class Topic extends Base {
       static {

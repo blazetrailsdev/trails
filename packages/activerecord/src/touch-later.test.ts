@@ -2,25 +2,30 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+let adapter: DatabaseAdapter;
+
+beforeAll(() => {
+  adapter = createTestAdapter();
+});
+beforeEach(async () => {
+  await defineSchema(adapter, {
+    invoices: { amount: "integer", updated_at: "datetime", created_at: "datetime" },
+  });
+});
+afterAll(async () => {
+  await dropAllTables(adapter);
+});
 
 describe("TouchLaterTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeTouchModel() {
     class Invoice extends Base {
       static {

@@ -4,14 +4,6 @@
  */
 import { describe, it } from "vitest";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
-
 describe("CommentTest", () => {
   it.skip("default primary key comment", () => {
     /* fixture-dependent */
