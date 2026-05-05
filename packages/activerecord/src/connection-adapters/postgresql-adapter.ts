@@ -1587,14 +1587,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Mirrors Rails' `PostgreSQLAdapter#discard!`. Abandons the pool
-   * without waiting for a clean drain — used when the process is about
-   * to fork or the connection is unrecoverably broken. Rails reopens the
-   * raw socket to /dev/null; we simply null out all references.
+   * Mirrors Rails' `PostgreSQLAdapter#discard!`. Used when the process
+   * is about to fork or the connection is unrecoverably broken. Rails
+   * reopens the raw socket to /dev/null; here we fire a non-blocking
+   * `pool.end()` (fire-and-forget) so server-side resources are
+   * eventually released, then immediately null all references so no
+   * further queries can start.
    */
   override discardBang(): void {
-    // Capture before nulling so we can fire a non-blocking end() to
-    // release server-side resources (mirrors Rails reopen to /dev/null).
     this._driverPool?.end().catch(() => {});
     this._driverPool = null;
     this._advisoryLockClient = null;

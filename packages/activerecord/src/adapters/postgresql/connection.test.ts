@@ -194,23 +194,30 @@ describeIfPg("PostgresqlConnectionTest", () => {
   it("disconnectBang closes pool", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
     const pool = a._driverPoolForTest();
-    expect(a.active).toBe(true);
-    a.disconnectBang();
-    expect(a.active).toBe(false);
-    expect(a.isConnected()).toBe(false);
-    // Await the pool drain that disconnectBang fired asynchronously.
-    await pool?.end().catch(() => {});
+    try {
+      expect(a.active).toBe(true);
+      a.disconnectBang();
+      expect(a.active).toBe(false);
+      expect(a.isConnected()).toBe(false);
+    } finally {
+      // disconnectBang fires pool.end() internally; await here so the
+      // handle is drained before the test exits.
+      await pool?.end().catch(() => {});
+    }
   });
 
-  it("discardBang abandons pool without draining", async () => {
+  it("discardBang fires async pool cleanup", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
-    const pool = a._driverPoolForTest();
-    expect(a.active).toBe(true);
-    a.discardBang();
-    expect(a.active).toBe(false);
-    expect(a.isConnected()).toBe(false);
-    // discardBang intentionally skips pool.end(); drain here for test hygiene.
-    await pool?.end().catch(() => {});
+    try {
+      expect(a.active).toBe(true);
+      a.discardBang();
+      expect(a.active).toBe(false);
+      expect(a.isConnected()).toBe(false);
+    } finally {
+      // discardBang already fired pool.end() fire-and-forget; close()
+      // is a no-op (pool is null) but ensures any lingering work finishes.
+      await a.close();
+    }
   });
 
   it("reconnect resets connection so queries work again", async () => {
