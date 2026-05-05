@@ -1,16 +1,9 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 
-// Number of parallel forks for activerecord tests. Set AR_DB_FORKS=4 in CI
-// after provisioning rails_js_test_2/3/4 alongside the base database. Leave
-// unset (or 0/1) for local runs — workers fall back to the base URL.
-const AR_DB_FORKS = parseInt(process.env.AR_DB_FORKS ?? "0", 10) || undefined;
-
-// When AR_DB_FORKS is unset and a real DB is present, cap to 1 fork so
-// parallel workers don't race on the same PG/MySQL database. SQLite uses
-// :memory: which is isolated per fork, so no cap is needed there.
-const AR_DB_MAX_FORKS =
-  AR_DB_FORKS ?? (process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 1 : undefined);
+// AR_DB_FORKS (read in test-setup-worker-db.ts) sets the advisory-lock slot
+// pool size. Worker count is no longer pinned to it: vitest spawns freely and
+// workers queue on advisory locks when all slots are held.
 
 const SHARED_EXCLUDE = [
   "**/node_modules/**",
@@ -104,10 +97,9 @@ export default defineConfig({
           // regression slips through.
           retry: process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 2 : 0,
           pool: "forks",
-          // minForks = maxForks so VITEST_WORKER_ID stays within [1, AR_DB_MAX_FORKS].
-          // Without this each file gets a new fork; IDs wrap mod AR_DB_MAX_FORKS,
-          // so workers share the same DB and race on table mutations mid-test.
-          poolOptions: { forks: { maxForks: AR_DB_MAX_FORKS, minForks: AR_DB_MAX_FORKS } },
+          // Worker count is intentionally uncapped: advisory locks in
+          // test-setup-worker-db.ts bound real DB concurrency to AR_DB_FORKS
+          // slots, so extra workers simply wait for a free slot.
         },
       },
       {
