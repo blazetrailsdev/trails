@@ -72,6 +72,7 @@ import { Association as AssociationInstance } from "./associations/association.j
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import * as ConnectionHandling from "./connection-handling.js";
 import * as ModelSchema from "./model-schema.js";
+import { fireAdapterSetHook } from "./_adapter-set-hook.js";
 import {
   createOrUpdate as callbacksCreateOrUpdate,
   _createRecord as callbacksCreateRecord,
@@ -249,10 +250,7 @@ export function _setScopeProxyWrapper(wrapper: (rel: any) => any): void {
 }
 
 /** @internal Hook called when a model's adapter is set. Used by test-adapter.ts. */
-let _onAdapterSet: ((modelClass: any) => void) | null = null;
-export function _setOnAdapterSetHook(hook: ((modelClass: any) => void) | null): void {
-  _onAdapterSet = hook;
-}
+export { setOnAdapterSetHook as _setOnAdapterSetHook } from "./_adapter-set-hook.js";
 
 // Mirrors Rails' AbstractAdapter#arel_visitor — routes Node#toSql() through the
 // dialect-specific visitor (e.g. SQLite booleans as 1/0, no FOR UPDATE, etc.).
@@ -742,7 +740,7 @@ export class Base extends Model {
     }
     this._adapter = adapter;
     _wireArelVisitor(adapter);
-    if (_onAdapterSet) _onAdapterSet(this);
+    fireAdapterSetHook(this);
 
     // Full schema reset on adapter swap: drops schema-sourced defs and
     // their prototype accessors (preserves user-declared defs), and
@@ -812,7 +810,7 @@ export class Base extends Model {
     if (modelPool) {
       this._adapter = modelPool.checkout();
       _wireArelVisitor(this._adapter);
-      if (_onAdapterSet) _onAdapterSet(this);
+      fireAdapterSetHook(this);
       return this._adapter;
     }
 
@@ -824,7 +822,7 @@ export class Base extends Model {
       if (!connectionClass._adapter) {
         connectionClass._adapter = connPool.checkout();
         _wireArelVisitor(connectionClass._adapter);
-        if (_onAdapterSet) _onAdapterSet(connectionClass);
+        fireAdapterSetHook(connectionClass);
       }
       return connectionClass._adapter;
     }

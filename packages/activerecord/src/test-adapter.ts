@@ -131,8 +131,27 @@ function registerModel(modelClass: any): void {
 
 /**
  * Extract columns from all registered model classes and add to _pendingModels.
+ *
+ * Conflict resolution: HABTM associations register an anonymous JoinModel
+ * with composite PK [ownerFk, targetFk] for the join table, and tests often
+ * also declare a user Model for that same table with the default id PK.
+ * Both register here. We need exactly one PK shape per table; if any
+ * non-CPK model claims the table, the CPK assignment from the anonymous
+ * JoinModel must yield. Otherwise the table loses its `id` column and any
+ * id-based DELETE/UPDATE on it fails. Two-pass approach: first pass
+ * collects which tables have a non-CPK claimant; second pass merges
+ * columns and applies CPK only when no non-CPK claimant exists.
  */
 function extractColumnsFromModels(): void {
+  const tablesWithNonCpk = new Set<string>();
+  for (const modelClass of _registeredModelClasses) {
+    if (modelClass.abstractClass) continue;
+    const tableName: string = modelClass.tableName;
+    if (!tableName) continue;
+    const pk = modelClass.primaryKey;
+    if (!Array.isArray(pk)) tablesWithNonCpk.add(tableName);
+  }
+
   for (const modelClass of _registeredModelClasses) {
     if (modelClass.abstractClass) continue;
     const tableName: string = modelClass.tableName;
@@ -141,22 +160,23 @@ function extractColumnsFromModels(): void {
     const attrs: Map<string, { name: string; type: { name?: string } }> =
       modelClass._attributeDefinitions;
 
-    // Detect composite or custom primary key
     const pk = modelClass.primaryKey;
     const isCpk = Array.isArray(pk);
     const isCustomPk =
       !isCpk && typeof pk === "string" && pk.length > 0 && pk !== "id" && !!attrs?.has(pk);
+    // Skip CPK if any non-CPK model already claims this table.
+    const applyCpk = isCpk && !tablesWithNonCpk.has(tableName);
 
-    const pkCols = isCpk ? (pk as string[]) : isCustomPk ? [pk] : [];
+    const pkCols = applyCpk ? (pk as string[]) : isCustomPk ? [pk] : [];
     const columns = new Map<string, string>();
     if (attrs) {
       for (const [name, def] of attrs) {
-        if (name === "id" && !isCpk && !isCustomPk) continue;
+        if (name === "id" && !applyCpk && !isCustomPk) continue;
         columns.set(name, sqlTypeForAttribute(def, pkCols.includes(name)));
       }
     }
 
-    if (isCpk) {
+    if (applyCpk) {
       _pendingCpk.set(tableName, pk as string[]);
     } else if (isCustomPk) {
       _pendingCpk.set(tableName, [pk]);

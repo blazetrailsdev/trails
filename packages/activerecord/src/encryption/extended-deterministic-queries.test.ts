@@ -144,8 +144,13 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     Configurable.config.deterministicKey = savedConfig.deterministicKey;
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     books = setupBooks();
+    // Warm the books table so the first create in each test doesn't race
+    // with the test-adapter's regex-recovery schema path on MariaDB,
+    // which can otherwise leave the create's INSERT torn from the
+    // subsequent SELECT (different pool connections, uncommitted state).
+    await books.EncryptedBook.where("1=1").toArray();
   });
 
   it("Finds records when data is unencrypted", async () => {
