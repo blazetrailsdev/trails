@@ -1516,12 +1516,34 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   reconnect(): void {
-    void this._driverPool?.end();
+    if (this._advisoryLockClient) {
+      this._advisoryLockClient.release();
+      this._advisoryLockClient = null;
+    }
+    if (this._client) {
+      this._releaseStatementPool(this._client);
+      this._client.release();
+      this._client = null;
+    }
+    this._driverPool?.end().catch(() => {});
     this._driverPool = null;
-    this._client = null;
+    this._inTransaction = false;
+    this._lastReleasedTxnClient = null;
     this._configuredClients = new WeakSet<pg.PoolClient>();
     this._statementPools = new WeakMap<pg.PoolClient, StatementPool>();
+    this._clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
     this.connect();
+  }
+
+  /**
+   * Public override so `AbstractAdapter#verifyBang()` (called by
+   * `ConnectionPool` on checkout) actually reconnects the PG pool
+   * rather than just clearing the statement cache.
+   *
+   * @internal
+   */
+  override reconnectBang(): void {
+    this.reconnect();
   }
 
   /**
@@ -1553,7 +1575,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this._client.release();
       this._client = null;
     }
-    void this._driverPool?.end();
+    this._driverPool?.end().catch(() => {});
     this._driverPool = null;
     super.disconnectBang();
   }

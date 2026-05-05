@@ -193,18 +193,24 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   it("disconnectBang closes pool", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
+    const pool = a._driverPoolForTest();
     expect(a.active).toBe(true);
     a.disconnectBang();
     expect(a.active).toBe(false);
     expect(a.isConnected()).toBe(false);
+    // Await the pool drain that disconnectBang fired asynchronously.
+    await pool?.end().catch(() => {});
   });
 
   it("discardBang abandons pool without draining", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
+    const pool = a._driverPoolForTest();
     expect(a.active).toBe(true);
     a.discardBang();
     expect(a.active).toBe(false);
     expect(a.isConnected()).toBe(false);
+    // discardBang intentionally skips pool.end(); drain here for test hygiene.
+    await pool?.end().catch(() => {});
   });
 
   it("reconnect resets connection so queries work again", async () => {
