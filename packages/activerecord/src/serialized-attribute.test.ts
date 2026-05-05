@@ -26,7 +26,13 @@ describe("SerializedAttributeTest", () => {
       users: { name: "string", preferences: "string" },
       parents: { name: "string", data: "string" },
       topics: { title: "string", content: "string" },
-      posts: { title: "string", settings: "string", tags: "string", meta: "string", data: "string" },
+      posts: {
+        title: "string",
+        settings: "string",
+        tags: "string",
+        meta: "string",
+        data: "string",
+      },
     });
   });
 

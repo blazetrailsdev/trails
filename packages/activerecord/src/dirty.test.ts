@@ -199,7 +199,13 @@ describe("DirtyTest", () => {
   beforeEach(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
-      posts: { title: "string", views: "integer", count: "integer", meta: "string", author_id: "integer" },
+      posts: {
+        title: "string",
+        views: "integer",
+        count: "integer",
+        meta: "string",
+        author_id: "integer",
+      },
       authors: { name: "string" },
     });
   });
