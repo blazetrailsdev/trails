@@ -725,7 +725,7 @@ function main() {
       if (includers) {
         for (const incFqn of includers) {
           const file = fqnToFile.get(incFqn);
-          if (file) files.add(rubyFileToTs(file));
+          if (file) files.add(rubyFileToTs(file, pkg));
           // Transitively: if incFqn is also a module, its includers count too
           for (const f of resolveIncluderFiles(incFqn, visited)) {
             files.add(f);
@@ -785,7 +785,7 @@ function main() {
     const fileResults: FileResult[] = [];
 
     for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-      const expectedTs = rubyFileToTs(rubyFile);
+      const expectedTs = rubyFileToTs(rubyFile, pkg);
       const tsMethods = tsMethodsByFile.get(expectedTs) || new Set<string>();
       const tsFileExists = fs.existsSync(path.join(pkgSrcDir, expectedTs));
       const missingMethods: MethodResult[] = [];
@@ -997,7 +997,7 @@ function main() {
         // `allRuby` mixes classes and modules; modules don't carry superclass.
         if (!(fqn in rubyPkg.classes)) continue;
 
-        const expectedTs = rubyFileToTs(info.file);
+        const expectedTs = rubyFileToTs(info.file, pkg);
         const short = shortName(fqn)!;
         const rubySuper = shortName(info.superclass);
 
