@@ -593,13 +593,11 @@ _Component C — Deduplicable cluster (5 files)_
 
 ### Wave 10 — Migration cluster
 
-**PR 44 — `migration/join_table.rb` (0%)**
+**PR 44 — `migration/join_table.rb` (100%)** ✅ #1188
 
 - Rails: `$AR/migration/join_table.rb` (16 LOC)
-- TS: `$TS/migration/join-table.ts` — **file does not exist; must be created**
-- Missing (2): `findJoinTableName`, `joinTableName`
-- LOC: Rails 16 LOC → ~40 net (create file + implement)
-- Dependencies: PR 8b (join table name logic referenced there)
+- TS: `$TS/migration/join-table.ts`
+- Implemented (2): `findJoinTableName`, `joinTableName`
 
 **PR 45 — `migration/command_recorder.rb` (42%)**
 
