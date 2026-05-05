@@ -175,6 +175,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   private static _spCounter = 0;
   private _driverPool: pg.Pool | null;
+  private _pgPoolOptions: pg.PoolConfig | null = null;
   private _client: pg.PoolClient | null = null;
   private _inTransaction = false;
   private _databaseVersion: number | null = null;
@@ -259,10 +260,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (typeof config === "string") {
       this._minMessages = "warning";
       this._sessionVariables = {};
-      this._driverPool = new pg.Pool({
+      this._pgPoolOptions = {
         connectionString: config,
         types: { getTypeParser: getTemporalTypeParser },
-      });
+      };
+      this._driverPool = new pg.Pool(this._pgPoolOptions);
       return;
     }
     // Rails' database.yml merges driver connection params + adapter
@@ -318,7 +320,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const userGetTypeParser = (
       pgConfig.types as { getTypeParser?: (oid: number, format?: string) => unknown } | undefined
     )?.getTypeParser;
-    this._driverPool = new pg.Pool({
+    this._pgPoolOptions = {
       ...pgConfig,
       types: {
         getTypeParser(oid: number, format?: string): unknown {
@@ -331,7 +333,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           return userGetTypeParser?.(oid, format) ?? getTemporalTypeParser(oid, format);
         },
       },
-    });
+    };
+    this._driverPool = new pg.Pool(this._pgPoolOptions);
   }
 
   /**
@@ -1489,6 +1492,128 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       await this._driverPool.end();
       this._driverPool = null;
     }
+  }
+
+  /**
+   * Mirrors Rails' private `PostgreSQLAdapter#connect`. Creates a fresh
+   * pg.Pool using the stored connection options. Called by `reconnect`
+   * after the old pool has been torn down.
+   *
+   * @internal
+   */
+  connect(): void {
+    if (!this._pgPoolOptions || this._driverPool) return;
+    this._driverPool = new pg.Pool(this._pgPoolOptions);
+  }
+
+  /**
+   * Mirrors Rails' private `PostgreSQLAdapter#reconnect`. Fires a
+   * non-blocking `pool.end()` on the old pool (fire-and-forget), resets
+   * all per-connection state, and immediately creates a fresh pool via
+   * `connect()`. Rails resets the single raw PG connection; here the
+   * old pool drains asynchronously while the new pool is already live.
+   *
+   * @internal
+   */
+  reconnect(): void {
+    if (this._advisoryLockClient) {
+      this._advisoryLockClient.release();
+      this._advisoryLockClient = null;
+    }
+    if (this._client) {
+      this._releaseStatementPool(this._client);
+      this._client.release();
+      this._client = null;
+    }
+    this._driverPool?.end().catch(() => {});
+    this._driverPool = null;
+    this._inTransaction = false;
+    this._lastReleasedTxnClient = null;
+    this._configuredClients = new WeakSet<pg.PoolClient>();
+    this._statementPools = new WeakMap<pg.PoolClient, StatementPool>();
+    this._clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+    this.resetTransaction();
+    this.connect();
+  }
+
+  /**
+   * Public override so `AbstractAdapter#verifyBang()` (called by
+   * `ConnectionPool` on checkout) actually reconnects the PG pool
+   * rather than just clearing the statement cache.
+   *
+   * @internal
+   */
+  override reconnectBang(): void {
+    this.reconnect();
+  }
+
+  /**
+   * Mirrors Rails' `PostgreSQLAdapter#configure_connection`. Applies
+   * per-connection settings (standard_conforming_strings, intervalstyle,
+   * client_min_messages, session variables). Delegates to the internal
+   * `_maybeConfigureConnection` which gates on a WeakSet so each physical
+   * client is configured exactly once.
+   *
+   * @internal
+   */
+  async configureConnection(client: pg.PoolClient): Promise<void> {
+    return this._maybeConfigureConnection(client);
+  }
+
+  /**
+   * Mirrors Rails' `PostgreSQLAdapter#disconnect!`. Closes the
+   * connection pool and releases any advisory-lock client. Pool teardown
+   * is fire-and-forget (we nullify `_driverPool` immediately so no new
+   * queries can start; the underlying pg.Pool drains asynchronously).
+   */
+  override disconnectBang(): void {
+    if (this._advisoryLockClient) {
+      this._advisoryLockClient.release();
+      this._advisoryLockClient = null;
+    }
+    if (this._client) {
+      this._releaseStatementPool(this._client);
+      this._client.release();
+      this._client = null;
+    }
+    this._driverPool?.end().catch(() => {});
+    this._driverPool = null;
+    // Rails' disconnect! calls reset_transaction; super.disconnectBang() does not.
+    this._inTransaction = false;
+    this._lastReleasedTxnClient = null;
+    this._clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+    this.resetTransaction();
+    super.disconnectBang();
+  }
+
+  /**
+   * Mirrors Rails' `PostgreSQLAdapter#discard!`. Used when the process
+   * is about to fork or the connection is unrecoverably broken. Rails
+   * reopens the raw socket to /dev/null; here we fire a non-blocking
+   * `pool.end()` (fire-and-forget) so server-side resources are
+   * eventually released, then immediately null all references so no
+   * further queries can start.
+   */
+  override discardBang(): void {
+    if (this._advisoryLockClient) {
+      this._advisoryLockClient.release();
+      this._advisoryLockClient = null;
+    }
+    if (this._client) {
+      this._releaseStatementPool(this._client);
+      this._client.release();
+      this._client = null;
+    }
+    this._driverPool?.end().catch(() => {});
+    this._driverPool = null;
+    this._inTransaction = false;
+    this._lastReleasedTxnClient = null;
+    this._configuredClients = new WeakSet<pg.PoolClient>();
+    this._statementPools = new WeakMap<pg.PoolClient, StatementPool>();
+    this._clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+    // Rails' discard! calls reset_transaction; super.discardBang() does not.
+    this.resetTransaction();
+    super.discardBang();
   }
 
   /**
@@ -4314,27 +4439,6 @@ function sqlKey(sql: any): never {
 function prepareStatement(sql: any, binds: any, conn: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#prepare_statement is not implemented",
-  );
-}
-
-/** @internal */
-function connect(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#connect is not implemented",
-  );
-}
-
-/** @internal */
-function reconnect(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#reconnect is not implemented",
-  );
-}
-
-/** @internal */
-function configureConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#configure_connection is not implemented",
   );
 }
 
