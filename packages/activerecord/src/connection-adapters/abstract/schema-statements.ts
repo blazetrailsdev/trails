@@ -9,6 +9,7 @@
  */
 
 import { NotImplementedError } from "../../errors.js";
+import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { tableNameLength, indexNameLength } from "./database-limits.js";
 import type { DatabaseAdapter } from "../../adapter.js";
@@ -1910,10 +1911,6 @@ export class SchemaStatements {
 
   /** @internal */
   joinTableName(table1: string, table2: string): string {
-    // Mirrors ModelSchema.derive_join_table_name:
-    // sort, join with NUL, deduplicate common word+separator prefix, replace NUL with _
-    const joined = [String(table1), String(table2)].sort().join("\0");
-    const deduped = joined.replace(/^(.*[_.])(.+)\0\1(.+)/, "$1$2_$3");
-    return deduped.replace("\0", "_");
+    return _joinTableName(table1, table2);
   }
 }
