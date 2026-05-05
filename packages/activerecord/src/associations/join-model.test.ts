@@ -1,10 +1,11 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/join_model_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { Base, registerModel, association, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { dropAllTables } from "../test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import {
   Associations,
@@ -20,12 +21,48 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
+/**
+ * Declare each model's table via defineSchema (read from `_attributeDefinitions`)
+ * and register it with the global model registry. One call replaces the
+ * defineSchema + per-class registerModel boilerplate at every test site.
+ */
+async function registerSchemaFor(adapter: DatabaseAdapter, ...models: any[]): Promise<void> {
+  const schema: Record<string, Record<string, string>> = {};
+  for (const M of models) {
+    const tableName = M.tableName as string;
+    if (!schema[tableName]) {
+      const cols: Record<string, string> = {};
+      for (const [name, def] of M._attributeDefinitions as Map<string, any>) {
+        if (name === "id") continue;
+        const inner = def?.type?.castType ?? def?.type;
+        cols[name] = (inner?.name as string) ?? "string";
+      }
+      schema[tableName] = cols;
+    }
+  }
+  await defineSchema(adapter, schema as any);
+  for (const M of models) registerModel(M);
+}
+
+// Disable the dynamic-adapter auto-schema path for this entire file.
+// Must be set before any describe/beforeEach runs so that createTestAdapter()
+// and all SchemaAdapter.setup() calls see the flag immediately.
+vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+
 // ==========================================================================
 // AssociationsJoinModelTest — mirrors join_model_test.rb
 // ==========================================================================
 
 describe("AssociationsJoinModelTest", () => {
   let adapter: DatabaseAdapter;
+
+  afterAll(async () => {
+    try {
+      await dropAllTables(adapter);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 
   class Author extends Base {
     static {
@@ -58,37 +95,14 @@ describe("AssociationsJoinModelTest", () => {
 
   beforeEach(async () => {
     adapter = freshAdapter();
-    // Pre-create the schema explicitly. The dynamic test-adapter still runs
-    // its normal CREATE-TABLE-IF-NOT-EXISTS / ADD-COLUMN setup on the first
-    // query (defineSchema doesn't update its `_createdTables` tracking — see
-    // docs/explicit-test-schema-plan.md for the deferred-to-TS-3 limitation),
-    // but with the columns already created by defineSchema, the recovery
-    // path's `_id`/`TEXT` fallback can no longer mistype `author_id` under
-    // DDL contention on PG/MariaDB. The PR #1200 id-set filter below is
-    // retained until TS-3 lets us disable the dynamic adapter outright.
-    await defineSchema(adapter, {
-      authors: { name: "string" },
-      posts: {
-        author_id: "integer",
-        title: "string",
-        body: "string",
-        type: "string",
-      },
-      tags: { name: "string" },
-      taggings: {
-        tag_id: "integer",
-        taggable_id: "integer",
-        taggable_type: "string",
-      },
-    });
     Author.adapter = adapter;
     Post.adapter = adapter;
     Tag.adapter = adapter;
     Tagging.adapter = adapter;
-    registerModel(Author);
-    registerModel(Post);
-    registerModel(Tag);
-    registerModel(Tagging);
+    // AR_NO_AUTO_SCHEMA=1 (stubbed in beforeAll) disables the dynamic
+    // adapter path; tests declare their schema explicitly via
+    // registerSchemaFor instead.
+    await registerSchemaFor(adapter, Author, Post, Tag, Tagging);
   });
 
   it("has many", async () => {
@@ -108,25 +122,16 @@ describe("AssociationsJoinModelTest", () => {
     const p1a = await Post.create({ author_id: a1.id, title: "A1P1", body: "B" });
     const p1b = await Post.create({ author_id: a1.id, title: "A1P2", body: "B" });
     const p2a = await Post.create({ author_id: a2.id, title: "A2P1", body: "B" });
-    // PR #1200's id-set filter: keep until TS-3 lands an env flag that
-    // disables the dynamic test-adapter entirely. defineSchema alone
-    // doesn't isolate this test on the shared PG/MariaDB CI worker.
-    const ours1 = new Set([(p1a as Post).id, (p1b as Post).id]);
-    const ours2 = new Set([(p2a as Post).id]);
-    const posts1 = (
-      await loadHasMany(a1, "posts", {
-        className: "Post",
-        foreignKey: "author_id",
-        primaryKey: "id",
-      })
-    ).filter((p) => ours1.has((p as Post).id));
-    const posts2 = (
-      await loadHasMany(a2, "posts", {
-        className: "Post",
-        foreignKey: "author_id",
-        primaryKey: "id",
-      })
-    ).filter((p) => ours2.has((p as Post).id));
+    const posts1 = await loadHasMany(a1, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      primaryKey: "id",
+    });
+    const posts2 = await loadHasMany(a2, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+      primaryKey: "id",
+    });
     expect(posts1.length).toBe(2);
     expect(posts2.length).toBe(1);
   });
@@ -148,8 +153,7 @@ describe("AssociationsJoinModelTest", () => {
       }
     }
     class InhSpecialPost extends InhPost {}
-    registerModel("InhAuthor", InhAuthor);
-    registerModel("InhPost", InhPost);
+    await registerSchemaFor(ad, InhAuthor, InhPost);
     registerModel("InhSpecialPost", InhSpecialPost);
     Associations.hasMany.call(InhAuthor, "inh_posts", {
       className: "InhPost",
@@ -174,15 +178,12 @@ describe("AssociationsJoinModelTest", () => {
       taggable_id: post.id,
       taggable_type: "Post",
     });
-    // PR #1200's polymorphic `as` + tag_id filter: keep until TS-3.
-    const taggings = (
-      await loadHasMany(post, "taggings", {
-        as: "taggable",
-        className: "Tagging",
-        foreignKey: "taggable_id",
-        primaryKey: "id",
-      })
-    ).filter((t) => (t as Tagging).tag_id === (tag as Tag).id);
+    const taggings = await loadHasMany(post, "taggings", {
+      as: "taggable",
+      className: "Tagging",
+      foreignKey: "taggable_id",
+      primaryKey: "id",
+    });
     expect(taggings.length).toBe(1);
     // Load tag through tagging
     const loadedTag = await loadHasOne(taggings[0] as Tagging, "tag", {
@@ -252,8 +253,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(CphmTag);
-    registerModel(CphmPost);
+    await registerSchemaFor(adapter, CphmTag, CphmPost);
     Associations.hasMany.call(CphmPost, "cphmTags", { as: "taggable", className: "CphmTag" });
     const post = await CphmPost.create({ title: "Hello" });
     await CphmTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "CphmPost" });
@@ -320,8 +320,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(SphmTag);
-    registerModel(SphmPost);
+    await registerSchemaFor(adapter, SphmTag, SphmPost);
     Associations.hasMany.call(SphmPost, "sphmTags", { as: "taggable", className: "SphmTag" });
     const post = await SphmPost.create({ title: "Hello" });
     const tag1 = await SphmTag.create({ name: "ruby" });
@@ -352,8 +351,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(SphoTag);
-    registerModel(SphoPost);
+    await registerSchemaFor(adapter, SphoTag, SphoPost);
     Associations.hasOne.call(SphoPost, "sphoTag", { as: "taggable", className: "SphoTag" });
     const post = await SphoPost.create({ title: "Hello" });
     const tag = await SphoTag.create({ name: "ruby" });
@@ -379,8 +377,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(SphnTag);
-    registerModel(SphnPost);
+    await registerSchemaFor(adapter, SphnTag, SphnPost);
     Associations.hasOne.call(SphnPost, "sphnTag", { as: "taggable", className: "SphnTag" });
     const post = new SphnPost({ title: "Hello" });
     await post.save();
@@ -412,9 +409,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(CpsPost);
-    registerModel(CpsTag);
-    registerModel(CpsTagging);
+    await registerSchemaFor(ad, CpsPost, CpsTag, CpsTagging);
     Associations.hasMany.call(CpsPost, "taggings", { className: "CpsTagging", as: "taggable" });
     const post = await CpsPost.create({ title: "Hello" });
     const tag = await CpsTag.create({ name: "misc" });
@@ -447,9 +442,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(CbpsPost);
-    registerModel(CbpsTag);
-    registerModel(CbpsTagging);
+    await registerSchemaFor(ad, CbpsPost, CbpsTag, CbpsTagging);
     Associations.hasMany.call(CbpsPost, "taggings", { className: "CbpsTagging", as: "taggable" });
     const post = await CbpsPost.create({ title: "Hello" });
     const tag = await CbpsTag.create({ name: "misc" });
@@ -481,9 +474,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(CphoPost);
-    registerModel(CphoTag);
-    registerModel(CphoTagging);
+    await registerSchemaFor(ad, CphoPost, CphoTag, CphoTagging);
     Associations.hasOne.call(CphoPost, "tagging", { className: "CphoTagging", as: "taggable" });
     const post = await CphoPost.create({ title: "Hello" });
     const tag = await CphoTag.create({ name: "misc" });
@@ -515,8 +506,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(DphmTag);
-    registerModel(DphmPost);
+    await registerSchemaFor(adapter, DphmTag, DphmPost);
     Associations.hasMany.call(DphmPost, "dphmTags", { as: "taggable", className: "DphmTag" });
     const post = await DphmPost.create({ title: "Hello" });
     await DphmTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "DphmPost" });
@@ -545,8 +535,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(DphmdTag);
-    registerModel(DphmdPost);
+    await registerSchemaFor(adapter, DphmdTag, DphmdPost);
     Associations.hasMany.call(DphmdPost, "dphmdTags", { as: "taggable", className: "DphmdTag" });
     const post = await DphmdPost.create({ title: "Hello" });
     const tag = await DphmdTag.create({
@@ -578,8 +567,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(DphmnTag);
-    registerModel(DphmnPost);
+    await registerSchemaFor(adapter, DphmnTag, DphmnPost);
     Associations.hasMany.call(DphmnPost, "dphmnTags", { as: "taggable", className: "DphmnTag" });
     const post = await DphmnPost.create({ title: "Hello" });
     const tag = await DphmnTag.create({
@@ -614,8 +602,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(DphodTag);
-    registerModel(DphodPost);
+    await registerSchemaFor(adapter, DphodTag, DphodPost);
     Associations.hasOne.call(DphodPost, "dphodTag", { as: "taggable", className: "DphodTag" });
     const post = await DphodPost.create({ title: "Hello" });
     const tag = await DphodTag.create({
@@ -644,8 +631,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(DphonTag);
-    registerModel(DphonPost);
+    await registerSchemaFor(adapter, DphonTag, DphonPost);
     Associations.hasOne.call(DphonPost, "dphonTag", { as: "taggable", className: "DphonTag" });
     const post = await DphonPost.create({ title: "Hello" });
     await DphonTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "DphonPost" });
@@ -685,9 +671,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(IhmtPost);
-    registerModel(IhmtTag);
-    registerModel(IhmtTagging);
+    await registerSchemaFor(ad, IhmtPost, IhmtTag, IhmtTagging);
     Associations.hasMany.call(IhmtPost, "taggings", {
       className: "IhmtTagging",
       foreignKey: "taggable_id",
@@ -725,8 +709,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(IphoTag);
-    registerModel(IphoPost);
+    await registerSchemaFor(adapter, IphoTag, IphoPost);
     Associations.hasOne.call(IphoPost, "iphoTag", { as: "taggable", className: "IphoTag" });
     const post = await IphoPost.create({ title: "Hello" });
     await IphoTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "IphoPost" });
@@ -761,8 +744,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(IphmTag);
-    registerModel(IphmPost);
+    await registerSchemaFor(adapter, IphmTag, IphmPost);
     Associations.hasMany.call(IphmPost, "iphmTags", { as: "taggable", className: "IphmTag" });
     const post = await IphmPost.create({ title: "Hello" });
     await IphmTag.create({ name: "ruby", taggable_id: post.id, taggable_type: "IphmPost" });
@@ -860,8 +842,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel("CfkAuthor", CfkAuthor);
-    registerModel("CfkPost", CfkPost);
+    await registerSchemaFor(ad, CfkAuthor, CfkPost);
     Associations.hasMany.call(CfkAuthor, "cfk_posts", {
       className: "CfkPost",
       foreignKey: "writer_id",
@@ -892,8 +873,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel("CpkJmAuthor", CpkJmAuthor);
-    registerModel("CpkJmPost", CpkJmPost);
+    await registerSchemaFor(ad, CpkJmAuthor, CpkJmPost);
     Associations.hasMany.call(CpkJmAuthor, "cpk_jm_posts", {
       className: "CpkJmPost",
       foreignKey: "author_code",
@@ -933,7 +913,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(UtrAuthor);
+    await registerSchemaFor(ad, UtrAuthor);
     Associations.hasMany.call(UtrAuthor, "tags", { through: "nonexistent", className: "Tag" });
     const author = await UtrAuthor.create({ name: "Bad" });
     // Error comes from ThroughReflection#checkValidityBang first-
@@ -970,9 +950,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel("CondPost", CondPost);
-    registerModel("CondTagging", CondTagging);
-    registerModel("CondTag", CondTag);
+    await registerSchemaFor(ad, CondPost, CondTagging, CondTag);
     Associations.hasMany.call(CondPost, "cond_taggings", {
       className: "CondTagging",
       foreignKey: "post_id",
@@ -1050,10 +1028,7 @@ describe("AssociationsJoinModelTest", () => {
       polymorphic: true,
       foreignKey: "taggable_id",
     });
-    registerModel("StTag", StTag);
-    registerModel("StTagging", StTagging);
-    registerModel("StPost", StPost);
-    registerModel("StComment", StComment);
+    await registerSchemaFor(adapter, StTag, StTagging, StPost, StComment);
 
     const tag = await StTag.create({ name: "ruby" });
     const post = await StPost.create({ title: "Tagged Post" });
@@ -1122,10 +1097,7 @@ describe("AssociationsJoinModelTest", () => {
       polymorphic: true,
       foreignKey: "taggable_id",
     });
-    registerModel("EstTag", EstTag);
-    registerModel("EstTagging", EstTagging);
-    registerModel("EstPost", EstPost);
-    registerModel("EstComment", EstComment);
+    await registerSchemaFor(adapter, EstTag, EstTagging, EstPost, EstComment);
 
     const tag = await EstTag.create({ name: "ruby" });
     const post = await EstPost.create({ title: "Eager Post" });
@@ -1194,9 +1166,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel("CcAuthor", CcAuthor);
-    registerModel("CcArticle", CcArticle);
-    registerModel("CcComment", CcComment);
+    await registerSchemaFor(ad, CcAuthor, CcArticle, CcComment);
     Associations.hasMany.call(CcAuthor, "cc_articles", {
       className: "CcArticle",
       foreignKey: "author_id",
@@ -1316,9 +1286,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(TphoAuthor);
-    registerModel(TphoPost);
-    registerModel(TphoTagging);
+    await registerSchemaFor(ad, TphoAuthor, TphoPost, TphoTagging);
     Associations.hasOne.call(TphoAuthor, "post", {
       className: "TphoPost",
       foreignKey: "author_id",
@@ -1365,9 +1333,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(TphmAuthor);
-    registerModel(TphmPost);
-    registerModel(TphmTagging);
+    await registerSchemaFor(ad, TphmAuthor, TphmPost, TphmTagging);
     Associations.hasMany.call(TphmAuthor, "posts", {
       className: "TphmPost",
       foreignKey: "author_id",
@@ -1414,9 +1380,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(IphmtAuthor);
-    registerModel(IphmtPost);
-    registerModel(IphmtTagging);
+    await registerSchemaFor(ad, IphmtAuthor, IphmtPost, IphmtTagging);
     Associations.hasMany.call(IphmtAuthor, "posts", {
       className: "IphmtPost",
       foreignKey: "author_id",
@@ -1466,10 +1430,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(ElAuthor);
-    registerModel(ElPost);
-    registerModel(ElTag);
-    registerModel(ElTagging);
+    await registerSchemaFor(ad, ElAuthor, ElPost, ElTag, ElTagging);
     Associations.hasMany.call(ElAuthor, "posts", { className: "ElPost", foreignKey: "author_id" });
     Associations.hasMany.call(ElPost, "taggings", {
       className: "ElTagging",
@@ -1509,8 +1470,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel("SrPerson", SrPerson);
-    registerModel("SrFriendship", SrFriendship);
+    await registerSchemaFor(ad, SrPerson, SrFriendship);
     Associations.hasMany.call(SrPerson, "sr_friendships", {
       className: "SrFriendship",
       foreignKey: "person_id",
@@ -1565,9 +1525,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel("CondHmtPost", CondHmtPost);
-    registerModel("CondHmtTagging", CondHmtTagging);
-    registerModel("CondHmtTag", CondHmtTag);
+    await registerSchemaFor(ad, CondHmtPost, CondHmtTagging, CondHmtTag);
     Associations.hasMany.call(CondHmtPost, "cond_hmt_taggings", {
       className: "CondHmtTagging",
       foreignKey: "post_id",
@@ -1651,9 +1609,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(CaPost);
-    registerModel(CaTag);
-    registerModel(CaTagging);
+    await registerSchemaFor(ad, CaPost, CaTag, CaTagging);
     Associations.hasMany.call(CaPost, "taggings", {
       className: "CaTagging",
       foreignKey: "taggable_id",
@@ -1729,9 +1685,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(DtPost);
-    registerModel(DtTag);
-    registerModel(DtTagging);
+    await registerSchemaFor(ad, DtPost, DtTag, DtTagging);
     Associations.hasMany.call(DtPost, "taggings", {
       className: "DtTagging",
       foreignKey: "taggable_id",
@@ -1784,9 +1738,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel(MdPost);
-    registerModel(MdTag);
-    registerModel(MdTagging);
+    await registerSchemaFor(ad, MdPost, MdTag, MdTagging);
     Associations.hasMany.call(MdPost, "taggings", {
       className: "MdTagging",
       foreignKey: "taggable_id",
@@ -1871,9 +1823,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(StiPost);
-    registerModel(StiAuthor);
-    registerModel(StiComment);
+    await registerSchemaFor(adapter, StiPost, StiAuthor, StiComment);
 
     Associations.hasMany.call(StiAuthor, "specialStiPosts", {
       className: "SpecialStiPost",
@@ -1928,9 +1878,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel("OrdPost", OrdPost);
-    registerModel("OrdTagging", OrdTagging);
-    registerModel("OrdTag", OrdTag);
+    await registerSchemaFor(ad, OrdPost, OrdTagging, OrdTag);
     Associations.hasMany.call(OrdPost, "ord_taggings", {
       className: "OrdTagging",
       foreignKey: "post_id",
@@ -2062,9 +2010,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel("SharedAuthor", SharedAuthor);
-    registerModel("SharedPost", SharedPost);
-    registerModel("SharedComment", SharedComment);
+    await registerSchemaFor(ad, SharedAuthor, SharedPost, SharedComment);
     Associations.belongsTo.call(SharedPost, "shared_author", {
       className: "SharedAuthor",
       foreignKey: "author_id",
@@ -2169,9 +2115,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(StiPost2);
-    registerModel(StiAuthor2);
-    registerModel(StiComment2);
+    await registerSchemaFor(adapter, StiPost2, StiAuthor2, StiComment2);
 
     Associations.hasMany.call(StiAuthor2, "stiPosts2", {
       className: "StiPost2",
@@ -2230,8 +2174,7 @@ describe("AssociationsJoinModelTest", () => {
       }
     }
     class HmiSpecialChild extends HmiChild {}
-    registerModel("HmiParent", HmiParent);
-    registerModel("HmiChild", HmiChild);
+    await registerSchemaFor(ad, HmiParent, HmiChild);
     registerModel("HmiSpecialChild", HmiSpecialChild);
     Associations.hasMany.call(HmiParent, "hmi_children", {
       className: "HmiChild",
@@ -2269,9 +2212,7 @@ describe("AssociationsJoinModelTest", () => {
         this.adapter = ad;
       }
     }
-    registerModel("PhmPost", PhmPost);
-    registerModel("PhmTagging", PhmTagging);
-    registerModel("PhmTag", PhmTag);
+    await registerSchemaFor(ad, PhmPost, PhmTagging, PhmTag);
     Associations.hasMany.call(PhmPost, "phm_taggings", {
       as: "taggable",
       className: "PhmTagging",
