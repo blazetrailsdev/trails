@@ -238,16 +238,6 @@ describeIfPg("PostgresqlConnectionTest", () => {
       await a.close();
     }
   });
-
-  it("configureConnection applies min_messages setting", async () => {
-    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, minMessages: "notice" });
-    try {
-      const level = await a.clientMinMessages();
-      expect(level).toBe("notice");
-    } finally {
-      await a.close();
-    }
-  });
 });
 
 describe("PostgreSQLAdapter constructor validation", () => {

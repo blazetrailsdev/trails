@@ -1577,6 +1577,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
     this._driverPool?.end().catch(() => {});
     this._driverPool = null;
+    // Rails' disconnect! calls reset_transaction; super.disconnectBang() does not.
+    this._inTransaction = false;
+    this._lastReleasedTxnClient = null;
+    this._clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+    this.resetTransaction();
     super.disconnectBang();
   }
 
@@ -1590,8 +1595,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._driverPool = null;
     this._advisoryLockClient = null;
     this._client = null;
+    this._inTransaction = false;
+    this._lastReleasedTxnClient = null;
     this._configuredClients = new WeakSet<pg.PoolClient>();
     this._statementPools = new WeakMap<pg.PoolClient, StatementPool>();
+    this._clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+    // Rails' discard! calls reset_transaction; super.discardBang() does not.
+    this.resetTransaction();
     super.discardBang();
   }
 
