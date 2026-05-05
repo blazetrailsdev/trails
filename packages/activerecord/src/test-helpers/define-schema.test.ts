@@ -48,8 +48,8 @@ describe("defineSchema", () => {
     const createCalls = spy.mock.calls
       .map((c) => c[0] as string)
       .filter((sql) => /CREATE TABLE/i.test(sql));
-    expect(createCalls[0]).toMatch(/"posts"/);
-    expect(createCalls[1]).toMatch(/"comments"/);
+    expect(createCalls[0]).toMatch(/\bposts\b/);
+    expect(createCalls[1]).toMatch(/\bcomments\b/);
   });
 
   it("topo sort handles a 3-table chain", async () => {
@@ -64,7 +64,7 @@ describe("defineSchema", () => {
     const order = spy.mock.calls
       .map((c) => c[0] as string)
       .filter((sql) => /CREATE TABLE/i.test(sql))
-      .map((sql) => sql.match(/"(\w+)"/)?.[1]);
+      .map((sql) => sql.match(/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?[`"']?(\w+)[`"']?/i)?.[1]);
     expect(order).toEqual(["a", "b", "c"]);
   });
 
