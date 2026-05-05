@@ -918,7 +918,8 @@ describe("CallbacksTest", () => {
 
   beforeEach(async () => {
     adapter = freshAdapter();
-    await defineSchema(adapter, { users: { name: "string", updated_at: "datetime" } });
+    // updated_at uses "string" (TEXT) to match test-adapter's non-PG mapping for datetime.
+    await defineSchema(adapter, { users: { name: "string", updated_at: "string" } });
   });
 
   afterAll(async () => {
@@ -1681,9 +1682,10 @@ describe("CallbacksTest", () => {
       lockeds: { allowed: "boolean" },
       envelopes: { label: "string" },
       protecteds: { sealed: "boolean" },
-      items: { name: "string", updated_at: "datetime", updated_on: "datetime" },
-      no_ts_items: { name: "string", updated_at: "datetime" },
-      no_change_items: { name: "string", updated_at: "datetime" },
+      // datetime columns use "string" (TEXT) to match test-adapter's non-PG mapping.
+      items: { name: "string", updated_at: "string", updated_on: "string" },
+      no_ts_items: { name: "string", updated_at: "string" },
+      no_change_items: { name: "string", updated_at: "string" },
       immutables: { locked: "boolean" },
     });
   });
