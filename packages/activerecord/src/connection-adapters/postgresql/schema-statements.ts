@@ -11,6 +11,10 @@ import type {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
 } from "../abstract/schema-definitions.js";
+import type {
+  ExclusionConstraintDefinition,
+  UniqueConstraintDefinition,
+} from "./schema-definitions.js";
 
 export interface PgIndexDefinition {
   table: string;
@@ -274,6 +278,75 @@ export interface SchemaStatements {
   foreignTableExists(tableName: string): Promise<boolean>;
   quotedIncludeColumnsForIndex(columnNames: string | string[]): string;
   schemaCreation(): unknown;
+  /** @internal */
+  createTableDefinition(name: string, options?: Record<string, unknown>): unknown;
+  /** @internal */
+  createAlterTable(name: string): unknown;
+  /** @internal */
+  newColumnFromField(tableName: string, field: unknown[], definitions: unknown): Promise<unknown>;
+  /** @internal */
+  fetchTypeMetadata(
+    columnName: string,
+    sqlType: string,
+    oid: number,
+    fmod: number,
+  ): Promise<unknown>;
+  /** @internal */
+  addColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options?: Record<string, unknown>,
+  ): unknown;
+  /** @internal */
+  changeColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options?: Record<string, unknown>,
+  ): unknown;
+  /** @internal */
+  changeColumnNullForAlter(
+    tableName: string,
+    columnName: string,
+    nullable: boolean,
+    defaultValue?: unknown,
+  ): unknown;
+  /** @internal */
+  addIndexOpclass(quotedColumns: Record<string, string>, options?: Record<string, unknown>): void;
+  /** @internal */
+  addOptionsForIndexColumns(
+    quotedColumns: Record<string, string>,
+    options?: Record<string, unknown>,
+  ): Record<string, string>;
+  /** @internal */
+  exclusionConstraintName(tableName: string, options?: Record<string, unknown>): string;
+  /** @internal */
+  exclusionConstraintFor(
+    tableName: string,
+    options?: Record<string, unknown>,
+  ): Promise<ExclusionConstraintDefinition | undefined>;
+  /** @internal */
+  exclusionConstraintForBang(
+    tableName: string,
+    expression?: string | null,
+    options?: Record<string, unknown>,
+  ): ExclusionConstraintDefinition;
+  /** @internal */
+  uniqueConstraintName(tableName: string, options?: Record<string, unknown>): string;
+  /** @internal */
+  uniqueConstraintFor(
+    tableName: string,
+    options?: Record<string, unknown>,
+  ): Promise<UniqueConstraintDefinition | undefined>;
+  /** @internal */
+  uniqueConstraintForBang(
+    tableName: string,
+    column?: string | string[] | null,
+    options?: Record<string, unknown>,
+  ): UniqueConstraintDefinition;
+  /** @internal */
+  extractSchemaQualifiedName(string: string): [string | null, string];
 }
 
 /** @internal */
