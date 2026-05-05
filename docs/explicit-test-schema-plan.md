@@ -48,3 +48,16 @@ beforeEach(async () => {
 After this, `_declaredColumns` is irrelevant for the named tables — the
 schema is whatever `defineSchema` wrote, not whatever sibling files happened
 to register first.
+
+### Known limitation (deferred to TS-3)
+
+`defineSchema()` writes DDL through `SchemaAdapter`, which only records
+the `id` column in `_createdColumns`. The next `processPendingModels`
+pass therefore emits a redundant `ALTER TABLE ADD COLUMN` per declared
+column; each errors with "column already exists" and is caught silently.
+This is benign (savepoint-wrapped, no transaction poisoning) but adds
+noise. Fixing it cleanly requires either bypassing `SchemaAdapter` to
+the inner driver, or letting `defineSchema` populate the tracking maps —
+both of which need changes inside `test-adapter.ts`. That file is
+reserved for TS-3, so the optimization rides along when TS-3 lands the
+env flag to disable the dynamic adapter path entirely.
