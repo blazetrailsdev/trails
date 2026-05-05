@@ -36,9 +36,9 @@ function slotDbUrl(baseUrl: string, slot: number): string {
   return url.toString();
 }
 
-// Bounded retry policy: when all slots are held (possible now that vitest
-// worker count is uncapped), retry with linear backoff. Workers that can't
-// acquire within the window fail loudly rather than silently sharing a DB.
+// Bounded retry policy: when all slots are held, retry with linear backoff.
+// Workers that can't acquire within the window fail loudly rather than
+// silently sharing a DB.
 const SLOT_RETRY_ATTEMPTS = 20;
 const SLOT_RETRY_DELAY_MS = 250; // 20 × 250ms = 5s max wait
 
