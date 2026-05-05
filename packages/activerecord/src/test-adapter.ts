@@ -362,17 +362,9 @@ async function dropAllTables(inner: any): Promise<void> {
 }
 
 /**
- * Drop every test-created object in the named PG schema (matviews,
- * views, tables, standalone sequences, enums/domains/range types)
- * using the adapter's own identifier quoting. Used for `public`,
- * which the AR adapter assumes exists and so can't be dropped
- * wholesale via `DROP SCHEMA … CASCADE`.
- *
- * Order matters: matviews → views → tables (CASCADE handles their
- * cross-references). Then standalone sequences (those owned by a
- * column drop with the table) and finally types — enums/domains can
- * be referenced by table columns, so they must come after the table
- * drops.
+ * Drop every materialized view, view, and table in the named PG schema
+ * using the adapter's own identifier quoting (which doubles embedded
+ * quotes). Used for `public`, which the AR adapter assumes exists.
  *
  * @internal
  */
@@ -407,37 +399,6 @@ async function dropPgObjectsInSchema(adapter: any, schema: string): Promise<void
       await adapter.exec(
         `DROP TABLE IF EXISTS ${qSchema}.${adapter.quoteIdentifier(name)} CASCADE`,
       );
-    } catch {}
-  }
-  // Standalone sequences (those owned by a table column were dropped
-  // with the table). pg_class.relkind='S' = sequence.
-  const sequences = (await adapter.execute(
-    `SELECT c.relname AS name FROM pg_class c
-     JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname = $1 AND c.relkind = 'S'`,
-    [schema],
-  )) as { name: string }[];
-  for (const { name } of sequences) {
-    try {
-      await adapter.exec(
-        `DROP SEQUENCE IF EXISTS ${qSchema}.${adapter.quoteIdentifier(name)} CASCADE`,
-      );
-    } catch {}
-  }
-  // User-defined types: enums ('e'), domains ('d'), range types ('r').
-  // Composite types tied to a relation (typrelid != 0 / pg_class.reltype
-  // matching) drop with the relation.
-  const types = (await adapter.execute(
-    `SELECT t.typname AS name FROM pg_type t
-     JOIN pg_namespace n ON n.oid = t.typnamespace
-     WHERE n.nspname = $1
-       AND t.typtype IN ('e', 'd', 'r')
-       AND NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.reltype = t.oid)`,
-    [schema],
-  )) as { name: string }[];
-  for (const { name } of types) {
-    try {
-      await adapter.exec(`DROP TYPE IF EXISTS ${qSchema}.${adapter.quoteIdentifier(name)} CASCADE`);
     } catch {}
   }
 }
