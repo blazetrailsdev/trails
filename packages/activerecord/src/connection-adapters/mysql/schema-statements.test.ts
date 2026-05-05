@@ -141,6 +141,11 @@ describe("MySQL::SchemaStatements", () => {
     expect(col.default).toBe("hello world");
   });
 
+  it("fetchTypeMetadata: fallback strips unsigned/zerofill modifiers", () => {
+    expect(fetchTypeMetadata("bigint unsigned").type).toBe("bigint");
+    expect(fetchTypeMetadata("int unsigned zerofill").type).toBe("int");
+  });
+
   it("fetchTypeMetadata wraps sqlType with MySQL TypeMetadata", () => {
     const meta = fetchTypeMetadata("varchar(255)", "auto_increment");
     expect(meta.sqlType).toBe("varchar(255)");
@@ -149,14 +154,14 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("fetchTypeMetadata: uses lookupCastType for limit/precision/scale", () => {
-    const lookup = (s: string) => ({ type: "integer", limit: 8, precision: null, scale: null });
+    const lookup = (s: string) => ({ name: "integer", limit: 8, precision: null, scale: null });
     const meta = fetchTypeMetadata("bigint unsigned", "", lookup);
     expect(meta.type).toBe("integer");
     expect(meta.limit).toBe(8);
   });
 
   it("newColumnFromField: limit from lookupCastType is preserved on Column", () => {
-    const lookup = (s: string) => ({ type: "integer", limit: 8, precision: null, scale: null });
+    const lookup = (s: string) => ({ name: "integer", limit: 8, precision: null, scale: null });
     const col = newColumnFromField(
       "t",
       { Field: "id", Type: "bigint", Null: "NO", Default: null, Extra: "" },
@@ -167,7 +172,7 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("fetchTypeMetadata: lookupCastType boolean mapping (tinyint(1) emulation)", () => {
-    const lookup = (s: string) => ({ type: "boolean", limit: null, precision: null, scale: null });
+    const lookup = (s: string) => ({ name: "boolean", limit: null, precision: null, scale: null });
     const meta = fetchTypeMetadata("tinyint(1)", "", lookup);
     expect(meta.type).toBe("boolean");
   });

@@ -137,7 +137,7 @@ export function newColumnFromField(
   field: Record<string, string | null>,
   createTableInfoFn: (tableName: string) => string | null,
   lookupCastType?: (sqlType: string) => {
-    type?: string;
+    name: string;
     limit?: number | null;
     precision?: number | null;
     scale?: number | null;
@@ -175,7 +175,7 @@ export function fetchTypeMetadata(
   sqlType: string,
   extra: string = "",
   lookupCastType?: (sqlType: string) => {
-    type?: string;
+    name: string;
     limit?: number | null;
     precision?: number | null;
     scale?: number | null;
@@ -188,18 +188,20 @@ export function fetchTypeMetadata(
 
   if (lookupCastType) {
     const castType = lookupCastType(sqlType);
-    // Normalize timestamp → datetime to match abstract type map alias_type.
-    const raw = (castType.type ?? sqlType).toLowerCase();
+    // Use .name (plain string property on ActiveModel Type).
+    const raw = castType.name.toLowerCase();
     baseType = /^timestamp/.test(raw) ? "datetime" : raw;
     limit = castType.limit ?? null;
     precision = castType.precision ?? null;
     scale = castType.scale ?? null;
   } else {
-    // Fallback: strip modifiers and normalize without adapter context.
+    // Fallback: strip (N) modifiers, then take first whitespace token to drop
+    // trailing modifiers like "unsigned" or "zerofill".
     baseType = sqlType
       .replace(/\(.*\).*$/, "")
       .trim()
-      .toLowerCase();
+      .toLowerCase()
+      .split(/\s+/)[0]!;
     if (/^timestamp/.test(baseType)) baseType = "datetime";
   }
 
