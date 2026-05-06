@@ -130,6 +130,9 @@ export async function performQuery(
 
   let result: pg.QueryResult;
 
+  // rowMode: "array" makes node-pg return rows as positional unknown[][] instead
+  // of the default Record<string,unknown>[] — matching libpq's wire format that
+  // the Ruby PG gem exposes as PG::Result#values. castResult expects arrays.
   if (prepare && this.prepareStatement) {
     const stmtKey = await this.prepareStatement(sql, binds, rawConnection);
     if (notificationPayload) notificationPayload["statement_name"] = stmtKey;
@@ -138,6 +141,7 @@ export async function performQuery(
         name: stmtKey,
         text: sql,
         values: typeCastedBinds as unknown[],
+        rowMode: "array",
       });
     } catch (err) {
       if (this.isCachedPlanFailure?.(err)) {
@@ -152,20 +156,28 @@ export async function performQuery(
           name: stmtKey,
           text: sql,
           values: typeCastedBinds as unknown[],
+          rowMode: "array",
         });
       } else {
         throw err;
       }
     }
   } else if (binds == null || binds.length === 0) {
-    result = await rawConnection.query(sql);
+    result = await rawConnection.query({ text: sql, rowMode: "array" });
   } else {
-    result = await rawConnection.query(sql, typeCastedBinds as unknown[]);
+    result = await rawConnection.query({
+      text: sql,
+      values: typeCastedBinds as unknown[],
+      rowMode: "array",
+    });
   }
 
   this.verified?.();
   this.handleWarnings?.(result);
-  if (notificationPayload) notificationPayload["row_count"] = result.rowCount ?? 0;
+  // Rails: notification_payload[:row_count] = result.count
+  // result.count on PG::Result = number of tuples in the result set.
+  // node-pg: result.rows.length for SELECT; result.rowCount for DML (null for SELECT).
+  if (notificationPayload) notificationPayload["row_count"] = result.rows.length;
 
   return result;
 }
@@ -193,9 +205,14 @@ export async function castResult(this: CastResultHost, result: pg.QueryResult): 
     const f = fields[i];
     const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name, "");
     columnTypes[i] = type;
+    // Rails: types[fname] = types[i] = … (both always set).
+    // Guard: skip name-keyed entry when fname is a pure digit string — that
+    // would collide with the numeric index key in a plain JS object.
     if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
   }
 
+  // result.rows is unknown[][] because performQuery sets rowMode: "array",
+  // matching Rails' PG::Result#values (positional arrays from libpq).
   const rows = (result.rows ?? []) as unknown[][];
   return new Result(columnNames, rows, columnTypes as Record<string, Type>);
 }
