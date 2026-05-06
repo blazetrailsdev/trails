@@ -188,7 +188,7 @@ export function timestampAttributesForUpdate(this: TimestampHost): string[] {
 // ---------------------------------------------------------------------------
 
 /** @internal */
-export function initializeDup(this: any, other: any): void {
+export function initializeDup(this: any, _other: any): void {
   clearTimestampAttributes.call(this);
 }
 
@@ -202,7 +202,7 @@ export async function _createRecord(this: any): Promise<unknown> {
   if ((this.constructor as any).recordTimestamps) {
     const time = currentTimeFromProperTimezone();
     for (const col of allTimestampAttributesInModel.call(this.constructor as TimestampHost)) {
-      if (!this._readAttribute?.(col)) {
+      if (this._readAttribute?.(col) == null) {
         this._writeAttribute?.(col, time);
       }
     }
@@ -255,7 +255,7 @@ export function maxUpdatedColumnTimestamp(this: any): Temporal.Instant | null {
   let max: Temporal.Instant | null = null;
   for (const attr of attrs) {
     const v = this.readAttribute?.(attr);
-    if (!v) continue;
+    if (v == null) continue;
     const inst: Temporal.Instant =
       v instanceof Object && typeof (v as any).epochMilliseconds === "number"
         ? (v as Temporal.Instant)
