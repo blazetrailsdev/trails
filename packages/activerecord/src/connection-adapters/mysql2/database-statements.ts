@@ -42,25 +42,6 @@ interface MultiStatementsHost {
 // Mysql2::Client::MULTI_STATEMENTS bitmask value from the Ruby gem.
 const MULTI_STATEMENTS_BIT = 0x10000;
 
-function parseExecuteResult(
-  result: mysql.RowDataPacket[] | mysql.ResultSetHeader,
-  resultFields: mysql.FieldPacket[],
-): Pick<Mysql2RawResult, "rows" | "fields" | "affectedRows"> {
-  if (Array.isArray(result)) {
-    const rows = result as Record<string, unknown>[];
-    return {
-      rows,
-      fields: (resultFields ?? []) as Array<{ name: string }>,
-      affectedRows: rows.length,
-    };
-  }
-  return {
-    rows: null,
-    fields: [],
-    affectedRows: (result as mysql.ResultSetHeader).affectedRows ?? 0,
-  };
-}
-
 /**
  * Returns an ActiveRecord::Result instance.
  * Rails also wraps in `unprepared_statement` when collecting EXPLAIN with
@@ -131,37 +112,52 @@ export async function performQuery(
   let affectedRows = 0;
 
   if (!hasBinds) {
-    // Avoid calling #affected_rows when a result exists — works around a mysql2
-    // gem 0.5.6 race with GCed prepared statements (brianmario/mysql2#1383).
-    ({ rows, fields, affectedRows } = parseExecuteResult(
-      ...((await rawConnection.query(sql)) as [
-        mysql.RowDataPacket[] | mysql.ResultSetHeader,
-        mysql.FieldPacket[],
-      ]),
-    ));
+    // Avoid calling #affected_rows when a result exists — mirrors Rails' workaround
+    // for a mysql2 gem 0.5.6 race with GCed prepared statements (brianmario/mysql2#1383).
+    const [result, resultFields] = (await rawConnection.query(sql)) as [
+      mysql.RowDataPacket[] | mysql.ResultSetHeader,
+      mysql.FieldPacket[],
+    ];
+    if (Array.isArray(result)) {
+      rows = result as Record<string, unknown>[];
+      fields = (resultFields ?? []) as Array<{ name: string }>;
+      affectedRows = rows.length;
+    } else {
+      affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+    }
   } else if (prepare) {
-    // On error, evict the key so the next call re-prepares (mirrors Rails'
-    // `@statements.delete(sql)` rescue).
+    // On error, evict the SQL key so the next call re-prepares (mirrors Rails'
+    // `@statements.delete(sql)` rescue block).
     try {
-      ({ rows, fields, affectedRows } = parseExecuteResult(
-        ...((await rawConnection.execute(sql, typeCastedBinds as any[])) as [
-          mysql.RowDataPacket[] | mysql.ResultSetHeader,
-          mysql.FieldPacket[],
-        ]),
-      ));
+      const [result, resultFields] = (await rawConnection.execute(
+        sql,
+        typeCastedBinds as any[],
+      )) as [mysql.RowDataPacket[] | mysql.ResultSetHeader, mysql.FieldPacket[]];
+      if (Array.isArray(result)) {
+        rows = result as Record<string, unknown>[];
+        fields = (resultFields ?? []) as Array<{ name: string }>;
+        affectedRows = rows.length;
+      } else {
+        affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+      }
     } catch (err) {
       this._statements?.delete(sql);
       throw err;
     }
   } else {
-    // Non-cached path. node-mysql2 doesn't expose prepare/execute/close
-    // separately, so execute() is used — driver auto-manages the server-side stmt.
-    ({ rows, fields, affectedRows } = parseExecuteResult(
-      ...((await rawConnection.execute(sql, typeCastedBinds as any[])) as [
-        mysql.RowDataPacket[] | mysql.ResultSetHeader,
-        mysql.FieldPacket[],
-      ]),
-    ));
+    // Non-cached path. node-mysql2 doesn't expose a prepare/execute/close
+    // triple, so execute() is used — the driver auto-manages the server-side stmt.
+    const [result, resultFields] = (await rawConnection.execute(sql, typeCastedBinds as any[])) as [
+      mysql.RowDataPacket[] | mysql.ResultSetHeader,
+      mysql.FieldPacket[],
+    ];
+    if (Array.isArray(result)) {
+      rows = result as Record<string, unknown>[];
+      fields = (resultFields ?? []) as Array<{ name: string }>;
+      affectedRows = rows.length;
+    } else {
+      affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+    }
   }
 
   this._affectedRowsBeforeWarnings = affectedRows;
