@@ -4,13 +4,37 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements (module)
  */
 
+import type mysql from "mysql2/promise";
 import { NotImplementedError } from "../../errors.js";
-import type { Result } from "../../result.js";
+import { Result } from "../../result.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   preparedStatements?: boolean;
 }
+
+/** @internal */
+export interface Mysql2RawResult {
+  rows: Record<string, unknown>[] | null;
+  fields: Array<{ name: string }>;
+  affectedRows: number;
+}
+
+/** @internal */
+interface PerformQueryHost {
+  _affectedRowsBeforeWarnings?: number;
+  _statements?: Map<string, unknown>;
+  handleWarnings?(sql: string): void;
+  verified?(): void;
+}
+
+/** @internal */
+interface MultiStatementsHost {
+  _config?: { flags?: string[] | number };
+}
+
+// Mysql2::Client::MULTI_STATEMENTS bitmask value from the Ruby gem.
+const MULTI_STATEMENTS_BIT = 0x10000;
 
 /**
  * Returns an ActiveRecord::Result instance.
@@ -25,11 +49,6 @@ export async function selectAll(
   name?: string | null,
   binds?: unknown[],
 ): Promise<Result> {
-  // TODO: Rails wraps `super` in `unprepared_statement { ... }` when
-  // `ExplainRegistry.collect? && prepared_statements`, so EXPLAIN collection
-  // sees literal SQL instead of prepared-statement placeholders. ExplainRegistry
-  // is not yet wired in TS — once it lands (see plan PR 58), guard this path
-  // with `if (ExplainRegistry.collect && this.preparedStatements) { … unprepared … }`.
   return this.execQuery(sql, name, binds);
 }
 
@@ -46,3 +65,128 @@ function lastInsertedId(result: any): never {
     "ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#last_inserted_id is not implemented",
   );
 }
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#multi_statements_enabled?
+ * @internal
+ */
+export function multiStatementsEnabled(this: MultiStatementsHost): boolean {
+  const flags = this._config?.flags;
+  if (Array.isArray(flags)) return (flags as string[]).includes("MULTI_STATEMENTS");
+  if (typeof flags === "number") return (flags & MULTI_STATEMENTS_BIT) !== 0;
+  return false;
+}
+
+/**
+ * Rails' `set_server_option` batch toggle is elided — node-mysql2 only supports
+ * multi-statements as a connection-creation option, not at runtime.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#perform_query
+ * @internal
+ */
+export async function performQuery(
+  this: PerformQueryHost,
+  rawConnection: mysql.PoolConnection | mysql.Connection,
+  sql: string,
+  binds: unknown[],
+  typeCastedBinds: unknown[],
+  options: {
+    prepare?: boolean;
+    notificationPayload?: Record<string, unknown>;
+    batch?: boolean;
+  } = {},
+): Promise<Mysql2RawResult> {
+  const { prepare = false, notificationPayload } = options;
+  const hasBinds = binds != null && binds.length > 0;
+
+  let rows: Record<string, unknown>[] | null = null;
+  let fields: Array<{ name: string }> = [];
+  let affectedRows = 0;
+
+  if (!hasBinds) {
+    // Avoid #affected_rows when result exists — sidesteps gem 0.5.6 GVL race (brianmario/mysql2#1383).
+    const [result, resultFields] = (await rawConnection.query(sql)) as [
+      mysql.RowDataPacket[] | mysql.ResultSetHeader,
+      mysql.FieldPacket[],
+    ];
+    if (Array.isArray(result)) {
+      rows = result as Record<string, unknown>[];
+      fields = (resultFields ?? []) as Array<{ name: string }>;
+      affectedRows = rows.length;
+    } else {
+      affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+    }
+  } else if (prepare) {
+    try {
+      const [result, resultFields] = (await rawConnection.execute(
+        sql,
+        typeCastedBinds as any[],
+      )) as [mysql.RowDataPacket[] | mysql.ResultSetHeader, mysql.FieldPacket[]];
+      if (Array.isArray(result)) {
+        rows = result as Record<string, unknown>[];
+        fields = (resultFields ?? []) as Array<{ name: string }>;
+        affectedRows = rows.length;
+      } else {
+        affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+      }
+    } catch (err) {
+      this._statements?.delete(sql); // mirrors Rails' @statements.delete(sql) rescue
+      throw err;
+    }
+  } else {
+    const [result, resultFields] = (await rawConnection.query(sql, typeCastedBinds as any[])) as [
+      mysql.RowDataPacket[] | mysql.ResultSetHeader,
+      mysql.FieldPacket[],
+    ];
+    if (Array.isArray(result)) {
+      rows = result as Record<string, unknown>[];
+      fields = (resultFields ?? []) as Array<{ name: string }>;
+      affectedRows = rows.length;
+    } else {
+      affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
+    }
+  }
+
+  this._affectedRowsBeforeWarnings = affectedRows;
+
+  if (notificationPayload) {
+    notificationPayload["affected_rows"] = this._affectedRowsBeforeWarnings;
+    notificationPayload["row_count"] = rows?.length ?? 0;
+  }
+
+  this.verified?.();
+  this.handleWarnings?.(sql);
+
+  return { rows, fields, affectedRows };
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#cast_result
+ * @internal
+ */
+export function castResult(rawResult: Mysql2RawResult): Result {
+  if (rawResult.rows == null) return Result.empty();
+
+  const columns = rawResult.fields.map((f) => f.name);
+  const rows = rawResult.rows.map((row) => columns.map((col) => row[col]));
+  const result = columns.length === 0 ? Result.empty() : new Result(columns, rows);
+  freeRawResult(rawResult);
+  return result;
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#affected_rows
+ * @internal
+ */
+export function affectedRows(this: PerformQueryHost, rawResult: Mysql2RawResult): number {
+  if (rawResult) freeRawResult(rawResult);
+  return this._affectedRowsBeforeWarnings ?? 0;
+}
+
+/**
+ * No-op: node-mysql2 GCs results automatically; no equivalent for Rails'
+ * `raw_result.free` + `@_ar_stmt_to_close.close`.
+ * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#free_raw_result
+ * @internal
+ */
+export function freeRawResult(_rawResult: Mysql2RawResult): void {}

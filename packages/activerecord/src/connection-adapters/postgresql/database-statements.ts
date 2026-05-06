@@ -4,10 +4,12 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements
  */
 
-import { NotImplementedError } from "../../errors.js";
+import pg from "pg";
+import { NotImplementedError, PreparedStatementCacheExpired } from "../../errors.js";
+import type { Type } from "@blazetrails/activemodel";
 import type { Nodes } from "@blazetrails/arel";
 import type { ExplainOption } from "../../adapter.js";
-import type { Result } from "../../result.js";
+import { Result } from "../../result.js";
 
 // Mirrors: PostgreSQL::DatabaseStatements::READ_QUERY (database_statements.rb:19-21)
 // Mirrors Rails' build_read_query_regexp which combines the default read list
@@ -71,39 +73,131 @@ export interface DatabaseStatements {
 }
 
 /** @internal */
+interface PerformQueryHost {
+  preparedStatements?: boolean;
+  prepareStatement?(sql: string, binds: unknown[], client: pg.PoolClient): Promise<string>;
+  isCachedPlanFailure?(err: unknown): boolean;
+  deleteStatementKey?(sql: string): void;
+  inTransaction?: boolean;
+  /** @internal */
+  handleWarnings?(result: pg.QueryResult): void;
+  verified?(): void;
+  updateTypemapForDefaultTimezone?(): Promise<void>;
+}
+
+/** @internal */
+interface CastResultHost {
+  getOidType(oid: number, fmod: number, columnName: string, sqlType?: string): Promise<Type>;
+}
+
+/** @internal */
 function cancelAnyRunningQuery(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#cancel_any_running_query is not implemented",
   );
 }
 
-/** @internal */
-function performQuery(
-  rawConnection: any,
-  sql: any,
-  binds: any,
-  typeCastedBinds: any,
-  prepare?: any,
-  notificationPayload?: any,
-  batch?: any,
-): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query is not implemented",
-  );
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
+ * @internal
+ */
+export async function performQuery(
+  this: PerformQueryHost,
+  rawConnection: pg.PoolClient,
+  sql: string,
+  binds: unknown[],
+  typeCastedBinds: unknown[],
+  options: {
+    prepare?: boolean;
+    notificationPayload?: Record<string, unknown>;
+    batch?: boolean;
+  } = {},
+): Promise<pg.QueryResult> {
+  const { prepare = false, notificationPayload } = options;
+
+  await this.updateTypemapForDefaultTimezone?.();
+
+  let result: pg.QueryResult;
+
+  if (prepare && this.prepareStatement) {
+    // prepareStatement issues SQL PREPARE on the server. Omitting `text` here sends
+    // Bind+Execute only — passing it would re-PARSE under the same name, which the
+    // server rejects. @types/pg requires text but node-pg accepts {name,values} at runtime.
+    const stmtKey = await this.prepareStatement(sql, binds, rawConnection);
+    if (notificationPayload) notificationPayload["statement_name"] = stmtKey;
+    const execPrepared = (name: string) =>
+      rawConnection.query({
+        name,
+        values: typeCastedBinds as unknown[],
+        rowMode: "array",
+      } as unknown as pg.QueryConfig);
+    try {
+      result = await execPrepared(stmtKey);
+    } catch (err) {
+      if (this.isCachedPlanFailure?.(err)) {
+        if (this.inTransaction) {
+          throw new PreparedStatementCacheExpired((err as Error).message);
+        }
+        // Flush the cache entry; prepareStatement allocates a fresh name and re-PREPAREs.
+        this.deleteStatementKey?.(sql);
+        result = await execPrepared(await this.prepareStatement(sql, binds, rawConnection));
+      } else {
+        throw err;
+      }
+    }
+  } else if (binds == null || binds.length === 0) {
+    result = await rawConnection.query({ text: sql, rowMode: "array" });
+  } else {
+    result = await rawConnection.query({
+      text: sql,
+      values: typeCastedBinds as unknown[],
+      rowMode: "array",
+    });
+  }
+
+  this.verified?.();
+  this.handleWarnings?.(result);
+  if (notificationPayload) notificationPayload["row_count"] = result.rows.length;
+
+  return result;
 }
 
-/** @internal */
-function castResult(result: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#cast_result is not implemented",
-  );
+/**
+ * async unlike Rails because getOidType may issue a pg_type lookup for unknown OIDs.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#cast_result
+ * @internal
+ */
+export async function castResult(this: CastResultHost, result: pg.QueryResult): Promise<Result> {
+  const fields = result.fields ?? [];
+  if (fields.length === 0) {
+    return Result.empty();
+  }
+
+  const columnNames = fields.map((f) => f.name);
+  const columnTypes: Record<string | number, Type> = {};
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
+    const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name, "");
+    columnTypes[i] = type;
+    // Rails sets types[fname] = types[i] unconditionally; we guard against a column
+    // named "1" colliding with integer index 1 in a plain JS object key space.
+    if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
+  }
+
+  const rows = (result.rows ?? []) as unknown[][];
+  return new Result(columnNames, rows, columnTypes as Record<string, Type>);
 }
 
-/** @internal */
-function affectedRows(result: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#affected_rows is not implemented",
-  );
+/**
+ * Rails calls `result.cmd_tuples` then `result.clear`. rowCount is node-pg's
+ * cmd_tuples equivalent; no .clear() is needed (JS GC handles it).
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#affected_rows
+ * @internal
+ */
+export function affectedRows(result: pg.QueryResult): number {
+  return result.rowCount ?? 0;
 }
 
 /** @internal */
