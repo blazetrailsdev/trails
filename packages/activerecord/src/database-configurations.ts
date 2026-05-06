@@ -1,5 +1,5 @@
 import { getEnv } from "@blazetrails/activesupport";
-import { NotImplementedError } from "./errors.js";
+import { AdapterNotSpecified } from "./errors.js";
 import {
   DatabaseConfig,
   type DatabaseConfigOptions,
@@ -213,28 +213,23 @@ export class DatabaseConfigurations {
    */
   resolve(config: unknown): DatabaseConfig {
     if (config instanceof DatabaseConfig) return config;
-    const defaultEnv = DatabaseConfigurations.defaultEnv;
     if (typeof config === "string") {
       // Mirrors Rails: resolve(symbol) → resolve_symbol_connection → find_db_config
       // Strings with a URI scheme (e.g. "postgres://", "sqlite3:") are treated as URLs.
       // Strings without a scheme are treated as env names (mirrors Ruby symbol lookup).
       const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config);
       if (!hasScheme) {
-        const found = this.findDbConfig(config);
-        if (found) return found;
-        throw new Error(
-          `The \`${config}\` database is not configured for the \`${defaultEnv}\` environment.`,
-        );
+        return this.resolveSymbolConnection(config);
       }
-      return new UrlConfig(defaultEnv, "primary", config);
+      return new UrlConfig(DatabaseConfigurations.defaultEnv, "primary", config);
     }
     if (typeof config === "object" && config !== null) {
       const opts = config as DatabaseConfigOptions;
       if (opts.url) {
         const { url, ...configWithoutUrl } = opts;
-        return new UrlConfig(defaultEnv, "primary", url, configWithoutUrl);
+        return new UrlConfig(DatabaseConfigurations.defaultEnv, "primary", url, configWithoutUrl);
       }
-      return new HashConfig(defaultEnv, "primary", opts);
+      return new HashConfig(DatabaseConfigurations.defaultEnv, "primary", opts);
     }
     throw new TypeError(
       `Invalid type for configuration. Expected string, hash, or DatabaseConfig. Got ${typeof config}`,
@@ -365,18 +360,124 @@ export class DatabaseConfigurations {
     name: string,
     config: DatabaseConfigOptions,
   ): DatabaseConfig {
-    // Mirrors Rails: iterate handlers in reverse (most recently registered first),
-    // pull url out of config, and return the first non-null DatabaseConfig.
+    return this.buildDbConfigFromHash(envName, name, config);
+  }
+
+  /** @internal */
+  private envWithConfigs(env?: string): DatabaseConfig[] {
+    if (env) return this._configurations.filter((c) => c.envName === env);
+    return this._configurations;
+  }
+
+  /** @internal */
+  private buildConfigs(configs: RawConfigurations | DatabaseConfig[]): DatabaseConfig[] {
+    if (Array.isArray(configs)) return configs;
+    return this._buildConfigs(this._mergeDatabaseUrl(configs, DatabaseConfigurations.defaultEnv));
+  }
+
+  /** @internal */
+  private walkConfigs(
+    envName: string,
+    config: Record<string, DatabaseConfigOptions>,
+  ): DatabaseConfig[] {
+    return Object.entries(config).map(([name, subConfig]) =>
+      this.buildDbConfigFromRawConfig(envName, name, subConfig),
+    );
+  }
+
+  /** @internal */
+  private resolveSymbolConnection(name: string): DatabaseConfig {
+    const dbConfig = this.findDbConfig(name);
+    if (dbConfig) return dbConfig;
+    const defaultEnv = DatabaseConfigurations.defaultEnv;
+    throw new AdapterNotSpecified(
+      `The \`${name}\` database is not configured for the \`${defaultEnv}\` environment.\n\n  Available database configurations are:\n\n  ${this.buildConfigurationSentence()}`,
+    );
+  }
+
+  /** @internal */
+  private buildConfigurationSentence(): string {
+    const configs = this.configsFor({ includeHidden: true });
+    const byEnv = new Map<string, string[]>();
+    for (const cfg of configs) {
+      const names = byEnv.get(cfg.envName) ?? [];
+      names.push(cfg.name);
+      byEnv.set(cfg.envName, names);
+    }
+    return Array.from(byEnv.entries())
+      .map(([env, names]) => (names.length > 1 ? `${env}: ${names.join(", ")}` : env))
+      .join("\n");
+  }
+
+  /** @internal */
+  private buildDbConfigFromRawConfig(
+    envName: string,
+    name: string,
+    config: string | DatabaseConfigOptions,
+  ): DatabaseConfig {
+    if (typeof config === "string") return this.buildDbConfigFromString(envName, name, config);
+    if (typeof config === "object" && config !== null && !Array.isArray(config))
+      return this.buildDbConfigFromHash(envName, name, config);
+    throw new InvalidConfigurationError(
+      `'{ ${envName} => ${String(config)} }' is not a valid configuration. Expected a URL string or a Hash.`,
+    );
+  }
+
+  /** @internal */
+  private buildDbConfigFromString(envName: string, name: string, config: string): DatabaseConfig {
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config)) {
+      // Rails leaks the URL verbatim; we redact credentials to avoid logging secrets.
+      const safe = config.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^@/]+@/, "$1***@");
+      throw new InvalidConfigurationError(
+        `'{ ${envName} => ${safe} }' is not a valid configuration. Expected a URL string or a Hash.`,
+      );
+    }
+    return new UrlConfig(envName, name, config);
+  }
+
+  /** @internal */
+  private buildDbConfigFromHash(
+    envName: string,
+    name: string,
+    config: DatabaseConfigOptions,
+  ): DatabaseConfig {
     const url = config.url;
     const configWithoutUrl = { ...config };
     delete configWithoutUrl.url;
-
     for (let i = DatabaseConfigurations.dbConfigHandlers.length - 1; i >= 0; i--) {
       const handler = DatabaseConfigurations.dbConfigHandlers[i];
       const result = handler(envName, name, url, configWithoutUrl);
       if (result) return result;
     }
     throw new InvalidConfigurationError(`No db config handler matched for ${envName}/${name}`);
+  }
+
+  /** @internal */
+  private environmentValueFor(name: string): string | undefined {
+    const nameEnvKey = `${name.toUpperCase()}_DATABASE_URL`;
+    return getEnv(nameEnvKey) ?? (name === "primary" ? getEnv("DATABASE_URL") : undefined);
+  }
+
+  /** @internal */
+  private environmentUrlConfig(
+    env: string,
+    name: string,
+    config: DatabaseConfigOptions,
+  ): DatabaseConfig | null {
+    const url = this.environmentValueFor(name);
+    if (!url) return null;
+    return new UrlConfig(env, name, url, config);
+  }
+
+  /** @internal */
+  private mergeDbEnvironmentVariables(
+    currentEnv: string,
+    configs: DatabaseConfig[],
+  ): DatabaseConfig[] {
+    return configs.map((config) => {
+      if (config instanceof UrlConfig || config.envName !== currentEnv) return config;
+      return this.environmentUrlConfig(currentEnv, config.name, config.configuration) ?? config;
+    });
   }
 }
 
@@ -399,80 +500,3 @@ _setDefaultEnvGetter(() => DatabaseConfigurations.defaultEnv);
 // Register the primary checker so HashConfig.isPrimary can consult the
 // current DatabaseConfigurations instance (matching Rails' global Base.configurations).
 _setPrimaryChecker((name) => _currentConfigurations?.isPrimary(name) ?? false);
-
-/** @internal */
-function envWithConfigs(env?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#env_with_configs is not implemented",
-  );
-}
-
-/** @internal */
-function buildConfigs(configs: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#build_configs is not implemented",
-  );
-}
-
-/** @internal */
-function walkConfigs(envName: any, config: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#walk_configs is not implemented",
-  );
-}
-
-/** @internal */
-function resolveSymbolConnection(name: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#resolve_symbol_connection is not implemented",
-  );
-}
-
-/** @internal */
-function buildConfigurationSentence(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#build_configuration_sentence is not implemented",
-  );
-}
-
-/** @internal */
-function buildDbConfigFromRawConfig(envName: any, name: any, config: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#build_db_config_from_raw_config is not implemented",
-  );
-}
-
-/** @internal */
-function buildDbConfigFromString(envName: any, name: any, config: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#build_db_config_from_string is not implemented",
-  );
-}
-
-/** @internal */
-function buildDbConfigFromHash(envName: any, name: any, config: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#build_db_config_from_hash is not implemented",
-  );
-}
-
-/** @internal */
-function mergeDbEnvironmentVariables(currentEnv: any, configs: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#merge_db_environment_variables is not implemented",
-  );
-}
-
-/** @internal */
-function environmentUrlConfig(env: any, name: any, config: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#environment_url_config is not implemented",
-  );
-}
-
-/** @internal */
-function environmentValueFor(name: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations#environment_value_for is not implemented",
-  );
-}

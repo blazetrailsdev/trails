@@ -9,7 +9,6 @@
  *   // => { adapter: "postgresql", host: "localhost", port: 9000,
  *   //      database: "foo_test", username: "foo", password: "bar", pool: "5" }
  */
-import { NotImplementedError } from "../errors.js";
 import type { DatabaseConfigOptions } from "./database-config.js";
 
 // Scheme-to-adapter mapping (Rails' ActiveRecord.protocol_adapters).
@@ -81,7 +80,7 @@ export class ConnectionUrlResolver {
    * Mirrors: ConnectionUrlResolver#to_hash
    */
   toHash(): DatabaseConfigOptions {
-    const config: Record<string, unknown> = { ...this._queryHash(), ...this._rawConfig() };
+    const config: Record<string, unknown> = { ...this.queryHash(), ...this.rawConfig() };
 
     // Remove null/undefined/empty values (Rails: compact_blank)
     for (const key of Object.keys(config)) {
@@ -106,7 +105,23 @@ export class ConnectionUrlResolver {
     return config as DatabaseConfigOptions;
   }
 
-  private _queryHash(): Record<string, string> {
+  /** @internal */
+  private get uri(): URL | null {
+    return this._parsed;
+  }
+
+  /** @internal */
+  private get uriParser(): { unescape(s: string): string } {
+    return { unescape: decodeURIComponent };
+  }
+
+  /** @internal */
+  private get resolvedAdapter(): string | null {
+    return this._adapter;
+  }
+
+  /** @internal */
+  private queryHash(): Record<string, string> {
     if (!this._query) return {};
     const result: Record<string, string> = {};
     for (const pair of this._query.split("&")) {
@@ -122,7 +137,8 @@ export class ConnectionUrlResolver {
     return result;
   }
 
-  private _rawConfig(): Record<string, unknown> {
+  /** @internal */
+  private rawConfig(): Record<string, unknown> {
     if (this._opaque !== null) {
       // Opaque URI: adapter + database (from opaque part)
       return {
@@ -137,13 +153,14 @@ export class ConnectionUrlResolver {
       username: parsed.username || undefined,
       password: parsed.password || undefined,
       port: parsed.port ? Number(parsed.port) : undefined,
-      database: this._databaseFromPath(parsed.pathname),
+      database: this.databaseFromPath(parsed.pathname),
       // URL API wraps IPv6 addresses in brackets; strip them to match Rails behavior
       host: parsed.hostname ? parsed.hostname.replace(/^\[(.+)\]$/, "$1") : undefined,
     };
   }
 
-  private _databaseFromPath(path: string): string | undefined {
+  /** @internal */
+  private databaseFromPath(path: string): string | undefined {
     if (!path) return undefined;
     // SQLite uses the full path as database name; others strip the leading slash
     if (this._adapter === "sqlite3") {
@@ -157,46 +174,4 @@ export class ConnectionUrlResolver {
 // logged without leaking credentials embedded in connection URLs.
 function redactUrl(url: string): string {
   return url.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^@/]+@/, "$1***@");
-}
-
-/** @internal */
-function uri(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#uri is not implemented",
-  );
-}
-
-/** @internal */
-function uriParser(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#uri_parser is not implemented",
-  );
-}
-
-/** @internal */
-function queryHash(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#query_hash is not implemented",
-  );
-}
-
-/** @internal */
-function rawConfig(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#raw_config is not implemented",
-  );
-}
-
-/** @internal */
-function resolvedAdapter(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#resolved_adapter is not implemented",
-  );
-}
-
-/** @internal */
-function databaseFromPath(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver#database_from_path is not implemented",
-  );
 }
