@@ -1000,7 +1000,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  protected isWarningIgnored(warning: { level?: string }): boolean {
+  override isWarningIgnored(warning: { level?: string; [k: string]: unknown }): boolean {
     return warning.level === "Note";
   }
 

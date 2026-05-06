@@ -6,10 +6,12 @@
 
 import { inspectExplainOption } from "../adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
-import { type Nodes, Visitors } from "@blazetrails/arel";
+import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
 import {
   ReadOnlyError,
   NotImplementedError,
+  ActiveRecordError,
+  StatementInvalid,
   ConnectionNotEstablished,
   ConnectionNotDefined,
   ConnectionFailed,
@@ -17,6 +19,8 @@ import {
   Deadlocked,
   LockWaitTimeout,
 } from "../errors.js";
+import { Notifications } from "@blazetrails/activesupport";
+import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache } from "./schema-cache.js";
 import { stripSqlComments } from "./sql-classification.js";
 import {
@@ -58,7 +62,6 @@ import {
 } from "./abstract/quoting.js";
 import type { Quoting } from "./abstract/quoting-interface.js";
 import { include } from "@blazetrails/activesupport";
-import type { Result } from "../result.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
@@ -1209,107 +1212,158 @@ export class AbstractAdapter implements Quoting {
   configureConnection(..._args: unknown[]): void | Promise<void> {
     this.checkVersion();
   }
+
+  /** @internal Mirrors: AbstractAdapter#translate_exception_class */
+  translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown {
+    if (nativeError instanceof ActiveRecordError) return nativeError;
+    const name = (nativeError as any)?.constructor?.name ?? "Error";
+    const msg = (nativeError as any)?.message ?? "";
+    const message = `${name}: ${msg}`;
+    const arError = this.translateException(nativeError, {
+      message,
+      sql: sql as string,
+      binds: binds as unknown[],
+    });
+    if (arError !== nativeError && arError instanceof Error && nativeError instanceof Error) {
+      arError.stack = nativeError.stack;
+    }
+    return arError;
+  }
+
+  /** Mirrors: AbstractAdapter#log */
+  async log<T>(
+    sql: string,
+    name: string | null | undefined = "SQL",
+    binds: unknown[] = [],
+    typeCastedBinds: unknown[] = [],
+    isAsync = false,
+    block?: () => Promise<T>,
+  ): Promise<T | void> {
+    try {
+      return await Notifications.instrumentAsync(
+        "sql.active_record",
+        {
+          sql,
+          name: name ?? "SQL",
+          binds,
+          type_casted_binds: typeCastedBinds,
+          async: isAsync,
+          connection: this,
+          row_count: 0,
+        },
+        block,
+      );
+    } catch (ex) {
+      if (ex instanceof StatementInvalid) {
+        throw ex.setQuery(sql, binds);
+      }
+      throw ex;
+    }
+  }
+
+  /** @internal Mirrors: AbstractAdapter#instrumenter */
+  get instrumenter(): typeof Notifications {
+    return Notifications;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#translate_exception */
+  translateException(
+    exception: unknown,
+    opts: { message: string; sql: string; binds: unknown[] },
+  ): unknown {
+    if (exception instanceof ActiveRecordError) return exception;
+    return new StatementInvalid(opts.message, {
+      sql: opts.sql,
+      binds: opts.binds,
+      connectionPool: this.pool,
+    });
+  }
+
+  /** @internal Mirrors: AbstractAdapter#column_for */
+  async columnFor(tableName: string, columnName: string): Promise<import("./column.js").Column> {
+    const cols = await (this as any).columns(tableName);
+    const col = (cols as import("./column.js").Column[]).find((c) => c.name === columnName);
+    if (!col) throw new ActiveRecordError(`No such column: ${tableName}.${columnName}`);
+    return col;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#column_for_attribute */
+  async columnForAttribute(attribute: {
+    relation: { name: string };
+    name: string;
+  }): Promise<import("./column.js").Column | undefined> {
+    const hash = await (this.schemaCache as any).columnsHash(this.pool, attribute.relation.name);
+    return hash?.[attribute.name];
+  }
+
+  /** @internal Mirrors: AbstractAdapter#collector */
+  collector(): Collectors.Composite | Collectors.SubstituteBinds {
+    if (this.preparedStatements) {
+      return new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
+    }
+    return new Collectors.SubstituteBinds(this as any, new Collectors.SQLString());
+  }
+
+  /** @internal Mirrors: AbstractAdapter#build_statement_pool */
+  buildStatementPool(..._args: unknown[]): unknown {
+    return undefined;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#build_result */
+  buildResult(
+    columns: string[],
+    rows: unknown[][],
+    columnTypes: ColumnTypes | null = null,
+  ): Result {
+    return new Result(columns, rows, columnTypes);
+  }
+
+  /** @internal Mirrors: AbstractAdapter#attempt_configure_connection */
+  async attemptConfigureConnection(): Promise<void> {
+    try {
+      await this.configureConnection();
+    } catch (e) {
+      this.disconnectBang();
+      throw e;
+    }
+  }
+
+  /** @internal Mirrors: AbstractAdapter#default_prepared_statements */
+  defaultPreparedStatements(): boolean {
+    return true;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#warning_ignored? */
+  isWarningIgnored(warning: {
+    message?: string;
+    code?: string | number;
+    [k: string]: unknown;
+  }): boolean {
+    const matchers: (string | RegExp)[] = (this.constructor as any).dbWarningsIgnore ?? [];
+    const msg = warning.message ?? "";
+    return matchers.some(
+      (m) =>
+        (typeof m === "string" ? msg.includes(m) : m.test(msg)) ||
+        (warning.code !== undefined &&
+          (typeof m === "string"
+            ? String(warning.code).includes(m)
+            : m.test(String(warning.code)))),
+    );
+  }
+
+  /** @internal Mirrors: AbstractAdapter#lookup_cast_type_from_column */
+  lookupCastTypeFromColumn(column: { sqlType: string | null }): unknown {
+    const sqlType = column.sqlType;
+    if (!sqlType) return null;
+    if (typeof (this as any).lookupCastType === "function") {
+      return (this as any).lookupCastType(sqlType);
+    }
+    return sqlType;
+  }
 }
 
 // Rails: `include DatabaseStatements` inside the class body.
 include(AbstractAdapter, DatabaseStatements);
-
-/** @internal */
-function translateExceptionClass(nativeError: any, sql: any, binds: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#translate_exception_class is not implemented",
-  );
-}
-
-function log(
-  sql: any,
-  name?: any,
-  binds?: any,
-  typeCastedBinds?: any,
-  async?: any,
-  block?: any,
-): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#log is not implemented",
-  );
-}
-
-/** @internal */
-function instrumenter(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#instrumenter is not implemented",
-  );
-}
-
-/** @internal */
-function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#translate_exception is not implemented",
-  );
-}
-
-/** @internal */
-function columnFor(tableName: any, columnName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#column_for is not implemented",
-  );
-}
-
-/** @internal */
-function columnForAttribute(attribute: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#column_for_attribute is not implemented",
-  );
-}
-
-/** @internal */
-function collector(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#collector is not implemented",
-  );
-}
-
-/** @internal */
-function arelVisitor(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#arel_visitor is not implemented",
-  );
-}
-
-/** @internal */
-function buildStatementPool(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#build_statement_pool is not implemented",
-  );
-}
-
-/** @internal */
-function buildResult(columns?: any, rows?: any, columnTypes?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#build_result is not implemented",
-  );
-}
-
-/** @internal */
-function attemptConfigureConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#attempt_configure_connection is not implemented",
-  );
-}
-
-/** @internal */
-function defaultPreparedStatements(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#default_prepared_statements is not implemented",
-  );
-}
-
-/** @internal */
-function isWarningIgnored(warning: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#warning_ignored? is not implemented",
-  );
-}
 
 /** @internal */
 function initializeTypeMap(m: any): never {
