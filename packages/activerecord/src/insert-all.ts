@@ -13,6 +13,12 @@ type AdapterDialect = AdapterName;
 const TIMESTAMP_COLUMNS = ["created_at", "updated_at"] as const;
 const UPDATE_TIMESTAMP_COLUMNS = ["updated_at"] as const;
 
+// Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#column_name_with_order_matcher
+// Allows safe column names (optionally table-qualified, with optional ASC/DESC/NULLS).
+// Used by disallowRawSqlBang to distinguish Ruby-symbol-equivalent strings from raw SQL.
+const COLUMN_NAME_WITH_ORDER =
+  /^\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*\s*$/i;
+
 export interface InsertAllOptions {
   onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
   updateOnly?: string | string[];
@@ -62,6 +68,10 @@ export class InsertAll {
     this._recordTimestamps = options.recordTimestamps ?? this.model.recordTimestamps;
     this.updateSql = undefined;
     this.onDuplicate = undefined;
+
+    if (options.onDuplicate !== undefined) this.disallowRawSqlBang(options.onDuplicate);
+    if (options.returning !== undefined && options.returning !== false)
+      this.disallowRawSqlBang(options.returning);
 
     if (options.returning !== undefined) {
       this.returning =
@@ -296,9 +306,10 @@ export class InsertAll {
   }
 
   /** @internal */
-  private disallowRawSqlBang(value: unknown): void {
+  private disallowRawSqlBang(value: unknown, permit: RegExp = COLUMN_NAME_WITH_ORDER): void {
     if (value instanceof Nodes.SqlLiteral) return;
     if (typeof value !== "string") return;
+    if (permit.test(value)) return;
     throw new Error(
       `Dangerous query method called with raw SQL string: ${value}. ` +
         "Known-safe values can be passed by wrapping them in Arel.sql().",
