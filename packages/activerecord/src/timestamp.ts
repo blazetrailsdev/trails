@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { Base } from "./base.js";
-import { ReadOnlyRecord, StaleObjectError, NotImplementedError } from "./errors.js";
+import { ReadOnlyRecord, StaleObjectError } from "./errors.js";
 import { UpdateManager, Nodes } from "@blazetrails/arel";
 import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 
@@ -164,6 +164,116 @@ export function currentTimeFromProperTimezone(): Temporal.Instant {
   return Temporal.Now.instant();
 }
 
+/** @internal */
+export function reloadSchemaFromCache(this: TimestampHost): void {
+  this._timestampAttributesForCreateInModel = undefined;
+  this._timestampAttributesForUpdateInModel = undefined;
+  this._allTimestampAttributesInModel = undefined;
+}
+
+/** @internal */
+export function timestampAttributesForCreate(this: TimestampHost): string[] {
+  const aliases = this._attributeAliases ?? {};
+  return CREATED_ATTRS.map((name) => aliases[name] ?? name);
+}
+
+/** @internal */
+export function timestampAttributesForUpdate(this: TimestampHost): string[] {
+  const aliases = this._attributeAliases ?? {};
+  return UPDATED_ATTRS.map((name) => aliases[name] ?? name);
+}
+
+// ---------------------------------------------------------------------------
+// Instance methods — mirrors ActiveRecord::Timestamp private block
+// ---------------------------------------------------------------------------
+
+/** @internal */
+export function initializeDup(this: any, _other: any): void {
+  clearTimestampAttributes.call(this);
+}
+
+/** @internal */
+export function initInternals(this: any): void {
+  this._touchRecord = null;
+}
+
+/** @internal */
+export async function _createRecord(this: any): Promise<unknown> {
+  if ((this.constructor as any).recordTimestamps) {
+    const time = currentTimeFromProperTimezone();
+    for (const col of allTimestampAttributesInModel.call(this.constructor as TimestampHost)) {
+      if (this._readAttribute?.(col) == null) {
+        this._writeAttribute?.(col, time);
+      }
+    }
+  }
+  // Rails calls super here (the persistence layer). In trails the persistence
+  // layer is wired separately via callbacks.ts; this method provides the
+  // timestamp-writing half only.
+  return this.id;
+}
+
+/** @internal */
+export async function _updateRecord(this: any): Promise<boolean> {
+  await recordUpdateTimestamps.call(this);
+  // Rails yields to super (persistence layer) inside record_update_timestamps.
+  // In trails the persistence layer is wired separately via callbacks.ts.
+  return true;
+}
+
+/** @internal */
+export function createOrUpdate(this: any, touch = true): Promise<boolean> {
+  this._touchRecord = touch;
+  return (this._createOrUpdate as () => Promise<boolean>).call(this);
+}
+
+/** @internal */
+export async function recordUpdateTimestamps(this: any): Promise<void> {
+  if (this._touchRecord && shouldRecordTimestamps.call(this)) {
+    const time = currentTimeFromProperTimezone();
+    const ctor = this.constructor as TimestampHost;
+    for (const col of timestampAttributesForUpdateInModel.call(ctor)) {
+      if (!this.willSaveChangeToAttribute?.(col)) {
+        this._writeAttribute?.(col, time);
+      }
+    }
+  }
+}
+
+/** @internal */
+export function shouldRecordTimestamps(this: any): boolean {
+  const ctor = this.constructor as any;
+  return (
+    ctor.recordTimestamps !== false && (!ctor.partialUpdates || this.hasChangesToSave?.() !== false)
+  );
+}
+
+/** @internal */
+export function maxUpdatedColumnTimestamp(this: any): Temporal.Instant | null {
+  const ctor = this.constructor as TimestampHost;
+  const attrs = timestampAttributesForUpdateInModel.call(ctor);
+  let max: Temporal.Instant | null = null;
+  for (const attr of attrs) {
+    const v = this.readAttribute?.(attr);
+    if (v == null) continue;
+    const inst: Temporal.Instant =
+      v instanceof Object && typeof (v as any).epochMilliseconds === "number"
+        ? (v as Temporal.Instant)
+        : Temporal.Instant.from(String(v));
+    if (max === null || Temporal.Instant.compare(inst, max) > 0) max = inst;
+  }
+  return max;
+}
+
+/** @internal */
+export function clearTimestampAttributes(this: any): void {
+  const ctor = this.constructor as TimestampHost;
+  for (const attr of allTimestampAttributesInModel.call(ctor)) {
+    this[attr] = null;
+    this.clearAttributeChange?.(attr);
+  }
+}
+
 /**
  * Module methods wired onto Base as static methods via `extend()` in base.ts.
  * Mirrors Rails' `ActiveSupport::Concern#ClassMethods` convention.
@@ -178,72 +288,3 @@ export const ClassMethods = {
 export const InstanceMethods = {
   touch,
 };
-
-/** @internal */
-function initInternals(): never {
-  throw new NotImplementedError("ActiveRecord::Timestamp#init_internals is not implemented");
-}
-
-/** @internal */
-function _createRecord(): never {
-  throw new NotImplementedError("ActiveRecord::Timestamp#_create_record is not implemented");
-}
-
-/** @internal */
-function _updateRecord(): never {
-  throw new NotImplementedError("ActiveRecord::Timestamp#_update_record is not implemented");
-}
-
-/** @internal */
-function createOrUpdate(touch?: any, opts?: any): never {
-  throw new NotImplementedError("ActiveRecord::Timestamp#create_or_update is not implemented");
-}
-
-/** @internal */
-function recordUpdateTimestamps(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Timestamp#record_update_timestamps is not implemented",
-  );
-}
-
-/** @internal */
-function shouldRecordTimestamps(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Timestamp#should_record_timestamps? is not implemented",
-  );
-}
-
-/** @internal */
-function maxUpdatedColumnTimestamp(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Timestamp#max_updated_column_timestamp is not implemented",
-  );
-}
-
-/** @internal */
-function clearTimestampAttributes(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Timestamp#clear_timestamp_attributes is not implemented",
-  );
-}
-
-/** @internal */
-function reloadSchemaFromCache(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Timestamp#reload_schema_from_cache is not implemented",
-  );
-}
-
-/** @internal */
-function timestampAttributesForCreate(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Timestamp#timestamp_attributes_for_create is not implemented",
-  );
-}
-
-/** @internal */
-function timestampAttributesForUpdate(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Timestamp#timestamp_attributes_for_update is not implemented",
-  );
-}
