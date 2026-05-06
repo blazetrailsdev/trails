@@ -1,4 +1,3 @@
-import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
@@ -250,19 +249,67 @@ export const ClassMethods = {
   isCounterCacheColumn,
 };
 
-/** @internal */
-function _createRecord(attributeNames?: any): never {
-  throw new NotImplementedError("ActiveRecord::CounterCache#_create_record is not implemented");
+type InstanceCounterHost = {
+  constructor: typeof Base;
+  destroyedByAssociation: unknown;
+  association(name: string): any;
+};
+
+function counterCachedAssociationNames(ctor: typeof Base): string[] {
+  const associations: Array<{ type: string; name: string; options: any }> =
+    (ctor as any)._associations ?? [];
+  return associations
+    .filter((a) => a.type === "belongsTo" && a.options?.counterCache)
+    .map((a) => a.name);
 }
 
-/** @internal */
-function destroyRow(): never {
-  throw new NotImplementedError("ActiveRecord::CounterCache#destroy_row is not implemented");
+/**
+ * @internal
+ * Mirrors: ActiveRecord::CounterCache#_create_record
+ */
+export async function _createRecord(
+  this: InstanceCounterHost,
+  superFn: () => Promise<unknown>,
+): Promise<unknown> {
+  const id = await superFn();
+  for (const name of counterCachedAssociationNames(this.constructor)) {
+    await this.association(name).incrementCounters();
+  }
+  return id;
 }
 
-/** @internal */
-function is_foreignKeysEqual(fkey1: any, fkey2: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::CounterCache#_foreign_keys_equal? is not implemented",
+/**
+ * @internal
+ * Mirrors: ActiveRecord::CounterCache#destroy_row
+ */
+export async function destroyRow(
+  this: InstanceCounterHost,
+  superFn: () => Promise<number>,
+): Promise<number> {
+  const affectedRows = await superFn();
+  if (affectedRows > 0) {
+    for (const name of counterCachedAssociationNames(this.constructor)) {
+      const assoc = this.association(name);
+      const dba = this.destroyedByAssociation as any;
+      if (!dba || !isForeignKeysEqual(dba.foreignKey, assoc.reflection?.foreignKey)) {
+        await assoc.decrementCounters();
+      }
+    }
+  }
+  return affectedRows;
+}
+
+/**
+ * @internal
+ * Mirrors: ActiveRecord::CounterCache#_foreign_keys_equal?
+ */
+export function isForeignKeysEqual(fkey1: unknown, fkey2: unknown): boolean {
+  if (fkey1 === fkey2) return true;
+  const arr1 = (Array.isArray(fkey1) ? fkey1 : [fkey1]).map((k) =>
+    typeof k === "string" ? k : String(k),
   );
+  const arr2 = (Array.isArray(fkey2) ? fkey2 : [fkey2]).map((k) =>
+    typeof k === "string" ? k : String(k),
+  );
+  return arr1.length === arr2.length && arr1.every((k, i) => k === arr2[i]);
 }

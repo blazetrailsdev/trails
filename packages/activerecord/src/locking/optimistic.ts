@@ -1,6 +1,9 @@
-import { NotImplementedError } from "../errors.js";
 import type { Base } from "../base.js";
+import { StaleObjectError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
+import { isWillSaveChangeToAttribute, attributeInDatabase } from "../attribute-methods/dirty.js";
+import { queryConstraintsList, _updateRecord as persistenceUpdateRecord } from "../persistence.js";
+import { attributesWithValues } from "../attribute-methods.js";
 
 /**
  * Optimistic locking support for ActiveRecord models.
@@ -70,6 +73,23 @@ function toInt(value: unknown): number {
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
 
+function buildBaseConstraints(
+  instance: InstanceLockingHost,
+  ctor: typeof Base,
+): Record<string, unknown> {
+  const constraintsList = queryConstraintsList.call(ctor as any);
+  if (!constraintsList) {
+    const pk = ctor.primaryKey as string;
+    return { [pk]: (instance as any).idInDatabase?.() ?? (instance as any).id };
+  }
+  return Object.fromEntries(
+    constraintsList.map((col: string) => [
+      col,
+      (instance as any).attributeInDatabase?.(col) ?? instance.readAttribute(col),
+    ]),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Class methods — mirrors ActiveRecord::Locking::Optimistic::ClassMethods
 // ---------------------------------------------------------------------------
@@ -80,6 +100,10 @@ interface LockingHost {
   _lockingColumn: string;
   lockOptimistically?: boolean;
   updateCounters?(id: unknown, counters: Record<string, number>): Promise<number>;
+  _updateRecord?(
+    values: Record<string, unknown>,
+    constraints: Record<string, unknown>,
+  ): Promise<number>;
 }
 
 /**
@@ -131,52 +155,142 @@ export async function updateCounters(
   return 0;
 }
 
-/** @internal */
-function _createRecord(attributeNames?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Locking::Optimistic#_create_record is not implemented",
-  );
+type InstanceLockingHost = {
+  constructor: typeof Base & LockingHost;
+  readAttribute(name: string): unknown;
+  writeAttribute(name: string, value: unknown): void;
+  clearAttributeChange(name: string): void;
+  changes: Record<string, [unknown, unknown]>;
+};
+
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Locking::Optimistic#_create_record
+ */
+export function _createRecord(
+  this: InstanceLockingHost,
+  attributeNames: string[],
+  superFn: (names: string[]) => unknown,
+): unknown {
+  const ctor = this.constructor;
+  if (ctor.lockingEnabled) {
+    const col = ctor.lockingColumn;
+    if (!attributeNames.includes(col)) attributeNames = [...attributeNames, col];
+  }
+  return superFn(attributeNames);
 }
 
-/** @internal */
-function _touchRow(attributeNames: any, time: any): never {
-  throw new NotImplementedError("ActiveRecord::Locking::Optimistic#_touch_row is not implemented");
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Locking::Optimistic#_touch_row
+ */
+export function _touchRow(
+  this: InstanceLockingHost,
+  touchAttrNames: string[],
+  time: unknown,
+  superFn: (names: string[], time: unknown) => unknown,
+): unknown {
+  const ctor = this.constructor;
+  if (ctor.lockingEnabled) {
+    touchAttrNames = [...touchAttrNames, ctor.lockingColumn];
+  }
+  return superFn(touchAttrNames, time);
 }
 
-/** @internal */
-function _updateRow(attributeNames: any, attemptedAction?: any): never {
-  throw new NotImplementedError("ActiveRecord::Locking::Optimistic#_update_row is not implemented");
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Locking::Optimistic#_update_row
+ */
+export async function _updateRow(
+  this: InstanceLockingHost,
+  attributeNames: string[],
+  attemptedAction: string,
+  superFn: (names: string[], action: string) => Promise<number>,
+): Promise<number> {
+  const ctor = this.constructor;
+  if (!ctor.lockingEnabled) return superFn(attributeNames, attemptedAction);
+
+  const col = ctor.lockingColumn;
+  const lockVersionWas = this.readAttribute(col);
+  const baseConstraints = buildBaseConstraints(this, ctor);
+  const updateConstraints = { ...baseConstraints, [col]: _lockValueForDatabase.call(this, col) };
+
+  attributeNames = [...attributeNames, col];
+  this.writeAttribute(col, (Number(this.readAttribute(col)) || 0) + 1);
+
+  try {
+    const affectedRows = await persistenceUpdateRecord.call(
+      ctor as any,
+      attributesWithValues.call(this as any, attributeNames),
+      updateConstraints,
+    );
+    if (affectedRows !== 1) throw new StaleObjectError(this, attemptedAction);
+    return affectedRows;
+  } catch (e) {
+    this.writeAttribute(col, lockVersionWas);
+    throw e;
+  }
 }
 
-/** @internal */
-function destroyRow(): never {
-  throw new NotImplementedError("ActiveRecord::Locking::Optimistic#destroy_row is not implemented");
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Locking::Optimistic#destroy_row
+ */
+export function destroyRow(
+  this: InstanceLockingHost,
+  superFn: () => number | Promise<number>,
+): number | Promise<number> {
+  const ctor = this.constructor;
+  if (!ctor.lockingEnabled) return superFn();
+  return Promise.resolve(superFn()).then((affected) => {
+    if (affected !== 1) throw new StaleObjectError(this, "destroy");
+    return affected;
+  });
 }
 
-/** @internal */
-function _lockValueForDatabase(lockingColumn: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Locking::Optimistic#_lock_value_for_database is not implemented",
-  );
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Locking::Optimistic#_lock_value_for_database
+ */
+export function _lockValueForDatabase(this: InstanceLockingHost, col: string): unknown {
+  if (isWillSaveChangeToAttribute(this as any, col)) {
+    return this.readAttribute(col) ?? 0;
+  }
+  return attributeInDatabase(this as any, col) ?? 0;
 }
 
-/** @internal */
-function _clearLockingColumn(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Locking::Optimistic#_clear_locking_column is not implemented",
-  );
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Locking::Optimistic#_clear_locking_column
+ */
+export function _clearLockingColumn(this: InstanceLockingHost): void {
+  const ctor = this.constructor;
+  const col = ctor.lockingColumn;
+  this.writeAttribute(col, null);
+  this.clearAttributeChange(col);
 }
 
-/** @internal */
-function _queryConstraintsHash(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Locking::Optimistic#_query_constraints_hash is not implemented",
-  );
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Locking::Optimistic#_query_constraints_hash
+ */
+export function _queryConstraintsHash(
+  this: InstanceLockingHost,
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  const ctor = this.constructor;
+  if (!ctor.lockingEnabled) return base;
+  const col = ctor.lockingColumn;
+  return { ...base, [col]: _lockValueForDatabase.call(this, col) };
 }
 
-/** @internal */
-function hookAttributeType(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Locking::Optimistic#hook_attribute_type is not implemented",
-  );
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#hook_attribute_type
+ */
+export function hookAttributeType(this: LockingHost, name: string, castType: Type): Type {
+  if (this.lockOptimistically !== false && name === this._lockingColumn) {
+    return new LockingType(castType);
+  }
+  return castType;
 }
