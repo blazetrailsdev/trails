@@ -14,19 +14,33 @@ and the recovery path never needs to fire.
 
 ## Tickets
 
-| ID    | Description                                          | Status          |
-| ----- | ---------------------------------------------------- | --------------- |
-| TS-1  | `defineSchema()` test helper                         | ✅ #1201        |
-| TS-2  | `dropAllTables()` test helper                        | 🟡 #1202 (open) |
-| TS-3  | Env flag to disable the dynamic auto-schema path     | ⏳ not started  |
-| TS-4a | Migrate `join-model.test.ts` (canary)                | ✅ this PR      |
-| TS-4… | Migrate remaining association/STI/polymorphic suites | ⏳ scheduled    |
+| ID       | Description                                         | Status                                                  |
+| -------- | --------------------------------------------------- | ------------------------------------------------------- |
+| TS-1     | `defineSchema()` test helper                        | ✅ #1201                                                |
+| TS-2     | `dropAllTables()` test helper                       | ✅ #1202                                                |
+| TS-3     | `AR_NO_AUTO_SCHEMA` env flag                        | ✅ #1203                                                |
+| TS-3-fix | env flag read per-call so `vi.stubEnv` engages      | ✅ #1216                                                |
+| TS-4a    | Migrate `join-model.test.ts` (canary)               | ✅ #1204                                                |
+| TS-4a-2  | Flip env flag for join-model + drop #1200 hacks     | ✅ #1215                                                |
+| TS-4b    | validations batch (7 files)                         | ✅ #1206                                                |
+| TS-4c    | timestamp + serialization (2 files)                 | ✅ #1210                                                |
+| TS-4d    | callbacks (1 file)                                  | ✅ #1211                                                |
+| TS-4e    | transactions (1 file)                               | ✅ #1212                                                |
+| TS-4f    | small-file batch (12 files)                         | ✅ #1213                                                |
+| TS-4g    | medium-file batch (10 files)                        | ✅ #1214                                                |
+| TS-4h    | small/medium batch (10 files)                       | ✅ #1217                                                |
+| TS-4i    | test-databases/defaults/explain/json-ser. (6 files) | ✅ #1218                                                |
+| TS-4j    | dirty/store/serialized-attribute (3 files)          | ✅ #1219                                                |
+| TS-4l    | `relation.test.ts` (1 file)                         | ✅ #1221                                                |
+| TS-4m    | `base.test.ts` (1 file, biggest)                    | ✅ #1234                                                |
+| TS-4…    | remaining association / large-file batches          | ⏳ in flight (48 / 162 files migrated as of 2026-05-06) |
+| TS-final | Delete dynamic adapter + HABTM shims                | ⏳ blocked on TS-4 completion                           |
 
-## Known flaky tests
+## Known flaky tests (resolved)
 
-| Test                                                                      | Diagnosed root cause                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Fix                                |
-| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `AssociationsJoinModelTest > has many with multiple authors` (PG/MariaDB) | **Partially diagnosed.** Initial hypothesis was cross-file `_declaredColumns` drift in the recovery path, but on the shared CI PG instance, removing PR #1200's id-set filter caused all three assertions to deterministically return empty result sets — not extra rows, not wrong types. defineSchema is necessary but not sufficient; some additional cross-file mechanism (likely modelRegistry STI scoping or shared adapter state) is also at play. Pending TS-3 (env flag to disable the dynamic adapter) for full removal of the workaround. | TS-3 (workaround retained for now) |
+The flaky `AssociationsJoinModelTest` cases that motivated this work were not, in the end, caused by the dynamic test-adapter's recovery path. The real cause was diagnosed in [docs/ar-test-parallelism-plan.md](./ar-test-parallelism-plan.md): vitest's `--no-file-parallelism` flag had been silently dropped (PR #1092), workers monotonic-incrementing `VITEST_WORKER_ID` modulo-collided onto the same `rails_js_test_N` DB, and worker B's `dropAllTables` afterAll landed inside worker A's `defineSchema` sequence. Fixed by the PR-P1..P6 advisory-lock parallelism work (#1223–#1228); #1222 was a separate stop-gap that re-added `--no-file-parallelism` while the proper fix was being designed.
+
+The schema-migration plan still stands on its own merits — explicit schema is clearer, kills the recovery-path-masks-bugs problem, and lets `test-adapter.ts` shrink to ≤200 LOC. But the original "join-model PG flake" is no longer a TS-final blocker.
 
 ## Migration pattern (TS-4a canary)
 
@@ -49,15 +63,6 @@ After this, `_declaredColumns` is irrelevant for the named tables — the
 schema is whatever `defineSchema` wrote, not whatever sibling files happened
 to register first.
 
-### Known limitation (deferred to TS-3)
+### Resolved limitation (TS-3 #1203)
 
-`defineSchema()` writes DDL through `SchemaAdapter`, which only records
-the `id` column in `_createdColumns`. The next `processPendingModels`
-pass therefore emits a redundant `ALTER TABLE ADD COLUMN` per declared
-column; each errors with "column already exists" and is caught silently.
-This is benign (savepoint-wrapped, no transaction poisoning) but adds
-noise. Fixing it cleanly requires either bypassing `SchemaAdapter` to
-the inner driver, or letting `defineSchema` populate the tracking maps —
-both of which need changes inside `test-adapter.ts`. That file is
-reserved for TS-3, so the optimization rides along when TS-3 lands the
-env flag to disable the dynamic adapter path entirely.
+The TS-4a canary documented a redundant-ALTER noise problem: `defineSchema()` wrote DDL through `SchemaAdapter`, which only recorded the `id` column in `_createdColumns`, so the next `processPendingModels` pass re-issued `ALTER TABLE ADD COLUMN` for every declared column (each erroring "column already exists" and being caught silently). TS-3 (`AR_NO_AUTO_SCHEMA=1`) eliminates this entirely — with the flag on, `processPendingModels` short-circuits and the redundant ALTERs never run. Migrated files now set the flag at module load (`vi.stubEnv("AR_NO_AUTO_SCHEMA", "1")`); see TS-3-fix #1216 for the per-call read that makes `vi.stubEnv` engage.

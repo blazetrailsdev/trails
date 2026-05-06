@@ -125,221 +125,57 @@ TS paths use `$TS/` = `packages/activerecord/src/`.
 
 ### Wave 0 — Misplaced-method cleanup (pure moves)
 
-**PR M2 — Move base.ts module methods to correct files**
+**PR M2 — Move base.ts module methods to correct files** ✅ #1151 #1152 #1156 #1157
 
-- Rails source: `$AR/base.rb` (338 LOC, mostly `include` directives — the methods live in the included module files)
-- TS source: `$TS/base.ts` (3148 LOC — monolith containing methods that belong in module files)
-- Target files: `$TS/core.ts`, `$TS/model-schema.ts`, `$TS/persistence.ts`, `$TS/attribute-methods.ts`, `$TS/scoping/default.ts`, `$TS/scoping/named.ts`, `$TS/autosave-association.ts`, `$TS/no-touching.ts`
-- Misplaced methods (sample): `id`, `touch`, `delete`, `save`, `save!`, `destroy`, `reload`, `_touchRow`, `_updateRecord`, `_createRecord`, `initInternals`, `attributeMethodsGenerated?`, `defineAttributeMethods`, `undefineAttributeMethods`, `scopeAttributes?`, `ignoreDefaultScope?`, `isScopeAttributes`
-- Split:
-  - M2: core + model-schema + persistence (~30 moves)
-  - M2b: scoping/\* + attribute-methods + small modules (~35 moves)
-- LOC: ~150 LOC each (moves only, no new logic)
-- Dependencies: none
-- Risk: `include()` wiring must be preserved — every moved method must still resolve at the class level. Run the full test suite between M2 and M2b.
-
-**PR M3 — Move adapter-layer misplaced methods (combined)**
-
-- TS sources: `$TS/connection-adapters/abstract-adapter.ts` (1270 LOC), `$TS/connection-adapters/abstract/schema-definitions.ts` (1352 LOC)
-- Abstract-adapter moves: `initialize`, `resetTransaction` → `$TS/connection-adapters/abstract/database-statements.ts`; `isWriteQuery`, `buildExplainClause` → `$TS/connection-adapters/mysql/database-statements.ts`; `selectAll` → `$TS/connection-adapters/mysql2/database-statements.ts`
-- Schema-definitions cross-adapter moves: `newColumnDefinition` (mysql), `aliasedTypes` (pg), `primaryKey` (mysql)
-- Plus: extract `quoteColumnName`, `quoteTableName`, `quoteString` from abstract-adapter.ts → `$TS/connection-adapters/abstract/quoting.ts` (currently inlined; ~6 misplaced)
-- Misplaced: ~24, LOC: ~220 net (moves + re-exports + `include()` wiring + smoke tests)
-- Dependencies: none (do before Wave 2)
-- Risk: every moved method must still resolve at the class level via `include()` or static assignment.
+**PR M3 — Move adapter-layer misplaced methods (combined)** ✅ #1161
 
 ---
 
 ### Wave 1 — Base type infrastructure
 
-**PR 1 — Base types + adapter-specific registry (combined)** _(~260 net LOC)_
-
-Wave 1 is unblocking infrastructure for Waves 2–5. Three small file groups merged into one PR — each is too small to ship alone (60/120/80 LOC) and they share the same TS type-system surface.
-
-_Component A — `type/time.rb` + `type/unsigned_integer.rb`_
-
-- Rails: `$AR/type/time.rb` (35 LOC), `$AR/type/unsigned_integer.rb` (16 LOC)
-- TS: `$TS/type/time.ts` (scaffold, 0 matched), `$TS/type/unsigned-integer.ts` (scaffold, 0 matched)
-- Missing: `time.ts` (3): `serialize`, `serializeCastValue`, `castValue`; `unsigned-integer.ts` (2): `maxValue`, `minValue`
-
-_Component B — `type/adapter_specific_registry.rb`_
-
-- Rails: `$AR/type/adapter_specific_registry.rb` (144 LOC)
-- TS: `$TS/type/adapter-specific-registry.ts` (9 matched, 12 missing, 43%)
-- Missing (12): `registrations`, `findRegistration`, `block`, `override`, `priorityExceptAdapter`, `matchesAdapter?`, `conflictsWith?`, `samePriorityExceptAdapter?`, `hasAdapterConflict?`, `options`, `klass`, `matchesOptions?`
-
-_Component C — Deduplicable cluster (5 files)_
-
-- Rails sources and current TS state:
-
-| Rails file                                            | LOC  | TS file                                               | Matched | Missing |
-| ----------------------------------------------------- | ---- | ----------------------------------------------------- | ------- | ------- |
-| `$AR/connection_adapters/deduplicable.rb`             | ~25  | `$TS/connection-adapters/deduplicable.ts`             | 3       | 1       |
-| `$AR/connection_adapters/column.rb`                   | ~100 | `$TS/connection-adapters/column.ts`                   | 14      | 2       |
-| `$AR/connection_adapters/sql_type_metadata.rb`        | ~40  | `$TS/connection-adapters/sql-type-metadata.ts`        | 6       | 2       |
-| `$AR/connection_adapters/mysql/type_metadata.rb`      | ~35  | `$TS/connection-adapters/mysql/type-metadata.ts`      | 2       | 2       |
-| `$AR/connection_adapters/postgresql/type_metadata.rb` | ~40  | `$TS/connection-adapters/postgresql/type-metadata.ts` | 3       | 2       |
-
-- Missing methods (9 total):
-  - `deduplicable.ts` (1): `deduplicate`
-  - `column.ts` (2): `autoPopulated?`, `virtual?` _(api:compare reports `autoPoppulated?` — confirmed typo in tooling output; Rails source `$AR/connection_adapters/column.rb` defines `auto_populated?`)_
-  - `sql-type-metadata.ts` (2): `deduplicated`, `hash`
-  - `mysql/type-metadata.ts` (2): `deduplicated`, `hash`
-  - `postgresql/type-metadata.ts` (2): `deduplicated`, `hash`
-- Component LOCs: A ~60, B ~120, C ~80 → **~260 combined**
-- Dependencies: verify #1136 (PG OID consolidation) before Component B
-- Risk: `block`/`override` use Ruby proc semantics — map to TS callbacks. `serializeCastValue` is a Rails 7.2 internal cast-pipeline hook.
-
-> **PRs 2 + 3 from prior revision are folded into PR 1.** The original Wave 1 had three sub-200 LOC PRs.
+**PR 1 — Base types + adapter-specific registry (combined)** _(~260 net LOC)_ ✅ #1147
 
 ---
 
 ### Wave 2 — Abstract adapter decomposition
 
-**PR 4 — `abstract/database_statements.rb` impl half**
+**PR 4 — `abstract/database_statements.rb` impl half** ✅ #1154
 
-- Rails: `$AR/connection_adapters/abstract/database_statements.rb` (747 LOC, lines 1–460 public, 460+ private)
-- TS: `$TS/connection-adapters/abstract/database-statements.ts` (1496 LOC, 59 matched, 13 missing, 82%)
-- Missing (13): `performQuery`, `preprocessQuery`, `defaultInsertValue`, `buildFixtureSql`, `buildFixtureStatements`, `buildTruncateStatement`, `buildTruncateStatements`, `combineMultiStatements`, `select`, `sqlForInsert`, `returningColumnValues`, `arelFromRelation`, `extractTableRefFromInsertSql`
-- Also move `initialize` + `resetTransaction` from `abstract-adapter.ts` (PR M3)
-- `performQuery` is the R2 cross-cutting hook (lines 400–430 of `$AR/.../abstract/database_statements.rb`)
-- LOC: Rails 747 LOC, TS 1496 LOC existing → ~240 net (new methods + fixture pipeline)
-- Split:
-  - PR 4: `performQuery`, `preprocessQuery`, `select`, `sqlForInsert`, `arelFromRelation`, `extractTableRefFromInsertSql`, `defaultInsertValue`, `returningColumnValues` (8 methods — query execution core)
-  - PR 4b: `buildFixtureSql`, `buildFixtureStatements`, `buildTruncateStatement`, `buildTruncateStatements`, `combineMultiStatements` (5 methods — fixture/truncate pipeline)
-- Dependencies: none
-- Risk: `performQuery` (Rails 7.2 central chokepoint, lines ~400–430) instruments, caches, and retries — study the full call chain including `withRawConnection` before implementing.
+**PR 5 — `abstract/schema_creation.rb`** ✅ #1139
 
-**PR 5 — `abstract/schema_creation.rb`** _(covered by #1139 — verify merge before starting)_
+**PR 6 — `abstract/schema_definitions.rb`** ✅ #1174
 
-- Rails: `$AR/connection_adapters/abstract/schema_creation.rb` (189 LOC)
-- TS: `$TS/connection-adapters/abstract/schema-creation.ts` (447 LOC, 11 matched, 10 missing, 52%)
-- Missing (10): `visitPrimaryKeyDefinition`, `visitAddForeignKey`, `visitDropConstraint`, `visitAddCheckConstraint`, `quotedColumns`, `addTableOptions!`, `columnOptions`, `addColumnOptions!`, `toSql`, `tableModifierInCreate`
-- LOC: Rails 189 LOC, TS 447 LOC existing → ~100 net (visitor implementations)
-- Dependencies: none (Wave 2 base)
-- Risk: `visitAddForeignKey` has a signature conflict noted in #1139 — legacy `(fromTable, toTable, options)` vs Rails `(o)`; the file-local helper workaround in #1139 must be preserved.
+**PR 7 — `abstract/schema_dumper.rb`** ✅ #1139
 
-**PR 6 — `abstract/schema_definitions.rb`** _(merged #1174)_
+**PR 8 — `abstract/schema_statements.rb` privates (part A)** ✅ #1165
 
-- Rails: `$AR/connection_adapters/abstract/schema_definitions.rb` (970 LOC)
-- TS: `$TS/connection-adapters/abstract/schema-definitions.ts` → 100% (86/86)
-- Dependencies: PR 5 (schema-creation visitors referenced in column definitions)
-
-**PR 7 — `abstract/schema_dumper.rb`** _(covered by #1139 — verify merge)_
-
-- Rails: `$AR/connection_adapters/abstract/schema_dumper.rb` (106 LOC)
-- TS: `$TS/connection-adapters/abstract/schema-dumper.ts` (118 LOC, 1 matched, 13 missing, 7%)
-- Missing (13): `columnSpec`, `columnSpecForPrimaryKey`, `prepareColumnOptions`, `defaultPrimaryKey?`, `explicitPrimaryKeyDefault?`, `schemaTypeWithVirtual`, `schemaType`, `schemaLimit`, `schemaPrecision`, `schemaScale`, `schemaDefault`, `schemaExpression`, `schemaCollation`
-- LOC: Rails 106 LOC, TS 118 LOC existing → ~80 net
-- Dependencies: PR 6
-
-**PR 8 — `abstract/schema_statements.rb` privates (part A)**
-
-- Rails: `$AR/connection_adapters/abstract/schema_statements.rb` (1899 LOC)
-- TS: `$TS/connection-adapters/abstract/schema-statements.ts` (1711 LOC, 76 matched, 42 missing, 64%)
-- Missing A (25): `generateIndexName`, `validateChangeColumnNullArgument!`, `columnOptionsKeys`, `addIndexSortOrder`, `optionsForIndexColumns`, `addOptionsForIndexColumns`, `indexNameForRemove`, `renameTableIndexes`, `renameColumnIndexes`, `createTableDefinition`, `createAlterTable`, `validateCreateTableOptions!`, `fetchTypeMetadata`, `indexColumnNames`, `indexNameOptions`, `expressionColumnName?`, `stripTableNamePrefixAndSuffix`, `foreignKeyName`, `foreignKeyFor`, `foreignKeyFor!`, `extractForeignKeyAction`, `foreignKeysEnabled?`, `checkConstraintName`, `checkConstraintFor`, `checkConstraintFor!`
-- LOC: ~250 net (each method ~5–15 LOC)
-- Dependencies: PR 6
-
-**PR 8b — `abstract/schema_statements.rb` privates (part B)**
-
-- Missing B (17): `validateIndexLength!`, `validateTableLength!`, `extractNewDefaultValue`, `canRemoveIndexByName?`, `referenceNameForTable`, `addColumnForAlter`, `changeColumnDefaultForAlter`, `renameColumnSql`, `removeColumnForAlter`, `removeColumnsForAlter`, `addTimestampsForAlter`, `removeTimestampsForAlter`, `insertVersionsSql`, `dataSourceSql`, `quotedScope`, `findJoinTableName`, `joinTableName`
-- LOC: ~250 net
-- Dependencies: PR 8
+**PR 8b — `abstract/schema_statements.rb` privates (part B)** ✅ #1175
 
 ---
 
 ### Wave 3 — Adapter-specific schema files
 
-**PR 9 — `mysql/schema_creation.rb` + `mysql/explain_pretty_printer.rb` (combined)** _(~260 net LOC)_
+**PR 9 — `mysql/schema_creation.rb` + `mysql/explain_pretty_printer.rb` (combined)** ✅ #1167
 
-- Rails: `mysql/schema_creation.rb` (106 LOC), `mysql/explain_pretty_printer.rb` (71 LOC)
-- TS: `$TS/connection-adapters/mysql/schema-creation.ts` (114 LOC, 0%, 11 missing), `$TS/connection-adapters/mysql/explain-pretty-printer.ts` (20%, 4 missing)
-- schema-creation missing (11): `visitDropForeignKey`, `visitDropCheckConstraint`, `visitAddColumnDefinition`, `visitChangeColumnDefinition`, `visitChangeColumnDefaultDefinition`, `visitCreateIndexDefinition`, `visitIndexDefinition`, `addTableOptions!`, `addColumnOptions!`, `addColumnPosition!`, `indexInCreate`
-- explain-pretty-printer missing (4): `computeColumnWidths`, `buildSeparator`, `buildCells`, `buildFooter`
-- LOC: ~180 + ~80 → **~260 combined**
-- Dependencies: PR 5 (for schema_creation)
-- Rationale: explain_pretty_printer is too small alone (~80 LOC); pairs with schema_creation as the mysql visitor/output cluster.
+**PR 10 — `mysql/schema_dumper.rb` (0%)** ✅ #1179
 
-**PR 10 — `mysql/schema_dumper.rb` (0%)**
+**PR 11 — `mysql/schema_statements.rb`** ✅ #1182
 
-- Rails: `$AR/connection_adapters/mysql/schema_dumper.rb` (97 LOC)
-- TS: `$TS/connection-adapters/mysql/schema-dumper.ts` (77 LOC scaffold, 0 matched, 9 missing)
-- Missing (9): `columnSpec`, `prepareColumnOptions`, `schemaType`, `schemaLimit`, `schemaPrecision`, `schemaScale`, `schemaDefault`, `schemaExpression`, `schemaCollation` (all override abstract base)
-- LOC: ~160 net + ~80 LOC of byte-exact-output snapshot tests → **~240 net**
-- Dependencies: PR 7
-- Note: snapshot tests vs schema.rb output are necessary; bringing the LOC into target range.
+**PR 12 — `postgresql/schema_creation.rb` (14%)** ✅ #1169
 
-**PR 11 — `mysql/schema_statements.rb` (38%)**
+**PR 13 — `postgresql/schema_dumper.rb` (0%)** ✅ #1178
 
-- Rails: `$AR/connection_adapters/mysql/schema_statements.rb` (307 LOC)
-- TS: `$TS/connection-adapters/mysql/schema-statements.ts` (191 LOC, 10 matched, 16 missing, 38%)
-- Missing (16): `createTable`, `dropTable`, `renameTable`, `addColumn`, `renameColumn`, `changeColumn`, `changeColumnDefault`, `changeColumnNull`, `addIndex`, `removeIndex`, `addAutoIncrementColumn`, `primaryKeys`, `caseInsensitiveComparison`, `strictMode?`, `createTableDefinition`, `fetchTypeMetadata`
-- LOC: Rails 307 LOC, TS 191 LOC → ~220 net
-- Dependencies: PR 8/8b, PR 6
+**PR 14 — `postgresql/schema_statements.rb` (83%)** ✅ #1183
 
-**PR 12 — `postgresql/schema_creation.rb` (14%)**
+**PR 15 — `sqlite3/schema_creation.rb` + `schema_definitions.rb` + `schema_dumper.rb`** ✅ #1184
 
-- Rails: `$AR/connection_adapters/postgresql/schema_creation.rb` (160 LOC)
-- TS: `$TS/connection-adapters/postgresql/schema-creation.ts` (150 LOC scaffold, 2 matched, 14 missing, 14%)
-- Missing (14): `visitAlterTable`, `visitAddForeignKey`, `visitForeignKeyDefinition`, `visitCheckConstraintDefinition`, `visitValidateConstraint`, `visitExclusionConstraintDefinition`, `visitUniqueConstraintDefinition`, `visitAddExclusionConstraint`, `visitAddUniqueConstraint`, `visitChangeColumnDefinition`, `visitChangeColumnDefaultDefinition`, `addColumnOptions!`, `quotedIncludeColumns`, `tableModifierInCreate`
-- LOC: Rails 160 LOC, TS 150 LOC → ~220 net
-- Dependencies: PR 5
-
-**PR 13 — `postgresql/schema_dumper.rb` (0%)**
-
-- Rails: `$AR/connection_adapters/postgresql/schema_dumper.rb` (128 LOC)
-- TS: `$TS/connection-adapters/postgresql/schema-dumper.ts` (91 LOC scaffold, 0 matched, 10 missing)
-- Missing (10): `columnSpec`, `prepareColumnOptions`, `schemaType`, `schemaLimit`, `schemaPrecision`, `schemaScale`, `schemaDefault`, `schemaExpression`, `schemaCollation`, `defaultPrimaryKey?` (all PG-specific overrides of abstract base)
-- LOC: Rails 128 LOC → ~200 net
-- Dependencies: PR 7
-
-**PR 14 — `postgresql/schema_statements.rb` (83%)**
-
-- Rails: `$AR/connection_adapters/postgresql/schema_statements.rb` (1163 LOC)
-- TS: `$TS/connection-adapters/postgresql/schema-statements.ts` (450 LOC, 76 matched, 16 missing, 83%)
-- Missing (16): `createDatabase`, `dropDatabase`, `createSchema`, `dropSchema`, `addIndex`, `removeIndex`, `renameTable`, `addForeignKey`, `validateForeignKey`, `addCheckConstraint`, `addExclusionConstraint`, `addUniqueConstraint`, `dropConstraint`, `createTableDefinition`, `fetchTypeMetadata`, `extractSchemaQualifiedTableName`
-- LOC: Rails 1163 LOC (large file, many already done), TS 450 LOC → ~240 net
-- Dependencies: PR 8/8b, PR 12
-
-**PR 15 — `sqlite3/schema_creation.rb` + `schema_definitions.rb` + `schema_dumper.rb`**
-
-- Rails sources:
-  - `$AR/connection_adapters/sqlite3/schema_creation.rb` (37 LOC) — 0%, 3 missing
-  - `$AR/connection_adapters/sqlite3/schema_definitions.rb` (~25 LOC) — 60%, 2 missing
-  - `$AR/connection_adapters/sqlite3/schema_dumper.rb` (47 LOC) — 0%, 5 missing
-- TS files:
-  - `$TS/connection-adapters/sqlite3/schema-creation.ts` (scaffold exists, 0 matched)
-  - `$TS/connection-adapters/sqlite3/schema-definitions.ts` (3 matched, 2 missing)
-  - `$TS/connection-adapters/sqlite3/schema-dumper.ts` (scaffold exists, 0 matched)
-- Missing (10 total):
-  - schema-creation (3): `visitForeignKeyDefinition`, `supportsIndexUsing?`, `addColumnOptions!`
-  - schema-definitions (2): `integerLikePrimaryKeyType`, `validColumnDefinitionOptions`
-  - schema-dumper (5): `columnSpec`, `prepareColumnOptions`, `schemaType`, `schemaLimit`, `schemaDefault`
-- LOC: ~180 net
-- Dependencies: PR 5, PR 7
-
-**PR 16 — `sqlite3/schema_statements.rb` (50%)**
-
-- Rails: `$AR/connection_adapters/sqlite3/schema_statements.rb` (223 LOC)
-- TS: `$TS/connection-adapters/sqlite3/schema-statements.ts` (9 matched, 9 missing, 50%)
-- Missing (9): `createTable`, `addColumn`, `changeColumn`, `changeColumnDefault`, `changeColumnNull`, `removeColumn`, `renameTable`, `renameColumn`, `addPrimaryKeyConstraint`
-- LOC: Rails 223 LOC → ~160 net
-- Dependencies: PR 8/8b, PR 15
+**PR 16 — `sqlite3/schema_statements.rb` (50%)** ✅ #1191
 
 ---
 
 ### Wave 4 — Database statements per adapter
 
-**PR 17 — sqlite3 + mysql `database_statements.rb` (combined)** _(~280 net LOC)_
-
-- Rails: `sqlite3/database_statements.rb` (149 LOC), `mysql/database_statements.rb` (95 LOC)
-- TS: `$TS/connection-adapters/sqlite3/database-statements.ts` (151 LOC, 56%), `$TS/connection-adapters/mysql/database-statements.ts` (61 LOC, 40%)
-- sqlite3 missing (8): `internalBeginTransaction`, `performQuery`, `castResult`, `affectedRows`, `executeBatch`, `buildTruncateStatement`, `returningColumnValues`, `defaultInsertValue`
-- mysql missing (6): `performQuery`, `castResult`, `affectedRows`, `executeAndFreeResult`, `combineMultiStatements`, `withoutPreparedStatement`
-- LOC: ~160 + ~120 → **~280 combined**
-- Dependencies: PR 4
-- Rationale: both implement the same `performQuery`/`castResult`/`affectedRows` triplet from R2; landing together reduces review-cycle on the protocol shape.
+**PR 17 — sqlite3 + mysql `database_statements.rb` (combined)** ✅ #1231
 
 **PR 18 — mysql2 + postgresql `database_statements.rb` (combined)** _(~320 net LOC — over hard limit, see split note)_
 
@@ -358,112 +194,33 @@ _Component C — Deduplicable cluster (5 files)_
 
 ### Wave 5 — Adapter classes
 
-**PR 21 — `abstract_mysql_adapter.rb` (76%)**
+**PR 21 — `abstract_mysql_adapter.rb` (76%)** ✅ #1186 (first split, 12/22)
 
-- Rails: `$AR/connection_adapters/abstract_mysql_adapter.rb` (1027 LOC)
-- TS: `$TS/connection-adapters/abstract-mysql-adapter.ts` (1205 LOC, 70 matched, 22 missing, 76%)
-- Missing (22): `initializeTypeMap`, `registerDateTimeTypes`, `registerIntegerTypes`, `registerStringTypes`, `registerNumericTypes`, `registerFloatTypes`, `registerBlobTypes`, `registerBooleanTypes`, `registerJsonTypes`, `validateType`, `typeToSql`, `newColumnDefinition`, `columnSpec`, `fullVersionString`, `getMysqlVariable`, `setMysqlVariable`, `caseInsensitiveComparison`, `caseSensitiveComparison`, `limitedSupportsIndexSortOrder?`, `limitedSupportsIndexInclude?`, `limitedSupportsDdlTransactions?`, `renameTableIndexes`
-- Split:
-  - PR 21 (12): `initializeTypeMap` + all `register*Types` helpers + `typeToSql`, `newColumnDefinition` (type-map core)
-  - PR 21b (10): `columnSpec`, `fullVersionString`, `getMysqlVariable`, `setMysqlVariable`, `caseInsensitiveComparison`, `caseSensitiveComparison`, `limitedSupports*`, `renameTableIndexes` (query/schema helpers)
-- LOC: ~250 net each
-- Dependencies: PR 1, PR 11, PR 18/18b
+**PR 22 — `mysql2_adapter.rb` (64%) + `mysql2_adapter` test parity** ✅ #1233
 
-**PR 22 — `mysql2_adapter.rb` (64%) + `mysql2_adapter` test parity** _(~250 net LOC)_
+**PR 23 — `postgresql_adapter.rb` (82%)** ✅ #1199 (first split) + #1242 (PR 23b)
 
-- Rails: `$AR/connection_adapters/mysql2_adapter.rb` (203 LOC)
-- TS: `$TS/connection-adapters/mysql2-adapter.ts` (1109 LOC, 14 matched, 8 missing, 64%)
-- Missing (8): `newClientConnection`, `connectWithoutRetry`, `configure`, `defaultPreparedStatements`, `reconnect`, `disconnect!`, `discard!`, `buildStatement`
-- Add Rails-mirrored test cases for the connect/discard/reconnect lifecycle (`test/cases/adapters/mysql2/connection_test.rb`)
-- LOC: ~150 impl + ~100 tests → ~250 net
-- Dependencies: PR 21
-
-**PR 23 — `postgresql_adapter.rb` (82%)**
-
-- Rails: `$AR/connection_adapters/postgresql_adapter.rb` (1189 LOC)
-- TS: `$TS/connection-adapters/postgresql-adapter.ts` (4212 LOC, 76 matched, 17 missing, 82%)
-- Missing (17): `connectAndConfigure`, `configureConnection`, `reconnect!`, `disconnect!`, `discard!`, `truncateTable`, `getAdvisoryLock`, `releaseAdvisoryLock`, `allSchemas`, `schema`, `encoderFor`, `decoderFor`, `pgEncoderForType`, `pgDecoderForType`, `initializeTypeMap`, `registerDateTimeTypes`, `enableExtension`
-- Split:
-  - PR 23 (9): `connectAndConfigure`, `configureConnection`, `reconnect!`, `disconnect!`, `discard!`, `truncateTable`, `getAdvisoryLock`, `releaseAdvisoryLock`, `allSchemas`
-  - PR 23b (8): `encoderFor`, `decoderFor`, `pgEncoderForType`, `pgDecoderForType`, `initializeTypeMap`, `registerDateTimeTypes`, `schema`, `enableExtension`
-- LOC: ~250 net each
-- Dependencies: PR 14, PR 18b
-
-**PR 24 — `sqlite3_adapter.rb` (75% → 86%) — table-rebuild cluster ✓ MERGED**
-
-- Rails: `$AR/connection_adapters/sqlite3_adapter.rb` (849 LOC)
-- TS: `$TS/connection-adapters/sqlite3-adapter.ts` (62 matched, 10 missing, 86%)
-- PR 24 (8, merged): `tableInfo`, `tableStructureSql`, `tableStructureWithCollation`, `tableStructure`, `moveTable`, `copyTable`, `copyTableIndexes`, `copyTableContents`
-- PR 24b (10 remaining): `bindParamsLength`, `extractValueFromDefault`, `extractDefaultFunction`, `hasDefaultFunction`, `isInvalidAlterTableType`, `translateException`, `buildStatementPool`, `connect`, `configureConnection`, `initializeTypeMap`
-- LOC: ~274 net (PR 24)
-- Dependencies: PR 16, PR 17
+**PR 24 — `sqlite3_adapter.rb`** ✅ #1195 (first split) + #1232 (PR 24b lifecycle/type-map)
 
 ---
 
 ### Wave 6 — abstract_adapter.rb residual
 
-**PR 25 — `abstract_adapter.rb` core privates**
-
-- Rails: `$AR/connection_adapters/abstract_adapter.rb` (1234 LOC, lines 946–1234 are privates)
-- TS: `$TS/connection-adapters/abstract-adapter.ts` (1270 LOC, 160 matched, ~40–60 true residual after Wave 2–5 account for sub-file methods)
-- Missing privates (from lines 946–1234 of Rails source): `reconnectCanRestoreState?`, `withRawConnection`, `verified!`, `retryableConnectionError?`, `invalidateTransaction`, `retryableQueryError?`, `backoff`, `reconnect`, `anyRawConnection`, `validRawConnection`, `extendedTypeMapKey`, `typeMap`, `translateExceptionClass`, `log`, `instrumenter`, `translateException`, `columnFor`, `columnForAttribute`, `collector`, `arelVisitor`, `buildStatementPool`, `buildResult`, `configureConnection`, `attemptConfigureConnection`, `defaultPreparedStatements`, `warningIgnored?`, `lookupCastTypeFromColumn`
-- Split:
-  - PR 25 (13): Connection lifecycle — `withRawConnection` (lines 983–1053), `verified!` (line 1054), `retryableConnectionError?`, `invalidateTransaction`, `retryableQueryError?`, `backoff`, `reconnect`, `anyRawConnection`, `validRawConnection`, `reconnectCanRestoreState?`, `extendedTypeMapKey`, `typeMap`, `configureConnection`
-  - PR 25b (14): Query/logging infrastructure — `translateExceptionClass`, `log`, `instrumenter`, `translateException`, `columnFor`, `columnForAttribute`, `collector`, `arelVisitor`, `buildStatementPool`, `buildResult`, `attemptConfigureConnection`, `defaultPreparedStatements`, `warningIgnored?`, `lookupCastTypeFromColumn`
-- LOC: ~250 net each
-- Dependencies: all of Waves 2–5
-
-**Risk:** `withRawConnection` (lines 983–1053 of `$AR/connection_adapters/abstract_adapter.rb`) is a deeply stateful lease — it tracks raw connection validity, handles retry loops, and calls `verified!`. It couples tightly to the connection pool work in #1133/#1134. Study those PRs before PR 25.
-
-**Also:** `lookupCastTypeFromColumn` appears in both `abstract_adapter.rb` (line 1227) and `postgresql/quoting.rb` (line 189) with different implementations — both must land separately.
+**PR 25 — `abstract_adapter.rb` core privates** ✅ #1235 (first split, 13/27)
 
 ---
 
 ### Wave 7 — Core AR model files
 
-**PR 26 — `attribute_assignment.rb` (0%)**
+**PR 26 — `attribute_assignment.rb` (0%)** ✅ #1180
 
-- Rails: `$AR/attribute_assignment.rb` (82 LOC)
-- TS: `$TS/attribute-assignment.ts` — **file does not exist; must be created**
-- Missing (7): `assignAttributes`, `_assignAttributes`, `assignMultiparameterAttributes`, `extractCallableAttribute`, `executeCallables`, `typeCastAttributeFromMultiparameterAssignment`, `findParamNamesAndAllowedRanges`
-- LOC: Rails 82 LOC → ~180 net (multiparameter date parsing is non-trivial in TS)
-- Dependencies: none
-- Risk: `assignMultiparameterAttributes` handles Rails date/time decomposition (`(1i)`, `(2i)`, `(3i)` field suffixes) — no direct TS equivalent. Must implement a field-grouping parser.
+**PR 27 — `attribute_methods.rb`** ✅ #1185
 
-**PR 27 — `attribute_methods.rb` (56% → 100%) ✅ merged #1185**
+**PR 28 — `attributes.rb` + `aggregations.rb` (combined)** ✅ #1237
 
-- Rails: `$AR/attribute_methods.rb` (547 LOC)
-- TS: `$TS/attribute-methods.ts` — 71/71 (100%)
-- Also fixed `attributesInDatabase` bug (was returning new values; should return original DB values per Rails spec)
-- Also broke circular import: primary-key.ts imports dangerousAttributeMethods from attribute-methods.ts, so the 5 id\* methods are inlined instead of imported
-- Dependencies: none
+**PR 29 — `timestamp.rb` (31%)** ✅ #1229
 
-**PR 28 — `attributes.rb` + `aggregations.rb` (combined)** _(~250 net LOC)_
-
-- Rails: `$AR/attributes.rb` (~80 LOC), `$AR/aggregations.rb` (287 LOC)
-- TS: `$TS/attributes.ts` (29%, 5 missing), `$TS/aggregations.ts` (50%, 3 missing)
-- attributes missing (5): `attribute`, `defaultAttributes`, `_default_attributes`, `buildAttributeFromUser`, `buildAttributeFromDatabase`
-- aggregations missing (3): `mapAggregationAttribute`, `reflectionFor`, `newValueFrom`
-- LOC: ~100 + ~80 + ~70 of value-object/composed-of test scaffolding → ~250
-- Dependencies: PR 27
-- Rationale: both define value-object/attribute factories layered on `attribute_methods`; pairs naturally.
-
-**PR 29 — `timestamp.rb` (31%)**
-
-- Rails: `$AR/timestamp.rb` (177 LOC)
-- TS: `$TS/timestamp.ts` (249 LOC, 5 matched, 11 missing, 31%)
-- Missing (11): `recordTimestamps`, `currentTime`, `maxUpdatedColumn`, `maxUpdatedAt`, `allTimestampAttributesInModel`, `timestampAttributesForCreate`, `timestampAttributesForUpdate`, `timestampAttributesForCreateInModel`, `timestampAttributesForUpdateInModel`, `touchedAttributesForCreate`, `touchedAttributesForUpdate`
-- LOC: Rails 177 LOC, TS 249 LOC → ~180 net
-- Dependencies: PR 27
-
-**PR 30 — `autosave_association.rb` (34%)**
-
-- Rails: `$AR/autosave_association.rb` (596 LOC)
-- TS: `$TS/autosave-association.ts` (629 LOC, 10 matched, 19 missing, 34%)
-- Missing (19): `saveCollectionAssociation`, `saveBelongsToAssociation`, `saveHasOneAssociation`, `nested_records_changed_for_autosave?`, `associationValid?`, `markForDestructionUnlessNew`, `destroyMarkedForDestructionAssociations`, `associationForeignKeyChanged?`, `markForDestruction`, `markedForDestruction?`, `raiseNestedAttributesRecordNotFoundError`, `callbacksForSave`, `shouldAutosave?`, `associationIsValid?`, `validatesPresenceOfBelongsTo?`, `defineNonCyclicMethod`, `addAutosaveAssociationCallbacks`, `addAutosaveBelongsToCallbacks`, `addAutosaveThroughCallbacks`
-- LOC: Rails 596 LOC, TS 629 LOC → ~260 net
-- Dependencies: PR 27, PR 29
-- Risk: `defineNonCyclicMethod` uses Ruby `define_method` + a cycle-detection registry. The TS equivalent must prevent infinite autosave loops — verify existing TS approach (`defineNonCyclicMethod` may already be partially implemented in `autosave-association.ts`).
+**PR 30 — `autosave_association.rb` (34%)** ✅ #1239
 
 **PR 31 — `nested_attributes.rb` (14%)**
 
@@ -473,17 +230,7 @@ _Component C — Deduplicable cluster (5 files)_
 - LOC: Rails 633 LOC → ~250 net
 - Dependencies: PR 30
 
-**PR 32 — `locking/optimistic.rb` + `counter_cache.rb` (combined)** _(~240 net LOC)_
-
-- Rails: `$AR/locking/optimistic.rb` (228 LOC), `$AR/counter_cache.rb` (230 LOC)
-- TS: `$TS/locking/optimistic.ts` (53%, 8 missing), `$TS/counter-cache.ts` (67%, 3 missing)
-- optimistic missing (8): `lockOptimistically?`, `lockingColumn`, `lockingEnabled?`, `addLockColumn`, `updateRecord`, `destroyWithVersionCheck`, `updateWithVersionCheck`, `lockedAttributeName`
-- counter_cache missing (3): `counterCacheName?`, `shouldUpdateCounter?`, `updateCounters`
-- LOC: ~160 + ~80 → ~240
-- Dependencies: PR 27
-- Rationale: both override `_updateRecord`/`destroy_row` write-path hooks — testing them together keeps the row-write contract coherent.
-
-> **PR 34 (aggregations) folded into PR 28.**
+**PR 32 — `locking/optimistic.rb` + `counter_cache.rb` (combined)** ✅ #1230
 
 **PR 35 — `core.rb` + `model_schema.rb` (combined)** _(~280 net LOC)_
 
@@ -545,25 +292,11 @@ _Component C — Deduplicable cluster (5 files)_
 
 **PR 39 — `encryptor.rb` (35%)** _(covered by E3)_
 
-- Rails: `$AR/encryption/encryptor.rb` (177 LOC)
-- TS: `$TS/encryption/encryptor.ts` (7 matched, 13 missing)
-- Missing (13): `defaultKeyProvider`, `validatePayloadType`, `cipher`, `buildEncryptedMessage`, `serializeMessage`, `deserializeMessage`, `serializer`, `compressIfWorthIt`, `compress`, `uncompressIfNeeded`, `uncompress`, `forceEncodingIfNeeded`, `forcedEncodingForDeterministicEncryption`
-
 **PR 40 — `message_serializer.rb` + `message_pack_message_serializer.rb`** _(covered by E2)_
-
-- Rails: `$AR/encryption/message_serializer.rb` (96 LOC) — 3 matched, 7 missing
-- Missing (7): `parseMessage`, `validateMessageDataFormat`, `parseProperties`, `messageToJson`, `headersToJson`, `encodeIfNeeded`, `decodeIfNeeded`
-- `message_pack_message_serializer.rb` — 3 matched, 5 missing
 
 **PR 41 — `encrypted_attribute_type.rb` (45%)** _(covered by E4)_
 
-- Rails: `$AR/encryption/encrypted_attribute_type.rb`
-- Missing (16): listed in E4 PR body
-
 **PR 42 — `encryptable_record.rb` (30%)** _(covered by E4)_
-
-- Rails: `$AR/encryption/encryptable_record.rb`
-- Missing (16): public `encrypt`/`decrypt`/`ciphertext_for`/`loadSchema!` (42); privates (42b)
 
 **PR 43 — Remaining encryption small files**
 
@@ -591,21 +324,9 @@ _Component C — Deduplicable cluster (5 files)_
 
 ### Wave 10 — Migration cluster
 
-**PR 44 — `migration/join_table.rb` (0%)**
+**PR 44 — `migration/join_table.rb` (0%)** ✅ #1188
 
-- Rails: `$AR/migration/join_table.rb` (16 LOC)
-- TS: `$TS/migration/join-table.ts` — **file does not exist; must be created**
-- Missing (2): `findJoinTableName`, `joinTableName`
-- LOC: Rails 16 LOC → ~40 net (create file + implement)
-- Dependencies: PR 8b (join table name logic referenced there)
-
-**PR 45 — `migration/command_recorder.rb` (42%)**
-
-- Rails: `$AR/migration/command_recorder.rb` (409 LOC)
-- TS: `$TS/migration/command-recorder.ts` (336 LOC, 16 matched, 22 missing, 42%)
-- Missing (22): `invertAddColumn`, `invertRemoveColumn`, `invertAddIndex`, `invertRemoveIndex`, `invertAddTimestamps`, `invertRemoveTimestamps`, `invertAddReference`, `invertRemoveReference`, `invertAddForeignKey`, `invertRemoveForeignKey`, `invertAddCheckConstraint`, `invertRemoveCheckConstraint`, `invertAddExclusionConstraint`, `invertRemoveExclusionConstraint`, `invertAddUniqueConstraint`, `invertRemoveUniqueConstraint`, `invertCreateTable`, `invertDropTable`, `invertCreateJoinTable`, `invertDropJoinTable`, `invertRenameTable`, `invertRenameColumn`
-- LOC: Rails 409 LOC, TS 336 LOC → ~250 net (likely dispatch table — check existing `invertX` pattern before reimplementing)
-- Dependencies: PR 44
+**PR 45 — `migration/command_recorder.rb` (42%)** ✅ #1236
 
 **PR 46 — `migration.rb` (68%)**
 
@@ -707,16 +428,7 @@ _Component C — Deduplicable cluster (5 files)_
 - Total: ~57 missing methods, ~240 net LOC
 - Dependencies: relevant Wave 2–7 PRs per file
 
-**PR 53 — Railtie + deprecator + job_runtime + query_assertions (combined)** _(~290 net LOC)_
-
-- Rails: `$AR/railtie.rb`, `$AR/deprecator.rb`, `$AR/railties/job_runtime.rb`, `$AR/testing/query_assertions.rb` (121 LOC)
-- TS: `$TS/railtie.ts`, `$TS/deprecator.ts`, `$TS/railties/job-runtime.ts` — **none of these files/dirs exist** — and `$TS/testing/query-assertions.ts` (11%, 8 missing)
-- Railtie/deprecator/job_runtime missing (13): railtie initialization hooks, deprecation wrapper, job runtime instrumentation
-- query_assertions missing (8): `assertQueries`, `assertNoQueries`, `assertQueriesMatch`, `assertNoQueriesMatch`, `countingQueries`, `countingQueriesMatching`, `querySubscriptionBlock`, `querySubscriptionCountingBlock`
-- LOC: ~150 + ~140 → ~290
-- Dependencies: PR 4 (for query_assertions subscription hook)
-- Rationale: all four are framework-instrumentation concerns sitting on the same notification subsystem; pairing keeps the instrumenter contract review single-pass.
-- Risk: `railtie.rb` may need actionpack cross-package wiring; ship stub initializers first if needed.
+**PR 53 — Railtie + deprecator + job_runtime + query_assertions (combined)** ✅ #1197 + #1198 (PR 53b query_assertions)
 
 ---
 
@@ -783,6 +495,8 @@ Folds former PRs 58 + 59 plus the remaining unassigned 1-missers from the PR 52 
 11. **`mysql2/` directory missing entirely**: `$TS/connection-adapters/mysql2/` does not exist. PR 18 must create directory + file. Verify `tsconfig.json` and `package.json` exports map do not need updating.
 
 12. **`railtie.ts` + `middleware/` directory both missing**: These require creating new top-level files and directories. Verify `$TS/index.ts` or barrel exports need updating after PR 50 and PR 53.
+
+13. **MariaDB `DATETIME` serialization**: The mysql2 adapter inserts ISO 8601 `Z`-suffix strings into `DATETIME` columns (e.g. `"2026-05-05T14:32:00Z"`) which MariaDB rejects. Surfaced during the test-schema migration (TS-4d #1211): both `defineSchema` and the legacy auto-schema path work around it by mapping `datetime` → `TEXT` on non-PG, so timestamp columns are never exercised as real `DATETIME` on MariaDB/SQLite. The real fix is in the adapter's datetime quoter/typecaster — emit MariaDB-compatible `YYYY-MM-DD HH:MM:SS` (no `T`, no `Z`) for `DATETIME` columns. Likely lives near `connection-adapters/mysql2/quoting.ts` / `typecast.ts`. Slot in alongside PR 22 (`mysql2_adapter.rb`) or as a standalone fix; tag PR 22's body with this dependency. Once fixed, revert the `defineSchema` datetime→TEXT downgrade so MariaDB tests actually exercise `DATETIME` semantics.
 
 ---
 
