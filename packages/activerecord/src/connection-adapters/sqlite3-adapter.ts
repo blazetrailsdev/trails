@@ -1946,9 +1946,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     const msg = e instanceof Error ? e.message : String(e);
-    // Wrap non-Error throws so translateException always receives an Error,
-    // but preserve the original thrown value as the cause so it isn't dropped.
-    const exc = e instanceof Error ? e : new Error(msg, { cause: e });
+    // Wrap non-Error throws so translateException always receives an Error.
+    // Preserve the original value as .cause and copy .code so code-based
+    // classification in translateException still works for non-Error throws.
+    let exc: Error;
+    if (e instanceof Error) {
+      exc = e;
+    } else {
+      exc = new Error(msg, { cause: e });
+      const code = (e as any)?.code;
+      if (code !== undefined) (exc as any).code = code;
+    }
     return translateException(exc, msg, sql, binds);
   }
 
@@ -1972,12 +1980,25 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   private configureConnection(): void {
     if (!this._readonly) {
-      this.db.pragma("foreign_keys = ON");
-      this.db.pragma("journal_mode = WAL");
-      this.db.pragma("synchronous = NORMAL");
-      this.db.pragma("mmap_size = 134217728");
-      this.db.pragma("journal_size_limit = 67108864");
-      this.db.pragma("cache_size = 2000");
+      // Apply Rails DEFAULT_PRAGMAS best-effort: an unsupported PRAGMA on a
+      // non-standard SQLite build should warn, not abort construction.
+      const defaults: [string, string][] = [
+        ["foreign_keys", "ON"],
+        ["journal_mode", "WAL"],
+        ["synchronous", "NORMAL"],
+        ["mmap_size", "134217728"],
+        ["journal_size_limit", "67108864"],
+        ["cache_size", "2000"],
+      ];
+      for (const [pragma, value] of defaults) {
+        try {
+          this.db.pragma(`${pragma} = ${value}`);
+        } catch (e) {
+          console.warn(
+            `SQLite default pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }
     }
     const pragmas = (this._config as SQLite3AdapterOptions).pragmas;
     if (pragmas) {
