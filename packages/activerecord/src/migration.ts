@@ -1608,15 +1608,18 @@ export class Migrator {
     } catch (e) {
       fnError = e;
     }
+    // releaseAdvisoryLock is guaranteed present (checked in the guard above).
+    // Any non-true return — false or undefined — is treated as failure, matching
+    // Rails: `release_advisory_lock(...) or raise` (migration.rb:1608-1612).
     let released: boolean | undefined;
     try {
-      released = await adapter.releaseAdvisoryLock?.(lockId);
+      released = await adapter.releaseAdvisoryLock!(lockId);
     } catch (releaseErr) {
       if (fnError !== _sentinel) throw fnError;
       throw releaseErr;
     }
     if (fnError !== _sentinel) throw fnError;
-    if (released === false) {
+    if (released !== true) {
       throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
     }
     return fnResult as T;
@@ -2038,19 +2041,7 @@ export class Migrator {
    */
   async run(direction: "up" | "down", targetVersion: number | string): Promise<void> {
     this._validateTargetVersion(targetVersion);
-    await this._withAdvisoryLock(async () => {
-      await this._ensureSchemaTable();
-      const key = String(BigInt(targetVersion));
-      const proxy = this._migrations.find((m) => m.version === key);
-      if (!proxy) {
-        throw new UnknownMigrationVersionError(key);
-      }
-      const applied = await this._appliedVersions();
-      const isApplied = applied.has(key);
-      if (direction === "up" && isApplied) return;
-      if (direction === "down" && !isApplied) return;
-      await this._runMigration(proxy, direction);
-    });
+    await this._withAdvisoryLock(() => this.runWithoutLock(direction, targetVersion));
   }
 
   private async _migrateUp(targetVersion: number | string | null): Promise<void> {
