@@ -129,6 +129,9 @@ importers:
       '@js-temporal/polyfill':
         specifier: ^0.5.1
         version: 0.5.1
+      better-sqlite3:
+        specifier: ^12.0.0
+        version: 12.6.2
       tinyglobby:
         specifier: ^0.2.16
         version: 0.2.16

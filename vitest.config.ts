@@ -21,6 +21,14 @@ const alias = {
     __dirname,
     "packages/activesupport/src/temporal.ts",
   ),
+  "@blazetrails/activesupport/sqlite-adapter": path.resolve(
+    __dirname,
+    "packages/activesupport/src/sqlite-adapter.ts",
+  ),
+  "@blazetrails/activesupport/sqlite/better-sqlite3": path.resolve(
+    __dirname,
+    "packages/activesupport/src/sqlite-drivers/better-sqlite3.ts",
+  ),
   "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
   "@blazetrails/activesupport/yaml": path.resolve(__dirname, "packages/activesupport/src/yaml.ts"),
   "@blazetrails/activesupport/process-adapter": path.resolve(
