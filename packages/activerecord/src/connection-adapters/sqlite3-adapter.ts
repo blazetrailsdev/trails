@@ -16,6 +16,7 @@ import {
   NotNullViolation,
   ValueTooLong,
   NoDatabaseError,
+  ConnectionNotEstablished,
   DatabaseConnectionError,
   TransactionIsolationError,
   NotImplementedError,
@@ -2165,7 +2166,7 @@ function translateException(
     return new InvalidForeignKey(message, { sql, binds, cause: exception });
   }
   if (/called on a closed database/i.test(msg)) {
-    return new StatementInvalid(message, { sql, binds, cause: exception });
+    return new ConnectionNotEstablished(message, { cause: exception });
   }
   return new StatementInvalid(message, { sql, binds, cause: exception });
 }
