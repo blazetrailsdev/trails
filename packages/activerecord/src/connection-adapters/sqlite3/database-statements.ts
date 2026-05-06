@@ -94,6 +94,7 @@ interface Sqlite3RunResult {
 }
 
 interface Sqlite3PreparedStatement {
+  readonly reader: boolean;
   columns(): Array<{ name: string }>;
   all(...params: unknown[]): Record<string, unknown>[];
   run(...params: unknown[]): Sqlite3RunResult;
@@ -177,8 +178,7 @@ export function performQuery(
       stmt = rawConnection.prepare(sql);
       this._statements.set(sql, stmt);
     }
-    const cols = stmt.columns();
-    if (cols.length === 0) {
+    if (!stmt.reader) {
       lastChanges = stmt.run(...typeCastedBinds).changes;
       result = Result.empty();
     } else {
@@ -187,8 +187,7 @@ export function performQuery(
   } else {
     const stmt = rawConnection.prepare(sql);
     const hasBind = binds != null && binds.length > 0;
-    const cols = stmt.columns();
-    if (cols.length === 0) {
+    if (!stmt.reader) {
       lastChanges = (hasBind ? stmt.run(...typeCastedBinds) : stmt.run()).changes;
       result = Result.empty();
     } else {
