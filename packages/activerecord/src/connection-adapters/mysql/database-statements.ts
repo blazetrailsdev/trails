@@ -4,10 +4,12 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements (module)
  */
 
+import { sql as arelSql } from "@blazetrails/arel";
 import type { ExplainOption } from "../../adapter.js";
 import type { Nodes } from "@blazetrails/arel";
 import { Result } from "../../result.js";
 import { defaultInsertValue as abstractDefaultInsertValue } from "../abstract/database-statements.js";
+import type { Version } from "../abstract-adapter.js";
 
 export interface DatabaseStatements {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
@@ -71,12 +73,11 @@ interface AutoIncrementColumnHost {
  * @internal
  */
 export function isAnalyzeWithoutExplain(
-  this: { mariaDb?(): boolean; databaseVersion?(): string } | void,
+  this: { isMariadb?(): boolean; getDatabaseVersion?(): Version } | void,
 ): boolean {
-  const host = this as { mariaDb?(): boolean; databaseVersion?(): string } | null;
-  if (!host?.mariaDb?.()) return false;
-  const version = host.databaseVersion?.() ?? "0.0.0";
-  return version >= "10.1.0";
+  const host = this as { isMariadb?(): boolean; getDatabaseVersion?(): Version } | null;
+  if (!host?.isMariadb?.()) return false;
+  return host.getDatabaseVersion?.().gte("10.1.0") === true;
 }
 
 /** @internal */
@@ -99,11 +100,10 @@ export function returningColumnValues(
 }
 
 /** @internal */
-export function combineMultiStatements(
-  this: { maxAllowedPacket?(): Promise<number> } | void,
-  totalSql: string[],
-): string[] {
-  const maxPacket = 16_777_216; // default 16 MiB; caller should supply via maxAllowedPacket()
+export function combineMultiStatements(totalSql: string[]): string[] {
+  // Rails reads max_allowed_packet from the server; we use the MySQL default.
+  // Callers that need the live value should await maxAllowedPacket() and pass it separately.
+  const maxPacket = 16_777_216;
   return totalSql.reduce<string[]>((chunks, sql) => {
     const prev = chunks[chunks.length - 1];
     if (isMaxAllowedPacketReached(sql, prev, maxPacket)) {
@@ -132,14 +132,14 @@ export function isMaxAllowedPacketReached(
 }
 
 /** @internal */
-export function maxAllowedPacket(
-  this: { showVariable?(name: string): Promise<number> } | void,
+export async function maxAllowedPacket(
+  this: { showVariable?(name: string): Promise<string | null> } | void,
 ): Promise<number> {
-  return (
-    (this as { showVariable?(name: string): Promise<number> } | null)?.showVariable?.(
-      "max_allowed_packet",
-    ) ?? Promise.resolve(16_777_216)
-  );
+  const raw = await (
+    this as { showVariable?(name: string): Promise<string | null> } | null
+  )?.showVariable?.("max_allowed_packet");
+  const parsed = raw != null ? parseInt(raw, 10) : NaN;
+  return Number.isNaN(parsed) ? 16_777_216 : parsed;
 }
 
 /**
@@ -147,8 +147,8 @@ export function maxAllowedPacket(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#high_precision_current_timestamp
  */
-export function highPrecisionCurrentTimestamp(): string {
-  return "CURRENT_TIMESTAMP(6)";
+export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
+  return arelSql("CURRENT_TIMESTAMP(6)");
 }
 
 /**
