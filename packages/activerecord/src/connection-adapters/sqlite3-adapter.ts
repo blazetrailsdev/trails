@@ -3,6 +3,7 @@ import type {
   RunResult,
   SqliteBinds,
   SqliteConnection,
+  SqliteDriver,
   SqliteStatement,
 } from "@blazetrails/activesupport/sqlite-adapter";
 import { getSqlite } from "@blazetrails/activesupport/sqlite-adapter";
@@ -1984,8 +1985,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   private connect(): void {
     try {
-      const driverName = (this._config as SQLite3AdapterOptions).driver;
-      const factory = getSqlite(driverName);
+      const driverOpt = (this._config as SQLite3AdapterOptions).driver;
+      const factory: SqliteDriver =
+        typeof driverOpt === "object" && driverOpt !== null ? driverOpt : getSqlite(driverOpt);
       if (!factory.openSync) {
         // PR 3 lifts connect() onto an awaited factory.open(); for now we
         // require an inProcessSync driver so the existing sync constructor

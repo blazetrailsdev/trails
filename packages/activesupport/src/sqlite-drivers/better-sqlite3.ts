@@ -92,6 +92,21 @@ class BetterSqlite3Connection implements SqliteConnection {
   }
 }
 
+/**
+ * Decode `file:` URIs and `:memory:` aliases. Returns `null` for memory
+ * databases, otherwise the bare filesystem path.
+ * @internal
+ */
+function resolveDatabasePath(database: string): string | null {
+  if (database === ":memory:") return null;
+  if (!database.startsWith("file:")) return database;
+  const q = database.indexOf("?");
+  const path = q === -1 ? database.slice("file:".length) : database.slice("file:".length, q);
+  const params = q === -1 ? null : new URLSearchParams(database.slice(q + 1));
+  if (path === ":memory:" || params?.get("mode") === "memory") return null;
+  return path;
+}
+
 /** @internal */
 function openDatabase(config: SqliteOpenConfig): Database.Database {
   const opts: Database.Options = { readonly: config.readOnly ?? false };
@@ -121,15 +136,10 @@ export const betterSqlite3Driver: SqliteDriver = {
   },
 
   databaseExists(config: SqliteOpenConfig): boolean {
-    const file = config.database;
-    if (file === ":memory:" || file.startsWith("file::memory:")) return true;
-    if (file.startsWith("file:")) {
-      const q = file.indexOf("?");
-      const params = q === -1 ? null : new URLSearchParams(file.slice(q + 1));
-      if (params?.get("mode") === "memory") return true;
-    }
+    const path = resolveDatabasePath(config.database);
+    if (path === null) return true; // memory database
     try {
-      return getFs().existsSync(file);
+      return getFs().existsSync(path);
     } catch {
       return false;
     }
