@@ -526,10 +526,13 @@ function validateHasOneAssociation(this: any, reflection: any): void {
   if (!(record.changedForAutosave?.() ?? false)) return;
   // Mirrors Rails: skip if the inverse belongs_to is currently validating or autosaving
   // to prevent infinite mutual-validation loops.
-  const inverseOf = reflection.inverseOf ?? reflection.inverse_of;
-  if (inverseOf) {
+  const inverse =
+    typeof reflection.inverseOf === "function"
+      ? reflection.inverseOf()
+      : (reflection.inverseOf ?? null);
+  if (inverse) {
     const inverseAssoc =
-      record._cachedAssociations?.get(inverseOf.name) !== undefined ? inverseOf : null;
+      record._cachedAssociations?.get(inverse.name) !== undefined ? inverse : null;
     if (
       inverseAssoc &&
       (record.isValidatingBelongsToFor?.(inverseAssoc) ||
@@ -611,8 +614,8 @@ function aroundSaveCollectionAssociation(this: any, fn: () => void): void {
 }
 
 /** @internal */
-async function saveCollectionAssociation(this: any, reflection: any): Promise<void> {
-  await autosaveHasMany(this, {
+async function saveCollectionAssociation(this: any, reflection: any): Promise<boolean> {
+  return autosaveHasMany(this, {
     name: reflection.name,
     type: "hasMany",
     options: reflection.options ?? {},
@@ -620,8 +623,8 @@ async function saveCollectionAssociation(this: any, reflection: any): Promise<vo
 }
 
 /** @internal */
-async function saveHasOneAssociation(this: any, reflection: any): Promise<void> {
-  await autosaveHasOne(this, {
+async function saveHasOneAssociation(this: any, reflection: any): Promise<boolean> {
+  return autosaveHasOne(this, {
     name: reflection.name,
     type: "hasOne",
     options: reflection.options ?? {},
@@ -657,7 +660,11 @@ function isAssociationForeignKeyChanged(reflection: any, record: any, key: any[]
 
 /** @internal */
 function isInversePolymorphicAssociationChanged(reflection: any, record: any): boolean {
-  if (!reflection.inverseOf?.polymorphic) return false;
+  const inverse =
+    typeof reflection.inverseOf === "function"
+      ? reflection.inverseOf()
+      : (reflection.inverseOf ?? null);
+  if (!inverse?.options?.polymorphic) return false;
   return reflection.activeRecord !== record?.constructor;
 }
 
@@ -683,7 +690,7 @@ function computePrimaryKey(reflection: any, record: any): string | string[] {
 
 /** @internal */
 function _ensureNoDuplicateErrors(this: any): void {
-  if (typeof this.errors?.uniq === "function") this.errors.uniq();
+  if (typeof this.errors?.uniqBang === "function") this.errors.uniqBang();
 }
 
 /** @internal */
@@ -726,11 +733,17 @@ function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) => any)
 /** @internal */
 function addAutosaveAssociationCallbacks(klass: any, reflection: any): void {
   const saveName = `autosaveAssociatedRecordsFor_${reflection.name}`;
-  if (reflection.collection) {
+  const isCol =
+    typeof reflection.isCollection === "function"
+      ? reflection.isCollection()
+      : !!reflection.collection;
+  const isHasOne =
+    typeof reflection.hasOne === "function" ? reflection.hasOne() : !!reflection.hasOne;
+  if (isCol) {
     defineNonCyclicMethod(klass, saveName, function (this: any) {
       return saveCollectionAssociation.call(this, reflection);
     });
-  } else if (reflection.hasOne) {
+  } else if (isHasOne) {
     defineNonCyclicMethod(klass, saveName, function (this: any) {
       return saveHasOneAssociation.call(this, reflection);
     });
@@ -747,11 +760,17 @@ function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
   if (!reflection.validate) return;
   const validationName = `validateAssociatedRecordsFor_${reflection.name}`;
   if (typeof klass.prototype?.[validationName] === "function") return;
-  if (reflection.collection) {
+  const isCol =
+    typeof reflection.isCollection === "function"
+      ? reflection.isCollection()
+      : !!reflection.collection;
+  const isHasOne =
+    typeof reflection.hasOne === "function" ? reflection.hasOne() : !!reflection.hasOne;
+  if (isCol) {
     defineNonCyclicMethod(klass, validationName, function (this: any) {
       return validateCollectionAssociation.call(this, reflection);
     });
-  } else if (reflection.hasOne) {
+  } else if (isHasOne) {
     defineNonCyclicMethod(klass, validationName, function (this: any) {
       return validateHasOneAssociation.call(this, reflection);
     });
