@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -1300,8 +1300,18 @@ describe("eachCurrentEnvironment", () => {
     expect(eachCurrentEnvironment("development")).toEqual(["development"]);
   });
 
+  it("skips test expansion when SKIP_TEST_DATABASE is set to empty string", () => {
+    process.env.SKIP_TEST_DATABASE = "";
+    expect(eachCurrentEnvironment("development")).toEqual(["development"]);
+  });
+
   it("skips test expansion when DATABASE_URL is set", () => {
     process.env.DATABASE_URL = "sqlite3::memory:";
+    expect(eachCurrentEnvironment("development")).toEqual(["development"]);
+  });
+
+  it("skips test expansion when DATABASE_URL is set to empty string", () => {
+    process.env.DATABASE_URL = "";
     expect(eachCurrentEnvironment("development")).toEqual(["development"]);
   });
 });
@@ -1395,8 +1405,7 @@ describe("initializeDatabase", () => {
   });
 
   it("re-throws unexpected errors from the probe query", async () => {
-    const origConnect = (DatabaseTasks as any)._connectFor.bind(DatabaseTasks);
-    (DatabaseTasks as any)._connectFor = async () => ({
+    const spy = vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
       execute: async () => {
         throw new Error("unexpected connection error");
       },
@@ -1409,7 +1418,7 @@ describe("initializeDatabase", () => {
       });
       await expect(initializeDatabase(config)).rejects.toThrow("unexpected connection error");
     } finally {
-      (DatabaseTasks as any)._connectFor = origConnect;
+      spy.mockRestore();
     }
   });
 });

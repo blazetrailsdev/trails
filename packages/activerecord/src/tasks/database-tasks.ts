@@ -911,11 +911,7 @@ export class DatabaseTasks {
   }
 
   private static async _schemaSha1(filename: string): Promise<string> {
-    const contents = getFs().readFileSync(filename, "utf-8");
-    const crypto = await getCryptoAsync();
-    const hash = crypto.createHash("sha1");
-    hash.update(contents);
-    return hash.digest("hex");
+    return _sha1File(filename);
   }
 
   /**
@@ -1138,7 +1134,11 @@ export function eachCurrentConfiguration(environment: string, name?: string): Da
 /** @internal */
 export function eachCurrentEnvironment(environment: string): string[] {
   const envs = [environment];
-  if (environment === "development" && !getEnv("SKIP_TEST_DATABASE") && !getEnv("DATABASE_URL")) {
+  if (
+    environment === "development" &&
+    getEnv("SKIP_TEST_DATABASE") === undefined &&
+    getEnv("DATABASE_URL") === undefined
+  ) {
     envs.push("test");
   }
   return envs;
@@ -1151,11 +1151,15 @@ export function isLocalDatabase(dbConfig: DatabaseConfig): boolean {
 }
 
 /** @internal */
-export async function schemaSha1(file: string): Promise<string> {
-  const contents = getFs().readFileSync(file, "utf-8");
+export function schemaSha1(file: string): Promise<string> {
+  return _sha1File(file);
+}
+
+async function _sha1File(filename: string): Promise<string> {
+  const bytes = getFs().readFileSync(filename);
   const crypto = await getCryptoAsync();
   const hash = crypto.createHash("sha1");
-  hash.update(contents);
+  hash.update(bytes);
   return hash.digest("hex");
 }
 
