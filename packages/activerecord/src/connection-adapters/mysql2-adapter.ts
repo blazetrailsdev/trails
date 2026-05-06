@@ -8,7 +8,7 @@ import {
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
 import { Version } from "./abstract-adapter.js";
-import { MismatchedForeignKey, NotImplementedError } from "../errors.js";
+import { MismatchedForeignKey, NoDatabaseError, NotImplementedError } from "../errors.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { quoteString as mysqlQuoteString } from "./mysql/quoting.js";
 import { Column } from "./column.js";
@@ -168,6 +168,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // not yet probed, `true`/`false` = result.
   private _statisticsHasExpression: boolean | undefined;
   private _fullVersionString: string | null = null;
+  private _database: string | undefined;
 
   constructor(config: string | (mysql.PoolOptions & TrailsAdapterOptions)) {
     super();
@@ -184,6 +185,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const { statementLimit, preparedStatements, ...mysqlConfig } = config;
     if (statementLimit !== undefined) this.statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
+    this._database = mysqlConfig.database as string | undefined;
     this._driverPool = Mysql2Adapter.newClient(mysqlConfig);
   }
 
@@ -194,7 +196,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private async getConn(): Promise<mysql.PoolConnection> {
     if (this._conn) return this._conn;
     if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
-    return this._driverPool.getConnection();
+    try {
+      return await this._driverPool.getConnection();
+    } catch (error) {
+      const e = error as { code?: unknown; errno?: unknown };
+      if (e.code === "ER_BAD_DB_ERROR" || e.errno === 1049) {
+        const db = this._database ?? "unknown";
+        throw NoDatabaseError.dbError(db);
+      }
+      throw error;
+    }
   }
 
   /**

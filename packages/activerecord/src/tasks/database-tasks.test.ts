@@ -1420,41 +1420,20 @@ describe("initializeDatabase", () => {
     await expect(initializeDatabase(config)).rejects.toThrow("unexpected connection error");
   });
 
-  it("creates the DB and returns true when probe throws NoDatabaseError", async () => {
-    let created = false;
-    vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
-      execute: async () => {
-        throw new NoDatabaseError("no database");
-      },
-      close: async () => {},
-    });
-    vi.spyOn(DatabaseTasks, "create").mockImplementation(async () => {
-      created = true;
-    });
-    const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" });
-    const result = await initializeDatabase(config);
-    expect(created).toBe(true);
-    expect(result).toBe(true);
-  });
-
-  it("creates the DB and returns true when probe throws MySQL ER_BAD_DB_ERROR", async () => {
-    let created = false;
-    const mysqlErr = Object.assign(new Error("Unknown database 'mydb'"), {
-      code: "ER_BAD_DB_ERROR",
-    });
-    vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
-      execute: async () => {
-        throw mysqlErr;
-      },
-      close: async () => {},
-    });
-    vi.spyOn(DatabaseTasks, "create").mockImplementation(async () => {
-      created = true;
-    });
-    const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" });
-    const result = await initializeDatabase(config);
-    expect(created).toBe(true);
-    expect(result).toBe(true);
+  it("creates the DB and returns true when the database file does not exist", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-initdb-new-"));
+    const dbFile = path.join(tmp, "newdb.sqlite3");
+    try {
+      const config = new HashConfig("test", "primary", {
+        adapter: "sqlite3",
+        database: dbFile,
+      });
+      const result = await initializeDatabase(config);
+      expect(result).toBe(true);
+      expect(fs.existsSync(dbFile)).toBe(true);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 
   it("loads schema dump when DB is fresh and dump file exists", async () => {
