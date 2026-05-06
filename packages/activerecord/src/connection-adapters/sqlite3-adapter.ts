@@ -4,7 +4,7 @@ import type {
   AdapterName,
   DatabaseAdapter,
   ExplainOption,
-  TrailsAdapterOptions,
+  SQLite3AdapterOptions,
 } from "../adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
@@ -16,6 +16,7 @@ import {
   NotNullViolation,
   ValueTooLong,
   NoDatabaseError,
+  ConnectionNotEstablished,
   DatabaseConnectionError,
   TransactionIsolationError,
   NotImplementedError,
@@ -133,7 +134,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new Visitors.SQLite(this);
   }
 
-  private db: Database.Database;
+  private db!: Database.Database;
   override get active(): boolean {
     return this.db?.open ?? false;
   }
@@ -144,7 +145,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
   private _filename: string;
-  private _statementPool = new GenericStatementPool<Database.Statement>();
+  // _statementLimit must be declared before _statementPool so buildStatementPool()
+  // reads the correct default when the field initializer runs.
+  private _statementLimit = 1000;
+  private _statementPool = this.buildStatementPool();
 
   private static _isMemoryFilename(filename: string): boolean {
     if (filename === ":memory:") return true;
@@ -156,11 +160,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (q === -1) return false;
     return new URLSearchParams(filename.slice(q + 1)).get("mode") === "memory";
   }
-
-  // Rails' `statement_limit` database.yml key. SQLite has a single
-  // connection (no pool), so the adapter owns exactly one pool and the
-  // setter resizes it directly.
-  private _statementLimit = 1000;
 
   /**
    * Maximum prepared statements cached on the single SQLite connection.
@@ -182,10 +181,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._statementPool.setMaxSize(value);
   }
 
-  constructor(
-    filename: string | ":memory:" = ":memory:",
-    options: TrailsAdapterOptions & { readonly?: boolean } = {},
-  ) {
+  constructor(filename: string | ":memory:" = ":memory:", options: SQLite3AdapterOptions = {}) {
     super();
     this._config = { ...options };
     this._filename = filename;
@@ -198,18 +194,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // Apply adapter-level options FIRST so invalid values fail before
     // the native driver opens a file handle that would otherwise leak.
     if (options.statementLimit !== undefined) this.statementLimit = options.statementLimit;
-    try {
-      this.db = new Database(filename, { readonly: this._readonly });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new DatabaseConnectionError(`Unable to open database '${filename}': ${msg}`, {
-        cause: e,
-      });
-    }
-    if (!this._readonly) {
-      this.db.pragma("journal_mode = WAL");
-      this.db.pragma("foreign_keys = ON");
-    }
+    this.connect();
+    this.configureConnection();
     this._nativeTypeMap = SQLite3Adapter._buildTypeMap();
   }
 
@@ -630,53 +616,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer
   // INTEGER in SQLite can store up to 8 bytes; default _limit to 8 when none given.
   private static _buildTypeMap(): TypeMap {
-    const sqlite3Int = (limit?: number) => new IntegerType({ limit: limit ?? 8 });
     const map = new TypeMap();
-    map.registerType("string", new StringType());
-    map.registerType("text", new TextType());
-    map.registerType("integer", sqlite3Int());
-    map.registerType("float", new FloatType());
-    map.registerType(/decimal|numeric/i, undefined, (sqlType) => {
-      const precisionMatch = /\(\s*(\d+)/.exec(sqlType);
-      const precision = precisionMatch ? parseInt(precisionMatch[1], 10) : undefined;
-      const scaleMatch = /\(\s*\d+\s*,\s*(\d+)\s*\)/.exec(sqlType);
-      // Rails: extract_scale returns 0 when no scale specified; use DecimalWithoutScale
-      const scale = scaleMatch
-        ? parseInt(scaleMatch[1], 10)
-        : precision !== undefined
-          ? 0
-          : undefined;
-      if (scale === 0) return new DecimalWithoutScale({ precision });
-      return new DecimalType({ precision, scale });
-    });
-    map.registerType("decimal", new DecimalType());
-    map.registerType("boolean", new BooleanType());
-    // Date/time types: no driver-level type-parser work needed for Temporal.
-    // better-sqlite3 returns datetime columns as TEXT strings (SQLite has no
-    // native datetime type).  SQLiteDateTimeType converts offset-less strings
-    // to Temporal.Instant using the same timezone as formatInstantForSql
-    // (default_timezone: UTC → UTC, local → host tz).  Writes go through
-    // sqlite3/quoting.ts which formats all Temporal types as :db strings.
-    map.registerType("date", new DateType());
-    map.registerType("datetime", new SQLiteDateTimeType());
-    map.registerType("timestamp", new SQLiteDateTimeType());
-    map.registerType("time", new TimeType());
-    map.registerType("blob", new BinaryType());
-    map.registerType("binary", new BinaryType());
-    map.registerType("json", new JsonType());
-    map.registerType("numeric", new DecimalWithoutScale());
-    // SQLite type affinity — regex matches for flexible type names
-    map.registerType(/int/i, undefined, (lookupKey) => {
-      if (/bigint/i.test(lookupKey)) return sqlite3Int(8);
-      return sqlite3Int();
-    });
-    // Explicit "bigint" registered after /int/i so it takes priority (TypeMap
-    // reverses entries; last registered wins on exact matches vs regex).
-    map.registerType("bigint", sqlite3Int(8));
-    map.registerType(/char/i, undefined, () => new StringType());
-    map.registerType(/clob/i, undefined, () => new TextType());
-    map.registerType(/blob/i, undefined, () => new BinaryType());
-    map.registerType(/real|floa|doub/i, undefined, () => new FloatType());
+    SQLite3Adapter.initializeTypeMap(map);
     return map;
   }
 
@@ -2005,25 +1946,135 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     const msg = e instanceof Error ? e.message : String(e);
-    const code = (e as any)?.code as string | undefined;
-    const cause = e;
+    // Wrap non-Error throws so translateException always receives an Error.
+    // Preserve the original value as .cause and copy .code so code-based
+    // classification in translateException still works for non-Error throws.
+    let exc: Error;
+    if (e instanceof Error) {
+      exc = e;
+    } else {
+      exc = new Error(msg, { cause: e });
+      const code = (e as any)?.code;
+      if (code !== undefined) (exc as any).code = code;
+    }
+    return translateException(exc, msg, sql, binds);
+  }
 
-    if (code?.includes("CONSTRAINT_UNIQUE") || msg.includes("UNIQUE constraint failed")) {
-      return new RecordNotUnique(msg, { sql, binds, cause });
+  /** @internal */
+  private buildStatementPool(): GenericStatementPool<Database.Statement> {
+    return new GenericStatementPool<Database.Statement>(this._statementLimit);
+  }
+
+  /** @internal */
+  private connect(): void {
+    try {
+      this.db = new Database(this._filename, { readonly: this._readonly });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new DatabaseConnectionError(`Unable to open database '${this._filename}': ${msg}`, {
+        cause: e,
+      });
     }
-    if (code?.includes("CONSTRAINT_FOREIGNKEY") || msg.includes("FOREIGN KEY constraint failed")) {
-      return new InvalidForeignKey(msg, { sql, binds, cause });
+  }
+
+  /** @internal */
+  private configureConnection(): void {
+    if (!this._readonly) {
+      // Apply Rails DEFAULT_PRAGMAS best-effort: an unsupported PRAGMA on a
+      // non-standard SQLite build should warn, not abort construction.
+      const defaults: [string, string][] = [
+        ["foreign_keys", "ON"],
+        ["journal_mode", "WAL"],
+        ["synchronous", "NORMAL"],
+        ["mmap_size", "134217728"],
+        ["journal_size_limit", "67108864"],
+        ["cache_size", "2000"],
+      ];
+      for (const [pragma, value] of defaults) {
+        try {
+          this.db.pragma(`${pragma} = ${value}`);
+        } catch (e) {
+          console.warn(
+            `SQLite default pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }
     }
-    if (code?.includes("CONSTRAINT_NOTNULL") || msg.includes("NOT NULL constraint failed")) {
-      return new NotNullViolation(msg, { sql, binds, cause });
+    const pragmas = (this._config as SQLite3AdapterOptions).pragmas;
+    if (pragmas) {
+      // Validate pragma name is a safe SQLite identifier before interpolating.
+      const SAFE_PRAGMA_NAME = /^\w+$/;
+      // Restrict values to identifier-like strings (enum pragmas) or scalars.
+      const SAFE_PRAGMA_VALUE = /^\w+$/;
+      for (const [pragma, value] of Object.entries(pragmas)) {
+        if (!SAFE_PRAGMA_NAME.test(pragma)) {
+          console.warn(`Skipping invalid SQLite pragma name: ${pragma}`);
+          continue;
+        }
+        const scalar =
+          typeof value === "boolean"
+            ? value
+              ? "1"
+              : "0"
+            : typeof value === "number"
+              ? String(value)
+              : SAFE_PRAGMA_VALUE.test(value)
+                ? value
+                : null;
+        if (scalar === null) {
+          console.warn(`Skipping SQLite pragma '${pragma}': value contains unsafe characters`);
+          continue;
+        }
+        try {
+          this.db.pragma(`${pragma} = ${scalar}`);
+        } catch (e) {
+          console.warn(
+            `SQLite pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }
     }
-    if (msg.includes("String or BLOB exceeded size limit")) {
-      return new ValueTooLong(msg, { sql, binds, cause });
-    }
-    if (code === "SQLITE_CANTOPEN" || msg.includes("unable to open database file")) {
-      return new NoDatabaseError(msg, { sql, binds, cause });
-    }
-    return new StatementInvalid(msg, { sql, binds, cause });
+  }
+
+  /** @internal */
+  private static initializeTypeMap(m: TypeMap): void {
+    const sqlite3Int = (limit?: number) => new IntegerType({ limit: limit ?? 8 });
+    m.registerType("string", new StringType());
+    m.registerType("text", new TextType());
+    m.registerType("integer", sqlite3Int());
+    m.registerType("float", new FloatType());
+    m.registerType(/decimal|numeric/i, undefined, (sqlType) => {
+      const precisionMatch = /\(\s*(\d+)/.exec(sqlType);
+      const precision = precisionMatch ? parseInt(precisionMatch[1], 10) : undefined;
+      const scaleMatch = /\(\s*\d+\s*,\s*(\d+)\s*\)/.exec(sqlType);
+      const scale = scaleMatch
+        ? parseInt(scaleMatch[1], 10)
+        : precision !== undefined
+          ? 0
+          : undefined;
+      if (scale === 0) return new DecimalWithoutScale({ precision });
+      return new DecimalType({ precision, scale });
+    });
+    m.registerType("decimal", new DecimalType());
+    m.registerType("boolean", new BooleanType());
+    // better-sqlite3 returns datetime columns as TEXT; SQLiteDateTimeType converts
+    // offset-less strings to Temporal.Instant using the configured default_timezone.
+    m.registerType("date", new DateType());
+    m.registerType("datetime", new SQLiteDateTimeType());
+    m.registerType("timestamp", new SQLiteDateTimeType());
+    m.registerType("time", new TimeType());
+    m.registerType("blob", new BinaryType());
+    m.registerType("binary", new BinaryType());
+    m.registerType("json", new JsonType());
+    m.registerType("numeric", new DecimalWithoutScale());
+    // SQLite type affinity — regex matches for flexible type names
+    m.registerType(/int/i, undefined, (k) => (/bigint/i.test(k) ? sqlite3Int(8) : sqlite3Int()));
+    // Explicit "bigint" registered after /int/i so it takes priority on exact matches.
+    m.registerType("bigint", sqlite3Int(8));
+    m.registerType(/char/i, undefined, () => new StringType());
+    m.registerType(/clob/i, undefined, () => new TextType());
+    m.registerType(/blob/i, undefined, () => new BinaryType());
+    m.registerType(/real|floa|doub/i, undefined, () => new FloatType());
   }
 }
 
@@ -2063,45 +2114,73 @@ function normalizeReferentialAction(action: string): string {
 }
 
 /** @internal */
-function bindParamsLength(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#bind_params_length is not implemented",
+function bindParamsLength(): number {
+  // https://www.sqlite.org/limits.html — default SQLITE_LIMIT_VARIABLE_NUMBER
+  return 999;
+}
+
+/** @internal */
+function extractValueFromDefault(default_: string | null): unknown {
+  return sqliteExtractValueFromDefault(default_);
+}
+
+/** @internal */
+function extractDefaultFunction(defaultValue: unknown, default_: string): string | undefined {
+  return hasDefaultFunction(defaultValue, default_) ? default_ : undefined;
+}
+
+/** @internal */
+function hasDefaultFunction(defaultValue: unknown, default_: string): boolean {
+  return (
+    defaultValue == null &&
+    /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(default_)
   );
 }
 
 /** @internal */
-function extractValueFromDefault(default_: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#extract_value_from_default is not implemented",
+function isInvalidAlterTableType(type: string, options: Record<string, unknown>): boolean {
+  return (
+    type === "primary_key" ||
+    Boolean(options["primary_key"]) ||
+    (options["null"] === false && options["default"] == null) ||
+    (type === "virtual" && Boolean(options["stored"]))
   );
 }
 
 /** @internal */
-function extractDefaultFunction(defaultValue: any, default_: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#extract_default_function is not implemented",
-  );
-}
-
-/** @internal */
-function hasDefaultFunction(defaultValue: any, default_: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#has_default_function? is not implemented",
-  );
-}
-
-/** @internal */
-function isInvalidAlterTableType(type: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#invalid_alter_table_type? is not implemented",
-  );
-}
-
-/** @internal */
-function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#translate_exception is not implemented",
-  );
+function translateException(
+  exception: Error,
+  message: string,
+  sql: string,
+  binds: unknown[],
+): Error {
+  const msg = exception.message;
+  const code = (exception as any)?.code as string | undefined;
+  if (
+    code?.includes("CONSTRAINT_UNIQUE") ||
+    /(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(msg)
+  ) {
+    return new RecordNotUnique(message, { sql, binds, cause: exception });
+  }
+  if (
+    code?.includes("CONSTRAINT_NOTNULL") ||
+    /(.* may not be NULL|NOT NULL constraint failed: .*)/i.test(msg)
+  ) {
+    return new NotNullViolation(message, { sql, binds, cause: exception });
+  }
+  if (code?.includes("CONSTRAINT_FOREIGNKEY") || /FOREIGN KEY constraint failed/i.test(msg)) {
+    return new InvalidForeignKey(message, { sql, binds, cause: exception });
+  }
+  if (msg.includes("String or BLOB exceeded size limit")) {
+    return new ValueTooLong(message, { sql, binds, cause: exception });
+  }
+  if (code === "SQLITE_CANTOPEN" || /unable to open database file/i.test(msg)) {
+    return new NoDatabaseError(message, { sql, binds, cause: exception });
+  }
+  if (/called on a closed database/i.test(msg)) {
+    return new ConnectionNotEstablished(message, { cause: exception });
+  }
+  return new StatementInvalid(message, { sql, binds, cause: exception });
 }
 
 /** @internal */
@@ -2112,36 +2191,8 @@ function arelVisitor(): never {
 }
 
 /** @internal */
-function buildStatementPool(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#build_statement_pool is not implemented",
-  );
-}
-
-/** @internal */
-function connect(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#connect is not implemented",
-  );
-}
-
-/** @internal */
 function reconnect(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3Adapter#reconnect is not implemented",
-  );
-}
-
-/** @internal */
-function configureConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#configure_connection is not implemented",
-  );
-}
-
-/** @internal */
-function initializeTypeMap(m: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#initialize_type_map is not implemented",
   );
 }

@@ -32,6 +32,18 @@ export interface TrailsAdapterOptions {
 }
 
 /**
+ * SQLite3-specific adapter options that extend the shared base.
+ */
+export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
+  readonly?: boolean;
+  // Mirrors: database.yml `pragmas:` — applied via PRAGMA on each connection.
+  // Keys must be simple SQLite pragma identifiers (word characters only, e.g. "cache_size").
+  // String values must be identifier-like enum words (e.g. "WAL", "NORMAL") — arbitrary
+  // strings are warned and skipped. Numbers and booleans are always accepted (boolean → "1"/"0").
+  pragmas?: Record<string, string | number | boolean>;
+}
+
+/**
  * PostgreSQL-specific adapter options that extend the shared base.
  * Kept separate so MySQL2/SQLite3 destructuring of `TrailsAdapterOptions`
  * never receives — and leaks — these keys into their driver configs.
