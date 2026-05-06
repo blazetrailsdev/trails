@@ -720,19 +720,40 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         return;
       }
 
-      // Bare identifier: `include(Host, Mod)`. Imports may rebind
-      // (`import { Math as MathMixin }`), so follow the alias to the
-      // original symbol's name and push it onto host.extends so
-      // compare.ts's getInherited() walker resolves it via tsByShort.
+      // Bare identifier: `include(Host, Mod)`. Two sub-cases:
+      //
+      // (a) Mod is a class / interface — push its name onto host.extends so
+      //     compare.ts's getInherited() walker resolves it via tsByShort.
+      //     Imports may rebind (`import { Math as MathMixin }`), so follow
+      //     the alias to the original symbol's name.
+      //
+      // (b) Mod is a `const` object literal (e.g. `export const QueryMethodBangs
+      //     = { foo, bar } as const`). The extractor never creates a class/module
+      //     entry for plain objects, so pushing the name to extends would leave
+      //     it unresolvable. Instead, harvest the object's method keys directly
+      //     onto the host — same treatment as the inline-object and
+      //     property-access branches above.
       if (ts.isIdentifier(modArg)) {
         const sym0 = checker.getSymbolAtLocation(modArg);
-        let modName: string;
-        if (sym0) {
-          const sym = sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
-          modName = sym.name;
-        } else {
-          modName = modArg.text;
+        const sym =
+          sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+
+        // (b): const object literal → harvest directly.
+        const valDecl = sym?.valueDeclaration ?? sym?.declarations?.[0];
+        if (valDecl && ts.isVariableDeclaration(valDecl) && valDecl.initializer) {
+          // Strip `as const` / other type assertions to reach the raw literal.
+          let init = valDecl.initializer;
+          while (ts.isAsExpression(init) || ts.isSatisfiesExpression(init)) {
+            init = (init as ts.AsExpression | ts.SatisfiesExpression).expression;
+          }
+          if (ts.isObjectLiteralExpression(init)) {
+            pushMethods(harvestObjectLiteralMethods(init, checker, hostInfo.file ?? ""));
+            return;
+          }
         }
+
+        // (a): class / interface / module — push name for later resolution.
+        const modName = sym?.name ?? modArg.text;
         if (!hostInfo.extends.includes(modName)) hostInfo.extends.push(modName);
       }
     });

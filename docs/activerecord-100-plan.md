@@ -245,24 +245,25 @@ TS paths use `$TS/` = `packages/activerecord/src/`.
 - Dependencies: PR M2, PR 28
 - Rationale: both are core class-level setup; pairing them lets the find/findBy cache live alongside columnsHash without an artificial split.
 
-**PR 37 — `relation.rb` (73%) — multi-split**
+**PR 37 — `relation.rb` QueryMethods bang mutations** ✅ #1263
 
 - Rails: `$AR/relation.rb` (1502 LOC)
-- TS: `$TS/relation.ts` (4591 LOC, 226 matched, 82 missing, 73%)
-- **Note**: relation sub-files (`relation/finder-methods.ts` etc.) are already 100%. These 82 are genuine missing privates in `relation.ts` itself.
-- Missing methods (full list from relation.rb lines 1312–1498):
-  - Group A (find/create helpers): `emptyScope?`, `strictLoadingValue`, `loadRecords`, `alreadyInScope?`, `globalScope?`, `currentScopeRestoringBlock`, `_new`, `_create`, `_create!`, `_scoping`, `_substituteValues`, `_incrementAttribute`
-  - Group B (query build): `execQueries`, `execMainQuery`, `instantiateRecords`, `skipQueryCacheIfNecessary`, `referencesEagerLoadedTables?`, `tablesInString`, `limitedCount`, `preloadAssociations`
-  - Group C (cache): `computeCacheKey`, `computeCacheVersion`
-  - Group D (public methods missing): `findOrCreateBy`, `findOrCreateBy!`, `createOrFindBy`, `createOrFindBy!`, `findOrInitializeBy`, `bindAttribute`, `whereValuesHash`, `scopeForCreate`, `eagerLoading?`, `joinedIncludesValues`, `prettyPrint`, `blank?`, `readonly?`, `valuesForQueries`, `emptyScope?`, `hasLimitOrOffset?`, `aliasTracker`
-- Split:
-  - PR 37 (20): Group A + Group C + `findOrCreateBy`, `findOrCreateBy!`, `createOrFindBy`, `createOrFindBy!`, `findOrInitializeBy`
-  - PR 37b (20): Group B query build privates
-  - PR 37c (22): Group D public methods missing from relation.ts
-  - PR 37d (20): remaining (verify against fresh api:compare before starting — some names may differ)
-- LOC: ~220 net each
-- Dependencies: PR M2, PR 35 (and PR 35b if model_schema is split out), Waves 2–5
-- Risk: `relation.ts` is 4591 LOC. Many "missing" privates may exist under slightly different camelCase names — audit with `grep -n "def " $AR/relation.rb` and cross-reference against `grep "^\s*(private\s+)?\w\+" $TS/relation.ts` before implementing each split.
+- TS: `$TS/relation.ts`
+- Added 40 explicit instance methods (bang mutations + `isNullRelation` + `constructJoinDependency` + `asyncBang`) that delegate to existing `QueryMethodBangs` functions, making them visible to api:compare.
+- Removed `include(Relation, QueryMethodBangs)` and `Included<typeof QueryMethodBangs>` in favour of direct class declarations.
+- relation.rb: 182/308 (59%) → 227/308 (74%)
+- **Root cause of plan mismatch**: Groups A, C, and the 5 public methods (findOrCreateBy etc.) were already matched as of api:compare run. The actual missing 126 methods are those from included Ruby modules (QueryMethods, FinderMethods, Calculations, Batches) that live in TS sub-files invisible to the extractor.
+- **Remaining 81 missing** (verify with fresh api:compare):
+  - ~20 calculation privates (from `relation/calculations.rb`) — some may need class-level delegation in relation.ts
+  - ~14 finder privates (`findWithIds`, `findOne`, etc.) — exist as file-level functions in finder-methods.ts
+  - ~30 build helpers (`buildArel`, `buildJoins`, etc.) — exist in query-methods.ts but not in QueryMethodBangs const
+  - ~10 batch helpers (`ensureValidOptionsForBatchingBang`, etc.)
+  - ~7 other (explain, async)
+- Split for remaining:
+  - PR 37b (~25): calculation privates + `ensureValidOptionsForBatchingBang` + `async`
+  - PR 37c (~25): build helpers (`buildArel`, `buildJoins`, `buildSelect`, `buildFrom`, etc.)
+  - PR 37d (~31): finder privates + remaining
+- Dependencies: complete
 
 ---
 
