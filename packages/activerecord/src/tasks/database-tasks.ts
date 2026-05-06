@@ -1102,7 +1102,7 @@ export function isVerbose(): boolean {
 
 /** @internal */
 export function databaseAdapterFor(
-  dbConfig: DatabaseConfig,
+  _dbConfig: DatabaseConfig,
   ...arguments_: unknown[]
 ): import("../adapter.js").DatabaseAdapter | null {
   void arguments_;
