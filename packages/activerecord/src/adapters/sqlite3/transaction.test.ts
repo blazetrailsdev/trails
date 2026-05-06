@@ -31,7 +31,7 @@ function withConn(opts: { sharedCache?: boolean } = {}): SQLite3Adapter {
 }
 
 function readUncommitted(conn: SQLite3Adapter): boolean {
-  const row = (conn as any).db.prepare("PRAGMA read_uncommitted").get() as {
+  const row = ((conn as any).driver.prepare("PRAGMA read_uncommitted") as any).get() as {
     read_uncommitted: number;
   };
   return row.read_uncommitted !== 0;
@@ -101,7 +101,7 @@ describe("SQLite3TransactionTest", () => {
 
   it("set the read_uncommitted PRAGMA to its previous value", async () => {
     const conn = withConn({ sharedCache: true });
-    (conn as any).db.exec("PRAGMA read_uncommitted=ON");
+    (conn as any).driver.exec("PRAGMA read_uncommitted=ON");
     expect(readUncommitted(conn)).toBe(true);
     await conn.beginIsolatedDbTransaction("read_uncommitted");
     expect(readUncommitted(conn)).toBe(true);

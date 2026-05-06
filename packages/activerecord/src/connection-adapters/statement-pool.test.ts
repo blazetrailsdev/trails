@@ -111,7 +111,7 @@ describe("SQLite3 StatementPool integration", () => {
   it("caches prepared statements across execute calls", async () => {
     const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
     const adapter = new SQLite3Adapter(":memory:");
-    const prepareSpy = vi.spyOn((adapter as any).db, "prepare");
+    const prepareSpy = vi.spyOn((adapter as any).driver, "prepare");
 
     try {
       await adapter.executeMutation(
