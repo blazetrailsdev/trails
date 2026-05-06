@@ -82,7 +82,10 @@ host-level primitives that downstream packages compose with.
 `fsAdapter`, `pathAdapter`, `osAdapter`, `processAdapter`,
 `childProcessAdapter`, `cryptoAdapter`, `asyncContextAdapter`. Lazy
 node defaults; trailties / a browser shell can override. CLI-only
-utilities (`glob`) live behind subpath exports.
+utilities (`glob`) live behind subpath exports. The adapter pattern is the
+canonical model for every new native-dep abstraction in the monorepo — see
+[browser-compat-plan.md](browser-compat-plan.md) for the full portability
+policy.
 
 ### Cache
 
