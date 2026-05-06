@@ -1,4 +1,5 @@
 import { getFs, getPath, Logger, getEnv } from "@blazetrails/activesupport";
+import type { FsDirent } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
@@ -97,6 +98,20 @@ export class PendingMigrationError extends MigrationError {
   constructor(message = "Migrations are pending. Run `migrate` to resolve.") {
     super(message);
     this.name = "PendingMigrationError";
+  }
+
+  /** @internal */
+  detailedMigrationMessage(pendingMigrations: Array<{ filename?: string }>): string {
+    const env = Migration.env();
+    let message =
+      "Migrations are pending. To resolve this issue, run:\n\n        bin/rails db:migrate";
+    if (env !== "development" && env !== "test") message += ` RAILS_ENV=${env}`;
+    message += "\n\n";
+    message += `You have ${pendingMigrations.length} pending ${pendingMigrations.length > 1 ? "migrations:" : "migration:"}\n\n`;
+    for (const m of pendingMigrations) {
+      if (m.filename) message += `${m.filename}\n`;
+    }
+    return message;
   }
 }
 
@@ -1008,6 +1023,43 @@ export abstract class Migration {
 
   get nearestDelegate(): DatabaseAdapter {
     return this.adapter;
+  }
+
+  /** @internal */
+  executeBlock(fn: () => Promise<void>): Promise<void> {
+    return fn();
+  }
+
+  /** @internal */
+  formatArguments(args: unknown[]): string {
+    const safeJson = (v: unknown) =>
+      JSON.stringify(v, (_k, val) => (typeof val === "bigint" ? `${val}n` : val));
+    const argList = args.slice(0, -1).map((a) => safeJson(a));
+    const last = args[args.length - 1];
+    if (last !== null && typeof last === "object" && !Array.isArray(last)) {
+      const filtered = Object.fromEntries(
+        Object.entries(last as Record<string, unknown>).filter(([k]) => !this.isInternalOption(k)),
+      );
+      if (Object.keys(filtered).length > 0) argList.push(safeJson(filtered));
+    } else if (last !== undefined) {
+      argList.push(safeJson(last));
+    }
+    return argList.join(", ");
+  }
+
+  /** @internal */
+  isInternalOption(optionName: string): boolean {
+    return optionName.startsWith("_");
+  }
+
+  /** @internal */
+  commandRecorder(): CommandRecorder {
+    return new CommandRecorder(this.adapter);
+  }
+
+  /** @internal */
+  static env(): string {
+    return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? "development";
   }
 }
 
@@ -2073,6 +2125,80 @@ export class Migrator {
   }
 
   static migrationsPaths: string[] = [];
+
+  // Rails: MigrationContext#migration_files
+  /** @internal */
+  migrationFiles(paths: string[] = Migrator.migrationsPaths): string[] {
+    const { readdirSync, existsSync } = getFs();
+    const { join } = getPath();
+    const files: string[] = [];
+    const collect = (dir: string) => {
+      if (!existsSync(dir)) return;
+      for (const entry of readdirSync(dir, { withFileTypes: true }) as FsDirent[]) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          collect(full);
+        } else if (/^\d+_.*\.(ts|js)$/.test(entry.name)) {
+          files.push(full);
+        }
+      }
+    };
+    for (const p of paths) collect(p);
+    return files.sort();
+  }
+
+  // Rails: MigrationContext#parse_migration_filename
+  /** @internal */
+  parseMigrationFilename(filename: string): [string, string, string] | null {
+    const base = filename.replace(/.*[/\\]/, "").replace(/\.(ts|js)$/, "");
+    const m = base.match(/^(\d+)_([a-z0-9_]*)(?:\.([a-z0-9_]*))?$/);
+    if (!m) return null;
+    return [m[1]!, m[2]!, m[3] ?? ""];
+  }
+
+  // Rails: MigrationContext#validate_timestamp?
+  /** @internal */
+  isValidateTimestamp(): boolean {
+    // Rails: ActiveRecord.timestamped_migrations (default true) && ActiveRecord.validate_migration_timestamps (default false)
+    // true && false = false, so false is the correct default until these config flags are wired.
+    return false;
+  }
+
+  // Rails: MigrationContext#valid_migration_timestamp?
+  /** @internal */
+  isValidMigrationTimestamp(version: string | number): boolean {
+    const tomorrow = Temporal.Now.plainDateTimeISO("UTC").add({ days: 1 });
+    const limit = Number(
+      `${tomorrow.year}${String(tomorrow.month).padStart(2, "0")}${String(tomorrow.day).padStart(2, "0")}${String(tomorrow.hour).padStart(2, "0")}${String(tomorrow.minute).padStart(2, "0")}${String(tomorrow.second).padStart(2, "0")}`,
+    );
+    return Number(version) < limit;
+  }
+
+  // Rails: MigrationContext#move
+  /** @internal */
+  async move(direction: "up" | "down", steps: number): Promise<void> {
+    const current = await this.currentVersion();
+    // Mirror Migrator#migrations: ascending for :up, descending for :down.
+    // MigrationContext#move uses migrator.migrations[start_index + steps], so the
+    // direction of the list determines which version "steps" positions forward lands on.
+    const asc = (a: MigrationProxy, b: MigrationProxy) =>
+      BigInt(a.version) < BigInt(b.version) ? -1 : 1;
+    const ordered =
+      direction === "up"
+        ? [...this._migrations].sort(asc)
+        : [...this._migrations].sort(asc).reverse();
+    const startIndex = current === 0 ? 0 : ordered.findIndex((m) => m.version === String(current));
+    if (current !== 0 && startIndex === -1) {
+      throw new UnknownMigrationVersionError(String(current));
+    }
+    const finish = ordered[startIndex + steps];
+    const targetVersion = finish ? Number(finish.version) : 0;
+    if (direction === "up") {
+      await this.up(targetVersion);
+    } else {
+      await this.down(targetVersion);
+    }
+  }
 }
 
 /**
@@ -2175,111 +2301,13 @@ export class CheckPending {
       );
     }
   }
-}
 
-/** @internal */
-function detailedMigrationMessage(pendingMigrations: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::PendingMigrationError#detailed_migration_message is not implemented",
-  );
-}
-
-function connectionPool(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::PendingMigrationError#connection_pool is not implemented",
-  );
-}
-
-/** @internal */
-function executeBlock(): never {
-  throw new NotImplementedError("ActiveRecord::Migration#execute_block is not implemented");
-}
-
-/** @internal */
-function formatArguments(arguments_: any): never {
-  throw new NotImplementedError("ActiveRecord::Migration#format_arguments is not implemented");
-}
-
-/** @internal */
-function isInternalOption(optionName: any): never {
-  throw new NotImplementedError("ActiveRecord::Migration#internal_option? is not implemented");
-}
-
-/** @internal */
-function commandRecorder(): never {
-  throw new NotImplementedError("ActiveRecord::Migration#command_recorder is not implemented");
-}
-
-/** @internal */
-function isAnySchemaNeedsUpdate(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Migration#any_schema_needs_update? is not implemented",
-  );
-}
-
-/** @internal */
-function dbConfigsInCurrentEnv(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Migration#db_configs_in_current_env is not implemented",
-  );
-}
-
-function pendingMigrations(): never {
-  throw new NotImplementedError("ActiveRecord::Migration#pending_migrations is not implemented");
-}
-
-/** @internal */
-function env(): never {
-  throw new NotImplementedError("ActiveRecord::Migration#env is not implemented");
-}
-
-/** @internal */
-function loadSchemaBang(): never {
-  throw new NotImplementedError("ActiveRecord::Migration#load_schema! is not implemented");
-}
-
-/** @internal */
-function buildWatcher(block?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Migration::CheckPending#build_watcher is not implemented",
-  );
-}
-
-function connection(): never {
-  throw new NotImplementedError("ActiveRecord::MigrationContext#connection is not implemented");
-}
-
-/** @internal */
-function migrationFiles(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::MigrationContext#migration_files is not implemented",
-  );
-}
-
-/** @internal */
-function parseMigrationFilename(filename: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::MigrationContext#parse_migration_filename is not implemented",
-  );
-}
-
-/** @internal */
-function isValidateTimestamp(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::MigrationContext#validate_timestamp? is not implemented",
-  );
-}
-
-/** @internal */
-function isValidMigrationTimestamp(version: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::MigrationContext#valid_migration_timestamp? is not implemented",
-  );
-}
-
-/** @internal */
-function move(direction: any, steps: any): never {
-  throw new NotImplementedError("ActiveRecord::MigrationContext#move is not implemented");
+  /** @internal */
+  buildWatcher(_paths?: string[]): null {
+    // In Rails this creates a filesystem watcher for migration files.
+    // In TS migrations are registered programmatically, not watched.
+    return null;
+  }
 }
 
 /** @internal */
@@ -2366,4 +2394,33 @@ function generateMigratorAdvisoryLockId(): never {
   throw new NotImplementedError(
     "ActiveRecord::Migrator#generate_migrator_advisory_lock_id is not implemented",
   );
+}
+
+/** @internal */
+function isAnySchemaNeedsUpdate(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Migration#any_schema_needs_update? is not implemented",
+  );
+}
+
+/** @internal */
+function dbConfigsInCurrentEnv(): never {
+  throw new NotImplementedError(
+    "ActiveRecord::Migration#db_configs_in_current_env is not implemented",
+  );
+}
+
+/** @internal */
+function loadSchemaBang(): never {
+  throw new NotImplementedError("ActiveRecord::Migration#load_schema! is not implemented");
+}
+
+/** @internal */
+function target(): never {
+  throw new NotImplementedError("ActiveRecord::Migrator#target is not implemented");
+}
+
+/** @internal */
+function start(): never {
+  throw new NotImplementedError("ActiveRecord::Migrator#start is not implemented");
 }
