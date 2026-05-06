@@ -250,8 +250,8 @@ export class DatabaseConfigurations {
    */
   static fromEnv(raw: RawConfigurations = {}): DatabaseConfigurations {
     const instance = new DatabaseConfigurations([]);
-    // NODE_ENV is the TS equivalent of Rails.env — use it when available so
-    // that DATABASE_URL merges into the active runtime environment.
+    // TRAILS_ENV is the canonical runtime env (BC-2); NODE_ENV is the one-release fallback.
+    // DATABASE_URL merges into whichever environment is active.
     const env = getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
     instance._configurations = instance._buildConfigs(instance._mergeDatabaseUrl(raw, env));
     return instance;
