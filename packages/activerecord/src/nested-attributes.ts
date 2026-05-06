@@ -4,6 +4,7 @@ import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./erro
 import { singularize, camelize, underscore } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
 import { isMarkedForDestruction, markForDestruction } from "./autosave-association.js";
+import { BooleanType } from "@blazetrails/activemodel";
 
 /**
  * Raised when more nested-attribute records are provided than the
@@ -32,7 +33,7 @@ export function _destroy(this: Base): boolean {
 interface NestedAttributeOptions {
   allowDestroy?: boolean;
   rejectIf?: (attrs: Record<string, unknown>) => boolean;
-  limit?: number;
+  limit?: number | ((...args: unknown[]) => number);
   updateOnly?: boolean;
 }
 
@@ -135,10 +136,11 @@ export function assignNestedAttributes(
   const ctor = record.constructor as typeof Base;
   const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
   const config = configs.find((c) => c.associationName === associationName);
-  if (config?.options.limit !== undefined && attrs.length > config.options.limit) {
+  const rawLimit = config?.options.limit;
+  const resolvedLimit = typeof rawLimit === "function" ? rawLimit() : rawLimit;
+  if (resolvedLimit !== undefined && attrs.length > resolvedLimit) {
     throw new TooManyRecords(
-      `Maximum ${config.options.limit} records are allowed. ` +
-        `Got ${attrs.length} records instead.`,
+      `Maximum ${resolvedLimit} records are allowed. ` + `Got ${attrs.length} records instead.`,
     );
   }
 
@@ -260,11 +262,11 @@ async function processNestedAttributes(record: Base): Promise<void> {
 
 const UNASSIGNABLE_KEYS = new Set(["id", "_destroy"]);
 
+const _booleanType = new BooleanType();
+
 /** @internal */
 function hasDestroyFlag(hash: Record<string, unknown>): boolean {
-  const v = hash["_destroy"];
-  if (v == null || v === false || v === "" || v === "0" || v === "false") return false;
-  return Boolean(v);
+  return _booleanType.cast(hash["_destroy"]) === true;
 }
 
 /** @internal */
@@ -348,10 +350,15 @@ function raiseNestedAttributesRecordNotFoundBang(
 }
 
 /** @internal */
-function checkRecordLimitBang(limit: number | undefined, attributesCollection: unknown[]): void {
-  if (limit !== undefined && attributesCollection.length > limit) {
+function checkRecordLimitBang(
+  limit: number | ((...args: unknown[]) => number) | undefined,
+  attributesCollection: unknown[],
+): void {
+  if (limit === undefined) return;
+  const resolved = typeof limit === "function" ? limit() : limit;
+  if (resolved !== undefined && attributesCollection.length > resolved) {
     throw new TooManyRecords(
-      `Maximum ${limit} records are allowed. Got ${attributesCollection.length} records instead.`,
+      `Maximum ${resolved} records are allowed. Got ${attributesCollection.length} records instead.`,
     );
   }
 }
