@@ -386,6 +386,7 @@ export {
 export { CurrentAttributes } from "./current-attributes.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
 export { EnvironmentInquirer } from "./environment-inquirer.js";
+export { getEnv } from "./environment.js";
 export { ExecutionContext } from "./execution-context.js";
 export { objectWith } from "./core-ext/object/with.js";
 export { ArrayInquirer, arrayInquiry } from "./array-inquirer.js";

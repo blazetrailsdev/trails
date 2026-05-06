@@ -1,3 +1,4 @@
+import { getEnv } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Current } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
@@ -111,7 +112,10 @@ export class Schema extends Current {
     // keeps Schema.define consistent with how Migrator and other
     // migration-stack pieces resolve the current environment.
     const environment =
-      info.environment ?? process.env.NODE_ENV ?? DatabaseConfigurations.defaultEnv;
+      info.environment ??
+      getEnv("TRAILS_ENV") ??
+      getEnv("NODE_ENV") ??
+      DatabaseConfigurations.defaultEnv;
     const internalMetadata = new InternalMetadata(adapter, { enabled });
     await internalMetadata.createTableAndSetFlags(environment);
   }

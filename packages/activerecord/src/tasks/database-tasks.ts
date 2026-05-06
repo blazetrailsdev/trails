@@ -8,7 +8,7 @@ import { NotImplementedError } from "../errors.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { ProtectedEnvironmentError } from "../migration.js";
-import { getFs, getPath, getCryptoAsync, getOs } from "@blazetrails/activesupport";
+import { getFs, getPath, getCryptoAsync, getOs, getEnv } from "@blazetrails/activesupport";
 import { coercePort } from "./task-utils.js";
 
 /**
@@ -347,7 +347,8 @@ export class DatabaseTasks {
   }
 
   static targetVersion(): number | null {
-    const version = process.env.VERSION;
+    // TRAILS_MIGRATION_VERSION is canonical; VERSION is the legacy fallback (one-release window).
+    const version = getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
     if (!version) return null;
     const str = version.trim();
     if (str === "" || !/^\d+$/.test(str)) return null;
@@ -355,7 +356,7 @@ export class DatabaseTasks {
   }
 
   static checkTargetVersion(version?: number | string): void {
-    const v = version ?? process.env.VERSION;
+    const v = version ?? getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
     if (v === undefined || v === null || String(v).trim() === "") return;
     const str = String(v).trim();
     if (!/^\d+$/.test(str)) {
@@ -364,7 +365,7 @@ export class DatabaseTasks {
   }
 
   static dumpSchemaFilename(config?: DatabaseConfig): string {
-    const envSchema = process.env.SCHEMA?.trim();
+    const envSchema = getEnv("SCHEMA")?.trim();
     if (envSchema) return envSchema;
     const format = this.schemaFormat;
     const ext = format === "sql" ? "sql" : format;

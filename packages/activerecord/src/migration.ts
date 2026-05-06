@@ -1,4 +1,4 @@
-import { getFs, getPath, Logger } from "@blazetrails/activesupport";
+import { getFs, getPath, Logger, getEnv } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
@@ -1458,7 +1458,10 @@ export class Migrator {
       enabled: options.internalMetadataEnabled ?? true,
     });
     this._environment =
-      options.environment ?? (process.env.NODE_ENV || DatabaseConfigurations.defaultEnv);
+      options.environment ??
+      getEnv("TRAILS_ENV") ??
+      getEnv("NODE_ENV") ??
+      DatabaseConfigurations.defaultEnv;
     this._strategy = options.strategy ?? new DefaultStrategy();
     this._validateMigrations(migrations);
     const normalized = migrations.map((m) => ({
@@ -1928,7 +1931,13 @@ export class Migrator {
     // In Ruby, "" is truthy, so any *present* value (including empty
     // string) bypasses the check. JS treats "" as falsy, so we use a
     // presence check instead to preserve Rails semantics.
-    if (process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK !== undefined) return;
+    // TRAILS_DISABLE_DATABASE_ENVIRONMENT_CHECK is the canonical name; DISABLE_DATABASE_ENVIRONMENT_CHECK
+    // is the legacy fallback (one-release window — remove when BC-4 lint rule ships).
+    if (
+      (getEnv("TRAILS_DISABLE_DATABASE_ENVIRONMENT_CHECK") ??
+        getEnv("DISABLE_DATABASE_ENVIRONMENT_CHECK")) !== undefined
+    )
+      return;
     await this._ensureSchemaTable();
     const stored = await this._internalMetadata.get("environment");
     if (stored === null) {

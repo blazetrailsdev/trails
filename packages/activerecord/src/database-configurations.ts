@@ -1,3 +1,4 @@
+import { getEnv } from "@blazetrails/activesupport";
 import { NotImplementedError } from "./errors.js";
 import {
   DatabaseConfig,
@@ -251,7 +252,7 @@ export class DatabaseConfigurations {
     const instance = new DatabaseConfigurations([]);
     // NODE_ENV is the TS equivalent of Rails.env — use it when available so
     // that DATABASE_URL merges into the active runtime environment.
-    const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
+    const env = getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
     instance._configurations = instance._buildConfigs(instance._mergeDatabaseUrl(raw, env));
     return instance;
   }
@@ -266,7 +267,7 @@ export class DatabaseConfigurations {
    * Mirrors: ActiveRecord::DatabaseConfigurations#build_url_hash
    */
   private _mergeDatabaseUrl(raw: RawConfigurations, envOverride?: string): RawConfigurations {
-    const databaseUrl = process.env.DATABASE_URL;
+    const databaseUrl = getEnv("DATABASE_URL");
     if (!databaseUrl) return raw;
 
     const hasConfigs = Object.keys(raw).length > 0;

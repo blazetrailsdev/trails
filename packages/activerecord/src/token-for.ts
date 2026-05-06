@@ -5,6 +5,7 @@
  */
 
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { getEnv } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 export { InvalidSignature };
@@ -29,8 +30,7 @@ function resolveSecret(): string {
   if (_tokenForSecret) {
     return typeof _tokenForSecret === "function" ? _tokenForSecret() : _tokenForSecret;
   }
-  const env = typeof process !== "undefined" ? process.env : undefined;
-  const envSecret = env?.BLAZETRAILS_SECRET_KEY_BASE ?? env?.BLAZETRAILS_SIGNED_ID_SECRET;
+  const envSecret = getEnv("BLAZETRAILS_SECRET_KEY_BASE") ?? getEnv("BLAZETRAILS_SIGNED_ID_SECRET");
   if (typeof envSecret === "string" && envSecret.length > 0) return envSecret;
   throw new Error(
     "TokenFor requires a configured secret. Call setTokenForSecret() " +
