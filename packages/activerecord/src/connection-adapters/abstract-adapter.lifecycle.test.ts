@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { ConnectionNotEstablished, ConnectionNotDefined } from "../errors.js";
 
@@ -22,9 +22,18 @@ describe("AbstractAdapter connection lifecycle privates", () => {
   });
 
   it("backoff sleeps proportionally to counter", async () => {
-    const t0 = Date.now();
-    await new AbstractAdapter().backoff(2);
-    expect(Date.now() - t0).toBeGreaterThanOrEqual(150);
+    vi.useFakeTimers();
+    try {
+      const a = new AbstractAdapter();
+      let resolved = false;
+      void a.backoff(2).then(() => (resolved = true));
+      await vi.advanceTimersByTimeAsync(150);
+      expect(resolved).toBe(false);
+      await vi.advanceTimersByTimeAsync(60);
+      expect(resolved).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("extendedTypeMapKey + typeMap default behavior", () => {

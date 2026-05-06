@@ -977,7 +977,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
+  override extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
     if (this._emulateBooleans) return { emulateBooleans: true };
     return null;
   }

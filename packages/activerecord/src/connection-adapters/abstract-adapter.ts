@@ -149,6 +149,9 @@ export class AbstractAdapter implements Quoting {
   private _idleSince = Date.now();
   protected _lastActivity = 0;
   protected _verified = false;
+  // Mirrors Rails @raw_connection_dirty. Setters land with the per-adapter
+  // exec paths (PR 25b) and reconnect-with-restore (Wave 6 follow-up);
+  // the default-false here matches Rails' fresh-adapter state.
   protected _rawConnectionDirty = false;
   private _lockQueue: Promise<unknown> = Promise.resolve();
   protected _config: Record<string, unknown> = {};
@@ -424,6 +427,10 @@ export class AbstractAdapter implements Quoting {
     if (!this.active) {
       this.reconnectBang();
     }
+    // Mirrors Rails: `connect_with_retry` calls `verified!` after a
+    // successful (re)connect; verifyBang is the abstract-side entry
+    // point that drives that flow.
+    this.verifiedBang();
   }
 
   clearCacheBang(): void {
@@ -1062,9 +1069,10 @@ export class AbstractAdapter implements Quoting {
   ): Promise<T> {
     const isFn = typeof optsOrCallback === "function";
     const opts = (isFn ? {} : optsOrCallback) ?? {};
-    const block = (isFn ? optsOrCallback : callback) as (
-      raw: DatabaseAdapter | null,
-    ) => Promise<T> | T;
+    const block = isFn ? optsOrCallback : callback;
+    if (typeof block !== "function") {
+      throw new TypeError("withRawConnection requires a callback");
+    }
     const allowRetry = opts.allowRetry ?? false;
     const materializeTransactions = opts.materializeTransactions ?? true;
 
