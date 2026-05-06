@@ -1064,7 +1064,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
-  /** @internal */
   override defaultPreparedStatements(): boolean {
     return false;
   }

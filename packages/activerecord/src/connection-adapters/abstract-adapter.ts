@@ -1240,6 +1240,8 @@ export class AbstractAdapter implements Quoting {
     block?: () => Promise<T>,
   ): Promise<T | void> {
     try {
+      const tx = this.currentTransaction();
+      const userTx = (tx as any).userTransaction ?? null;
       return await Notifications.instrumentAsync(
         "sql.active_record",
         {
@@ -1249,6 +1251,7 @@ export class AbstractAdapter implements Quoting {
           type_casted_binds: typeCastedBinds,
           async: isAsync,
           connection: this,
+          transaction: userTx,
           row_count: 0,
         },
         block,
