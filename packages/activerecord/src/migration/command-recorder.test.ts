@@ -118,6 +118,12 @@ describe("CommandRecorder", () => {
       expect(cmd).toBe("addIndex");
       expect(args[1]).toBe("email");
     });
+
+    it("invertRemoveIndex handles array column list without treating it as options", () => {
+      const [cmd, args] = new CommandRecorder().invertRemoveIndex(["users", ["email", "name"]]);
+      expect(cmd).toBe("addIndex");
+      expect(args[1]).toEqual(["email", "name"]);
+    });
   });
 
   describe("invertAddTimestamps / invertRemoveTimestamps", () => {

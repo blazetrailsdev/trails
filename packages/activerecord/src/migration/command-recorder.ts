@@ -186,7 +186,13 @@ export class CommandRecorder {
   invertRemoveIndex(args: unknown[]): [string, unknown[]] {
     const a = args.slice();
     let options: Record<string, unknown> = {};
-    if (a.length > 0 && typeof a[a.length - 1] === "object" && a[a.length - 1] !== null) {
+    // extract_options! only strips a trailing Hash, never an Array (which is a column list)
+    if (
+      a.length > 0 &&
+      typeof a[a.length - 1] === "object" &&
+      a[a.length - 1] !== null &&
+      !Array.isArray(a[a.length - 1])
+    ) {
       options = { ...(a.pop() as Record<string, unknown>) };
     }
     const table = a[0];
