@@ -36,6 +36,11 @@ export class Name {
   hashKey(): string {
     return JSON.stringify([this.schema, this.identifier]);
   }
+
+  /** @internal */
+  protected parts(): string[] {
+    return [this.schema, this.identifier].filter((p): p is string => p != null);
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace

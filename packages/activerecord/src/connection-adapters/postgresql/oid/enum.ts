@@ -6,7 +6,6 @@
  * def cast_value(value); value.to_s; end`.
  */
 
-import { NotImplementedError } from "../../../errors.js";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Enum extends ValueType<string> {
@@ -24,8 +23,6 @@ export class Enum extends ValueType<string> {
 }
 
 /** @internal */
-function castValue(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Enum#cast_value is not implemented",
-  );
+function castValue(value: unknown): string {
+  return String(value);
 }

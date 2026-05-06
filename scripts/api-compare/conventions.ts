@@ -124,6 +124,8 @@ export const SKIP = new Set([
   "extended",
   "included",
   "inherited",
+  // Ruby object hooks — no TypeScript equivalent
+  "singleton_method_added",
 ]);
 
 /**

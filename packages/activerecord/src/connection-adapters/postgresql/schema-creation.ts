@@ -11,6 +11,7 @@ import {
   type ColumnOptions,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
+  CheckConstraintDefinition,
 } from "../abstract/schema-definitions.js";
 import type { SchemaQuoter } from "../abstract/assert-schema-adapter.js";
 import type {
@@ -224,6 +225,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
       }
     }
     return super.addColumnOptionsBang(sql, options);
+  }
+
+  /** @internal */
+  protected override visitCheckConstraintDefinition(o: CheckConstraintDefinition): string {
+    const sql = super.visitCheckConstraintDefinition(o);
+    return o.validate ? sql : `${sql} NOT VALID`;
   }
 
   /** @internal */

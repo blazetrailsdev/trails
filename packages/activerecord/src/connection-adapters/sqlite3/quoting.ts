@@ -103,6 +103,15 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
   return quoteColumnName(attr);
 }
 
+/**
+ * Mirrors: SQLite3::Quoting#quoted_time. Stores time values with the fixed
+ * date 2000-01-01 so SQLite can round-trip them as datetime strings.
+ * @internal
+ */
+export function quotedTime(value: Temporal.PlainTime): string {
+  return `'2000-01-01 ${formatPlainTimeForSql(value)}'`;
+}
+
 export function quotedBinary(value: Uint8Array | ArrayBuffer): string {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
   const hex = Array.from(bytes)
