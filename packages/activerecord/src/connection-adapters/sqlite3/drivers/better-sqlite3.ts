@@ -78,6 +78,11 @@ class BetterSqlite3Driver implements SqliteDriver {
   }
 }
 
+/** Wrap an already-open better-sqlite3 Database synchronously. @internal */
+export function createBetterSqlite3Driver(db: Database.Database): SqliteDriver {
+  return new BetterSqlite3Driver(db);
+}
+
 export const betterSqlite3DriverFactory: DriverFactory = {
   name: "better-sqlite3",
 

@@ -1,4 +1,6 @@
 import Database from "better-sqlite3";
+import type { SqliteDriver, SqliteStatement } from "./sqlite3/driver.js";
+import { createBetterSqlite3Driver } from "./sqlite3/drivers/better-sqlite3.js";
 import { Visitors } from "@blazetrails/arel";
 import type {
   AdapterName,
@@ -134,9 +136,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new Visitors.SQLite(this);
   }
 
-  private db!: Database.Database;
+  private driver!: SqliteDriver;
   override get active(): boolean {
-    return this.db?.open ?? false;
+    return this.driver?.open ?? false;
   }
   private _inTransaction = false;
   private _savepointCounter = 0;
@@ -235,35 +237,35 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
-  private _cachedStatement(sql: string): Database.Statement {
+  private _cachedStatement(sql: string): SqliteStatement {
     // When preparedStatements is off, skip the pool and prepare per call —
     // matches Rails' `statement_pool` behavior gated on
     // `prepared_statements`. better-sqlite3 still uses its own statement
     // handle internally, but we no longer cache across executes.
     if (!this.preparedStatements) {
-      const stmt = this.db.prepare(sql);
+      const stmt = this.driver.prepare(sql) as SqliteStatement;
       this._maybeEnableSafeIntegers(sql, stmt);
       return stmt;
     }
     let stmt = this._statementPool.get(sql);
     if (!stmt) {
-      stmt = this.db.prepare(sql);
+      stmt = this.driver.prepare(sql) as SqliteStatement;
       this._maybeEnableSafeIntegers(sql, stmt);
       this._statementPool.set(sql, stmt);
     }
     return stmt;
   }
 
-  // Enable safeIntegers on row-returning statements that expose bigint-declared
+  // Enable setReadBigInts on row-returning statements that expose bigint-declared
   // columns so the driver returns JS bigint rather than a lossy number.
   // Non-bigint integer columns in the same row also return bigint when
-  // safeIntegers is enabled — IntegerType.cast handles bigint → number for those.
+  // setReadBigInts is enabled — IntegerType.cast handles bigint → number for those.
   // stmt.reader gates out PRAGMA/EXPLAIN and other non-row statements.
-  private _maybeEnableSafeIntegers(sql: string, stmt: Database.Statement): void {
+  private _maybeEnableSafeIntegers(sql: string, stmt: SqliteStatement): void {
     if (isWriteQuerySql(sql) || !stmt.reader) return;
     const cols = stmt.columns();
     if (cols.some((c) => c.type !== null && /bigint/i.test(c.type))) {
-      stmt.safeIntegers(true);
+      stmt.setReadBigInts(true);
     }
   }
 
@@ -273,7 +275,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#pragma
    */
   pragma(name: string): unknown {
-    return this.db.pragma(name);
+    return this.driver.pragma(name);
   }
 
   /**
@@ -317,7 +319,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         const stmt = this._cachedStatement(sql);
-        const result = stmt.run(...binds);
+        const result = stmt.run(...binds) as import("./sqlite3/driver.js").RunResult;
         this.dirtyCurrentTransaction();
         payload.row_count = typeof result.changes === "number" ? result.changes : 0;
 
@@ -360,31 +362,31 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
       );
     }
-    const row = this.db.prepare("PRAGMA read_uncommitted").get() as
+    const row = (this.driver.prepare("PRAGMA read_uncommitted") as SqliteStatement).get() as
       | { read_uncommitted: number }
       | undefined;
     this._previousReadUncommitted = row?.read_uncommitted ?? 0;
-    this.db.exec("PRAGMA read_uncommitted=ON");
+    this.driver.exec("PRAGMA read_uncommitted=ON");
     await this.beginDbTransaction();
   }
 
   // Mirrors: SQLite3::DatabaseStatements#reset_isolation_level
   resetIsolationLevel(): void {
     if (this._previousReadUncommitted !== null) {
-      this.db.exec(`PRAGMA read_uncommitted=${this._previousReadUncommitted}`);
+      this.driver.exec(`PRAGMA read_uncommitted=${this._previousReadUncommitted}`);
       this._previousReadUncommitted = null;
     }
   }
 
   async beginDbTransaction(): Promise<void> {
     if (!this._inTransaction) {
-      this.db.exec("BEGIN");
+      this.driver.exec("BEGIN");
       this._inTransaction = true;
     }
   }
 
   async beginTransaction(): Promise<void> {
-    this.db.exec("BEGIN");
+    this.driver.exec("BEGIN");
     this._inTransaction = true;
   }
 
@@ -392,7 +394,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Commit the current transaction.
    */
   async commitDbTransaction(): Promise<void> {
-    this.db.exec("COMMIT");
+    this.driver.exec("COMMIT");
     this._inTransaction = false;
   }
 
@@ -401,7 +403,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async rollbackDbTransaction(): Promise<void> {
-    this.db.exec("ROLLBACK");
+    this.driver.exec("ROLLBACK");
     this._inTransaction = false;
   }
 
@@ -413,21 +415,21 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    this.db.exec(`SAVEPOINT "${name}"`);
+    this.driver.exec(`SAVEPOINT "${name}"`);
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    this.db.exec(`RELEASE SAVEPOINT "${name}"`);
+    this.driver.exec(`RELEASE SAVEPOINT "${name}"`);
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    this.db.exec(`ROLLBACK TO SAVEPOINT "${name}"`);
+    this.driver.exec(`ROLLBACK TO SAVEPOINT "${name}"`);
   }
 
   /**
@@ -445,10 +447,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     binds: unknown[] = [],
     _options: ExplainOption[] = [],
   ): Promise<string> {
-    const rows = this.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...binds) as Record<
-      string,
-      unknown
-    >[];
+    const rows = (this.driver.prepare(`EXPLAIN QUERY PLAN ${sql}`) as SqliteStatement).all(
+      ...binds,
+    ) as Record<string, unknown>[];
     return rows.map((r) => `${r.id}|${r.parent}|${r.notused}|${r.detail}`).join("\n");
   }
 
@@ -555,14 +556,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Close the database connection.
    */
   close(): void {
-    this.db.close();
+    this.driver.close();
   }
 
   /**
    * Check if the database is open.
    */
   get isOpen(): boolean {
-    return this.db.open;
+    return this.driver.open;
   }
 
   /**
@@ -576,7 +577,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Execute raw SQL (for DDL and other non-query statements).
    */
   exec(sql: string): void {
-    this.db.exec(sql);
+    this.driver.exec(sql);
   }
 
   /**
@@ -584,7 +585,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Escape hatch for advanced usage.
    */
   get raw(): Database.Database {
-    return this.db;
+    return this.driver.raw as Database.Database;
   }
 
   /**
@@ -706,11 +707,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // --- Connection lifecycle ---
 
   override isConnected(): boolean {
-    return this.db.open;
+    return this.driver.open;
   }
 
   isActive(): boolean {
-    return this.db.open;
+    return this.driver.open;
   }
 
   override clearCacheBang(): void {
@@ -720,8 +721,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override disconnectBang(): void {
     super.disconnectBang();
-    if (this.db.open) {
-      this.db.close();
+    if (this.driver.open) {
+      this.driver.close();
     }
   }
 
@@ -746,7 +747,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   get encoding(): string {
-    const result = this.db.pragma("encoding") as Array<{ encoding: string }>;
+    const result = this.driver.pragma("encoding") as Array<{ encoding: string }>;
     return result[0]?.encoding ?? "UTF-8";
   }
 
@@ -760,7 +761,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override getDatabaseVersion(): Version {
     if (!this._databaseVersion) {
-      const row = this.db.prepare("SELECT sqlite_version() AS v").get() as any;
+      const row = (
+        this.driver.prepare("SELECT sqlite_version() AS v") as SqliteStatement
+      ).get() as any;
       this._databaseVersion = new Version(row?.v ?? "0.0.0");
     }
     return this._databaseVersion;
@@ -1147,20 +1150,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
-    const oldForeignKeys = (this.db.pragma("foreign_keys") as any[])[0]?.foreign_keys;
-    const oldDefer = (this.db.pragma("defer_foreign_keys") as any[])[0]?.defer_foreign_keys;
+    const oldForeignKeys = (this.driver.pragma("foreign_keys") as any[])[0]?.foreign_keys;
+    const oldDefer = (this.driver.pragma("defer_foreign_keys") as any[])[0]?.defer_foreign_keys;
     try {
-      this.db.pragma("defer_foreign_keys = ON");
-      this.db.pragma("foreign_keys = OFF");
+      this.driver.pragma("defer_foreign_keys = ON");
+      this.driver.pragma("foreign_keys = OFF");
       await fn();
     } finally {
-      this.db.pragma(`defer_foreign_keys = ${oldDefer ?? 0}`);
-      this.db.pragma(`foreign_keys = ${oldForeignKeys ?? 1}`);
+      this.driver.pragma(`defer_foreign_keys = ${oldDefer ?? 0}`);
+      this.driver.pragma(`foreign_keys = ${oldForeignKeys ?? 1}`);
     }
   }
 
   override async checkAllForeignKeysValidBang(): Promise<void> {
-    const violations = this.db.pragma("foreign_key_check") as Array<Record<string, unknown>>;
+    const violations = this.driver.pragma("foreign_key_check") as Array<Record<string, unknown>>;
     if (violations.length > 0) {
       const tables = violations.map((r) => r.table).join(", ");
       throw new StatementInvalid(`Foreign key violations found: ${tables}`, {
@@ -1200,7 +1203,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
              UNION ALL
              SELECT sql FROM sqlite_master WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`;
     }
-    const row = this.db.prepare(sql).get() as { sql: string } | undefined;
+    const row = (this.driver.prepare(sql) as SqliteStatement).get() as { sql: string } | undefined;
     return row?.sql ?? null;
   }
 
@@ -1419,11 +1422,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         [],
         "SCHEMA",
       )) as Array<{ name: string; seqno: number }>;
-      const idxSqlRow = this.db
-        .prepare(
+      const idxSqlRow = (
+        this.driver.prepare(
           `SELECT sql FROM ${sqliteMaster} WHERE type='index' AND name=${sqliteQuoteStringLiteral(idx.name)}`,
-        )
-        .get() as { sql: string } | undefined;
+        ) as SqliteStatement
+      ).get() as { sql: string } | undefined;
       const whereMatch = idxSqlRow?.sql ? /\bWHERE\b\s+(.+)$/i.exec(idxSqlRow.sql) : null;
       result.push({
         name: idx.name,
@@ -1602,9 +1605,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const { schema, bare: bareTable } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const qTable = quoteTableName(tableName);
-    const tableInfo = this.db
-      .prepare(`PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bareTable)})`)
-      .all() as Array<Record<string, unknown>>;
+    const tableInfo = (
+      this.driver.prepare(
+        `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bareTable)})`,
+      ) as SqliteStatement
+    ).all() as Array<Record<string, unknown>>;
 
     const columns: Record<string, Record<string, unknown>> = {};
     for (const col of tableInfo) {
@@ -1614,19 +1619,21 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     modify(columns);
 
     // Collect existing indexes to recreate after table rebuild
-    const indexList = this.db
-      .prepare(`PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bareTable)})`)
-      .all() as Array<Record<string, unknown>>;
+    const indexList = (
+      this.driver.prepare(
+        `PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bareTable)})`,
+      ) as SqliteStatement
+    ).all() as Array<Record<string, unknown>>;
     const indexDefs: string[] = [];
     for (const idx of indexList) {
       const idxName = idx.name as string;
       // Skip auto-created indexes (sqlite_autoindex_*)
       if (idxName.startsWith("sqlite_autoindex_")) continue;
-      const createSql = this.db
-        .prepare(
+      const createSql = (
+        this.driver.prepare(
           `SELECT sql FROM ${pragmaPrefix}sqlite_master WHERE type='index' AND name=${sqliteQuoteStringLiteral(idxName)}`,
-        )
-        .get() as { sql: string } | undefined;
+        ) as SqliteStatement
+      ).get() as { sql: string } | undefined;
       if (createSql?.sql) {
         indexDefs.push(createSql.sql);
       }
@@ -1738,20 +1745,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
     try {
       await this.disableReferentialIntegrity(async () => {
-        this.db.exec(`CREATE TABLE ${qTmp} (${colDefs.join(", ")})`);
+        this.driver.exec(`CREATE TABLE ${qTmp} (${colDefs.join(", ")})`);
         if (originalColNames.length > 0) {
           const selectCols = originalColNames.map((n) => quoteColumnName(n)).join(", ");
-          this.db.exec(`INSERT INTO ${qTmp} (${selectCols}) SELECT ${selectCols} FROM ${qTable}`);
+          this.driver.exec(
+            `INSERT INTO ${qTmp} (${selectCols}) SELECT ${selectCols} FROM ${qTable}`,
+          );
         }
-        this.db.exec(`DROP TABLE ${qTable}`);
-        this.db.exec(`ALTER TABLE ${qTmp} RENAME TO ${quoteColumnName(bareTable)}`);
+        this.driver.exec(`DROP TABLE ${qTable}`);
+        this.driver.exec(`ALTER TABLE ${qTmp} RENAME TO ${quoteColumnName(bareTable)}`);
       });
 
       // Recreate indexes inside the transaction so failures roll back
       // the entire rebuild rather than leaving a partially-migrated table.
       for (const sql of indexDefs) {
         try {
-          this.db.exec(sql);
+          this.driver.exec(sql);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "";
           if (!msg.includes("no such column") && !msg.includes("already exists")) {
@@ -1789,7 +1798,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   private tableStructureSql(tableName: string, columnNames?: string[]): string[] {
     const querySql = `SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = ${sqliteQuoteStringLiteral(tableName)}`;
-    const row = this.db.prepare(querySql).get() as { sql: string } | undefined;
+    const row = (this.driver.prepare(querySql) as SqliteStatement).get() as
+      | { sql: string }
+      | undefined;
     if (!row?.sql) return [];
     const body = row.sql.replace(/\);\s*$/, "").replace(/^[^(]*\(/, "");
     const names = columnNames ?? [];
@@ -1852,7 +1863,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     block?: (colDefs: string[]) => void,
   ): Promise<void> {
     await this.copyTable(from, to, options, block);
-    this.db.exec(`DROP TABLE ${quoteTableName(from)}`);
+    this.driver.exec(`DROP TABLE ${quoteTableName(from)}`);
   }
 
   /** @internal */
@@ -1889,7 +1900,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
     if (block) block(colDefs);
     const prefix = options.temporary ? "CREATE TEMPORARY TABLE" : "CREATE TABLE";
-    this.db.exec(`${prefix} ${quoteTableName(to)} (${colDefs.join(", ")})`);
+    this.driver.exec(`${prefix} ${quoteTableName(to)} (${colDefs.join(", ")})`);
     await this.copyTableIndexes(from, to, rename);
     await this.copyTableContents(from, to, contentCols, rename);
   }
@@ -1919,7 +1930,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
       let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${quoteColumnName(newName)} ON ${quoteTableName(to)} (${cols.map((c) => quoteColumnName(c)).join(", ")})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
-      this.db.exec(sql);
+      this.driver.exec(sql);
     }
   }
 
@@ -1939,7 +1950,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const fromColsToCopy = validCols.map((col) => destToSrc[col]);
     const quotedDest = validCols.map((c) => quoteColumnName(c)).join(", ");
     const quotedSrc = fromColsToCopy.map((c) => quoteColumnName(c)).join(", ");
-    this.db.exec(
+    this.driver.exec(
       `INSERT INTO ${quoteTableName(to)} (${quotedDest}) SELECT ${quotedSrc} FROM ${quoteTableName(from)}`,
     );
   }
@@ -1961,14 +1972,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /** @internal */
-  private buildStatementPool(): GenericStatementPool<Database.Statement> {
-    return new GenericStatementPool<Database.Statement>(this._statementLimit);
+  private buildStatementPool(): GenericStatementPool<SqliteStatement> {
+    return new GenericStatementPool<SqliteStatement>(this._statementLimit);
   }
 
   /** @internal */
   private connect(): void {
     try {
-      this.db = new Database(this._filename, { readonly: this._readonly });
+      this.driver = createBetterSqlite3Driver(
+        new Database(this._filename, { readonly: this._readonly }),
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new DatabaseConnectionError(`Unable to open database '${this._filename}': ${msg}`, {
@@ -1992,7 +2005,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       ];
       for (const [pragma, value] of defaults) {
         try {
-          this.db.pragma(`${pragma} = ${value}`);
+          this.driver.pragma(`${pragma} = ${value}`);
         } catch (e) {
           console.warn(
             `SQLite default pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
@@ -2026,7 +2039,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           continue;
         }
         try {
-          this.db.pragma(`${pragma} = ${scalar}`);
+          this.driver.pragma(`${pragma} = ${scalar}`);
         } catch (e) {
           console.warn(
             `SQLite pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
@@ -2083,7 +2096,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
  *
  * SQLite3-specific statement pool backed by the generic StatementPool.
  */
-export class StatementPool extends GenericStatementPool<Database.Statement> {}
+export class StatementPool extends GenericStatementPool<SqliteStatement> {}
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer
