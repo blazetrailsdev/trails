@@ -1,4 +1,4 @@
-import { NotImplementedError } from "./errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import {
   underscore,
@@ -904,7 +904,9 @@ export class AssociationReflection extends MacroReflection {
   protected ensureOptionNotGivenAsClassBang(optionName: string): void {
     const val = this.options[optionName];
     if (val && (val as any).constructor === Function) {
-      throw new Error(`A class was passed to \`:${optionName}\` but we are expecting a string.`);
+      throw new ArgumentError(
+        `A class was passed to \`:${optionName}\` but we are expecting a string.`,
+      );
     }
   }
 
@@ -1421,11 +1423,7 @@ export class ThroughReflection extends AbstractReflection {
 
   /** @internal */
   protected deriveClassName(): string {
-    return (
-      (this.options.sourceType as string) ||
-      (this.sourceReflection as any)?.className ||
-      this._delegate.className
-    );
+    return (this.options.sourceType as string) || (this.sourceReflection as any)?.className;
   }
 
   /**
@@ -1901,52 +1899,3 @@ export const ClassMethods = {
   },
   _reflectOnAssociation: _reflectOnAssociationClassMethod,
 };
-
-/** @internal */
-function actualSourceReflection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::AbstractReflection#actual_source_reflection is not implemented",
-  );
-}
-
-/** @internal */
-function ensureOptionNotGivenAsClassBang(optionName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::AbstractReflection#ensure_option_not_given_as_class! is not implemented",
-  );
-}
-
-/** @internal */
-function deriveClassName(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::MacroReflection#derive_class_name is not implemented",
-  );
-}
-
-/** @internal */
-function deriveJoinTable(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::AssociationReflection#derive_join_table is not implemented",
-  );
-}
-
-/** @internal */
-function delegateReflection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::ThroughReflection#delegate_reflection is not implemented",
-  );
-}
-
-/** @internal */
-function collectJoinReflections(seed: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::ThroughReflection#collect_join_reflections is not implemented",
-  );
-}
-
-/** @internal */
-function sourceTypeScope(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::PolymorphicReflection#source_type_scope is not implemented",
-  );
-}

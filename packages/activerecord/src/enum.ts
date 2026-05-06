@@ -284,14 +284,14 @@ export class EnumMethods {
     if (instanceMethods) {
       Object.defineProperty(klass.prototype, `${valueMethodName}?`, {
         value: function (this: any) {
-          return this[`${name}ForDatabase`] === value || this.readAttribute(name) === value;
+          return this.readAttributeForDatabase(name) === value;
         },
         writable: true,
         configurable: true,
       });
       Object.defineProperty(klass.prototype, `${valueMethodName}!`, {
         value: async function (this: any) {
-          await this.update({ [name]: value });
+          await this.updateBang({ [name]: value });
         },
         writable: true,
         configurable: true,
@@ -449,8 +449,8 @@ export function _enum(
   },
 ): void {
   if (values == null) throw new ArgumentError(`${String(name)} enum values must not be nil`);
-  assertValidEnumOptions(options ?? {});
   assertValidEnumDefinitionValues(values);
+  assertValidEnumOptions(options ?? {});
   enumMethod.call(this, name, values as Record<string, number>, options);
 }
 
