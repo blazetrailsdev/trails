@@ -85,7 +85,7 @@ describe("SQLite3TransactionTest", () => {
     await conn.beginIsolatedDbTransaction("read_uncommitted");
     expect(readUncommitted(conn)).toBe(true);
     await conn.rollbackDbTransaction();
-    conn.resetIsolationLevel();
+    await conn.resetIsolationLevel();
     expect(readUncommitted(conn)).toBe(false);
   });
 
@@ -95,7 +95,7 @@ describe("SQLite3TransactionTest", () => {
     await conn.beginIsolatedDbTransaction("read_uncommitted");
     expect(readUncommitted(conn)).toBe(true);
     await conn.commitDbTransaction();
-    conn.resetIsolationLevel();
+    await conn.resetIsolationLevel();
     expect(readUncommitted(conn)).toBe(false);
   });
 
@@ -106,7 +106,7 @@ describe("SQLite3TransactionTest", () => {
     await conn.beginIsolatedDbTransaction("read_uncommitted");
     expect(readUncommitted(conn)).toBe(true);
     await conn.commitDbTransaction();
-    conn.resetIsolationLevel();
+    await conn.resetIsolationLevel();
     // restored to previous value (ON)
     expect(readUncommitted(conn)).toBe(true);
   });

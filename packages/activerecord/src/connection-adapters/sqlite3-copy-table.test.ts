@@ -8,53 +8,53 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
     db = new SQLite3Adapter(":memory:");
   });
 
-  afterEach(() => {
-    db.close();
+  afterEach(async () => {
+    await db.close();
   });
 
   // --- tableStructureSql ---
 
-  it("tableStructureSql returns column definition strings from CREATE TABLE SQL", () => {
-    db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT NOT NULL)');
-    const strings = (db as any).tableStructureSql("users", ["id", "name"]);
+  it("tableStructureSql returns column definition strings from CREATE TABLE SQL", async () => {
+    await db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT NOT NULL)');
+    const strings = await (db as any).tableStructureSql("users", ["id", "name"]);
     expect(strings).toHaveLength(2);
     expect(strings[0]).toMatch(/"id"/);
     expect(strings[1]).toMatch(/"name"/);
   });
 
-  it("tableStructureSql returns empty array for non-existent table", () => {
-    const strings = (db as any).tableStructureSql("no_such_table");
+  it("tableStructureSql returns empty array for non-existent table", async () => {
+    const strings = await (db as any).tableStructureSql("no_such_table");
     expect(strings).toEqual([]);
   });
 
-  it("tableStructureSql includes CONSTRAINT strings", () => {
-    db.exec(
+  it("tableStructureSql includes CONSTRAINT strings", async () => {
+    await db.exec(
       'CREATE TABLE "orders" ("id" INTEGER PRIMARY KEY, "user_id" INTEGER, CONSTRAINT "fk_user" FOREIGN KEY("user_id") REFERENCES "users"("id"))',
     );
-    const strings = (db as any).tableStructureSql("orders", ["id", "user_id"]);
+    const strings = await (db as any).tableStructureSql("orders", ["id", "user_id"]);
     expect(strings.some((s: string) => s.includes("CONSTRAINT"))).toBe(true);
   });
 
   // --- tableStructureWithCollation ---
 
-  it("tableStructureWithCollation extracts collation from CREATE TABLE SQL", () => {
-    db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")');
+  it("tableStructureWithCollation extracts collation from CREATE TABLE SQL", async () => {
+    await db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")');
     const basic = [
       { name: "id", type: "INTEGER", notnull: 0, dflt_value: null, pk: 1 },
       { name: "name", type: "TEXT", notnull: 0, dflt_value: null, pk: 0 },
     ];
-    const enriched = (db as any).tableStructureWithCollation("users", basic);
+    const enriched = await (db as any).tableStructureWithCollation("users", basic);
     const nameCol = enriched.find((c: any) => c.name === "name");
     expect(nameCol.collation).toBe("NOCASE");
   });
 
-  it("tableStructureWithCollation extracts auto_increment flag", () => {
-    db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT)');
+  it("tableStructureWithCollation extracts auto_increment flag", async () => {
+    await db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT)');
     const basic = [
       { name: "id", type: "INTEGER", notnull: 0, dflt_value: null, pk: 1 },
       { name: "name", type: "TEXT", notnull: 0, dflt_value: null, pk: 0 },
     ];
-    const enriched = (db as any).tableStructureWithCollation("users", basic);
+    const enriched = await (db as any).tableStructureWithCollation("users", basic);
     const idCol = enriched.find((c: any) => c.name === "id");
     expect(idCol.auto_increment).toBe(true);
   });
@@ -62,7 +62,7 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   // --- tableInfo ---
 
   it("tableInfo returns PRAGMA table_info rows", async () => {
-    db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)");
+    await db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)");
     const info = await (db as any).tableInfo("users");
     expect(info).toHaveLength(2);
     expect(info[0].name).toBe("id");
@@ -71,7 +71,7 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   // --- tableStructure ---
 
   it("tableStructure returns enriched column info", async () => {
-    db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")');
+    await db.exec('CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT COLLATE "NOCASE")');
     const structure = await (db as any).tableStructure("users");
     expect(structure).toHaveLength(2);
     const nameCol = structure.find((c: any) => c.name === "name");
@@ -85,9 +85,9 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   // --- copyTableContents ---
 
   it("copyTableContents copies rows from source to destination", async () => {
-    db.exec("CREATE TABLE src (id INTEGER, name TEXT)");
-    db.exec("CREATE TABLE dst (id INTEGER, name TEXT)");
-    db.exec("INSERT INTO src VALUES (1, 'Alice'), (2, 'Bob')");
+    await db.exec("CREATE TABLE src (id INTEGER, name TEXT)");
+    await db.exec("CREATE TABLE dst (id INTEGER, name TEXT)");
+    await db.exec("INSERT INTO src VALUES (1, 'Alice'), (2, 'Bob')");
     await (db as any).copyTableContents("src", "dst", ["id", "name"]);
     const rows = (db.raw as import("better-sqlite3").Database)
       .prepare("SELECT * FROM dst ORDER BY id")
@@ -97,9 +97,9 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   });
 
   it("copyTableContents respects column rename mapping", async () => {
-    db.exec("CREATE TABLE src (id INTEGER, old_name TEXT)");
-    db.exec("CREATE TABLE dst (id INTEGER, new_name TEXT)");
-    db.exec("INSERT INTO src VALUES (1, 'Alice')");
+    await db.exec("CREATE TABLE src (id INTEGER, old_name TEXT)");
+    await db.exec("CREATE TABLE dst (id INTEGER, new_name TEXT)");
+    await db.exec("INSERT INTO src VALUES (1, 'Alice')");
     // rename: {srcCol: destCol} = {old_name: new_name}
     await (db as any).copyTableContents("src", "dst", ["id", "new_name"], {
       old_name: "new_name",
@@ -111,9 +111,9 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   // --- copyTableIndexes ---
 
   it("copyTableIndexes recreates indexes on destination table", async () => {
-    db.exec("CREATE TABLE src (id INTEGER, email TEXT)");
-    db.exec("CREATE UNIQUE INDEX index_src_on_email ON src (email)");
-    db.exec("CREATE TABLE dst (id INTEGER, email TEXT)");
+    await db.exec("CREATE TABLE src (id INTEGER, email TEXT)");
+    await db.exec("CREATE UNIQUE INDEX index_src_on_email ON src (email)");
+    await db.exec("CREATE TABLE dst (id INTEGER, email TEXT)");
     await (db as any).copyTableIndexes("src", "dst");
     const idxList = (db.raw as import("better-sqlite3").Database)
       .prepare("PRAGMA index_list(dst)")
@@ -123,9 +123,9 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   });
 
   it("copyTableIndexes preserves partial index WHERE clause", async () => {
-    db.exec("CREATE TABLE src (id INTEGER, active INTEGER, email TEXT)");
-    db.exec("CREATE UNIQUE INDEX index_src_on_email_active ON src (email) WHERE active = 1");
-    db.exec("CREATE TABLE dst (id INTEGER, active INTEGER, email TEXT)");
+    await db.exec("CREATE TABLE src (id INTEGER, active INTEGER, email TEXT)");
+    await db.exec("CREATE UNIQUE INDEX index_src_on_email_active ON src (email) WHERE active = 1");
+    await db.exec("CREATE TABLE dst (id INTEGER, active INTEGER, email TEXT)");
     await (db as any).copyTableIndexes("src", "dst");
     const idxSql = (db.raw as import("better-sqlite3").Database)
       .prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='dst'")
@@ -136,8 +136,8 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   // --- copyTable ---
 
   it("copyTable creates destination with same schema and data", async () => {
-    db.exec("CREATE TABLE src (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
-    db.exec("INSERT INTO src VALUES (1, 'Alice')");
+    await db.exec("CREATE TABLE src (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
+    await db.exec("INSERT INTO src VALUES (1, 'Alice')");
     await (db as any).copyTable("src", "dst");
     const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
     expect(rows).toHaveLength(1);
@@ -145,8 +145,8 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   });
 
   it("copyTable renames columns when options.rename is provided", async () => {
-    db.exec("CREATE TABLE src (id INTEGER, old_col TEXT)");
-    db.exec("INSERT INTO src VALUES (1, 'hello')");
+    await db.exec("CREATE TABLE src (id INTEGER, old_col TEXT)");
+    await db.exec("INSERT INTO src VALUES (1, 'hello')");
     await (db as any).copyTable("src", "dst", { rename: { old_col: "new_col" } });
     const cols = (db.raw as import("better-sqlite3").Database)
       .prepare("PRAGMA table_info(dst)")
@@ -159,8 +159,8 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
   // --- moveTable ---
 
   it("moveTable copies data to destination and drops source", async () => {
-    db.exec("CREATE TABLE src (id INTEGER PRIMARY KEY, name TEXT)");
-    db.exec("INSERT INTO src VALUES (1, 'Alice')");
+    await db.exec("CREATE TABLE src (id INTEGER PRIMARY KEY, name TEXT)");
+    await db.exec("INSERT INTO src VALUES (1, 'Alice')");
     await (db as any).moveTable("src", "dst");
     const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
     expect(rows).toHaveLength(1);
