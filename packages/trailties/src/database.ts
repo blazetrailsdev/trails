@@ -431,6 +431,11 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
   switch (adapter) {
     case "sqlite3":
     case "sqlite": {
+      // Trailties is a Node-only entry point, so it's the right place to wire
+      // in the default better-sqlite3 driver. App authors who want a different
+      // SQLite driver register it before calling connectAdapter (or pass a
+      // `driver:` field in the config).
+      await import("@blazetrails/activesupport/sqlite/better-sqlite3");
       const { SQLite3Adapter } =
         await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
       return new SQLite3Adapter(config.database ?? ":memory:");
