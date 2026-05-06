@@ -49,10 +49,11 @@ link_source() {
   local rel="$1"
   local src="$MAIN_REPO/$rel"
   local dst="$TARGET/$rel"
-  if [[ ! -d "$src" ]]; then
-    echo "    skip $rel (not fetched in main worktree — run pnpm api:compare there first)"
+  if [[ ! -e "$src" ]]; then
+    echo "    skip $rel (not present in main worktree)"
     return
   fi
+  mkdir -p "$(dirname "$dst")"
   rm -rf "$dst"
   ln -s "$src" "$dst"
   echo "    linked $rel -> $src"
@@ -61,6 +62,10 @@ link_source() {
 echo "==> Linking Rails and Rack source from main worktree"
 link_source "scripts/api-compare/.rails-source"
 link_source "scripts/api-compare/.rack-source"
+
+echo "==> Linking .claude config from main worktree (skills + per-machine permissions)"
+link_source ".claude/skills"
+link_source ".claude/settings.local.json"
 
 echo "==> Running pnpm install"
 ( cd "$TARGET" && pnpm install )
