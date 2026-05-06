@@ -215,6 +215,12 @@ export {
   IrreversibleOrderError,
   UnknownAttributeReference,
   UnmodifiableRelation,
+  QueryAborted,
+  ConnectionFailed,
+  TransactionRollbackError,
+  SerializationFailure,
+  Deadlocked,
+  LockWaitTimeout,
 } from "./errors.js";
 export {
   ReadonlyAttributeError,

@@ -7,7 +7,16 @@
 import { inspectExplainOption } from "../adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
 import { type Nodes, Visitors } from "@blazetrails/arel";
-import { ReadOnlyError, NotImplementedError } from "../errors.js";
+import {
+  ReadOnlyError,
+  NotImplementedError,
+  ConnectionNotEstablished,
+  ConnectionNotDefined,
+  ConnectionFailed,
+  TransactionRollbackError,
+  Deadlocked,
+  LockWaitTimeout,
+} from "../errors.js";
 import { SchemaCache } from "./schema-cache.js";
 import { stripSqlComments } from "./sql-classification.js";
 import {
@@ -136,13 +145,19 @@ export interface AbstractAdapter {
 export class AbstractAdapter implements Quoting {
   static readonly Version = Version;
 
-  private _connection: DatabaseAdapter | null = null;
+  protected _connection: DatabaseAdapter | null = null;
   private _owner: string | null = null;
   private _inUse = false;
   private _preparedStatements = false;
   private _schemaCache: SchemaCache | null = null;
   private _idleSince = Date.now();
   protected _lastActivity = 0;
+  protected _verified = false;
+  // Mirrors Rails @raw_connection_dirty. Setters land with the per-adapter
+  // exec paths (PR 25b) and reconnect-with-restore (Wave 6 follow-up);
+  // the default-false here matches Rails' fresh-adapter state.
+  protected _rawConnectionDirty = false;
+  private _lockQueue: Promise<unknown> = Promise.resolve();
   protected _config: Record<string, unknown> = {};
   _transactionManager: TransactionManager = new TransactionManager(this as any);
 
@@ -416,6 +431,10 @@ export class AbstractAdapter implements Quoting {
     if (!this.active) {
       this.reconnectBang();
     }
+    // Mirrors Rails: `connect_with_retry` calls `verified!` after a
+    // successful (re)connect; verifyBang is the abstract-side entry
+    // point that drives that flow.
+    this.verifiedBang();
   }
 
   clearCacheBang(): void {
@@ -1034,104 +1053,166 @@ export class AbstractAdapter implements Quoting {
 
   static registerClassWithPrecision(_typeMap: unknown, _name: string, _klass: unknown): void {}
 
+  private _extendedTypeMap?: Map<string, unknown>;
   get extendedTypeMap(): Map<string, unknown> {
-    return new Map();
+    return (this._extendedTypeMap ??= new Map());
+  }
+
+  // --- Connection lifecycle privates (Rails abstract_adapter.rb 946–1234) ---
+
+  /** @internal Mirrors: AbstractAdapter#reconnect_can_restore_state? */
+  isReconnectCanRestoreState(): boolean {
+    return this._transactionManager.isRestorable() && !this._rawConnectionDirty;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#with_raw_connection */
+  async withRawConnection<T>(
+    optsOrCallback:
+      | { allowRetry?: boolean; materializeTransactions?: boolean }
+      | ((raw: DatabaseAdapter | null) => Promise<T> | T),
+    callback?: (raw: DatabaseAdapter | null) => Promise<T> | T,
+  ): Promise<T> {
+    const isFn = typeof optsOrCallback === "function";
+    const opts = (isFn ? {} : optsOrCallback) ?? {};
+    const block = isFn ? optsOrCallback : callback;
+    if (typeof block !== "function") {
+      throw new TypeError("withRawConnection requires a callback");
+    }
+    const allowRetry = opts.allowRetry ?? false;
+    const materializeTransactions = opts.materializeTransactions ?? true;
+
+    const run = async (): Promise<T> => {
+      if (this._connection === null && this.isReconnectCanRestoreState()) this.connectBang();
+      if (materializeTransactions) await this.materializeTransactions();
+
+      let retriesAvailable = allowRetry ? this.connectionRetries : 0;
+      const deadline = this.retryDeadline !== null ? Date.now() + this.retryDeadline * 1000 : null;
+      let reconnectable = this.isReconnectCanRestoreState();
+      const last = this.secondsSinceLastActivity;
+      const recent = last !== null && last < this.verifyTimeout;
+      if (!this._verified && !recent && reconnectable && !allowRetry) this.verifyBang();
+
+      for (;;) {
+        try {
+          return await block(this._connection);
+        } catch (e) {
+          const err = e as Error;
+          this.invalidateTransaction(err);
+          const expired = deadline !== null && deadline < Date.now();
+          if (!expired && retriesAvailable > 0) {
+            retriesAvailable -= 1;
+            if (this.isRetryableQueryError(err)) {
+              await this.backoff(this.connectionRetries - retriesAvailable);
+              continue;
+            }
+            if (reconnectable && this.isRetryableConnectionError(err)) {
+              this.reconnectBang();
+              reconnectable = false;
+              continue;
+            }
+          }
+          if (!this.isRetryableQueryError(err)) {
+            this._lastActivity = 0;
+            this._verified = false;
+          }
+          throw err;
+        } finally {
+          if (materializeTransactions) this.dirtyCurrentTransaction();
+        }
+      }
+    };
+
+    const prev = this._lockQueue;
+    const next = prev.then(run, run);
+    this._lockQueue = next.catch(() => undefined);
+    return next as Promise<T>;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#verified! */
+  verifiedBang(): void {
+    this._lastActivity = Date.now();
+    this._verified = true;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#retryable_connection_error? */
+  isRetryableConnectionError(exception: unknown): boolean {
+    if (
+      exception instanceof ConnectionNotEstablished &&
+      !(exception instanceof ConnectionNotDefined)
+    ) {
+      return true;
+    }
+    return exception instanceof ConnectionFailed;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#invalidate_transaction */
+  invalidateTransaction(exception: unknown): void {
+    if (!(exception instanceof TransactionRollbackError)) return;
+    if (!this.isSavepointErrorsInvalidateTransactions()) return;
+    const tx = this.currentTransaction() as { invalidateBang?: () => void };
+    tx.invalidateBang?.();
+  }
+
+  /** @internal Mirrors: AbstractAdapter#retryable_query_error? */
+  isRetryableQueryError(exception: unknown): boolean {
+    const tx = this.currentTransaction() as { isInvalidated?: () => boolean };
+    if (tx.isInvalidated?.()) return false;
+    return exception instanceof Deadlocked || exception instanceof LockWaitTimeout;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#backoff (100ms × counter) */
+  backoff(counter: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 100 * counter));
+  }
+
+  /** @internal Mirrors: AbstractAdapter#any_raw_connection */
+  anyRawConnection(): DatabaseAdapter | null | Promise<DatabaseAdapter | null> {
+    return this._connection ?? this.validRawConnection();
+  }
+
+  /** @internal Mirrors: AbstractAdapter#valid_raw_connection */
+  validRawConnection(): DatabaseAdapter | null | Promise<DatabaseAdapter | null> {
+    if (this._verified && this._connection) return this._connection;
+    return this.withRawConnection(
+      { allowRetry: false, materializeTransactions: false },
+      (conn) => conn,
+    );
+  }
+
+  /** @internal Mirrors: AbstractAdapter#extended_type_map_key */
+  extendedTypeMapKey(): Record<string, unknown> | null {
+    // Rails parity: `if @default_timezone` — Ruby treats "" as truthy,
+    // so check for the type rather than JS truthiness.
+    const tz = this._config.defaultTimezone;
+    return typeof tz === "string" ? { defaultTimezone: tz } : null;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#type_map */
+  get typeMap(): unknown {
+    const ctor = this.constructor as {
+      EXTENDED_TYPE_MAPS?: Map<string, unknown>;
+      TYPE_MAP?: unknown;
+      extendedTypeMap?: (key: Record<string, unknown>) => unknown;
+    };
+    const key = this.extendedTypeMapKey();
+    if (!key) return ctor.TYPE_MAP ?? this.extendedTypeMap;
+    const build = () => ctor.extendedTypeMap?.(key) ?? this.extendedTypeMap;
+    const cache = ctor.EXTENDED_TYPE_MAPS;
+    if (!cache) return build();
+    const ck = JSON.stringify(key);
+    let m = cache.get(ck);
+    if (!m) cache.set(ck, (m = build()));
+    return m;
+  }
+
+  /** @internal Mirrors: AbstractAdapter#configure_connection */
+  configureConnection(..._args: unknown[]): void | Promise<void> {
+    this.checkVersion();
   }
 }
 
 // Rails: `include DatabaseStatements` inside the class body.
 include(AbstractAdapter, DatabaseStatements);
-
-/** @internal */
-function canPerformCaseInsensitiveComparisonFor(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#can_perform_case_insensitive_comparison_for? is not implemented",
-  );
-}
-
-/** @internal */
-function isReconnectCanRestoreState(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#reconnect_can_restore_state? is not implemented",
-  );
-}
-
-/** @internal */
-function withRawConnection(allowRetry?: any, materializeTransactions?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#with_raw_connection is not implemented",
-  );
-}
-
-/** @internal */
-function verifiedBang(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#verified! is not implemented",
-  );
-}
-
-/** @internal */
-function isRetryableConnectionError(exception: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#retryable_connection_error? is not implemented",
-  );
-}
-
-/** @internal */
-function invalidateTransaction(exception: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#invalidate_transaction is not implemented",
-  );
-}
-
-/** @internal */
-function isRetryableQueryError(exception: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#retryable_query_error? is not implemented",
-  );
-}
-
-/** @internal */
-function backoff(counter: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#backoff is not implemented",
-  );
-}
-
-/** @internal */
-function reconnect(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#reconnect is not implemented",
-  );
-}
-
-/** @internal */
-function anyRawConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#any_raw_connection is not implemented",
-  );
-}
-
-/** @internal */
-function validRawConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#valid_raw_connection is not implemented",
-  );
-}
-
-/** @internal */
-function extendedTypeMapKey(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#extended_type_map_key is not implemented",
-  );
-}
-
-/** @internal */
-function typeMap(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#type_map is not implemented",
-  );
-}
 
 /** @internal */
 function translateExceptionClass(nativeError: any, sql: any, binds: any): never {
@@ -1206,13 +1287,6 @@ function buildStatementPool(): never {
 function buildResult(columns?: any, rows?: any, columnTypes?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractAdapter#build_result is not implemented",
-  );
-}
-
-/** @internal */
-function configureConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#configure_connection is not implemented",
   );
 }
 

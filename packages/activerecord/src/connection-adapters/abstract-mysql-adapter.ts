@@ -977,7 +977,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  protected extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
+  override extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
+    // Mirrors Rails AbstractMysqlAdapter#extended_type_map_key (lines 762–768):
+    // pair defaultTimezone with emulateBooleans when set; otherwise fall
+    // back to the booleans-only key.
+    const tz = this._config.defaultTimezone;
+    if (typeof tz === "string") {
+      return { defaultTimezone: tz, emulateBooleans: this._emulateBooleans };
+    }
     if (this._emulateBooleans) return { emulateBooleans: true };
     return null;
   }
@@ -1145,13 +1152,6 @@ function addIndexForAlter(tableName: any, columnName: any, options?: any): never
 function removeIndexForAlter(tableName: any, columnName?: any, options?: any): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#remove_index_for_alter is not implemented",
-  );
-}
-
-/** @internal */
-function configureConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#configure_connection is not implemented",
   );
 }
 

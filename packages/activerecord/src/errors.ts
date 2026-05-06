@@ -221,6 +221,72 @@ export class StatementInvalid extends AdapterError {
   }
 }
 
+/** Mirrors `ActiveRecord::QueryAborted`. */
+export class QueryAborted extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "QueryAborted";
+  }
+}
+
+/** Mirrors `ActiveRecord::ConnectionFailed`. */
+export class ConnectionFailed extends QueryAborted {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "ConnectionFailed";
+  }
+}
+
+/** Mirrors `ActiveRecord::TransactionRollbackError`. */
+export class TransactionRollbackError extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "TransactionRollbackError";
+  }
+}
+
+/** Mirrors `ActiveRecord::SerializationFailure`. */
+export class SerializationFailure extends TransactionRollbackError {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "SerializationFailure";
+  }
+}
+
+/** Mirrors `ActiveRecord::Deadlocked`. */
+export class Deadlocked extends TransactionRollbackError {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "Deadlocked";
+  }
+}
+
+/** Mirrors `ActiveRecord::LockWaitTimeout`. */
+export class LockWaitTimeout extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "LockWaitTimeout";
+  }
+}
+
 export class WrappedDatabaseException extends StatementInvalid {
   constructor(
     message?: string,
