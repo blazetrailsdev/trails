@@ -1127,14 +1127,26 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       include: options.include as string[] | undefined,
     });
     // Mirrors visit_IndexDefinition(o, create=false): no ON clause, no CREATE prefix.
+    // Lengths applied per MySQL's add_index_length: col(N) for prefix indexes.
     // Algorithm appended with ", " separator per Rails' add_index_for_alter.
+    const lengths = idx.lengths as Record<string, number> | number | undefined;
     const indexType = idx.type?.toUpperCase() ?? (idx.unique ? "UNIQUE" : undefined);
     const parts: string[] = [];
     if (indexType) parts.push(indexType);
     parts.push("INDEX");
     parts.push(this.quoteIdentifier(idx.name));
     if (idx.using) parts.push(`USING ${idx.using}`);
-    const quotedCols = columnNames.map((c) => this.quoteColumnName(c)).join(", ");
+    const quotedCols = columnNames
+      .map((c) => {
+        const len =
+          typeof lengths === "number"
+            ? lengths
+            : typeof lengths === "object"
+              ? lengths[c]
+              : undefined;
+        return len ? `${this.quoteColumnName(c)}(${len})` : this.quoteColumnName(c);
+      })
+      .join(", ");
     parts.push(`(${quotedCols})`);
     const idxSql = parts.join(" ");
     return algorithmSql ? `ADD ${idxSql}, ${algorithmSql}` : `ADD ${idxSql}`;
@@ -1146,7 +1158,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName?: string | string[],
     options: Record<string, unknown> = {},
   ): string {
-    void tableName;
     const indexName =
       (options.name as string | undefined) ??
       (columnName
