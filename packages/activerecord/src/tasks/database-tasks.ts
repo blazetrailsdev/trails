@@ -4,8 +4,7 @@
  * Mirrors: ActiveRecord::Tasks::DatabaseTasks
  */
 
-import { NotImplementedError } from "../errors.js";
-import type { DatabaseConfig } from "../database-configurations/database-config.js";
+import { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { ProtectedEnvironmentError } from "../migration.js";
 import { getFs, getPath, getCryptoAsync, getOs, getEnv } from "@blazetrails/activesupport";
@@ -600,10 +599,7 @@ export class DatabaseTasks {
 
   private static _environmentsFor(environment?: string): string[] {
     const env = this._normalizeEnv(environment);
-    if (!environment?.trim() && env === "development") {
-      return ["development", "test"];
-    }
-    return [env];
+    return eachCurrentEnvironment(env);
   }
 
   static async structureDump(
@@ -912,11 +908,7 @@ export class DatabaseTasks {
   }
 
   private static async _schemaSha1(filename: string): Promise<string> {
-    const contents = getFs().readFileSync(filename, "utf-8");
-    const crypto = await getCryptoAsync();
-    const hash = crypto.createHash("sha1");
-    hash.update(contents);
-    return hash.digest("hex");
+    return _sha1File(filename);
   }
 
   /**
@@ -1085,111 +1077,162 @@ export interface DatabaseTaskHandler {
 }
 
 /** @internal */
-function truncateTables(dbConfig: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#truncate_tables is not implemented",
-  );
+export async function withTemporaryPool<T = void>(
+  dbConfig: DatabaseConfig,
+  fn: (adapter: import("../adapter.js").DatabaseAdapter) => Promise<T>,
+): Promise<T> {
+  return DatabaseTasks.withTemporaryConnection(dbConfig, fn);
 }
 
 /** @internal */
-function withTemporaryPool(dbConfig: any, clobber?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#with_temporary_pool is not implemented",
-  );
+export function resolveConfiguration(configuration: unknown): DatabaseConfig {
+  // DatabaseConfig instances don't need a configurations registry — return as-is.
+  // Avoids constructing a new DatabaseConfigurations (which mutates the global singleton).
+  if (configuration instanceof DatabaseConfig) return configuration;
+  const configs = DatabaseTasks.databaseConfiguration;
+  if (!configs) throw new Error("DatabaseTasks.databaseConfiguration is not set");
+  return configs.resolve(configuration);
 }
 
 /** @internal */
-function configsFor(options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#configs_for is not implemented",
-  );
+export function isVerbose(): boolean {
+  const v = getEnv("VERBOSE");
+  return v !== undefined ? v !== "false" : true;
 }
 
 /** @internal */
-function resolveConfiguration(configuration: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#resolve_configuration is not implemented",
-  );
+export function databaseAdapterFor(
+  _dbConfig: DatabaseConfig,
+  ...arguments_: unknown[]
+): import("../adapter.js").DatabaseAdapter | null {
+  void arguments_;
+  return DatabaseTasks.migrationConnection();
 }
 
 /** @internal */
-function isVerbose(): never {
-  throw new NotImplementedError("ActiveRecord::Tasks::DatabaseTasks#verbose? is not implemented");
+export function classForAdapter(adapter: string): DatabaseTaskHandler {
+  const handler = DatabaseTasks.resolveTask(adapter);
+  if (!handler) {
+    throw new DatabaseNotSupported(`Rake tasks not supported by '${adapter}' adapter`);
+  }
+  return handler;
 }
 
 /** @internal */
-function databaseAdapterFor(dbConfig: any, ...arguments_: any[]): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#database_adapter_for is not implemented",
-  );
+export function eachCurrentConfiguration(environment: string, name?: string): DatabaseConfig[] {
+  const results: DatabaseConfig[] = [];
+  for (const env of eachCurrentEnvironment(environment)) {
+    for (const cfg of DatabaseTasks.configsFor(env)) {
+      if (name && name !== cfg.name) continue;
+      results.push(cfg);
+    }
+  }
+  return results;
 }
 
 /** @internal */
-function classForAdapter(adapter: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#class_for_adapter is not implemented",
-  );
+export function eachCurrentEnvironment(environment: string): string[] {
+  const envs = [environment];
+  if (
+    environment === "development" &&
+    getEnv("SKIP_TEST_DATABASE") === undefined &&
+    getEnv("DATABASE_URL") === undefined
+  ) {
+    envs.push("test");
+  }
+  return envs;
 }
 
 /** @internal */
-function eachCurrentConfiguration(environment: any, name?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#each_current_configuration is not implemented",
-  );
+export function isLocalDatabase(dbConfig: DatabaseConfig): boolean {
+  const host = dbConfig.host;
+  return !host || host === "localhost" || host === "127.0.0.1" || host === "::1";
 }
 
 /** @internal */
-function eachCurrentEnvironment(environment: any, block?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#each_current_environment is not implemented",
-  );
+export function schemaSha1(file: string): Promise<string> {
+  return _sha1File(file);
+}
+
+async function _sha1File(filename: string): Promise<string> {
+  const bytes = getFs().readFileSync(filename);
+  const crypto = await getCryptoAsync();
+  const hash = crypto.createHash("sha1");
+  hash.update(bytes);
+  return hash.digest("hex");
 }
 
 /** @internal */
-function eachLocalConfiguration(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#each_local_configuration is not implemented",
-  );
+export function structureDumpFlagsFor(adapter: string): string | string[] | null {
+  const flags = DatabaseTasks.structureDumpFlags;
+  if (!flags) return null;
+  if (typeof flags === "string" || Array.isArray(flags)) return flags;
+  return (flags as Record<string, string | string[]>)[adapter] ?? null;
 }
 
 /** @internal */
-function isLocalDatabase(dbConfig: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#local_database? is not implemented",
-  );
+export function structureLoadFlagsFor(adapter: string): string | string[] | null {
+  const flags = DatabaseTasks.structureLoadFlags;
+  if (!flags) return null;
+  if (typeof flags === "string" || Array.isArray(flags)) return flags;
+  return (flags as Record<string, string | string[]>)[adapter] ?? null;
 }
 
 /** @internal */
-function schemaSha1(file: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#schema_sha1 is not implemented",
-  );
+export async function checkCurrentProtectedEnvironmentBang(
+  dbConfig: DatabaseConfig,
+): Promise<void> {
+  await DatabaseTasks.withTemporaryConnection(dbConfig, async () => {
+    await DatabaseTasks.checkProtectedEnvironmentsBang(dbConfig.envName);
+  });
 }
 
 /** @internal */
-function structureDumpFlagsFor(adapter: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#structure_dump_flags_for is not implemented",
-  );
+export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<boolean> {
+  return DatabaseTasks.withTemporaryConnection(dbConfig, async () => {
+    const adapter = DatabaseTasks.migrationConnection()!;
+    const { NoDatabaseError } = await import("../errors.js");
+    const { SchemaMigration } = await import("../schema-migration.js");
+    let alreadyInitialized = false;
+    try {
+      // Probe DB connectivity first — throws NoDatabaseError if the DB doesn't exist.
+      // tableExists() swallows all errors internally so can't detect a missing DB.
+      await adapter.execute("SELECT 1");
+      const sm = new SchemaMigration(adapter);
+      alreadyInitialized = await sm.tableExists();
+    } catch (error) {
+      if (error instanceof NoDatabaseError || _isMissingDatabaseError(error)) {
+        await DatabaseTasks.create(dbConfig);
+      } else {
+        throw error;
+      }
+    }
+    if (!alreadyInitialized) {
+      const rawPath = DatabaseTasks.schemaDumpPath(dbConfig);
+      if (rawPath) {
+        const p = getPath();
+        const resolved =
+          p.isAbsolute && !p.isAbsolute(rawPath) ? p.resolve(DatabaseTasks.root, rawPath) : rawPath;
+        if (getFs().existsSync(resolved)) {
+          await DatabaseTasks.loadSchema(dbConfig, DatabaseTasks.schemaFormat, resolved);
+        }
+      }
+    }
+    return !alreadyInitialized;
+  });
 }
 
-/** @internal */
-function structureLoadFlagsFor(adapter: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#structure_load_flags_for is not implemented",
-  );
-}
-
-/** @internal */
-function checkCurrentProtectedEnvironmentBang(dbConfig: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#check_current_protected_environment! is not implemented",
-  );
-}
-
-/** @internal */
-function initializeDatabase(dbConfig: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::DatabaseTasks#initialize_database is not implemented",
-  );
+// TODO: remove _isMissingDatabaseError once mysql2-adapter translates ER_BAD_DB_ERROR to
+// NoDatabaseError at the connection level (matching how postgresql-adapter already does in
+// newClient). The 3D000 branch is dead code for PG today because connection failures are
+// already translated by PostgreSQLAdapter.newClient before SELECT 1 runs.
+function _isMissingDatabaseError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { code?: unknown; errno?: unknown };
+  // MySQL: ER_BAD_DB_ERROR (errno 1049) — adapter doesn't translate this to NoDatabaseError yet
+  if (e.code === "ER_BAD_DB_ERROR" || e.errno === 1049) return true;
+  // PostgreSQL: SQLSTATE 3D000 — dead code today since PG translates at connection time,
+  // kept as a defensive fallback in case the SQL-level error surfaces through a pool proxy.
+  if (e.code === "3D000") return true;
+  return false;
 }

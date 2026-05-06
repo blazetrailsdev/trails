@@ -7,7 +7,7 @@
 import { getFs, getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "../adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { DatabaseAlreadyExists, NotImplementedError } from "../errors.js";
+import { DatabaseAlreadyExists } from "../errors.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { coercePort } from "./task-utils.js";
 
@@ -333,32 +333,51 @@ export class MySQLDatabaseTasks {
   private escapeIdent(value: string): string {
     return value.replace(/`/g, "``");
   }
+
+  /** @internal */
+  private connection(): DatabaseAdapter | null {
+    return DatabaseTasks.migrationConnection();
+  }
+
+  /** @internal */
+  private async establishConnection(config?: DatabaseConfig): Promise<void> {
+    const cfg = config ?? this.dbConfig;
+    const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
+    const c = cfg.configuration;
+    let adapter: DatabaseAdapter;
+    if (c.url) {
+      adapter = new Mysql2Adapter(String(c.url));
+    } else {
+      const socket = c.socket as string | undefined;
+      adapter = socket
+        ? new Mysql2Adapter({
+            database: cfg.database,
+            user: c.username as string | undefined,
+            password: c.password as string | undefined,
+            socketPath: socket,
+          })
+        : new Mysql2Adapter({
+            host: (c.host as string) ?? "localhost",
+            port: coercePort(c.port, 3306),
+            database: cfg.database,
+            user: c.username as string | undefined,
+            password: c.password as string | undefined,
+          });
+    }
+    DatabaseTasks.setAdapter(adapter);
+  }
+
+  /** @internal */
+  private configurationHashWithoutDatabase(): ConfigHash {
+    const { database: _db, ...rest } = this.configurationHash;
+    return rest;
+  }
 }
 
 /** @internal */
-function connection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::MySQLDatabaseTasks#connection is not implemented",
-  );
-}
-
-/** @internal */
-function establishConnection(config?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::MySQLDatabaseTasks#establish_connection is not implemented",
-  );
-}
-
-/** @internal */
-function configurationHashWithoutDatabase(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::MySQLDatabaseTasks#configuration_hash_without_database is not implemented",
-  );
-}
-
-/** @internal */
-function runCmdError(cmd: any, args: any, action: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Tasks::MySQLDatabaseTasks#run_cmd_error is not implemented",
+export function runCmdError(cmd: string, _args: string[], _action: string): string {
+  return (
+    `failed to execute: \`${cmd}\`\n` +
+    `Please check the output for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
   );
 }

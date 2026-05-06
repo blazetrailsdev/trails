@@ -1,14 +1,24 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
+import {
+  DatabaseTasks,
+  DatabaseNotSupported,
+  isVerbose,
+  eachCurrentEnvironment,
+  schemaSha1,
+  structureDumpFlagsFor,
+  structureLoadFlagsFor,
+  initializeDatabase,
+} from "./database-tasks.js";
 import { quoteTableName as mysqlQuoteTableName } from "../connection-adapters/mysql/quoting.js";
 import { quoteTableName as abstractQuoteTableName } from "../connection-adapters/abstract/quoting.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { NoDatabaseError } from "../errors.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   it("raises an error when called with protected environment", async () => {
@@ -1240,6 +1250,234 @@ describe("DatabaseTasks _appendSchemaInformation adapter quoting", () => {
       expect(written.length).toBeGreaterThan(head.length);
     } finally {
       DatabaseTasks.setAdapter(null);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("isVerbose", () => {
+  afterEach(() => {
+    delete (process.env as Record<string, string | undefined>).VERBOSE;
+  });
+
+  it("returns true by default", () => {
+    delete (process.env as Record<string, string | undefined>).VERBOSE;
+    expect(isVerbose()).toBe(true);
+  });
+
+  it("returns false when VERBOSE=false", () => {
+    process.env.VERBOSE = "false";
+    expect(isVerbose()).toBe(false);
+  });
+
+  it("returns true when VERBOSE=true", () => {
+    process.env.VERBOSE = "true";
+    expect(isVerbose()).toBe(true);
+  });
+
+  it("returns true for any non-false value", () => {
+    process.env.VERBOSE = "1";
+    expect(isVerbose()).toBe(true);
+  });
+});
+
+describe("eachCurrentEnvironment", () => {
+  afterEach(() => {
+    delete (process.env as Record<string, string | undefined>).SKIP_TEST_DATABASE;
+    delete (process.env as Record<string, string | undefined>).DATABASE_URL;
+  });
+
+  it("returns single env for non-development", () => {
+    expect(eachCurrentEnvironment("test")).toEqual(["test"]);
+    expect(eachCurrentEnvironment("production")).toEqual(["production"]);
+  });
+
+  it("expands development to include test", () => {
+    expect(eachCurrentEnvironment("development")).toEqual(["development", "test"]);
+  });
+
+  it("skips test expansion when SKIP_TEST_DATABASE is set", () => {
+    process.env.SKIP_TEST_DATABASE = "1";
+    expect(eachCurrentEnvironment("development")).toEqual(["development"]);
+  });
+
+  it("skips test expansion when SKIP_TEST_DATABASE is set to empty string", () => {
+    process.env.SKIP_TEST_DATABASE = "";
+    expect(eachCurrentEnvironment("development")).toEqual(["development"]);
+  });
+
+  it("skips test expansion when DATABASE_URL is set", () => {
+    process.env.DATABASE_URL = "sqlite3::memory:";
+    expect(eachCurrentEnvironment("development")).toEqual(["development"]);
+  });
+
+  it("skips test expansion when DATABASE_URL is set to empty string", () => {
+    process.env.DATABASE_URL = "";
+    expect(eachCurrentEnvironment("development")).toEqual(["development"]);
+  });
+});
+
+describe("schemaSha1", () => {
+  it("returns a 40-char hex SHA1 of the file contents", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sha1-"));
+    const file = path.join(tmp, "schema.ts");
+    try {
+      fs.writeFileSync(file, "export default () => {};");
+      const result = await schemaSha1(file);
+      expect(result).toMatch(/^[0-9a-f]{40}$/);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("returns different hashes for different content", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sha1-"));
+    const a = path.join(tmp, "a.ts");
+    const b = path.join(tmp, "b.ts");
+    try {
+      fs.writeFileSync(a, "content A");
+      fs.writeFileSync(b, "content B");
+      expect(await schemaSha1(a)).not.toBe(await schemaSha1(b));
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("structureDumpFlagsFor / structureLoadFlagsFor", () => {
+  afterEach(() => {
+    DatabaseTasks.structureDumpFlags = null;
+    DatabaseTasks.structureLoadFlags = null;
+  });
+
+  it("returns null when flags are not set", () => {
+    expect(structureDumpFlagsFor("sqlite3")).toBeNull();
+    expect(structureLoadFlagsFor("sqlite3")).toBeNull();
+  });
+
+  it("returns the flat string/array value regardless of adapter", () => {
+    DatabaseTasks.structureDumpFlags = "--no-create-db";
+    expect(structureDumpFlagsFor("sqlite3")).toBe("--no-create-db");
+    DatabaseTasks.structureLoadFlags = ["--verbose"];
+    expect(structureLoadFlagsFor("mysql2")).toEqual(["--verbose"]);
+  });
+
+  it("returns adapter-specific flags from a hash", () => {
+    DatabaseTasks.structureDumpFlags = { sqlite3: "--compact", mysql2: "--no-data" };
+    expect(structureDumpFlagsFor("sqlite3")).toBe("--compact");
+    expect(structureDumpFlagsFor("mysql2")).toBe("--no-data");
+    expect(structureDumpFlagsFor("postgresql")).toBeNull();
+  });
+});
+
+describe("initializeDatabase", () => {
+  afterEach(() => {
+    DatabaseTasks.setAdapter(null);
+    vi.restoreAllMocks();
+  });
+
+  it("returns true (fresh DB) when schema_migrations table does not exist", async () => {
+    // In-memory SQLite: SELECT 1 succeeds (DB exists), but schema_migrations is absent.
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" });
+    const result = await initializeDatabase(config);
+    expect(result).toBe(true);
+  });
+
+  it("returns false when schema_migrations table already exists", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-initdb-"));
+    const dbFile = path.join(tmp, "test.sqlite3");
+    try {
+      // Pre-create the DB file with schema_migrations so initializeDatabase sees it.
+      const { SQLite3Adapter } = await import("../connection-adapters/sqlite3-adapter.js");
+      const setup = new SQLite3Adapter(dbFile);
+      await setup.executeMutation(
+        "CREATE TABLE schema_migrations (version VARCHAR(255) NOT NULL PRIMARY KEY)",
+      );
+      await (setup as unknown as { close(): Promise<void> }).close();
+
+      const config = new HashConfig("test", "primary", {
+        adapter: "sqlite3",
+        database: dbFile,
+      });
+      const result = await initializeDatabase(config);
+      expect(result).toBe(false);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("re-throws unexpected errors from the probe query", async () => {
+    vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
+      execute: async () => {
+        throw new Error("unexpected connection error");
+      },
+      close: async () => {},
+    });
+    const config = new HashConfig("test", "primary", {
+      adapter: "sqlite3",
+      database: ":memory:",
+    });
+    await expect(initializeDatabase(config)).rejects.toThrow("unexpected connection error");
+  });
+
+  it("creates the DB and returns true when probe throws NoDatabaseError", async () => {
+    let created = false;
+    vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
+      execute: async () => {
+        throw new NoDatabaseError("no database");
+      },
+      close: async () => {},
+    });
+    vi.spyOn(DatabaseTasks, "create").mockImplementation(async () => {
+      created = true;
+    });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" });
+    const result = await initializeDatabase(config);
+    expect(created).toBe(true);
+    expect(result).toBe(true);
+  });
+
+  it("creates the DB and returns true when probe throws MySQL ER_BAD_DB_ERROR", async () => {
+    let created = false;
+    const mysqlErr = Object.assign(new Error("Unknown database 'mydb'"), {
+      code: "ER_BAD_DB_ERROR",
+    });
+    vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
+      execute: async () => {
+        throw mysqlErr;
+      },
+      close: async () => {},
+    });
+    vi.spyOn(DatabaseTasks, "create").mockImplementation(async () => {
+      created = true;
+    });
+    const config = new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:" });
+    const result = await initializeDatabase(config);
+    expect(created).toBe(true);
+    expect(result).toBe(true);
+  });
+
+  it("loads schema dump when DB is fresh and dump file exists", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-initdb-schema-"));
+    const schemaFile = path.join(tmp, "schema.ts");
+    fs.writeFileSync(schemaFile, "export default async () => {};");
+    try {
+      vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
+        execute: async () => {
+          throw new NoDatabaseError("no database");
+        },
+        close: async () => {},
+      });
+      vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
+      const loadSchemaSpy = vi.spyOn(DatabaseTasks, "loadSchema").mockResolvedValue(undefined);
+      vi.spyOn(DatabaseTasks, "schemaDumpPath").mockReturnValue(schemaFile);
+      const config = new HashConfig("test", "primary", {
+        adapter: "sqlite3",
+        database: ":memory:",
+      });
+      await initializeDatabase(config);
+      expect(loadSchemaSpy).toHaveBeenCalled();
+    } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
