@@ -741,10 +741,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._statementPool.clear();
   }
 
-  override async disconnectBang(): Promise<void> {
+  override disconnectBang(): void {
     super.disconnectBang();
     if (this.driver.isOpen()) {
-      await this.driver.close();
+      // driver.close() returns void | Promise<void>; for inProcessSync drivers
+      // (better-sqlite3) this is sync. Async-driver teardown belongs in pool
+      // infra once it awaits disconnectBang() — callers today are sync.
+      this.driver.close();
     }
   }
 
@@ -1451,10 +1454,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         [],
         "SCHEMA",
       )) as Array<{ name: string; seqno: number }>;
-      const idxSqlStmt2 = await this.driver.prepare(
+      const idxSqlStmt = await this.driver.prepare(
         `SELECT sql FROM ${sqliteMaster} WHERE type='index' AND name=${sqliteQuoteStringLiteral(idx.name)}`,
       );
-      const idxSqlRow = (await idxSqlStmt2.get()) as { sql: string } | undefined;
+      const idxSqlRow = (await idxSqlStmt.get()) as { sql: string } | undefined;
       const whereMatch = idxSqlRow?.sql ? /\bWHERE\b\s+(.+)$/i.exec(idxSqlRow.sql) : null;
       result.push({
         name: idx.name,

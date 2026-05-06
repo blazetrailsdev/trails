@@ -11,8 +11,8 @@ beforeEach(() => {
   adapter = new SQLite3Adapter(":memory:");
 });
 
-afterEach(() => {
-  adapter.close();
+afterEach(async () => {
+  await adapter.close();
   Notifications.unsubscribeAll();
 });
 
@@ -33,7 +33,7 @@ describe("SQLite3AdapterTest", () => {
     const dbPath = path.join(nested, "test.db");
     const a = new SQLite3Adapter(dbPath);
     expect(a.isOpen).toBe(true);
-    a.close();
+    await a.close();
     fs.rmSync(baseDir, { recursive: true, force: true });
   });
 
@@ -42,23 +42,23 @@ describe("SQLite3AdapterTest", () => {
     expect(adapter.isOpen).toBe(true);
   });
 
-  it("database exists returns true for an in memory db", () => {
+  it("database exists returns true for an in memory db", async () => {
     const memAdapter = new SQLite3Adapter(":memory:");
     expect(memAdapter).toBeDefined();
-    memAdapter.close();
+    await memAdapter.close();
   });
 
-  it("connect with url", () => {
+  it("connect with url", async () => {
     // better-sqlite3 doesn't use URLs, but we can open a :memory: db
     const a = new SQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
-    a.close();
+    await a.close();
   });
 
-  it("connect memory with url", () => {
+  it("connect memory with url", async () => {
     const a = new SQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
-    a.close();
+    await a.close();
   });
 
   it("column types", async () => {
@@ -107,24 +107,24 @@ describe("SQLite3AdapterTest", () => {
     ).toThrow();
   });
 
-  it("bad timeout", () => {
+  it("bad timeout", async () => {
     // better-sqlite3 accepts timeout option; a negative value is accepted but harmless
     const a = new SQLite3Adapter(":memory:");
     expect(a).toBeDefined();
-    a.close();
+    await a.close();
   });
 
-  it("nil timeout", () => {
+  it("nil timeout", async () => {
     // No timeout specified — default constructor works fine
     const a = new SQLite3Adapter(":memory:");
     expect(a).toBeDefined();
-    a.close();
+    await a.close();
   });
 
-  it("connect", () => {
+  it("connect", async () => {
     const a = new SQLite3Adapter(":memory:");
     expect(a).toBeDefined();
-    a.close();
+    await a.close();
   });
 
   it("encoding", async () => {
@@ -146,11 +146,11 @@ describe("SQLite3AdapterTest", () => {
     const fk = await adapter.execute(`PRAGMA foreign_keys`);
     expect(fk[0].foreign_keys).toBe(1);
     // Can turn it off
-    adapter.pragma("foreign_keys = OFF");
+    await adapter.pragma("foreign_keys = OFF");
     const fk2 = await adapter.execute(`PRAGMA foreign_keys`);
     expect(fk2[0].foreign_keys).toBe(0);
     // Restore
-    adapter.pragma("foreign_keys = ON");
+    await adapter.pragma("foreign_keys = ON");
   });
 
   it("overriding default journal mode pragma", async () => {
@@ -158,46 +158,46 @@ describe("SQLite3AdapterTest", () => {
     // Test that pragma call doesn't throw
     const jm = await adapter.execute(`PRAGMA journal_mode`);
     expect(jm[0].journal_mode).toBeDefined();
-    adapter.pragma("journal_mode = DELETE");
+    await adapter.pragma("journal_mode = DELETE");
     const jm2 = await adapter.execute(`PRAGMA journal_mode`);
     // In-memory DB ignores journal_mode changes, stays "memory"
     expect(jm2[0].journal_mode).toBeDefined();
   });
 
   it("overriding default synchronous pragma", async () => {
-    adapter.pragma("synchronous = OFF");
+    await adapter.pragma("synchronous = OFF");
     const rows = await adapter.execute(`PRAGMA synchronous`);
     expect(rows[0].synchronous).toBe(0);
-    adapter.pragma("synchronous = NORMAL");
+    await adapter.pragma("synchronous = NORMAL");
   });
 
   it("overriding default journal size limit pragma", async () => {
-    adapter.pragma("journal_size_limit = 1048576");
+    await adapter.pragma("journal_size_limit = 1048576");
     const rows = await adapter.execute(`PRAGMA journal_size_limit`);
     expect(rows[0].journal_size_limit).toBe(1048576);
   });
 
   it("overriding default mmap size pragma", async () => {
     // mmap_size pragma returns empty on in-memory databases,
-    // so just verify the pragma call doesn't throw
-    expect(() => adapter.pragma("mmap_size = 0")).not.toThrow();
+    // so just verify the pragma call doesn't reject
+    await adapter.pragma("mmap_size = 0");
   });
 
   it("overriding default cache size pragma", async () => {
-    adapter.pragma("cache_size = 5000");
+    await adapter.pragma("cache_size = 5000");
     const rows = await adapter.execute(`PRAGMA cache_size`);
     expect(rows[0].cache_size).toBe(5000);
   });
 
   it("setting new pragma", async () => {
-    adapter.pragma("temp_store = MEMORY");
+    await adapter.pragma("temp_store = MEMORY");
     const rows = await adapter.execute(`PRAGMA temp_store`);
     expect(rows[0].temp_store).toBe(2); // MEMORY = 2
   });
 
-  it("setting invalid pragma", () => {
-    // SQLite silently ignores unknown pragmas — no error thrown
-    expect(() => adapter.pragma("not_a_real_pragma")).not.toThrow();
+  it("setting invalid pragma", async () => {
+    // SQLite silently ignores unknown pragmas — no rejection
+    await adapter.pragma("not_a_real_pragma");
   });
 
   it("exec no binds", async () => {
@@ -523,23 +523,23 @@ describe("SQLite3AdapterTest", () => {
     expect(adapter.isOpen).toBe(true);
   });
 
-  it("statement closed", () => {
+  it("statement closed", async () => {
     const a = new SQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
-    a.close();
+    await a.close();
     expect(a.isOpen).toBe(false);
   });
 
-  it("db is not readonly when readonly option is false", () => {
+  it("db is not readonly when readonly option is false", async () => {
     const a = new SQLite3Adapter(":memory:", { readonly: false });
     expect(a.isOpen).toBe(true);
-    a.close();
+    await a.close();
   });
 
-  it("db is not readonly when readonly option is unspecified", () => {
+  it("db is not readonly when readonly option is unspecified", async () => {
     const a = new SQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);
-    a.close();
+    await a.close();
   });
 
   it("db is readonly when readonly option is true", async () => {
@@ -549,12 +549,12 @@ describe("SQLite3AdapterTest", () => {
     const os = await import("os");
     const tmpFile = path.join(os.tmpdir(), `sqlite-readonly-test-${Date.now()}.db`);
     const writer = new SQLite3Adapter(tmpFile);
-    writer.exec(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    writer.close();
+    await writer.exec(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    await writer.close();
     const reader = new SQLite3Adapter(tmpFile, { readonly: true });
     const rows = await reader.execute(`SELECT * FROM "test"`);
     expect(rows).toHaveLength(0);
-    reader.close();
+    await reader.close();
     fs.unlinkSync(tmpFile);
   });
 
@@ -564,13 +564,13 @@ describe("SQLite3AdapterTest", () => {
     const os = await import("os");
     const tmpFile = path.join(os.tmpdir(), `sqlite-readonly-write-${Date.now()}.db`);
     const writer = new SQLite3Adapter(tmpFile);
-    writer.exec(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    writer.close();
+    await writer.exec(`CREATE TABLE "test" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    await writer.close();
     const reader = new SQLite3Adapter(tmpFile, { readonly: true });
     await expect(
       reader.executeMutation(`INSERT INTO "test" ("name") VALUES ('fail')`),
     ).rejects.toThrow();
-    reader.close();
+    await reader.close();
     fs.unlinkSync(tmpFile);
   });
 
