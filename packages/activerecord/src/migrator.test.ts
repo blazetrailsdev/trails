@@ -795,7 +795,7 @@ describe("Migrator advisory lock wrapping", () => {
     );
   });
 
-  it("uses db-scoped lock ID when adapter exposes currentDatabase", async () => {
+  it("uses db-scoped lock ID matching Rails MIGRATOR_SALT * Zlib.crc32(dbName)", async () => {
     const adapter = createTestAdapter();
     const lockIds: unknown[] = [];
     adapter.supportsAdvisoryLocks = () => true;
@@ -807,7 +807,8 @@ describe("Migrator advisory lock wrapping", () => {
     (adapter as unknown as Record<string, unknown>).currentDatabase = async () => "myapp_test";
     const migrator = new Migrator(adapter, []);
     await migrator.migrate();
-    expect(typeof lockIds[0]).toBe("bigint");
-    expect(lockIds[0]).not.toBe(BigInt(2053462845));
+    // Ruby: Zlib.crc32("myapp_test") == 601888509
+    // Rails: MIGRATOR_SALT (2053462845) * 601888509 == 1235955690063948105
+    expect(lockIds[0]).toBe(1235955690063948105n);
   });
 });
