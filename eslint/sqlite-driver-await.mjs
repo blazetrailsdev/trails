@@ -2,12 +2,13 @@
  * ESLint rule: sqlite-driver-await
  *
  * Flags `driver.<method>(...)` call sites — where `driver` is a local
- * identifier (variable or parameter) — that are not wrapped in `await` or
- * chained with `.then()` / `.catch()` / `.finally()`.  The SqliteDriver interface returns
- * `T | Promise<T>` so that the same surface can back both the current
- * synchronous better-sqlite3 implementation and a future async driver.  A
- * forgotten `await` silently discards the Promise when the async path is
- * enabled — this rule turns that into a lint-time (CI) error.
+ * identifier (variable or parameter) — that are not wrapped in `await`,
+ * chained with `.then()` / `.catch()` / `.finally()`, or returned.
+ * The SqliteDriver interface returns `T | Promise<T>` so that the same
+ * surface can back both the current synchronous better-sqlite3 implementation
+ * and a future async driver.  A forgotten `await` silently discards the
+ * Promise when the async path is enabled — this rule turns that into a
+ * lint-time (CI) error.
  *
  * `this.driver.<method>()` is excluded: those call sites use `this` as the
  * receiver and are covered by the TypeScript compiler once return types
@@ -22,27 +23,11 @@
 
 /**
  * @internal
- * Strip TS-only and parenthesized wrapper expressions that don't change the
- * runtime value: non-null assertion (`x!`), type assertions (`x as T`,
- * `<T>x`), satisfies (`x satisfies T`), and parenthesized expressions.
- * Without unwrapping, forms like `driver!.run(...)` or
- * `(driver as SqliteDriver).run(...)` would silently bypass the rule.
+ * AST node types that are transparent at runtime: they wrap a value without
+ * changing it (TS non-null assertion, type assertions, parentheses).
+ * Used by both `unwrap` (object-side) and `isSafelyConsumed` (parent-side)
+ * so the two helper paths stay in sync.
  */
-function unwrap(node) {
-  while (
-    node &&
-    (node.type === "TSNonNullExpression" ||
-      node.type === "TSAsExpression" ||
-      node.type === "TSTypeAssertion" ||
-      node.type === "TSSatisfiesExpression" ||
-      node.type === "ParenthesizedExpression")
-  ) {
-    node = node.expression;
-  }
-  return node;
-}
-
-/** @internal */
 const TRANSPARENT_TYPES = new Set([
   "ParenthesizedExpression",
   "TSNonNullExpression",
@@ -53,8 +38,24 @@ const TRANSPARENT_TYPES = new Set([
 
 /**
  * @internal
+ * Strip TS-only and parenthesized wrapper expressions that don't change the
+ * runtime value: non-null assertion (`x!`), type assertions (`x as T`,
+ * `<T>x`), satisfies (`x satisfies T`), and parenthesized expressions.
+ * Without unwrapping, forms like `driver!.run(...)` or
+ * `(driver as SqliteDriver).run(...)` would silently bypass the rule.
+ */
+function unwrap(node) {
+  while (node && TRANSPARENT_TYPES.has(node.type)) {
+    node = node.expression;
+  }
+  return node;
+}
+
+/**
+ * @internal
  * Returns true when `node` (a CallExpression whose callee is `driver.<method>`)
- * is safely consumed — either awaited or chained with .then/.catch/.finally.
+ * is safely consumed — awaited, chained with .then/.catch/.finally, or
+ * returned (caller takes responsibility for the Promise).
  * Walks up through transparent wrapper nodes (parentheses, TS assertions) on
  * both paths, so `await (driver.run(...))` and `(driver.run()).then(...)` are
  * both correctly recognised as safe.
@@ -71,6 +72,8 @@ function isSafelyConsumed(node) {
   if (!parent) return false;
   // await driver.foo()  /  await (driver.foo())
   if (parent.type === "AwaitExpression") return true;
+  // return driver.foo() — caller takes responsibility for the Promise
+  if (parent.type === "ReturnStatement") return true;
   // (driver.foo()).then(...) / .catch(...) / .finally(...)
   if (
     parent.type === "MemberExpression" &&
@@ -92,12 +95,12 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require await (or .then chain) on sqlite driver calls — interface returns T | Promise<T>.",
+        "Require await, .then/.catch/.finally chain, or return on sqlite driver calls — interface returns T | Promise<T>.",
     },
     schema: [],
     messages: {
       missingAwait:
-        "sqlite driver call must be awaited (interface returns T | Promise<T>); add 'await' or chain '.then'/'.catch'/'.finally'.",
+        "sqlite driver call must be awaited (interface returns T | Promise<T>); add 'await', chain '.then'/'.catch'/'.finally', or return the Promise.",
     },
   },
   create(context) {

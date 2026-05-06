@@ -36,6 +36,8 @@ tester.run("sqlite-driver-await", rule, {
     { code: "async function f(driver: any) { await (driver as any).run('x'); }" },
     // parenthesized call with .then chain
     { code: "(driver.run('SELECT 1')).then((r: unknown) => r);" },
+    // return — caller takes responsibility for the Promise
+    { code: "function f(driver: any) { return driver.pragma('x'); }" },
   ],
   invalid: [
     // bare identifier call
@@ -51,11 +53,6 @@ tester.run("sqlite-driver-await", rule, {
     // second call in sequence misses await
     {
       code: "async function f(driver: any) { await driver.exec('A'); driver.run('B'); }",
-      errors: [{ messageId: "missingAwait" }],
-    },
-    // returned without await
-    {
-      code: "function f(driver: any) { return driver.pragma('x'); }",
       errors: [{ messageId: "missingAwait" }],
     },
     // arbitrary chain (not then/catch/finally) is not safe
