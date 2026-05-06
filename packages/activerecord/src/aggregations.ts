@@ -1,4 +1,3 @@
-import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import { reload as persistenceReload } from "./persistence.js";
 import { AggregateReflection } from "./reflection.js";
@@ -67,29 +66,61 @@ export function composedOf(
     ),
   );
 
+  readerMethod(modelClass, name, options.mapping, options.className);
+  writerMethod(modelClass, name, options.mapping, options.className, options.converter);
+}
+
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Aggregations::ClassMethods#reader_method
+ */
+function readerMethod(
+  modelClass: typeof Base,
+  name: string,
+  mapping: [string, string][],
+  klass: new (...args: any[]) => any,
+): void {
+  const descriptor = (Object.getOwnPropertyDescriptor(modelClass.prototype, name) ??
+    {}) as PropertyDescriptor;
   Object.defineProperty(modelClass.prototype, name, {
+    ...descriptor,
     get(this: Base): unknown {
       const cache = getAggregationCache(this);
       if (cache.has(name)) return cache.get(name);
-
-      const args = options.mapping.map(([modelAttr]) => this.readAttribute(modelAttr));
+      const args = mapping.map(([modelAttr]) => this.readAttribute(modelAttr));
       if (args.every((a) => a === null || a === undefined)) return null;
-
-      const obj = Object.freeze(new options.className(...args));
+      const obj = Object.freeze(new klass(...args));
       cache.set(name, obj);
       return obj;
     },
+    configurable: true,
+  });
+}
+
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Aggregations::ClassMethods#writer_method
+ */
+function writerMethod(
+  modelClass: typeof Base,
+  name: string,
+  mapping: [string, string][],
+  klass: new (...args: any[]) => any,
+  converter?: (value: unknown) => unknown,
+): void {
+  const descriptor = (Object.getOwnPropertyDescriptor(modelClass.prototype, name) ??
+    {}) as PropertyDescriptor;
+  Object.defineProperty(modelClass.prototype, name, {
+    ...descriptor,
     set(this: Base, value: unknown): void {
       const cache = getAggregationCache(this);
-
       if (value === null || value === undefined) {
-        for (const [modelAttr] of options.mapping) this.writeAttribute(modelAttr, null);
+        for (const [modelAttr] of mapping) this.writeAttribute(modelAttr, null);
         cache.delete(name);
         return;
       }
-
-      if (value instanceof options.className) {
-        for (const [modelAttr, valueAttr] of options.mapping)
+      if (value instanceof klass) {
+        for (const [modelAttr, valueAttr] of mapping)
           this.writeAttribute(modelAttr, (value as any)[valueAttr]);
         cache.set(
           name,
@@ -97,11 +128,10 @@ export function composedOf(
         );
         return;
       }
-
-      if (options.converter) {
-        const converted = options.converter(value);
-        if (converted instanceof options.className) {
-          for (const [modelAttr, valueAttr] of options.mapping)
+      if (converter) {
+        const converted = converter(value);
+        if (converted instanceof klass) {
+          for (const [modelAttr, valueAttr] of mapping)
             this.writeAttribute(modelAttr, (converted as any)[valueAttr]);
           cache.set(
             name,
@@ -148,17 +178,10 @@ export const InstanceMethods = {
   reload,
 };
 
-/** @internal */
-function initInternals(): never {
-  throw new NotImplementedError("ActiveRecord::Aggregations#init_internals is not implemented");
-}
-
-/** @internal */
-function readerMethod(): never {
-  throw new NotImplementedError("ActiveRecord::Aggregations#reader_method is not implemented");
-}
-
-/** @internal */
-function writerMethod(): never {
-  throw new NotImplementedError("ActiveRecord::Aggregations#writer_method is not implemented");
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Aggregations#init_internals
+ */
+function initInternals(this: Base): void {
+  (this as any)._aggregationCache = new Map<string, unknown>();
 }

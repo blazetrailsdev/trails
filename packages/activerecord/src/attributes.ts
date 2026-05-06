@@ -8,18 +8,18 @@
  * Mirrors: ActiveRecord::Attributes
  */
 
-import { NotImplementedError } from "./errors.js";
 import {
   Attribute,
   AttributeSet,
   type Type,
   applyPendingAttributeModifications,
-  resetDefaultAttributes,
+  resetDefaultAttributes as amResetDefaultAttributes,
   registerWithSuperclass,
 } from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
 import type { Base } from "./base.js";
 import { applyPendingEncryptions } from "./encryption.js";
+import { lookup as typeLookup } from "./type.js";
 
 type AnyClass = any;
 
@@ -95,7 +95,7 @@ export function defineAttribute(
     ...(options.limit != null ? { limit: options.limit } : {}),
   });
 
-  resetDefaultAttributes(this);
+  amResetDefaultAttributes(this);
   applyPendingEncryptions(this);
 
   // Install prototype accessor so the attribute is readable/writable by name,
@@ -178,26 +178,64 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
   return cacheHost._cachedDefaultAttributes;
 }
 
-/** @internal */
-function reloadSchemaFromCache(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Attributes#reload_schema_from_cache is not implemented",
-  );
+const NO_DEFAULT_PROVIDED = Symbol("NO_DEFAULT_PROVIDED");
+
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Attributes::ClassMethods#reload_schema_from_cache
+ */
+function reloadSchemaFromCache(this: AnyClass): void {
+  amResetDefaultAttributes(this);
 }
 
-/** @internal */
-function defineDefaultAttribute(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Attributes#define_default_attribute is not implemented",
-  );
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Attributes::ClassMethods#define_default_attribute
+ */
+function defineDefaultAttribute(
+  this: AnyClass,
+  name: string,
+  value: unknown,
+  type: Type,
+  fromUser: boolean,
+): void {
+  const defaults = _defaultAttributes.call(this);
+  let defaultAttr: Attribute;
+  if (value === NO_DEFAULT_PROVIDED) {
+    defaultAttr = defaults.getAttribute(name).withType(type);
+  } else if (fromUser) {
+    const existing = defaults.getAttribute(name);
+    defaultAttr = existing.withType(type).withUserDefault(value);
+  } else {
+    defaultAttr = Attribute.fromDatabase(name, value, type);
+  }
+  defaults.set(name, defaultAttr);
 }
 
-/** @internal */
-function resolveTypeName(): never {
-  throw new NotImplementedError("ActiveRecord::Attributes#resolve_type_name is not implemented");
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Attributes::ClassMethods#reset_default_attributes
+ */
+function resetDefaultAttributes(this: AnyClass): void {
+  reloadSchemaFromCache.call(this);
 }
 
-/** @internal */
-function typeForColumn(): never {
-  throw new NotImplementedError("ActiveRecord::Attributes#type_for_column is not implemented");
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Attributes::ClassMethods#resolve_type_name
+ */
+function resolveTypeName(this: AnyClass, name: string): Type {
+  return typeLookup(name) as Type;
+}
+
+/**
+ * @internal
+ * Mirrors: ActiveRecord::Attributes::ClassMethods#type_for_column
+ */
+function typeForColumn(
+  this: AnyClass,
+  _connection: unknown,
+  column: { name: string; type: Type },
+): Type {
+  return column.type;
 }
