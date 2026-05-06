@@ -5,7 +5,7 @@
  */
 
 import pg from "pg";
-import { NotImplementedError, PreparedStatementCacheExpired } from "../../errors.js";
+import { PreparedStatementCacheExpired } from "../../errors.js";
 import type { Type } from "@blazetrails/activemodel";
 import type { Nodes } from "@blazetrails/arel";
 import type { ExplainOption } from "../../adapter.js";
@@ -91,10 +91,19 @@ interface CastResultHost {
 }
 
 /** @internal */
-function cancelAnyRunningQuery(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#cancel_any_running_query is not implemented",
-  );
+interface CancelAnyRunningQueryHost {
+  _cancelAnyRunningQuery(): void;
+}
+
+/**
+ * Delegates to the adapter's `_cancelAnyRunningQuery` which uses node-pg's
+ * internal `client.cancel()` to send a CancelRequest before ROLLBACK.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#cancel_any_running_query
+ * @internal
+ */
+export function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): void {
+  this._cancelAnyRunningQuery();
 }
 
 /**
@@ -201,50 +210,134 @@ export function affectedRows(result: pg.QueryResult): number {
 }
 
 /** @internal */
-function executeBatch(statements: any, name?: any, kwargs?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#execute_batch is not implemented",
-  );
+interface ExecuteBatchHost {
+  execute(sql: string, binds?: unknown[], name?: string | null): Promise<unknown>;
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#execute_batch
+ * @internal
+ */
+export async function executeBatch(
+  this: ExecuteBatchHost,
+  statements: string[],
+  name: string | null = null,
+): Promise<unknown> {
+  return this.execute(statements.join("; "), [], name ?? undefined);
 }
 
 /** @internal */
-function buildTruncateStatements(tableNames: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#build_truncate_statements is not implemented",
-  );
+interface BuildTruncateStatementsHost {
+  quoteTableName(name: string): string;
+}
+
+/**
+ * Rails combines all table names into a single TRUNCATE statement.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#build_truncate_statements
+ * @internal
+ */
+export function buildTruncateStatements(
+  this: BuildTruncateStatementsHost,
+  tableNames: string[],
+): string[] {
+  return [`TRUNCATE TABLE ${tableNames.map((t) => this.quoteTableName(t)).join(", ")}`];
 }
 
 /** @internal */
-function lastInsertIdResult(sequenceName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#last_insert_id_result is not implemented",
-  );
+interface LastInsertIdResultHost {
+  execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  quote(value: unknown): string;
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#last_insert_id_result
+ * @internal
+ */
+export async function lastInsertIdResult(
+  this: LastInsertIdResultHost,
+  sequenceName: string,
+): Promise<Result> {
+  return this.execQuery(`SELECT currval(${this.quote(sequenceName)})`, "SQL");
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#returning_column_values
+ * @internal
+ */
+export function returningColumnValues(result: Result): unknown[] | undefined {
+  return result.rows[0];
+}
+
+/**
+ * Returns pk unless it is composite (array), in which case returns undefined.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#suppress_composite_primary_key
+ * @internal
+ */
+export function suppressCompositePrimaryKey(pk: string | string[] | undefined): string | undefined {
+  return Array.isArray(pk) ? undefined : pk;
+}
+
+// Levels that Rails treats as actionable (not ignored). Anything outside
+// this set (e.g. NOTICE, DEBUG) is silently dropped.
+const ACTIONABLE_LEVELS = new Set(["WARNING", "ERROR", "FATAL", "PANIC"]);
+
+/** @internal */
+type SqlWarning = {
+  level?: string;
+  message?: string;
+  code?: string | number;
+  sql?: unknown;
+  [k: string]: unknown;
+};
+
+/** @internal */
+interface HandleWarningsHost {
+  _noticeReceiverSqlWarnings?: SqlWarning[];
+  // Used to call the abstract adapter's pattern-matcher without risking
+  // recursion if this module's isWarningIgnored is later bound to the class.
+  _abstractIsWarningIgnored?(warning: SqlWarning): boolean;
+}
+
+/**
+ * Iterates notice-receiver warnings accumulated during the query and attaches
+ * the result object (mirrors Rails attaching the PG::Result).
+ *
+ * Rails also calls `ActiveRecord.db_warnings_action.call(warning)` here.
+ * That global hook is not yet wired in TS; warnings are collected and filtered
+ * but not dispatched to a user-configured action. Tracked as a follow-up.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#handle_warnings
+ * @internal
+ */
+export function handleWarnings(this: HandleWarningsHost, result: pg.QueryResult): void {
+  if (!this._noticeReceiverSqlWarnings?.length) return;
+  for (const warning of this._noticeReceiverSqlWarnings) {
+    if (isWarningIgnored.call(this, warning)) continue;
+    warning.sql = result;
+    // TODO: dispatch to ActiveRecord.db_warnings_action equivalent once wired
+  }
 }
 
 /** @internal */
-function returningColumnValues(result: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#returning_column_values is not implemented",
-  );
+interface IsWarningIgnoredHost {
+  _abstractIsWarningIgnored?(warning: SqlWarning): boolean;
 }
 
-/** @internal */
-function suppressCompositePrimaryKey(pk: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#suppress_composite_primary_key is not implemented",
-  );
-}
-
-/** @internal */
-function handleWarnings(sql: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#handle_warnings is not implemented",
-  );
-}
-
-/** @internal */
-function isWarningIgnored(warning: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#warning_ignored? is not implemented",
-  );
+/**
+ * A warning is ignored if its level is below the actionable threshold (not in
+ * WARNING/ERROR/FATAL/PANIC) OR if the base adapter's pattern matchers
+ * (db_warnings_ignore) say to ignore it.
+ *
+ * Uses `_abstractIsWarningIgnored` (set to `AbstractAdapter.prototype.isWarningIgnored`)
+ * for the `|| super` delegation, avoiding self-recursion if this function is ever
+ * assigned to the class as `isWarningIgnored`.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#warning_ignored?
+ * @internal
+ */
+export function isWarningIgnored(this: IsWarningIgnoredHost | void, warning: SqlWarning): boolean {
+  const belowThreshold = !ACTIONABLE_LEVELS.has(warning.level ?? "");
+  return belowThreshold || (this?._abstractIsWarningIgnored?.(warning) ?? false);
 }
