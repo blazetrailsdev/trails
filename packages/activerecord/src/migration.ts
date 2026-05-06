@@ -40,6 +40,18 @@ export {
 
 import { ActiveRecordError, NotImplementedError } from "./errors.js";
 
+// Mirrors Zlib.crc32 (ISO 3309 / ITU-T V.42 polynomial).
+function _crc32(str: string): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i);
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
 // Migration error classes. Rails defines these in migration.rb, so
 // they live here. internal-metadata.ts imports EnvironmentStorageError
 // back from this module; the ESM cycle is safe because each callsite
@@ -116,6 +128,9 @@ export class PendingMigrationError extends MigrationError {
 }
 
 export class ConcurrentMigrationError extends MigrationError {
+  static readonly RELEASE_LOCK_FAILED_MESSAGE =
+    "Failed to release advisory lock, which means the lock file could not be deleted.";
+
   constructor(message = "Cannot run migrations because another migration is currently running.") {
     super(message);
     this.name = "ConcurrentMigrationError";
@@ -172,6 +187,8 @@ export abstract class Migration {
   private _recording = false;
   private _recorder = new CommandRecorder();
   private _name?: string;
+  /** @internal */
+  static delegate: DatabaseAdapter | null = null;
   private _version?: string;
   verbose = true;
   static logger: Logger = new Logger();
@@ -1016,14 +1033,17 @@ export abstract class Migration {
   }
 
   /** @internal */
+  static get nearestDelegate(): DatabaseAdapter | null {
+    return (
+      this.delegate ?? (Object.getPrototypeOf(this) as typeof Migration).nearestDelegate ?? null
+    );
+  }
+
+  /** @internal */
   static methodMissing(name: string, ...args: unknown[]): unknown {
-    const delegate = (this as unknown as Record<string, unknown>).nearestDelegate;
-    if (
-      delegate !== null &&
-      delegate !== undefined &&
-      typeof (delegate as Record<string, unknown>)[name] === "function"
-    ) {
-      return ((delegate as Record<string, unknown>)[name] as (...a: unknown[]) => unknown)(...args);
+    const delegate = this.nearestDelegate as Record<string, unknown> | null;
+    if (delegate !== null && typeof delegate[name] === "function") {
+      return (delegate[name] as (...a: unknown[]) => unknown)(...args);
     }
     throw new TypeError(`undefined method '${name}' for ${this.name}`);
   }
@@ -1549,8 +1569,8 @@ export class Migrator {
     return [...this._migrations];
   }
 
-  // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32 of googol)
-  private static readonly _LOCK_ID = 2053462845;
+  // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32("googol"))
+  private static readonly _MIGRATOR_SALT = 2053462845;
 
   /**
    * Wrap a block with an advisory lock to prevent concurrent migrations.
@@ -1563,15 +1583,28 @@ export class Migrator {
     if (!adapter.supportsAdvisoryLocks?.() || !adapter.getAdvisoryLock) {
       return fn();
     }
-    const locked = await adapter.getAdvisoryLock(Migrator._LOCK_ID);
+    const lockId = await this.generateMigratorAdvisoryLockId();
+    const locked = await adapter.getAdvisoryLock(lockId);
     if (!locked) {
       throw new ConcurrentMigrationError();
     }
+    // Mirrors Rails ensure clause: release the lock, raise if release fails.
+    // The fn error (if any) takes priority; release-failed error is raised only
+    // when fn succeeded. Structured this way to satisfy no-unsafe-finally.
+    const _sentinel = Symbol();
+    let fnResult: T | typeof _sentinel = _sentinel;
+    let fnError: unknown = _sentinel;
     try {
-      return await fn();
-    } finally {
-      await adapter.releaseAdvisoryLock?.(Migrator._LOCK_ID);
+      fnResult = await fn();
+    } catch (e) {
+      fnError = e;
     }
+    const released = await adapter.releaseAdvisoryLock?.(lockId);
+    if (fnError !== _sentinel) throw fnError;
+    if (released === false) {
+      throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
+    }
+    return fnResult as T;
   }
 
   /**
@@ -1792,7 +1825,8 @@ export class Migrator {
 
   /**
    * Acquire the migrator advisory lock, run fn, then release it.
-   * Raises ConcurrentMigrationError if the lock cannot be acquired.
+   * Raises ConcurrentMigrationError if the lock cannot be acquired or released.
+   * No-op (runs fn directly) when the adapter does not support advisory locks.
    *
    * @internal
    * Mirrors: ActiveRecord::Migrator#with_advisory_lock
@@ -1803,14 +1837,19 @@ export class Migrator {
 
   /**
    * Return the integer lock ID used for the migrator advisory lock.
-   * Derived from a fixed salt (Rails uses Zlib.crc32 of "googol") so
-   * every process targeting the same database uses the same ID.
+   * Mirrors Rails: `MIGRATOR_SALT * Zlib.crc32(connection.current_database)`.
+   * Falls back to the salt alone when the adapter doesn't expose currentDatabase.
    *
    * @internal
    * Mirrors: ActiveRecord::Migrator#generate_migrator_advisory_lock_id
    */
-  generateMigratorAdvisoryLockId(): number {
-    return Migrator._LOCK_ID;
+  async generateMigratorAdvisoryLockId(): Promise<number> {
+    const adapter = this._adapter as unknown as { currentDatabase?(): Promise<string> };
+    if (typeof adapter.currentDatabase === "function") {
+      const dbName = await adapter.currentDatabase();
+      return Migrator._MIGRATOR_SALT * _crc32(dbName);
+    }
+    return Migrator._MIGRATOR_SALT;
   }
 
   /**
