@@ -5,7 +5,6 @@
  * Instance methods are this-typed functions on the module object.
  * The [included] hook registers validateAssociations onto the class.
  */
-import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import type { ValidationContextArg } from "./validations.js";
 import { CompositePrimaryKeyMismatchError } from "./associations/errors.js";
@@ -496,134 +495,311 @@ function propagateErrors(parent: Base, child: Base, assocName: string): void {
 }
 
 /** @internal */
-function initInternals(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#init_internals is not implemented",
+function initInternals(this: any): void {
+  this._alreadyCalled = null;
+}
+
+/** @internal */
+function associatedRecordsToValidateOrSave(
+  association: any,
+  newRecord: boolean,
+  autosave: boolean,
+): any[] | null {
+  const raw = association?.target;
+  if (raw == null) return null;
+  const target: any[] = Array.isArray(raw) ? raw : [raw];
+  if (newRecord) return target;
+  if (autosave) return target.filter((r: any) => r.changedForAutosave?.() ?? false);
+  return target.filter((r: any) => r.isNewRecord?.() ?? false);
+}
+
+/** @internal */
+function isNestedRecordsChangedForAutosave(this: any): boolean {
+  return _nestedRecordsChangedForAutosave(this);
+}
+
+/** @internal */
+function validateHasOneAssociation(this: any, reflection: any): void {
+  const record =
+    this._cachedAssociations?.get(reflection.name) ??
+    this._preloadedAssociations?.get(reflection.name);
+  if (!record || typeof record !== "object" || Array.isArray(record)) return;
+  if (!(record.changedForAutosave?.() ?? false)) return;
+  // Mirrors Rails: skip if the inverse belongs_to is currently validating or autosaving
+  // to prevent infinite mutual-validation loops.
+  const inverse =
+    typeof reflection.inverseOf === "function"
+      ? reflection.inverseOf()
+      : (reflection.inverseOf ?? null);
+  if (inverse) {
+    const inverseLoaded =
+      record._cachedAssociations?.has(inverse.name) ||
+      record._preloadedAssociations?.has(inverse.name);
+    if (
+      inverseLoaded &&
+      (record.isValidatingBelongsToFor?.(inverse) || record.isAutosavingBelongsToFor?.(inverse))
+    )
+      return;
+  }
+  isAssociationValid(reflection, record, this);
+}
+
+/** @internal */
+function validateBelongsToAssociation(this: any, reflection: any): void {
+  const record =
+    this._cachedAssociations?.get(reflection.name) ??
+    this._preloadedAssociations?.get(reflection.name);
+  if (!record || typeof record !== "object") return;
+  if (!(record.changedForAutosave?.() ?? false)) return;
+  _setValidatingBelongsToFor(this, reflection, true);
+  try {
+    isAssociationValid(reflection, record, this);
+  } finally {
+    _setValidatingBelongsToFor(this, reflection, false);
+  }
+}
+
+/** @internal */
+function validateCollectionAssociation(this: any, reflection: any): void {
+  // Mirrors Rails: use associatedRecordsToValidateOrSave to filter by new_record/autosave state.
+  const association = {
+    target:
+      this._cachedAssociations?.get(reflection.name) ??
+      this._preloadedAssociations?.get(reflection.name),
+  };
+  const records = associatedRecordsToValidateOrSave(
+    association,
+    typeof this.isNewRecord === "function" ? this.isNewRecord() : false,
+    !!reflection.options?.autosave,
+  );
+  if (!records) return;
+  for (const record of records) {
+    isAssociationValid(reflection, record, this);
+  }
+}
+
+/** @internal */
+function isAssociationValid(reflection: any, record: any, owner: any): boolean {
+  if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;
+  if (reflection.options?.autosave && isMarkedForDestruction(record)) return true;
+  // Mirror Rails: only forward a custom (non-:create/:update) validation context.
+  const context: ValidationContextArg | undefined =
+    typeof owner?.customValidationContext === "function" && owner.customValidationContext()
+      ? owner._validationContext
+      : undefined;
+  const isChildValid = typeof record.isValid === "function" ? record.isValid(context) : true;
+  if (!isChildValid) {
+    const parentErrors = owner?.errors;
+    if (parentErrors && reflection.options?.autosave) {
+      const msgs = (
+        Array.isArray(record.errors?.fullMessages) ? record.errors.fullMessages : []
+      ) as string[];
+      for (const msg of msgs) parentErrors.add("base", "invalid", { message: msg });
+    } else if (parentErrors) {
+      parentErrors.add(reflection.name ?? "base", "invalid");
+    }
+  }
+  return isChildValid;
+}
+
+/** @internal */
+function aroundSaveCollectionAssociation(
+  this: any,
+  fn: () => void | Promise<any>,
+): void | Promise<any> {
+  const prev = this._newRecordBeforeSave ?? false;
+  this._newRecordBeforeSave =
+    !prev && (typeof this.isNewRecord === "function" ? this.isNewRecord() : false);
+  const restore = () => {
+    this._newRecordBeforeSave = prev;
+  };
+  let result: void | Promise<any>;
+  try {
+    result = fn();
+  } catch (e) {
+    restore();
+    throw e;
+  }
+  if (result != null && typeof (result as any).then === "function") {
+    return (result as Promise<any>).then(
+      (v) => {
+        restore();
+        return v;
+      },
+      (e) => {
+        restore();
+        throw e;
+      },
+    );
+  }
+  restore();
+  return result;
+}
+
+/** @internal */
+async function saveCollectionAssociation(this: any, reflection: any): Promise<boolean> {
+  return autosaveHasMany(this, {
+    name: reflection.name,
+    type: "hasMany",
+    options: reflection.options ?? {},
+  });
+}
+
+/** @internal */
+async function saveHasOneAssociation(this: any, reflection: any): Promise<boolean> {
+  return autosaveHasOne(this, {
+    name: reflection.name,
+    type: "hasOne",
+    options: reflection.options ?? {},
+  });
+}
+
+/** @internal */
+function is_recordChanged(reflection: any, record: any, key: any[]): boolean {
+  const fkCols: string[] = Array.isArray(reflection.foreignKey)
+    ? reflection.foreignKey
+    : [reflection.foreignKey];
+  return (
+    (typeof record.isNewRecord === "function" ? record.isNewRecord() : false) ||
+    isAssociationForeignKeyChanged(reflection, record, key) ||
+    isInversePolymorphicAssociationChanged(reflection, record) ||
+    (typeof record.willSaveChangeToAttribute === "function"
+      ? fkCols.some((col) => record.willSaveChangeToAttribute(col))
+      : false)
   );
 }
 
 /** @internal */
-function associatedRecordsToValidateOrSave(association: any, newRecord: any, autosave: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#associated_records_to_validate_or_save is not implemented",
-  );
+function isAssociationForeignKeyChanged(reflection: any, record: any, key: any[]): boolean {
+  if (reflection.throughReflection) return false;
+  const fk: string[] = Array.isArray(reflection.foreignKey)
+    ? reflection.foreignKey
+    : [reflection.foreignKey];
+  if (!fk.every((k: string) => record.hasAttribute?.(k) !== false)) return false;
+  const recordFk = fk.map((k: string) => String(record._readAttribute?.(k) ?? ""));
+  const keyArr = (Array.isArray(key) ? key : [key]).map((v) => String(v ?? ""));
+  return recordFk.join("\0") !== keyArr.join("\0");
 }
 
 /** @internal */
-function isNestedRecordsChangedForAutosave(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#nested_records_changed_for_autosave? is not implemented",
-  );
+function isInversePolymorphicAssociationChanged(reflection: any, record: any): boolean {
+  const inverse =
+    typeof reflection.inverseOf === "function"
+      ? reflection.inverseOf()
+      : (reflection.inverseOf ?? null);
+  if (!inverse?.options?.polymorphic) return false;
+  return reflection.activeRecord !== record?.constructor;
 }
 
 /** @internal */
-function validateHasOneAssociation(reflection: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#validate_has_one_association is not implemented",
-  );
+async function saveBelongsToAssociation(this: any, reflection: any): Promise<boolean> {
+  return _autosaveBelongsTo(this, {
+    name: reflection.name,
+    type: "belongsTo",
+    options: reflection.options ?? {},
+  });
 }
 
 /** @internal */
-function validateBelongsToAssociation(reflection: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#validate_belongs_to_association is not implemented",
-  );
+function computePrimaryKey(reflection: any, record: any): string | string[] {
+  if (reflection.options?.primaryKey) return reflection.options.primaryKey;
+  const ctor = record?.constructor as any;
+  if (Array.isArray(ctor?.primaryKey)) {
+    const pk: string[] = ctor.primaryKey;
+    return pk.includes("id") ? "id" : pk;
+  }
+  return ctor?.primaryKey ?? "id";
 }
 
 /** @internal */
-function validateCollectionAssociation(reflection: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#validate_collection_association is not implemented",
-  );
+function _ensureNoDuplicateErrors(this: any): void {
+  if (typeof this.errors?.uniqBang === "function") this.errors.uniqBang();
 }
 
 /** @internal */
-function isAssociationValid(association: any, record: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#association_valid? is not implemented",
-  );
+function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) => any): void {
+  if (typeof klass.prototype?.[name] === "function") return;
+  if (klass.prototype) {
+    klass.prototype[name] = function (this: any) {
+      this._alreadyCalled ??= Object.create(null);
+      if (this._alreadyCalled[name]) return true;
+      this._alreadyCalled[name] = true;
+      const clear = () => {
+        this._alreadyCalled[name] = false;
+      };
+      let result: any;
+      try {
+        result = fn.call(this);
+      } catch (e) {
+        clear();
+        throw e;
+      }
+      // Keep the guard set until async work settles to prevent re-entrant autosave cycles.
+      if (result != null && typeof result.then === "function") {
+        return result.then(
+          (v: any) => {
+            clear();
+            return v;
+          },
+          (e: any) => {
+            clear();
+            throw e;
+          },
+        );
+      }
+      clear();
+      return result;
+    };
+  }
 }
 
 /** @internal */
-function aroundSaveCollectionAssociation(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#around_save_collection_association is not implemented",
-  );
+function addAutosaveAssociationCallbacks(klass: any, reflection: any): void {
+  const saveName = `autosaveAssociatedRecordsFor_${reflection.name}`;
+  const isCol =
+    typeof reflection.isCollection === "function"
+      ? reflection.isCollection()
+      : !!reflection.collection;
+  const isHasOne =
+    typeof reflection.hasOne === "function" ? reflection.hasOne() : !!reflection.hasOne;
+  if (isCol) {
+    defineNonCyclicMethod(klass, saveName, function (this: any) {
+      return saveCollectionAssociation.call(this, reflection);
+    });
+  } else if (isHasOne) {
+    defineNonCyclicMethod(klass, saveName, function (this: any) {
+      return saveHasOneAssociation.call(this, reflection);
+    });
+  } else {
+    defineNonCyclicMethod(klass, saveName, function (this: any) {
+      return saveBelongsToAssociation.call(this, reflection);
+    });
+  }
+  defineAutosaveValidationCallbacks(klass, reflection);
 }
 
 /** @internal */
-function saveCollectionAssociation(reflection: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#save_collection_association is not implemented",
-  );
-}
-
-/** @internal */
-function saveHasOneAssociation(reflection: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#save_has_one_association is not implemented",
-  );
-}
-
-/** @internal */
-function is_recordChanged(reflection: any, record: any, key: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#_record_changed? is not implemented",
-  );
-}
-
-/** @internal */
-function isAssociationForeignKeyChanged(reflection: any, record: any, key: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#association_foreign_key_changed? is not implemented",
-  );
-}
-
-/** @internal */
-function isInversePolymorphicAssociationChanged(reflection: any, record: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#inverse_polymorphic_association_changed? is not implemented",
-  );
-}
-
-/** @internal */
-function saveBelongsToAssociation(reflection: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#save_belongs_to_association is not implemented",
-  );
-}
-
-/** @internal */
-function computePrimaryKey(reflection: any, record: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#compute_primary_key is not implemented",
-  );
-}
-
-/** @internal */
-function _ensureNoDuplicateErrors(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#_ensure_no_duplicate_errors is not implemented",
-  );
-}
-
-/** @internal */
-function defineNonCyclicMethod(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#define_non_cyclic_method is not implemented",
-  );
-}
-
-/** @internal */
-function addAutosaveAssociationCallbacks(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#add_autosave_association_callbacks is not implemented",
-  );
-}
-
-/** @internal */
-function defineAutosaveValidationCallbacks(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::AutosaveAssociation#define_autosave_validation_callbacks is not implemented",
-  );
+function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
+  if (!reflection.validate) return;
+  const validationName = `validateAssociatedRecordsFor_${reflection.name}`;
+  if (typeof klass.prototype?.[validationName] === "function") return;
+  const isCol =
+    typeof reflection.isCollection === "function"
+      ? reflection.isCollection()
+      : !!reflection.collection;
+  const isHasOne =
+    typeof reflection.hasOne === "function" ? reflection.hasOne() : !!reflection.hasOne;
+  if (isCol) {
+    defineNonCyclicMethod(klass, validationName, function (this: any) {
+      return validateCollectionAssociation.call(this, reflection);
+    });
+  } else if (isHasOne) {
+    defineNonCyclicMethod(klass, validationName, function (this: any) {
+      return validateHasOneAssociation.call(this, reflection);
+    });
+  } else {
+    defineNonCyclicMethod(klass, validationName, function (this: any) {
+      return validateBelongsToAssociation.call(this, reflection);
+    });
+  }
 }
