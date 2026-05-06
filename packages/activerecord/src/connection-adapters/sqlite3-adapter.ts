@@ -357,28 +357,39 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   // Mirrors: SQLite3::DatabaseStatements#begin_deferred_transaction
   async beginDeferredTransaction(isolation?: string | null): Promise<void> {
-    if (isolation) return this.beginIsolatedDbTransaction(isolation);
-    return this.beginDbTransaction();
+    if (isolation) return this._internalBeginTransaction("DEFERRED", isolation);
+    this.driver.exec("BEGIN DEFERRED TRANSACTION");
+    this._inTransaction = true;
   }
 
   // Mirrors: SQLite3::DatabaseStatements#begin_isolated_db_transaction
   async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    if (isolation !== "read_uncommitted") {
-      throw new TransactionIsolationError(
-        "SQLite3 only supports the `read_uncommitted` transaction isolation level",
-      );
+    return this._internalBeginTransaction("DEFERRED", isolation);
+  }
+
+  // Mirrors: SQLite3::DatabaseStatements#internal_begin_transaction
+  private async _internalBeginTransaction(mode: string, isolation: string | null): Promise<void> {
+    if (isolation) {
+      if (isolation !== "read_uncommitted") {
+        throw new TransactionIsolationError(
+          "SQLite3 only supports the `read_uncommitted` transaction isolation level",
+        );
+      }
+      if (!this.isSharedCache()) {
+        throw new TransactionIsolationError(
+          "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
+        );
+      }
     }
-    if (!this.isSharedCache()) {
-      throw new TransactionIsolationError(
-        "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
-      );
+    this.driver.exec(`BEGIN ${mode} TRANSACTION`);
+    this._inTransaction = true;
+    if (isolation) {
+      const row = this.driver.prepare("PRAGMA read_uncommitted").get() as
+        | { read_uncommitted: number }
+        | undefined;
+      this._previousReadUncommitted = row?.read_uncommitted ?? 0;
+      this.driver.exec("PRAGMA read_uncommitted=ON");
     }
-    const row = this.driver.prepare("PRAGMA read_uncommitted").get() as
-      | { read_uncommitted: number }
-      | undefined;
-    this._previousReadUncommitted = row?.read_uncommitted ?? 0;
-    this.driver.exec("PRAGMA read_uncommitted=ON");
-    await this.beginDbTransaction();
   }
 
   // Mirrors: SQLite3::DatabaseStatements#reset_isolation_level
@@ -391,13 +402,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async beginDbTransaction(): Promise<void> {
     if (!this._inTransaction) {
-      this.driver.exec("BEGIN");
+      this.driver.exec("BEGIN IMMEDIATE TRANSACTION");
       this._inTransaction = true;
     }
   }
 
   async beginTransaction(): Promise<void> {
-    this.driver.exec("BEGIN");
+    this.driver.exec("BEGIN IMMEDIATE TRANSACTION");
     this._inTransaction = true;
   }
 
@@ -405,7 +416,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * Commit the current transaction.
    */
   async commitDbTransaction(): Promise<void> {
-    this.driver.exec("COMMIT");
+    this.driver.exec("COMMIT TRANSACTION");
     this._inTransaction = false;
   }
 
@@ -414,7 +425,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async rollbackDbTransaction(): Promise<void> {
-    this.driver.exec("ROLLBACK");
+    try {
+      this.driver.exec("ROLLBACK TRANSACTION");
+    } catch (e) {
+      // Mirrors Rails: rescue ConnectionNotEstablished, ConnectionFailed.
+      // A closed/dropped connection is an implicit rollback; re-throw anything else.
+      const translated = this._translateException(e, "ROLLBACK TRANSACTION", []);
+      if (!(translated instanceof ConnectionNotEstablished)) throw translated;
+    }
     this._inTransaction = false;
   }
 
