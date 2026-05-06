@@ -168,11 +168,10 @@ export async function performQuery(
 export function castResult(rawResult: Mysql2RawResult): Result {
   if (rawResult.rows == null) return Result.empty();
 
-  const fields = rawResult.fields.map((f) => f.name);
-  const result = fields.length === 0 ? Result.empty() : Result.fromRowHashes(rawResult.rows);
-
+  const columns = rawResult.fields.map((f) => f.name);
+  const rows = rawResult.rows.map((row) => columns.map((col) => row[col]));
+  const result = columns.length === 0 ? Result.empty() : new Result(columns, rows);
   freeRawResult(rawResult);
-
   return result;
 }
 
@@ -186,8 +185,9 @@ export function affectedRows(this: PerformQueryHost, rawResult: Mysql2RawResult)
 }
 
 /**
- * No-op in TS: node-mysql2 GCs results and manages stmt lifecycle automatically.
- * Rails calls `result.free` + COM_STMT_CLOSE via `@_ar_stmt_to_close`.
+ * No-op in TS: node-mysql2 GCs results automatically; there is no `free()`
+ * method or stmt-close hook equivalent to Rails' `raw_result.free` +
+ * `@_ar_stmt_to_close.close`.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#free_raw_result
  * @internal
