@@ -95,6 +95,20 @@ export const AutosaveAssociation = {
   [included](klass: any) {
     klass._validateAssociationsFn = validateAssociations;
   },
+
+  associatedRecordsToValidateOrSave,
+  isNestedRecordsChangedForAutosave,
+  validateHasOneAssociation,
+  validateBelongsToAssociation,
+  validateCollectionAssociation,
+  isAssociationValid,
+  aroundSaveCollectionAssociation,
+  saveCollectionAssociation,
+  saveHasOneAssociation,
+  is_recordChanged,
+  isAssociationForeignKeyChanged,
+  isInversePolymorphicAssociationChanged,
+  saveBelongsToAssociation,
 };
 
 // ---------------------------------------------------------------------------
@@ -500,7 +514,7 @@ function initInternals(this: any): void {
 }
 
 /** @internal */
-function associatedRecordsToValidateOrSave(
+export function associatedRecordsToValidateOrSave(
   association: any,
   newRecord: boolean,
   autosave: boolean,
@@ -514,12 +528,12 @@ function associatedRecordsToValidateOrSave(
 }
 
 /** @internal */
-function isNestedRecordsChangedForAutosave(this: any): boolean {
+export function isNestedRecordsChangedForAutosave(this: any): boolean {
   return _nestedRecordsChangedForAutosave(this);
 }
 
 /** @internal */
-function validateHasOneAssociation(this: any, reflection: any): void {
+export function validateHasOneAssociation(this: any, reflection: any): void {
   const record =
     this._cachedAssociations?.get(reflection.name) ??
     this._preloadedAssociations?.get(reflection.name);
@@ -545,7 +559,7 @@ function validateHasOneAssociation(this: any, reflection: any): void {
 }
 
 /** @internal */
-function validateBelongsToAssociation(this: any, reflection: any): void {
+export function validateBelongsToAssociation(this: any, reflection: any): void {
   const record =
     this._cachedAssociations?.get(reflection.name) ??
     this._preloadedAssociations?.get(reflection.name);
@@ -560,7 +574,7 @@ function validateBelongsToAssociation(this: any, reflection: any): void {
 }
 
 /** @internal */
-function validateCollectionAssociation(this: any, reflection: any): void {
+export function validateCollectionAssociation(this: any, reflection: any): void {
   // Mirrors Rails: use associatedRecordsToValidateOrSave to filter by new_record/autosave state.
   const association = {
     target:
@@ -579,7 +593,7 @@ function validateCollectionAssociation(this: any, reflection: any): void {
 }
 
 /** @internal */
-function isAssociationValid(reflection: any, record: any, owner: any): boolean {
+export function isAssociationValid(reflection: any, record: any, owner: any): boolean {
   if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;
   if (reflection.options?.autosave && isMarkedForDestruction(record)) return true;
   // Mirror Rails: only forward a custom (non-:create/:update) validation context.
@@ -603,7 +617,7 @@ function isAssociationValid(reflection: any, record: any, owner: any): boolean {
 }
 
 /** @internal */
-function aroundSaveCollectionAssociation(
+export function aroundSaveCollectionAssociation(
   this: any,
   fn: () => void | Promise<any>,
 ): void | Promise<any> {
@@ -637,7 +651,7 @@ function aroundSaveCollectionAssociation(
 }
 
 /** @internal */
-async function saveCollectionAssociation(this: any, reflection: any): Promise<boolean> {
+export async function saveCollectionAssociation(this: any, reflection: any): Promise<boolean> {
   return autosaveHasMany(this, {
     name: reflection.name,
     type: "hasMany",
@@ -646,7 +660,7 @@ async function saveCollectionAssociation(this: any, reflection: any): Promise<bo
 }
 
 /** @internal */
-async function saveHasOneAssociation(this: any, reflection: any): Promise<boolean> {
+export async function saveHasOneAssociation(this: any, reflection: any): Promise<boolean> {
   return autosaveHasOne(this, {
     name: reflection.name,
     type: "hasOne",
@@ -655,7 +669,7 @@ async function saveHasOneAssociation(this: any, reflection: any): Promise<boolea
 }
 
 /** @internal */
-function is_recordChanged(reflection: any, record: any, key: any[]): boolean {
+export function is_recordChanged(reflection: any, record: any, key: any[]): boolean {
   const fkCols: string[] = Array.isArray(reflection.foreignKey)
     ? reflection.foreignKey
     : [reflection.foreignKey];
@@ -670,7 +684,7 @@ function is_recordChanged(reflection: any, record: any, key: any[]): boolean {
 }
 
 /** @internal */
-function isAssociationForeignKeyChanged(reflection: any, record: any, key: any[]): boolean {
+export function isAssociationForeignKeyChanged(reflection: any, record: any, key: any[]): boolean {
   if (reflection.throughReflection) return false;
   const fk: string[] = Array.isArray(reflection.foreignKey)
     ? reflection.foreignKey
@@ -682,7 +696,7 @@ function isAssociationForeignKeyChanged(reflection: any, record: any, key: any[]
 }
 
 /** @internal */
-function isInversePolymorphicAssociationChanged(reflection: any, record: any): boolean {
+export function isInversePolymorphicAssociationChanged(reflection: any, record: any): boolean {
   const inverse =
     typeof reflection.inverseOf === "function"
       ? reflection.inverseOf()
@@ -692,7 +706,7 @@ function isInversePolymorphicAssociationChanged(reflection: any, record: any): b
 }
 
 /** @internal */
-async function saveBelongsToAssociation(this: any, reflection: any): Promise<boolean> {
+export async function saveBelongsToAssociation(this: any, reflection: any): Promise<boolean> {
   return _autosaveBelongsTo(this, {
     name: reflection.name,
     type: "belongsTo",

@@ -1174,7 +1174,7 @@ function _queryConstraintsHash(this: any): Record<string, unknown> {
 function destroyAssociations(this: PersistencePrivateHost): void {}
 
 /** @internal */
-function destroyRow(this: PersistencePrivateHost): Promise<number> {
+export function destroyRow(this: PersistencePrivateHost): Promise<number> {
   return _deleteRow.call(this);
 }
 
@@ -1184,7 +1184,7 @@ function _deleteRow(this: PersistencePrivateHost): Promise<number> {
 }
 
 /** @internal */
-function _touchRow(
+export function _touchRow(
   this: any,
   attributeNames: string[],
   time?: Temporal.Instant | null,
@@ -1197,7 +1197,7 @@ function _touchRow(
 }
 
 /** @internal */
-function _updateRow(
+export function _updateRow(
   this: PersistencePrivateHost,
   attributeNames: string[],
   _attemptedAction = "update",

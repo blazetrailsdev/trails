@@ -130,3 +130,13 @@ export function findParameterPosition(multiparameterName: string): number {
   const match = multiparameterName.match(/\((\d+)/);
   return match ? parseInt(match[1], 10) : 0;
 }
+
+export const InstanceMethods = {
+  _assignAttributes,
+  assignNestedParameterAttributes,
+  assignMultiparameterAttributes,
+  executeCallstackForMultiparameterAttributes,
+  extractCallstackForMultiparameterAttributes,
+  typeCastAttributeValue,
+  findParameterPosition,
+};

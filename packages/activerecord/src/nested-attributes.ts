@@ -266,19 +266,19 @@ const UNASSIGNABLE_KEYS = new Set(["id", "_destroy"]);
 const _booleanType = new BooleanType();
 
 /** @internal */
-function hasDestroyFlag(hash: Record<string, unknown>): boolean {
+export function hasDestroyFlag(hash: Record<string, unknown>): boolean {
   return _booleanType.cast(hash["_destroy"]) === true;
 }
 
 /** @internal */
-function isAllowDestroy(record: Base, associationName: string): boolean {
+export function isAllowDestroy(record: Base, associationName: string): boolean {
   const configs: NestedAttributeConfig[] =
     (record.constructor as any)._nestedAttributeConfigs ?? [];
   return configs.find((c) => c.associationName === associationName)?.options.allowDestroy ?? false;
 }
 
 /** @internal */
-function isWillBeDestroyed(
+export function isWillBeDestroyed(
   record: Base,
   associationName: string,
   attributes: Record<string, unknown>,
@@ -287,7 +287,7 @@ function isWillBeDestroyed(
 }
 
 /** @internal */
-function callRejectIf(
+export function callRejectIf(
   record: Base,
   associationName: string,
   attributes: Record<string, unknown>,
@@ -300,7 +300,7 @@ function callRejectIf(
 }
 
 /** @internal */
-function isRejectNewRecord(
+export function isRejectNewRecord(
   record: Base,
   associationName: string,
   attributes: Record<string, unknown>,
@@ -312,7 +312,7 @@ function isRejectNewRecord(
 }
 
 /** @internal */
-function assignToOrMarkForDestruction(
+export function assignToOrMarkForDestruction(
   childRecord: Base,
   attributes: Record<string, unknown>,
   allowDestroy: boolean,
@@ -328,7 +328,7 @@ function assignToOrMarkForDestruction(
 }
 
 /** @internal */
-function findRecordById(klass: typeof Base, records: Base[], id: unknown): Base | undefined {
+export function findRecordById(klass: typeof Base, records: Base[], id: unknown): Base | undefined {
   if (Array.isArray((klass as any).primaryKey)) {
     const needle = (Array.isArray(id) ? id : [id]).map(String);
     return records.find((r) => {
@@ -340,7 +340,7 @@ function findRecordById(klass: typeof Base, records: Base[], id: unknown): Base 
 }
 
 /** @internal */
-function raiseNestedAttributesRecordNotFoundBang(
+export function raiseNestedAttributesRecordNotFoundBang(
   record: Base,
   associationName: string,
   recordId: unknown,
@@ -358,7 +358,7 @@ function raiseNestedAttributesRecordNotFoundBang(
 }
 
 /** @internal */
-function checkRecordLimitBang(
+export function checkRecordLimitBang(
   limit: number | ((...args: unknown[]) => number) | undefined,
   attributesCollection: unknown[],
 ): void {
@@ -396,7 +396,7 @@ function generateAssociationWriter(
 }
 
 /** @internal */
-function assignNestedAttributesForOneToOneAssociation(
+export function assignNestedAttributesForOneToOneAssociation(
   record: Base,
   associationName: string,
   attributes: Record<string, unknown>,
@@ -415,7 +415,7 @@ function assignNestedAttributesForOneToOneAssociation(
 }
 
 /** @internal */
-function assignNestedAttributesForCollectionAssociation(
+export function assignNestedAttributesForCollectionAssociation(
   record: Base,
   associationName: string,
   attributesCollection: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
@@ -448,3 +448,18 @@ function assignNestedAttributesForCollectionAssociation(
   }
   (record as any)._pendingNestedAttributes.set(associationName, attrs);
 }
+
+export const InstanceMethods = {
+  _destroy,
+  hasDestroyFlag,
+  isAllowDestroy,
+  isWillBeDestroyed,
+  callRejectIf,
+  isRejectNewRecord,
+  assignToOrMarkForDestruction,
+  findRecordById,
+  raiseNestedAttributesRecordNotFoundBang,
+  checkRecordLimitBang,
+  assignNestedAttributesForOneToOneAssociation,
+  assignNestedAttributesForCollectionAssociation,
+};
