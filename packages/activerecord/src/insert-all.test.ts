@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, defineEnum } from "./index.js";
-
+import { InsertAll } from "./insert-all.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
@@ -817,5 +817,74 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
 
     const books = await Book.all().toArray();
     expect(books.length).toBe(2);
+  });
+
+  // Rails: disallow_raw_sql! is called on on_duplicate and returning in the InsertAll constructor
+  // (lines 24-25 of insert_all.rb). Tested via InsertAll directly since the relation wrappers
+  // insertAll/upsertAll have their own restricted option types.
+  it("rejects raw SQL string for onDuplicate", () => {
+    class Book extends Base {
+      static {
+        this._tableName = "books";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(
+      () =>
+        new InsertAll(Book.all() as any, adapter, [{ title: "x" }], {
+          onDuplicate: "title = 'injected'" as any,
+        }),
+    ).toThrow("Dangerous query method");
+  });
+
+  it("allows Arel.sql for onDuplicate", async () => {
+    const { sql } = await import("@blazetrails/arel");
+    class Book extends Base {
+      static {
+        this._tableName = "books";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(
+      () =>
+        new InsertAll(Book.all() as any, adapter, [{ id: 1, title: "x" }], {
+          onDuplicate: sql("title = excluded.title"),
+        }),
+    ).not.toThrow();
+  });
+
+  it("rejects raw SQL string for returning", () => {
+    class Book extends Base {
+      static {
+        this._tableName = "books";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    expect(
+      () =>
+        new InsertAll(Book.all() as any, adapter, [{ title: "x" }], {
+          returning: "DROP TABLE books" as any,
+        }),
+    ).toThrow("Dangerous query method");
+  });
+
+  it("allows safe column name string for returning", () => {
+    class Book extends Base {
+      static {
+        this._tableName = "books";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    // plain column-name string (Ruby symbol equivalent) must not throw
+    expect(
+      () =>
+        new InsertAll(Book.all() as any, adapter, [{ id: 1, title: "x" }], { returning: "title" }),
+    ).not.toThrow();
   });
 });

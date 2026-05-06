@@ -1,9 +1,9 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { NotImplementedError } from "./errors.js";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { SerializeCastValue } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { quoteSqlValue } from "./base.js";
+import { stiName } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./adapter.js";
 
@@ -12,6 +12,13 @@ type AdapterDialect = AdapterName;
 
 const TIMESTAMP_COLUMNS = ["created_at", "updated_at"] as const;
 const UPDATE_TIMESTAMP_COLUMNS = ["updated_at"] as const;
+
+// Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#column_name_with_order_matcher
+// Intentionally more restrictive than Rails: quoted identifiers ("col", `col`) and COLLATE
+// clauses are not matched. Callers with those forms must use Arel.sql(). This is the safe
+// direction — false-negatives force Arel.sql(), false-positives would allow SQL injection.
+const COLUMN_NAME_WITH_ORDER =
+  /^\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*\s*$/i;
 
 export interface InsertAllOptions {
   onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
@@ -63,6 +70,10 @@ export class InsertAll {
     this.updateSql = undefined;
     this.onDuplicate = undefined;
 
+    if (options.onDuplicate !== undefined) this.disallowRawSqlBang(options.onDuplicate);
+    if (options.returning !== undefined && options.returning !== false)
+      this.disallowRawSqlBang(options.returning);
+
     if (options.returning !== undefined) {
       this.returning =
         options.returning === false ||
@@ -80,6 +91,8 @@ export class InsertAll {
     if (this.inserts.length === 0) {
       this.keys = new Set();
     } else {
+      this.resolveSti();
+      this.resolveAttributeAliases();
       this.keys = new Set(Object.keys(this.inserts[0]));
     }
 
@@ -91,9 +104,9 @@ export class InsertAll {
       this.keys.add(key);
     }
 
-    this._verifyAttributes();
-    this._configureDuplicateLogic(options.onDuplicate);
-    this._ensureValidOptionsForConnection();
+    this.verifyAttributes();
+    this.configureOnDuplicateUpdateLogic(options.onDuplicate);
+    this.ensureValidOptionsForConnectionBang();
   }
 
   async execute(): Promise<number> {
@@ -105,7 +118,7 @@ export class InsertAll {
 
   updatableColumns(): string[] {
     if (this._updatableColumns) return this._updatableColumns;
-    const exclude = new Set([...this.primaryKeys(), ...this._uniqueByColumns()]);
+    const exclude = new Set([...this.readonlyColumns(), ...this.uniqueByColumns()]);
     if (this.recordTimestamps() && !this.updateOnly && !this.updateSql) {
       for (const col of TIMESTAMP_COLUMNS) {
         exclude.add(col);
@@ -129,15 +142,13 @@ export class InsertAll {
   }
 
   mapKeyWithValue<T>(fn: (key: string, value: unknown) => T): T[][] {
-    const now = this.recordTimestamps() ? Temporal.Now.instant() : undefined;
+    const timestamps = this.recordTimestamps() ? this.timestampsForCreate() : undefined;
     const keysList = [...this.keysIncludingTimestamps()];
     return this.inserts.map((row) => {
       const merged = { ...this._scopeAttributes, ...row };
-      if (now) {
-        for (const col of TIMESTAMP_COLUMNS) {
-          if (this.model._attributeDefinitions.has(col) && merged[col] == null) {
-            merged[col] = now;
-          }
+      if (timestamps) {
+        for (const [col, val] of Object.entries(timestamps)) {
+          if (merged[col] == null) merged[col] = val;
         }
       }
       return keysList.map((key) => fn(key, merged[key]));
@@ -164,7 +175,8 @@ export class InsertAll {
     return this._keysIncludingTimestamps;
   }
 
-  private _verifyAttributes(): void {
+  /** @internal */
+  private verifyAttributes(): void {
     if (this.inserts.length <= 1) return;
     for (const row of this.inserts.slice(1)) {
       const rowKeys = new Set([...Object.keys(row), ...Object.keys(this._scopeAttributes)]);
@@ -174,8 +186,9 @@ export class InsertAll {
     }
   }
 
-  private _configureDuplicateLogic(onDuplicate: InsertAllOptions["onDuplicate"]): void {
-    if (onDuplicate instanceof Nodes.SqlLiteral && this.updateOnly !== undefined) {
+  /** @internal */
+  private configureOnDuplicateUpdateLogic(onDuplicate: InsertAllOptions["onDuplicate"]): void {
+    if (this.isCustomUpdateSqlProvided(onDuplicate) && this.updateOnly !== undefined) {
       throw new Error(
         "You can't set :update_only and provide custom update SQL via :on_duplicate at the same time",
       );
@@ -183,7 +196,7 @@ export class InsertAll {
     if (
       onDuplicate !== undefined &&
       onDuplicate !== "update" &&
-      !(onDuplicate instanceof Nodes.SqlLiteral) &&
+      !this.isCustomUpdateSqlProvided(onDuplicate) &&
       this.updateOnly !== undefined
     ) {
       throw new Error("Cannot use both onDuplicate and updateOnly");
@@ -192,8 +205,8 @@ export class InsertAll {
     if (this.updateOnly !== undefined) {
       this._updatableColumns = Array.isArray(this.updateOnly) ? this.updateOnly : [this.updateOnly];
       this.onDuplicate = this._updatableColumns.length === 0 ? "skip" : "update";
-    } else if (onDuplicate instanceof Nodes.SqlLiteral) {
-      this.updateSql = onDuplicate;
+    } else if (this.isCustomUpdateSqlProvided(onDuplicate)) {
+      this.updateSql = onDuplicate as Nodes.SqlLiteral;
       this.onDuplicate = "update";
     } else if (onDuplicate === "skip") {
       this.onDuplicate = "skip";
@@ -202,12 +215,18 @@ export class InsertAll {
     }
   }
 
-  private _uniqueByColumns(): string[] {
-    if (!this.uniqueBy) return [];
-    return Array.isArray(this.uniqueBy) ? this.uniqueBy : [this.uniqueBy];
+  /** @internal */
+  private isCustomUpdateSqlProvided(onDuplicate: InsertAllOptions["onDuplicate"]): boolean {
+    return onDuplicate instanceof Nodes.SqlLiteral;
   }
 
-  private _ensureValidOptionsForConnection(): void {
+  /** @internal */
+  private uniqueByColumns(): string[] {
+    return this.findUniqueIndexFor(this.uniqueBy);
+  }
+
+  /** @internal */
+  private ensureValidOptionsForConnectionBang(): void {
     if (
       this.returning &&
       typeof (this.connection as any).supportsInsertReturning === "function" &&
@@ -217,6 +236,100 @@ export class InsertAll {
         `${(this.connection as any).constructor?.name ?? "Adapter"} does not support INSERT...RETURNING`,
       );
     }
+  }
+
+  /** @internal */
+  private hasAttributeAliases(attributes: Record<string, unknown>): boolean {
+    // _attributeAliases is on the AttributeMethods mixin host, not yet declared on typeof Base
+    const aliases = (this.model as any)._attributeAliases as Record<string, string> | undefined;
+    if (!aliases) return false;
+    return Object.keys(attributes).some((attr) => attr in aliases);
+  }
+
+  /** @internal */
+  private resolveSti(): void {
+    // descendsFromActiveRecord? is not yet implemented; use inheritanceColumn as proxy
+    const inheritanceCol = this.model.inheritanceColumn;
+    if (!inheritanceCol) return;
+    const type = stiName(this.model);
+    for (const insert of this.inserts) {
+      if (insert[inheritanceCol] == null) {
+        insert[inheritanceCol] = type;
+      }
+    }
+  }
+
+  /** @internal */
+  private resolveAttributeAliases(): void {
+    if (!this.inserts[0] || !this.hasAttributeAliases(this.inserts[0])) return;
+    for (let i = 0; i < this.inserts.length; i++) {
+      const resolved: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(this.inserts[i])) {
+        resolved[this.resolveAttributeAlias(key)] = val;
+      }
+      this.inserts[i] = resolved;
+    }
+  }
+
+  /** @internal */
+  private resolveAttributeAlias(attribute: string): string {
+    const aliases = (this.model as any)._attributeAliases as Record<string, string> | undefined;
+    return aliases?.[attribute] ?? attribute;
+  }
+
+  /** @internal */
+  private findUniqueIndexFor(uniqueBy: string | string[] | undefined): string[] {
+    const nameOrCols =
+      uniqueBy == null ? this.primaryKeys() : Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy];
+    const sortedMatch = [...nameOrCols].sort().join(",");
+    const idx = this.uniqueIndexes().find(
+      (i: any) =>
+        nameOrCols.includes(i.name) ||
+        (Array.isArray(i.columns) && [...i.columns].sort().join(",") === sortedMatch),
+    ) as any;
+    if (idx) return Array.isArray(idx.columns) ? idx.columns : nameOrCols;
+    // uniqueBy == null → caller wants PK uniqueness; PKs are already in readonlyColumns()
+    // so returning [] here is equivalent (they're excluded from updatableColumns either way).
+    // uniqueBy matching primary keys explicitly → return the PK columns directly.
+    if (uniqueBy == null || sortedMatch === [...this.primaryKeys()].sort().join(","))
+      return uniqueBy == null ? [] : this.primaryKeys();
+    throw new Error(`No unique index found for ${JSON.stringify(uniqueBy)}`);
+  }
+
+  /** @internal */
+  private uniqueIndexes(): unknown[] {
+    const cache = this.model.schemaCache;
+    if (!cache) return [];
+    const indexes = (cache as any).indexes?.(this.model.arelTable.name) ?? [];
+    return (indexes as any[]).filter((i: any) => i.unique);
+  }
+
+  /** @internal */
+  private readonlyColumns(): string[] {
+    return [...this.primaryKeys(), ...this.model.readonlyAttributes];
+  }
+
+  /** @internal */
+  private disallowRawSqlBang(value: unknown, permit: RegExp = COLUMN_NAME_WITH_ORDER): void {
+    if (value instanceof Nodes.SqlLiteral) return;
+    if (typeof value !== "string") return;
+    if (permit.test(value)) return;
+    throw new Error(
+      `Dangerous query method called with raw SQL string: ${value}. ` +
+        "Known-safe values can be passed by wrapping them in Arel.sql().",
+    );
+  }
+
+  /** @internal */
+  private timestampsForCreate(): Record<string, unknown> {
+    const now = Temporal.Now.instant();
+    const result: Record<string, unknown> = {};
+    for (const col of TIMESTAMP_COLUMNS) {
+      if (this.model._attributeDefinitions.has(col)) {
+        result[col] = now;
+      }
+    }
+    return result;
   }
 }
 
@@ -439,91 +552,4 @@ export class Builder {
       }),
     );
   }
-}
-
-/** @internal */
-function hasAttributeAliases(attributes: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::InsertAll#has_attribute_aliases? is not implemented",
-  );
-}
-
-/** @internal */
-function resolveSti(): never {
-  throw new NotImplementedError("ActiveRecord::InsertAll#resolve_sti is not implemented");
-}
-
-/** @internal */
-function resolveAttributeAliases(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::InsertAll#resolve_attribute_aliases is not implemented",
-  );
-}
-
-/** @internal */
-function resolveAttributeAlias(attribute: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::InsertAll#resolve_attribute_alias is not implemented",
-  );
-}
-
-/** @internal */
-function configureOnDuplicateUpdateLogic(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::InsertAll#configure_on_duplicate_update_logic is not implemented",
-  );
-}
-
-/** @internal */
-function isCustomUpdateSqlProvided(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::InsertAll#custom_update_sql_provided? is not implemented",
-  );
-}
-
-/** @internal */
-function findUniqueIndexFor(uniqueBy: any): never {
-  throw new NotImplementedError("ActiveRecord::InsertAll#find_unique_index_for is not implemented");
-}
-
-/** @internal */
-function uniqueIndexes(): never {
-  throw new NotImplementedError("ActiveRecord::InsertAll#unique_indexes is not implemented");
-}
-
-/** @internal */
-function ensureValidOptionsForConnectionBang(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::InsertAll#ensure_valid_options_for_connection! is not implemented",
-  );
-}
-
-/** @internal */
-function toSql(): never {
-  throw new NotImplementedError("ActiveRecord::InsertAll#to_sql is not implemented");
-}
-
-/** @internal */
-function readonlyColumns(): never {
-  throw new NotImplementedError("ActiveRecord::InsertAll#readonly_columns is not implemented");
-}
-
-/** @internal */
-function uniqueByColumns(): never {
-  throw new NotImplementedError("ActiveRecord::InsertAll#unique_by_columns is not implemented");
-}
-
-/** @internal */
-function verifyAttributes(attributes: any): never {
-  throw new NotImplementedError("ActiveRecord::InsertAll#verify_attributes is not implemented");
-}
-
-/** @internal */
-function disallowRawSqlBang(value: any): never {
-  throw new NotImplementedError("ActiveRecord::InsertAll#disallow_raw_sql! is not implemented");
-}
-
-/** @internal */
-function timestampsForCreate(): never {
-  throw new NotImplementedError("ActiveRecord::InsertAll#timestamps_for_create is not implemented");
 }
