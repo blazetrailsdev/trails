@@ -72,4 +72,16 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     const result = await driver.pragma("journal_mode");
     expect(result).toBeDefined();
   });
+
+  it("driver.open is true while connected", () => {
+    expect(driver.open).toBe(true);
+  });
+
+  it("statement.reader is true for SELECT, false for INSERT", async () => {
+    const sel = await driver.prepare("SELECT 1");
+    expect(sel.reader).toBe(true);
+
+    const ins = await driver.prepare("INSERT INTO widgets (name, qty) VALUES (?, ?)");
+    expect(ins.reader).toBe(false);
+  });
 });

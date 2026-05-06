@@ -21,6 +21,8 @@ export interface SqliteStatement {
   all(...binds: unknown[]): unknown[] | Promise<unknown[]>;
   columns(): ColumnInfo[];
   setReadBigInts(on: boolean): void;
+  /** True when the statement returns rows (SELECT/PRAGMA that yields rows). */
+  readonly reader: boolean;
   finalize?(): void | Promise<void>;
 }
 
@@ -29,6 +31,8 @@ export interface SqliteDriver {
   exec(sql: string): void | Promise<void>;
   pragma(source: string, opts?: { simple?: boolean }): unknown | Promise<unknown>;
   close(): void | Promise<void>;
+  /** True while the database connection is open. */
+  readonly open: boolean;
   readonly raw: unknown;
 }
 

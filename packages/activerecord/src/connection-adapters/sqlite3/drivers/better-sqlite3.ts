@@ -25,6 +25,10 @@ class BetterSqlite3Statement implements SqliteStatement {
     return this.stmt.all(...binds) as unknown[];
   }
 
+  get reader(): boolean {
+    return this.stmt.reader;
+  }
+
   columns(): ColumnInfo[] {
     return this.stmt.columns().map((c) => ({
       name: c.name,
@@ -55,6 +59,10 @@ class BetterSqlite3Driver implements SqliteDriver {
 
   prepare(sql: string): BetterSqlite3Statement {
     return new BetterSqlite3Statement(this.raw.prepare(sql));
+  }
+
+  get open(): boolean {
+    return this.raw.open;
   }
 
   exec(sql: string): void {
