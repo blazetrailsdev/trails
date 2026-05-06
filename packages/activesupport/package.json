@@ -70,6 +70,10 @@
       "types": "./dist/sqlite-drivers/better-sqlite3.d.ts",
       "default": "./dist/sqlite-drivers/better-sqlite3.js"
     },
+    "./sqlite/node-sqlite": {
+      "types": "./dist/sqlite-drivers/node-sqlite.d.ts",
+      "default": "./dist/sqlite-drivers/node-sqlite.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

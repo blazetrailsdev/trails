@@ -78,6 +78,7 @@ export default defineConfig(
       "packages/activesupport/src/os-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
       "packages/activerecord/src/tsc-wrapper/**",
+      "packages/activesupport/src/sqlite-drivers/node-sqlite.ts",
       "packages/activesupport/src/gzip.ts",
       "packages/rack/src/deflater.ts",
       "packages/activerecord/src/encryption/config.ts",
