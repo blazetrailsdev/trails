@@ -1589,6 +1589,7 @@ export class Migrator {
       throw new ConcurrentMigrationError();
     }
     // Capture fn error so we can release the lock before re-throwing (no-unsafe-finally).
+    // Release errors are swallowed when fn itself failed so the migration error wins.
     const _sentinel = Symbol();
     let fnResult: T | typeof _sentinel = _sentinel;
     let fnError: unknown = _sentinel;
@@ -1597,7 +1598,13 @@ export class Migrator {
     } catch (e) {
       fnError = e;
     }
-    const released = await adapter.releaseAdvisoryLock?.(lockId);
+    let released: boolean | undefined;
+    try {
+      released = await adapter.releaseAdvisoryLock?.(lockId);
+    } catch (releaseErr) {
+      if (fnError !== _sentinel) throw fnError;
+      throw releaseErr;
+    }
     if (fnError !== _sentinel) throw fnError;
     if (released === false) {
       throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
