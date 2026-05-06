@@ -42,37 +42,39 @@ function unwrap(node) {
   return node;
 }
 
+/** @internal */
+const TRANSPARENT_TYPES = new Set([
+  "ParenthesizedExpression",
+  "TSNonNullExpression",
+  "TSAsExpression",
+  "TSTypeAssertion",
+  "TSSatisfiesExpression",
+]);
+
 /**
  * @internal
  * Returns true when `node` (a CallExpression whose callee is `driver.<method>`)
  * is safely consumed — either awaited or chained with .then/.catch/.finally.
- * Walks up through transparent wrapper nodes (parentheses, TS assertions) so
- * that `await (driver.run(...))` is correctly recognised as safe.
+ * Walks up through transparent wrapper nodes (parentheses, TS assertions) on
+ * both paths, so `await (driver.run(...))` and `(driver.run()).then(...)` are
+ * both correctly recognised as safe.
  */
 function isSafelyConsumed(node) {
-  let ancestor = node.parent;
-  // Walk up through transparent wrappers (e.g. parenthesized expressions).
-  while (
-    ancestor &&
-    (ancestor.type === "ParenthesizedExpression" ||
-      ancestor.type === "TSNonNullExpression" ||
-      ancestor.type === "TSAsExpression" ||
-      ancestor.type === "TSTypeAssertion" ||
-      ancestor.type === "TSSatisfiesExpression")
-  ) {
-    ancestor = ancestor.parent;
+  // Walk up through transparent wrappers, tracking the last child seen so we
+  // can verify MemberExpression.object === cur for the chain check.
+  let cur = node;
+  let parent = cur.parent;
+  while (parent && TRANSPARENT_TYPES.has(parent.type)) {
+    cur = parent;
+    parent = parent.parent;
   }
-  if (!ancestor) return false;
+  if (!parent) return false;
   // await driver.foo()  /  await (driver.foo())
-  if (ancestor.type === "AwaitExpression") return true;
-  // driver.foo().then(...) / .catch(...) / .finally(...)
-  // The immediate parent of the original node must still be the MemberExpression
-  // callee — don't allow wrappers between the call and the chain accessor.
-  const parent = node.parent;
+  if (parent.type === "AwaitExpression") return true;
+  // (driver.foo()).then(...) / .catch(...) / .finally(...)
   if (
-    parent &&
     parent.type === "MemberExpression" &&
-    parent.object === node &&
+    parent.object === cur &&
     parent.property.type === "Identifier" &&
     (parent.property.name === "then" ||
       parent.property.name === "catch" ||

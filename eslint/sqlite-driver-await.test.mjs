@@ -34,6 +34,8 @@ tester.run("sqlite-driver-await", rule, {
     { code: "async function f(driver: any) { await driver!.run('x'); }" },
     // type assertion, but awaited
     { code: "async function f(driver: any) { await (driver as any).run('x'); }" },
+    // parenthesized call with .then chain
+    { code: "(driver.run('SELECT 1')).then((r: unknown) => r);" },
   ],
   invalid: [
     // bare identifier call
