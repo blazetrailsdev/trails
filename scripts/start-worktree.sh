@@ -68,10 +68,21 @@ exec 9>&-
 # successful exit at the bottom of the file.
 WORKTREE_CREATED=1
 cleanup_partial_worktree() {
-  if [[ "${WORKTREE_CREATED:-0}" == 1 ]]; then
-    echo "==> Removing partial worktree $TARGET" >&2
-    git -C "$MAIN_REPO" worktree remove --force "$TARGET" 2>/dev/null || true
-    git -C "$MAIN_REPO" branch -D "$NAME" 2>/dev/null || true
+  if [[ "${WORKTREE_CREATED:-0}" != 1 ]]; then return; fi
+  echo "==> Removing partial worktree $TARGET" >&2
+  if ! git -C "$MAIN_REPO" worktree remove --force "$TARGET" 2>/dev/null; then
+    # `git worktree remove` can fail if the worktree got into an inconsistent
+    # state (eg. worktree dir was deleted out of band, lock files left over).
+    # Fall back to manually removing the directory and pruning so the next
+    # invocation of this script doesn't hit "Target already exists".
+    echo "    git worktree remove failed; falling back to rm -rf + git worktree prune" >&2
+    rm -rf "$TARGET"
+    git -C "$MAIN_REPO" worktree prune 2>/dev/null || true
+  fi
+  if ! git -C "$MAIN_REPO" branch -D "$NAME" 2>/dev/null; then
+    # Branch may not exist (worktree add failed before branch creation) or be
+    # already gone — log and continue rather than masking the EXIT status.
+    echo "    note: branch $NAME was not deletable (already gone or never created)" >&2
   fi
 }
 trap cleanup_partial_worktree EXIT
@@ -108,7 +119,11 @@ link_source() {
     done
     echo "    Recovery:" >&2
     if [[ -n "$donor" ]]; then
-      echo "      cp -r $(printf %q "$donor") $(printf %q "$src")" >&2
+      # Prepend `rm -rf` so the recovery works whether $src is missing OR a
+      # broken self-referential symlink. `[[ ! -e ]]` is true for broken
+      # symlinks (the link exists but the target doesn't), and `cp` would
+      # otherwise fail to overwrite the dangling link with a directory.
+      echo "      rm -rf $(printf %q "$src") && cp -r $(printf %q "$donor") $(printf %q "$src")" >&2
     else
       echo "      No sibling worktree has $rel either. Re-run the appropriate fetch" >&2
       echo "      script (e.g. scripts/api-compare/fetch-rails.sh for .rails-source)" >&2
