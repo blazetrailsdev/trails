@@ -167,6 +167,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // don't expose it, so we detect once and remember. `undefined` =
   // not yet probed, `true`/`false` = result.
   private _statisticsHasExpression: boolean | undefined;
+  private _fullVersionString: string | null = null;
 
   constructor(config: string | (mysql.PoolOptions & TrailsAdapterOptions)) {
     super();
@@ -1039,6 +1040,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         unknown,
       ];
       const ver = row?.v ?? "0.0.0";
+      this._fullVersionString = ver;
       this._mariadb = /mariadb/i.test(ver);
       this._databaseVersion = new Version(this.versionString(ver));
       return ver;
@@ -1048,11 +1050,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Return the full version string as stored by the last getFullVersion call.
+   * Return the full raw version string from the last getFullVersion call.
+   * Mirrors Rails' full_version → database_version.full_version_string.
    * @internal
    */
   fullVersion(): string {
-    return this._databaseVersion?.toString() ?? "0.0.0";
+    return this._fullVersionString ?? "0.0.0";
   }
 
   /** @internal */
