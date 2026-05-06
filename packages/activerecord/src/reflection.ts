@@ -1,4 +1,4 @@
-import { NotImplementedError } from "./errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import {
   underscore,
@@ -370,6 +370,14 @@ export class MacroReflection extends AbstractReflection {
       return this._scope.call(relation, relation, owner) || relation;
     }
     return relation;
+  }
+
+  /**
+   * @internal
+   * Derives class name from association name. Used by `className` getter.
+   */
+  protected deriveClassName(): string {
+    return camelize(this.name);
   }
 
   private normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
@@ -883,6 +891,34 @@ export class AssociationReflection extends MacroReflection {
     }
     return camelize(this.name);
   }
+
+  /** @internal */
+  protected actualSourceReflection(): this {
+    return this;
+  }
+
+  /**
+   * @internal
+   * Raises if the given option was passed a class instead of a string.
+   */
+  protected ensureOptionNotGivenAsClassBang(optionName: string): void {
+    const val = this.options[optionName];
+    if (typeof val === "function" && /^class[\s{]/.test(Function.prototype.toString.call(val))) {
+      throw new ArgumentError(
+        `A class was passed to \`:${optionName}\` but we are expecting a string.`,
+      );
+    }
+  }
+
+  /**
+   * @internal
+   * Derives the join table name for hasAndBelongsToMany associations.
+   */
+  protected deriveJoinTable(): string {
+    return [underscore(this.activeRecord.tableName), underscore(this.klass.tableName)]
+      .sort()
+      .join("_");
+  }
 }
 
 /**
@@ -1021,6 +1057,11 @@ export class HasAndBelongsToManyReflection extends AssociationReflection {
  */
 export class ThroughReflection extends AbstractReflection {
   private _delegate: AssociationReflection;
+
+  /** @internal */
+  get delegateReflection(): AssociationReflection {
+    return this._delegate;
+  }
   private _sourceReflectionCache: AssociationReflection | ThroughReflection | null | undefined =
     undefined;
   private _throughReflectionCache: AssociationReflection | ThroughReflection | null | undefined =
@@ -1033,39 +1074,39 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get name(): string {
-    return this._delegate.name;
+    return this.delegateReflection.name;
   }
 
   get macro(): MacroType {
-    return this._delegate.macro;
+    return this.delegateReflection.macro;
   }
 
   get options(): Record<string, unknown> {
-    return this._delegate.options;
+    return this.delegateReflection.options;
   }
 
   get activeRecord(): typeof Base {
-    return this._delegate.activeRecord;
+    return this.delegateReflection.activeRecord;
   }
 
   get pluralName(): string {
-    return this._delegate.pluralName;
+    return this.delegateReflection.pluralName;
   }
 
   get foreignKey(): string | string[] {
-    return this.sourceReflection?.foreignKey ?? this._delegate.foreignKey;
+    return this.sourceReflection?.foreignKey ?? this.delegateReflection.foreignKey;
   }
 
   get foreignType(): string | null {
-    return this.sourceReflection?.foreignType ?? this._delegate.foreignType;
+    return this.sourceReflection?.foreignType ?? this.delegateReflection.foreignType;
   }
 
   get scope(): ((...args: any[]) => any) | null {
-    return this._delegate.scope;
+    return this.delegateReflection.scope;
   }
 
   get className(): string {
-    return this._delegate.className;
+    return this.delegateReflection.className;
   }
 
   get klass(): typeof Base {
@@ -1185,7 +1226,7 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   collectJoinChain(): AbstractReflection[] {
-    return this._collectJoinReflections([this]);
+    return this.collectJoinReflections([this]);
   }
 
   clearAssociationScopeCache(): void {
@@ -1359,21 +1400,37 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   addAsSource(seed: AbstractReflection[]): AbstractReflection[] {
-    return this._collectJoinReflections(seed);
+    return this.collectJoinReflections(seed);
   }
 
   addAsPolymorphicThrough(
     reflection: AbstractReflection,
     seed: AbstractReflection[],
   ): AbstractReflection[] {
-    return this._collectJoinReflections([...seed, new PolymorphicReflection(this, reflection)]);
+    return this.collectJoinReflections([...seed, new PolymorphicReflection(this, reflection)]);
   }
 
   addAsThrough(seed: AbstractReflection[]): AbstractReflection[] {
-    return this._collectJoinReflections([...seed, this]);
+    return this.collectJoinReflections([...seed, this]);
   }
 
-  private _collectJoinReflections(seed: AbstractReflection[]): AbstractReflection[] {
+  /** @internal */
+  protected actualSourceReflection(): AbstractReflection {
+    const src = this.sourceReflection;
+    if (!src) return this;
+    return (src as any).actualSourceReflection?.() ?? src;
+  }
+
+  /** @internal */
+  protected deriveClassName(): string {
+    return (this.options.sourceType as string) || (this.sourceReflection as any)?.className || "";
+  }
+
+  /**
+   * @internal
+   * Walks the through chain collecting all intermediate reflections.
+   */
+  private collectJoinReflections(seed: AbstractReflection[]): AbstractReflection[] {
     const src = this.sourceReflection;
     if (!src) return seed;
     const a = src.addAsSource(seed);
@@ -1450,11 +1507,11 @@ export class PolymorphicReflection extends AbstractReflection {
 
   constraints(): Array<(...args: any[]) => any> {
     const reflConstraints = (this._reflection as any).constraints?.() ?? [];
-    const typeConstraint = this._sourceTypeScope();
-    return [...reflConstraints, typeConstraint];
+    return [...reflConstraints, this.sourceTypeScope()];
   }
 
-  private _sourceTypeScope(): (...args: any[]) => any {
+  /** @internal */
+  private sourceTypeScope(): (...args: any[]) => any {
     const typeCol = (this._previousReflection as any).foreignType;
     const sourceType = (this._previousReflection as any).options?.sourceType;
     return (rel: any) => rel?.where?.({ [typeCol]: sourceType }) ?? rel;
@@ -1842,52 +1899,3 @@ export const ClassMethods = {
   },
   _reflectOnAssociation: _reflectOnAssociationClassMethod,
 };
-
-/** @internal */
-function actualSourceReflection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::AbstractReflection#actual_source_reflection is not implemented",
-  );
-}
-
-/** @internal */
-function ensureOptionNotGivenAsClassBang(optionName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::AbstractReflection#ensure_option_not_given_as_class! is not implemented",
-  );
-}
-
-/** @internal */
-function deriveClassName(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::MacroReflection#derive_class_name is not implemented",
-  );
-}
-
-/** @internal */
-function deriveJoinTable(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::AssociationReflection#derive_join_table is not implemented",
-  );
-}
-
-/** @internal */
-function delegateReflection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::ThroughReflection#delegate_reflection is not implemented",
-  );
-}
-
-/** @internal */
-function collectJoinReflections(seed: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::ThroughReflection#collect_join_reflections is not implemented",
-  );
-}
-
-/** @internal */
-function sourceTypeScope(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Reflection::PolymorphicReflection#source_type_scope is not implemented",
-  );
-}
