@@ -45,7 +45,8 @@ The JS ecosystem treats `NODE_ENV` as a _build-time hint_ (bundlers replace it
 statically), not a reliable runtime value. `trailties/database.ts` already
 prefers `TRAILS_ENV` with a `NODE_ENV` fallback. BC-2 codifies this
 everywhere: `TRAILS_ENV` is the canonical runtime environment name; `NODE_ENV`
-is a one-release fallback shim, then dropped.
+remains a silent read-only fallback indefinitely (never written, never
+advertised, but never removed — too many apps set only `NODE_ENV`).
 
 ### SQLite driver registry
 
@@ -153,11 +154,11 @@ rack) get their status set to ✅ or flagged as ❌ after a grep-and-review pass
 
 ## 5. CI gates (added in BC-4)
 
-| Gate                    | Tooling                                                                                           | Job                    | Trigger    |
-| ----------------------- | ------------------------------------------------------------------------------------------------- | ---------------------- | ---------- |
-| Browser-bundle smoke    | `esbuild --bundle --platform=browser --bundle <barrel> 2>&1 \| grep -E "^(✘\|error)"` per package | `Browser Bundle` (new) | Every push |
-| No bare native imports  | `blazetrails/no-native-import` ESLint rule                                                        | `Lint` (existing)      | Every push |
-| No direct `process.env` | `blazetrails/no-direct-process-env` ESLint rule                                                   | `Lint` (existing)      | Every push |
+| Gate                    | Tooling                                                                                  | Job                    | Trigger    |
+| ----------------------- | ---------------------------------------------------------------------------------------- | ---------------------- | ---------- |
+| Browser-bundle smoke    | `esbuild --bundle --platform=browser <barrel> 2>&1 \| grep -E "^(✘\|error)"` per package | `Browser Bundle` (new) | Every push |
+| No bare native imports  | `blazetrails/no-native-import` ESLint rule                                               | `Lint` (existing)      | Every push |
+| No direct `process.env` | `blazetrails/no-direct-process-env` ESLint rule                                          | `Lint` (existing)      | Every push |
 
 A package barrel that resolves `node:fs` in the browser-bundle step fails
 the `Browser Bundle` job with a non-zero exit code — the hard signal that a
