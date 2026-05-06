@@ -45,6 +45,10 @@ tester.run("sqlite-driver-await", rule, {
     { code: "function f(driver: any) { return driver.pragma('x'); }" },
     // arrow implicit return
     { code: "const f = (driver: any) => driver.pragma('x');" },
+    // optional chaining, awaited
+    { code: "async function f(driver: any) { await driver?.run('x'); }" },
+    // optional chaining, returned
+    { code: "function f(driver: any) { return driver?.pragma('x'); }" },
   ],
   invalid: [
     // bare identifier call

@@ -25,12 +25,13 @@
 /**
  * @internal
  * AST node types that are transparent at runtime: they wrap a value without
- * changing it (TS non-null assertion, type assertions, parentheses).
- * Used by both `unwrap` (object-side) and `isSafelyConsumed` (parent-side)
- * so the two helper paths stay in sync.
+ * changing it (TS non-null assertion, type assertions, parentheses, optional
+ * chaining). Used by both `unwrap` (object-side) and `isSafelyConsumed`
+ * (parent-side) so the two helper paths stay in sync.
  */
 const TRANSPARENT_TYPES = new Set([
   "ParenthesizedExpression",
+  "ChainExpression",
   "TSNonNullExpression",
   "TSAsExpression",
   "TSTypeAssertion",
