@@ -66,8 +66,8 @@ export class ShardSelector {
   private async setShard<T>(shard: string | symbol, block: () => T | Promise<T>): Promise<T> {
     const shardKey =
       typeof shard === "string" ? shard : (Symbol.keyFor(shard) ?? shard.description ?? "");
-    return (Base as any).connectedTo({ shard: shardKey }, () =>
-      (Base as any).prohibitShardSwapping(() => block(), this.options.lock ?? true),
-    );
+    return Base.connectedTo({ shard: shardKey }, () =>
+      Base.prohibitShardSwapping(() => block(), this.options.lock ?? true),
+    ) as Promise<T>;
   }
 }
