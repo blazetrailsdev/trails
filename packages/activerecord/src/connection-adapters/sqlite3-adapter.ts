@@ -1979,6 +1979,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   override configureConnection(): void {
+    // Mirrors Rails: AbstractAdapter#configure_connection → check_version.
+    super.configureConnection();
     if (!this._readonly) {
       // Apply Rails DEFAULT_PRAGMAS best-effort: an unsupported PRAGMA on a
       // non-standard SQLite build should warn, not abort construction.

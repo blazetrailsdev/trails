@@ -1053,8 +1053,9 @@ export class AbstractAdapter implements Quoting {
 
   static registerClassWithPrecision(_typeMap: unknown, _name: string, _klass: unknown): void {}
 
+  private _extendedTypeMap?: Map<string, unknown>;
   get extendedTypeMap(): Map<string, unknown> {
-    return new Map();
+    return (this._extendedTypeMap ??= new Map());
   }
 
   // --- Connection lifecycle privates (Rails abstract_adapter.rb 946–1234) ---
@@ -1180,9 +1181,10 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal Mirrors: AbstractAdapter#extended_type_map_key */
   extendedTypeMapKey(): Record<string, unknown> | null {
-    return this._config.defaultTimezone
-      ? { defaultTimezone: String(this._config.defaultTimezone) }
-      : null;
+    // Rails parity: `if @default_timezone` — Ruby treats "" as truthy,
+    // so check for the type rather than JS truthiness.
+    const tz = this._config.defaultTimezone;
+    return typeof tz === "string" ? { defaultTimezone: tz } : null;
   }
 
   /** @internal Mirrors: AbstractAdapter#type_map */

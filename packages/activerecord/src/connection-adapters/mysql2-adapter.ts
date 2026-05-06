@@ -1026,6 +1026,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // database_timezone on the single raw connection. In our pool model
     // we have no single raw connection to configure here; mysql2's typeCast
     // handles temporal fields and results are returned as objects (not arrays).
+    super.configureConnection();
   }
 
   /**
