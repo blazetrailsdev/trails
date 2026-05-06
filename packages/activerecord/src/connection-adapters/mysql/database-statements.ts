@@ -11,6 +11,7 @@ import { Result } from "../../result.js";
 import {
   defaultInsertValue as abstractDefaultInsertValue,
   internalExecQuery,
+  toSql as abstractToSql,
 } from "../abstract/database-statements.js";
 import type { Version } from "../abstract-adapter.js";
 
@@ -157,14 +158,14 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
  */
 export async function explain(
   this: BuildExplainClauseHost & {
-    toSql?(arel: unknown, binds?: unknown[]): string;
     explainPrettyPrinter?(): { pp(result: Result, elapsed: number): string };
   },
   arel: unknown,
   binds: unknown[] = [],
   options: ExplainOption[] = [],
 ): Promise<string> {
-  const sql = buildExplainClause.call(this, options) + " " + (this.toSql?.(arel, binds) ?? arel);
+  const sql =
+    buildExplainClause.call(this, options) + " " + abstractToSql.call(this as any, arel, binds);
   const start = Date.now();
   const result = await internalExecQuery.call(this as any, String(sql), "EXPLAIN", binds);
   const elapsed = (Date.now() - start) / 1000;
