@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::Core
  */
 
-import { NotImplementedError } from "./errors.js";
 import { RecordNotFound } from "./errors.js";
 import { Notifications, getAsyncContext, ParameterFilter } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
@@ -565,47 +564,73 @@ export function arelTable(this: CoreHost): Table {
 }
 
 /** @internal */
-function initInternals(): never {
-  throw new NotImplementedError("ActiveRecord::Core#init_internals is not implemented");
+function initInternals(
+  this: CoreRecord & {
+    _readonly: boolean;
+    _destroyed: boolean;
+    _markedForDestruction: boolean;
+    _destroyedByAssociation: unknown;
+    _strictLoading: boolean;
+    _strictLoadingMode: StrictLoadingMode;
+  },
+): void {
+  this._readonly = false;
+  this._destroyed = false;
+  this._markedForDestruction = false;
+  this._destroyedByAssociation = null;
+  const klass = this.constructor as any;
+  this._strictLoading = klass.strictLoadingByDefault ?? false;
+  this._strictLoadingMode = klass.strictLoadingMode ?? "all";
 }
 
 /** @internal */
-function initializeInternalsCallback(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Core#initialize_internals_callback is not implemented",
-  );
+function initializeInternalsCallback(this: unknown): void {
+  // hook for subclasses — overridden by inheritance.ts
 }
 
 /** @internal */
-function isCustomInspectMethodDefined(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Core#custom_inspect_method_defined? is not implemented",
-  );
+function isCustomInspectMethodDefined(this: { constructor: { prototype: object } }): boolean {
+  return Object.prototype.hasOwnProperty.call(this.constructor.prototype, "inspect");
 }
 
 /** @internal */
-function inspectWithAttributes(attributesToList: any): never {
-  throw new NotImplementedError("ActiveRecord::Core#inspect_with_attributes is not implemented");
+function inspectWithAttributes(this: CoreRecord, attributesToList: string[]): string {
+  const ctor = this.constructor as { name: string };
+  if (!this._attributes) return `#<${ctor.name} not initialized>`;
+  const attrMap = new Map(Array.from(this._attributes));
+  const attrs = attributesToList
+    .filter((name) => attrMap.has(name))
+    .map((name) => `${name}: ${formatForInspect.call(this, name, this.readAttribute(name))}`)
+    .join(", ");
+  return `#<${ctor.name} ${attrs}>`;
 }
 
 /** @internal */
-function attributesForInspect(): never {
-  throw new NotImplementedError("ActiveRecord::Core#attributes_for_inspect is not implemented");
+function attributesForInspect(this: CoreRecord): string[] {
+  const klass = this.constructor as any;
+  const forInspect = klass.attributesForInspect;
+  if (forInspect === "all" || forInspect == null) return allAttributesForInspect.call(this);
+  return Array.isArray(forInspect) ? forInspect : allAttributesForInspect.call(this);
 }
 
 /** @internal */
-function allAttributesForInspect(): never {
-  throw new NotImplementedError("ActiveRecord::Core#all_attributes_for_inspect is not implemented");
+function allAttributesForInspect(this: CoreRecord): string[] {
+  if (!this._attributes) return [];
+  return Array.from(this._attributes).map(([k]) => k);
 }
 
 /** @internal */
-function relation(): never {
-  throw new NotImplementedError("ActiveRecord::Core#relation is not implemented");
+function relation(this: CoreHost): any {
+  return (this as any).all();
 }
 
 /** @internal */
-function cachedFindBy(): never {
-  throw new NotImplementedError("ActiveRecord::Core#cached_find_by is not implemented");
+function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
+  const conditions: Record<string, unknown> = {};
+  for (let i = 0; i < keys.length; i++) {
+    conditions[keys[i]] = values[i];
+  }
+  return (this as any).findBy(conditions);
 }
 
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {

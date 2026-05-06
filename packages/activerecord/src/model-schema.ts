@@ -1,4 +1,3 @@
-import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
@@ -1021,42 +1020,45 @@ export const ClassMethods = {
 };
 
 /** @internal */
-function initializeLoadSchemaMonitor(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ModelSchema#initialize_load_schema_monitor is not implemented",
-  );
+function yamlEncoder(this: SchemaHost): AttributeSetCoder {
+  return attributeSetCoder.call(this);
 }
 
 /** @internal */
-function reloadSchemaFromCache(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ModelSchema#reload_schema_from_cache is not implemented",
-  );
+function initializeLoadSchemaMonitor(this: SchemaHost): void {
+  // no-op: JS is single-threaded; no Monitor/Mutex needed
 }
 
 /** @internal */
-function isSchemaLoaded(): never {
-  throw new NotImplementedError("ActiveRecord::ModelSchema#schema_loaded? is not implemented");
+function reloadSchemaFromCache(this: SchemaHost): void {
+  resetColumnInformation.call(this);
 }
 
 /** @internal */
-function loadSchemaBang(): never {
-  throw new NotImplementedError("ActiveRecord::ModelSchema#load_schema! is not implemented");
+function isSchemaLoaded(this: SchemaHost): boolean {
+  return this._schemaLoaded ?? false;
 }
 
 /** @internal */
-function undecoratedTableName(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ModelSchema#undecorated_table_name is not implemented",
-  );
+function loadSchemaBang(this: SchemaHost): void {
+  loadSchema.call(this);
 }
 
 /** @internal */
-function computeTableName(): never {
-  throw new NotImplementedError("ActiveRecord::ModelSchema#compute_table_name is not implemented");
+function undecoratedTableName(this: SchemaHost, modelName: string): string {
+  const base = modelName.split("::").pop() ?? modelName;
+  return pluralize(underscore(base));
 }
 
 /** @internal */
-function typeForColumn(): never {
-  throw new NotImplementedError("ActiveRecord::ModelSchema#type_for_column is not implemented");
+function computeTableName(this: SchemaHost): string {
+  return resolveTableName.call(this as any);
+}
+
+/** @internal */
+function typeForColumn(this: SchemaHost, connection: any, column: any): any {
+  if (typeof connection?.lookupCastTypeFromColumn === "function") {
+    return connection.lookupCastTypeFromColumn(column);
+  }
+  return null;
 }
