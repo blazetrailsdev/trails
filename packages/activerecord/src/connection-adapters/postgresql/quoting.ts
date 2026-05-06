@@ -4,14 +4,15 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting
  */
 
-import { NotImplementedError } from "../../errors.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import {
   quote as abstractQuote,
+  quotedDate as abstractQuotedDate,
   quotedFalse as abstractQuotedFalse,
   quotedTrue as abstractQuotedTrue,
   typeCast as abstractTypeCast,
 } from "../abstract/quoting.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Range } from "./oid/range.js";
@@ -344,6 +345,34 @@ export function checkIntegerRange(value: bigint | number): void {
   }
 }
 
+/**
+ * Mirrors: PostgreSQL::Quoting#quoted_date. Appends " BC" for years ≤ 0
+ * (where year 0 in Temporal corresponds to 1 BC in the proleptic Gregorian
+ * calendar, matching Ruby's Date#year behaviour).
+ * @internal
+ */
+export function quotedDate(
+  value:
+    | Temporal.Instant
+    | Temporal.ZonedDateTime
+    | Temporal.PlainDateTime
+    | Temporal.PlainDate
+    | Temporal.PlainTime,
+): string {
+  const year =
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.ZonedDateTime
+      ? value.year
+      : null;
+  if (year !== null && year <= 0) {
+    const bceYear = String(-year + 1).padStart(4, "0");
+    const base = abstractQuotedDate(value);
+    return base.replace(/^-?\d+/, bceYear) + " BC";
+  }
+  return abstractQuotedDate(value);
+}
+
 /** @internal */
 function encodeRange(value: Range): string {
   const lower = value.begin == null || value.begin === -Infinity ? "" : String(value.begin);
@@ -360,44 +389,63 @@ function isSqlLiteral(value: unknown): value is { value: string } {
   );
 }
 
-/** @internal */
-function lookupCastType(sqlType: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#lookup_cast_type is not implemented",
-  );
+/**
+ * Mirrors: PostgreSQL::Quoting#encode_array. Recursively type-casts the array
+ * values and joins them into a PG literal string: `{v1,v2,...}`.
+ * @internal
+ */
+function encodeArray(arrayData: ArrayData): string {
+  const values = typeCastArray(arrayData.values);
+  return formatArray(values);
 }
 
-/** @internal */
-function encodeArray(arrayData: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#encode_array is not implemented",
-  );
+function formatArray(values: unknown[]): string {
+  const items = values.map((v) => {
+    if (Array.isArray(v)) return formatArray(v);
+    if (v == null) return "NULL";
+    const s = String(v);
+    // Empty strings, NULL-like strings, and strings containing PG array
+    // special chars must be double-quoted to survive round-trip.
+    if (s.length === 0 || /^null$/i.test(s) || /[{},"\\]|\s/.test(s))
+      return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    return s;
+  });
+  return `{${items.join(",")}}`;
 }
 
-/** @internal */
-function determineEncodingOfStringsInArray(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#determine_encoding_of_strings_in_array is not implemented",
-  );
+/**
+ * Mirrors: PostgreSQL::Quoting#determine_encoding_of_strings_in_array. In
+ * Ruby this returns the encoding of the first string found (used to
+ * force-encode the PG encoder output). JS strings are always UTF-16 internally
+ * so encoding coercion is a no-op; we return null to signal "no re-encoding".
+ * @internal
+ */
+function determineEncodingOfStringsInArray(_value: unknown): null {
+  return null;
 }
 
-/** @internal */
-function typeCastArray(values: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#type_cast_array is not implemented",
-  );
+/**
+ * Mirrors: PostgreSQL::Quoting#type_cast_array. Recursively calls typeCast
+ * on leaf values.
+ * @internal
+ */
+function typeCastArray(values: unknown[]): unknown[] {
+  return values.map((item) => (Array.isArray(item) ? typeCastArray(item) : typeCast(item)));
 }
 
-/** @internal */
-function typeCastRangeValue(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#type_cast_range_value is not implemented",
-  );
+/**
+ * Mirrors: PostgreSQL::Quoting#type_cast_range_value. Returns empty string for
+ * infinite bounds, otherwise delegates to typeCast.
+ * @internal
+ */
+function typeCastRangeValue(value: unknown): unknown {
+  return isInfinity(value) ? "" : typeCast(value);
 }
 
-/** @internal */
-function isInfinity(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#infinity? is not implemented",
-  );
+/**
+ * Mirrors: PostgreSQL::Quoting#infinity?. Returns true when value is ±Infinity.
+ * @internal
+ */
+function isInfinity(value: unknown): boolean {
+  return value === Infinity || value === -Infinity;
 }

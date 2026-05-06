@@ -103,9 +103,16 @@ function buildDefaultScope(): never {
   );
 }
 
-/** @internal */
-function isExecuteScope(): never {
-  throw new NotImplementedError("ActiveRecord::Scoping::Default#execute_scope? is not implemented");
+/**
+ * Mirrors: Scoping::Default#execute_scope?. Returns true when the default
+ * scope should be applied, based on the all_queries flag.
+ * @internal
+ */
+function isExecuteScope(
+  allQueries: boolean | null | undefined,
+  defaultScopeObj: DefaultScope,
+): boolean {
+  return allQueries == null || (!!allQueries && defaultScopeObj.allQueries);
 }
 
 /** @internal */
@@ -122,9 +129,18 @@ function ignoreDefaultScope(): never {
   );
 }
 
-/** @internal */
-function evaluateDefaultScope(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Scoping::Default#evaluate_default_scope is not implemented",
-  );
+/**
+ * Mirrors: Scoping::Default#evaluate_default_scope. Temporarily sets
+ * ignore_default_scope to true while yielding so nested calls don't re-apply
+ * the default scope recursively.
+ * @internal
+ */
+async function evaluateDefaultScope(modelClass: any, fn: () => unknown): Promise<unknown> {
+  if (modelClass._ignoreDefaultScope) return;
+  try {
+    modelClass._ignoreDefaultScope = true;
+    return await fn();
+  } finally {
+    modelClass._ignoreDefaultScope = false;
+  }
 }
