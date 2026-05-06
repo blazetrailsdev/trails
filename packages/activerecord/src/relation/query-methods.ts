@@ -1687,6 +1687,7 @@ export const QueryMethodBangs = {
   uniqBang,
   excludingBang,
   constructJoinDependency,
+  asyncBang,
 } as const;
 
 // ---------------------------------------------------------------------------

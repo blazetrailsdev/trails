@@ -4490,221 +4490,6 @@ export class Relation<T extends Base> {
   private skipQueryCacheIfNecessary<R>(block: () => R): R {
     return block();
   }
-
-  // ---------------------------------------------------------------------------
-  // QueryMethods bang mutations — mirrors ActiveRecord::QueryMethods (relation/query_methods.rb).
-  // Rails mixes these into Relation via `include QueryMethods`. Declared here
-  // as explicit instance methods so api:compare attributes them to relation.rb.
-  // ---------------------------------------------------------------------------
-
-  /** @internal */
-  includesBang(...associations: AssociationSpec[]): this {
-    return QueryMethodBangs.includesBang.call(this as any, ...associations);
-  }
-
-  /** @internal */
-  eagerLoadBang(...associations: AssociationSpec[]): this {
-    return QueryMethodBangs.eagerLoadBang.call(this as any, ...associations);
-  }
-
-  /** @internal */
-  preloadBang(...associations: AssociationSpec[]): this {
-    return QueryMethodBangs.preloadBang.call(this as any, ...associations);
-  }
-
-  /** @internal */
-  referencesBang(...tables: string[]): this {
-    return QueryMethodBangs.referencesBang.call(this as any, ...tables);
-  }
-
-  /** @internal */
-  withBang(...ctes: Array<Record<string, any>>): this {
-    return QueryMethodBangs.withBang.call(this as any, ...ctes);
-  }
-
-  /** @internal */
-  withRecursiveBang(...ctes: Array<Record<string, any>>): this {
-    return QueryMethodBangs.withRecursiveBang.call(this as any, ...ctes);
-  }
-
-  /** @internal */
-  reselectBang(...columns: any[]): this {
-    return QueryMethodBangs.reselectBang.call(this as any, ...columns);
-  }
-
-  /** @internal */
-  _selectBang(...columns: any[]): this {
-    return QueryMethodBangs._selectBang.call(this as any, ...columns);
-  }
-
-  /** @internal */
-  groupBang(...columns: string[]): this {
-    return QueryMethodBangs.groupBang.call(this as any, ...columns);
-  }
-
-  /** @internal */
-  regroupBang(...columns: string[]): this {
-    return QueryMethodBangs.regroupBang.call(this as any, ...columns);
-  }
-
-  /** @internal */
-  orderBang(
-    ...args: Array<
-      string | Record<string, "asc" | "desc"> | Nodes.Node | string[] | [Nodes.Node, ...unknown[]]
-    >
-  ): this {
-    return QueryMethodBangs.orderBang.call(this as any, ...args);
-  }
-
-  /** @internal */
-  reorderBang(
-    ...args: Array<
-      string | Record<string, "asc" | "desc"> | Nodes.Node | string[] | [Nodes.Node, ...unknown[]]
-    >
-  ): this {
-    return QueryMethodBangs.reorderBang.call(this as any, ...args);
-  }
-
-  /** @internal */
-  unscopeBang(...types: Array<string | { where: string | string[] }>): this {
-    return QueryMethodBangs.unscopeBang.call(this as any, ...types);
-  }
-
-  /** @internal */
-  joinsBang(...args: (string | Nodes.Join)[]): this {
-    return QueryMethodBangs.joinsBang.call(this as any, ...args);
-  }
-
-  /** @internal */
-  leftOuterJoinsBang(...args: AssociationSpec[]): this {
-    return QueryMethodBangs.leftOuterJoinsBang.call(this as any, ...args);
-  }
-
-  /** @internal */
-  whereBang(opts: any, ...rest: unknown[]): this {
-    return QueryMethodBangs.whereBang.call(this as any, opts, ...rest);
-  }
-
-  /** @internal */
-  invertWhereBang(): this {
-    return QueryMethodBangs.invertWhereBang.call(this as any);
-  }
-
-  /** @internal */
-  andBang(other: any): this {
-    return QueryMethodBangs.andBang.call(this as any, other);
-  }
-
-  /** @internal */
-  orBang(other: any): this {
-    return QueryMethodBangs.orBang.call(this as any, other);
-  }
-
-  /** @internal */
-  havingBang(opts: string | Record<string, unknown> | Nodes.Node, ...rest: unknown[]): this {
-    return QueryMethodBangs.havingBang.call(this as any, opts, ...rest);
-  }
-
-  /** @internal */
-  limitBang(value: number | null): this {
-    return QueryMethodBangs.limitBang.call(this as any, value);
-  }
-
-  /** @internal */
-  offsetBang(value: number): this {
-    return QueryMethodBangs.offsetBang.call(this as any, value);
-  }
-
-  /** @internal */
-  lockBang(locks: string | boolean = true): this {
-    return QueryMethodBangs.lockBang.call(this as any, locks);
-  }
-
-  /** @internal */
-  noneBang(): this {
-    return QueryMethodBangs.noneBang.call(this as any);
-  }
-
-  /** @internal */
-  isNullRelation(): boolean {
-    return QueryMethodBangs.isNullRelation.call(this as any);
-  }
-
-  /** @internal */
-  readonlyBang(value = true): this {
-    return QueryMethodBangs.readonlyBang.call(this as any, value);
-  }
-
-  /** @internal */
-  strictLoadingBang(value = true): this {
-    return QueryMethodBangs.strictLoadingBang.call(this as any, value);
-  }
-
-  /** @internal */
-  createWithBang(value: Record<string, unknown> | null): this {
-    return QueryMethodBangs.createWithBang.call(this as any, value);
-  }
-
-  /** @internal */
-  fromBang(value: any, subqueryName?: string): this {
-    return QueryMethodBangs.fromBang.call(this as any, value, subqueryName);
-  }
-
-  /** @internal */
-  distinctBang(value = true): this {
-    return QueryMethodBangs.distinctBang.call(this as any, value);
-  }
-
-  /** @internal */
-  extendingBang(...modules: Array<Record<string, Function> | ((rel: any) => void)>): this {
-    return QueryMethodBangs.extendingBang.call(this as any, ...modules);
-  }
-
-  /** @internal */
-  optimizerHintsBang(...hints: string[]): this {
-    return QueryMethodBangs.optimizerHintsBang.call(this as any, ...hints);
-  }
-
-  /** @internal */
-  reverseOrderBang(): this {
-    return QueryMethodBangs.reverseOrderBang.call(this as any);
-  }
-
-  /** @internal */
-  skipQueryCacheBang(value = true): this {
-    return QueryMethodBangs.skipQueryCacheBang.call(this as any, value);
-  }
-
-  /** @internal */
-  skipPreloadingBang(): this {
-    return QueryMethodBangs.skipPreloadingBang.call(this as any);
-  }
-
-  /** @internal */
-  annotateBang(...comments: string[]): this {
-    return QueryMethodBangs.annotateBang.call(this as any, ...comments);
-  }
-
-  /** @internal */
-  uniqBang(_name?: string): this {
-    return QueryMethodBangs.uniqBang.call(this as any, _name);
-  }
-
-  /** @internal */
-  excludingBang(records: any[]): this {
-    return QueryMethodBangs.excludingBang.call(this as any, records);
-  }
-
-  /** @internal */
-  constructJoinDependency(associations: string | AssociationSpec[], _joinType?: unknown): any {
-    return QueryMethodBangs.constructJoinDependency.call(this as any, associations, _joinType);
-  }
-
-  /** @internal */
-  asyncBang(): this {
-    (this as any)._async = true;
-    return this;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -4722,11 +4507,11 @@ export interface Relation<T extends Base> {
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 
-// Calculations doesn't involve T — Included<> works fine.
+// QueryMethodBangs and Calculations don't involve T — Included<> works fine.
 // FinderMethods and SpawnMethods return T-typed values — explicit signatures needed.
-// QueryMethodBangs methods are now declared directly on the class above.
 
-export interface Relation<T extends Base> extends Included<typeof Calculations> {
+export interface Relation<T extends Base>
+  extends Included<typeof QueryMethodBangs>, Included<typeof Calculations> {
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;
@@ -4776,6 +4561,7 @@ export interface Relation<T extends Base> extends Included<typeof Calculations> 
   mergeBang(other: any): Relation<T>;
 }
 
+include(Relation, QueryMethodBangs);
 include(Relation, FinderMethods);
 include(Relation, Calculations);
 include(Relation, SpawnMethods);
