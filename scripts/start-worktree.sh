@@ -31,19 +31,36 @@ if [[ -e "$TARGET" ]]; then
   exit 1
 fi
 
-echo "==> Updating main repo at $MAIN_REPO"
-git -C "$MAIN_REPO" fetch origin --prune
-CURRENT_BRANCH="$(git -C "$MAIN_REPO" symbolic-ref --short HEAD 2>/dev/null || echo "")"
-if [[ "$CURRENT_BRANCH" == "main" ]]; then
-  git -C "$MAIN_REPO" pull --ff-only origin main
-else
-  echo "    (main worktree is on '$CURRENT_BRANCH'; fetched only — skipping pull)"
+echo "==> Fetching origin/main at $MAIN_REPO"
+# Serialize fetch across concurrent start-worktree.sh invocations — git's ref
+# locks fail loudly when two `git fetch` runs race the same ref. The flock
+# also covers the worktree add below so two spawns don't compete on the
+# packed-refs file.
+exec 9>"$MAIN_REPO/.git/start-worktree.lock"
+# 60s timeout so a crashed prior run doesn't hang future spawns forever.
+# Stale lock file is harmless (flock holds an OS-level advisory lock that
+# releases on process exit); the file just sits there until next run.
+if ! flock -w 60 9; then
+  echo "Could not acquire $MAIN_REPO/.git/start-worktree.lock within 60s." >&2
+  echo "Another start-worktree run may be stuck. Investigate, then retry." >&2
+  exit 1
 fi
+git -C "$MAIN_REPO" fetch origin --prune
+
+# We branch off origin/main, NOT local main. The main worktree's local
+# branch can lag freely; users can `git pull` when they want. Skipping the
+# ff-merge avoids two failure modes that have bitten us:
+#   1. Dirty working tree — even unrelated uncommitted changes block ff.
+#   2. Untracked files that match what just landed in upstream (e.g. a doc
+#      that another spawn or a freshly-merged PR added) — git refuses ff
+#      because the merge would "overwrite" the untracked file.
 
 mkdir -p "$WORKTREES_ROOT"
 
 echo "==> Creating worktree at $TARGET on new branch '$NAME' from origin/main"
 git -C "$MAIN_REPO" worktree add -b "$NAME" "$TARGET" origin/main
+flock -u 9
+exec 9>&-
 
 link_source() {
   local rel="$1"
