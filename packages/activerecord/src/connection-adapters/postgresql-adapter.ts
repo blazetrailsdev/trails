@@ -43,7 +43,6 @@ import {
   RecordNotUnique,
   StatementInvalid,
   ValueTooLong,
-  NotImplementedError,
 } from "../errors.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
@@ -2095,7 +2094,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async enableExtension(name: string): Promise<void> {
-    await this.exec(`CREATE EXTENSION IF NOT EXISTS ${this.quoteIdentifier(name)}`);
+    const parts = String(name).split(".");
+    const extName = parts[parts.length - 1];
+    const schema = parts.length > 1 ? parts[parts.length - 2] : null;
+    let sql = `CREATE EXTENSION IF NOT EXISTS "${extName}"`;
+    if (schema) sql += ` SCHEMA ${schema}`;
+    await this.exec(sql);
+    await this.reloadTypeMap();
   }
 
   async disableExtension(
@@ -4147,6 +4152,239 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const quotedName = pgName.identifier ? this.quoteLiteral(pgName.identifier) : null;
     return { schema, name: quotedName };
   }
+
+  /**
+   * Parse a raw `pg_attrdef` expression into a scalar default value.
+   * Mirrors: PostgreSQLAdapter#extract_value_from_default
+   * @internal
+   */
+  extractValueFromDefault(defaultExpr: string | null): unknown {
+    if (defaultExpr == null) return null;
+    // Quoted types: [(B]?'...'.*::"?([\w. ]+)"?(?:\[\])? — Rails uses /m so . matches newline
+    const quoted = /^[(B]?'([\s\S]*)'.*::"?([\w. ]+)"?(?:\[\])?$/.exec(defaultExpr);
+    if (quoted) {
+      if (quoted[1] === "now" && quoted[2] === "date") return null;
+      return quoted[1].replace(/''/g, "'");
+    }
+    if (defaultExpr === "true" || defaultExpr === "false") return defaultExpr;
+    // Numeric: optional parens, optional ::bigint cast
+    const num = /^\(?(-?\d+(?:\.\d*)?)\)?(?:::bigint)?$/.exec(defaultExpr);
+    if (num) return num[1];
+    // Object identifier (bare integer)
+    if (/^-?\d+$/.test(defaultExpr)) return defaultExpr;
+    return null;
+  }
+
+  /**
+   * Return the default expression as-is when it is a SQL function/expression.
+   * Mirrors: PostgreSQLAdapter#extract_default_function
+   * @internal
+   */
+  extractDefaultFunction(defaultValue: unknown, defaultExpr: string | null): string | null {
+    if (defaultExpr != null && this.hasDefaultFunction(defaultValue, defaultExpr)) {
+      return defaultExpr;
+    }
+    return null;
+  }
+
+  /**
+   * True when the raw default expression is a SQL function rather than a literal.
+   * Mirrors: PostgreSQLAdapter#has_default_function?
+   * @internal
+   */
+  hasDefaultFunction(defaultValue: unknown, defaultExpr: string): boolean {
+    return (
+      defaultValue == null &&
+      /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/.test(defaultExpr)
+    );
+  }
+
+  /**
+   * Map a pg driver error to the appropriate ActiveRecord exception class.
+   * Mirrors: PostgreSQLAdapter#translate_exception (the private helper).
+   * @internal
+   */
+  translateException(
+    exception: unknown,
+    opts: { message?: string; sql?: string; binds?: unknown[] } = {},
+  ): Error {
+    return this._translateException(exception, opts.sql ?? "", opts.binds ?? []);
+  }
+
+  /**
+   * True when the error is retryable (not inside a failed transaction).
+   * Mirrors: PostgreSQLAdapter#retryable_query_error?
+   * @internal
+   */
+  isRetryableQueryError(_exception: unknown): boolean {
+    // Rails checks @raw_connection.transaction_status != PG::PQTRANS_INERROR.
+    // node-pg doesn't expose the PG transaction status byte, so we conservatively
+    // return true (same as the base class). Callers already guard on open_transactions.
+    return true;
+  }
+
+  /**
+   * True when the PG error is a cached-plan invalidation (SQLSTATE 0A000
+   * from RevalidateCachedQuery). Mirrors: PostgreSQLAdapter#is_cached_plan_failure?
+   * @internal
+   */
+  isCachedPlanFailure(pgerror: unknown): boolean {
+    if (!(pgerror instanceof Error)) return false;
+    const code = (pgerror as { code?: string }).code;
+    return code === "0A000";
+  }
+
+  /**
+   * Statement-pool key. Rails scopes this to schema_search_path; here we
+   * use a fixed prefix because search_path is set once per connection.
+   * Mirrors: PostgreSQLAdapter#sql_key
+   * @internal
+   */
+  sqlKey(sql: string): string {
+    return `-${sql}`;
+  }
+
+  /**
+   * Prepare a statement on the given client, caching by sql_key.
+   * Mirrors: PostgreSQLAdapter#prepare_statement
+   * @internal
+   */
+  async prepareStatement(sql: string, _binds: unknown[], client: pg.PoolClient): Promise<string> {
+    const pool = this._poolFor(client);
+    // Use same cache key as _preparedNameFor so prepared statements created here
+    // are visible to / deduped with the internal query path.
+    const existing = pool.get(sql);
+    if (existing) return existing.name;
+    const name = pool.nextKey();
+    // PREPARE ... AS avoids executing the statement (node-pg's { name, text } form
+    // both prepares and executes in a single roundtrip).
+    await client.query(`PREPARE ${pgQuoteColumnName(name)} AS ${sql}`);
+    pool.set(sql, { name });
+    return name;
+  }
+
+  /**
+   * Sync the session timezone variable after `default_timezone` changes.
+   * Mirrors: PostgreSQLAdapter#reconfigure_connection_timezone
+   * @internal
+   */
+  async reconfigureConnectionTimezone(): Promise<void> {
+    const tz = getDefaultTimezone();
+    await this.withClient(async (client) => {
+      if (tz === "utc") {
+        await client.query("SET SESSION timezone TO 'UTC'");
+      } else {
+        await client.query("SET SESSION timezone TO DEFAULT");
+      }
+    });
+  }
+
+  /**
+   * Fetch raw column metadata rows from pg_attribute for a table.
+   * Mirrors: PostgreSQLAdapter#column_definitions
+   * @internal
+   */
+  async columnDefinitions(tableName: string): Promise<
+    {
+      attname: string;
+      format_type: string;
+      pg_get_expr: string | null;
+      attnotnull: boolean;
+      atttypid: number;
+      atttypmod: number;
+      collname: string | null;
+      comment: string | null;
+      identity: string | null;
+      attgenerated: string | null;
+    }[]
+  > {
+    const identityCol = this.supportsIdentityColumns()
+      ? "attidentity"
+      : `${this.quote("")}::varchar`;
+    const generatedCol = this.supportsVirtualColumns()
+      ? "attgenerated"
+      : `${this.quote("")}::varchar`;
+    const rows = await this.schemaQuery(
+      `SELECT a.attname, format_type(a.atttypid, a.atttypmod),
+              pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod,
+              c.collname, col_description(a.attrelid, a.attnum) AS comment,
+              ${identityCol} AS identity,
+              ${generatedCol} AS attgenerated
+         FROM pg_attribute a
+         LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+         LEFT JOIN pg_type t ON a.atttypid = t.oid
+         LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation
+        WHERE a.attrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
+          AND a.attnum > 0 AND NOT a.attisdropped
+        ORDER BY a.attnum`,
+    );
+    return rows.map((r) => ({
+      attname: r.attname as string,
+      format_type: r.format_type as string,
+      pg_get_expr: (r.pg_get_expr as string | null) ?? null,
+      attnotnull: r.attnotnull as boolean,
+      atttypid: r.atttypid as number,
+      atttypmod: r.atttypmod as number,
+      collname: (r.collname as string | null) ?? null,
+      comment: (r.comment as string | null) ?? null,
+      identity: (r.identity as string | null) || null,
+      attgenerated: (r.attgenerated as string | null) || null,
+    }));
+  }
+
+  /**
+   * Build the per-adapter StatementPool (used on initialization).
+   * Mirrors: PostgreSQLAdapter#build_statement_pool
+   * @internal
+   */
+  buildStatementPool(client: pg.PoolClient): StatementPool {
+    return new StatementPool(client, this._statementLimit);
+  }
+
+  /**
+   * No-op in node-pg: Ruby's pg gem uses PG::TypeMapByClass to encode
+   * query parameters as text. node-pg serialises bind values with
+   * JS's toString() by default, which is equivalent for our supported
+   * types (Integer, Boolean). Mirrors: PostgreSQLAdapter#add_pg_encoders
+   * @internal
+   */
+  addPgEncoders(): void {
+    // node-pg handles parameter encoding natively; no extra type map needed.
+  }
+
+  /**
+   * Update the timestamp decoder after default_timezone changes.
+   * Mirrors: PostgreSQLAdapter#update_typemap_for_default_timezone
+   * @internal
+   */
+  async updateTypemapForDefaultTimezone(): Promise<void> {
+    // node-pg uses custom type parsers registered at pool construction time
+    // via getTypeParser (see constructor). A timezone change only requires
+    // a session-level SET so subsequent result sets are interpreted correctly.
+    await this.reconfigureConnectionTimezone();
+  }
+
+  /**
+   * No-op in node-pg: result decoding is handled by the getTypeParser hook
+   * registered at pool construction. Mirrors: PostgreSQLAdapter#add_pg_decoders
+   * @internal
+   */
+  addPgDecoders(): void {
+    // node-pg decodes results via getTypeParser registered in the constructor.
+  }
+
+  /**
+   * Build a type-coder descriptor from a pg_type row and a coder class name.
+   * Mirrors: PostgreSQLAdapter#construct_coder
+   * @internal
+   */
+  constructCoder(
+    row: { oid: string | number; typname: string },
+    coderClass: string | null,
+  ): { oid: number; name: string; coderClass: string } | null {
+    if (!coderClass) return null;
+    return { oid: Number(row.oid), name: row.typname, coderClass };
+  }
 }
 
 export type IndexDefinition = PgIndexDefinition;
@@ -4351,156 +4589,3 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
   "time with time zone": "timetz",
   boolean: "bool",
 };
-
-/** @internal */
-function typeMap(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#type_map is not implemented",
-  );
-}
-
-function initializeTypeMap(m?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#initialize_type_map is not implemented",
-  );
-}
-
-/** @internal */
-function extractValueFromDefault(default_: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#extract_value_from_default is not implemented",
-  );
-}
-
-/** @internal */
-function extractDefaultFunction(defaultValue: any, default_: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#extract_default_function is not implemented",
-  );
-}
-
-/** @internal */
-function hasDefaultFunction(defaultValue: any, default_: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#has_default_function? is not implemented",
-  );
-}
-
-/** @internal */
-function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#translate_exception is not implemented",
-  );
-}
-
-/** @internal */
-function isRetryableQueryError(exception: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#retryable_query_error? is not implemented",
-  );
-}
-
-/** @internal */
-function getOidType(oid: any, fmod: any, columnName: any, sqlType?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#get_oid_type is not implemented",
-  );
-}
-
-/** @internal */
-function loadAdditionalTypes(oids?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#load_additional_types is not implemented",
-  );
-}
-
-/** @internal */
-function isCachedPlanFailure(pgerror: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#is_cached_plan_failure? is not implemented",
-  );
-}
-
-/** @internal */
-function isInTransaction(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#in_transaction? is not implemented",
-  );
-}
-
-/** @internal */
-function sqlKey(sql: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#sql_key is not implemented",
-  );
-}
-
-/** @internal */
-function prepareStatement(sql: any, binds: any, conn: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#prepare_statement is not implemented",
-  );
-}
-
-/** @internal */
-function reconfigureConnectionTimezone(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#reconfigure_connection_timezone is not implemented",
-  );
-}
-
-/** @internal */
-function columnDefinitions(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#column_definitions is not implemented",
-  );
-}
-
-/** @internal */
-function arelVisitor(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#arel_visitor is not implemented",
-  );
-}
-
-/** @internal */
-function buildStatementPool(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#build_statement_pool is not implemented",
-  );
-}
-
-/** @internal */
-function canPerformCaseInsensitiveComparisonFor(column: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#can_perform_case_insensitive_comparison_for? is not implemented",
-  );
-}
-
-/** @internal */
-function addPgEncoders(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#add_pg_encoders is not implemented",
-  );
-}
-
-/** @internal */
-function updateTypemapForDefaultTimezone(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#update_typemap_for_default_timezone is not implemented",
-  );
-}
-
-/** @internal */
-function addPgDecoders(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#add_pg_decoders is not implemented",
-  );
-}
-
-/** @internal */
-function constructCoder(row: any, coderClass: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#construct_coder is not implemented",
-  );
-}
