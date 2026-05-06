@@ -2025,6 +2025,58 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
     return new StatementInvalid(msg, { sql, binds, cause });
   }
+
+  /** @internal */
+  private buildStatementPool(): GenericStatementPool<Database.Statement> {
+    return new GenericStatementPool<Database.Statement>(this._statementLimit);
+  }
+
+  /** @internal */
+  private connect(): void {
+    this.db = new Database(this._filename, { readonly: this._readonly });
+  }
+
+  /** @internal */
+  private configureConnection(): void {
+    if (!this._readonly) {
+      this.db.pragma("foreign_keys = ON");
+      this.db.pragma("journal_mode = WAL");
+      this.db.pragma("synchronous = NORMAL");
+      this.db.pragma("mmap_size = 134217728");
+      this.db.pragma("journal_size_limit = 67108864");
+      this.db.pragma("cache_size = 2000");
+    }
+    const pragmas = (this._config as Record<string, unknown>)?.pragmas as
+      | Record<string, unknown>
+      | undefined;
+    if (pragmas) {
+      for (const [pragma, value] of Object.entries(pragmas)) {
+        try {
+          this.db.pragma(`${pragma} = ${String(value)}`);
+        } catch {
+          console.warn(`Unknown SQLite pragma: ${pragma}`);
+        }
+      }
+    }
+  }
+
+  /** @internal */
+  static initializeTypeMap(m: TypeMap): void {
+    const sqlite3Int = (limit?: number) => new IntegerType({ limit: limit ?? 8 });
+    m.registerType("string", new StringType());
+    m.registerType("text", new TextType());
+    m.registerType("integer", sqlite3Int());
+    m.registerType("float", new FloatType());
+    m.registerType("decimal", new DecimalType());
+    m.registerType("boolean", new BooleanType());
+    m.registerType("date", new DateType());
+    m.registerType("datetime", new SQLiteDateTimeType());
+    m.registerType("time", new TimeType());
+    m.registerType("binary", new BinaryType());
+    m.registerType("json", new JsonType());
+    m.registerType(/int/i, undefined, (k) => (/bigint/i.test(k) ? sqlite3Int(8) : sqlite3Int()));
+    m.registerType("bigint", sqlite3Int(8));
+  }
 }
 
 /**
@@ -2063,45 +2115,59 @@ function normalizeReferentialAction(action: string): string {
 }
 
 /** @internal */
-function bindParamsLength(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#bind_params_length is not implemented",
+function bindParamsLength(): number {
+  // https://www.sqlite.org/limits.html — default SQLITE_LIMIT_VARIABLE_NUMBER
+  return 999;
+}
+
+/** @internal */
+function extractValueFromDefault(default_: string | null): unknown {
+  return sqliteExtractValueFromDefault(default_);
+}
+
+/** @internal */
+function extractDefaultFunction(defaultValue: unknown, default_: string): string | undefined {
+  return hasDefaultFunction(defaultValue, default_) ? default_ : undefined;
+}
+
+/** @internal */
+function hasDefaultFunction(defaultValue: unknown, default_: string): boolean {
+  return (
+    !defaultValue && /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(default_)
   );
 }
 
 /** @internal */
-function extractValueFromDefault(default_: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#extract_value_from_default is not implemented",
+function isInvalidAlterTableType(type: string, options: Record<string, unknown>): boolean {
+  return (
+    type === "primary_key" ||
+    Boolean(options["primary_key"]) ||
+    (options["null"] === false && options["default"] == null) ||
+    (type === "virtual" && Boolean(options["stored"]))
   );
 }
 
 /** @internal */
-function extractDefaultFunction(defaultValue: any, default_: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#extract_default_function is not implemented",
-  );
-}
-
-/** @internal */
-function hasDefaultFunction(defaultValue: any, default_: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#has_default_function? is not implemented",
-  );
-}
-
-/** @internal */
-function isInvalidAlterTableType(type: any, options: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#invalid_alter_table_type? is not implemented",
-  );
-}
-
-/** @internal */
-function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#translate_exception is not implemented",
-  );
+function translateException(
+  exception: Error,
+  message: string,
+  sql: string,
+  binds: unknown[],
+): Error {
+  const msg = exception.message;
+  if (/(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(msg)) {
+    return new RecordNotUnique(message, { sql, binds, cause: exception });
+  }
+  if (/(.* may not be NULL|NOT NULL constraint failed: .*)/i.test(msg)) {
+    return new NotNullViolation(message, { sql, binds, cause: exception });
+  }
+  if (/FOREIGN KEY constraint failed/i.test(msg)) {
+    return new InvalidForeignKey(message, { sql, binds, cause: exception });
+  }
+  if (/called on a closed database/i.test(msg)) {
+    return new StatementInvalid(message, { sql, binds, cause: exception });
+  }
+  return new StatementInvalid(message, { sql, binds, cause: exception });
 }
 
 /** @internal */
@@ -2112,36 +2178,8 @@ function arelVisitor(): never {
 }
 
 /** @internal */
-function buildStatementPool(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#build_statement_pool is not implemented",
-  );
-}
-
-/** @internal */
-function connect(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#connect is not implemented",
-  );
-}
-
-/** @internal */
 function reconnect(): never {
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3Adapter#reconnect is not implemented",
-  );
-}
-
-/** @internal */
-function configureConnection(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#configure_connection is not implemented",
-  );
-}
-
-/** @internal */
-function initializeTypeMap(m: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#initialize_type_map is not implemented",
   );
 }
