@@ -1898,12 +1898,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // duration of the lock.
   private _advisoryLockClient: pg.PoolClient | null = null;
 
-  async getAdvisoryLock(lockId: number | string): Promise<boolean> {
+  async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
     const client = await this._acquireFreshClient();
     try {
-      const isNumeric = typeof lockId === "number";
-      const sql = `SELECT pg_try_advisory_lock(${isNumeric ? "$1" : "hashtext($1)"}) AS locked`;
-      const result = await client.query(sql, [isNumeric ? lockId : String(lockId)]);
+      const [sql, param] = _pgAdvisoryLockSql("pg_try_advisory_lock", "locked", lockId);
+      const result = await client.query(sql, [param]);
       const locked = result.rows[0]?.locked === true;
       if (locked) {
         this._advisoryLockClient = client;
@@ -1917,13 +1916,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
   }
 
-  async releaseAdvisoryLock(lockId: number | string): Promise<boolean> {
+  async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
     const client = this._advisoryLockClient;
     if (!client) return false;
     try {
-      const isNumeric = typeof lockId === "number";
-      const sql = `SELECT pg_advisory_unlock(${isNumeric ? "$1" : "hashtext($1)"}) AS unlocked`;
-      const result = await client.query(sql, [isNumeric ? lockId : String(lockId)]);
+      const [sql, param] = _pgAdvisoryLockSql("pg_advisory_unlock", "unlocked", lockId);
+      const result = await client.query(sql, [param]);
       return result.rows[0]?.unlocked === true;
     } finally {
       this._advisoryLockClient = null;
@@ -4523,6 +4521,16 @@ export class MoneyDecoder {
     if (isNaN(num)) return NaN;
     return negative ? -num : num;
   }
+}
+
+function _pgAdvisoryLockSql(
+  fn: string,
+  col: string,
+  lockId: number | bigint | string,
+): [string, unknown] {
+  if (typeof lockId === "bigint") return [`SELECT ${fn}($1::bigint) AS ${col}`, lockId.toString()];
+  if (typeof lockId === "number") return [`SELECT ${fn}($1) AS ${col}`, lockId];
+  return [`SELECT ${fn}(hashtext($1)) AS ${col}`, lockId];
 }
 
 /**

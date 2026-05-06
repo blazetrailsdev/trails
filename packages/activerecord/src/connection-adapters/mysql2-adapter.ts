@@ -876,7 +876,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // so acquire and release use the same session.
   private _advisoryLockConn: mysql.PoolConnection | null = null;
 
-  async getAdvisoryLock(lockId: number | string): Promise<boolean> {
+  async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
     if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
     const conn = await this._driverPool.getConnection();
     try {
@@ -894,7 +894,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  async releaseAdvisoryLock(lockId: number | string): Promise<boolean> {
+  async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
     const conn = this._advisoryLockConn;
     if (!conn) return false;
     try {

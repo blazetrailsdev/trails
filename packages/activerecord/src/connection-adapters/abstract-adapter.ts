@@ -927,11 +927,11 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  async getAdvisoryLock(_lockId: number | string): Promise<boolean> {
+  async getAdvisoryLock(_lockId: number | bigint | string): Promise<boolean> {
     return false;
   }
 
-  async releaseAdvisoryLock(_lockId: number | string): Promise<boolean> {
+  async releaseAdvisoryLock(_lockId: number | bigint | string): Promise<boolean> {
     return false;
   }
 

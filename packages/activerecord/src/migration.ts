@@ -40,6 +40,19 @@ export {
 
 import { ActiveRecordError, NotImplementedError } from "./errors.js";
 
+// Mirrors Zlib.crc32 (ISO 3309 / ITU-T V.42 polynomial) operating on UTF-8 bytes.
+function _crc32(str: string): number {
+  const bytes = new TextEncoder().encode(str);
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
 // Migration error classes. Rails defines these in migration.rb, so
 // they live here. internal-metadata.ts imports EnvironmentStorageError
 // back from this module; the ESM cycle is safe because each callsite
@@ -116,6 +129,8 @@ export class PendingMigrationError extends MigrationError {
 }
 
 export class ConcurrentMigrationError extends MigrationError {
+  static readonly RELEASE_LOCK_FAILED_MESSAGE = "Failed to release advisory lock";
+
   constructor(message = "Cannot run migrations because another migration is currently running.") {
     super(message);
     this.name = "ConcurrentMigrationError";
@@ -172,6 +187,12 @@ export abstract class Migration {
   private _recording = false;
   private _recorder = new CommandRecorder();
   private _name?: string;
+  /**
+   * Class-level delegation target set from outside (mirrors Rails `class << self; attr_accessor :delegate`).
+   * Distinct from the instance `delegate` getter, which returns the current adapter.
+   * @internal
+   */
+  static delegate: DatabaseAdapter | null = null;
   private _version?: string;
   verbose = true;
   static logger: Logger = new Logger();
@@ -1015,14 +1036,41 @@ export abstract class Migration {
     await this.checkPendingMigrations();
   }
 
+  /** @internal */
+  static get nearestDelegate(): DatabaseAdapter | null {
+    return (
+      this.delegate ?? (Object.getPrototypeOf(this) as typeof Migration).nearestDelegate ?? null
+    );
+  }
+
+  /** @internal */
+  static methodMissing(name: string, ...args: unknown[]): unknown {
+    const delegate = this.nearestDelegate as Record<string, unknown> | null;
+    if (delegate !== null && typeof delegate[name] === "function") {
+      return (delegate[name] as (...a: unknown[]) => unknown).apply(delegate, args);
+    }
+    throw new TypeError(`undefined method '${name}' for ${this.name}`);
+  }
+
   // --- Delegation (Rails: Migration#nearest_delegate, #delegate) ---
 
+  /** Instance delegation target — returns the current adapter. Distinct from the class-level `Migration.delegate`. */
   get delegate(): DatabaseAdapter {
     return this.adapter;
   }
 
   get nearestDelegate(): DatabaseAdapter {
     return this.adapter;
+  }
+
+  /** @internal */
+  methodMissing(name: string, ...args: unknown[]): unknown {
+    const conn = this.adapter as unknown as Record<string, unknown>;
+    if (typeof conn[name] !== "function") {
+      // JS has no NoMethodError; TypeError is the closest stdlib equivalent.
+      throw new TypeError(`undefined method '${name}' for ${this.adapter.constructor.name}`);
+    }
+    return (conn[name] as (...a: unknown[]) => unknown).apply(conn, args);
   }
 
   /** @internal */
@@ -1527,8 +1575,8 @@ export class Migrator {
     return [...this._migrations];
   }
 
-  // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32 of googol)
-  private static readonly _LOCK_ID = 2053462845;
+  // Rails: MIGRATOR_SALT = 2053462845 (Zlib.crc32("googol"))
+  private static readonly _MIGRATOR_SALT = 2053462845;
 
   /**
    * Wrap a block with an advisory lock to prevent concurrent migrations.
@@ -1538,18 +1586,48 @@ export class Migrator {
    */
   private async _withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
     const adapter = this._adapter;
-    if (!adapter.supportsAdvisoryLocks?.() || !adapter.getAdvisoryLock) {
+    if (
+      !adapter.supportsAdvisoryLocks?.() ||
+      !adapter.getAdvisoryLock ||
+      !adapter.releaseAdvisoryLock
+    ) {
       return fn();
     }
-    const locked = await adapter.getAdvisoryLock(Migrator._LOCK_ID);
+    if (typeof adapter.currentDatabase !== "function") {
+      throw new Error(
+        `${adapter.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
+      );
+    }
+    const lockId = await this.generateMigratorAdvisoryLockId();
+    const locked = await adapter.getAdvisoryLock(lockId);
     if (!locked) {
       throw new ConcurrentMigrationError();
     }
+    // Capture fn error so we can release the lock before re-throwing (no-unsafe-finally).
+    // Release errors are swallowed when fn itself failed so the migration error wins.
+    const _sentinel = Symbol();
+    let fnResult: T | typeof _sentinel = _sentinel;
+    let fnError: unknown = _sentinel;
     try {
-      return await fn();
-    } finally {
-      await adapter.releaseAdvisoryLock?.(Migrator._LOCK_ID);
+      fnResult = await fn();
+    } catch (e) {
+      fnError = e;
     }
+    // releaseAdvisoryLock is guaranteed present (checked in the guard above).
+    // Any non-true return — false or undefined — is treated as failure, matching
+    // Rails: `release_advisory_lock(...) or raise` (migration.rb:1608-1612).
+    let released: boolean | undefined;
+    try {
+      released = await adapter.releaseAdvisoryLock!(lockId);
+    } catch (releaseErr) {
+      if (fnError !== _sentinel) throw fnError;
+      throw releaseErr;
+    }
+    if (fnError !== _sentinel) throw fnError;
+    if (released !== true) {
+      throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
+    }
+    return fnResult as T;
   }
 
   /**
@@ -1643,6 +1721,121 @@ export class Migrator {
         await this._runMigration(proxy, "up");
       }
     });
+  }
+
+  /**
+   * @internal Mirrors: ActiveRecord::Migrator#run_without_lock
+   *
+   * Signature differs from Rails: Rails reads `@direction`/`@target_version` from
+   * per-invocation instance state; TS takes them as explicit params.
+   *
+   * The already-applied guards replicate the skip logic in Rails'
+   * `execute_migration_in_transaction` (migration.rb:1528-1530), which checks
+   * `migrated.include?(migration.version)` before running. Our `_runMigration`
+   * doesn't carry that check, so the guard lives here instead.
+   */
+  async runWithoutLock(direction: "up" | "down", targetVersion: string | number): Promise<void> {
+    this._validateTargetVersion(targetVersion);
+    await this._ensureSchemaTable();
+    const key = String(BigInt(targetVersion));
+    const proxy = this._migrations.find((m) => m.version === key);
+    if (!proxy) throw new UnknownMigrationVersionError(key);
+    const applied = await this._appliedVersions();
+    if (direction === "up" && applied.has(key)) return;
+    if (direction === "down" && !applied.has(key)) return;
+    await this._runMigration(proxy, direction);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#migrate_without_lock */
+  async migrateWithoutLock(targetVersion?: number | string | null): Promise<void> {
+    await this._ensureSchemaTable();
+    await this._migrateUp(targetVersion ?? null);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#record_environment */
+  async recordEnvironment(): Promise<void> {
+    if (this._internalMetadata.enabled) {
+      await this._ensureSchemaTable();
+      await this._internalMetadata.set("environment", this._environment);
+    }
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#ran? */
+  async isRan(proxy: MigrationProxy): Promise<boolean> {
+    const applied = await this._appliedVersions();
+    return applied.has(proxy.version);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#invalid_target? */
+  isInvalidTarget(targetVersion?: string | number | null): boolean {
+    if (targetVersion === null || targetVersion === undefined) return false;
+    try {
+      const key = String(BigInt(targetVersion));
+      return !this._migrations.some((m) => m.version === key);
+    } catch {
+      return true;
+    }
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction */
+  async executeMigrationInTransaction(
+    proxy: MigrationProxy,
+    direction: "up" | "down" = "up",
+  ): Promise<void> {
+    await this._runMigration(proxy, direction);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#record_version_state_after_migrating */
+  async recordVersionStateAfterMigrating(
+    version: string,
+    direction: "up" | "down" = "up",
+  ): Promise<void> {
+    if (direction === "up") {
+      await this._schemaMigration.recordVersion(version);
+    } else {
+      await this._schemaMigration.deleteVersion(version);
+    }
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#ddl_transaction */
+  async ddlTransaction(migration: MigrationLike, fn: () => Promise<void>): Promise<void> {
+    return this._ddlTransaction(migration, fn);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#use_transaction? */
+  isUseTransaction(migration: MigrationLike): boolean {
+    return this._useTransaction(migration);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#use_advisory_lock? */
+  isUseAdvisoryLock(): boolean {
+    return !!(
+      this._adapter.supportsAdvisoryLocks?.() &&
+      this._adapter.getAdvisoryLock &&
+      this._adapter.releaseAdvisoryLock &&
+      typeof this._adapter.currentDatabase === "function"
+    );
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#with_advisory_lock */
+  async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
+    return this._withAdvisoryLock(fn);
+  }
+
+  /** @internal Mirrors: ActiveRecord::Migrator#generate_migrator_advisory_lock_id */
+  async generateMigratorAdvisoryLockId(): Promise<bigint> {
+    if (typeof this._adapter.currentDatabase !== "function") {
+      throw new Error(
+        `${this._adapter.constructor.name} must implement currentDatabase() to support advisory-locked migrations`,
+      );
+    }
+    const dbName = await this._adapter.currentDatabase();
+    if (!dbName) {
+      // currentDatabase() returned empty — adapter bug (MySQL stub returns "").
+      // Fall back to the salt; file a fix for the adapter.
+      return BigInt(Migrator._MIGRATOR_SALT);
+    }
+    return BigInt(Migrator._MIGRATOR_SALT) * BigInt(_crc32(dbName));
   }
 
   /**
@@ -1849,20 +2042,7 @@ export class Migrator {
    * scoped to `target_version` and calls `#run`).
    */
   async run(direction: "up" | "down", targetVersion: number | string): Promise<void> {
-    this._validateTargetVersion(targetVersion);
-    await this._withAdvisoryLock(async () => {
-      await this._ensureSchemaTable();
-      const key = String(BigInt(targetVersion));
-      const proxy = this._migrations.find((m) => m.version === key);
-      if (!proxy) {
-        throw new UnknownMigrationVersionError(key);
-      }
-      const applied = await this._appliedVersions();
-      const isApplied = applied.has(key);
-      if (direction === "up" && isApplied) return;
-      if (direction === "down" && !isApplied) return;
-      await this._runMigration(proxy, direction);
-    });
+    await this._withAdvisoryLock(() => this.runWithoutLock(direction, targetVersion));
   }
 
   private async _migrateUp(targetVersion: number | string | null): Promise<void> {
@@ -2308,92 +2488,6 @@ export class CheckPending {
     // In TS migrations are registered programmatically, not watched.
     return null;
   }
-}
-
-/** @internal */
-function runWithoutLock(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#run_without_lock is not implemented");
-}
-
-/** @internal */
-function migrateWithoutLock(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#migrate_without_lock is not implemented");
-}
-
-/** @internal */
-function recordEnvironment(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#record_environment is not implemented");
-}
-
-/** @internal */
-function isRan(migration: any): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#ran? is not implemented");
-}
-
-/** @internal */
-function isInvalidTarget(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#invalid_target? is not implemented");
-}
-
-/** @internal */
-function executeMigrationInTransaction(migration: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Migrator#execute_migration_in_transaction is not implemented",
-  );
-}
-
-/** @internal */
-function finish(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#finish is not implemented");
-}
-
-/** @internal */
-function validate(migrations: any): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#validate is not implemented");
-}
-
-/** @internal */
-function recordVersionStateAfterMigrating(version: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Migrator#record_version_state_after_migrating is not implemented",
-  );
-}
-
-/** @internal */
-function isUp(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#up? is not implemented");
-}
-
-/** @internal */
-function isDown(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#down? is not implemented");
-}
-
-/** @internal */
-function ddlTransaction(migration: any, block?: any): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#ddl_transaction is not implemented");
-}
-
-/** @internal */
-function isUseTransaction(migration: any): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#use_transaction? is not implemented");
-}
-
-/** @internal */
-function isUseAdvisoryLock(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#use_advisory_lock? is not implemented");
-}
-
-/** @internal */
-function withAdvisoryLock(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#with_advisory_lock is not implemented");
-}
-
-/** @internal */
-function generateMigratorAdvisoryLockId(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Migrator#generate_migrator_advisory_lock_id is not implemented",
-  );
 }
 
 /** @internal */
