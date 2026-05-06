@@ -1,3 +1,4 @@
+import { getEnv } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Current } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
@@ -24,7 +25,7 @@ function adapterPool(adapter: DatabaseAdapter):
 export interface SchemaDefineInfo {
   /** Schema version to mark as migrated (calls assume_migrated_upto_version). */
   version?: string | number;
-  /** Environment label stored in ar_internal_metadata. Defaults to NODE_ENV. */
+  /** Environment label stored in ar_internal_metadata. Defaults to TRAILS_ENV (or NODE_ENV fallback). */
   environment?: string;
 }
 
@@ -104,14 +105,17 @@ export class Schema extends Current {
     // (the rest of the migration stack uses the same shape — see
     // migration.ts:1440).
     const enabled = adapterPool(adapter)?.dbConfig?.useMetadataTable !== false;
-    // Environment fallback chain: explicit info.environment → NODE_ENV
-    // → DatabaseConfigurations.defaultEnv (which itself defaults to
-    // "development" but can be overridden by the app, e.g. via
+    // Environment fallback chain: explicit info.environment → TRAILS_ENV
+    // → NODE_ENV (one-release fallback) → DatabaseConfigurations.defaultEnv
+    // (defaults to "development" but can be overridden by the app, e.g. via
     // trailties boot). Using defaultEnv over a hard-coded literal
     // keeps Schema.define consistent with how Migrator and other
     // migration-stack pieces resolve the current environment.
     const environment =
-      info.environment ?? process.env.NODE_ENV ?? DatabaseConfigurations.defaultEnv;
+      info.environment ??
+      getEnv("TRAILS_ENV") ??
+      getEnv("NODE_ENV") ??
+      DatabaseConfigurations.defaultEnv;
     const internalMetadata = new InternalMetadata(adapter, { enabled });
     await internalMetadata.createTableAndSetFlags(environment);
   }

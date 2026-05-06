@@ -90,6 +90,14 @@ Files to migrate:
 
 `DATABASE_URL` is an industry standard and stays unchanged.
 
+**Implementation note (shipped in #1251):** The original spec called for the full
+`EnvAdapter` / `registerEnvAdapter` / `getEnvAdapter` pattern mirroring `getFs`.
+BC-2 shipped the simpler shape — a thin `getEnv()` wrapper over
+`globalThis.process.env` with no registry. The simpler shape is sufficient for
+every use case through BC-4. If a future consumer needs to inject a different env
+source (e.g. `import.meta.env` in a browser shim), lift `environment.ts` to the
+full adapter pattern at that point.
+
 ### BC-3 — database-adapter registry (~250 LOC)
 
 **Block until sqlite-driver PR M (#1247) merges** so the registry pattern is

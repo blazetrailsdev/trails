@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, getEnv } from "@blazetrails/activesupport";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
@@ -82,7 +82,7 @@ export function connectsTo(
 
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
-      const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
+      const env = getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
       const found = configs.configsFor({ envName: env, name: dbKey });
       const dbConfig = found[0] ?? new HashConfig(env, dbKey, {});
       const pool = this.connectionHandler.establishConnection(dbConfig, {
@@ -530,7 +530,7 @@ async function establishWithConfig(
   }
 
   const dbConfig = new HashConfig(
-    process.env.NODE_ENV || DatabaseConfigurations.defaultEnv,
+    getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv,
     "primary",
     {
       adapter: adapterName,
@@ -564,7 +564,7 @@ async function autoConnect(modelClass: typeof Base): Promise<void> {
     const raw = await loadConfigFile(modelClass);
     configs = DatabaseConfigurations.fromEnv(raw);
   }
-  const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
+  const env = getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
   const primaryConfigs = configs.configsFor({ envName: env, name: "primary" });
   const dbConfig = primaryConfigs[0] ?? configs.findDbConfig(env);
 
