@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import {
   Base,
@@ -599,5 +599,57 @@ describe("SQLite3Adapter._isMemoryFilename", () => {
 
   it("treats a regular file path as on-disk", () => {
     expect(isMemoryFilename("/tmp/test.db")).toBe(false);
+  });
+});
+
+describe("SQLite3Adapter pragmas option", () => {
+  let adapter: SQLite3Adapter | undefined;
+
+  afterEach(() => {
+    adapter?.close();
+    vi.restoreAllMocks();
+  });
+
+  it("applies a valid numeric pragma on construction", () => {
+    adapter = new SQLite3Adapter(":memory:", { pragmas: { cache_size: 500 } });
+    const result = adapter.raw.pragma("cache_size") as Array<{ cache_size: number }>;
+    expect(result[0]?.cache_size).toBe(500);
+  });
+
+  it("converts boolean true to 1 for pragma", () => {
+    adapter = new SQLite3Adapter(":memory:", { pragmas: { foreign_keys: true } });
+    const result = adapter.raw.pragma("foreign_keys") as Array<{ foreign_keys: number }>;
+    expect(result[0]?.foreign_keys).toBe(1);
+  });
+
+  it("converts boolean false to 0 for pragma", () => {
+    adapter = new SQLite3Adapter(":memory:", { pragmas: { foreign_keys: false } });
+    const result = adapter.raw.pragma("foreign_keys") as Array<{ foreign_keys: number }>;
+    expect(result[0]?.foreign_keys).toBe(0);
+  });
+
+  it("applies a valid string enum pragma", () => {
+    adapter = new SQLite3Adapter(":memory:", { pragmas: { synchronous: "FULL" } });
+    const result = adapter.raw.pragma("synchronous") as Array<{ synchronous: number }>;
+    // SQLite returns synchronous as integer: 0=OFF,1=NORMAL,2=FULL,3=EXTRA
+    expect(result[0]?.synchronous).toBe(2);
+  });
+
+  it("warns and skips an invalid pragma name", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    adapter = new SQLite3Adapter(":memory:", {
+      pragmas: { "bad-name!": 1 } as Record<string, number>,
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("invalid SQLite pragma name"),
+    );
+  });
+
+  it("warns and skips a string value with unsafe characters", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    adapter = new SQLite3Adapter(":memory:", {
+      pragmas: { synchronous: "FULL; DROP TABLE users" },
+    });
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unsafe characters"));
   });
 });
