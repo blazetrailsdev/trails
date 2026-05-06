@@ -767,4 +767,68 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
   });
+
+  // -- Connection lifecycle (mirrors mysql2/connection_test.rb) --
+  describe("connection lifecycle", () => {
+    it("fullVersion returns the real server version string without a prior warm-up call", async () => {
+      const ver = await (adapter as any).fullVersion();
+      expect(typeof ver).toBe("string");
+      expect(ver).toMatch(/\d+\.\d+\.\d+/);
+    });
+
+    it("getFullVersion returns the full raw string including any server suffix", async () => {
+      const full = await (adapter as any).getFullVersion();
+      // The raw string from SELECT VERSION() may include suffixes like
+      // "-MySQL Community Server - GPL" or "10.x.x-MariaDB". We store it
+      // verbatim so fullVersion() can report it faithfully.
+      expect(full).toBe((adapter as any)._fullVersionString);
+    });
+
+    it("getFullVersion populates _databaseVersion with the parsed semver", async () => {
+      await (adapter as any).getFullVersion();
+      const dv = (adapter as any)._databaseVersion;
+      expect(dv).not.toBeNull();
+      expect(typeof dv.toString()).toBe("string");
+      expect(dv.toString()).toMatch(/^\d+\.\d+\.\d+$/);
+    });
+
+    it("getFullVersion sets _mariadb based on version string content", async () => {
+      const full = await (adapter as any).getFullVersion();
+      const expectedMariadb = /mariadb/i.test(full);
+      expect((adapter as any)._mariadb).toBe(expectedMariadb);
+    });
+
+    it("getFullVersion cache: second call via fullVersion returns same value", async () => {
+      const full = await (adapter as any).getFullVersion();
+      expect(await (adapter as any).fullVersion()).toBe(full);
+    });
+
+    it("isTextType returns true for char/varchar/text, false for int", () => {
+      expect((adapter as any).isTextType("varchar(255)")).toBe(true);
+      expect((adapter as any).isTextType("char(10)")).toBe(true);
+      expect((adapter as any).isTextType("text")).toBe(true);
+      expect((adapter as any).isTextType("int")).toBe(false);
+      expect((adapter as any).isTextType("bigint")).toBe(false);
+    });
+
+    it("isTextType normalizes case and whitespace like lookupCastType", () => {
+      expect((adapter as any).isTextType("  VARCHAR(255)  ")).toBe(true);
+      expect((adapter as any).isTextType("TEXT")).toBe(true);
+      expect((adapter as any).isTextType("  INT  ")).toBe(false);
+    });
+
+    it("connect is a no-op and leaves the adapter connected", () => {
+      expect(adapter.isConnected()).toBe(true);
+      (adapter as any).connect();
+      expect(adapter.isConnected()).toBe(true);
+    });
+
+    it("configureConnection is a no-op", () => {
+      expect(() => (adapter as any).configureConnection()).not.toThrow();
+    });
+
+    it("defaultPreparedStatements returns false", () => {
+      expect((adapter as any).defaultPreparedStatements()).toBe(false);
+    });
+  });
 });
