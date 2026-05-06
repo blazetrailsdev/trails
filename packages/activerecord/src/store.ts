@@ -300,3 +300,59 @@ function asRegularHash(
   if (obj instanceof HashWithIndifferentAccess) return obj.toHash();
   return { ...obj };
 }
+
+/**
+ * Serializes a store value by converting to a plain hash before encoding.
+ *
+ * Mirrors: ActiveRecord::Store::IndifferentCoder#dump
+ *
+ * @internal
+ */
+export function dump(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+  const plain =
+    obj instanceof HashWithIndifferentAccess
+      ? obj.toHash()
+      : typeof obj === "object" && !Array.isArray(obj)
+        ? { ...(obj as Record<string, unknown>) }
+        : obj;
+  return JSON.stringify(plain);
+}
+
+/**
+ * Deserializes a store value and wraps in HashWithIndifferentAccess.
+ *
+ * Mirrors: ActiveRecord::Store::IndifferentCoder#load
+ *
+ * @internal
+ */
+export function load(value: unknown): unknown {
+  if (value === null || value === undefined) return asIndifferentHash(null);
+  const parsed = typeof value === "string" ? JSON.parse(value) : value;
+  return asIndifferentHash(parsed);
+}
+
+/**
+ * Converts any value to a HashWithIndifferentAccess. Returns an empty HWIA
+ * for nil/non-hash values, mirroring Rails' IndifferentCoder.as_indifferent_hash.
+ *
+ * Mirrors: ActiveRecord::Store::IndifferentCoder.as_indifferent_hash
+ *
+ * @internal
+ */
+export function asIndifferentHash(obj: unknown): HashWithIndifferentAccess<unknown> {
+  if (obj instanceof HashWithIndifferentAccess) return obj;
+  if (obj !== null && obj !== undefined && typeof obj === "object" && !Array.isArray(obj)) {
+    return new HashWithIndifferentAccess(obj as Record<string, unknown>);
+  }
+  return new HashWithIndifferentAccess({});
+}
+
+/**
+ * Returns (creating if needed) the store-accessor module for a model class.
+ *
+ * Mirrors: ActiveRecord::Store::ClassMethods#_store_accessors_module
+ *
+ * @internal
+ */
+export const _storeAccessorsModule = storeAccessorsModule;

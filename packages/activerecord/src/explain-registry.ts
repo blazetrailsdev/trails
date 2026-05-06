@@ -16,7 +16,6 @@
  * scope has been opened so existing unit-level tests keep working.
  */
 
-import { NotImplementedError } from "./errors.js";
 import { getAsyncContext } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
 
@@ -108,7 +107,17 @@ export class ExplainRegistry {
   }
 }
 
-/** @internal */
-function instance(): never {
-  throw new NotImplementedError("ActiveRecord::ExplainRegistry#instance is not implemented");
+/**
+ * Returns an ExplainRegistry instance. Rails stores one per thread in
+ * IsolatedExecutionState; trails stores async-local state in a Slot bag
+ * and the ExplainRegistry class delegates all static methods to it.
+ * Because the constructor is a no-op, a new instance is functionally
+ * equivalent to the "cached" thread-local one.
+ *
+ * Mirrors: ActiveRecord::ExplainRegistry.instance (private class method)
+ *
+ * @internal
+ */
+export function instance(): ExplainRegistry {
+  return new ExplainRegistry();
 }

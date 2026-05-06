@@ -4,7 +4,6 @@
  * A configuration built from a connection URL. Parses the URL into a
  * config hash and merges with any provided configuration overrides.
  */
-import { NotImplementedError } from "../errors.js";
 import { HashConfig } from "./hash-config.js";
 import type { DatabaseConfigOptions } from "./database-config.js";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
@@ -79,9 +78,16 @@ function buildUrlHash(url: string): DatabaseConfigOptions {
   return new ConnectionUrlResolver(url).toHash();
 }
 
-/** @internal */
-function toBooleanBang(configurationHash: any, key: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DatabaseConfigurations::UrlConfig#to_boolean! is not implemented",
-  );
+/**
+ * Convert a string value at `key` in `configurationHash` to a boolean in-place.
+ * String "false" → false; any other string → true. Non-string values are untouched.
+ *
+ * Mirrors: ActiveRecord::DatabaseConfigurations::UrlConfig#to_boolean! (private)
+ *
+ * @internal
+ */
+export function toBooleanBang(configurationHash: Record<string, unknown>, key: string): void {
+  if (typeof configurationHash[key] === "string") {
+    configurationHash[key] = configurationHash[key] !== "false";
+  }
 }

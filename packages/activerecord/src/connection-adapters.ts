@@ -106,11 +106,15 @@ export {
   TableDefinition,
 } from "./connection-adapters/abstract/schema-definitions.js";
 
-/** @internal */
-function defaultPrimaryKey(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters#default_primary_key is not implemented",
-  );
+/**
+ * Returns the default primary key name used when creating tables.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#default_primary_key (private)
+ *
+ * @internal
+ */
+export function defaultPrimaryKey(): string {
+  return "id";
 }
 
 function name(): never {

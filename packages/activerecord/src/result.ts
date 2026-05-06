@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::Result
  */
 
-import { NotImplementedError } from "./errors.js";
 export type ColumnType = { deserialize(value: unknown): unknown };
 export type ColumnTypes = Record<string | number, ColumnType>;
 
@@ -242,12 +241,40 @@ const EMPTY_COLUMNS = Object.freeze([]) as unknown as string[];
 const EMPTY_ROWS = Object.freeze([]) as unknown as unknown[][];
 const EMPTY = Object.freeze(new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_TYPES)) as Result;
 
-/** @internal */
-function columnType(name: any, index: any, typeOverrides: any): never {
-  throw new NotImplementedError("ActiveRecord::Result#column_type is not implemented");
+/**
+ * Look up the column type for a given column name and index, with optional overrides.
+ *
+ * Mirrors: ActiveRecord::Result#column_type (private)
+ *
+ * @internal
+ */
+export function columnType(
+  name: string,
+  index: number,
+  typeOverrides: ColumnTypes,
+  columnTypes: ColumnTypes,
+): ColumnType {
+  if (name in typeOverrides) return typeOverrides[name];
+  if (index in columnTypes) return columnTypes[index as unknown as string];
+  if (name in columnTypes) return columnTypes[name];
+  return IDENTITY_TYPE;
 }
 
-/** @internal */
-function hashRows(): never {
-  throw new NotImplementedError("ActiveRecord::Result#hash_rows is not implemented");
+/**
+ * Build the memoized array of hash rows from raw rows and column indexes.
+ *
+ * Mirrors: ActiveRecord::Result#hash_rows (private)
+ *
+ * @internal
+ */
+export function hashRows(
+  rows: unknown[][],
+  colIndexes: Record<string, number>,
+): Record<string, unknown>[] {
+  const entries = Object.entries(colIndexes);
+  return rows.map((row) => {
+    const obj: Record<string, unknown> = {};
+    for (const [key, i] of entries) obj[key] = row[i];
+    return obj;
+  });
 }

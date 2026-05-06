@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::Integration
  */
 
-import { NotImplementedError } from "./errors.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { squish, parameterize, truncate } from "@blazetrails/activesupport";
@@ -212,16 +211,40 @@ export function collectionCacheKey(
   return Promise.resolve("");
 }
 
-/** @internal */
-function canUseFastCacheVersion(timestamp: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Integration#can_use_fast_cache_version? is not implemented",
-  );
+// Matches DB timestamp strings in the form "YYYY-MM-DD HH:MM:SS" or
+// "YYYY-MM-DD HH:MM:SS.ffffff" — the only shapes rawTimestampToCacheVersion
+// can reliably strip-and-pad to a 20-char usec key.
+const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/;
+
+/**
+ * Returns true when the raw DB timestamp string can be converted directly
+ * to a cache version without re-parsing (fast path). Checks: string type,
+ * usec format, and expected DB timestamp shape. The UTC-timezone and
+ * updatedAtCameFromUser? guards from Rails are omitted — they require an
+ * async connection call that can't be made synchronously here; the shape
+ * check acts as a partial proxy that prevents broken cache keys.
+ *
+ * Mirrors: ActiveRecord::Integration#can_use_fast_cache_version? (private)
+ *
+ * @internal
+ */
+export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown): boolean {
+  if (typeof timestamp !== "string") return false;
+  const klass = record.constructor as any;
+  if ((klass.cacheTimestampFormat ?? "usec") !== "usec") return false;
+  return TIMESTAMP_RE.test(timestamp);
 }
 
-/** @internal */
-function rawTimestampToCacheVersion(timestamp: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Integration#raw_timestamp_to_cache_version is not implemented",
-  );
+/**
+ * Convert a raw DB timestamp string (e.g. "2018-10-15 20:02:15.266505") to a
+ * compact 20-character cache version string, padding with trailing zeros if
+ * Postgres truncated them.
+ *
+ * Mirrors: ActiveRecord::Integration#raw_timestamp_to_cache_version (private)
+ *
+ * @internal
+ */
+export function rawTimestampToCacheVersion(timestamp: string): string {
+  const key = timestamp.replace(/[-: .]/g, "");
+  return key.length < 20 ? key.padEnd(20, "0") : key;
 }

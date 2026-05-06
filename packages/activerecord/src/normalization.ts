@@ -10,7 +10,6 @@
  * Mirrors: ActiveRecord::Normalization
  */
 
-import { NotImplementedError } from "./errors.js";
 import { Model } from "@blazetrails/activemodel";
 
 /**
@@ -83,16 +82,36 @@ export function normalizeAttribute(record: InstanceType<typeof Model>, name: str
   return record.normalizeAttribute(name);
 }
 
-/** @internal */
-function normalize(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Normalization::NormalizedValueType#normalize is not implemented",
-  );
+/**
+ * Apply the normalizer proc to a value, skipping nil unless normalize_nil is set.
+ *
+ * Mirrors: ActiveRecord::Normalization::NormalizedValueType#normalize (private)
+ *
+ * @internal
+ */
+export function normalize(normalizedType: NormalizedValueType, value: unknown): unknown {
+  if ((value === null || value === undefined) && !normalizedType.normalizeNil) return value;
+  return normalizedType.normalizer(value);
 }
 
-/** @internal */
-function normalizeChangedInPlaceAttributes(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Normalization#normalize_changed_in_place_attributes is not implemented",
-  );
+/**
+ * For each normalized attribute that changed in place, re-normalize its value.
+ *
+ * Mirrors: ActiveRecord::Normalization#normalize_changed_in_place_attributes (private)
+ *
+ * @internal
+ */
+export function normalizeChangedInPlaceAttributes(record: any): void {
+  // Rails: self.class.normalized_attributes (Set from class_attribute).
+  // TS activemodel stores normalizations in Model._normalizations (Map<string, ...>).
+  const normalizations: Map<string, unknown> | undefined = record.constructor?._normalizations;
+  if (!normalizations) return;
+  for (const name of normalizations.keys()) {
+    if (
+      typeof record.attributeChangedInPlace === "function" &&
+      record.attributeChangedInPlace(name)
+    ) {
+      record.normalizeAttribute(name);
+    }
+  }
 }

@@ -1,4 +1,3 @@
-import { NotImplementedError } from "./errors.js";
 import type { Base } from "./base.js";
 import { underscore } from "@blazetrails/activesupport";
 
@@ -138,9 +137,19 @@ export function getDelegatedTypeConfig(
   return (modelClass as any)._delegatedTypes?.get(role);
 }
 
-/** @internal */
-function defineDelegatedTypeMethods(role: any, types?: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::DelegatedType#define_delegated_type_methods is not implemented",
-  );
+/**
+ * Define all accessor methods for a delegated type role on the given model class.
+ * Called internally by `delegatedType`; the public entry point is `delegatedType`.
+ *
+ * Mirrors: ActiveRecord::DelegatedType#define_delegated_type_methods (private)
+ *
+ * @internal
+ */
+export function defineDelegatedTypeMethods(
+  modelClass: typeof Base,
+  role: string,
+  types: string[],
+  options: DelegatedTypeOptions,
+): void {
+  delegatedType(modelClass, role, { ...options, types });
 }

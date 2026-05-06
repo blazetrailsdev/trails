@@ -1,5 +1,4 @@
-import { NotImplementedError } from "../errors.js";
-import { Type, ValueType } from "@blazetrails/activemodel";
+import { Type, ValueType, BinaryData } from "@blazetrails/activemodel";
 
 export interface Coder {
   dump(value: unknown): string | null;
@@ -96,7 +95,34 @@ export class Serialized extends ValueType {
   }
 }
 
-/** @internal */
-function encoded(value: any): never {
-  throw new NotImplementedError("ActiveRecord::Type::Serialized#encoded is not implemented");
+/**
+ * Returns the encoded (serialized) representation of a value, or undefined
+ * if the value equals the default. Used for changed_in_place? detection.
+ *
+ * Mirrors: ActiveRecord::Type::Serialized#encoded (private)
+ *
+ * @internal
+ */
+export function encoded(serialized: Serialized, value: unknown): unknown {
+  // Use the constructor-cached default to avoid calling coder.load(null) again,
+  // which would produce a fresh object on every call and break reference equality.
+  const s = serialized as any;
+  const defaultVal = s._defaultValue;
+  if (value === defaultVal) return undefined;
+  if (typeof value === "object" && value !== null && s._defaultValueJson !== undefined) {
+    try {
+      if (JSON.stringify(value) === s._defaultValueJson) return undefined;
+    } catch {
+      // non-serializable; treat as non-default
+    }
+  }
+  const payload = serialized.coder.dump(value);
+  // Rails: if payload && subtype.binary? → ActiveModel::Type::Binary::Data.new(payload)
+  if (
+    payload &&
+    ((serialized.subtype as any).binary?.() ?? (serialized.subtype as any).isBinary?.())
+  ) {
+    return new BinaryData(payload);
+  }
+  return payload;
 }

@@ -287,3 +287,62 @@ export class QueryLogs {
 export function escapeComment(content: string): string {
   return String(content).replace(/\*\//g, "* /").replace(/\/\*/g, "/ *");
 }
+
+/**
+ * Build the [name, handler] pairs list from the current tag definitions,
+ * sorted by name. Called when tags change so the list stays consistent.
+ *
+ * Mirrors: ActiveRecord::QueryLogs#rebuild_handlers (private)
+ *
+ * @internal
+ */
+export function rebuildHandlers(
+  tags: TagDefinition[],
+): [string, (ctx: Record<string, TagValue>) => TagValue][] {
+  const handlers: [string, (ctx: Record<string, TagValue>) => TagValue][] = [];
+  for (const tag of tags) {
+    if (typeof tag === "function") {
+      // Function tags are invoked directly — mirror tagContent()'s "custom" branch.
+      const fn = tag as TagHandler;
+      handlers.push(["custom", (ctx) => fn(ctx) as TagValue]);
+    } else if (typeof tag === "object" && tag !== null) {
+      for (const [k, v] of Object.entries(tag)) {
+        handlers.push([k, buildHandler(k, v as TagValue | TagHandler)]);
+      }
+    } else {
+      const name = String(tag);
+      handlers.push([name, buildHandler(name)]);
+    }
+  }
+  handlers.sort((a, b) => a[0].localeCompare(b[0]));
+  return handlers;
+}
+
+/**
+ * Build a callable handler for a single tag definition. String tags become
+ * GetKeyHandler lookups; zero-arity functions are wrapped to ignore the ctx
+ * arg; functions with args are used as-is; static values become identity
+ * functions returning that value.
+ *
+ * Mirrors: ActiveRecord::QueryLogs#build_handler (private)
+ *
+ * @internal
+ */
+export function buildHandler(
+  name: string,
+  handler?: TagValue | TagHandler,
+): (ctx: Record<string, TagValue>) => TagValue {
+  if (handler == null) {
+    const h = new GetKeyHandler(name);
+    return (ctx) => h.call(ctx);
+  }
+  if (typeof handler === "function") {
+    if (handler.length === 0) {
+      const fn = handler as () => TagValue;
+      return () => fn();
+    }
+    return handler as (ctx: Record<string, TagValue>) => TagValue;
+  }
+  const val = handler;
+  return () => val;
+}

@@ -122,6 +122,16 @@ export class TableMetadata {
     return this._arelTable;
   }
 
+  /** @internal */
+  get klass(): typeof Base | null {
+    return this._klass;
+  }
+
+  /** @internal */
+  get reflection(): any {
+    return this._reflection;
+  }
+
   get joinPrimaryKey(): string | string[] | null {
     return this._reflection?.joinPrimaryKey ?? null;
   }

@@ -5,7 +5,6 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache
  */
 
-import { NotImplementedError } from "../errors.js";
 import { getFs, getPath } from "@blazetrails/activesupport";
 import { Column } from "./column.js";
 import type { ColumnJSON } from "./column.js";
@@ -713,37 +712,94 @@ export class FakePool {
   }
 }
 
-/** @internal */
-function emptyCache(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaReflection#empty_cache is not implemented",
-  );
+/**
+ * Allocate and initialize a new empty SchemaCache — used by SchemaReflection
+ * to create a fresh cache without loading from disk.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::SchemaReflection#empty_cache (private)
+ *
+ * @internal
+ */
+export function emptyCache(): SchemaCache {
+  return new SchemaCache();
 }
 
-/** @internal */
-function isIgnoredTable(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaCache#ignored_table? is not implemented",
-  );
+/**
+ * Returns true when the table name matches the schema_cache_ignored_tables list.
+ * Rails delegates to ActiveRecord.schema_cache_ignored_table?(table_name); trails
+ * has no global ignored-tables registry yet so this always returns false.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#ignored_table? (private)
+ *
+ * @internal
+ */
+export function isIgnoredTable(_tableName: string): boolean {
+  return false;
 }
 
-/** @internal */
-function deriveColumnsHashAndDeduplicateValues(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaCache#derive_columns_hash_and_deduplicate_values is not implemented",
-  );
+/**
+ * Rebuild columnsHash from columns after loading from disk. Rails also
+ * deduplicates string values (-value) to share objects across rows; TS
+ * uses regular strings so no deduplication step is needed.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#derive_columns_hash_and_deduplicate_values (private)
+ *
+ * @internal
+ */
+export function deriveColumnsHashAndDeduplicateValues(cache: SchemaCache): void {
+  (cache as any)._columnsHash.clear();
+  for (const [table, cols] of (cache as any)._columns as Map<string, Column[]>) {
+    const hash: Record<string, Column> = {};
+    for (const col of cols) hash[col.name] = col;
+    (cache as any)._columnsHash.set(table, hash);
+  }
 }
 
-/** @internal */
-function deepDeduplicate(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaCache#deep_deduplicate is not implemented",
-  );
+/**
+ * Recursively deep-clone arrays and plain objects. Rails uses `-value` (String#+@)
+ * to intern strings; TS has no string interning, so primitives are returned as-is
+ * and only arrays/objects are cloned (no identity preservation).
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#deep_deduplicate (private)
+ *
+ * @internal
+ */
+export function deepDeduplicate<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((v) => deepDeduplicate(v)) as unknown as T;
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[deepDeduplicate(k)] = deepDeduplicate(v);
+    }
+    return out as unknown as T;
+  }
+  return value;
 }
 
-/** @internal */
-function open(filename: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SchemaCache#open is not implemented",
-  );
+/**
+ * Write content to a file, creating parent directories as needed.
+ * Rails uses File.atomic_write; TS writes synchronously (not atomically —
+ * FsAdapter lacks renameSync).
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#open (private)
+ *
+ * @internal
+ */
+export function open(
+  filename: string,
+  callback: (file: { write(data: string): void }) => void,
+): void {
+  const fs = getFs();
+  const path = getPath();
+  fs.mkdirSync(path.dirname(filename), { recursive: true });
+  let content = "";
+  callback({
+    write: (data: string) => {
+      content += data;
+    },
+  });
+  // FsAdapter does not expose renameSync, so a true atomic write is not possible.
+  // Write directly to the target file (mirrors Rails' File.atomic_write intent;
+  // full atomicity would require renameSync support in FsAdapter).
+  fs.writeFileSync(filename, content, "utf-8");
 }

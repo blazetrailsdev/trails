@@ -1,7 +1,7 @@
-import { NotImplementedError } from "./errors.js";
 import { ExplainRegistry } from "./explain-registry.js";
 import type { Base } from "./base.js";
 import type { ExplainOption } from "./adapter.js";
+import { Attribute } from "@blazetrails/activemodel";
 
 /**
  * Explain module — entry points for collecting queries and running EXPLAIN.
@@ -41,12 +41,57 @@ export async function execExplain(
   return (modelClass as any).all()._execExplain(queries, options);
 }
 
-/** @internal */
-function renderBind(connection: any, attr: any): never {
-  throw new NotImplementedError("ActiveRecord::Explain#render_bind is not implemented");
+function byteSize(value: unknown): number {
+  if (value == null) return 0;
+  if (typeof value === "string") {
+    return typeof Buffer !== "undefined"
+      ? Buffer.byteLength(value)
+      : new TextEncoder().encode(value).length;
+  }
+  if (typeof ArrayBuffer !== "undefined") {
+    if (value instanceof ArrayBuffer) return value.byteLength;
+    if (ArrayBuffer.isView(value)) return value.byteLength;
+  }
+  return byteSize(String(value));
 }
 
-/** @internal */
-function buildExplainClause(connection: any, options?: any): never {
-  throw new NotImplementedError("ActiveRecord::Explain#build_explain_clause is not implemented");
+/**
+ * Render a single bind parameter as [name, value] for EXPLAIN output.
+ * Binary values are replaced with a byte-count summary.
+ *
+ * Mirrors: ActiveRecord::Explain#render_bind (private)
+ *
+ * @internal
+ */
+export function renderBind(connection: any, attr: unknown): [string | null, unknown] {
+  // Mirrors Rails: `if ActiveModel::Attribute === attr`
+  if (attr instanceof Attribute) {
+    const dbValue =
+      typeof attr.valueForDatabase === "function"
+        ? (attr.valueForDatabase as () => unknown)()
+        : attr.valueForDatabase;
+    const isBinary = (attr.type as any)?.binary?.() ?? (attr.type as any)?.isBinary?.() ?? false;
+    if (isBinary && (attr.value ?? dbValue) != null) {
+      const bytes = byteSize(dbValue ?? attr.value);
+      return [attr.name, `<${bytes} bytes of binary data>`];
+    }
+    return [attr.name, connection?.typeCast?.(dbValue) ?? dbValue];
+  }
+  const value = connection?.typeCast?.(attr) ?? attr;
+  return [null, value];
+}
+
+/**
+ * Build the EXPLAIN prefix clause. Delegates to the connection's
+ * buildExplainClause method if available, otherwise returns "EXPLAIN for:".
+ *
+ * Mirrors: ActiveRecord::Explain#build_explain_clause (private)
+ *
+ * @internal
+ */
+export function buildExplainClause(connection: any, options: ExplainOption[] = []): string {
+  if (connection && typeof connection.buildExplainClause === "function") {
+    return connection.buildExplainClause(options);
+  }
+  return "EXPLAIN for:";
 }

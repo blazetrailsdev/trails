@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { ActiveRecordError, ReadOnlyRecord, NotImplementedError } from "./errors.js";
+import { ActiveRecordError, ReadOnlyRecord } from "./errors.js";
 import {
   touch as timestampTouch,
   timestampAttributesForUpdateInModel,
@@ -185,14 +185,26 @@ export const InstanceMethods = {
   beforeCommittedBang,
 };
 
-/** @internal */
-function initInternals(): never {
-  throw new NotImplementedError("ActiveRecord::TouchLater#init_internals is not implemented");
+/**
+ * Initialize deferred-touch state on a record during init_internals.
+ *
+ * Mirrors: ActiveRecord::TouchLater#init_internals (private)
+ *
+ * @internal
+ */
+export function initInternals(record: any): void {
+  record._deferTouchAttrs = null;
+  record._touchTime = null;
 }
 
-/** @internal */
-function hasDeferTouchAttrs(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::TouchLater#has_defer_touch_attrs? is not implemented",
-  );
+/**
+ * Returns true when the record has pending deferred touch attributes.
+ *
+ * Mirrors: ActiveRecord::TouchLater#has_defer_touch_attrs? (private)
+ *
+ * @internal
+ */
+export function hasDeferTouchAttrs(record: any): boolean {
+  const attrs = record._deferTouchAttrs;
+  return Array.isArray(attrs) && attrs.length > 0;
 }

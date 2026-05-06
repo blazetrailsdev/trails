@@ -53,4 +53,9 @@ export class Map {
 
     return new ValueType();
   }
+
+  /** @internal */
+  get klass(): any {
+    return this._klass;
+  }
 }

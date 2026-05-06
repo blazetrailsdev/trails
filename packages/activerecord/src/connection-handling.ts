@@ -779,9 +779,20 @@ export const ClassMethods = {
 // overrides like register("mysql2", ...) aren't shadowed by normalization.
 _setAdapterClassResolver(async (adapterName) => _loadAdapter(adapterName));
 
-/** @internal */
-function resolveConfigForConnection(configOrEnv: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionHandling#resolve_config_for_connection is not implemented",
-  );
+/**
+ * Resolve a config-or-env value through Base.configurations and set the
+ * connection_specification_name on the calling class.
+ *
+ * Mirrors: ActiveRecord::ConnectionHandling#resolve_config_for_connection (private)
+ *
+ * @internal
+ */
+export function resolveConfigForConnection(this: typeof Base, configOrEnv: unknown): unknown {
+  if (!this.name) throw new Error("Anonymous class is not allowed.");
+  // Rails also sets self.connection_specification_name = connection_name as a side effect.
+  const connectionName = isPrimaryClass.call(this)
+    ? ((this as any)._baseClassName ?? this.name)
+    : this.name;
+  (this as any)._connectionSpecificationName = connectionName;
+  return (this as any).configurations?.resolve(configOrEnv) ?? configOrEnv;
 }

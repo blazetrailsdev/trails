@@ -1,4 +1,3 @@
-import { NotImplementedError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
 
 /**
@@ -65,9 +64,13 @@ export class Connection {
   }
 }
 
-/** @internal */
-function tableName(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::TypeCaster::Connection#table_name is not implemented",
-  );
+/**
+ * Returns the table name this type caster resolves columns against.
+ *
+ * Mirrors: ActiveRecord::TypeCaster::Connection#table_name (attr_reader, private)
+ *
+ * @internal
+ */
+export function tableName(connection: Connection): string {
+  return (connection as any)._tableName as string;
 }

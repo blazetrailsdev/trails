@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::StatementPool
  */
 
-import { NotImplementedError } from "../errors.js";
 export class StatementPool<T = unknown> {
   private _statements = new Map<string, T>();
   private _maxSize: number;
@@ -124,9 +123,15 @@ export class StatementPool<T = unknown> {
   }
 }
 
-/** @internal */
-function cache(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::StatementPool#cache is not implemented",
-  );
+/**
+ * Returns the per-process statement cache. Rails scopes this by Process.pid so
+ * forked child processes start with an empty cache; Node is single-process so
+ * the internal Map is returned directly.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::StatementPool#cache (private)
+ *
+ * @internal
+ */
+export function cache<T>(pool: StatementPool<T>): Map<string, T> {
+  return (pool as any)._statements as Map<string, T>;
 }
