@@ -1089,10 +1089,8 @@ export async function withTemporaryPool(
 
 /** @internal */
 export function resolveConfiguration(configuration: unknown): DatabaseConfig {
-  if (!DatabaseTasks.databaseConfiguration) {
-    throw new Error("DatabaseTasks.databaseConfiguration is not set");
-  }
-  return DatabaseTasks.databaseConfiguration.resolve(configuration);
+  const configs = DatabaseTasks.databaseConfiguration ?? new DatabaseConfigurations([]);
+  return configs.resolve(configuration);
 }
 
 /** @internal */
