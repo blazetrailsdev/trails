@@ -1588,9 +1588,7 @@ export class Migrator {
     if (!locked) {
       throw new ConcurrentMigrationError();
     }
-    // Mirrors Rails ensure clause: release the lock, raise if release fails.
-    // The fn error (if any) takes priority; release-failed error is raised only
-    // when fn succeeded. Structured this way to satisfy no-unsafe-finally.
+    // Capture fn error so we can release the lock before re-throwing (no-unsafe-finally).
     const _sentinel = Symbol();
     let fnResult: T | typeof _sentinel = _sentinel;
     let fnError: unknown = _sentinel;
@@ -1700,12 +1698,7 @@ export class Migrator {
     });
   }
 
-  /**
-   * Run a specific migration (by targetVersion) without acquiring the advisory lock.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#run_without_lock
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#run_without_lock */
   async runWithoutLock(direction: "up" | "down", targetVersion: string | number): Promise<void> {
     await this._ensureSchemaTable();
     const key = String(BigInt(targetVersion));
@@ -1717,58 +1710,33 @@ export class Migrator {
     await this._runMigration(proxy, direction);
   }
 
-  /**
-   * Run all pending migrations without acquiring the advisory lock.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#migrate_without_lock
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#migrate_without_lock */
   async migrateWithoutLock(targetVersion?: number | string | null): Promise<void> {
     await this._ensureSchemaTable();
     await this._migrateUp(targetVersion ?? null);
   }
 
-  /**
-   * Stamp the current environment name into ar_internal_metadata.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#record_environment
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#record_environment */
   async recordEnvironment(): Promise<void> {
     if (this._internalMetadata.enabled) {
       await this._internalMetadata.set("environment", this._environment);
     }
   }
 
-  /**
-   * Return true if the migration at the given version has already been applied.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#ran?
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#ran? */
   async isRan(proxy: MigrationProxy): Promise<boolean> {
     const applied = await this._appliedVersions();
     return applied.has(proxy.version);
   }
 
-  /**
-   * Return true if targetVersion is set but no matching migration exists.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#invalid_target?
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#invalid_target? */
   isInvalidTarget(targetVersion?: string | number | null): boolean {
     if (targetVersion === null || targetVersion === undefined) return false;
     const key = String(BigInt(targetVersion));
     return !this._migrations.some((m) => m.version === key);
   }
 
-  /**
-   * Execute a single migration inside a DDL transaction.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction */
   async executeMigrationInTransaction(
     proxy: MigrationProxy,
     direction: "up" | "down" = "up",
@@ -1776,12 +1744,7 @@ export class Migrator {
     await this._runMigration(proxy, direction);
   }
 
-  /**
-   * Record that a version was applied or rolled back in schema_migrations.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#record_version_state_after_migrating
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#record_version_state_after_migrating */
   async recordVersionStateAfterMigrating(
     version: string,
     direction: "up" | "down" = "up",
@@ -1793,56 +1756,27 @@ export class Migrator {
     }
   }
 
-  /**
-   * Wrap fn in a DDL transaction if the adapter and migration support it.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#ddl_transaction
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#ddl_transaction */
   async ddlTransaction(migration: MigrationLike, fn: () => Promise<void>): Promise<void> {
     return this._ddlTransaction(migration, fn);
   }
 
-  /**
-   * Return true if this migration should be wrapped in a DDL transaction.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#use_transaction?
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#use_transaction? */
   isUseTransaction(migration: MigrationLike): boolean {
     return this._useTransaction(migration);
   }
 
-  /**
-   * Return true if the adapter supports advisory locks and they are enabled.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#use_advisory_lock?
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#use_advisory_lock? */
   isUseAdvisoryLock(): boolean {
     return !!(this._adapter.supportsAdvisoryLocks?.() && this._adapter.getAdvisoryLock);
   }
 
-  /**
-   * Acquire the migrator advisory lock, run fn, then release it.
-   * Raises ConcurrentMigrationError if the lock cannot be acquired or released.
-   * No-op (runs fn directly) when the adapter does not support advisory locks.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#with_advisory_lock
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#with_advisory_lock */
   async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
     return this._withAdvisoryLock(fn);
   }
 
-  /**
-   * Return the integer lock ID used for the migrator advisory lock.
-   * Mirrors Rails: `MIGRATOR_SALT * Zlib.crc32(connection.current_database)`.
-   * Falls back to the salt alone when the adapter doesn't expose currentDatabase.
-   *
-   * @internal
-   * Mirrors: ActiveRecord::Migrator#generate_migrator_advisory_lock_id
-   */
+  /** @internal Mirrors: ActiveRecord::Migrator#generate_migrator_advisory_lock_id */
   async generateMigratorAdvisoryLockId(): Promise<number> {
     const adapter = this._adapter as unknown as { currentDatabase?(): Promise<string> };
     if (typeof adapter.currentDatabase === "function") {
