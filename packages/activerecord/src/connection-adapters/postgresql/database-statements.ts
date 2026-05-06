@@ -99,16 +99,6 @@ function cancelAnyRunningQuery(): never {
 }
 
 /**
- * Execute `sql` against the raw `pg.PoolClient` and return the raw PG result.
- *
- * Three execution paths mirror Rails exactly:
- * 1. `prepare: true` → prepare a named statement via `this.prepareStatement`,
- *    then call `client.query({ name, text: sql, values: typeCastedBinds })`.
- *    On `PG::FeatureNotSupported` (cached-plan failure), flush the cached key
- *    and retry (if not in a transaction).
- * 2. No binds → `client.query(sql)` (`async_exec` equivalent).
- * 3. Binds present → `client.query(sql, typeCastedBinds)` (`exec_params`).
- *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
  * @internal
  */
@@ -130,9 +120,7 @@ export async function performQuery(
 
   let result: pg.QueryResult;
 
-  // rowMode: "array" makes node-pg return rows as positional unknown[][] instead
-  // of the default Record<string,unknown>[] — matching libpq's wire format that
-  // the Ruby PG gem exposes as PG::Result#values. castResult expects arrays.
+  // rowMode:"array" → rows as positional unknown[][] matching libpq/PG::Result#values.
   if (prepare && this.prepareStatement) {
     const stmtKey = await this.prepareStatement(sql, binds, rawConnection);
     if (notificationPayload) notificationPayload["statement_name"] = stmtKey;
@@ -174,21 +162,14 @@ export async function performQuery(
 
   this.verified?.();
   this.handleWarnings?.(result);
-  // Rails: notification_payload[:row_count] = result.count
-  // result.count on PG::Result = number of tuples in the result set.
-  // node-pg: result.rows.length for SELECT; result.rowCount for DML (null for SELECT).
+  // result.count in libpq = number of tuples; node-pg exposes this as result.rows.length.
   if (notificationPayload) notificationPayload["row_count"] = result.rows.length;
 
   return result;
 }
 
 /**
- * Convert a raw `pg.QueryResult` to an `ActiveRecord::Result`, resolving OID
- * types for each column via `this.getOidType`. Returns an empty Result for
- * results with no fields (DDL, DML with no RETURNING).
- *
- * `castResult` is `async` in TS (unlike Rails which is synchronous) because
- * `getOidType` may need to issue a pg_type lookup for unknown OIDs.
+ * async unlike Rails because getOidType may issue a pg_type lookup for unknown OIDs.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#cast_result
  * @internal
@@ -205,26 +186,17 @@ export async function castResult(this: CastResultHost, result: pg.QueryResult): 
     const f = fields[i];
     const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name, "");
     columnTypes[i] = type;
-    // Rails: types[fname] = types[i] = … (both always set).
-    // Guard: skip name-keyed entry when fname is a pure digit string — that
-    // would collide with the numeric index key in a plain JS object.
+    // Guard vs numeric-string column names colliding with integer index keys.
     if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
   }
 
-  // result.rows is unknown[][] because performQuery sets rowMode: "array",
-  // matching Rails' PG::Result#values (positional arrays from libpq).
   const rows = (result.rows ?? []) as unknown[][];
   return new Result(columnNames, rows, columnTypes as Record<string, Type>);
 }
 
 /**
- * Return the number of rows affected by the last DML statement (`cmd_tuples`
- * in libpq). Clears the result to free server-side memory.
- *
- * In node-pg, `pg.QueryResult#rowCount` is the JS equivalent of libpq's
- * `PQcmdTuples`. Unlike the Ruby PG gem, node-pg results are JS objects and
- * are garbage-collected without an explicit `clear` call, so no `.clear()`
- * equivalent is needed.
+ * Rails calls `result.cmd_tuples` then `result.clear`. rowCount is node-pg's
+ * cmd_tuples equivalent; no .clear() is needed (JS GC handles it).
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#affected_rows
  * @internal
