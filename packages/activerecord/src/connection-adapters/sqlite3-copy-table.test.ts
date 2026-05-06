@@ -89,7 +89,9 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
     db.exec("CREATE TABLE dst (id INTEGER, name TEXT)");
     db.exec("INSERT INTO src VALUES (1, 'Alice'), (2, 'Bob')");
     await (db as any).copyTableContents("src", "dst", ["id", "name"]);
-    const rows = db.raw.prepare("SELECT * FROM dst ORDER BY id").all();
+    const rows = (db.raw as import("better-sqlite3").Database)
+      .prepare("SELECT * FROM dst ORDER BY id")
+      .all();
     expect(rows).toHaveLength(2);
     expect((rows[0] as any).name).toBe("Alice");
   });
@@ -102,7 +104,7 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
     await (db as any).copyTableContents("src", "dst", ["id", "new_name"], {
       old_name: "new_name",
     });
-    const rows = db.raw.prepare("SELECT * FROM dst").all();
+    const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
     expect((rows[0] as any).new_name).toBe("Alice");
   });
 
@@ -113,7 +115,9 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
     db.exec("CREATE UNIQUE INDEX index_src_on_email ON src (email)");
     db.exec("CREATE TABLE dst (id INTEGER, email TEXT)");
     await (db as any).copyTableIndexes("src", "dst");
-    const idxList = db.raw.prepare("PRAGMA index_list(dst)").all() as any[];
+    const idxList = (db.raw as import("better-sqlite3").Database)
+      .prepare("PRAGMA index_list(dst)")
+      .all() as any[];
     expect(idxList.length).toBeGreaterThan(0);
     expect(idxList[0].unique).toBe(1);
   });
@@ -123,7 +127,7 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
     db.exec("CREATE UNIQUE INDEX index_src_on_email_active ON src (email) WHERE active = 1");
     db.exec("CREATE TABLE dst (id INTEGER, active INTEGER, email TEXT)");
     await (db as any).copyTableIndexes("src", "dst");
-    const idxSql = db.raw
+    const idxSql = (db.raw as import("better-sqlite3").Database)
       .prepare("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='dst'")
       .get() as { sql: string } | undefined;
     expect(idxSql?.sql).toMatch(/WHERE\s+active\s*=\s*1/i);
@@ -135,7 +139,7 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
     db.exec("CREATE TABLE src (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
     db.exec("INSERT INTO src VALUES (1, 'Alice')");
     await (db as any).copyTable("src", "dst");
-    const rows = db.raw.prepare("SELECT * FROM dst").all();
+    const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
     expect(rows).toHaveLength(1);
     expect((rows[0] as any).name).toBe("Alice");
   });
@@ -144,9 +148,11 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
     db.exec("CREATE TABLE src (id INTEGER, old_col TEXT)");
     db.exec("INSERT INTO src VALUES (1, 'hello')");
     await (db as any).copyTable("src", "dst", { rename: { old_col: "new_col" } });
-    const cols = db.raw.prepare("PRAGMA table_info(dst)").all() as any[];
+    const cols = (db.raw as import("better-sqlite3").Database)
+      .prepare("PRAGMA table_info(dst)")
+      .all() as any[];
     expect(cols.map((c: any) => c.name)).toContain("new_col");
-    const rows = db.raw.prepare("SELECT * FROM dst").all();
+    const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
     expect((rows[0] as any).new_col).toBe("hello");
   });
 
@@ -156,9 +162,9 @@ describe("SQLite3Adapter table-rebuild cluster", () => {
     db.exec("CREATE TABLE src (id INTEGER PRIMARY KEY, name TEXT)");
     db.exec("INSERT INTO src VALUES (1, 'Alice')");
     await (db as any).moveTable("src", "dst");
-    const rows = db.raw.prepare("SELECT * FROM dst").all();
+    const rows = (db.raw as import("better-sqlite3").Database).prepare("SELECT * FROM dst").all();
     expect(rows).toHaveLength(1);
-    const tables = db.raw
+    const tables = (db.raw as import("better-sqlite3").Database)
       .prepare("SELECT name FROM sqlite_master WHERE type='table'")
       .all() as any[];
     expect(tables.map((t: any) => t.name)).not.toContain("src");

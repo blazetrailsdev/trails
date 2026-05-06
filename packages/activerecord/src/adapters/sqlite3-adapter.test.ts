@@ -612,25 +612,33 @@ describe("SQLite3Adapter pragmas option", () => {
 
   it("applies a valid numeric pragma on construction", () => {
     adapter = new SQLite3Adapter(":memory:", { pragmas: { cache_size: 500 } });
-    const result = adapter.raw.pragma("cache_size") as Array<{ cache_size: number }>;
+    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+      "cache_size",
+    ) as Array<{ cache_size: number }>;
     expect(result[0]?.cache_size).toBe(500);
   });
 
   it("converts boolean true to 1 for pragma", () => {
     adapter = new SQLite3Adapter(":memory:", { pragmas: { foreign_keys: true } });
-    const result = adapter.raw.pragma("foreign_keys") as Array<{ foreign_keys: number }>;
+    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+      "foreign_keys",
+    ) as Array<{ foreign_keys: number }>;
     expect(result[0]?.foreign_keys).toBe(1);
   });
 
   it("converts boolean false to 0 for pragma", () => {
     adapter = new SQLite3Adapter(":memory:", { pragmas: { foreign_keys: false } });
-    const result = adapter.raw.pragma("foreign_keys") as Array<{ foreign_keys: number }>;
+    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+      "foreign_keys",
+    ) as Array<{ foreign_keys: number }>;
     expect(result[0]?.foreign_keys).toBe(0);
   });
 
   it("applies a valid string enum pragma", () => {
     adapter = new SQLite3Adapter(":memory:", { pragmas: { synchronous: "FULL" } });
-    const result = adapter.raw.pragma("synchronous") as Array<{ synchronous: number }>;
+    const result = (adapter.raw as import("better-sqlite3").Database).pragma(
+      "synchronous",
+    ) as Array<{ synchronous: number }>;
     // SQLite returns synchronous as integer: 0=OFF,1=NORMAL,2=FULL,3=EXTRA
     expect(result[0]?.synchronous).toBe(2);
   });

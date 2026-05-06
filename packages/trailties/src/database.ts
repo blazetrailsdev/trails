@@ -431,9 +431,30 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
   switch (adapter) {
     case "sqlite3":
     case "sqlite": {
+      // Trailties is a Node-only entry point, so it's the right place to wire
+      // in the default better-sqlite3 driver. App authors who want a different
+      // SQLite driver register it before calling connectAdapter (or pass a
+      // `driver:` field in the config).
+      try {
+        await import("@blazetrails/activesupport/sqlite/better-sqlite3");
+      } catch (cause) {
+        throw new Error(
+          "trailties needs the `better-sqlite3` package to open a SQLite database. " +
+            "Install it (`pnpm add better-sqlite3`) or register a custom SQLite driver " +
+            "via `registerSqliteDriver()` from `@blazetrails/activesupport/sqlite-adapter`.",
+          { cause },
+        );
+      }
       const { SQLite3Adapter } =
         await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-      return new SQLite3Adapter(config.database ?? ":memory:");
+      // Forward adapter-level options from database.yml (driver, readonly,
+      // statementLimit, pragmas, …). Stripping adapter/database/url keeps
+      // adapter options clean of routing fields.
+      const { adapter: _a, database: _d, url: _u, ...rest } = config;
+      void _a;
+      void _d;
+      void _u;
+      return new SQLite3Adapter(config.database ?? ":memory:", rest as Record<string, unknown>);
     }
     case "postgresql":
     case "postgres": {

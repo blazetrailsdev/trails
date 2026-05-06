@@ -60,8 +60,15 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
 }
 
 // Pre-registered adapters matching Rails' canonical names.
-const sqlite3Loader: AdapterLoader = async () =>
-  (await import("./connection-adapters/sqlite3-adapter.js")).SQLite3Adapter as any;
+const sqlite3Loader: AdapterLoader = async () => {
+  // Lazy-load the default better-sqlite3 driver alongside the adapter so any
+  // production entry point that resolves "sqlite3" (CLI bins, trailties,
+  // establishConnection) gets a registered driver without each consumer
+  // re-importing the subpath. Apps that pre-register a custom driver are
+  // unaffected — registerSqliteDriver overwrites with a one-time warn.
+  await import("@blazetrails/activesupport/sqlite/better-sqlite3").catch(() => {});
+  return (await import("./connection-adapters/sqlite3-adapter.js")).SQLite3Adapter as any;
+};
 const mysql2Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
 const postgresqlLoader: AdapterLoader = async () =>

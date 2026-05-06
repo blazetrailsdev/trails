@@ -6,6 +6,11 @@
  * there.
  */
 
+// Self-registers the better-sqlite3 driver so the AR test adapter can resolve
+// it via getSqlite() without each test bootstrapping the registry. Lives here
+// (not in activerecord/index.ts) to keep better-sqlite3 a true optional peer
+// for non-test consumers.
+import "@blazetrails/activesupport/sqlite/better-sqlite3";
 import { beforeEach } from "vitest";
 import { resetTestAdapterState } from "./test-adapter.js";
 
