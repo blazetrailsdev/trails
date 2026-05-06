@@ -8,7 +8,10 @@ import { sql as arelSql } from "@blazetrails/arel";
 import type { ExplainOption } from "../../adapter.js";
 import type { Nodes } from "@blazetrails/arel";
 import { Result } from "../../result.js";
-import { defaultInsertValue as abstractDefaultInsertValue } from "../abstract/database-statements.js";
+import {
+  defaultInsertValue as abstractDefaultInsertValue,
+  internalExecQuery,
+} from "../abstract/database-statements.js";
 import type { Version } from "../abstract-adapter.js";
 
 export interface DatabaseStatements {
@@ -37,8 +40,8 @@ export function isWriteQuery(sql: string): boolean {
 }
 
 export interface BuildExplainClauseHost {
-  /** @internal */
-  analyzeWithoutExplain?(): boolean;
+  isMariadb?(): boolean;
+  getDatabaseVersion?(): Version;
 }
 
 /**
@@ -52,9 +55,7 @@ export function buildExplainClause(
 ): string {
   if (options.length === 0) return "EXPLAIN";
   const clause = `EXPLAIN ${options.map((o) => (typeof o === "string" ? o.toUpperCase() : `FORMAT=${(o as { format: string }).format.toUpperCase()}`)).join(" ")}`;
-  // analyzeWithoutExplain? = mariadb? && database_version >= "10.1.0" — not yet wired
-  const analyzeWithoutExplain = (this as BuildExplainClauseHost | null)?.analyzeWithoutExplain?.();
-  if (analyzeWithoutExplain && clause.includes("ANALYZE")) {
+  if (isAnalyzeWithoutExplain.call(this) && clause.includes("ANALYZE")) {
     return clause.replace("EXPLAIN ", "");
   }
   return clause;
@@ -72,10 +73,8 @@ interface AutoIncrementColumnHost {
 /**
  * @internal
  */
-export function isAnalyzeWithoutExplain(
-  this: { isMariadb?(): boolean; getDatabaseVersion?(): Version } | void,
-): boolean {
-  const host = this as { isMariadb?(): boolean; getDatabaseVersion?(): Version } | null;
+export function isAnalyzeWithoutExplain(this: BuildExplainClauseHost | void): boolean {
+  const host = this as BuildExplainClauseHost | null;
   if (!host?.isMariadb?.()) return false;
   return host.getDatabaseVersion?.().gte("10.1.0") === true;
 }
@@ -101,8 +100,8 @@ export function returningColumnValues(
 
 /** @internal */
 export function combineMultiStatements(totalSql: string[]): string[] {
-  // Rails reads max_allowed_packet from the server; we use the MySQL default.
-  // Callers that need the live value should await maxAllowedPacket() and pass it separately.
+  // Rails reads max_allowed_packet lazily from the server; we use the MySQL default (16 MiB).
+  // Full wiring (async server query) is deferred to the adapter layer.
   const maxPacket = 16_777_216;
   return totalSql.reduce<string[]>((chunks, sql) => {
     const prev = chunks[chunks.length - 1];
@@ -159,7 +158,6 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 export async function explain(
   this: BuildExplainClauseHost & {
     toSql?(arel: unknown, binds?: unknown[]): string;
-    internalExecQuery?(sql: string, name?: string, binds?: unknown[]): Promise<Result>;
     explainPrettyPrinter?(): { pp(result: Result, elapsed: number): string };
   },
   arel: unknown,
@@ -168,8 +166,7 @@ export async function explain(
 ): Promise<string> {
   const sql = buildExplainClause.call(this, options) + " " + (this.toSql?.(arel, binds) ?? arel);
   const start = Date.now();
-  const result =
-    (await this.internalExecQuery?.(String(sql), "EXPLAIN", binds)) ?? new Result([], []);
+  const result = await internalExecQuery.call(this as any, String(sql), "EXPLAIN", binds);
   const elapsed = (Date.now() - start) / 1000;
   return this.explainPrettyPrinter?.().pp(result, elapsed) ?? JSON.stringify(result.rows);
 }

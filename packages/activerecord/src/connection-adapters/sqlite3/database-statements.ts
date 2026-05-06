@@ -103,7 +103,7 @@ interface Sqlite3RawConnection {
 interface InternalBeginTransactionHost {
   executeMutation(sql: string): Promise<unknown>;
   queryValue(sql: string, name?: string): Promise<unknown>;
-  sharedCache?(): boolean;
+  isSharedCache?(): boolean;
   _previousReadUncommitted?: unknown;
 }
 
@@ -132,8 +132,8 @@ export async function internalBeginTransaction(
         "SQLite3 only supports the `read_uncommitted` transaction isolation level",
       );
     }
-    if (this.sharedCache && !this.sharedCache()) {
-      throw new Error(
+    if (this.isSharedCache && !this.isSharedCache()) {
+      throw new TransactionIsolationError(
         "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
       );
     }
