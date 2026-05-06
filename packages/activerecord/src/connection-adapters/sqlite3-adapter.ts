@@ -1972,7 +1972,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /** @internal */
-  private buildStatementPool(): GenericStatementPool<SqliteStatement> {
+  override buildStatementPool(): GenericStatementPool<SqliteStatement> {
     return new GenericStatementPool<SqliteStatement>(this._statementLimit);
   }
 
