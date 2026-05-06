@@ -505,8 +505,9 @@ function associatedRecordsToValidateOrSave(
   newRecord: boolean,
   autosave: boolean,
 ): any[] | null {
-  const target: any[] = association?.target;
-  if (!target) return null;
+  const raw = association?.target;
+  if (raw == null) return null;
+  const target: any[] = Array.isArray(raw) ? raw : [raw];
   if (newRecord) return target;
   if (autosave) return target.filter((r: any) => r.changedForAutosave?.() ?? false);
   return target.filter((r: any) => r.isNewRecord?.() ?? false);
