@@ -9,6 +9,7 @@ import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
 import noProcessBypass from "./eslint/no-process-bypass.mjs";
 import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
+import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 
 export default defineConfig(
   {
@@ -99,6 +100,7 @@ export default defineConfig(
           "no-process-bypass": noProcessBypass,
           "rails-private-jsdoc": railsPrivateJsdoc,
           "no-native-date": noNativeDate,
+          "sqlite-driver-await": sqliteDriverAwait,
         },
       },
     },
@@ -170,6 +172,18 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-private-jsdoc": "error",
+    },
+  },
+
+  // ── sqlite-driver-await: driver call sites must be awaited ──
+  {
+    files: [
+      "packages/activerecord/src/connection-adapters/sqlite3/**/*.ts",
+      "packages/activerecord/src/connection-adapters/sqlite3-adapter.ts",
+    ],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/sqlite-driver-await": "error",
     },
   },
 
