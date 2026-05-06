@@ -3,6 +3,7 @@ import { StaleObjectError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute, attributeInDatabase } from "../attribute-methods/dirty.js";
 import { queryConstraintsList, _updateRecord as persistenceUpdateRecord } from "../persistence.js";
+import { attributesWithValues } from "../attribute-methods.js";
 
 /**
  * Optimistic locking support for ActiveRecord models.
@@ -159,7 +160,6 @@ type InstanceLockingHost = {
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
-  attributesWithValues(names: string[]): Record<string, unknown>;
   changes: Record<string, [unknown, unknown]>;
 };
 
@@ -221,7 +221,7 @@ export async function _updateRow(
   try {
     const affectedRows = await persistenceUpdateRecord.call(
       ctor as any,
-      this.attributesWithValues(attributeNames),
+      attributesWithValues.call(this as any, attributeNames),
       updateConstraints,
     );
     if (affectedRows !== 1) throw new StaleObjectError(this, attemptedAction);

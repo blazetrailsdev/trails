@@ -291,7 +291,7 @@ export async function destroyRow(
     for (const name of counterCachedAssociationNames(this.constructor)) {
       const assoc = this.association(name);
       const dba = this.destroyedByAssociation as any;
-      if (!dba || !is_foreignKeysEqual(dba.foreignKey, assoc.reflection?.foreignKey)) {
+      if (!dba || !isForeignKeysEqual(dba.foreignKey, assoc.reflection?.foreignKey)) {
         await assoc.decrementCounters();
       }
     }
@@ -303,7 +303,7 @@ export async function destroyRow(
  * @internal
  * Mirrors: ActiveRecord::CounterCache#_foreign_keys_equal?
  */
-export function is_foreignKeysEqual(fkey1: unknown, fkey2: unknown): boolean {
+export function isForeignKeysEqual(fkey1: unknown, fkey2: unknown): boolean {
   if (fkey1 === fkey2) return true;
   const arr1 = (Array.isArray(fkey1) ? fkey1 : [fkey1]).map((k) =>
     typeof k === "string" ? k : String(k),
