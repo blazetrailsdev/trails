@@ -13,8 +13,9 @@ leave them in browser builds even when the feature is unused. Lint rules and
 browser-bundle CI (added in BC-4) enforce this.
 
 **Database adapters opt in via registry, not eager import.**
-Apps that use PostgreSQL or MySQL import `@blazetrails/activerecord/adapters/postgresql`
-(or `/mysql2`, `/sqlite3`). Core activerecord has zero top-level imports of
+Apps that use PostgreSQL import `@blazetrails/activerecord/adapters/postgresql`,
+MySQL import `@blazetrails/activerecord/adapters/mysql2`, SQLite import
+`@blazetrails/activerecord/adapters/sqlite3`. Core activerecord has zero top-level imports of
 adapter packages. The goal is _PG-not-bundled-when-unused_, not
 _PG-in-the-browser_.
 
@@ -71,8 +72,10 @@ function getEnv(key: string, defaultValue: string): string;
 function getEnv(key: string): string | undefined;
 ```
 
-Read-back policy: read `TRAILS_ENV`, no fallback. Pre-release — direct
-replacement with no shim.
+Read-back policy: read `TRAILS_ENV` only — no `NODE_ENV` fallback.
+Pre-release; direct replacement. The `defaultValue` argument (e.g.
+`getEnv("TRAILS_ENV", "development")`) is for explicit caller-supplied
+defaults, not for `NODE_ENV` aliasing.
 
 Files to migrate:
 
@@ -149,16 +152,16 @@ rack) get their status set to ✅ or flagged as ❌ after a grep-and-review pass
 
 ## 5. CI gates (added in BC-4)
 
-| Gate                    | Tooling                                                                                  | Job                    | Trigger    |
-| ----------------------- | ---------------------------------------------------------------------------------------- | ---------------------- | ---------- |
-| Browser-bundle smoke    | `esbuild --bundle --platform=browser <barrel> 2>&1 \| grep -E "^(✘\|error)"` per package | `Browser Bundle` (new) | Every push |
-| No bare native imports  | `blazetrails/no-native-import` ESLint rule                                               | `Lint` (existing)      | Every push |
-| No direct `process.env` | `blazetrails/no-direct-process-env` ESLint rule                                          | `Lint` (existing)      | Every push |
+| Gate                    | Tooling                                                                | Job                    | Trigger    |
+| ----------------------- | ---------------------------------------------------------------------- | ---------------------- | ---------- |
+| Browser-bundle smoke    | `esbuild --bundle --platform=browser <barrel>` — fail on non-zero exit | `Browser Bundle` (new) | Every push |
+| No bare native imports  | `blazetrails/no-native-import` ESLint rule                             | `Lint` (existing)      | Every push |
+| No direct `process.env` | `blazetrails/no-direct-process-env` ESLint rule                        | `Lint` (existing)      | Every push |
 
-A package barrel that resolves `node:fs` in the browser-bundle step fails
-the `Browser Bundle` job with a non-zero exit code — the hard signal that a
-dep has leaked past the adapter layer. This catches regressions that
-tree-shaker analysis would miss.
+A package barrel that resolves `node:fs` causes esbuild to exit non-zero,
+failing the `Browser Bundle` job. Rely on esbuild's own exit code — don't
+pipe to grep (grep exits 1 on no matches, which would fail CI when the build
+is clean).
 
 ## 6. Open questions
 
