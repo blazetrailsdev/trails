@@ -77,7 +77,6 @@ interface PerformQueryHost {
   preparedStatements?: boolean;
   prepareStatement?(sql: string, binds: unknown[], client: pg.PoolClient): Promise<string>;
   isCachedPlanFailure?(err: unknown): boolean;
-  /** Flush the cached statement key so the next prepare picks a fresh name. */
   deleteStatementKey?(sql: string): void;
   inTransaction?: boolean;
   /** @internal */
@@ -120,7 +119,6 @@ export async function performQuery(
 
   let result: pg.QueryResult;
 
-  // rowMode:"array" → rows as positional unknown[][] matching libpq/PG::Result#values.
   if (prepare && this.prepareStatement) {
     const stmtKey = await this.prepareStatement(sql, binds, rawConnection);
     if (notificationPayload) notificationPayload["statement_name"] = stmtKey;
@@ -134,11 +132,8 @@ export async function performQuery(
     } catch (err) {
       if (this.isCachedPlanFailure?.(err)) {
         if (this.inTransaction) {
-          // Inside a transaction all subsequent commands raise InFailedSQLTransaction;
-          // wrap as PreparedStatementCacheExpired so callers can handle appropriately.
           throw new PreparedStatementCacheExpired((err as Error).message);
         }
-        // Outside a transaction: flush the cached plan and retry once.
         this.deleteStatementKey?.(sql);
         result = await rawConnection.query({
           name: stmtKey,
@@ -162,7 +157,6 @@ export async function performQuery(
 
   this.verified?.();
   this.handleWarnings?.(result);
-  // result.count in libpq = number of tuples; node-pg exposes this as result.rows.length.
   if (notificationPayload) notificationPayload["row_count"] = result.rows.length;
 
   return result;
@@ -186,7 +180,6 @@ export async function castResult(this: CastResultHost, result: pg.QueryResult): 
     const f = fields[i];
     const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name, "");
     columnTypes[i] = type;
-    // Guard vs numeric-string column names colliding with integer index keys.
     if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
   }
 

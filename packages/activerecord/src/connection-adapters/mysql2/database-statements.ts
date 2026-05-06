@@ -13,17 +13,11 @@ export interface DatabaseStatementsHost {
   preparedStatements?: boolean;
 }
 
-/**
- * Opaque raw result returned by performQuery and consumed by castResult / affectedRows.
- * @internal
- */
+/** @internal */
 export interface Mysql2RawResult {
   rows: Record<string, unknown>[] | null;
   fields: Array<{ name: string }>;
   affectedRows: number;
-  // Rails attaches @_ar_stmt_to_close to the raw result so free_raw_result can
-  // send COM_STMT_CLOSE. node-mysql2 manages stmt lifecycle automatically — no
-  // equivalent hook is needed.
 }
 
 /** @internal */
@@ -84,10 +78,8 @@ export function multiStatementsEnabled(this: MultiStatementsHost): boolean {
 }
 
 /**
- * Execute `sql` against `rawConnection` and return a Mysql2RawResult.
- *
- * Rails' `set_server_option(OPTION_MULTI_STATEMENTS_{ON,OFF})` batch toggle has
- * no equivalent in node-mysql2 (connection-creation option only), so it is elided.
+ * Rails' `set_server_option` batch toggle is elided — node-mysql2 only supports
+ * multi-statements as a connection-creation option, not at runtime.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#perform_query
  * @internal
@@ -112,8 +104,7 @@ export async function performQuery(
   let affectedRows = 0;
 
   if (!hasBinds) {
-    // Avoid calling #affected_rows when a result exists — mirrors Rails' workaround
-    // for a mysql2 gem 0.5.6 race with GCed prepared statements (brianmario/mysql2#1383).
+    // Avoid #affected_rows when result exists — sidesteps gem 0.5.6 GVL race (brianmario/mysql2#1383).
     const [result, resultFields] = (await rawConnection.query(sql)) as [
       mysql.RowDataPacket[] | mysql.ResultSetHeader,
       mysql.FieldPacket[],
@@ -126,8 +117,6 @@ export async function performQuery(
       affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
     }
   } else if (prepare) {
-    // On error, evict the SQL key so the next call re-prepares (mirrors Rails'
-    // `@statements.delete(sql)` rescue block).
     try {
       const [result, resultFields] = (await rawConnection.execute(
         sql,
@@ -141,12 +130,10 @@ export async function performQuery(
         affectedRows = (result as mysql.ResultSetHeader).affectedRows ?? 0;
       }
     } catch (err) {
-      this._statements?.delete(sql);
+      this._statements?.delete(sql); // mirrors Rails' @statements.delete(sql) rescue
       throw err;
     }
   } else {
-    // Non-cached path. node-mysql2 doesn't expose a prepare/execute/close
-    // triple, so execute() is used — the driver auto-manages the server-side stmt.
     const [result, resultFields] = (await rawConnection.execute(sql, typeCastedBinds as any[])) as [
       mysql.RowDataPacket[] | mysql.ResultSetHeader,
       mysql.FieldPacket[],
@@ -198,13 +185,10 @@ export function affectedRows(this: PerformQueryHost, rawResult: Mysql2RawResult)
 }
 
 /**
- * In the Ruby mysql2 gem, `result.free` releases the C-level result set and
- * `stmt.close` sends COM_STMT_CLOSE. node-mysql2 GCs results and manages
- * stmt lifecycle automatically — this is a no-op in TS.
+ * No-op in TS: node-mysql2 GCs results and manages stmt lifecycle automatically.
+ * Rails calls `result.free` + COM_STMT_CLOSE via `@_ar_stmt_to_close`.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#free_raw_result
  * @internal
  */
-export function freeRawResult(_rawResult: Mysql2RawResult): void {
-  // no-op: node-mysql2 manages result and stmt lifecycle automatically
-}
+export function freeRawResult(_rawResult: Mysql2RawResult): void {}
