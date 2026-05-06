@@ -65,9 +65,10 @@ describe("AbstractAdapter connection lifecycle privates", () => {
   });
 
   it("withRawConnection rejects when no callback is provided", async () => {
-    await expect(
-      (new AbstractAdapter().withRawConnection as unknown as () => Promise<unknown>)(),
-    ).rejects.toThrow(TypeError);
+    const a = new AbstractAdapter();
+    await expect((a as any).withRawConnection({})).rejects.toThrow(
+      /withRawConnection requires a callback/,
+    );
   });
 
   it("configureConnection invokes checkVersion", () => {
