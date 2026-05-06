@@ -20,10 +20,10 @@ import {
   StatementInvalid,
   ValueTooLong,
   sqlTypeToMigrationKeyword,
-  NotImplementedError,
 } from "../errors.js";
 import { sql as arelSql, type Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
+import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import {
   quoteString as mysqlQuoteString,
   quote as mysqlQuote,
@@ -41,7 +41,12 @@ import {
   unquotedTrue as mysqlUnquotedTrue,
   unquotedFalse as mysqlUnquotedFalse,
 } from "./mysql/quoting.js";
-import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
+import {
+  ChangeColumnDefinition,
+  ColumnDefinition,
+  ForeignKeyDefinition,
+  IndexDefinition,
+} from "./abstract/schema-definitions.js";
 import { TypeMap } from "../type/type-map.js";
 import {
   StringType,
@@ -831,29 +836,31 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
+   * @internal
    * Build a MismatchedForeignKey from a MySQL FK constraint error.
    * Parses the FK SQL to identify the mismatched columns, then looks up
    * the referenced column's type to produce a helpful suggestion.
    *
    * Mirrors: AbstractMysqlAdapter#mismatched_foreign_key (abstract_mysql_adapter.rb:1001)
    */
-  protected _mismatchedForeignKey(
+  protected mismatchedForeignKey(
     message: string,
     sql: string,
     binds: unknown[],
     cause: unknown,
   ): MismatchedForeignKey {
-    const details = this._mismatchedForeignKeyDetails(message, sql);
+    const details = this.mismatchedForeignKeyDetails(message, sql);
     return new MismatchedForeignKey({ message, sql, binds, cause, ...details });
   }
 
   /**
+   * @internal
    * Parse a CREATE TABLE / ALTER TABLE SQL statement to extract the FK
    * details needed for a helpful MismatchedForeignKey error message.
    *
    * Mirrors: AbstractMysqlAdapter#mismatched_foreign_key_details (abstract_mysql_adapter.rb:978)
    */
-  private _mismatchedForeignKeyDetails(
+  protected mismatchedForeignKeyDetails(
     message: string,
     sql: string,
   ): Partial<ConstructorParameters<typeof MismatchedForeignKey>[0]> {
@@ -943,10 +950,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         return new InvalidForeignKey(msg, { sql, binds, cause });
       case ER_CANNOT_ADD_FOREIGN:
       case ER_FK_INCOMPATIBLE_COLUMNS:
-        return this._mismatchedForeignKey(msg, sql, binds, cause);
+        return this.mismatchedForeignKey(msg, sql, binds, cause);
       case ER_CANNOT_CREATE_TABLE:
         if (msg.includes("errno: 150") || msg.includes("errno 150")) {
-          return this._mismatchedForeignKey(msg, sql, binds, cause);
+          return this.mismatchedForeignKey(msg, sql, binds, cause);
         }
         return new StatementInvalid(msg, { sql, binds, cause });
       case ER_NOT_NULL_VIOLATION:
@@ -1080,6 +1087,123 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
+  changeColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: string,
+    options: Record<string, unknown> = {},
+  ): string {
+    const colDef = new ColumnDefinition(columnName, type, options);
+    const cd = new ChangeColumnDefinition(colDef, columnName);
+    return new MysqlSchemaCreation().accept(cd);
+  }
+
+  /** @internal */
+  renameColumnForAlter(tableName: string, columnName: string, newColumnName: string): string {
+    if (this.supportsRenameColumn()) {
+      return `RENAME COLUMN ${this.quoteIdentifier(columnName)} TO ${this.quoteIdentifier(newColumnName)}`;
+    }
+    // TODO: implement CHANGE-column fallback for older MySQL/MariaDB
+    //   (matches abstract_mysql_adapter.rb:rename_column_for_alter when !supports_rename_column?).
+    //   Requires fetching the existing column type via columnDefinitions() and building a
+    //   ChangeColumnDefinition. Safe to skip for modern servers: MySQL ≥8.0.3 and
+    //   MariaDB ≥10.5.2 always hit the fast path above.
+    throw new Error(
+      "renameColumnForAlter fallback path (CHANGE clause for older MySQL/MariaDB) not yet implemented",
+    );
+  }
+
+  /** @internal */
+  addIndexForAlter(
+    tableName: string,
+    columnName: string | string[],
+    options: Record<string, unknown> = {},
+  ): string {
+    const columnNames = Array.isArray(columnName) ? columnName : [columnName];
+    const indexName =
+      (options.name as string | undefined) ?? `index_${tableName}_on_${columnNames.join("_and_")}`;
+    const algorithmKey = (options.algorithm as string | undefined)?.toLowerCase();
+    let algorithmSql: string | undefined;
+    if (algorithmKey) {
+      const algorithms = this.indexAlgorithms() as Record<string, string>;
+      if (!(algorithmKey in algorithms)) {
+        const valid = Object.keys(algorithms);
+        throw new Error(
+          `Algorithm must be one of the following: ${valid.map((a) => `'${a}'`).join(", ")}`,
+        );
+      }
+      // "default" maps to "ALGORITHM = DEFAULT" in the table but means no algorithm clause
+      algorithmSql = algorithmKey === "default" ? undefined : algorithms[algorithmKey];
+    }
+    const comment = options.comment as string | undefined;
+    const idx = new IndexDefinition(tableName, indexName, !!options.unique, columnNames, {
+      where: options.where as string | undefined,
+      using: options.using as string | undefined,
+      type: options.type as string | undefined,
+      lengths: (options.length ?? {}) as Record<string, number>,
+      orders: (options.order ?? {}) as Record<string, string>,
+      include: options.include as string[] | undefined,
+      comment,
+    });
+    // Mirrors visit_IndexDefinition(o, create=false): no ON clause, no CREATE prefix.
+    // Lengths applied per MySQL's add_index_length: col(N) for prefix indexes.
+    // Comment appended via addSqlCommentBang pattern. Algorithm with ", " separator.
+    const lengths = idx.lengths as Record<string, number> | number | undefined;
+    const indexType = idx.type?.toUpperCase() ?? (idx.unique ? "UNIQUE" : undefined);
+    const parts: string[] = [];
+    if (indexType) parts.push(indexType);
+    parts.push("INDEX");
+    parts.push(this.quoteIdentifier(idx.name));
+    if (idx.using) parts.push(`USING ${idx.using}`);
+    const quotedCols = columnNames
+      .map((c) => {
+        const len =
+          typeof lengths === "number"
+            ? lengths
+            : typeof lengths === "object"
+              ? lengths[c]
+              : undefined;
+        return len ? `${this.quoteColumnName(c)}(${len})` : this.quoteColumnName(c);
+      })
+      .join(", ");
+    parts.push(`(${quotedCols})`);
+    let idxSql = parts.join(" ");
+    if (comment) idxSql += ` COMMENT ${mysqlQuoteString(comment)}`;
+    return algorithmSql ? `ADD ${idxSql}, ${algorithmSql}` : `ADD ${idxSql}`;
+  }
+
+  /** @internal */
+  removeIndexForAlter(
+    tableName: string,
+    columnName?: string | string[],
+    options: Record<string, unknown> = {},
+  ): string {
+    const indexName =
+      (options.name as string | undefined) ??
+      (columnName
+        ? `index_${tableName}_on_${Array.isArray(columnName) ? columnName.join("_and_") : columnName}`
+        : undefined);
+    if (!indexName) throw new Error("removeIndexForAlter: no name or column provided");
+    return `DROP INDEX ${this.quoteColumnName(indexName)}`;
+  }
+
+  /** @internal */
+  async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
+    return this.schemaQuery(`SHOW FULL FIELDS FROM ${this.quoteTableName(tableName)}`);
+  }
+
+  /** @internal */
+  async createTableInfo(tableName: string): Promise<string | null> {
+    const rows = await this.schemaQuery(`SHOW CREATE TABLE ${this.quoteTableName(tableName)}`);
+    return (rows[0]?.["Create Table"] as string | null | undefined) ?? null;
+  }
+
+  /** @internal */
+  buildStatementPool(): StatementPool {
+    return new StatementPool(this.statementLimit);
+  }
+
+  /** @internal */
   protected extractPrecision(sqlType: string): number | null {
     const match = /\((\d+)(?:,\d+)?\)/.exec(sqlType);
     const parsed = match ? parseInt(match[1], 10) : null;
@@ -1125,67 +1249,4 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
   nextKey(): string {
     return `a${++this._counter}`;
   }
-}
-
-/** @internal */
-function changeColumnForAlter(tableName: any, columnName: any, type: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#change_column_for_alter is not implemented",
-  );
-}
-
-/** @internal */
-function renameColumnForAlter(tableName: any, columnName: any, newColumnName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#rename_column_for_alter is not implemented",
-  );
-}
-
-/** @internal */
-function addIndexForAlter(tableName: any, columnName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#add_index_for_alter is not implemented",
-  );
-}
-
-/** @internal */
-function removeIndexForAlter(tableName: any, columnName?: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#remove_index_for_alter is not implemented",
-  );
-}
-
-/** @internal */
-function columnDefinitions(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#column_definitions is not implemented",
-  );
-}
-
-/** @internal */
-function createTableInfo(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#create_table_info is not implemented",
-  );
-}
-
-/** @internal */
-function buildStatementPool(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#build_statement_pool is not implemented",
-  );
-}
-
-/** @internal */
-function mismatchedForeignKeyDetails(message?: any, sql?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#mismatched_foreign_key_details is not implemented",
-  );
-}
-
-/** @internal */
-function mismatchedForeignKey(message: any, sql?: any, binds?: any, connectionPool?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#mismatched_foreign_key is not implemented",
-  );
 }

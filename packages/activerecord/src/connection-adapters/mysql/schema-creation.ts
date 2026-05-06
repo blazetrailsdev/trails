@@ -83,6 +83,19 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
+  override accept(
+    o:
+      | Parameters<AbstractSchemaCreation["accept"]>[0]
+      | ChangeColumnDefinition
+      | ChangeColumnDefaultDefinition,
+  ): string {
+    if (o instanceof ChangeColumnDefinition) return this.visitChangeColumnDefinition(o);
+    if (o instanceof ChangeColumnDefaultDefinition)
+      return this.visitChangeColumnDefaultDefinition(o);
+    return super.accept(o as Parameters<AbstractSchemaCreation["accept"]>[0]);
+  }
+
+  /** @internal */
   protected visitChangeColumnDefinition(o: ChangeColumnDefinition): string {
     const sql = `CHANGE ${this.adapter.quoteIdentifier(o.name)} ${this.accept(o.column)}`;
     return this.addColumnPositionBang(sql, this.columnOptions(o.column) as MysqlColumnOptions);
