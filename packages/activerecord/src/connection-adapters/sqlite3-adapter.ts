@@ -145,7 +145,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
   private _filename: string;
-  private _statementPool = new GenericStatementPool<Database.Statement>();
+  // _statementLimit must be declared before _statementPool so buildStatementPool()
+  // reads the correct default when the field initializer runs.
+  private _statementLimit = 1000;
+  private _statementPool = this.buildStatementPool();
 
   private static _isMemoryFilename(filename: string): boolean {
     if (filename === ":memory:") return true;
@@ -157,11 +160,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (q === -1) return false;
     return new URLSearchParams(filename.slice(q + 1)).get("mode") === "memory";
   }
-
-  // Rails' `statement_limit` database.yml key. SQLite has a single
-  // connection (no pool), so the adapter owns exactly one pool and the
-  // setter resizes it directly.
-  private _statementLimit = 1000;
 
   /**
    * Maximum prepared statements cached on the single SQLite connection.
@@ -1948,25 +1946,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     const msg = e instanceof Error ? e.message : String(e);
-    const code = (e as any)?.code as string | undefined;
-    const cause = e;
-
-    if (code?.includes("CONSTRAINT_UNIQUE") || msg.includes("UNIQUE constraint failed")) {
-      return new RecordNotUnique(msg, { sql, binds, cause });
-    }
-    if (code?.includes("CONSTRAINT_FOREIGNKEY") || msg.includes("FOREIGN KEY constraint failed")) {
-      return new InvalidForeignKey(msg, { sql, binds, cause });
-    }
-    if (code?.includes("CONSTRAINT_NOTNULL") || msg.includes("NOT NULL constraint failed")) {
-      return new NotNullViolation(msg, { sql, binds, cause });
-    }
-    if (msg.includes("String or BLOB exceeded size limit")) {
-      return new ValueTooLong(msg, { sql, binds, cause });
-    }
-    if (code === "SQLITE_CANTOPEN" || msg.includes("unable to open database file")) {
-      return new NoDatabaseError(msg, { sql, binds, cause });
-    }
-    return new StatementInvalid(msg, { sql, binds, cause });
+    const exc = e instanceof Error ? e : new Error(msg);
+    return translateException(exc, msg, sql, binds);
   }
 
   /** @internal */
@@ -2151,14 +2132,27 @@ function translateException(
   binds: unknown[],
 ): Error {
   const msg = exception.message;
-  if (/(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(msg)) {
+  const code = (exception as any)?.code as string | undefined;
+  if (
+    code?.includes("CONSTRAINT_UNIQUE") ||
+    /(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(msg)
+  ) {
     return new RecordNotUnique(message, { sql, binds, cause: exception });
   }
-  if (/(.* may not be NULL|NOT NULL constraint failed: .*)/i.test(msg)) {
+  if (
+    code?.includes("CONSTRAINT_NOTNULL") ||
+    /(.* may not be NULL|NOT NULL constraint failed: .*)/i.test(msg)
+  ) {
     return new NotNullViolation(message, { sql, binds, cause: exception });
   }
-  if (/FOREIGN KEY constraint failed/i.test(msg)) {
+  if (code?.includes("CONSTRAINT_FOREIGNKEY") || /FOREIGN KEY constraint failed/i.test(msg)) {
     return new InvalidForeignKey(message, { sql, binds, cause: exception });
+  }
+  if (msg.includes("String or BLOB exceeded size limit")) {
+    return new ValueTooLong(message, { sql, binds, cause: exception });
+  }
+  if (code === "SQLITE_CANTOPEN" || /unable to open database file/i.test(msg)) {
+    return new NoDatabaseError(message, { sql, binds, cause: exception });
   }
   if (/called on a closed database/i.test(msg)) {
     return new ConnectionNotEstablished(message, { cause: exception });
