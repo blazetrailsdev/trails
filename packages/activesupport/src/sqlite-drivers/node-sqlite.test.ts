@@ -87,11 +87,13 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
     expect(conn.isOpen()).toBe(true);
   });
 
-  it("statement.reader is true for SELECT, false for INSERT", async () => {
-    const sel = await conn.prepare("SELECT 1");
-    expect(sel.reader).toBe(true);
-    const ins = await conn.prepare("INSERT INTO widgets (name, qty) VALUES (?, ?)");
-    expect(ins.reader).toBe(false);
+  it("statement.reader is true for SELECT/PRAGMA, false for INSERT/write-PRAGMA", async () => {
+    expect((await conn.prepare("SELECT 1")).reader).toBe(true);
+    expect((await conn.prepare("PRAGMA journal_mode")).reader).toBe(true);
+    expect((await conn.prepare("INSERT INTO widgets (name, qty) VALUES (?, ?)")).reader).toBe(
+      false,
+    );
+    expect((await conn.prepare("PRAGMA foreign_keys = ON")).reader).toBe(false);
   });
 
   it("databaseExists() reports memory databases as present", () => {

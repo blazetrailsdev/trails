@@ -41,7 +41,10 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
   constructor(private readonly stmt: import("node:sqlite").StatementSync) {
     stmt.setAllowBareNamedParameters(true); // allow { name: val } to bind $name
     const sql = stmt.sourceSQL.trimStart().toUpperCase();
-    this.reader = /^(SELECT|WITH|EXPLAIN|VALUES|TABLE)\b/.test(sql);
+    // PRAGMA without `=` returns rows; PRAGMA with `=` is a write. Matches better-sqlite3.
+    this.reader =
+      /^(SELECT|WITH|EXPLAIN|VALUES|TABLE)\b/.test(sql) ||
+      (/^PRAGMA\b/.test(sql) && !sql.includes("="));
   }
 
   private call<T>(method: string, binds: SqliteBinds | undefined): T {
