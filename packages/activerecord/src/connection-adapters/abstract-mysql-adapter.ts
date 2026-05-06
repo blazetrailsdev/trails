@@ -41,7 +41,7 @@ import {
   unquotedTrue as mysqlUnquotedTrue,
   unquotedFalse as mysqlUnquotedFalse,
 } from "./mysql/quoting.js";
-import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
+import { ForeignKeyDefinition, IndexDefinition } from "./abstract/schema-definitions.js";
 import { TypeMap } from "../type/type-map.js";
 import {
   StringType,
@@ -1111,10 +1111,33 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): string {
-    void tableName;
-    void columnName;
-    void options;
-    throw new Error("addIndexForAlter: not yet wired (requires SchemaStatements.addIndexOptions)");
+    const columnNames = Array.isArray(columnName) ? columnName : [columnName];
+    const indexName =
+      (options.name as string | undefined) ?? `index_${tableName}_on_${columnNames.join("_and_")}`;
+    const algorithmKey = (options.algorithm as string | undefined)?.toLowerCase();
+    const algorithmSql = algorithmKey
+      ? (this.indexAlgorithms() as Record<string, string>)[algorithmKey]
+      : undefined;
+    const idx = new IndexDefinition(tableName, indexName, !!options.unique, columnNames, {
+      where: options.where as string | undefined,
+      using: options.using as string | undefined,
+      type: options.type as string | undefined,
+      lengths: (options.length ?? {}) as Record<string, number>,
+      orders: (options.order ?? {}) as Record<string, string>,
+      include: options.include as string[] | undefined,
+    });
+    // Mirrors visit_IndexDefinition(o, create=false): no ON clause, no CREATE prefix.
+    // Algorithm appended with ", " separator per Rails' add_index_for_alter.
+    const indexType = idx.type?.toUpperCase() ?? (idx.unique ? "UNIQUE" : undefined);
+    const parts: string[] = [];
+    if (indexType) parts.push(indexType);
+    parts.push("INDEX");
+    parts.push(this.quoteIdentifier(idx.name));
+    if (idx.using) parts.push(`USING ${idx.using}`);
+    const quotedCols = columnNames.map((c) => this.quoteColumnName(c)).join(", ");
+    parts.push(`(${quotedCols})`);
+    const idxSql = parts.join(" ");
+    return algorithmSql ? `ADD ${idxSql}, ${algorithmSql}` : `ADD ${idxSql}`;
   }
 
   /** @internal */
@@ -1124,11 +1147,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     options: Record<string, unknown> = {},
   ): string {
     void tableName;
-    void columnName;
-    void options;
-    throw new Error(
-      "removeIndexForAlter: not yet wired (requires SchemaStatements.indexNameForRemove)",
-    );
+    const indexName =
+      (options.name as string | undefined) ??
+      (columnName
+        ? `index_${tableName}_on_${Array.isArray(columnName) ? columnName.join("_and_") : columnName}`
+        : undefined);
+    if (!indexName) throw new Error("removeIndexForAlter: no name or column provided");
+    return `DROP INDEX ${this.quoteColumnName(indexName)}`;
   }
 
   /** @internal */
