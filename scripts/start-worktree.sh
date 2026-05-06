@@ -22,7 +22,20 @@ case "$NAME" in
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MAIN_REPO="$(cd "$SCRIPT_DIR/.." && git rev-parse --show-toplevel)"
+# When this script is invoked from a child worktree (its scripts/ dir may be
+# symlinked from main), `git rev-parse --show-toplevel` returns the *child*
+# worktree, where `.git` is a file (not a dir), so any path under .git
+# errors with "Not a directory". Use --git-common-dir to find the shared
+# gitdir (the main worktree's .git) and walk up one to get the main repo.
+WORKTREE_ROOT="$(cd "$SCRIPT_DIR/.." && git rev-parse --show-toplevel)"
+GIT_COMMON_DIR="$(cd "$WORKTREE_ROOT" && git rev-parse --git-common-dir)"
+# git-common-dir is relative when invoked from the main worktree, absolute
+# (under .git/worktrees/<name>) when from a child. Normalise either way.
+case "$GIT_COMMON_DIR" in
+  /*) MAIN_GIT_DIR="$GIT_COMMON_DIR" ;;
+  *)  MAIN_GIT_DIR="$WORKTREE_ROOT/$GIT_COMMON_DIR" ;;
+esac
+MAIN_REPO="$(cd "$MAIN_GIT_DIR/.." && pwd)"
 WORKTREES_ROOT="$HOME/github/blazetrailsdev/worktrees"
 TARGET="$WORKTREES_ROOT/$NAME"
 
@@ -36,12 +49,12 @@ echo "==> Fetching origin/main at $MAIN_REPO"
 # locks fail loudly when two `git fetch` runs race the same ref. The flock
 # also covers the worktree add below so two spawns don't compete on the
 # packed-refs file.
-exec 9>"$MAIN_REPO/.git/start-worktree.lock"
+exec 9>"$MAIN_GIT_DIR/start-worktree.lock"
 # 60s timeout so a crashed prior run doesn't hang future spawns forever.
 # Stale lock file is harmless (flock holds an OS-level advisory lock that
 # releases on process exit); the file just sits there until next run.
 if ! flock -w 60 9; then
-  echo "Could not acquire $MAIN_REPO/.git/start-worktree.lock within 60s." >&2
+  echo "Could not acquire $MAIN_GIT_DIR/start-worktree.lock within 60s." >&2
   echo "Another start-worktree run may be stuck. Investigate, then retry." >&2
   exit 1
 fi
