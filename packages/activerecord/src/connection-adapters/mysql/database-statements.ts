@@ -20,7 +20,7 @@ export interface DatabaseStatements {
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execInsert(sql: string, name?: string | null, binds?: unknown[], pk?: string): Promise<unknown>;
-  explain(sql: string, binds?: unknown[], options?: { extended?: boolean }): Promise<string>;
+  explain(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
   lastInsertedId(result: unknown): number;
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
 }
