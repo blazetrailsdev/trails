@@ -1,9 +1,9 @@
 import type { Base } from "./base.js";
 import { modelRegistry } from "./associations.js";
-import { ActiveRecordError, UnknownAttributeError, NotImplementedError } from "./errors.js";
+import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, underscore } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
-import { isMarkedForDestruction } from "./autosave-association.js";
+import { isMarkedForDestruction, markForDestruction } from "./autosave-association.js";
 
 /**
  * Raised when more nested-attribute records are provided than the
@@ -82,10 +82,13 @@ export function acceptsNestedAttributesFor(
     options,
   } as NestedAttributeConfig);
 
-  // Define the setter for `{associationName}Attributes`
-  const attrName = `${associationName}Attributes`;
+  const type =
+    assocExists.type === "hasMany" || assocExists.type === "hasAndBelongsToMany"
+      ? "collection"
+      : "one_to_one";
+  generateAssociationWriter(modelClass, associationName, type);
 
-  // Store pending nested attrs on instance for processing during save
+  // Wrap save to flush pending nested attributes after the parent is persisted
   const originalSave = modelClass.prototype.save;
   if (!(modelClass as any)._nestedSaveWrapped) {
     (modelClass as any)._nestedSaveWrapped = true;
@@ -94,7 +97,6 @@ export function acceptsNestedAttributesFor(
       const result = await originalSave.call(this);
       if (!result) return false;
 
-      // Process pending nested attributes
       await processNestedAttributes(this);
       return true;
     };
@@ -256,88 +258,178 @@ async function processNestedAttributes(record: Base): Promise<void> {
   (record as any)._pendingNestedAttributes = null;
 }
 
+const UNASSIGNABLE_KEYS = new Set(["id", "_destroy"]);
+
+/** @internal */
+function hasDestroyFlag(hash: Record<string, unknown>): boolean {
+  const v = hash["_destroy"];
+  if (v == null || v === false || v === "" || v === "0" || v === "false") return false;
+  return Boolean(v);
+}
+
+/** @internal */
+function isAllowDestroy(record: Base, associationName: string): boolean {
+  const configs: NestedAttributeConfig[] =
+    (record.constructor as any)._nestedAttributeConfigs ?? [];
+  return configs.find((c) => c.associationName === associationName)?.options.allowDestroy ?? false;
+}
+
+/** @internal */
+function isWillBeDestroyed(
+  record: Base,
+  associationName: string,
+  attributes: Record<string, unknown>,
+): boolean {
+  return isAllowDestroy(record, associationName) && hasDestroyFlag(attributes);
+}
+
+/** @internal */
+function callRejectIf(
+  record: Base,
+  associationName: string,
+  attributes: Record<string, unknown>,
+): boolean {
+  if (isWillBeDestroyed(record, associationName, attributes)) return false;
+  const configs: NestedAttributeConfig[] =
+    (record.constructor as any)._nestedAttributeConfigs ?? [];
+  const rejectIf = configs.find((c) => c.associationName === associationName)?.options.rejectIf;
+  return rejectIf ? rejectIf(attributes) : false;
+}
+
+/** @internal */
+function isRejectNewRecord(
+  record: Base,
+  associationName: string,
+  attributes: Record<string, unknown>,
+): boolean {
+  return (
+    isWillBeDestroyed(record, associationName, attributes) ||
+    callRejectIf(record, associationName, attributes)
+  );
+}
+
+/** @internal */
+function assignToOrMarkForDestruction(
+  childRecord: Base,
+  attributes: Record<string, unknown>,
+  allowDestroy: boolean,
+): void {
+  const assignable: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(attributes)) {
+    if (!UNASSIGNABLE_KEYS.has(k)) assignable[k] = v;
+  }
+  childRecord.assignAttributes(assignable);
+  if (hasDestroyFlag(attributes) && allowDestroy) {
+    markForDestruction(childRecord);
+  }
+}
+
+/** @internal */
+function findRecordById(_klass: typeof Base, records: Base[], id: unknown): Base | undefined {
+  return records.find((r) => String(r.id) === String(id));
+}
+
+/** @internal */
+function raiseNestedAttributesRecordNotFoundBang(
+  record: Base,
+  associationName: string,
+  recordId: unknown,
+): never {
+  const ctor = record.constructor as typeof Base;
+  const associations: any[] = (ctor as any)._associations ?? [];
+  const assocDef = associations.find((a: any) => a.name === associationName);
+  const modelName = assocDef?.options?.className ?? camelize(singularize(associationName));
+  throw new RecordNotFound(
+    `Couldn't find ${modelName} with ID=${recordId} for ${ctor.name} with ID=${record.id}`,
+    modelName,
+    "id",
+    recordId,
+  );
+}
+
+/** @internal */
+function checkRecordLimitBang(limit: number | undefined, attributesCollection: unknown[]): void {
+  if (limit !== undefined && attributesCollection.length > limit) {
+    throw new TooManyRecords(
+      `Maximum ${limit} records are allowed. Got ${attributesCollection.length} records instead.`,
+    );
+  }
+}
+
+/** @internal */
+function generateAssociationWriter(
+  modelClass: typeof Base,
+  associationName: string,
+  type: "collection" | "one_to_one",
+): void {
+  const attrName = `${associationName}Attributes`;
+  if (type === "collection") {
+    Object.defineProperty(modelClass.prototype, attrName, {
+      set(this: Base, value: any) {
+        assignNestedAttributesForCollectionAssociation(this, associationName, value);
+      },
+      configurable: true,
+    });
+  } else {
+    Object.defineProperty(modelClass.prototype, attrName, {
+      set(this: Base, value: any) {
+        assignNestedAttributesForOneToOneAssociation(this, associationName, value);
+      },
+      configurable: true,
+    });
+  }
+}
+
 /** @internal */
 function assignNestedAttributesForOneToOneAssociation(
-  associationName: any,
-  attributes: any,
-): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#assign_nested_attributes_for_one_to_one_association is not implemented",
-  );
+  record: Base,
+  associationName: string,
+  attributes: Record<string, unknown>,
+): void {
+  if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
+    throw new Error(
+      `Hash expected for \`${associationName}\` attributes, got ${typeof attributes}`,
+    );
+  }
+  if (!isRejectNewRecord(record, associationName, attributes)) {
+    if (!(record as any)._pendingNestedAttributes) {
+      (record as any)._pendingNestedAttributes = new Map();
+    }
+    (record as any)._pendingNestedAttributes.set(associationName, [attributes]);
+  }
 }
 
 /** @internal */
 function assignNestedAttributesForCollectionAssociation(
-  associationName: any,
-  attributesCollection: any,
-): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#assign_nested_attributes_for_collection_association is not implemented",
-  );
-}
+  record: Base,
+  associationName: string,
+  attributesCollection: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
+): void {
+  if (typeof attributesCollection !== "object" || attributesCollection === null) {
+    throw new Error(
+      `Hash or Array expected for \`${associationName}\` attributes, got ${typeof attributesCollection}`,
+    );
+  }
+  const ctor = record.constructor as typeof Base;
+  const configs: NestedAttributeConfig[] = (ctor as any)._nestedAttributeConfigs ?? [];
+  const config = configs.find((c) => c.associationName === associationName);
 
-/** @internal */
-function checkRecordLimitBang(limit: any, attributesCollection: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#check_record_limit! is not implemented",
-  );
-}
+  let attrs: Record<string, unknown>[];
+  if (Array.isArray(attributesCollection)) {
+    attrs = attributesCollection;
+  } else {
+    const keys = Object.keys(attributesCollection);
+    if (keys.includes("id")) {
+      attrs = [attributesCollection as unknown as Record<string, unknown>];
+    } else {
+      attrs = keys.sort().map((k) => (attributesCollection as any)[k]);
+    }
+  }
 
-/** @internal */
-function assignToOrMarkForDestruction(record: any, attributes: any, allowDestroy: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#assign_to_or_mark_for_destruction is not implemented",
-  );
-}
+  checkRecordLimitBang(config?.options.limit, attrs);
 
-/** @internal */
-function hasDestroyFlag(hash: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#has_destroy_flag? is not implemented",
-  );
-}
-
-/** @internal */
-function isRejectNewRecord(associationName: any, attributes: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#reject_new_record? is not implemented",
-  );
-}
-
-/** @internal */
-function callRejectIf(associationName: any, attributes: any): never {
-  throw new NotImplementedError("ActiveRecord::NestedAttributes#call_reject_if is not implemented");
-}
-
-/** @internal */
-function isWillBeDestroyed(associationName: any, attributes: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#will_be_destroyed? is not implemented",
-  );
-}
-
-/** @internal */
-function isAllowDestroy(associationName: any): never {
-  throw new NotImplementedError("ActiveRecord::NestedAttributes#allow_destroy? is not implemented");
-}
-
-/** @internal */
-function raiseNestedAttributesRecordNotFoundBang(associationName: any, recordId: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#raise_nested_attributes_record_not_found! is not implemented",
-  );
-}
-
-/** @internal */
-function findRecordById(klass: any, records: any, id: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#find_record_by_id is not implemented",
-  );
-}
-
-/** @internal */
-function generateAssociationWriter(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::NestedAttributes#generate_association_writer is not implemented",
-  );
+  if (!(record as any)._pendingNestedAttributes) {
+    (record as any)._pendingNestedAttributes = new Map();
+  }
+  (record as any)._pendingNestedAttributes.set(associationName, attrs);
 }
