@@ -85,6 +85,8 @@ export default defineConfig(
       "packages/activerecord/src/encryption/config.ts",
       "packages/activerecord/src/encryption/context.ts",
       "packages/activerecord/src/connection-handling.ts",
+      // MigrationProxy uses createRequire for synchronous file loading — Node-only
+      "packages/activerecord/src/deprecator.ts",
     ],
     rules: {
       "blazetrails/no-node-builtins": "error",
