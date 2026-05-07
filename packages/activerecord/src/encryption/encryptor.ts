@@ -47,7 +47,6 @@ export interface KeyProviderLike {
 export class Encryptor {
   private _compress: boolean;
   private _compressor: Compressor;
-  private _cipher = new Cipher();
   private _serializer = new MessageSerializer();
 
   constructor(options?: { compress?: boolean; compressor?: Compressor }) {
@@ -100,11 +99,7 @@ export class Encryptor {
     }
 
     const message = this.deserializeMessage(encryptedText);
-    const iv = message.headers.get("iv") as string;
-    const authTag = message.headers.get("at") as string;
     const compressed = message.headers.get("c") === true;
-
-    if (!iv || !authTag) throw new DecryptionError("Missing IV or auth tag");
 
     // Precedence mirrors encrypt(): keyProvider > key > default.
     let keys: string[];
@@ -121,13 +116,18 @@ export class Encryptor {
     // Mirrors Rails: rescue *(ENCODING_ERRORS + DECRYPT_ERRORS) => raise Errors::Decryption.
     // Cipher errors (wrong key, auth-tag mismatch) are already DecryptionError; this
     // catch also covers inflate errors on corrupt compressed payloads.
-    try {
-      const decryptedBuf = this.cipher().decrypt(message.payload, keys, iv, authTag);
-      return this.uncompressIfNeeded(decryptedBuf, compressed);
-    } catch (e) {
-      if (e instanceof Base) throw e;
-      throw new DecryptionError(e instanceof Error ? e.message : String(e));
+    // Mirrors Rails: rescue *(ENCODING_ERRORS + DECRYPT_ERRORS) => raise Errors::Decryption.
+    // Try each key; the cipher raises DecryptionError on auth-tag mismatch.
+    for (const key of keys) {
+      try {
+        const decryptedBuf = new Cipher(key).decrypt(message);
+        return this.uncompressIfNeeded(decryptedBuf, compressed);
+      } catch (e) {
+        if (e instanceof Base && !(e instanceof DecryptionError)) throw e;
+        // Wrong key — try next.
+      }
     }
+    throw new DecryptionError("None of the provided keys could decrypt the data");
   }
 
   isEncrypted(text: string): boolean {
@@ -177,11 +177,6 @@ export class Encryptor {
   }
 
   /** @internal */
-  private cipher(): Cipher {
-    return this._cipher;
-  }
-
-  /** @internal */
   private serializeMessage(message: Message): string {
     return this.serializer().dump(message);
   }
@@ -213,10 +208,7 @@ export class Encryptor {
     if (key == null) throw new ConfigError("No encryption key provided");
 
     const [cipherInput, compressed] = this.compressIfWorthIt(clearText);
-    const { payload, iv, authTag } = this.cipher().encrypt(cipherInput, key, cipherOptions);
-
-    const message = new Message(payload);
-    message.addHeaders({ iv, at: authTag });
+    const message = new Cipher(key, cipherOptions).encrypt(cipherInput);
     if (compressed) message.addHeader("c", true);
     if (encKeyObj.publicTags) {
       for (const [k, v] of Object.entries(encKeyObj.publicTags)) {

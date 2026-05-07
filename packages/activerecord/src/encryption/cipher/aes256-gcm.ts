@@ -6,21 +6,23 @@
 
 import { getCrypto } from "@blazetrails/activesupport";
 import { ConfigError, DecryptionError } from "../errors.js";
+import { Message } from "../message.js";
 
 const KEY_LENGTH = 32;
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
 export class Aes256Gcm {
+  static readonly CIPHER_TYPE = "aes-256-gcm";
   static keyLength = KEY_LENGTH;
   static ivLength = IV_LENGTH;
 
   // Declared for TypeScript type-checking only; defined as non-enumerable
   // in the constructor so it doesn't appear in JSON.stringify / object spreads.
-  declare readonly secret?: string;
+  declare readonly secret: string;
   readonly deterministic: boolean;
 
-  constructor(secret?: string, options?: { deterministic?: boolean }) {
+  constructor(secret: string, options?: { deterministic?: boolean }) {
     Object.defineProperty(this, "secret", {
       value: secret,
       writable: false,
@@ -41,17 +43,12 @@ export class Aes256Gcm {
     return { deterministic: this.deterministic };
   }
 
-  encrypt(
-    data: string | Buffer,
-    key: string,
-    options?: { deterministic?: boolean },
-  ): { payload: string; iv: string; authTag: string } {
-    this._validateKeyLength(key);
-    const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
-    // Accept Buffer (e.g. compressed binary data) or string (UTF-8 text).
-    const inputBuf = Buffer.isBuffer(data) ? data : Buffer.from(data, "utf-8");
+  encrypt(clearText: string | Buffer, options?: { deterministic?: boolean }): Message {
+    this._validateKeyLength(this.secret);
+    const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
+    const inputBuf = Buffer.isBuffer(clearText) ? clearText : Buffer.from(clearText, "utf-8");
     const iv = this.generateIv(keyBuf, inputBuf, options?.deterministic ?? this.deterministic);
-    const cipher = getCrypto().createCipheriv("aes-256-gcm", keyBuf, iv, {
+    const cipher = getCrypto().createCipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
     const encrypted = Buffer.concat([
@@ -63,50 +60,49 @@ export class Aes256Gcm {
     }
     const authTag = Buffer.from(cipher.getAuthTag());
 
-    return {
-      payload: encrypted.toString("base64"),
+    const message = new Message(encrypted.toString("base64"));
+    message.addHeaders({
       iv: iv.toString("base64"),
-      authTag: authTag.toString("base64"),
-    };
+      at: authTag.toString("base64"),
+    });
+    return message;
   }
 
   /**
-   * Decrypt a payload and return the raw bytes.
+   * Decrypt a Message and return the raw bytes.
    *
-   * **Breaking change from pre-PR-C behaviour**: previously returned a `string`;
-   * now returns `Buffer` to match Rails, which stores raw (possibly binary)
-   * bytes in the AES cipher. Callers must decode explicitly:
-   *   - plain text: `cipher.decrypt(...).toString("utf-8")`
-   *   - compressed: pass the Buffer directly to `compressor.inflate()`
+   * **Breaking change from pre-PR-C behaviour**: previously accepted
+   * `(payload, keys, iv, authTag)` separately; now accepts a `Message` object
+   * to match Rails' `def decrypt(encrypted_message)`.
    *
    * `Encryptor` handles this automatically; only direct `Cipher` users are affected.
    */
-  decrypt(payload: string, keys: string | string[], iv: string, authTag: string): Buffer {
-    const keyList = Array.isArray(keys) ? keys : [keys];
+  decrypt(message: Message): Buffer {
+    const iv = message.headers.get("iv") as string;
+    const authTag = message.headers.get("at") as string;
+    if (!iv || !authTag) throw new DecryptionError("Missing IV or auth tag");
+
     const ivBuf = Buffer.from(iv, "base64");
     const authTagBuf = Buffer.from(authTag, "base64");
-    const encryptedBuf = Buffer.from(payload, "base64");
+    const encryptedBuf = Buffer.from(message.payload, "base64");
+    const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
 
-    for (const key of keyList) {
-      try {
-        const keyBuf = Buffer.from(key, "base64").subarray(0, KEY_LENGTH);
-        const decipher = getCrypto().createDecipheriv("aes-256-gcm", keyBuf, ivBuf, {
-          authTagLength: AUTH_TAG_LENGTH,
-        });
-        if (!decipher.setAuthTag) {
-          throw new ConfigError("Crypto adapter does not support GCM auth tags (setAuthTag)");
-        }
-        decipher.setAuthTag(authTagBuf);
-        return Buffer.concat([
-          Buffer.from(decipher.update(encryptedBuf)),
-          Buffer.from(decipher.final()),
-        ]);
-      } catch (e) {
-        if (e instanceof ConfigError) throw e;
-        continue;
+    try {
+      const decipher = getCrypto().createDecipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, ivBuf, {
+        authTagLength: AUTH_TAG_LENGTH,
+      });
+      if (!decipher.setAuthTag) {
+        throw new ConfigError("Crypto adapter does not support GCM auth tags (setAuthTag)");
       }
+      decipher.setAuthTag(authTagBuf);
+      return Buffer.concat([
+        Buffer.from(decipher.update(encryptedBuf)),
+        Buffer.from(decipher.final()),
+      ]);
+    } catch (e) {
+      if (e instanceof ConfigError) throw e;
+      throw new DecryptionError("The provided key could not decrypt the data");
     }
-    throw new DecryptionError("None of the provided keys could decrypt the data");
   }
 
   private _validateKeyLength(key: string): void {
