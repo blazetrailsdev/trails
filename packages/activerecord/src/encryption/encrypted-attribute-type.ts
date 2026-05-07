@@ -1,10 +1,11 @@
-import { Type, ValueType, StringType } from "@blazetrails/activemodel";
+import { Type, ValueType, StringType, BinaryData } from "@blazetrails/activemodel";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
 import { isEncryptionDisabled, isProtectedMode } from "./context.js";
 import { Configurable } from "./configurable.js";
 import {
+  Encoding as EncodingError,
   Encryption as EncryptionError,
   Decryption as DecryptionError,
   Base as BaseEncryptionError,
@@ -53,6 +54,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   private _encryptor: EncryptorLike;
   private _previousTypesMemo?: EncryptedAttributeType[];
   private _previousTypesMemoKey?: boolean;
+  private _serializeWithOldestMemo?: boolean;
 
   constructor(options: {
     scheme: Scheme;
@@ -244,16 +246,18 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private isSerializeWithOldest(): boolean {
-    return this.scheme.isFixed() && this.previousTypesWithoutCleanText().length > 0;
+    this._serializeWithOldestMemo ??=
+      this.scheme.isFixed() && this.previousTypesWithoutCleanText().length > 0;
+    return this._serializeWithOldestMemo;
   }
 
   /** @internal */
   private serializeWithOldest(value: unknown): unknown {
     // Use previousTypesWithoutCleanText to avoid selecting the clean-text fallback
-    // scheme when supportUnencryptedData is true. The oldest (last) previous scheme
-    // keeps ciphertexts stable across key rotations.
-    const prev = this.previousTypesWithoutCleanText();
-    return (prev[prev.length - 1] ?? this).serialize(value);
+    // scheme when supportUnencryptedData is true. Mirrors Rails' previous_types.first
+    // (first of previous_schemes_including_clean_text = first of previous_schemes when
+    // clean text is excluded), keeping ciphertexts stable across key rotations.
+    return (this.previousTypes[0] ?? this).serialize(value);
   }
 
   /** @internal */
@@ -269,6 +273,9 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private encryptAsText(value: string): string {
+    if (this._encryptor.isBinary() && !this.castType.isBinary()) {
+      throw new EncodingError("Binary encoded data can only be stored in binary columns");
+    }
     return this._encryptor.encrypt(value, this.encryptionOptions());
   }
 
@@ -283,7 +290,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private encryptionOptions(): Record<string, unknown> {
-    const opts: Record<string, unknown> = { deterministic: this.scheme.deterministic };
+    const opts: Record<string, unknown> = { deterministic: this.deterministic };
     const kp = this.scheme.keyProvider;
     if (kp != null) opts.keyProvider = kp;
     return opts;
@@ -314,11 +321,13 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private textToDatabaseType(value: unknown): unknown {
+    if (value && this.castType.isBinary()) return new BinaryData(value as string);
     return value;
   }
 
   /** @internal */
   private databaseTypeToText(value: unknown): unknown {
+    if (value && this.castType.isBinary()) return this.castType.deserialize?.(value) ?? value;
     return value;
   }
 
