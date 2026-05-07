@@ -612,10 +612,15 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
     // Rails Array form: [sql, bind1, bind2, ...] — spread to avoid triggering
     // the composite-key overload of where() which requires all-string arrays.
     const [sql, ...binds] = conditions as unknown[];
-    if (sql !== undefined) relation = relation.where(sql as string, ...binds);
+    if (sql !== undefined) relation = relation.where(sql, ...binds);
+  } else if (conditions instanceof Nodes.Node) {
+    // Arel node — pass directly rather than wrapping as a PK value.
+    relation = relation.where(conditions);
   } else if (typeof conditions === "object") {
+    // Hash-like: Rails' `when Hash` branch — skip if empty.
     if (Object.keys(conditions as object).length > 0) relation = relation.where(conditions);
   } else {
+    // Scalar → PK lookup (Rails' else branch: `where!(primary_key => conditions)`).
     const pk = (rel as any)._modelClass.primaryKey;
     relation = relation.where({ [pk as string]: conditions });
   }
