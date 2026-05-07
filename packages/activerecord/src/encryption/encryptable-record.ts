@@ -224,9 +224,11 @@ export class EncryptableRecord {
     _name: string,
     _originalName: string,
   ): void {
-    // Rails uses Ruby's `include(Module.new { define_method ... })` to dynamically
-    // override attribute accessors. TS has no equivalent; the ignoreCase
-    // read-original behaviour is handled at the EncryptedAttributeType level.
+    // The public entry point (Base.encrypts / encryption.ts#encrypts) handles
+    // the ignoreCase accessor override via _preserveOriginalEncrypted, which
+    // uses Object.defineProperty to wire the before-save sync and getter/setter.
+    // This @internal stub exists for api:compare parity only and is not called
+    // on the live path.
   }
 
   /** @internal */
@@ -260,7 +262,11 @@ export class EncryptableRecord {
   static ciphertextFor(record: any, attributeName: string): unknown {
     const klass = record.constructor as any;
     const resolvedName = klass._attributeAliases?.[attributeName] ?? attributeName;
-    return record.readAttributeBeforeTypeCast?.(resolvedName);
+    if (this.isEncryptedAttribute(record, attributeName)) {
+      return record.readAttributeBeforeTypeCast?.(resolvedName);
+    }
+    // Unencrypted — return the DB-serialized value (mirrors read_attribute_for_database).
+    return record._attributes?.valuesForDatabase?.()?.[resolvedName];
   }
 
   /** @internal */
