@@ -1348,8 +1348,11 @@ export class Base extends Model {
 
   /**
    * Declare a stored attribute backed by a JSON/text column.
-   * Implicitly wires IndifferentCoder via serialize() so the column
-   * deserializes to HashWithIndifferentAccess on read.
+   * Registers an IndifferentCoder for the column. For plain text/string columns,
+   * also calls serialize() so readAttribute returns HashWithIndifferentAccess.
+   * Structured types (json/jsonb/hstore) have a type-level accessor and handle
+   * their own cast/serialize — IndifferentCoder is registered but serialize()
+   * is not called for those.
    *
    * Mirrors: ActiveRecord::Store::ClassMethods#store
    */

@@ -86,16 +86,19 @@ export class IndifferentCoder {
 
   dump(obj: unknown): unknown {
     // Mirror Rails as_regular_hash: obj.to_hash if it responds, else {}.
+    // null/undefined → {} (nil.respond_to?(:to_hash) is false in Ruby).
     // HWIA responds to toHash(); plain objects (Object/null prototype) spread;
-    // class instances, Arrays, and primitives return {} — matching Ruby's
-    // respond_to?(:to_hash) which is false for arbitrary class instances.
-    const proto = obj !== null && typeof obj === "object" ? Object.getPrototypeOf(obj) : null;
-    const plain =
-      obj instanceof HashWithIndifferentAccess
-        ? obj.toHash()
-        : proto === Object.prototype || proto === null
-          ? { ...(obj as Record<string, unknown>) }
-          : {};
+    // class instances, Arrays, and primitives return {}.
+    let plain: Record<string, unknown>;
+    if (obj == null) {
+      plain = {};
+    } else if (obj instanceof HashWithIndifferentAccess) {
+      plain = obj.toHash();
+    } else {
+      const proto = typeof obj === "object" ? Object.getPrototypeOf(obj) : null;
+      plain =
+        proto === Object.prototype || proto === null ? { ...(obj as Record<string, unknown>) } : {};
+    }
     return this.coder ? this.coder.dump(plain) : JSON.stringify(plain);
   }
 
