@@ -136,7 +136,10 @@ import {
   attributeInDatabase as _attributeInDatabase,
   attributeNamesForPartialUpdates as _attributeNamesForPartialUpdates,
   attributeNamesForPartialInserts as _attributeNamesForPartialInserts,
+  idBeforeTypeCast as _idBeforeTypeCast,
+  isSavedChanges as _isSavedChanges,
 } from "./attribute-methods.js";
+import { normalizeChangedInPlaceAttributes as _normalizeChangedInPlaceAttributesFn } from "./normalization.js";
 import {
   toKey as _toKey,
   getId as _getId,
@@ -956,6 +959,8 @@ export class Base extends Model {
   declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;
   declare static shardKeys: typeof ConnectionHandling.shardKeys;
   declare static isSharded: typeof ConnectionHandling.isSharded;
+  /** @internal */
+  declare static resolveConfigForConnection: typeof ConnectionHandling.resolveConfigForConnection;
 
   // --- ModelSchema mixin (wired via extend() after class) ---
   // Mirrors: ActiveRecord::Attributes
@@ -2953,6 +2958,16 @@ extend(Base, {
   defineAttribute: _defineAttribute,
   _defaultAttributes: _arDefaultAttributes,
 });
+extend(Base, {
+  // _queryBySql/_loadFromSql already wired by extend(Base, Querying) above.
+  // ConnectionHandling.ClassMethods does not include resolveConfigForConnection
+  // (it's a standalone export, not in the ClassMethods object), so wire it here.
+  resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
+  // localStoredAttributes omitted: Base.store() writes to Base._storedAttributes (a Map),
+  // but store.ts:localStoredAttributes reads from a separate WeakMap populated only by
+  // store.ts:store(). The two registries are disconnected, so the wrapper always returns {}.
+  // Category C: requires unifying the two store implementations before wiring.
+});
 
 include(Base, {
   // ReadonlyAttributes
@@ -3105,6 +3120,34 @@ include(Base, {
   attributeInDatabase: _attributeInDatabase,
   attributeNamesForPartialUpdates: _attributeNamesForPartialUpdates,
   attributeNamesForPartialInserts: _attributeNamesForPartialInserts,
+  // idBeforeTypeCast is AR-specific (not on Model); safe to wire.
+  idBeforeTypeCast: _idBeforeTypeCast,
+  // isSavedChanges is AR-specific (not on Model); safe to wire.
+  isSavedChanges: _isSavedChanges,
+  // TouchLater privates — not on Model; safe to wire.
+  hasDeferTouchAttrs(this: Base) {
+    return TouchLater.hasDeferTouchAttrs(this);
+  },
+  // generateTokenFor omitted: token-for.ts imports @blazetrails/activesupport/message-verifier
+  // (node:crypto). The module is intentionally excluded from the main barrel (see index.ts
+  // comment near line 292). Eager-importing it here would reintroduce the BC-3 crypto leak.
+  // normalizeChangedInPlaceAttributes is not on Model; safe to wire.
+  normalizeChangedInPlaceAttributes(this: Base) {
+    return _normalizeChangedInPlaceAttributesFn(this);
+  },
+  // normalizeAttribute lives on Model.prototype (inherited). Wire via direct
+  // prototype reference so api:compare credits it to base.ts without shadowing
+  // Model's implementation via a wrapper that would create a circular call.
+  normalizeAttribute: Model.prototype.normalizeAttribute,
+  // readAttributeBeforeTypeCast/attributesBeforeTypeCast — inherited from Model.prototype
+  // (readAttributeBeforeTypeCast is a method, attributesBeforeTypeCast is a getter).
+  // The re-exports in before-type-cast.ts call record.<methodName>(), so wiring
+  // them would create cycles. Category A: inherited, extractor limitation.
+  // savedChanges/hasChangesToSave/changesToSave/changedAttributeNamesToSave/
+  // attributesInDatabase — getters on Model.prototype; wiring via include() replaces
+  // the getter descriptor with a data property and breaks behavior. Category A.
+  // savedChangeToAttribute — on Model (returns boolean); AR version returns [T,T]|null
+  // pair — overriding breaks tests. Category A: resolved via Model inheritance.
   // CounterCache privates
   _foreignKeysEqual: CounterCache._foreignKeysEqual,
   // Associations privates
