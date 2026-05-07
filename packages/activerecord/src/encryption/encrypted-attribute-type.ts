@@ -1,11 +1,11 @@
-import { NotImplementedError } from "../errors.js";
-import { Type, ValueType, StringType } from "@blazetrails/activemodel";
+import { Type, ValueType, StringType, BinaryData } from "@blazetrails/activemodel";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
 import { isEncryptionDisabled, isProtectedMode } from "./context.js";
 import { Configurable } from "./configurable.js";
 import {
+  Encoding as EncodingError,
   Encryption as EncryptionError,
   Decryption as DecryptionError,
   Base as BaseEncryptionError,
@@ -54,6 +54,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   private _encryptor: EncryptorLike;
   private _previousTypesMemo?: EncryptedAttributeType[];
   private _previousTypesMemoKey?: boolean;
+  private _serializeWithOldestMemo?: boolean;
 
   constructor(options: {
     scheme: Scheme;
@@ -112,13 +113,8 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     if (isProtectedMode() && !this.deterministic) {
       throw new EncryptionError("Can't write encrypted attribute in protected mode");
     }
-    const casted = this.castType.serialize?.(value) ?? value;
-    if (casted === null || casted === undefined) return null;
-    const str = typeof casted === "string" ? casted : String(casted);
-    const normalized = this.deterministic ? this._applyForcedEncoding(str) : str;
-    const toEncrypt =
-      this.scheme.downcase || this.scheme.ignoreCase ? normalized.toLowerCase() : normalized;
-    return this.encrypt(toEncrypt);
+    if (this.isSerializeWithOldest()) return this.serializeWithOldest(value);
+    return this.serializeWithCurrent(value);
   }
 
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
@@ -149,50 +145,60 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     // via @previous_types[support_unencrypted_data?]).
     const key = this.supportUnencryptedData;
     if (!this._previousTypesMemo || this._previousTypesMemoKey !== key) {
-      const schemes: Scheme[] = [...(this.scheme.previousSchemes ?? [])];
-      if (this.supportUnencryptedData) {
-        // Append a NullEncryptor-backed scheme so query expansion
-        // produces a plaintext fallback (matches Rails' clean_text_scheme).
-        schemes.push(this._cleanTextScheme());
-      }
-      this._previousTypesMemo = schemes.map(
-        (s) =>
-          new EncryptedAttributeType({
-            scheme: s,
-            castType: this.castType,
-            previousType: true,
-            default: this._default,
-          }),
+      this._previousTypesMemo = this.buildPreviousTypesFor(
+        this.previousSchemesIncludingCleanText(),
       );
       this._previousTypesMemoKey = key;
     }
     return this._previousTypesMemo;
   }
 
-  private _cleanTextScheme(): Scheme {
-    // Rails' clean_text_scheme passes `downcase: downcase?`, and Rails'
-    // `Scheme` sets `@downcase = downcase || ignore_case` internally so
-    // `downcase?` is true for either flag. Our Scheme keeps the flags
-    // separate, so fold `ignoreCase` into `downcase` here to mirror
-    // Rails' effective behavior. Without this, a scheme configured
-    // `ignoreCase: true, downcase: false` would produce a non-lower-
-    // casing clean-text fallback and miss normalized plaintext rows.
-    return new Scheme({
-      deterministic: this.scheme.deterministic,
-      downcase: this.scheme.downcase || this.scheme.ignoreCase,
-      encryptor: new NullEncryptor(),
-    });
+  get supportUnencryptedData(): boolean {
+    if (this._previousType) return false;
+    // Mirrors Rails' EncryptedAttributeType#support_unencrypted_data? which delegates
+    // directly to scheme.support_unencrypted_data?. The scheme already handles the
+    // per-attribute override vs global config fallback — no extra AND-gate needed here.
+    return this.scheme.isSupportUnencryptedData();
   }
 
-  private decrypt(value: unknown): unknown {
+  /** @internal */
+  private previousSchemesIncludingCleanText(): Scheme[] {
+    const schemes = [...(this.scheme.previousSchemes ?? [])];
+    if (this.supportUnencryptedData) schemes.push(this.cleanTextScheme());
+    return schemes;
+  }
+
+  /** @internal */
+  private previousTypesWithoutCleanText(): EncryptedAttributeType[] {
+    return this.buildPreviousTypesFor(this.scheme.previousSchemes ?? []);
+  }
+
+  /** @internal */
+  private buildPreviousTypesFor(schemes: Scheme[]): EncryptedAttributeType[] {
+    return schemes.map(
+      (s) =>
+        new EncryptedAttributeType({
+          scheme: s,
+          castType: this.castType,
+          previousType: true,
+          default: this._default,
+        }),
+    );
+  }
+
+  /** @internal */
+  private isPreviousType(): boolean {
+    return this._previousType;
+  }
+
+  /** @internal */
+  private decryptAsText(value: unknown): unknown {
     if (value === null || value === undefined) return value;
     if (this._default !== undefined && this._default === value) return value;
 
     // Adapters that use JSON/JSONB columns (e.g. PostgreSQL) return the stored value
     // as a parsed JS object rather than a raw string. Re-stringify so the encryptor
     // always receives the JSON string that was originally stored.
-    // Fall back to String() if JSON.stringify throws (circular refs, etc.) so failures
-    // surface as DecryptionError rather than an unexpected TypeError.
     let ciphertext: string;
     if (typeof value === "string") {
       ciphertext = value;
@@ -208,59 +214,83 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
       return this._encryptor.decrypt(ciphertext, this.decryptionOptions());
     } catch (error) {
       if (!(error instanceof BaseEncryptionError)) throw error;
-      if (this.scheme.previousSchemes.length === 0) {
-        return this._handleDeserializeError(error, value);
-      }
-      return this._tryPreviousTypes(value);
+      if (this.scheme.previousSchemes.length === 0)
+        return this.handleDeserializeError(error, value);
+      return this.tryToDeserializeWithPreviousEncryptedTypes(value);
     }
   }
 
-  private _tryPreviousTypes(value: unknown): unknown {
+  private decrypt(value: unknown): unknown {
+    return this.textToDatabaseType(this.decryptAsText(this.databaseTypeToText(value)));
+  }
+
+  /** @internal */
+  private tryToDeserializeWithPreviousEncryptedTypes(value: unknown): unknown {
     const prev = this.previousTypes;
     for (let i = 0; i < prev.length; i++) {
       try {
         return prev[i].deserialize(value);
       } catch (error) {
         if (!(error instanceof BaseEncryptionError)) throw error;
-        if (i === prev.length - 1) {
-          return this._handleDeserializeError(error, value);
-        }
+        if (i === prev.length - 1) return this.handleDeserializeError(error, value);
       }
     }
     return value;
   }
 
-  private _handleDeserializeError(error: BaseEncryptionError, value: unknown): unknown {
-    if (error instanceof DecryptionError && this.supportUnencryptedData) {
-      return value;
-    }
+  /** @internal */
+  private handleDeserializeError(error: BaseEncryptionError, value: unknown): unknown {
+    if (error instanceof DecryptionError && this.supportUnencryptedData) return value;
     throw error;
   }
 
-  private _applyForcedEncoding(value: string): string {
-    const forced = Configurable.config.forcedEncodingForDeterministicEncryption;
-    if (!forced) return value;
-    const enc = _normalizeEncoding(forced);
-    if (enc === null || enc === "utf8") return value;
-    return _replaceUnencodable(value, enc === "ascii" ? 0x7f : 0xff);
+  /** @internal */
+  private isSerializeWithOldest(): boolean {
+    this._serializeWithOldestMemo ??=
+      this.scheme.isFixed() && this.scheme.previousSchemes.length > 0;
+    return this._serializeWithOldestMemo;
   }
 
-  private encrypt(value: string): string {
-    // When fixed (default for deterministic), use the oldest previous scheme so
-    // existing ciphertexts remain stable across key rotations. When fixed: false,
-    // use the current (newest) scheme. Mirrors Rails' Scheme#oldest_encryption_scheme.
-    const encryptingScheme =
-      this.scheme.isFixed() && this.scheme.previousSchemes.length > 0
-        ? this.scheme.previousSchemes[this.scheme.previousSchemes.length - 1]
-        : this.scheme;
-    return encryptingScheme.encryptor.encrypt(value, this._encryptionOptionsFor(encryptingScheme));
+  /** @internal */
+  private serializeWithOldest(value: unknown): unknown {
+    // Mirrors Rails' previous_types.first — the first of the previous types (which are
+    // built from previousSchemesIncludingCleanText, so the clean-text entry, if any, is
+    // at the end and never selected here). Keeps ciphertexts stable across key rotations.
+    return (this.previousTypes[0] ?? this).serialize(value);
   }
 
-  private _encryptionOptionsFor(scheme: Scheme): Record<string, unknown> {
-    const opts: Record<string, unknown> = {
-      deterministic: scheme.deterministic,
-    };
-    const kp = scheme.keyProvider;
+  /** @internal */
+  private serializeWithCurrent(value: unknown): unknown {
+    const casted = this.castType.serialize?.(value) ?? value;
+    if (casted === null || casted === undefined) return null;
+    const str = typeof casted === "string" ? casted : String(casted);
+    const normalized = this.deterministic ? this._applyForcedEncoding(str) : str;
+    const toEncrypt =
+      this.scheme.downcase || this.scheme.ignoreCase ? normalized.toLowerCase() : normalized;
+    return this.encrypt(toEncrypt);
+  }
+
+  /** @internal */
+  private encryptAsText(value: string): string {
+    if (this._encryptor.isBinary() && !this.castType.isBinary()) {
+      throw new EncodingError("Binary encoded data can only be stored in binary columns");
+    }
+    return this._encryptor.encrypt(value, this.encryptionOptions());
+  }
+
+  private encrypt(value: string): unknown {
+    return this.textToDatabaseType(this.encryptAsText(value));
+  }
+
+  /** @internal */
+  private get encryptor(): EncryptorLike {
+    return this._encryptor;
+  }
+
+  /** @internal */
+  private encryptionOptions(): Record<string, unknown> {
+    const opts: Record<string, unknown> = { deterministic: this.deterministic };
+    const kp = this.scheme.keyProvider;
     if (kp != null) opts.keyProvider = kp;
     return opts;
   }
@@ -272,12 +302,45 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     return opts;
   }
 
-  get supportUnencryptedData(): boolean {
-    if (this._previousType) return false;
-    // Mirrors Rails' EncryptedAttributeType#support_unencrypted_data? which delegates
-    // directly to scheme.support_unencrypted_data?. The scheme already handles the
-    // per-attribute override vs global config fallback — no extra AND-gate needed here.
-    return this.scheme.isSupportUnencryptedData();
+  /** @internal */
+  private cleanTextScheme(): Scheme {
+    // Rails' clean_text_scheme passes `downcase: downcase?`, and Rails'
+    // `Scheme` sets `@downcase = downcase || ignore_case` internally so
+    // `downcase?` is true for either flag. Our Scheme keeps the flags
+    // separate, so fold `ignoreCase` into `downcase` here to mirror
+    // Rails' effective behavior. Without this, a scheme configured
+    // `ignoreCase: true, downcase: false` would produce a non-lower-
+    // casing clean-text fallback and miss normalized plaintext rows.
+    return new Scheme({
+      deterministic: this.scheme.deterministic,
+      downcase: this.scheme.downcase || this.scheme.ignoreCase,
+      encryptor: new NullEncryptor(),
+    });
+  }
+
+  /** @internal */
+  private textToDatabaseType(value: unknown): unknown {
+    if (value != null && this.castType.isBinary()) return new BinaryData(value as string);
+    return value;
+  }
+
+  /** @internal */
+  private databaseTypeToText(value: unknown): unknown {
+    if (value != null && this.castType.isBinary()) {
+      const raw = this.castType.deserialize?.(value) ?? value;
+      // BinaryType.deserialize returns Uint8Array; decode back to the ciphertext string
+      // so decryptAsText always receives a plain string.
+      return raw instanceof Uint8Array ? new TextDecoder().decode(raw) : raw;
+    }
+    return value;
+  }
+
+  private _applyForcedEncoding(value: string): string {
+    const forced = Configurable.config.forcedEncodingForDeterministicEncryption;
+    if (!forced) return value;
+    const enc = _normalizeEncoding(forced);
+    if (enc === null || enc === "utf8") return value;
+    return _replaceUnencodable(value, enc === "ascii" ? 0x7f : 0xff);
   }
 }
 
@@ -294,117 +357,5 @@ function isAdditionalValue(value: unknown): boolean {
     typeof value === "object" &&
     value !== null &&
     (value as Record<symbol, unknown>)[ADDITIONAL_VALUE_BRAND] === true
-  );
-}
-
-/** @internal */
-function previousSchemesIncludingCleanText(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#previous_schemes_including_clean_text is not implemented",
-  );
-}
-
-/** @internal */
-function previousTypesWithoutCleanText(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#previous_types_without_clean_text is not implemented",
-  );
-}
-
-/** @internal */
-function buildPreviousTypesFor(schemes: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#build_previous_types_for is not implemented",
-  );
-}
-
-/** @internal */
-function isPreviousType(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#previous_type? is not implemented",
-  );
-}
-
-/** @internal */
-function decryptAsText(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#decrypt_as_text is not implemented",
-  );
-}
-
-/** @internal */
-function tryToDeserializeWithPreviousEncryptedTypes(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#try_to_deserialize_with_previous_encrypted_types is not implemented",
-  );
-}
-
-/** @internal */
-function handleDeserializeError(error: any, value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#handle_deserialize_error is not implemented",
-  );
-}
-
-/** @internal */
-function isSerializeWithOldest(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#serialize_with_oldest? is not implemented",
-  );
-}
-
-/** @internal */
-function serializeWithOldest(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#serialize_with_oldest is not implemented",
-  );
-}
-
-/** @internal */
-function serializeWithCurrent(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#serialize_with_current is not implemented",
-  );
-}
-
-/** @internal */
-function encryptAsText(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#encrypt_as_text is not implemented",
-  );
-}
-
-/** @internal */
-function encryptor(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#encryptor is not implemented",
-  );
-}
-
-/** @internal */
-function encryptionOptions(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#encryption_options is not implemented",
-  );
-}
-
-/** @internal */
-function cleanTextScheme(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#clean_text_scheme is not implemented",
-  );
-}
-
-/** @internal */
-function textToDatabaseType(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#text_to_database_type is not implemented",
-  );
-}
-
-/** @internal */
-function databaseTypeToText(value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::EncryptedAttributeType#database_type_to_text is not implemented",
   );
 }
