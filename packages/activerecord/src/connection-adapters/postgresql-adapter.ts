@@ -957,7 +957,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       row_count: 0,
     };
     this._noticeReceiverSqlWarnings = [];
-    const rows = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    const m = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         return await this.withClient(async (client) => {
           const result = await this._runQuery(client, rewritten, binds);
@@ -972,7 +972,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     });
     this._flushWarnings();
-    return rows;
+    return m;
   }
 
   /**
@@ -1000,90 +1000,86 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       connection: this,
       row_count: 0,
     };
-    const mutationResult = await Notifications.instrumentAsync(
-      "sql.active_record",
-      payload,
-      async () => {
-        try {
-          return await this.withClient(async (client) => {
-            this.dirtyCurrentTransaction();
-            const upper = sql.trimStart().toUpperCase();
+    const m = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        return await this.withClient(async (client) => {
+          this.dirtyCurrentTransaction();
+          const upper = sql.trimStart().toUpperCase();
 
-            // For INSERT without RETURNING, append RETURNING id automatically
-            // (only when use_insert_returning? is true — mirrors Rails postgresql_adapter.rb:630)
-            if (
-              this._useInsertReturning &&
-              upper.startsWith("INSERT") &&
-              !upper.includes("RETURNING")
-            ) {
-              const withReturning = `${pgSql} RETURNING id`;
-              const useSavepoint = this._inTransaction;
-              const spName = useSavepoint ? `_bt_ret_${++PostgreSQLAdapter._spCounter}` : "";
-              // Update payload.sql to the exact statement we're about to
-              // run so subscribers (LogSubscriber / ExplainSubscriber /
-              // QueryCache keys) see what actually hit pg. The fallback
-              // branch below resets it to pgSql if the RETURNING attempt
-              // fails and we re-run without it.
-              payload.sql = withReturning;
-              try {
-                if (useSavepoint) await client.query(`SAVEPOINT "${spName}"`);
-                const result = await this._runQuery(client, withReturning, binds);
-                if (useSavepoint) await client.query(`RELEASE SAVEPOINT "${spName}"`);
-                payload.row_count = result.rowCount ?? 0;
-                if (result.rows.length > 1) {
-                  return result.rowCount ?? result.rows.length;
-                }
-                if (result.rows.length > 0) {
-                  const firstCol = Object.keys(result.rows[0])[0];
-                  return Number(result.rows[0][firstCol]);
-                }
-                return result.rowCount ?? 0;
-              } catch (err) {
-                // Cached-plan failures must propagate to the
-                // transaction-retry machinery (Rails raises
-                // PreparedStatementCacheExpired for exactly this
-                // reason — retrying inside an aborted txn would fail
-                // with 25P02). Everything else falls through to the
-                // "retry without RETURNING" path this catch was
-                // originally written for.
-                if (err instanceof PreparedStatementCacheExpired) throw err;
-                if (useSavepoint) {
-                  await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
-                  await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
-                }
-                payload.sql = pgSql;
-                const result = await this._runQuery(client, pgSql, binds);
-                payload.row_count = result.rowCount ?? 0;
-                return result.rowCount ?? 0;
-              }
-            }
-
-            // For INSERT with explicit RETURNING
-            if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
-              const result = await this._runQuery(client, pgSql, binds);
+          // For INSERT without RETURNING, append RETURNING id automatically
+          // (only when use_insert_returning? is true — mirrors Rails postgresql_adapter.rb:630)
+          if (
+            this._useInsertReturning &&
+            upper.startsWith("INSERT") &&
+            !upper.includes("RETURNING")
+          ) {
+            const withReturning = `${pgSql} RETURNING id`;
+            const useSavepoint = this._inTransaction;
+            const spName = useSavepoint ? `_bt_ret_${++PostgreSQLAdapter._spCounter}` : "";
+            // Update payload.sql to the exact statement we're about to
+            // run so subscribers (LogSubscriber / ExplainSubscriber /
+            // QueryCache keys) see what actually hit pg. The fallback
+            // branch below resets it to pgSql if the RETURNING attempt
+            // fails and we re-run without it.
+            payload.sql = withReturning;
+            try {
+              if (useSavepoint) await client.query(`SAVEPOINT "${spName}"`);
+              const result = await this._runQuery(client, withReturning, binds);
+              if (useSavepoint) await client.query(`RELEASE SAVEPOINT "${spName}"`);
               payload.row_count = result.rowCount ?? 0;
+              if (result.rows.length > 1) {
+                return result.rowCount ?? result.rows.length;
+              }
               if (result.rows.length > 0) {
                 const firstCol = Object.keys(result.rows[0])[0];
                 return Number(result.rows[0][firstCol]);
               }
               return result.rowCount ?? 0;
+            } catch (err) {
+              // Cached-plan failures must propagate to the
+              // transaction-retry machinery (Rails raises
+              // PreparedStatementCacheExpired for exactly this
+              // reason — retrying inside an aborted txn would fail
+              // with 25P02). Everything else falls through to the
+              // "retry without RETURNING" path this catch was
+              // originally written for.
+              if (err instanceof PreparedStatementCacheExpired) throw err;
+              if (useSavepoint) {
+                await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
+                await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
+              }
+              payload.sql = pgSql;
+              const result = await this._runQuery(client, pgSql, binds);
+              payload.row_count = result.rowCount ?? 0;
+              return result.rowCount ?? 0;
             }
+          }
 
-            // For UPDATE/DELETE, return affected rows
+          // For INSERT with explicit RETURNING
+          if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
             const result = await this._runQuery(client, pgSql, binds);
             payload.row_count = result.rowCount ?? 0;
+            if (result.rows.length > 0) {
+              const firstCol = Object.keys(result.rows[0])[0];
+              return Number(result.rows[0][firstCol]);
+            }
             return result.rowCount ?? 0;
-          });
-        } catch (e: any) {
-          const translated = this._translateException(e, pgSql, binds);
-          payload.exception = translated;
-          payload.exception_object = translated;
-          throw translated;
-        }
-      },
-    );
+          }
+
+          // For UPDATE/DELETE, return affected rows
+          const result = await this._runQuery(client, pgSql, binds);
+          payload.row_count = result.rowCount ?? 0;
+          return result.rowCount ?? 0;
+        });
+      } catch (e: any) {
+        const translated = this._translateException(e, pgSql, binds);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
+      }
+    });
     this._flushWarnings();
-    return mutationResult;
+    return m;
   }
 
   /**
