@@ -4,112 +4,146 @@
  * Mirrors: ActiveRecord::Assertions::QueryAssertions
  */
 
-import type { DatabaseAdapter } from "../adapter.js";
+import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
+
+/** @internal */
+export interface SqlPayload {
+  sql?: string;
+  name?: string;
+  binds?: unknown[];
+  cached?: boolean;
+  [key: string]: unknown;
+}
 
 /**
  * Mirrors: ActiveRecord::Assertions::QueryAssertions::SQLCounter
  *
- * Counts SQL queries executed during a block. Wraps a DatabaseAdapter
- * to intercept execute/executeMutation calls.
+ * Collects SQL queries by subscribing to `sql.active_record` notifications.
+ * `logFull` contains non-schema [sql, binds] pairs; `logAll` contains all sql strings.
  */
 export class SQLCounter {
-  private _queries: string[] = [];
-  private _listening = false;
+  /** @internal */
+  readonly logFull: [string, unknown[]][];
 
-  get queries(): readonly string[] {
-    return this._queries;
+  readonly logAll: string[];
+
+  constructor() {
+    this.logFull = [];
+    this.logAll = [];
   }
 
-  get count(): number {
-    return this._queries.length;
+  get log(): string[] {
+    return this.logFull.map(([sql]) => sql);
   }
 
-  record(sql: string): void {
-    if (this._listening) {
-      this._queries.push(sql);
+  /** Notification handler — mirrors Rails' `call(*, payload)`. */
+  call(_name: unknown, _id: unknown, payload: SqlPayload): void {
+    if (payload.cached) return;
+
+    const sql = payload.sql ?? "";
+    this.logAll.push(sql);
+
+    if (payload.name !== "SCHEMA") {
+      const binds = (payload.binds as unknown[] | undefined) ?? [];
+      this.logFull.push([sql, binds]);
     }
   }
-
-  start(): void {
-    this._queries = [];
-    this._listening = true;
-  }
-
-  stop(): void {
-    this._listening = false;
-  }
-
-  reset(): void {
-    this._queries = [];
-  }
-
-  /**
-   * Wrap a DatabaseAdapter so all queries are recorded by this counter.
-   */
-  wrap(adapter: DatabaseAdapter): DatabaseAdapter {
-    const counter = this;
-    return new Proxy(adapter as object, {
-      get(target, prop, receiver) {
-        if (prop === "execute") {
-          return async (sql: string, binds?: unknown[]) => {
-            counter.record(sql);
-            return (target as DatabaseAdapter).execute(sql, binds);
-          };
-        }
-        if (prop === "executeMutation") {
-          return async (sql: string, binds?: unknown[]) => {
-            counter.record(sql);
-            return (target as DatabaseAdapter).executeMutation(sql, binds);
-          };
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-    }) as DatabaseAdapter;
-  }
 }
 
 /**
- * Mirrors: ActiveRecord::Assertions::QueryAssertions
+ * Asserts that the number of SQL queries executed in the given block matches
+ * the expected count. If `count` is omitted, asserts at least one query ran.
+ *
+ * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_queries_count
  */
-export interface QueryAssertions {
-  assertQueries(expected: number, fn: () => void | Promise<void>): Promise<void>;
-  assertNoQueries(fn: () => void | Promise<void>): Promise<void>;
-}
-
-/**
- * Mirrors: ActiveRecord::Assertions
- */
-export interface Assertions {
-  queryAssertions: QueryAssertions;
-}
-
-/**
- * Assert that exactly `expected` queries are executed during `fn`.
- */
-export async function assertQueries(
-  counter: SQLCounter,
-  expected: number,
+export async function assertQueriesCount(
+  count: number | undefined,
+  includeSchema: boolean,
   fn: () => void | Promise<void>,
 ): Promise<void> {
-  counter.start();
+  const counter = new SQLCounter();
+  const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
+    counter.call(event.name, event.transactionId, event.payload as SqlPayload);
+  });
   try {
     await fn();
   } finally {
-    counter.stop();
+    Notifications.unsubscribe(sub);
   }
-  if (counter.count !== expected) {
-    throw new Error(
-      `Expected ${expected} queries, but got ${counter.count}:\n${counter.queries.join("\n")}`,
-    );
+  const queries = includeSchema ? counter.logAll : counter.log;
+  if (count !== undefined) {
+    if (queries.length !== count) {
+      throw new Error(
+        `${queries.length} instead of ${count} queries were executed. Queries: ${queries.join("\n\n")}`,
+      );
+    }
+  } else {
+    if (queries.length < 1) {
+      throw new Error("1 or more queries expected, but none were executed.");
+    }
   }
 }
 
 /**
- * Assert that no queries are executed during `fn`.
+ * Asserts that no SQL queries are executed in the given block.
+ *
+ * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_no_queries
  */
 export async function assertNoQueries(
-  counter: SQLCounter,
+  includeSchema: boolean,
   fn: () => void | Promise<void>,
 ): Promise<void> {
-  await assertQueries(counter, 0, fn);
+  await assertQueriesCount(0, includeSchema, fn);
+}
+
+/**
+ * Asserts that SQL queries matching `match` executed in the given block meet
+ * the expected count. If `count` is omitted, asserts at least one match.
+ *
+ * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_queries_match
+ */
+export async function assertQueriesMatch(
+  match: RegExp,
+  count: number | undefined,
+  includeSchema: boolean,
+  fn: () => void | Promise<void>,
+): Promise<void> {
+  const counter = new SQLCounter();
+  const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
+    counter.call(event.name, event.transactionId, event.payload as SqlPayload);
+  });
+  try {
+    await fn();
+  } finally {
+    Notifications.unsubscribe(sub);
+  }
+  const queries = includeSchema ? counter.logAll : counter.log;
+  const matched = queries.filter((q) => match.test(q));
+
+  if (count !== undefined) {
+    if (matched.length !== count) {
+      throw new Error(
+        `${matched.length} instead of ${count} queries were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
+      );
+    }
+  } else {
+    if (matched.length < 1) {
+      throw new Error(
+        `1 or more queries expected, but none were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
+      );
+    }
+  }
+}
+
+/**
+ * Asserts that no SQL queries matching `match` are executed in the given block.
+ *
+ * Mirrors: ActiveRecord::Assertions::QueryAssertions#assert_no_queries_match
+ */
+export async function assertNoQueriesMatch(
+  match: RegExp,
+  includeSchema: boolean,
+  fn: () => void | Promise<void>,
+): Promise<void> {
+  await assertQueriesMatch(match, 0, includeSchema, fn);
 }
