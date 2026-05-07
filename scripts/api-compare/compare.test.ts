@@ -10,8 +10,9 @@ import {
   dedupeRubyMethodInto,
   selectMisplacedFile,
   MISPLACED_MIN_HITS,
+  buildEntitiesByName,
 } from "./compare.js";
-import type { ClassInfo, MethodInfo, PackageInfo } from "./types.js";
+import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
 function cls(file: string, name: string, superclass?: string): ClassInfo {
   return {
@@ -23,6 +24,23 @@ function cls(file: string, name: string, superclass?: string): ClassInfo {
     instanceMethods: [],
     classMethods: [],
   };
+}
+
+function method(name: string): MethodInfo {
+  return { name, visibility: "public", params: [] };
+}
+
+function makeManifest(
+  packages: Record<
+    string,
+    { classes?: Record<string, ClassInfo>; modules?: Record<string, ClassInfo> }
+  >,
+): ApiManifest {
+  const result: ApiManifest = { source: "typescript", generatedAt: "", packages: {} };
+  for (const [pkg, p] of Object.entries(packages)) {
+    result.packages[pkg] = { classes: p.classes ?? {}, modules: p.modules ?? {} };
+  }
+  return result;
 }
 
 describe("nameMatches", () => {
@@ -612,5 +630,81 @@ describe("selectMisplacedFile", () => {
       10,
     );
     expect(result).toBe("winner.ts");
+  });
+});
+
+describe("buildEntitiesByName", () => {
+  it("includes entities from the current package", () => {
+    const base = cls("packages/activerecord/src/base.ts", "Base");
+    const ts = makeManifest({ activerecord: { classes: { Base: base } } });
+    const map = buildEntitiesByName("activerecord", ts);
+    expect(map.get("Base")).toContain(base);
+  });
+
+  it("includes entities from @blazetrails/* dep packages when package.json lists them", () => {
+    // activerecord depends on activemodel; Model lives in activemodel.
+    const model = cls("packages/activemodel/src/model.ts", "Model");
+    model.instanceMethods = [method("attributes")];
+
+    const base = cls("packages/activerecord/src/base.ts", "Base");
+    base.superclass = "Model";
+
+    const ts = makeManifest({
+      activerecord: { classes: { Base: base } },
+      activemodel: { classes: { Model: model } },
+    });
+
+    // activerecord's real package.json includes @blazetrails/activemodel,
+    // so buildEntitiesByName should pull in Model from activemodel.
+    const map = buildEntitiesByName("activerecord", ts);
+    const modelCandidates = map.get("Model") ?? [];
+    expect(modelCandidates).toContain(model);
+  });
+
+  it("does not add dep-package entities for a package with no blazetrails deps (e.g. activesupport)", () => {
+    const concern = cls("packages/activesupport/src/concern.ts", "Concern");
+    const ts = makeManifest({
+      activesupport: { classes: { Concern: concern } },
+      activemodel: { classes: { Model: cls("packages/activemodel/src/model.ts", "Model") } },
+    });
+
+    const map = buildEntitiesByName("activesupport", ts);
+    // activesupport's package.json has no @blazetrails/* deps, so Model must not appear.
+    expect(map.has("Model")).toBe(false);
+  });
+
+  it("excludes __fixtures__ and tsc-wrapper stubs so they don't shadow real dep-package entities", () => {
+    // activerecord tsc-wrapper fixtures contain a stub Model with 1 method;
+    // the real Model in activemodel has many methods. Fixtures must be skipped.
+    const stubModel = cls("tsc-wrapper/__fixtures__/base.ts", "Model");
+    stubModel.instanceMethods = [method("stub")];
+    const realModel = cls("model.ts", "Model");
+    realModel.instanceMethods = [method("attributes"), method("readAttribute")];
+
+    const ts = makeManifest({
+      activerecord: { classes: { StubModel: stubModel } },
+      activemodel: { classes: { Model: realModel } },
+    });
+
+    const map = buildEntitiesByName("activerecord", ts);
+    const candidates = map.get("Model") ?? [];
+    expect(candidates).toContain(realModel);
+    expect(candidates).not.toContain(stubModel);
+  });
+
+  it("current-package entities appear before dep-package entities (same name)", () => {
+    const localModel = cls("packages/activerecord/src/model.ts", "Model");
+    const depModel = cls("packages/activemodel/src/model.ts", "Model");
+    const ts = makeManifest({
+      activerecord: { classes: { LocalModel: localModel } },
+      activemodel: { classes: { Model: depModel } },
+    });
+    // Override localModel name so both share the key "Model"
+    localModel.name = "Model";
+
+    const map = buildEntitiesByName("activerecord", ts);
+    const candidates = map.get("Model") ?? [];
+    // Local should be first (added first due to current-package priority)
+    expect(candidates[0]).toBe(localModel);
   });
 });

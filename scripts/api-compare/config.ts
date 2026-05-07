@@ -21,6 +21,19 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actioncontroller: "actionpack",
 };
 
+/**
+ * Inverse of PACKAGE_DIR_OVERRIDES: directory name → api-compare package keys.
+ * Derived automatically so the two maps can't drift.
+ * Used when resolving an npm dep name (e.g. `@blazetrails/actionpack`) to the
+ * logical package keys used in the TS manifest.
+ */
+export const DIR_TO_PACKAGES: Record<string, string[]> = Object.entries(
+  PACKAGE_DIR_OVERRIDES,
+).reduce<Record<string, string[]>>((acc, [pkg, dir]) => {
+  (acc[dir] ??= []).push(pkg);
+  return acc;
+}, {});
+
 /** Override package → src subdirectory when package shares a dir */
 export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   actiondispatch: "actiondispatch",
