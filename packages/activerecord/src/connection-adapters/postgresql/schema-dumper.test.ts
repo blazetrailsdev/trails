@@ -115,7 +115,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ type: "string", sqlType: "character varying[]", array: true });
       const spec = dumper.prepareColumnOptions(col);
-      expect(spec["array"]).toBe("true");
+      expect(spec["array"]).toBe(true);
     });
 
     it("does not add array for non-array columns", () => {

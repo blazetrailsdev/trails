@@ -59,6 +59,28 @@ describe("PostgreSQL quoting", () => {
     expect(quoteDefaultExpression(41, column, typeMap)).toBe(" DEFAULT 42");
   });
 
+  it("serializes array defaults via fallback OidArray when type map misses", () => {
+    const column = { sqlType: "text[]", array: true };
+    const nullTypeMap = {
+      lookup() {
+        return null;
+      },
+    };
+    expect(quoteDefaultExpression([], column, nullTypeMap)).toBe(" DEFAULT '{}'");
+    expect(quoteDefaultExpression(["a", "b"], column, nullTypeMap)).toBe(" DEFAULT '{a,b}'");
+  });
+
+  it("does not apply array fallback when column.array is false", () => {
+    const column = { sqlType: "text", array: false };
+    const nullTypeMap = {
+      lookup() {
+        return null;
+      },
+    };
+    // A plain string value should still round-trip normally
+    expect(quoteDefaultExpression("hello", column, nullTypeMap)).toBe(" DEFAULT 'hello'");
+  });
+
   it("serializes array defaults through the type map", () => {
     const arrayType = new OidArray(stringSubtype);
     const column = { sqlType: "text[]", array: true };

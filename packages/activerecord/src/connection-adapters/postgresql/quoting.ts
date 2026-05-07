@@ -13,7 +13,8 @@ import {
   typeCast as abstractTypeCast,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Data as ArrayData } from "./oid/array.js";
+import { Array as OidArray, Data as ArrayData } from "./oid/array.js";
+import { ValueType } from "@blazetrails/activemodel";
 import { Data as BitData } from "./oid/bit.js";
 import { Range } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
@@ -210,6 +211,13 @@ export function quoteDefaultExpression(
     const sqlType = column.sqlType ?? column.type ?? null;
     const castType = sqlType ? typeMap?.lookup(sqlType) : null;
     serialized = castType?.serialize ? castType.serialize(value) : value;
+    // Array types are keyed by OID, not by SQL type name — type map lookup
+    // misses. Encode via a passthrough OidArray so quote() gets an ArrayData.
+    // Guard on column.array === true so non-array columns with a falsy array
+    // flag don't silently emit an array literal for unexpected Array values.
+    if (column.array === true && globalThis.Array.isArray(serialized)) {
+      serialized = new ArrayData(new OidArray(new ValueType()), serialized as unknown[]);
+    }
   }
   return ` DEFAULT ${quote(serialized)}`;
 }

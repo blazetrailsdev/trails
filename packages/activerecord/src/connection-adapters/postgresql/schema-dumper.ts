@@ -11,7 +11,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected override prepareColumnOptions(column: Column): Record<string, unknown> {
     const spec = super.prepareColumnOptions(column as any);
-    if (column.array) spec["array"] = "true";
+    if (column.array) spec["array"] = true;
 
     const adapter = this.pgAdapter();
     if (adapter?.supportsVirtualColumns?.() && column.isVirtual()) {
