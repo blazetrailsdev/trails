@@ -7,13 +7,9 @@
  * Mirrors: ActiveRecord::AttributeMethods::Serialization
  */
 
-/**
- * The Serialization module interface.
- *
- * Mirrors: ActiveRecord::AttributeMethods::Serialization
- */
 import { JSON as CodersJSON } from "../coders/json.js";
 import { Json as JsonType } from "../type/json.js";
+
 export interface Serialization {
   serialize(attribute: string, options?: { coder?: unknown }): void;
 }
@@ -67,4 +63,35 @@ function isTypeIncompatibleWithSerialize(
   if (castType != null && typeof (castType as any).typeCastArray === "function" && type === Array)
     return true;
   return false;
+}
+
+type CoderLike = { dump(v: unknown): string; load(v: unknown): unknown };
+
+/**
+ * Builds the inner coder for a store column given raw options.
+ * If coder responds to both load and dump, uses it directly.
+ * If coder is a constructor (responds to new but not load), instantiates it.
+ * Falls back to returning coder as-is when type is Object or unspecified.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::Serialization::ClassMethods#build_column_serializer
+ *
+ * @internal
+ */
+export function buildColumnSerializer(
+  attrName: string,
+  coder: unknown,
+  type: unknown,
+  _yaml?: Record<string, unknown>,
+): unknown {
+  const resolvedCoder = coder === globalThis.JSON ? CodersJSON : coder;
+
+  if (typeof resolvedCoder === "function" && !("load" in resolvedCoder)) {
+    return new (resolvedCoder as any)(attrName, type);
+  }
+
+  if (type && type !== Object) {
+    return new ColumnSerializer(attrName, resolvedCoder as CoderLike);
+  }
+
+  return resolvedCoder;
 }

@@ -1,7 +1,7 @@
 import { ConfigurationError } from "./errors.js";
 import type { Base } from "./base.js";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { buildColumnSerializer } from "./coders/build-column-serializer.js";
+import { buildColumnSerializer } from "./attribute-methods/serialization.js";
 
 // Injected by base.ts to break the store→serialize→json→store circular dep.
 // store() calls this when wiring IndifferentCoder for plain text/string columns.
