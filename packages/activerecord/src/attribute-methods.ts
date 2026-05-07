@@ -101,8 +101,7 @@ export function accessedFields(this: AttributeRecord): string[] {
  *
  * Mirrors: ActiveRecord::AttributeMethods::GeneratedAttributeMethods
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface GeneratedAttributeMethods {}
+export class GeneratedAttributeMethods {}
 
 // ---------------------------------------------------------------------------
 // Class methods — mirrors ActiveRecord::AttributeMethods::ClassMethods
