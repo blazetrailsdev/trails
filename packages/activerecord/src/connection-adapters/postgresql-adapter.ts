@@ -2494,8 +2494,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       if (options.default === null) {
         await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`);
       } else {
+        const defaultExpr = pgQuoteDefaultExpression(
+          options.default,
+          { array: options.array, sqlType: pgType },
+          this.typeMap,
+        );
+        // pgQuoteDefaultExpression returns " DEFAULT value" — strip the prefix
+        const defaultValue = defaultExpr.replace(/^ DEFAULT /, "");
         await this.exec(
-          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${this.quoteLiteral(options.default)}`,
+          `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${defaultValue}`,
         );
       }
     }
@@ -4557,6 +4564,12 @@ function _pgAdvisoryLockSql(
  */
 function splitPgDefault(raw: string | null): { literal: unknown; fn: string | null } {
   if (raw == null) return { literal: null, fn: null };
+  // 'value'::type[] — array literal with a cast; {} is the PG empty-array literal.
+  const arrayLiteral = /^'((?:[^']|'')*)'::[\w"\s.(,)]+\[\]$/.exec(raw);
+  if (arrayLiteral) {
+    const content = arrayLiteral[1];
+    return { literal: content === "{}" ? [] : content, fn: null };
+  }
   // 'value'::type — quoted literal with an optional cast.
   const quoted = /^'((?:[^']|'')*)'::[\w"\s.]+$/.exec(raw);
   if (quoted) return { literal: quoted[1].replace(/''/g, "'"), fn: null };

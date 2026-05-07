@@ -45,6 +45,7 @@ export interface ColumnInfo {
   precision?: number | null;
   scale?: number | null;
   collation?: string | null;
+  array?: boolean;
 }
 
 export interface IndexInfo {
@@ -316,6 +317,7 @@ class AdapterSchemaSource implements SchemaSource {
       precision: col.precision ?? undefined,
       scale: col.scale ?? undefined,
       collation: col.collation ?? undefined,
+      array: (col as any).array || undefined,
     }));
   }
 
@@ -666,6 +668,7 @@ export class SchemaDumper {
           colspec[key] = value;
         }
       }
+      if (col.array && !colspec.array) colspec.array = true;
       if (col.limit !== undefined && col.limit !== null && extraOpts?.limit === undefined)
         colspec.limit = col.limit;
       if (

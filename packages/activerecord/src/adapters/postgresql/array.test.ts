@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -26,6 +27,26 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlArrayTest", () => {
+    it("column", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const cols = (PgArrays as any).columnsHash() as Record<string, any>;
+      const column = cols["tags"];
+      expect(column.type).toBe("string");
+      expect(column.sqlType).toBe("character varying(255)");
+      expect(column.isArray()).toBe(true);
+      const type = (PgArrays as any).typeForAttribute("tags");
+      expect(type?.isBinary?.()).toBeFalsy();
+      const ratingsColumn = cols["ratings"];
+      expect(ratingsColumn.type).toBe("integer");
+      expect(ratingsColumn.isArray()).toBe(true);
+    });
     it.skip("not compatible with serialize array", async () => {
       // BLOCKED: adapter-pg — serialize decorator gap
       // ROOT-CAUSE: Base.serialize() in base.ts does not raise ColumnNotSerializableError for
@@ -47,20 +68,35 @@ describeIfPg("PostgreSQLAdapter", () => {
       //   (e.g. ["foo","bar"]) into PG literal form (e.g. ARRAY['foo','bar']) for the DEFAULT clause.
       // SCOPE: ~20 LOC in connection-adapters/postgresql/schema-statements.ts
     });
-    it.skip("schema dump with shorthand", async () => {
-      /* BLOCKED: schema_dumper.ts array:true emission missing; needs column.isArray() (~10 LOC) */
+    it("schema dump with shorthand", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "pg_arrays");
+      expect(output).toMatch(/t\.string\s+"tags",\s+limit: 255,\s+array: true/);
+      expect(output).toMatch(/t\.integer\s+"ratings",\s+array: true/);
+      expect(output).toMatch(
+        /t\.decimal\s+"decimals",\s+precision: 10,\s+scale: 2,\s+default: \[\],\s+array: true/,
+      );
     });
-    it.skip("change column with array", async () => {
-      // BLOCKED: adapter-pg — Column#array? introspection missing
-      // ROOT-CAUSE: connection-adapters/postgresql/column.ts has no `array` boolean field /
-      //   `isArray()` method; columnsHash entries cannot report array?: true after changeColumn.
-      // SCOPE: ~15 LOC in column.ts + wire through schema-statements changeColumn
+    it("change column with array", async () => {
+      await adapter.addColumn("pg_arrays", "snippets", "string", { array: true, default: [] });
+      await adapter.changeColumn("pg_arrays", "snippets", "text", { array: true, default: [] });
+      const cols = await adapter.columns("pg_arrays");
+      const column = cols.find((c) => c.name === "snippets")!;
+      expect(column.type).toBe("text");
+      expect((column as any).default).toEqual([]);
+      expect((column as any).isArray()).toBe(true);
     });
-    it.skip("change column from non array to array", async () => {
-      // BLOCKED: adapter-pg — Column#array? introspection + changeColumn USING clause missing
-      // ROOT-CAUSE: same as "change column with array"; additionally changeColumn does not accept
-      //   a `using:` option to emit the USING expression in ALTER COLUMN TYPE.
-      // SCOPE: ~20 LOC in column.ts + schema-statements.ts changeColumn
+    it("change column from non array to array", async () => {
+      await adapter.addColumn("pg_arrays", "snippets", "string");
+      await adapter.changeColumn("pg_arrays", "snippets", "text", {
+        array: true,
+        default: [],
+        using: `string_to_array("snippets", ',')`,
+      });
+      const cols = await adapter.columns("pg_arrays");
+      const column = cols.find((c) => c.name === "snippets")!;
+      expect(column.type).toBe("text");
+      expect((column as any).default).toEqual([]);
+      expect((column as any).isArray()).toBe(true);
     });
     it.skip("change column cant make non array column to array", async () => {
       // BLOCKED: adapter-pg — StatementInvalid wrapping missing for DDL errors

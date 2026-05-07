@@ -89,6 +89,11 @@ export class Column extends BaseColumn {
     return super.hasDefault && !this.isVirtual();
   }
 
+  // Mirrors: Column#array? — true when the column stores an array type
+  isArray(): boolean {
+    return this.array;
+  }
+
   // Mirrors: Column#enum? — true when the OID type is a user-defined pg enum
   get isEnum(): boolean {
     return this.sqlTypeMetadata?.type === "enum";
