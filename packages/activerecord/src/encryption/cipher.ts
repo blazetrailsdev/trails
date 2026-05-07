@@ -1,6 +1,7 @@
 /**
- * Outer Cipher dispatcher — wraps Aes256Gcm and provides the
- * encryption/decryption API used by the rest of the encryption subsystem.
+ * Public-facing cipher API that wraps Aes256Gcm with multi-key rotation
+ * and deterministic-mode support. The internal encryption subsystem
+ * (Encryptor, EncryptedAttributeType) uses Aes256Gcm directly.
  *
  * Mirrors: ActiveRecord::Encryption::Cipher (encryption/cipher.rb)
  */
