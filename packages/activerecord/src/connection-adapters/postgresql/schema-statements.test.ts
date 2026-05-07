@@ -521,6 +521,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(adapter.extractSchemaQualifiedName("things")).toEqual([null, "things"]);
     });
 
+    it("exclusionConstraintForBang raises ArgumentError for missing constraint", async () => {
+      await expect(
+        adapter.exclusionConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent WITH ="),
+      ).rejects.toThrow("has no exclusion constraint");
+    });
+
+    it("uniqueConstraintForBang raises ArgumentError for missing constraint", async () => {
+      await expect(
+        adapter.uniqueConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent_col"),
+      ).rejects.toThrow("has no unique constraint");
+    });
+
     it("exclusionConstraintName is deterministic and uses name option", () => {
       const name = adapter.exclusionConstraintName("products", { expression: "price WITH =" });
       expect(name).toMatch(/^excl_rails_[0-9a-f]{10}$/);

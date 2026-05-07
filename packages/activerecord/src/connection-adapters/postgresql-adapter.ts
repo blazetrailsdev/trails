@@ -3798,7 +3798,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         ? expressionOrOptions
         : options;
     if (!expression && !opts.name) {
-      throw new Error(
+      throw new ArgumentError(
         "Either expression or `name` option must be provided for removeExclusionConstraint.",
       );
     }
@@ -3867,7 +3867,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         ? columnNameOrOptions
         : options;
     if (!columnName && !opts.name && !opts.usingIndex) {
-      throw new Error(
+      throw new ArgumentError(
         "Either `columnName`, `name`, or `usingIndex` option must be provided for removeUniqueConstraint.",
       );
     }
@@ -4081,8 +4081,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     options: Record<string, unknown> = {},
   ): Promise<ExclusionConstraintDefinition> {
     const result = await this.exclusionConstraintFor(tableName, {
-      expression: expression ?? undefined,
       ...options,
+      expression: expression ?? undefined,
     });
     if (!result)
       throw new ArgumentError(
@@ -4133,8 +4133,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     options: Record<string, unknown> = {},
   ): Promise<UniqueConstraintDefinition> {
     const result = await this.uniqueConstraintFor(tableName, {
-      column: column ?? undefined,
       ...options,
+      column: column ?? undefined,
     });
     if (!result)
       throw new ArgumentError(
