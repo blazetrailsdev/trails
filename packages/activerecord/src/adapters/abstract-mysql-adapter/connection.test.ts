@@ -1,8 +1,11 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/connection_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
+import type { NotificationEvent } from "@blazetrails/activesupport";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { NoDatabaseError, DatabaseVersionError } from "../../errors.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -10,49 +13,56 @@ describeIfMysql("Mysql2Adapter", () => {
     adapter = new Mysql2Adapter(MYSQL_TEST_URL);
   });
   afterEach(async () => {
+    vi.restoreAllMocks();
+    Notifications.unsubscribeAll();
     await adapter.close();
   });
 
   describe("ConnectionTest", () => {
+    it("bad connection", async () => {
+      const u = new URL(MYSQL_TEST_URL);
+      u.pathname = "/inexistent_activerecord_unittest";
+      const badAdapter = new Mysql2Adapter(u.toString());
+      try {
+        await expect(badAdapter.execute("SELECT 1")).rejects.toBeInstanceOf(NoDatabaseError);
+      } finally {
+        await badAdapter.close();
+      }
+    });
+
     it.skip("no automatic reconnection after timeout", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: Mysql2Adapter#active checks `_driverPool != null`, not socket liveness.
+      // SCOPE: wire socket ping into Mysql2Adapter#active (connection-adapters/mysql2-adapter.ts).
     });
     it.skip("successful reconnection after timeout with manual reconnect", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: reconnectBang() not implemented on Mysql2Adapter (no pool teardown + recreate).
+      // SCOPE: store config in constructor; override reconnectBang() in mysql2-adapter.ts.
     });
     it.skip("successful reconnection after timeout with verify", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: verifyBang() doesn't reconnect on Mysql2Adapter — same gap as reconnectBang().
     });
     it.skip("execute after disconnect reconnects", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: _checkoutConn() throws when _driverPool is null; no lazy reconnect.
+      // SCOPE: store config in constructor; recreate _driverPool in _checkoutConn() after disconnect.
     });
-    it.skip("quote after disconnect reconnects", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+
+    it("quote after disconnect reconnects", () => {
+      adapter.disconnectBang();
+      expect(adapter.quote("string")).toBe("'string'");
     });
-    it.skip("active after disconnect", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+
+    it("active after disconnect", () => {
+      expect(adapter.active).toBe(true);
+      adapter.disconnectBang();
+      expect(adapter.active).toBe(false);
     });
+
     it.skip("wait timeout as string", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: wait_timeout not wired into pool.on('connection') setup in mysql2-adapter.ts.
+      // SCOPE: parse wait_timeout from config; emit `SET SESSION wait_timeout = N` alongside SET time_zone.
     });
     it.skip("wait timeout as url", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: same as "wait timeout as string" — URL query param not parsed.
     });
 
     it("character set connection is configured", async () => {
@@ -62,79 +72,120 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it.skip("collation connection is configured", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: requires second adapter (ARUnit2Model pattern) — not in TS test infra.
+      // showVariable() now implemented; only the second-adapter assertion is missing.
+      // SCOPE: add MYSQL_TEST_URL2 + second adapter to test-helper.ts.
     });
     it.skip("mysql default in strict mode", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: configureConnection() doesn't set sql_mode/STRICT_ALL_TABLES in mysql2-adapter.ts.
+      // SCOPE: implement configureConnection() to emit SET SESSION sql_mode = '...,STRICT_ALL_TABLES'.
     });
     it.skip("mysql strict mode disabled", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: strict: false config not wired — same gap as "mysql default in strict mode".
     });
     it.skip("mysql strict mode specified default", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: strict: :default config not wired — same gap as "mysql default in strict mode".
     });
     it.skip("mysql sql mode variable overrides strict mode", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: variables config hash not wired into pool.on('connection') in mysql2-adapter.ts.
+      // SCOPE: parse variables; emit SET SESSION for each key alongside SET time_zone.
     });
     it.skip("passing arbitrary flags to adapter", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: pool model has no single raw_connection; flags on query_options not accessible.
+      // SCOPE: expose query_options via a test accessor or pool config read-back.
     });
     it.skip("passing flags by array to adapter", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: same as "passing arbitrary flags to adapter".
     });
     it.skip("mysql set session variable", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: variables config not wired — same gap as "mysql sql mode variable overrides".
     });
     it.skip("mysql set session variable to default", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: same as "mysql set session variable".
     });
-    it.skip("logs name show variable", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+
+    it("logs name show variable", async () => {
+      await adapter.materializeTransactions();
+      const logged: Array<[string, string]> = [];
+      const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
+        logged.push([event.payload.sql as string, event.payload.name as string]);
+      });
+      try {
+        await adapter.showVariable("foo");
+        expect(logged[0]?.[1]).toBe("SCHEMA");
+      } finally {
+        Notifications.unsubscribe(sub);
+      }
     });
+
     it.skip("logs name rename column for alter", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+      // BLOCKED: renameColumnForAlter() returns a SQL fragment (for bulk ALTER) and doesn't
+      //   fire sql.active_record notifications; the SHOW CREATE TABLE path (old MySQL/MariaDB)
+      //   needs to call execute() with name "SCHEMA" — not yet implemented.
     });
-    it.skip("version string", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+
+    it("version string", async () => {
+      const spy = vi.spyOn(adapter, "getFullVersion");
+      spy.mockResolvedValueOnce("8.0.35-0ubuntu0.22.04.1");
+      expect((await adapter.getDatabaseVersion()).toString()).toBe("8.0.35");
+
+      // Clear the cache so the second stub is not masked by the first result.
+      (adapter as any)._databaseVersion = null;
+      spy.mockResolvedValueOnce("5.7.0");
+      expect((await adapter.getDatabaseVersion()).toString()).toBe("5.7.0");
     });
-    it.skip("version string with mariadb", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+
+    it("version string with mariadb", async () => {
+      vi.spyOn(adapter, "getFullVersion").mockResolvedValueOnce(
+        "5.5.5-10.6.5-MariaDB-1:10.6.5+maria~focal",
+      );
+      expect((await adapter.getDatabaseVersion()).toString()).toBe("10.6.5");
     });
-    it.skip("version string invalid", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+
+    it("version string invalid", async () => {
+      const spy = vi.spyOn(adapter, "getFullVersion");
+      const assertVersionError = async (version: string | null, expectedMsg: string) => {
+        spy.mockResolvedValueOnce(version as string);
+        let caughtErr: unknown;
+        try {
+          await adapter.getDatabaseVersion();
+        } catch (e) {
+          caughtErr = e;
+        }
+        expect(caughtErr).toBeInstanceOf(DatabaseVersionError);
+        expect((caughtErr as DatabaseVersionError).message).toBe(expectedMsg);
+      };
+
+      await assertVersionError(
+        "some-database-proxy",
+        'Unable to parse MySQL version from "some-database-proxy"',
+      );
+      await assertVersionError("", 'Unable to parse MySQL version from ""');
+      await assertVersionError(null, "Unable to parse MySQL version from nil");
     });
-    it.skip("lock free", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in connection
-      // ROOT-CAUSE: adapters/mysql2/connection.ts or abstract-mysql-adapter/connection.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/connection.ts; affects ~10–26 tests in connection.test.ts
+
+    it("get and release advisory lock", async () => {
+      const lockName = "test lock'n'name";
+
+      const gotLock = await adapter.getAdvisoryLock(lockName);
+      expect(gotLock).toBe(true);
+
+      const isFree = await adapter.selectValue(`SELECT IS_FREE_LOCK(${adapter.quote(lockName)})`);
+      expect(isFree).toBe(0);
+
+      const released = await adapter.releaseAdvisoryLock(lockName);
+      expect(released).toBe(true);
+
+      const isFreeAfter = await adapter.selectValue(
+        `SELECT IS_FREE_LOCK(${adapter.quote(lockName)})`,
+      );
+      expect(isFreeAfter).toBe(1);
+    });
+
+    it("release non existent advisory lock", async () => {
+      const lockName = "fake lock'n'name";
+      const released = await adapter.releaseAdvisoryLock(lockName);
+      expect(released).toBe(false);
     });
   });
 });

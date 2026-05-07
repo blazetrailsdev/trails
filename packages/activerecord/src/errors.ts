@@ -487,6 +487,13 @@ export class NoDatabaseError extends StatementInvalid {
   }
 }
 
+export class DatabaseVersionError extends ActiveRecordError {
+  constructor(message?: string) {
+    super(message ?? "Unknown database version");
+    this.name = "DatabaseVersionError";
+  }
+}
+
 export class DatabaseAlreadyExists extends StatementInvalid {
   constructor(
     message?: string,
