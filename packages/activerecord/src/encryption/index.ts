@@ -4,7 +4,7 @@ export { Properties } from "./properties.js";
 export { Key } from "./key.js";
 export { KeyGenerator } from "./key-generator.js";
 export { Cipher } from "./cipher.js";
-export { Cipher as Aes256Gcm } from "./cipher/aes256-gcm.js";
+export { Aes256Gcm } from "./cipher/aes256-gcm.js";
 export { MessageSerializer } from "./message-serializer.js";
 export { Encryptor } from "./encryptor.js";
 export type { EncryptorOptions, EncryptorLike, KeyProviderLike } from "./encryptor.js";
