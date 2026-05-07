@@ -156,6 +156,19 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     }
   });
 
+  it("configure fires onConfigure hooks so cache-clearing callbacks take effect", () => {
+    let fired = false;
+    const dispose = Configurable.onConfigure(() => {
+      fired = true;
+    });
+    try {
+      Configurable.configure({ primaryKey: "test-key" });
+      expect(fired).toBe(true);
+    } finally {
+      dispose();
+    }
+  });
+
   it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {
     Configurable.config.excludeFromFilterParameters = ["secret_token"];
 
