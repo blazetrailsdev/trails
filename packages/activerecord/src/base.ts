@@ -140,7 +140,6 @@ import {
   isSavedChanges as _isSavedChanges,
 } from "./attribute-methods.js";
 import { normalizeChangedInPlaceAttributes as _normalizeChangedInPlaceAttributesFn } from "./normalization.js";
-import { localStoredAttributes as _localStoredAttributesFn } from "./store.js";
 import {
   toKey as _toKey,
   getId as _getId,
@@ -960,6 +959,8 @@ export class Base extends Model {
   declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;
   declare static shardKeys: typeof ConnectionHandling.shardKeys;
   declare static isSharded: typeof ConnectionHandling.isSharded;
+  /** @internal */
+  declare static resolveConfigForConnection: typeof ConnectionHandling.resolveConfigForConnection;
 
   // --- ModelSchema mixin (wired via extend() after class) ---
   // Mirrors: ActiveRecord::Attributes
@@ -2962,10 +2963,10 @@ extend(Base, {
   // ConnectionHandling.ClassMethods does not include resolveConfigForConnection
   // (it's a standalone export, not in the ClassMethods object), so wire it here.
   resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
-  // localStoredAttributes is a class-level attr_accessor in Rails; wire for runtime.
-  localStoredAttributes(this: typeof Base) {
-    return _localStoredAttributesFn(this);
-  },
+  // localStoredAttributes omitted: Base.store() writes to Base._storedAttributes (a Map),
+  // but store.ts:localStoredAttributes reads from a separate WeakMap populated only by
+  // store.ts:store(). The two registries are disconnected, so the wrapper always returns {}.
+  // Category C: requires unifying the two store implementations before wiring.
 });
 
 include(Base, {
