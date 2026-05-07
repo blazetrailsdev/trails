@@ -76,7 +76,10 @@ export abstract class Attribute {
   }
 
   get valueForDatabase(): unknown {
-    if (!this._hasValueForDatabase || this.changedInPlace()) {
+    if (
+      !this._hasValueForDatabase ||
+      this.type.isChangedInPlace(this._cachedValueForDatabase, this.value)
+    ) {
       this._cachedValueForDatabase = this._valueForDatabase();
       this._hasValueForDatabase = true;
     }
