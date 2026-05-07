@@ -619,6 +619,9 @@ describe("EachTest", () => {
   });
 
   it.skip("in batches touch all returns rows affected", async () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
     const adp = freshAdapter();
     class Post extends Base {
       static {

@@ -6846,6 +6846,9 @@ describe("RelationTest", () => {
   });
 
   it.skip("eager association loading of stis with multiple references", async () => {
+    // BLOCKED: relation — Relation feature gap (standalone relations test)
+    // ROOT-CAUSE: relation.ts missing Rails parity for this feature
+    // SCOPE: ~30 LOC fix in relation.ts; affects ~8 tests in relations.test.ts
     // Requires STI polymorphic eager loading with multiple references —
     // eagerLoad with nested includes across STI subclasses not yet supported
     /* fixture-dependent */

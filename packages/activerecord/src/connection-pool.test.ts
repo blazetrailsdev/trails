@@ -112,9 +112,9 @@ function makeTransactionAwarePool(size: number = 5): ConnectionPool {
 
 describe("ConnectionPoolThreadTest", () => {
   it.skip("lock thread allow fiber reentrency", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for ConnectionPoolThreadTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+    // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+    // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
     /* needs fiber/thread emulation */
   });
 });
@@ -135,9 +135,9 @@ it("checkout after close", () => {
 });
 
 it.skip("released connection moves between threads", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for ConnectionPoolThreadTest
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
   /* needs thread emulation */
 });
 
@@ -195,8 +195,8 @@ it("with connection prevent permanent checkout on fresh lease releases", () => {
 
 it.skip("new connection no query", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs query tracking */
 });
 
@@ -233,8 +233,8 @@ it("full pool blocks", async () => {
 
 it.skip("full pool blocking shares load interlock", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs thread interlock */
 });
 
@@ -262,15 +262,15 @@ it("reap and active", () => {
 
 it.skip("reap inactive", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs reaper/idle timeout */
 });
 
 it.skip("inactive are returned from dead thread", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
   /* needs thread tracking */
 });
 
@@ -381,9 +381,9 @@ it("remove connection", () => {
 });
 
 it.skip("remove connection for thread", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
   /* needs thread tracking */
 });
 
@@ -416,15 +416,15 @@ it("checkout order is lifo", () => {
 
 it.skip("checkout fairness", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs thread fairness */
 });
 
 it.skip("checkout fairness by group", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs thread fairness */
 });
 
@@ -509,29 +509,29 @@ it("clearReloadableConnections only disconnects reloadable adapters", () => {
 
 it.skip("pool sets connection visitor", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs visitor pattern */
 });
 
 it.skip("anonymous class exception", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs class-based pool resolution */
 });
 
 it.skip("connection notification is called", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs instrumentation/notifications */
 });
 
 it.skip("connection notification is called for shard", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs instrumentation/notifications */
 });
 
@@ -548,50 +548,50 @@ it("sets pool schema reflection", () => {
 
 it.skip("pool sets connection schema cache", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs schema cache */
 });
 
 it.skip("concurrent connection establishment", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
   /* needs concurrency */
 });
 
 it.skip("non bang disconnect and clear reloadable connections throw exception if threads dont return their conns", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
   /* needs thread tracking */
 });
 
 it.skip("disconnect and clear reloadable connections attempt to wait for threads to return their conns", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
   /* needs thread tracking */
 });
 
 it.skip("bang versions of disconnect and clear reloadable connections if unable to acquire all connections proceed anyway", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs thread tracking */
 });
 
 it.skip("disconnect and clear reloadable connections are able to preempt other waiting threads", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
   /* needs thread tracking */
 });
 
 it.skip("clear reloadable connections creates new connections for waiting threads if necessary", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
   /* needs thread tracking */
 });
 
@@ -607,9 +607,9 @@ it("connection pool stat", () => {
 });
 
 it.skip("public connections access threadsafe", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
+  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
+  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
   /* needs thread safety */
 });
 
@@ -645,8 +645,8 @@ it("pin connection connected?", async () => {
 
 it.skip("pin connection synchronize the connection", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs thread synchronization */
 });
 
@@ -753,15 +753,15 @@ it("pin connection isolation across execution contexts", async () => {
 
 it.skip("pin connection nesting lock", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs thread locking */
 });
 
 it.skip("pin connection nesting lock inverse", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
+  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
   /* needs thread locking */
 });
 

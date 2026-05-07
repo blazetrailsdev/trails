@@ -14,15 +14,55 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlDeferredConstraintsTest", () => {
-    it.skip("deferrable initially deferred", async () => {});
-    it.skip("deferrable initially immediate", async () => {});
-    it.skip("not deferrable", async () => {});
-    it.skip("set constraints all deferred", async () => {});
-    it.skip("set constraints all immediate", async () => {});
-    it.skip("defer constraints", async () => {});
-    it.skip("defer constraints with specific fk", async () => {});
-    it.skip("defer constraints with multiple fks", async () => {});
-    it.skip("defer constraints only defers single fk", async () => {});
-    it.skip("set constraints requires valid value", async () => {});
+    it.skip("deferrable initially deferred", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
+    it.skip("deferrable initially immediate", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
+    it.skip("not deferrable", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
+    it.skip("set constraints all deferred", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
+    it.skip("set constraints all immediate", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
+    it.skip("defer constraints", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
+    it.skip("defer constraints with specific fk", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
+    it.skip("defer constraints with multiple fks", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
+    it.skip("defer constraints only defers single fk", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
+    it.skip("set constraints requires valid value", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in deferred-constraints
+      // ROOT-CAUSE: adapters/postgresql/deferred-constraints.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/deferred-constraints.ts; affects ~10–47 tests in deferred-constraints.test.ts
+    });
   });
 });

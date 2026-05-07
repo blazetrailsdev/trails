@@ -397,22 +397,25 @@ function categorize(relPath: string, describeName: string, testName: string): An
     if (p.includes("sharding") || p.includes("shard")) {
       return {
         blocked: "connection-pool — sharding / shard-selector not fully implemented",
-        rootCause: "connection-adapters/connection-handler.ts#connectingToShard not implemented",
-        scope: "~100 LOC in connection-handler.ts; affects ~19–26 tests in sharding files",
+        rootCause:
+          "connection-adapters/abstract/connection-handler.ts#connectingToShard not implemented",
+        scope:
+          "~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~19–26 tests in sharding files",
       };
     }
     if (p.includes("multi-db") || p.includes("multiple")) {
       return {
         blocked: "connection-pool — multi-database handler / switching not fully implemented",
         rootCause:
-          "connection-adapters/connection-handler.ts#connectedTo for multi-DB not fully implemented",
-        scope: "~100 LOC in connection-handler.ts; affects ~11–21 tests in multiple-db files",
+          "connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented",
+        scope:
+          "~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files",
       };
     }
     return {
       blocked: `connection-pool — connection pool / handler gap in ${file}`,
-      rootCause: `connection-pool.ts or connection-handler.ts missing Rails parity for ${describeName || "pool lifecycle"}`,
-      scope: `~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in ${file}.test.ts`,
+      rootCause: `connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for ${describeName || "pool lifecycle"}`,
+      scope: `~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in ${file}.test.ts`,
     };
   }
 
@@ -478,7 +481,7 @@ function categorize(relPath: string, describeName: string, testName: string): An
     const file = path.basename(p, ".test.ts");
     return {
       blocked: `validation — validator behavior gap in ${file}`,
-      rootCause: `validations/${file}.ts or i18n/translation.ts missing Rails parity`,
+      rootCause: `validations/${file}.ts or translation.ts missing Rails parity`,
       scope: `~30–100 LOC fix in validations/; affects ~4–11 tests in ${file}.test.ts`,
     };
   }
@@ -588,7 +591,7 @@ function categorize(relPath: string, describeName: string, testName: string): An
     return {
       blocked: "migration — multi-DB migrator / primary-class gap",
       rootCause:
-        "migration.ts#MigrationContext or connection-handler.ts#primaryClass not fully implemented",
+        "migration.ts#MigrationContext or connection-adapters/abstract/connection-handler.ts#primaryClass not fully implemented",
       scope: `~50 LOC fix in migration.ts; affects ~7 tests in ${file}.test.ts`,
     };
   }
@@ -688,8 +691,9 @@ function categorize(relPath: string, describeName: string, testName: string): An
     return {
       blocked: "connection-pool — unconnected model behavior not fully implemented",
       rootCause:
-        "core.ts or connection-handler.ts#withoutConnection not implementing unconnected model semantics",
-      scope: "~30 LOC fix in connection-handler.ts; affects ~3 tests in unconnected.test.ts",
+        "connection-adapters/abstract/connection-handler.ts — unconnected model API (withoutConnection) not yet implemented",
+      scope:
+        "~30 LOC fix in connection-adapters/abstract/connection-handler.ts; affects ~3 tests in unconnected.test.ts",
     };
   }
 
@@ -727,8 +731,9 @@ function categorize(relPath: string, describeName: string, testName: string): An
       blocked:
         "connection-pool — pooled connection checkout/checkin semantics not fully implemented",
       rootCause:
-        "connection-pool.ts#checkout or withConnection not fully implementing pool lifecycle",
-      scope: "~30 LOC fix in connection-pool.ts; affects ~3 tests in pooled-connections.test.ts",
+        "connection-adapters/abstract/connection-pool.ts#checkout or withConnection not fully implementing pool lifecycle",
+      scope:
+        "~30 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~3 tests in pooled-connections.test.ts",
     };
   }
 
@@ -738,8 +743,8 @@ function categorize(relPath: string, describeName: string, testName: string): An
     return {
       blocked: "connection-pool — invalid / disconnected connection handling gap",
       rootCause:
-        "connection-handler.ts or abstract-adapter.ts#checkoutTimeout not raising correct error",
-      scope: `~20 LOC fix in connection-handler.ts; affects ~1 test in ${file}.test.ts`,
+        "connection-adapters/abstract/connection-handler.ts or abstract-adapter.ts#checkoutTimeout not raising correct error",
+      scope: `~20 LOC fix in connection-adapters/abstract/connection-handler.ts; affects ~1 test in ${file}.test.ts`,
     };
   }
 
@@ -867,7 +872,7 @@ function categorize(relPath: string, describeName: string, testName: string): An
       rootCause:
         "type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps",
       scope:
-        "~50–100 LOC in type/date-time.ts + connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters",
+        "~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters",
     };
   }
 
@@ -1004,7 +1009,7 @@ function annotateFile(src: string, relPath: string): string | null {
   // Regex to find skip call openers (handles it.skip / xit / test.skip / describe.skip).
   // Captures up to and including the `{` of the callback body.
   const SKIP_OPEN =
-    /\b(?:it\.skip|xit|test\.skip|describe\.skip)\s*\(\s*(?:"[^"]*"|'[^']*'|`[^`]*`)\s*,\s*\(\s*\)\s*=>\s*\{/g;
+    /\b(?:it\.skip|xit|test\.skip|describe\.skip)\s*\(\s*(?:"[^"]*"|'[^']*'|`[^`]*`)\s*,\s*(?:async\s+)?\([^)]*\)\s*=>\s*\{/g;
 
   let result = src;
   let offset = 0; // cumulative offset from insertions

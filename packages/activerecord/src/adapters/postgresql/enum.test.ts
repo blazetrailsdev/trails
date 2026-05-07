@@ -168,7 +168,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs ORM layer (pluck)
-    it.skip("enum pluck", async () => {});
+    it.skip("enum pluck", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
 
     it("enum distinct", async () => {
       await adapter.executeMutation(
@@ -205,7 +209,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs migration framework
-    it.skip("enum migration", async () => {});
+    it.skip("enum migration", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
 
     it("enum array", async () => {
       await adapter.exec(`ALTER TABLE "postgresql_enums" ADD COLUMN "past_moods" mood[]`);

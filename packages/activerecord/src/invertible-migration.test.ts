@@ -166,6 +166,9 @@ describe("InvertibleMigrationTest", () => {
   });
 
   it.skip("migrate revert change column default", async () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migration not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     // ALTER COLUMN SET DEFAULT not supported in SQLite/MemoryAdapter
     class CreateHorses extends Migration {
       async change() {

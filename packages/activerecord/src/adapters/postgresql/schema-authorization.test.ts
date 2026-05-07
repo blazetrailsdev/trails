@@ -14,12 +14,36 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("SchemaAuthorizationTest", () => {
-    it.skip("schema authorization", async () => {});
-    it.skip("schema authorization with quoted names", async () => {});
-    it.skip("session authorization", async () => {});
-    it.skip("reset authorization", async () => {});
-    it.skip("sequence schema authorization", async () => {});
-    it.skip("tables schema authorization", async () => {});
+    it.skip("schema authorization", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema-authorization
+      // ROOT-CAUSE: adapters/postgresql/schema-authorization.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/schema-authorization.ts; affects ~10–47 tests in schema-authorization.test.ts
+    });
+    it.skip("schema authorization with quoted names", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema-authorization
+      // ROOT-CAUSE: adapters/postgresql/schema-authorization.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/schema-authorization.ts; affects ~10–47 tests in schema-authorization.test.ts
+    });
+    it.skip("session authorization", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema-authorization
+      // ROOT-CAUSE: adapters/postgresql/schema-authorization.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/schema-authorization.ts; affects ~10–47 tests in schema-authorization.test.ts
+    });
+    it.skip("reset authorization", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema-authorization
+      // ROOT-CAUSE: adapters/postgresql/schema-authorization.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/schema-authorization.ts; affects ~10–47 tests in schema-authorization.test.ts
+    });
+    it.skip("sequence schema authorization", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema-authorization
+      // ROOT-CAUSE: adapters/postgresql/schema-authorization.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/schema-authorization.ts; affects ~10–47 tests in schema-authorization.test.ts
+    });
+    it.skip("tables schema authorization", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema-authorization
+      // ROOT-CAUSE: adapters/postgresql/schema-authorization.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/schema-authorization.ts; affects ~10–47 tests in schema-authorization.test.ts
+    });
     it.skip("schema invisible", () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema-authorization
       // ROOT-CAUSE: adapters/postgresql/schema-authorization.ts missing or incomplete Rails parity

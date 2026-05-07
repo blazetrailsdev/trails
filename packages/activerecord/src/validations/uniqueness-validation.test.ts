@@ -145,6 +145,9 @@ describe("UniquenessValidationTest", () => {
 
   // Real DBs reject queries referencing nonexistent columns
   it.skip("validate uniqueness with scope invalid syntax", async () => {
+    // BLOCKED: validation — validator behavior gap in uniqueness-validation
+    // ROOT-CAUSE: validations/uniqueness-validation.ts or translation.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in validations/; affects ~4–11 tests in uniqueness-validation.test.ts
     const adp = freshAdapter();
     class Post extends Base {
       static {

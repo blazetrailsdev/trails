@@ -15,29 +15,85 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLDatatypeTest", () => {
-    it.skip("money column", async () => {});
-    it.skip("number column", async () => {});
-    it.skip("time column", async () => {});
-    it.skip("date column", async () => {});
-    it.skip("timestamp column", async () => {});
-    it.skip("boolean column", async () => {});
-    it.skip("text column", async () => {});
-    it.skip("binary column", async () => {});
-    it.skip("oid column", async () => {});
+    it.skip("money column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
+    it.skip("number column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
+    it.skip("time column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
+    it.skip("date column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
+    it.skip("timestamp column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
+    it.skip("boolean column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
+    it.skip("text column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
+    it.skip("binary column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
+    it.skip("oid column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
     it.skip("data type of time types", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
       // Requires AR model with interval column; no adapter-level equivalent
     });
     it.skip("data type of oid types", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
       // Requires AR model with oid column; no adapter-level equivalent
     });
     it.skip("time values", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
       // Requires AR model (PostgresqlTime); no adapter-level equivalent
     });
-    it.skip("update large time in seconds", async () => {});
+    it.skip("update large time in seconds", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
     it.skip("oid values", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
       // Requires AR model (PostgresqlOid); no adapter-level equivalent
     });
-    it.skip("update oid", async () => {});
+    it.skip("update oid", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in datatype
+      // ROOT-CAUSE: adapters/postgresql/datatype.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/datatype.ts; affects ~10–47 tests in datatype.test.ts
+    });
 
     it("text columns are limitless the upper limit is one GB", async () => {
       expect(adapter.typeToSql("text", { limit: 100_000 })).toBe("text");

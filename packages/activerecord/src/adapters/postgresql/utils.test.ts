@@ -39,9 +39,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Number(rows[0].val)).toBe(3);
     });
 
-    it.skip("distinct zero", async () => {});
-    it.skip("distinct one", async () => {});
-    it.skip("distinct multiple", async () => {});
+    it.skip("distinct zero", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in utils
+      // ROOT-CAUSE: adapters/postgresql/utils.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/utils.ts; affects ~10–47 tests in utils.test.ts
+    });
+    it.skip("distinct one", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in utils
+      // ROOT-CAUSE: adapters/postgresql/utils.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/utils.ts; affects ~10–47 tests in utils.test.ts
+    });
+    it.skip("distinct multiple", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in utils
+      // ROOT-CAUSE: adapters/postgresql/utils.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/utils.ts; affects ~10–47 tests in utils.test.ts
+    });
 
     it("extract schema qualified name", () => {
       const cases: Record<string, [string | null, string]> = {

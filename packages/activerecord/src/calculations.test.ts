@@ -1752,14 +1752,23 @@ describe("CalculationsTest", () => {
   });
 
   it.skip("should group by summed association", async () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
     // requires association join fixture
   });
 
   it.skip("should calculate grouped association with foreign key option", async () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
     // requires fixture-based associations
   });
 
   it.skip("pluck with serialization", async () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
     // requires custom serialized attribute types
   });
 });

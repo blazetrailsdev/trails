@@ -195,9 +195,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("translate exception lock wait timeout", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
       /* needs concurrent connections with lock contention */
     });
     it.skip("translate exception deadlock", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
       /* needs concurrent connections with deadlock scenario */
     });
 
@@ -215,12 +221,36 @@ describeIfPg("PostgreSQLAdapter", () => {
       ).rejects.toThrow(/invalid input|integer/i);
     });
 
-    it.skip("translate exception query cancelled", async () => {});
-    it.skip("translate exception serialization failure", async () => {});
-    it.skip("type map", async () => {});
-    it.skip("type map for results", async () => {});
-    it.skip("only reload type map once for every unrecognized type", async () => {});
-    it.skip("only warn on first encounter of unrecognized oid", async () => {});
+    it.skip("translate exception query cancelled", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("translate exception serialization failure", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("type map", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("type map for results", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("only reload type map once for every unrecognized type", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("only warn on first encounter of unrecognized oid", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
     it("extension enabled", async () => {
       await adapter.enableExtension("citext");
       expect(await adapter.extensionEnabled("citext")).toBe(true);
@@ -249,10 +279,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.disableExtension("citext", { force: "cascade" });
       expect(await adapter.extensionEnabled("citext")).toBe(false);
     });
-    it.skip("prepared statements", async () => {});
-    it.skip("prepared statements with multiple binds", async () => {});
-    it.skip("prepared statements disabled", async () => {});
-    it.skip("default prepared statements", async () => {});
+    it.skip("prepared statements", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("prepared statements with multiple binds", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("prepared statements disabled", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("default prepared statements", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
 
     // ── Bind parameter rewriting + type round-trip ──────────────────────
     // Our adapter rewrites ? → $1, $2. These tests verify that bind params
@@ -466,6 +512,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("reconnect after bad connection on check version", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
       /* needs reconnection logic */
     });
 
@@ -483,9 +532,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(pk).toBe("custom_id");
     });
 
-    it.skip("exec insert with returning disabled and no sequence name given", async () => {});
-    it.skip("exec insert default values with returning disabled and no sequence name given", async () => {});
-    it.skip("exec insert default values quoted schema with returning disabled and no sequence name given", async () => {});
+    it.skip("exec insert with returning disabled and no sequence name given", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("exec insert default values with returning disabled and no sequence name given", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("exec insert default values quoted schema with returning disabled and no sequence name given", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
 
     it("serial sequence", async () => {
       await adapter.exec(`CREATE TABLE "ex_serial_seq" ("id" SERIAL PRIMARY KEY)`);
@@ -531,6 +592,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result).toBeNull();
     });
     it.skip("pk and sequence for with collision pg class oid", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
       /* needs specific OID collision scenario */
     });
 
@@ -629,11 +693,31 @@ describeIfPg("PostgreSQLAdapter", () => {
         "posts.updater_id AS alias_0, posts.title",
       );
     });
-    it.skip("raise error when cannot translate exception", async () => {});
-    it.skip("translate no connection exception to not established", async () => {});
-    it.skip("reload type map for newly defined types", async () => {});
-    it.skip("unparsed defaults are at least set when saving", async () => {});
-    it.skip("only check for insensitive comparison capability once", async () => {});
+    it.skip("raise error when cannot translate exception", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("translate no connection exception to not established", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("reload type map for newly defined types", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("unparsed defaults are at least set when saving", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("only check for insensitive comparison capability once", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
     it("extensions omits current schema name", async () => {
       const wasEnabled = await adapter.extensionEnabled("hstore");
       if (wasEnabled) await adapter.disableExtension("hstore");
@@ -664,14 +748,46 @@ describeIfPg("PostgreSQLAdapter", () => {
         if (wasEnabled) await adapter.enableExtension("hstore");
       }
     });
-    it.skip("ignores warnings when behaviour ignore", async () => {});
-    it.skip("logs warnings when behaviour log", async () => {});
-    it.skip("raises warnings when behaviour raise", async () => {});
-    it.skip("reports when behaviour report", async () => {});
-    it.skip("warnings behaviour can be customized with a proc", async () => {});
-    it.skip("allowlist of warnings to ignore", async () => {});
-    it.skip("allowlist of warning codes to ignore", async () => {});
-    it.skip("does not raise notice level warnings", async () => {});
+    it.skip("ignores warnings when behaviour ignore", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("logs warnings when behaviour log", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("raises warnings when behaviour raise", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("reports when behaviour report", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("warnings behaviour can be customized with a proc", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("allowlist of warnings to ignore", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("allowlist of warning codes to ignore", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
+    it.skip("does not raise notice level warnings", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
+    });
     it("date decoding enabled", async () => {
       await adapter.exec(`CREATE TABLE "ex_dates" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
       await adapter.exec(`INSERT INTO "ex_dates" ("d") VALUES ('2023-06-15')`);
@@ -684,6 +800,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("date decoding disabled", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter.ts; affects ~10–47 tests in postgresql-adapter.test.ts
       /* needs adapter-level date decoding toggle */
     });
 

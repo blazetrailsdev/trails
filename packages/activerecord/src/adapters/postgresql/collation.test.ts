@@ -14,11 +14,31 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLCollationTest", () => {
-    it.skip("columns collation", async () => {});
-    it.skip("collation change", async () => {});
-    it.skip("collation add", async () => {});
-    it.skip("collation schema dump", async () => {});
-    it.skip("collation default", async () => {});
+    it.skip("columns collation", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in collation
+      // ROOT-CAUSE: adapters/postgresql/collation.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/collation.ts; affects ~10–47 tests in collation.test.ts
+    });
+    it.skip("collation change", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in collation
+      // ROOT-CAUSE: adapters/postgresql/collation.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/collation.ts; affects ~10–47 tests in collation.test.ts
+    });
+    it.skip("collation add", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in collation
+      // ROOT-CAUSE: adapters/postgresql/collation.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/collation.ts; affects ~10–47 tests in collation.test.ts
+    });
+    it.skip("collation schema dump", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in collation
+      // ROOT-CAUSE: adapters/postgresql/collation.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/collation.ts; affects ~10–47 tests in collation.test.ts
+    });
+    it.skip("collation default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in collation
+      // ROOT-CAUSE: adapters/postgresql/collation.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/collation.ts; affects ~10–47 tests in collation.test.ts
+    });
     it.skip("string column with collation", () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in collation
       // ROOT-CAUSE: adapters/postgresql/collation.ts missing or incomplete Rails parity

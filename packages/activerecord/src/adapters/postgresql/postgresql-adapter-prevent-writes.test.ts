@@ -30,14 +30,46 @@ describeIfPg("PostgreSQLAdapter", () => {
   }
 
   describe("PostgreSQLAdapterPreventWritesTest", () => {
-    it.skip("prevent writes insert", async () => {});
-    it.skip("prevent writes update", async () => {});
-    it.skip("prevent writes delete", async () => {});
-    it.skip("prevent writes create table", async () => {});
-    it.skip("prevent writes drop table", async () => {});
-    it.skip("prevent writes allows select", async () => {});
-    it.skip("prevent writes allows explain", async () => {});
-    it.skip("prevent writes toggle", async () => {});
+    it.skip("prevent writes insert", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter-prevent-writes
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter-prevent-writes.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter-prevent-writes.ts; affects ~10–47 tests in postgresql-adapter-prevent-writes.test.ts
+    });
+    it.skip("prevent writes update", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter-prevent-writes
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter-prevent-writes.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter-prevent-writes.ts; affects ~10–47 tests in postgresql-adapter-prevent-writes.test.ts
+    });
+    it.skip("prevent writes delete", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter-prevent-writes
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter-prevent-writes.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter-prevent-writes.ts; affects ~10–47 tests in postgresql-adapter-prevent-writes.test.ts
+    });
+    it.skip("prevent writes create table", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter-prevent-writes
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter-prevent-writes.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter-prevent-writes.ts; affects ~10–47 tests in postgresql-adapter-prevent-writes.test.ts
+    });
+    it.skip("prevent writes drop table", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter-prevent-writes
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter-prevent-writes.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter-prevent-writes.ts; affects ~10–47 tests in postgresql-adapter-prevent-writes.test.ts
+    });
+    it.skip("prevent writes allows select", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter-prevent-writes
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter-prevent-writes.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter-prevent-writes.ts; affects ~10–47 tests in postgresql-adapter-prevent-writes.test.ts
+    });
+    it.skip("prevent writes allows explain", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter-prevent-writes
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter-prevent-writes.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter-prevent-writes.ts; affects ~10–47 tests in postgresql-adapter-prevent-writes.test.ts
+    });
+    it.skip("prevent writes toggle", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in postgresql-adapter-prevent-writes
+      // ROOT-CAUSE: adapters/postgresql/postgresql-adapter-prevent-writes.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/postgresql-adapter-prevent-writes.ts; affects ~10–47 tests in postgresql-adapter-prevent-writes.test.ts
+    });
 
     it("doesnt error when a read query with cursors is called while preventing writes", async () => {
       preventWrites(adapter);

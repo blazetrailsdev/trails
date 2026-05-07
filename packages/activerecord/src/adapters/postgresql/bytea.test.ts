@@ -14,20 +14,76 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlByteaTest", () => {
-    it.skip("column", async () => {});
-    it.skip("default", async () => {});
-    it.skip("type cast binary column", async () => {});
-    it.skip("type cast bytea", async () => {});
-    it.skip("type cast bytea empty string", async () => {});
-    it.skip("type cast bytea nil", async () => {});
-    it.skip("write and read", async () => {});
-    it.skip("write and read with url safe base64", async () => {});
-    it.skip("write nothing", async () => {});
-    it.skip("write nil", async () => {});
-    it.skip("write empty string", async () => {});
-    it.skip("write with hex format", async () => {});
-    it.skip("write with escape format", async () => {});
-    it.skip("write via fixture", async () => {});
+    it.skip("column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("type cast binary column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("type cast bytea", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("type cast bytea empty string", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("type cast bytea nil", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("write and read", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("write and read with url safe base64", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("write nothing", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("write nil", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("write empty string", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("write with hex format", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("write with escape format", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
+    it.skip("write via fixture", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in bytea
+      // ROOT-CAUSE: adapters/postgresql/bytea.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/bytea.ts; affects ~10–47 tests in bytea.test.ts
+    });
     it("binary columns are limitless the upper limit is one GB", () => {
       expect(adapter.typeToSql("binary", { limit: 100_000 })).toBe("bytea");
       expect(() => adapter.typeToSql("binary", { limit: 4_294_967_295 })).toThrow();

@@ -636,6 +636,9 @@ describe("NestedRelationScopingTest", () => {
   });
 
   it.skip("three level nested exclusive scoped find", async () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     const { Post } = makeModel();
     await Post.create({ title: "A", author: "Alice" });
     await Post.create({ title: "B", author: "Bob" });

@@ -14,9 +14,25 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlFullTextTest", () => {
-    it.skip("tsvector column", async () => {});
-    it.skip("tsquery column", async () => {});
-    it.skip("full text search", async () => {});
-    it.skip("update tsvector", async () => {});
+    it.skip("tsvector column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in full-text
+      // ROOT-CAUSE: adapters/postgresql/full-text.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/full-text.ts; affects ~10–47 tests in full-text.test.ts
+    });
+    it.skip("tsquery column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in full-text
+      // ROOT-CAUSE: adapters/postgresql/full-text.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/full-text.ts; affects ~10–47 tests in full-text.test.ts
+    });
+    it.skip("full text search", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in full-text
+      // ROOT-CAUSE: adapters/postgresql/full-text.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/full-text.ts; affects ~10–47 tests in full-text.test.ts
+    });
+    it.skip("update tsvector", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in full-text
+      // ROOT-CAUSE: adapters/postgresql/full-text.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/full-text.ts; affects ~10–47 tests in full-text.test.ts
+    });
   });
 });

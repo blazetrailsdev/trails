@@ -215,8 +215,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("uuid schema dump", async () => {});
-    it.skip("uuid migration", async () => {});
+    it.skip("uuid schema dump", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
+      // ROOT-CAUSE: adapters/postgresql/uuid.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+    });
+    it.skip("uuid migration", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
+      // ROOT-CAUSE: adapters/postgresql/uuid.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+    });
 
     it("uuid gen random uuid", async () => {
       const rows = await adapter.execute(`SELECT gen_random_uuid() AS uuid`);
@@ -302,7 +310,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows).toHaveLength(2);
     });
 
-    it.skip("uuid association", async () => {});
+    it.skip("uuid association", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
+      // ROOT-CAUSE: adapters/postgresql/uuid.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+    });
 
     it("uuid foreign key", async () => {
       await adapter.exec(`DROP TABLE IF EXISTS uuid_fk_child`);

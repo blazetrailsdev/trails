@@ -154,7 +154,11 @@ describe("AdapterTest", () => {
 });
 
 describe("AdapterForeignKeyTest", () => {
-  it.skip("disable referential integrity", async () => {});
+  it.skip("disable referential integrity", async () => {
+    // BLOCKED: schema — abstract adapter schema introspection / query execution gap
+    // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#tableExists/indexes/dataSources or abstract-adapter.ts#execQuery not fully implemented
+    // SCOPE: ~100 LOC across abstract/schema-statements.ts + abstract-adapter.ts; affects ~70 tests in adapter.test.ts
+  });
   it.skip("foreign key violations are translated to specific exception with validate false", () => {
     // BLOCKED: schema — abstract adapter schema introspection / query execution gap
     // ROOT-CAUSE: connection-adapters/abstract/schema-statements.ts#tableExists/indexes/dataSources or abstract-adapter.ts#execQuery not fully implemented

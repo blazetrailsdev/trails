@@ -545,6 +545,9 @@ describe("WhereChainTest", () => {
   });
 
   it.skip("rewhere with polymorphic association", async () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     // requires polymorphic association
   });
 

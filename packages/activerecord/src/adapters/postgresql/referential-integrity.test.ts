@@ -14,11 +14,31 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlReferentialIntegrityTest", () => {
-    it.skip("enable referential integrity", async () => {});
-    it.skip("disable and enable referential integrity", async () => {});
-    it.skip("foreign key violation without disable", async () => {});
-    it.skip("foreign key violation with disable", async () => {});
-    it.skip("truncate with cascade", async () => {});
+    it.skip("enable referential integrity", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in referential-integrity
+      // ROOT-CAUSE: adapters/postgresql/referential-integrity.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/referential-integrity.ts; affects ~10–47 tests in referential-integrity.test.ts
+    });
+    it.skip("disable and enable referential integrity", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in referential-integrity
+      // ROOT-CAUSE: adapters/postgresql/referential-integrity.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/referential-integrity.ts; affects ~10–47 tests in referential-integrity.test.ts
+    });
+    it.skip("foreign key violation without disable", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in referential-integrity
+      // ROOT-CAUSE: adapters/postgresql/referential-integrity.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/referential-integrity.ts; affects ~10–47 tests in referential-integrity.test.ts
+    });
+    it.skip("foreign key violation with disable", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in referential-integrity
+      // ROOT-CAUSE: adapters/postgresql/referential-integrity.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/referential-integrity.ts; affects ~10–47 tests in referential-integrity.test.ts
+    });
+    it.skip("truncate with cascade", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in referential-integrity
+      // ROOT-CAUSE: adapters/postgresql/referential-integrity.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/referential-integrity.ts; affects ~10–47 tests in referential-integrity.test.ts
+    });
     it.skip("should reraise invalid foreign key exception and show warning", () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in referential-integrity
       // ROOT-CAUSE: adapters/postgresql/referential-integrity.ts missing or incomplete Rails parity

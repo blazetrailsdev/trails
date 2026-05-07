@@ -1810,14 +1810,23 @@ describe("WhereTest", () => {
   });
 
   it.skip("type casting nested joins", async () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs join fixture setup */
   });
 
   it.skip("where with through association", async () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs has_many :through */
   });
 
   it.skip("polymorphic nested array where", async () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association fixture */
   });
 });

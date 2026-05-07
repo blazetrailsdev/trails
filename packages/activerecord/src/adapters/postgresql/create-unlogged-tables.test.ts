@@ -14,15 +14,55 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("UnloggedTablesTest", () => {
-    it.skip("create unlogged table", async () => {});
-    it.skip("create unlogged table with index", async () => {});
-    it.skip("create unlogged table from select", async () => {});
-    it.skip("create logged table", async () => {});
-    it.skip("unlogged table schema dump", async () => {});
-    it.skip("logged by default", async () => {});
-    it.skip("unlogged in test environment when unlogged setting enabled", async () => {});
-    it.skip("not included in schema dump", async () => {});
-    it.skip("not changed in change table", async () => {});
-    it.skip("gracefully handles temporary tables", async () => {});
+    it.skip("create unlogged table", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
+    it.skip("create unlogged table with index", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
+    it.skip("create unlogged table from select", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
+    it.skip("create logged table", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
+    it.skip("unlogged table schema dump", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
+    it.skip("logged by default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
+    it.skip("unlogged in test environment when unlogged setting enabled", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
+    it.skip("not included in schema dump", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
+    it.skip("not changed in change table", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
+    it.skip("gracefully handles temporary tables", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in create-unlogged-tables
+      // ROOT-CAUSE: adapters/postgresql/create-unlogged-tables.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/create-unlogged-tables.ts; affects ~10–47 tests in create-unlogged-tables.test.ts
+    });
   });
 });

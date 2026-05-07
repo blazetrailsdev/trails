@@ -14,8 +14,20 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlDomainTest", () => {
-    it.skip("column", async () => {});
-    it.skip("domain type", async () => {});
-    it.skip("domain acts like basetype", async () => {});
+    it.skip("column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in domain
+      // ROOT-CAUSE: adapters/postgresql/domain.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/domain.ts; affects ~10–47 tests in domain.test.ts
+    });
+    it.skip("domain type", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in domain
+      // ROOT-CAUSE: adapters/postgresql/domain.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/domain.ts; affects ~10–47 tests in domain.test.ts
+    });
+    it.skip("domain acts like basetype", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in domain
+      // ROOT-CAUSE: adapters/postgresql/domain.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/domain.ts; affects ~10–47 tests in domain.test.ts
+    });
   });
 });

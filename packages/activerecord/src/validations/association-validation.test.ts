@@ -237,7 +237,7 @@ describe("AssociationValidationTest", () => {
   });
   it.skip("validates associated with create context", () => {
     // BLOCKED: validation — validator behavior gap in association-validation
-    // ROOT-CAUSE: validations/association-validation.ts or i18n/translation.ts missing Rails parity
+    // ROOT-CAUSE: validations/association-validation.ts or translation.ts missing Rails parity
     // SCOPE: ~30–100 LOC fix in validations/; affects ~4–11 tests in association-validation.test.ts
     /* needs update! and replies.create — complex persistence operations */
   });

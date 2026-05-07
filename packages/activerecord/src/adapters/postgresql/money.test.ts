@@ -159,13 +159,25 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs ActiveRecord type system
-    it.skip("money regex backtracking", async () => {});
+    it.skip("money regex backtracking", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in money
+      // ROOT-CAUSE: adapters/postgresql/money.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/money.ts; affects ~10–47 tests in money.test.ts
+    });
 
     // Needs ORM layer (sum with expressions)
-    it.skip("sum with type cast", async () => {});
+    it.skip("sum with type cast", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in money
+      // ROOT-CAUSE: adapters/postgresql/money.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/money.ts; affects ~10–47 tests in money.test.ts
+    });
 
     // Needs ORM layer (pluck)
-    it.skip("pluck with type cast", async () => {});
+    it.skip("pluck with type cast", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in money
+      // ROOT-CAUSE: adapters/postgresql/money.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/money.ts; affects ~10–47 tests in money.test.ts
+    });
 
     it("create and update money", async () => {
       const id = await adapter.executeMutation(
@@ -200,7 +212,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs ORM layer (BigDecimal handling)
-    it.skip("update all with money big decimal", async () => {});
+    it.skip("update all with money big decimal", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in money
+      // ROOT-CAUSE: adapters/postgresql/money.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/money.ts; affects ~10–47 tests in money.test.ts
+    });
 
     it("update all with money numeric", async () => {
       await adapter.executeMutation(

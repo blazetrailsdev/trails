@@ -17,14 +17,46 @@ describeIfPg("Migration", () => {
   });
 
   describe("PgChangeSchemaTest", () => {
-    it.skip("change column", async () => {});
-    it.skip("change column with null", async () => {});
-    it.skip("change column with default", async () => {});
-    it.skip("change column default with null", async () => {});
-    it.skip("change column null", async () => {});
-    it.skip("change column scale", async () => {});
-    it.skip("change column precision", async () => {});
-    it.skip("change column limit", async () => {});
+    it.skip("change column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
+    it.skip("change column with null", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
+    it.skip("change column with default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
+    it.skip("change column default with null", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
+    it.skip("change column null", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
+    it.skip("change column scale", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
+    it.skip("change column precision", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
+    it.skip("change column limit", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
 
     it("change string to date", async () => {
       await adapter.changeColumn("strings", "somedate", "timestamp", {
@@ -62,9 +94,21 @@ describeIfPg("Migration", () => {
       expect(col!.type).toBe("timestamp without time zone");
     });
 
-    it.skip("change type with symbol using timestamp with timestamptz as default", async () => {});
-    it.skip("change type with symbol with timestamptz as default", async () => {});
-    it.skip("change type with symbol using datetime with timestamptz as default", async () => {});
+    it.skip("change type with symbol using timestamp with timestamptz as default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
+    it.skip("change type with symbol with timestamptz as default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
+    it.skip("change type with symbol using datetime with timestamptz as default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
+      // ROOT-CAUSE: adapters/postgresql/change-schema.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    });
 
     it("change type with array", async () => {
       await adapter.changeColumn("strings", "somedate", "timestamp", {

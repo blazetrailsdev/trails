@@ -16,13 +16,41 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlIntervalTest", () => {
-    it.skip("column", async () => {});
-    it.skip("default", async () => {});
-    it.skip("type cast interval", async () => {});
-    it.skip("interval write", async () => {});
-    it.skip("interval iso 8601", async () => {});
-    it.skip("interval schema dump", async () => {});
-    it.skip("interval where", async () => {});
+    it.skip("column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
+      // ROOT-CAUSE: adapters/postgresql/interval.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
+    });
+    it.skip("default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
+      // ROOT-CAUSE: adapters/postgresql/interval.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
+    });
+    it.skip("type cast interval", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
+      // ROOT-CAUSE: adapters/postgresql/interval.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
+    });
+    it.skip("interval write", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
+      // ROOT-CAUSE: adapters/postgresql/interval.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
+    });
+    it.skip("interval iso 8601", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
+      // ROOT-CAUSE: adapters/postgresql/interval.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
+    });
+    it.skip("interval schema dump", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
+      // ROOT-CAUSE: adapters/postgresql/interval.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
+    });
+    it.skip("interval where", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
+      // ROOT-CAUSE: adapters/postgresql/interval.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
+    });
     it.skip("interval type", () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
       // ROOT-CAUSE: adapters/postgresql/interval.ts missing or incomplete Rails parity

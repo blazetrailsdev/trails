@@ -14,17 +14,65 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlCitextTest", () => {
-    it.skip("citext column", async () => {});
-    it.skip("citext default", async () => {});
-    it.skip("citext type cast", async () => {});
-    it.skip("case insensitive where", async () => {});
-    it.skip("case insensitive uniqueness", async () => {});
-    it.skip("case insensitive comparison", async () => {});
-    it.skip("citext schema dump", async () => {});
-    it.skip("citext enabled", async () => {});
-    it.skip("change table supports json", async () => {});
-    it.skip("write", async () => {});
-    it.skip("select case insensitive", async () => {});
-    it.skip("case insensitiveness", async () => {});
+    it.skip("citext column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("citext default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("citext type cast", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("case insensitive where", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("case insensitive uniqueness", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("case insensitive comparison", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("citext schema dump", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("citext enabled", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("change table supports json", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("write", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("select case insensitive", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
+    it.skip("case insensitiveness", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
+      // ROOT-CAUSE: adapters/postgresql/citext.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    });
   });
 });

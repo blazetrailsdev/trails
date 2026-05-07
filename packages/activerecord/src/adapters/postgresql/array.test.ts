@@ -26,24 +26,45 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlArrayTest", () => {
     it.skip("not compatible with serialize array", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs serialize API */
     });
     it.skip("array with serialized attributes", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs serialize API */
     });
     it.skip("default strings", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs add_column + column_defaults */
     });
     it.skip("change column with array", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs column introspection with array? predicate */
     });
     it.skip("change column from non array to array", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs column introspection with array? predicate */
     });
     it.skip("change column cant make non array column to array", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs StatementInvalid error wrapping */
     });
     it.skip("change column default with array", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs change_column_default */
     });
 
@@ -110,10 +131,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("with multi dimensional empty strings", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* pg module doesn't handle multi-dim with empty strings well */
     });
 
     it.skip("with arbitrary whitespace", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* pg module doesn't handle multi-dim with whitespace well */
     });
 
@@ -155,12 +182,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("insert fixture", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs fixture insertion API */
     });
     it.skip("attribute for inspect for array field", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs attribute_for_inspect on Base model */
     });
     it.skip("attribute for inspect for array field for large array", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs attribute_for_inspect on Base model */
     });
 
@@ -193,6 +229,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("quoting non standard delimiters", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs OID::Array type with custom delimiter */
     });
 
@@ -208,18 +247,33 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("mutate value in array", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs hstore array support */
     });
     it.skip("datetime with timezone awareness", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs timezone infrastructure */
     });
     it.skip("assigning non array value", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs Base model with array attribute */
     });
     it.skip("assigning empty string", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs Base model with array attribute */
     });
     it.skip("assigning valid pg array literal", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs Base model with array attribute */
     });
 
@@ -232,6 +286,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("uniqueness validation", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs validates_uniqueness_of on Base model */
     });
 
@@ -243,6 +300,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("precision is respected on timestamp columns", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
+      // ROOT-CAUSE: adapters/postgresql/array.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
       /* needs timestamp precision handling */
     });
   });

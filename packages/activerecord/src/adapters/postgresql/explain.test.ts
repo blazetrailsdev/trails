@@ -121,6 +121,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(parsed[0]).toHaveProperty("Plan");
     });
 
-    it.skip("explain options with eager loading", async () => {});
+    it.skip("explain options with eager loading", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in explain
+      // ROOT-CAUSE: adapters/postgresql/explain.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/explain.ts; affects ~10–47 tests in explain.test.ts
+    });
   });
 });

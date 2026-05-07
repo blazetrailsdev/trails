@@ -207,36 +207,69 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("custom range column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs custom range type creation */
     });
     it.skip("custom range type cast", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs custom range type */
     });
     it.skip("custom range write", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs custom range type */
     });
     it.skip("range schema dump", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs schema dumper */
     });
     it.skip("range migration", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs migration API */
     });
     it.skip("multirange int4", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs PG 14+ multirange support */
     });
     it.skip("multirange int8", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs PG 14+ multirange support */
     });
     it.skip("multirange num", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs PG 14+ multirange support */
     });
     it.skip("multirange ts", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs PG 14+ multirange support */
     });
     it.skip("multirange tstz", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs PG 14+ multirange support */
     });
     it.skip("multirange date", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
+      // ROOT-CAUSE: adapters/postgresql/range.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs PG 14+ multirange support */
     });
 

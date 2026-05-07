@@ -47,9 +47,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs add_column + column_defaults */
     });
     it.skip("change column default with hstore", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs change_column_default */
     });
 
@@ -141,18 +147,33 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("hstore with store accessors", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs store_accessor on Base model */
     });
     it.skip("hstore dirty tracking", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs Base model dirty tracking */
     });
     it.skip("hstore duplication", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs Base model dup */
     });
     it.skip("hstore mutate", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs Base model change tracking */
     });
     it.skip("hstore nested", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs Base model */
     });
     it("hstore where", async () => {
@@ -304,21 +325,39 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].r).toEqual({ a: "1", b: "2" });
     });
     it.skip("hstore populate", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs populate_record() with a composite type */
     });
     it.skip("hstore schema dump", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs schema dumper */
     });
     it.skip("hstore migration", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs migration API */
     });
     it.skip("hstore gen random uuid", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs gen_random_uuid() */
     });
     it.skip("hstore gen random uuid default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs gen_random_uuid() default */
     });
     it.skip("hstore fixture", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs fixture loading */
     });
 
@@ -523,14 +562,23 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("select", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* duplicate of hstore select */
     });
 
     it.skip("contains nils", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs Base model with hstore */
     });
 
     it.skip("schema dump with shorthand", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in hstore
+      // ROOT-CAUSE: adapters/postgresql/hstore.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/hstore.ts; affects ~10–47 tests in hstore.test.ts
       /* needs schema dumper */
     });
   });

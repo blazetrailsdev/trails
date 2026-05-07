@@ -14,7 +14,15 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlCaseInsensitiveTest", () => {
-    it.skip("case insensitive comparison", async () => {});
-    it.skip("case insensitiveness", async () => {});
+    it.skip("case insensitive comparison", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in case-insensitive
+      // ROOT-CAUSE: adapters/postgresql/case-insensitive.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/case-insensitive.ts; affects ~10–47 tests in case-insensitive.test.ts
+    });
+    it.skip("case insensitiveness", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in case-insensitive
+      // ROOT-CAUSE: adapters/postgresql/case-insensitive.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in adapters/postgresql/case-insensitive.ts; affects ~10–47 tests in case-insensitive.test.ts
+    });
   });
 });
