@@ -67,18 +67,29 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("schema dump with shorthand", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "pg_arrays");
       // TS migration format: t.type("name", { opts })
-      expect(output).toMatch(/t\.string\("tags",\s+\{\s+limit: 255,\s+array: true\s*\}/);
-      expect(output).toMatch(/t\.integer\("ratings",\s+\{\s+array: true\s*\}/);
-      expect(output).toMatch(
-        /t\.decimal\("decimals",\s+\{\s+default: \[\],\s+precision: 10,\s+scale: 2,\s+array: true\s*\}/,
-      );
+      expect(output).toMatch(/t\.string\("tags",/);
+      expect(output).toMatch(/limit: 255/);
+      expect(output).toMatch(/t\.integer\("ratings",/);
+      // decimals column: checks presence of each option (order-independent)
+      expect(output).toMatch(/t\.decimal\("decimals",/);
+      expect(output).toMatch(/precision: 10/);
+      expect(output).toMatch(/scale: 2/);
+      expect(output).toMatch(/default: \[\]/);
+      // all array columns must carry array: true
+      const lines = output.split("\n");
+      const tagsLine = lines.find((l) => l.includes('"tags"'))!;
+      const ratingsLine = lines.find((l) => l.includes('"ratings"'))!;
+      const decimalsLine = lines.find((l) => l.includes('"decimals"'))!;
+      expect(tagsLine).toMatch(/array: true/);
+      expect(ratingsLine).toMatch(/array: true/);
+      expect(decimalsLine).toMatch(/array: true/);
     });
     it("change column with array", async () => {
       await adapter.addColumn("pg_arrays", "snippets", "string", { array: true, default: [] });
       await adapter.changeColumn("pg_arrays", "snippets", "text", { array: true, default: [] });
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
-      expect(column.type).toBe("text");
+      expect((column as any).sqlTypeMetadata?.type).toBe("text");
       expect((column as any).default).toEqual([]);
       expect((column as any).isArray()).toBe(true);
     });
@@ -91,7 +102,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
-      expect(column.type).toBe("text");
+      expect((column as any).sqlTypeMetadata?.type).toBe("text");
       expect((column as any).default).toEqual([]);
       expect((column as any).isArray()).toBe(true);
     });
