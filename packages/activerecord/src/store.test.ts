@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import { Base, registerModel, store, storedAttributes } from "./index.js";
+import { Base, registerModel, store, storedAttributes, localStoredAttributes } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -435,7 +435,8 @@ describe("StoreTest", () => {
     store(Parent, "settings", { accessors: ["theme"] });
     store(Child, "settings", { accessors: ["color"] });
     expect(storedAttributes(Parent)["settings"]).toEqual(["theme"]);
-    expect(storedAttributes(Child)["settings"]).toEqual(["color"]);
+    // Rails merges parent into child for stored_attributes (vs local_stored_attributes which is per-class only)
+    expect(storedAttributes(Child)["settings"]).toEqual(["theme", "color"]);
   });
 
   it("YAML coder initializes the store when a Nil value is given", () => {
@@ -616,6 +617,67 @@ describe("StoreTest", () => {
     (u as any)._dirty.snapshot(u._attributes);
     (u as any).theme = "red";
     expect(u.attributeChanged("settings")).toBe(true);
+  });
+
+  it("Base.store() writes are visible through localStoredAttributes()", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = a2;
+      }
+    }
+    Item.store("settings", { accessors: ["theme", "language"] });
+    const local = localStoredAttributes(Item);
+    expect(local["settings"]).toEqual(["theme", "language"]);
+  });
+
+  it("store() function writes are visible through Base.localStoredAttributes class method", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("prefs", "string");
+        this.adapter = a2;
+      }
+    }
+    store(Item, "prefs", { accessors: ["notify", "digest"] });
+    const local = Item.localStoredAttributes();
+    expect(local["prefs"]).toEqual(["notify", "digest"]);
+  });
+
+  it("store() called twice with overlapping keys deduplicates (Rails |= union)", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = a2;
+      }
+    }
+    store(Item, "settings", { accessors: ["theme"] });
+    store(Item, "settings", { accessors: ["theme", "language"] });
+    const local = localStoredAttributes(Item);
+    expect(local["settings"]).toEqual(["theme", "language"]);
+  });
+
+  it("storedAttributes() merges parent and child registries", () => {
+    const a2 = freshAdapter();
+    class Parent extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = a2;
+      }
+    }
+    class Child extends Parent {}
+    store(Parent, "settings", { accessors: ["theme"] });
+    store(Child, "settings", { accessors: ["color"] });
+    const parentAttrs = storedAttributes(Parent);
+    expect(parentAttrs["settings"]).toEqual(["theme"]);
+    const childAttrs = storedAttributes(Child);
+    expect(childAttrs["settings"]).toEqual(["theme", "color"]);
   });
 });
 

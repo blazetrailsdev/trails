@@ -145,6 +145,7 @@ export {
   store,
   storeAccessor,
   storedAttributes,
+  localStoredAttributes,
   HashAccessor,
   IndifferentHashAccessor,
   StringKeyedHashAccessor,

@@ -28,21 +28,61 @@ export function storeAccessorsModule(modelClass: typeof Base): Set<string> {
 }
 
 /**
- * Returns the stored attributes registry for a model class.
- */
-export function storedAttributes(modelClass: typeof Base): Record<string, string[]> {
-  return _storedAttributes.get(modelClass) ?? {};
-}
-
-/**
- * Returns only the stored attributes defined directly on this class (not
- * inherited ones). Mirrors Rails' `attr_accessor :local_stored_attributes`
- * on `ActiveRecord::Store` — each class has its own hash of store→keys[].
+ * Returns the stored attributes registered directly on this class (not inherited).
  *
  * Mirrors: ActiveRecord::Store#local_stored_attributes
  */
 export function localStoredAttributes(modelClass: typeof Base): Record<string, string[]> {
   return _storedAttributes.get(modelClass) ?? {};
+}
+
+/**
+ * This-typed wrapper for wiring as a class method via extend(Base).
+ *
+ * Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes
+ */
+export function localStoredAttributesMethod(this: typeof Base): Record<string, string[]> {
+  return localStoredAttributes(this);
+}
+
+/**
+ * Returns stored attributes for this class merged with all ancestors'.
+ * Each store column's key list is the union of parent and local keys (deduped,
+ * order: parent keys first). Mirrors Rails' merge block: `{ |k, a, b| a | b }`.
+ *
+ * Mirrors: ActiveRecord::Store::ClassMethods#stored_attributes
+ */
+export function storedAttributes(modelClass: typeof Base): Record<string, string[]> {
+  const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
+  const parentAttrs =
+    parent && typeof parent === "function" && parent !== Function.prototype
+      ? storedAttributes(parent)
+      : {};
+  const local = _storedAttributes.get(modelClass);
+  if (!local) return parentAttrs;
+  const merged: Record<string, string[]> = { ...parentAttrs };
+  for (const [store, keys] of Object.entries(local)) {
+    merged[store] = [...new Set([...(parentAttrs[store] ?? []), ...keys])];
+  }
+  return merged;
+}
+
+/**
+ * Registers accessor keys on a store column for `klass`. Uses Set union so
+ * repeated calls with overlapping keys deduplicate (mirrors Rails `|=`).
+ *
+ * Called directly by store(). Base.store() delegates to store(), which
+ * calls this — so the WeakMap is the single source of truth for
+ * localStoredAttributes / storedAttributes.
+ */
+export function addLocalStoredAttribute(
+  klass: typeof Base,
+  storeName: string,
+  keys: string[],
+): void {
+  const existing = _storedAttributes.get(klass) ?? {};
+  const prev = existing[storeName] ?? [];
+  _storedAttributes.set(klass, { ...existing, [storeName]: [...new Set([...prev, ...keys])] });
 }
 
 /**
@@ -176,11 +216,7 @@ export function store(
 ): void {
   const { accessors, prefix, suffix } = options;
 
-  // Track stored attributes
-  const existing = _storedAttributes.get(modelClass) ?? {};
-  const prev = existing[attribute] ?? [];
-  existing[attribute] = [...prev, ...accessors];
-  _storedAttributes.set(modelClass, existing);
+  addLocalStoredAttribute(modelClass, attribute, accessors);
 
   for (const accessor of accessors) {
     let accessorName = accessor;
@@ -222,24 +258,18 @@ export const storeAccessor = store;
 
 /**
  * Returns the HashAccessor class for a given store attribute column.
- * Raises ConfigurationError if the column is not a declared store.
+ * Raises ConfigurationError if the column is not a declared store and the
+ * attribute type has no accessor.
  *
  * Mirrors: ActiveRecord::Store#store_accessor_for (private)
  *
  * @internal
  */
-function storeAccessorFor(modelClass: typeof Base, storeAttribute: string): typeof HashAccessor {
-  const attrs = storedAttributes(modelClass);
-  if (!attrs || !Object.prototype.hasOwnProperty.call(attrs, storeAttribute)) {
-    throw new ConfigurationError(
-      `the column '${storeAttribute}' has not been configured as a store. ` +
-        `Please make sure the column is declared via store() or use a structured column type.`,
-    );
-  }
-  // Prefer the accessor class configured on the attribute type (e.g. hstore →
-  // StringKeyedHashAccessor). Guard: only use the result if it has read/write
-  // methods (some types implement accessor() but return null).
-  // Mirrors Rails: type_for_attribute(attr).accessor.
+export function storeAccessorFor(
+  modelClass: typeof Base,
+  storeAttribute: string,
+): typeof HashAccessor {
+  // Rails dispatches via type_for_attribute(attr).accessor — check the type first.
   const type = (modelClass as any).typeForAttribute?.(storeAttribute);
   if (type && typeof (type as any).accessor === "function") {
     const accessor = (type as any).accessor();
@@ -247,7 +277,28 @@ function storeAccessorFor(modelClass: typeof Base, storeAttribute: string): type
       return accessor as typeof HashAccessor;
     }
   }
+  // Plain string/JSON columns have no type.accessor; fall back to
+  // IndifferentHashAccessor after confirming the column was declared via store().
+  if (!_hasStoredAttribute(modelClass, storeAttribute)) {
+    throw new ConfigurationError(
+      `the column '${storeAttribute}' has not been configured as a store. ` +
+        `Please make sure the column is declared via store() or use a structured column type.`,
+    );
+  }
   return IndifferentHashAccessor;
+}
+
+// Direct ancestry walk — short-circuits on first hit without building the full
+// merged map that storedAttributes() produces. Stops at Function.prototype
+// consistent with other prototype-chain walks in this codebase.
+function _hasStoredAttribute(klass: typeof Base, name: string): boolean {
+  let cls: typeof Base | null = klass;
+  while (cls && typeof cls === "function" && cls !== Function.prototype) {
+    const local = _storedAttributes.get(cls);
+    if (local && Object.prototype.hasOwnProperty.call(local, name)) return true;
+    cls = Object.getPrototypeOf(cls) as typeof Base | null;
+  }
+  return false;
 }
 
 /**
@@ -255,7 +306,7 @@ function storeAccessorFor(modelClass: typeof Base, storeAttribute: string): type
  *
  * Mirrors: ActiveRecord::Store#read_store_attribute (private)
  */
-function readStoreAttribute(
+export function readStoreAttribute(
   record: Base,
   storeAttribute: string,
   key: string,
@@ -273,7 +324,7 @@ function readStoreAttribute(
  *
  * Mirrors: ActiveRecord::Store#write_store_attribute (private)
  */
-function writeStoreAttribute(
+export function writeStoreAttribute(
   record: Base,
   storeAttribute: string,
   key: string,
@@ -283,6 +334,44 @@ function writeStoreAttribute(
   const modelClass = declaringClass ?? (record.constructor as typeof Base);
   const accessor = storeAccessorFor(modelClass, storeAttribute);
   accessor.write(record, storeAttribute, key, value);
+}
+
+/**
+ * This-typed wrapper for wiring readStoreAttribute as instance method via include(Base).
+ *
+ * Mirrors: ActiveRecord::Store#read_store_attribute (private)
+ *
+ * @internal
+ */
+export function readStoreAttributeMethod(this: Base, storeAttribute: string, key: string): unknown {
+  return readStoreAttribute(this, storeAttribute, key);
+}
+
+/**
+ * This-typed wrapper for wiring writeStoreAttribute as instance method via include(Base).
+ *
+ * Mirrors: ActiveRecord::Store#write_store_attribute (private)
+ *
+ * @internal
+ */
+export function writeStoreAttributeMethod(
+  this: Base,
+  storeAttribute: string,
+  key: string,
+  value: unknown,
+): void {
+  writeStoreAttribute(this, storeAttribute, key, value);
+}
+
+/**
+ * This-typed wrapper for wiring storeAccessorFor as instance method via include(Base).
+ *
+ * Mirrors: ActiveRecord::Store#store_accessor_for (private)
+ *
+ * @internal
+ */
+export function storeAccessorForMethod(this: Base, storeAttribute: string): typeof HashAccessor {
+  return storeAccessorFor(this.constructor as typeof Base, storeAttribute);
 }
 
 /**
