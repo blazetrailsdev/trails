@@ -116,7 +116,6 @@ import {
   attributesForCreate as _attributesForCreate,
   attributesForUpdate as _attributesForUpdate,
   attributeNames as _attributeNames,
-  attributes as _attributes,
   isAttributeMethod as _isAttributeMethod,
   attributesWithValues as _attributesWithValues,
   formatForInspect as _formatForInspect,
@@ -3083,7 +3082,6 @@ include(Base, {
   performValidations: _Validations.performValidations,
   // AttributeMethods privates and additional instance methods
   _hasAttribute: _privateHasAttribute,
-  attributes: _attributes,
   isAttributeMethod: _isAttributeMethod,
   attributesWithValues: _attributesWithValues,
   attributesForCreate: _attributesForCreate,
