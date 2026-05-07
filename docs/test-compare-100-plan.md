@@ -350,6 +350,9 @@ This drops them from both the Ruby denominator and the skipped backlog.
 **PR that added whole-file exclusions: #1304** (chore(test-compare): exclude permanently-not-portable Rails tests).
 Delta: 8097 → 7970 Ruby tests (−127), 2211 → 2085 skipped (−126).
 
+**PR that added per-test exclusion infra + mixed-file entries: #1305** (feat(test-compare): per-test exclusions for mixed GVL/serialization files).
+Delta: 7970 → 7930 Ruby tests (−40), 2085 → 2048 skipped (−37).
+
 ### YAML / Marshal / Ruby object serialization ✓ excluded
 
 - `test/cases/yaml_serialization_test.rb` — YAML round-trip of arbitrary Ruby objects (**excluded**)
@@ -357,14 +360,16 @@ Delta: 8097 → 7970 Ruby tests (−127), 2211 → 2085 skipped (−126).
 - `test/cases/marshal_serialization_test.rb` — Marshal.dump/load (**already excluded** before this PR)
 - `test/cases/coders/yaml_column_test.rb` — Psych YAMLColumn (**already excluded** before this PR)
 - `test/cases/message_pack_test.rb` — MessagePack Ruby bridge (**already excluded** before this PR)
-- Any `serialized_attribute_test.rb` case asserting `Marshal.dump` / `Marshal.load` (mixed file — per-test exclusion pending)
+- `test/cases/serialized_attribute_test.rb` — 19 YAML/class-serializer cases excluded (17 unique names; 2 names appear in both the base class and a subclass within the file)
+- `test/cases/base_test.rb` — 7 Marshal cases (**per-test excluded**)
 
 ### Ruby concurrency / thread / GVL ✓ partially excluded
 
 - `test/cases/transaction_isolation_test.rb` — all 7 cases GVL thread parallelism (**excluded**)
 - `test/cases/schema_loading_test.rb` — all 3 cases Zeitwerk/on_load from background threads (**excluded**)
 - `test/cases/reload_models_test.rb` — ActiveSupport::Dependencies class reloading (**excluded**)
-- `test/cases/connection_pool_test.rb` cases asserting on `Thread#priority`, GVL release timing (mixed file — per-test exclusion pending)
+- `test/cases/connection_pool_test.rb` — 11 GVL thread cases (**per-test excluded**)
+- `test/cases/base_test.rb` — 2 GVL thread-handler cases (**per-test excluded**)
 - `test/cases/relation/load_async_test.rb` cases that assert GVL release while a query runs (mixed file)
 
 ### Ruby autoload / `require` / class reloading ✓ excluded (see GVL above)
@@ -372,7 +377,7 @@ Delta: 8097 → 7970 Ruby tests (−127), 2211 → 2085 skipped (−126).
 ### Process / Signal / fork
 
 - `connection_handler_test.rb` cases asserting `Process.fork` cleanup (mixed file)
-- `reaper_test.rb` cases asserting `Thread.kill` semantics (mixed file)
+- `test/cases/reaper_test.rb` — 1 fork case (**per-test excluded**)
 
 ### Rake / dbconsole shell-out ✓ excluded
 

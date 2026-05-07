@@ -21,9 +21,13 @@
 // `testFile` because their TS source counterparts either don't exist or
 // are being actively ported.
 
-export type ExcludedFile = {
-  reason: string;
-} & ({ pattern: string; testFile?: string } | { pattern?: string; testFile: string });
+export type ExcludedFile = { reason: string } & (
+  | { pattern: string; testFile?: string; tests?: never }
+  | { pattern?: string; testFile: string; tests?: never }
+  // Per-test exclusion: test-only — never affects api:compare.
+  // Only the listed Ruby test descriptions are dropped from test:compare counts.
+  | { pattern?: never; testFile: string; tests: string[] }
+);
 
 export const EXCLUDED_FILES: ExcludedFile[] = [
   {
@@ -193,6 +197,72 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
       "Tests `rails dbconsole` PTY/exec invocation for SQLite. " +
       "Spawning a PTY-backed interactive subprocess has no Node.js equivalent.",
   },
+  // --- Permanently not-portable: per-test GVL / serialization in mixed files ---
+  {
+    testFile: "connection_pool_test.rb",
+    tests: [
+      "lock thread allow fiber reentrency",
+      "released connection moves between threads",
+      "inactive are returned from dead thread",
+      "remove connection for thread",
+      "concurrent connection establishment",
+      "non bang disconnect and clear reloadable connections throw exception if threads dont return their conns",
+      "disconnect and clear reloadable connections attempt to wait for threads to return their conns",
+      "bang versions of disconnect and clear reloadable connections if unable to acquire all connections proceed anyway",
+      "disconnect and clear reloadable connections are able to preempt other waiting threads",
+      "clear reloadable connections creates new connections for waiting threads if necessary",
+      "public connections access threadsafe",
+    ],
+    reason:
+      "GVL / Ruby Thread semantics — concurrent connection tests cannot translate to single-threaded Node.js.",
+  },
+  {
+    testFile: "serialized_attribute_test.rb",
+    tests: [
+      "serialized class attribute",
+      "serialized class does not become frozen",
+      "serialized attribute should raise exception on assignment with wrong type",
+      "serialized attribute with class constraint",
+      "where by serialized attribute with array",
+      "where by serialized attribute with hash",
+      "where by serialized attribute with hash in array",
+      "serialize attribute via select method when time zone available",
+      "serialize attribute can be serialized in an integer column",
+      "classes without no arg constructors are not supported",
+      "is not changed when stored blob",
+      "is not changed when stored in blob frozen payload",
+      "decorated type with type for attribute",
+      "decorated type with decorator block",
+      "serialized attribute works under concurrent initial access",
+      "serialized time attribute",
+      "supports permitted classes for default column serializer",
+    ],
+    reason:
+      "YAML/Psych column serialization and class-constrained serializers — Ruby-only format with no Node.js equivalent.",
+  },
+  {
+    testFile: "base_test.rb",
+    tests: [
+      // GVL
+      "new threads get default the default connection handler",
+      "changing a connection handler in a main thread does not poison the other threads",
+      // Ruby Marshal serialization
+      "marshal round trip",
+      "marshal inspected round trip",
+      "marshal new record round trip",
+      "marshalling with associations 6 1",
+      "marshalling with associations 7 1",
+      "marshal between processes",
+      "marshalling new record round trip with associations",
+    ],
+    reason:
+      "GVL / Ruby Thread semantics and Marshal binary serialization — both are Ruby-only; no Node.js equivalent.",
+  },
+  {
+    testFile: "reaper_test.rb",
+    tests: ["connection pool starts reaper in fork"],
+    reason: "GVL / Ruby fork() semantics — process forking has no Node.js equivalent.",
+  },
   // --- Permanently not-portable: Ruby serialization formats ---
   {
     testFile: "yaml_serialization_test.rb",
@@ -213,5 +283,11 @@ export function isExcluded(file: string): boolean {
 }
 
 export function isTestExcluded(testFile: string): boolean {
-  return EXCLUDED_FILES.some((e) => e.testFile && testFile.includes(e.testFile));
+  return EXCLUDED_FILES.some((e) => e.testFile && !e.tests && testFile.includes(e.testFile));
+}
+
+export function isTestCaseExcluded(testFile: string, testName: string): boolean {
+  return EXCLUDED_FILES.some(
+    (e) => e.testFile && e.tests && testFile.includes(e.testFile) && e.tests.includes(testName),
+  );
 }

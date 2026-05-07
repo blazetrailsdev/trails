@@ -27,7 +27,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { TestManifest } from "./types.js";
-import { isTestExcluded } from "../api-compare/excluded-files.js";
+import { isTestCaseExcluded, isTestExcluded } from "../api-compare/excluded-files.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
@@ -263,6 +263,7 @@ function main() {
       const seenPaths = new Set<string>();
       const seenDescs = new Set<string>();
       for (const tc of file.testCases) {
+        if (isTestCaseExcluded(file.file, tc.description)) continue;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
         if (!seenPaths.has(np)) {
@@ -300,6 +301,10 @@ function main() {
       // Track which Ruby tests (by index) have been matched
       const matchedRuby = new Set<number>();
 
+      const excludedCount = file.testCases.filter((tc) =>
+        isTestCaseExcluded(file.file, tc.description),
+      ).length;
+
       let matched = 0;
       let matchedSkipped = 0;
       let wrongDescribe = 0;
@@ -311,6 +316,7 @@ function main() {
       // Pass 1: Path matches (exact ancestor + description match)
       for (let ri = 0; ri < file.testCases.length; ri++) {
         const tc = file.testCases[ri];
+        if (isTestCaseExcluded(file.file, tc.description)) continue;
         const np = normPath(tc.ancestors, tc.description);
         const tsIdx = consumeIndex(pathIndex.get(np), consumedTs);
         if (tsIdx >= 0) {
@@ -333,6 +339,7 @@ function main() {
       for (let ri = 0; ri < file.testCases.length; ri++) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
+        if (isTestCaseExcluded(file.file, tc.description)) continue;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
@@ -370,6 +377,7 @@ function main() {
       for (let ri = 0; ri < file.testCases.length; ri++) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
+        if (isTestCaseExcluded(file.file, tc.description)) continue;
         totalRuby++;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
@@ -479,12 +487,12 @@ function main() {
         rubyFile: file.file,
         conventionTsFile: conventionTs,
         tsFileExists: exists,
-        rubyTestCount: file.testCases.length,
+        rubyTestCount: file.testCases.length - excludedCount,
         matched,
         matchedSkipped,
         wrongDescribe,
         misplaced,
-        missing: file.testCases.length - matched - misplaced,
+        missing: file.testCases.length - excludedCount - matched - misplaced,
         ...(showMissing ? { missingTests } : {}),
         ...(misplacedTests.length > 0 ? { misplacedTests } : {}),
         ...(wrongDescribeTests.length > 0 ? { wrongDescribeTests } : {}),
