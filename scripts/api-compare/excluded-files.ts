@@ -6,11 +6,20 @@
 //   - not-applicable: Ruby-only concerns that don't map to JS
 //     (thread-pool plumbing, Marshal/Psych/MessagePack formats, etc.)
 //
-// `pattern` matches against the Ruby source file path from extract-ruby-api.rb
-// (e.g. "promise.rb", "coders/yaml_column.rb").
-// `testFile` (optional) matches against the Ruby test file path from
-// extract-ruby-tests.rb (e.g. "message_pack_test.rb"). Omit when there is
-// no corresponding test file in the Rails suite.
+// Each entry must set at least one of:
+//   `pattern`  — substring match against the Ruby SOURCE file path
+//                (from extract-ruby-api.rb, e.g. "promise.rb").
+//                Consumed by isExcluded() → api:compare.
+//                Omit for test-only entries where the source IS being ported.
+//   `testFile` — substring match against the Ruby TEST file path
+//                (from extract-ruby-tests.rb, e.g. "message_pack_test.rb").
+//                Consumed by isTestExcluded() → test:compare.
+//                Omit when there is no corresponding Rails test file.
+//
+// Most entries set both (source and test excluded together).
+// Test-only entries (GVL, Rake, dbconsole, Ruby serialization) set only
+// `testFile` because their TS source counterparts either don't exist or
+// are being actively ported.
 
 export type ExcludedFile = {
   reason: string;
