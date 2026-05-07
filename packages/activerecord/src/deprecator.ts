@@ -5,8 +5,7 @@
  * Also covers: gem_version.rb, version.rb, and MigrationProxy (migration.rb)
  */
 import { createRequire } from "node:module";
-import { basename } from "node:path";
-import { Deprecation } from "@blazetrails/activesupport";
+import { Deprecation, getPath } from "@blazetrails/activesupport";
 
 export { Deprecation as Deprecator };
 
@@ -53,7 +52,7 @@ export class MigrationProxy {
   }
 
   basename(): string {
-    return basename(this.filename);
+    return getPath().basename(this.filename);
   }
 
   migrate(direction: "up" | "down"): Promise<void> {
