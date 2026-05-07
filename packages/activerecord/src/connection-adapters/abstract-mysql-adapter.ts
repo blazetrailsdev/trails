@@ -613,18 +613,23 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * Query a MySQL session variable by name.
-   * Mirrors: AbstractMysqlAdapter#show_variable — executes `SHOW VARIABLES LIKE ?`
-   * with logging name "SCHEMA" so LogSubscriber records it under schema queries.
+   * Mirrors: AbstractMysqlAdapter#show_variable — uses `SELECT @@name` with logging
+   * name "SCHEMA". Returns null for unknown variables (Rails rescues StatementInvalid).
    */
   async showVariable(name: string): Promise<string | null> {
-    const rows = await (
-      this as unknown as {
-        execute(sql: string, binds: unknown[], name: string): Promise<Record<string, unknown>[]>;
-      }
-    ).execute("SHOW VARIABLES LIKE ?", [name], "SCHEMA");
-    if (rows.length === 0) return null;
-    const row = rows[0];
-    return (row.Value ?? row.value ?? row.VALUE ?? null) as string | null;
+    try {
+      const rows = await (
+        this as unknown as {
+          execute(sql: string, binds: unknown[], name: string): Promise<Record<string, unknown>[]>;
+        }
+      ).execute(`SELECT @@${name}`, [], "SCHEMA");
+      if (rows.length === 0) return null;
+      const row = rows[0];
+      const val = row[Object.keys(row)[0]];
+      return val == null ? null : String(val);
+    } catch {
+      return null;
+    }
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
