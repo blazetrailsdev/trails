@@ -1364,6 +1364,9 @@ export class Base extends Model {
     });
   }
 
+  /** Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes */
+  declare static localStoredAttributes: typeof _localStoredAttributesMethod;
+
   // -- Scopes registry (used by Relation) --
   static _scopes: Map<string, (rel: any, ...args: any[]) => any> = new Map();
   static _defaultScope: ((rel: any) => any) | null = null;
@@ -2640,6 +2643,12 @@ export class Base extends Model {
   declare _writeAttribute: (name: string, value: unknown) => void;
   /** @internal */
   declare cameFromUser: (name: string) => boolean;
+  /** @internal */
+  declare readStoreAttribute: (storeAttribute: string, key: string) => unknown;
+  /** @internal */
+  declare writeStoreAttribute: (storeAttribute: string, key: string, value: unknown) => void;
+  /** @internal */
+  declare storeAccessorFor: (storeAttribute: string) => typeof import("./store.js").HashAccessor;
 
   get attributeNamesList(): string[] {
     return _attributeNamesList.call(this as any);

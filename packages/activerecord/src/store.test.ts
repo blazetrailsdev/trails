@@ -643,7 +643,7 @@ describe("StoreTest", () => {
       }
     }
     store(Item, "prefs", { accessors: ["notify", "digest"] });
-    const local = (Item as any).localStoredAttributes();
+    const local = Item.localStoredAttributes();
     expect(local["prefs"]).toEqual(["notify", "digest"]);
   });
 

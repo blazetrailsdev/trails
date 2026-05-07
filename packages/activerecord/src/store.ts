@@ -65,11 +65,12 @@ export function storedAttributes(modelClass: typeof Base): Record<string, string
 }
 
 /**
- * Registers accessor keys on a store column for `klass`, using clone-on-write
- * so subclass writes don't bleed into parent registries.
+ * Registers accessor keys on a store column for `klass`. Uses Set union so
+ * repeated calls with overlapping keys deduplicate (mirrors Rails `|=`).
  *
- * Called by both store.ts:store() and Base.store() so the WeakMap is the
- * single source of truth for localStoredAttributes / storedAttributes.
+ * Called directly by store(). Base.store() delegates to store(), which
+ * calls this — so the WeakMap is the single source of truth for
+ * localStoredAttributes / storedAttributes.
  */
 export function addLocalStoredAttribute(
   klass: typeof Base,
