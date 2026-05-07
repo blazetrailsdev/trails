@@ -9,7 +9,6 @@
 
 import { JSON as CodersJSON } from "../coders/json.js";
 import { ColumnSerializer as CodersColumnSerializer } from "../coders/column-serializer.js";
-import { Json as JsonType } from "../type/json.js";
 
 export interface Serialization {
   serialize(attribute: string, options?: { coder?: unknown }): void;
@@ -60,7 +59,9 @@ function isTypeIncompatibleWithSerialize(
   type: unknown,
 ): boolean {
   const resolvedCoder = coder === globalThis.JSON ? CodersJSON : coder;
-  if (castType instanceof JsonType && resolvedCoder === CodersJSON) return true;
+  // Duck-type for ActiveRecord::Type::Json — avoids importing type/json.ts which would
+  // create a cycle via store.ts → serialization.ts → type/json.ts → store.ts.
+  if ((castType as any)?.name === "json" && resolvedCoder === CodersJSON) return true;
   if (castType != null && typeof (castType as any).typeCastArray === "function" && type === Array)
     return true;
   return false;

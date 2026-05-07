@@ -113,18 +113,23 @@ export class Encryptor {
       keys = kp.decryptionKeys(message).map((k) => k.secret);
     }
 
-    // Mirrors Rails: rescue *(ENCODING_ERRORS + DECRYPT_ERRORS) => raise Errors::Decryption.
-    // Cipher errors (wrong key, auth-tag mismatch) are already DecryptionError; this
-    // catch also covers inflate errors on corrupt compressed payloads.
-    // Mirrors Rails: rescue *(ENCODING_ERRORS + DECRYPT_ERRORS) => raise Errors::Decryption.
-    // Try each key; the cipher raises DecryptionError on auth-tag mismatch.
+    // Mirrors Rails: try_to_decrypt_with_each rescues only Errors::Decryption (wrong key /
+    // auth-tag mismatch) and re-raises on the last key. Non-Decryption errors (e.g.
+    // EncryptedContentIntegrity, ConfigError) propagate immediately. Inflate errors are
+    // message-level so they are wrapped as DecryptionError and thrown immediately.
     for (const key of keys) {
+      let decryptedBuf: Buffer;
       try {
-        const decryptedBuf = new Cipher(key).decrypt(message);
+        decryptedBuf = new Cipher(key).decrypt(message);
+      } catch (e) {
+        if (e instanceof DecryptionError) continue; // wrong key — try next
+        throw e; // EncryptedContentIntegrity, ConfigError, etc.
+      }
+      try {
         return this.uncompressIfNeeded(decryptedBuf, compressed);
       } catch (e) {
-        if (e instanceof Base && !(e instanceof DecryptionError)) throw e;
-        // Wrong key — try next.
+        if (e instanceof Base) throw e;
+        throw new DecryptionError(e instanceof Error ? e.message : String(e));
       }
     }
     throw new DecryptionError("None of the provided keys could decrypt the data");

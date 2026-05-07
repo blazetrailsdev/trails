@@ -78,11 +78,13 @@ export class Aes256Gcm {
    * `Encryptor` handles this automatically; only direct `Cipher` users are affected.
    */
   decrypt(message: Message): Buffer {
-    const iv = message.headers.get("iv") as string;
-    const authTag = message.headers.get("at") as string;
+    const iv = message.headers.get("iv");
+    const authTag = message.headers.get("at");
     // Mirrors Rails: nil iv/auth_tag raises EncryptedContentIntegrity (not Decryption),
     // so it propagates out of the per-key retry loop rather than being swallowed.
-    if (!iv || !authTag) throw new EncryptedContentIntegrity();
+    // Also guard against non-string header values from malformed deserialized messages.
+    if (typeof iv !== "string" || typeof authTag !== "string")
+      throw new EncryptedContentIntegrity();
     // Mirrors Rails: OpenSSL bindings don't raise on truncated auth tags, so we check
     // the length explicitly to prevent auth-tag forgery.
     const authTagBuf = Buffer.from(authTag, "base64");
