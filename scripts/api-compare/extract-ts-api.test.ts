@@ -235,7 +235,8 @@ function extractFromFiles(srcDir: string, files: Record<string, string>): Packag
   // detection's bare-specifier check succeeds in the virtual program.
   const ASC_PATH = "/_node_modules/@blazetrails/activesupport.ts";
   const all: Record<string, string> = {
-    [ASC_PATH]: `export function include(klass: any, mod: any): void {}`,
+    [ASC_PATH]: `export function include(klass: any, mod: any): void {}
+export function extend(klass: any, mod: any): void {}`,
   };
   for (const [rel, text] of Object.entries(files)) all[`${srcDir}/${rel}`] = text;
 
@@ -431,6 +432,85 @@ describe("extractFromProgram — include() detection", () => {
       `,
     });
     expect(info.classes["node-expression.ts:NodeExpression"].extends).toContain("Predications");
+  });
+});
+
+describe("extractFromProgram — extend() detection", () => {
+  it("pushes a bare-identifier class mod onto host.extends", () => {
+    const info = extractFromFiles("/p", {
+      "querying.ts": `export class Querying { all(): void {} }`,
+      "base.ts": `export class Base {}`,
+      "wire.ts": `
+        import { extend } from "@blazetrails/activesupport";
+        import { Base } from "./base.js";
+        import { Querying } from "./querying.js";
+        extend(Base, Querying);
+      `,
+    });
+    expect(info.classes["base.ts:Base"].extends).toContain("Querying");
+  });
+
+  it("follows import aliases (`Querying as QueryingMixin`) to the canonical class name", () => {
+    const info = extractFromFiles("/p", {
+      "querying.ts": `export class Querying { all(): void {} }`,
+      "base.ts": `export class Base {}`,
+      "wire.ts": `
+        import { extend } from "@blazetrails/activesupport";
+        import { Base } from "./base.js";
+        import { Querying as QueryingMixin } from "./querying.js";
+        extend(Base, QueryingMixin);
+      `,
+    });
+    expect(info.classes["base.ts:Base"].extends).toContain("Querying");
+  });
+
+  it("resolves property-access mod arg by harvesting the declaration's methods directly", () => {
+    const info = extractFromFiles("/p", {
+      "translation.ts": `
+        export function humanAttributeName(): string { return ""; }
+        export const ClassMethods = { humanAttributeName };
+      `,
+      "base.ts": `export class Base {}`,
+      "wire.ts": `
+        import { extend } from "@blazetrails/activesupport";
+        import * as Translation from "./translation.js";
+        import { Base } from "./base.js";
+        extend(Base, Translation.ClassMethods);
+      `,
+    });
+    const base = info.classes["base.ts:Base"];
+    expect(base.instanceMethods.map((m) => m.name)).toContain("humanAttributeName");
+    expect(base.extends).not.toContain("ClassMethods");
+  });
+
+  it("pushes inline object-literal mod methods directly onto the host", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `export class Base {}`,
+      "wire.ts": `
+        import { extend } from "@blazetrails/activesupport";
+        import { Base } from "./base.js";
+        extend(Base, { find() {}, findBy: () => {}, where: function () {} });
+      `,
+    });
+    expect(info.classes["base.ts:Base"].instanceMethods.map((m) => m.name).sort()).toEqual([
+      "find",
+      "findBy",
+      "where",
+    ]);
+  });
+
+  it("ignores `extend()` calls when the file doesn't import from @blazetrails/activesupport", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `export class Base {}`,
+      "querying.ts": `export const Querying = { all() {} };`,
+      "wire.ts": `
+        import { Base } from "./base.js";
+        import { Querying } from "./querying.js";
+        function extend(a: any, b: any) {}
+        extend(Base, Querying);
+      `,
+    });
+    expect(info.classes["base.ts:Base"].extends).not.toContain("Querying");
   });
 });
 
