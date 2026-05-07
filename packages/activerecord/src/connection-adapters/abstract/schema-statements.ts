@@ -388,7 +388,9 @@ export class SchemaStatements {
     const adapter = this.adapter as any;
     if (
       typeof adapter.addForeignKey === "function" &&
-      typeof adapter.checkConstraints === "function"
+      adapter.addForeignKey !== SchemaStatements.prototype.addForeignKey &&
+      typeof adapter.checkConstraints === "function" &&
+      adapter.checkConstraints !== SchemaStatements.prototype.checkConstraints
     ) {
       return adapter.addForeignKey(fromTable, toTable, options);
     }
@@ -418,7 +420,10 @@ export class SchemaStatements {
       | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
   ): Promise<void> {
     const adapter = this.adapter as any;
-    if (typeof adapter.removeForeignKey === "function") {
+    if (
+      typeof adapter.removeForeignKey === "function" &&
+      adapter.removeForeignKey !== SchemaStatements.prototype.removeForeignKey
+    ) {
       return adapter.removeForeignKey(fromTable, toTableOrOptions);
     }
     const ifExists = typeof toTableOrOptions === "object" && toTableOrOptions?.ifExists === true;
@@ -448,7 +453,10 @@ export class SchemaStatements {
     options: { name?: string; validate?: boolean } = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
-    if (typeof adapter.addCheckConstraint === "function") {
+    if (
+      typeof adapter.addCheckConstraint === "function" &&
+      adapter.addCheckConstraint !== SchemaStatements.prototype.addCheckConstraint
+    ) {
       return adapter.addCheckConstraint(tableName, expression, options);
     }
     const name = options.name ?? this._checkConstraintName(tableName, expression);
@@ -464,7 +472,10 @@ export class SchemaStatements {
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
   ): Promise<void> {
     const adapter = this.adapter as any;
-    if (typeof adapter.removeCheckConstraint === "function") {
+    if (
+      typeof adapter.removeCheckConstraint === "function" &&
+      adapter.removeCheckConstraint !== SchemaStatements.prototype.removeCheckConstraint
+    ) {
       return adapter.removeCheckConstraint(tableName, expressionOrOptions);
     }
     const ifExists =
@@ -747,7 +758,10 @@ export class SchemaStatements {
     const adapter = this.adapter as {
       foreignKeys?: (t: string) => Promise<ForeignKeyDefinition[]>;
     };
-    if (typeof adapter.foreignKeys === "function") {
+    if (
+      typeof adapter.foreignKeys === "function" &&
+      (adapter.foreignKeys as unknown) !== SchemaStatements.prototype.foreignKeys
+    ) {
       return adapter.foreignKeys(tableName);
     }
     return [];
@@ -1052,7 +1066,10 @@ export class SchemaStatements {
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     const adapter = this.adapter as any;
-    if (typeof adapter.checkConstraints === "function") {
+    if (
+      typeof adapter.checkConstraints === "function" &&
+      adapter.checkConstraints !== SchemaStatements.prototype.checkConstraints
+    ) {
       return adapter.checkConstraints(tableName);
     }
     throw new Error("NotImplementedError: checkConstraints is not implemented");

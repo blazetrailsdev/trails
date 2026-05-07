@@ -68,6 +68,7 @@ import type {
   Table,
   ForeignKeyDefinition,
   AddForeignKeyOptions,
+  AddIndexOptions,
   ColumnType,
   ColumnOptions,
 } from "./abstract/schema-definitions.js";
@@ -173,7 +174,13 @@ export interface AbstractAdapter {
     tableName: string,
     ...columns: Array<{ name: string; type: ColumnType; options?: ColumnOptions }>
   ): Promise<void>;
+  removeColumn(
+    tableName: string,
+    columnName: string,
+    options?: { ifExists?: boolean },
+  ): Promise<void>;
   removeColumns(tableName: string, ...columns: string[]): Promise<void>;
+  addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;
   removeIndex(
     tableName: string,
     options?: { column?: string | string[]; name?: string },

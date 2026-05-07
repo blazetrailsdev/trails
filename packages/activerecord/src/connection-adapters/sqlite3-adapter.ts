@@ -961,6 +961,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.executeMutation(sql);
   }
 
+  // SQLite removes columns via table-rebuild; _type is unused (legacy param).
+  // @ts-expect-error TS2416 — third param is string instead of {ifExists?}; harmonize in a follow-up
   async removeColumn(tableName: string, columnName: string, _type?: string): Promise<void> {
     await this.alterTable(tableName, (columns) => {
       delete columns[columnName];

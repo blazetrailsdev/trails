@@ -43,4 +43,19 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     await adapter.addColumn("widgets", "color", "string");
     expect(await adapter.columnExists("widgets", "color")).toBe(true);
   });
+
+  it("delegating methods (removeForeignKey, foreignKeys) do not infinitely recurse", async () => {
+    // Regression: before the self-delegation guard, mixed-in SchemaStatements
+    // methods like removeForeignKey/foreignKeys checked `this.adapter.<method>`
+    // which returned `this`, causing infinite recursion on adapters without overrides.
+    adapter = new SQLite3Adapter(":memory:");
+    await adapter.createTable("products", (t) => t.string("name"));
+    // foreignKeys falls back to [] on SQLite (no override, no recursion)
+    const fks = await (adapter as any).foreignKeys("products");
+    expect(Array.isArray(fks)).toBe(true);
+    // removeForeignKey on a non-existent key should throw without stack overflow
+    await expect(
+      (adapter as any).removeForeignKey("products", { name: "nonexistent_fk" }),
+    ).rejects.toThrow();
+  });
 });
