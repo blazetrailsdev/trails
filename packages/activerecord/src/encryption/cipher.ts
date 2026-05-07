@@ -8,12 +8,19 @@
 
 import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";
 import { ConfigError, DecryptionError } from "./errors.js";
+import { Message } from "./message.js";
 
 export class Cipher {
   encrypt(clearText: string, key: string, options?: { deterministic?: boolean }): string {
-    const aes = this.cipherFor(key, options?.deterministic ?? false);
-    const { payload, iv, authTag } = aes.encrypt(clearText, key, options);
-    return JSON.stringify({ p: payload, iv, at: authTag });
+    const message = this.cipherFor(key, options?.deterministic ?? false).encrypt(
+      clearText,
+      options,
+    );
+    return JSON.stringify({
+      p: message.payload,
+      iv: message.headers.get("iv"),
+      at: message.headers.get("at"),
+    });
   }
 
   decrypt(encryptedText: string, key: string | string[]): string {
@@ -51,7 +58,9 @@ export class Cipher {
     let lastError: unknown;
     for (const key of keys) {
       try {
-        const buf = this.cipherFor(key).decrypt(data.p, key, data.iv, data.at);
+        const msg = new Message(data.p);
+        msg.addHeaders({ iv: data.iv, at: data.at });
+        const buf = this.cipherFor(key).decrypt(msg);
         return buf.toString("utf-8");
       } catch (e) {
         if (e instanceof ConfigError) throw e;
