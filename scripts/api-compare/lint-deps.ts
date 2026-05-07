@@ -127,7 +127,12 @@ function collectRubyDepMethods(ruby: ApiManifest, pkg: string, dep: string): Rub
 
 type TsDepMap = Map<string, Map<string, boolean>>; // file -> method -> usesDep
 
-function analyzeTsDepUsage(pkgSrcDir: string, tsImport: string, tsIdentifiers: string[]): TsDepMap {
+function analyzeTsDepUsage(
+  pkgSrcDir: string,
+  tsImport: string,
+  tsIdentifiers: string[],
+  dep: string,
+): TsDepMap {
   const result: TsDepMap = new Map();
   const allFiles = getAllTsFiles(pkgSrcDir);
   if (allFiles.length === 0) return result;
@@ -178,7 +183,7 @@ function analyzeTsDepUsage(pkgSrcDir: string, tsImport: string, tsIdentifiers: s
     // Check each method's signature and body for dependency references.
     const methodMap = new Map<string, boolean>();
     visitMethodDeclarations(sourceFile, (name, methodNode) => {
-      const uses = methodUsesDepImport(methodNode, importedNames, knownIds);
+      const uses = methodUsesDepImport(methodNode, importedNames, knownIds, dep, sourceFile);
       const existing = methodMap.get(name);
       if (existing === undefined || uses) methodMap.set(name, uses);
     });
@@ -240,19 +245,42 @@ function visitMethodDeclarations(
   ts.forEachChild(sourceFile, visit);
 }
 
-function methodUsesDepImport(
+export function isWithinTypeNode(node: ts.Node): boolean {
+  let current = node.parent;
+  while (current) {
+    if (ts.isTypeNode(current)) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+export function hasLintDepsIgnore(node: ts.Node, dep: string, sourceFile: ts.SourceFile): boolean {
+  const fullText = sourceFile.getFullText();
+  const nodeStart = node.getFullStart();
+  // Collect leading trivia (comments) before the node
+  const trivia = fullText.slice(nodeStart, node.getStart(sourceFile));
+  const re = /\/\/\s*lint-deps-ignore:\s*(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(trivia)) !== null) {
+    if (m[1] === dep) return true;
+  }
+  return false;
+}
+
+export function methodUsesDepImport(
   node: ts.Node,
   importedNames: Set<string>,
   knownIdentifiers: Set<string>,
+  dep: string,
+  sourceFile: ts.SourceFile,
 ): boolean {
-  // Check the entire method declaration: parameter types, return type, and body.
-  // Skip identifiers in declaration name positions (param names, method names)
-  // to avoid false positives from names that happen to match import names.
+  if (hasLintDepsIgnore(node, dep, sourceFile)) return true;
   let found = false;
   const check = (n: ts.Node) => {
     if (found) return;
     if (ts.isIdentifier(n)) {
       if (isDeclarationName(n)) return;
+      if (isWithinTypeNode(n)) return;
       if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
         found = true;
         return;
@@ -495,7 +523,12 @@ function main() {
     const rubyMethods = collectRubyDepMethods(ruby, rule.package, rule.dependency);
 
     const pkgSrcDir = packageSrcDir(rule.package);
-    const tsDepMap = analyzeTsDepUsage(pkgSrcDir, rule.tsImport, rule.tsIdentifiers);
+    const tsDepMap = analyzeTsDepUsage(
+      pkgSrcDir,
+      rule.tsImport,
+      rule.tsIdentifiers,
+      rule.dependency,
+    );
 
     const { violations, compliant, unmatched } = crossReference(rubyMethods, tsDepMap);
     allResults.push({ rule, violations, compliant, unmatched });
@@ -538,4 +571,7 @@ function main() {
   }
 }
 
-main();
+// Only run when invoked directly, not when imported by tests
+if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"))) {
+  main();
+}
