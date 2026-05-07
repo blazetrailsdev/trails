@@ -1222,17 +1222,12 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
   });
 }
 
-// TODO: remove _isMissingDatabaseError once mysql2-adapter translates ER_BAD_DB_ERROR to
-// NoDatabaseError at the connection level (matching how postgresql-adapter already does in
-// newClient). The 3D000 branch is dead code for PG today because connection failures are
-// already translated by PostgreSQLAdapter.newClient before SELECT 1 runs.
+// Defensive fallback for SQL-level errors that slip through pool proxies or
+// adapters that don't yet translate at connection time.
 function _isMissingDatabaseError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
-  const e = error as { code?: unknown; errno?: unknown };
-  // MySQL: ER_BAD_DB_ERROR (errno 1049) — adapter doesn't translate this to NoDatabaseError yet
-  if (e.code === "ER_BAD_DB_ERROR" || e.errno === 1049) return true;
-  // PostgreSQL: SQLSTATE 3D000 — dead code today since PG translates at connection time,
-  // kept as a defensive fallback in case the SQL-level error surfaces through a pool proxy.
-  if (e.code === "3D000") return true;
-  return false;
+  const e = error as { code?: unknown };
+  // PostgreSQL SQLSTATE 3D000 — normally translated by PostgreSQLAdapter.newClient,
+  // kept here as a safety net for pool proxies that re-surface the raw error.
+  return e.code === "3D000";
 }

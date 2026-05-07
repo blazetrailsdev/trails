@@ -8,7 +8,7 @@ import {
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
 import { Version } from "./abstract-adapter.js";
-import { MismatchedForeignKey, NotImplementedError } from "../errors.js";
+import { MismatchedForeignKey, NoDatabaseError, NotImplementedError } from "../errors.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { quoteString as mysqlQuoteString } from "./mysql/quoting.js";
 import { Column } from "./column.js";
@@ -168,10 +168,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // not yet probed, `true`/`false` = result.
   private _statisticsHasExpression: boolean | undefined;
   private _fullVersionString: string | null = null;
+  private _database: string | undefined;
 
   constructor(config: string | (mysql.PoolOptions & TrailsAdapterOptions)) {
     super();
     if (typeof config === "string") {
+      try {
+        this._database =
+          decodeURIComponent(new URL(config).pathname.replace(/^\/+/, "").replace(/\/+$/, "")) ||
+          undefined;
+      } catch {
+        // malformed URI — leave _database undefined
+      }
       this._driverPool = Mysql2Adapter.newClient({ uri: config });
       return;
     }
@@ -184,7 +192,34 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const { statementLimit, preparedStatements, ...mysqlConfig } = config;
     if (statementLimit !== undefined) this.statementLimit = statementLimit;
     if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
+    this._database =
+      (mysqlConfig.database as string | undefined) ??
+      (() => {
+        try {
+          const uri = (mysqlConfig as { uri?: string }).uri;
+          return uri
+            ? decodeURIComponent(new URL(uri).pathname.replace(/^\/+/, "").replace(/\/+$/, "")) ||
+                undefined
+            : undefined;
+        } catch {
+          return undefined;
+        }
+      })();
     this._driverPool = Mysql2Adapter.newClient(mysqlConfig);
+  }
+
+  /** Checkout a fresh connection from the pool, translating ER_BAD_DB_ERROR. */
+  private async _checkoutConn(): Promise<mysql.PoolConnection> {
+    if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
+    try {
+      return await this._driverPool.getConnection();
+    } catch (error) {
+      const e = error as { code?: unknown; errno?: unknown };
+      if (e.code === "ER_BAD_DB_ERROR" || e.errno === 1049) {
+        throw NoDatabaseError.dbError(this._database ?? "unknown");
+      }
+      throw error;
+    }
   }
 
   /**
@@ -193,8 +228,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   private async getConn(): Promise<mysql.PoolConnection> {
     if (this._conn) return this._conn;
-    if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
-    return this._driverPool.getConnection();
+    return this._checkoutConn();
   }
 
   /**
@@ -397,8 +431,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Begin a transaction. Acquires a dedicated connection from the pool.
    */
   async beginTransaction(): Promise<void> {
-    if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
-    this._conn = await this._driverPool.getConnection();
+    this._conn = await this._checkoutConn();
     await this._conn.query("BEGIN");
     this._inTransaction = true;
   }
@@ -877,8 +910,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _advisoryLockConn: mysql.PoolConnection | null = null;
 
   async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
-    const conn = await this._driverPool.getConnection();
+    const conn = await this._checkoutConn();
     try {
       const [rows] = await conn.query("SELECT GET_LOCK(?, 0) AS locked", [String(lockId)]);
       const locked = (rows as Record<string, unknown>[])[0]?.locked === 1;

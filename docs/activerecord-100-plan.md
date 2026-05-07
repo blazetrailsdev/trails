@@ -378,7 +378,7 @@ TS paths use `$TS/` = `packages/activerecord/src/`.
 - Dependencies: PR 48
 - Risk: These depend on Rack-style middleware infrastructure. Verify how `connection-handling.ts` implements the middleware interface before implementing.
 
-**PR 51 — Tasks cluster**
+**PR 51 — Tasks cluster** (#1270)
 
 - Rails sources:
 

@@ -3,6 +3,7 @@ import mysql from "mysql2/promise";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { Base, transaction, registerModel, loadBelongsTo, loadHasMany } from "../index.js";
+import { NoDatabaseError } from "../errors.js";
 
 /**
  * These tests require a running MySQL instance. They will be skipped if
@@ -829,6 +830,19 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("defaultPreparedStatements returns false", () => {
       expect((adapter as any).defaultPreparedStatements()).toBe(false);
+    });
+  });
+
+  describe("NoDatabaseError translation", () => {
+    it("throws NoDatabaseError when connecting to a nonexistent database", async () => {
+      const url = new URL(MYSQL_TEST_URL);
+      url.pathname = "/trails_nonexistent_db_" + Math.random().toString(36).slice(2);
+      const adapter = new Mysql2Adapter(url.toString());
+      try {
+        await expect(adapter.execute("SELECT 1")).rejects.toBeInstanceOf(NoDatabaseError);
+      } finally {
+        await adapter.close();
+      }
     });
   });
 });
