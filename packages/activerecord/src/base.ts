@@ -3138,7 +3138,7 @@ include(Base, {
   // normalizeAttribute lives on Model.prototype (inherited). Wire via direct
   // prototype reference so api:compare credits it to base.ts without shadowing
   // Model's implementation via a wrapper that would create a circular call.
-  normalizeAttribute: (Model.prototype as any).normalizeAttribute as (name: string) => void,
+  normalizeAttribute: Model.prototype.normalizeAttribute,
   // readAttributeBeforeTypeCast/attributesBeforeTypeCast — inherited from Model.prototype
   // (readAttributeBeforeTypeCast is a method, attributesBeforeTypeCast is a getter).
   // The re-exports in before-type-cast.ts call record.<methodName>(), so wiring
