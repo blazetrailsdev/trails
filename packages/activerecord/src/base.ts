@@ -244,7 +244,7 @@ export function quoteSqlValue(v: unknown, asArray = false): string {
     const arrayLiteral = quoteArrayLiteral(v);
     return `'${arrayLiteral.replace(/'/g, "''")}'`;
   }
-  if (typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'`;
+  if (!asArray && typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'`;
   return `'${String(v).replace(/'/g, "''")}'`;
 }
 

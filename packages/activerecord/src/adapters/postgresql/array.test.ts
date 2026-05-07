@@ -26,9 +26,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlArrayTest", () => {
-    it.skip("column", async () => {
-      /* BLOCKED: Column#isArray() / array? missing in column.ts (~15 LOC) */
-    });
     it.skip("not compatible with serialize array", async () => {
       // BLOCKED: adapter-pg — serialize decorator gap
       // ROOT-CAUSE: Base.serialize() in base.ts does not raise ColumnNotSerializableError for
