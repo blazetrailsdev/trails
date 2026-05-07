@@ -415,4 +415,57 @@ describe("TransactionInstrumentationTest", () => {
 
     Notifications.unsubscribe(sub);
   });
+
+  it("TM path: addTransactionRecord called and after_commit fires on save", async () => {
+    const { Topic, adapter } = makeTopic();
+    const enrolled: unknown[] = [];
+    const orig = (adapter as any).addTransactionRecord?.bind(adapter);
+    (adapter as any).addTransactionRecord = (record: unknown, ...rest: unknown[]) => {
+      enrolled.push(record);
+      return orig?.(record, ...rest);
+    };
+
+    const committed: string[] = [];
+    Topic.afterCommit(function (record: InstanceType<typeof Topic>) {
+      committed.push(record.title as string);
+    });
+
+    await Topic.create({ title: "tm-test" });
+
+    expect(enrolled.length).toBeGreaterThan(0);
+    expect(committed).toEqual(["tm-test"]);
+  });
+
+  it("TM path: after_rollback fires on explicit rollback", async () => {
+    const { Topic } = makeTopic();
+
+    const rolledBack: string[] = [];
+    Topic.afterRollback(function (record: InstanceType<typeof Topic>) {
+      rolledBack.push(record.title as string);
+    });
+
+    await Topic.transaction(async () => {
+      await Topic.create({ title: "rollback-test" });
+      throw new Rollback();
+    });
+
+    expect(rolledBack).toEqual(["rollback-test"]);
+  });
+
+  it("TM path: nested transaction propagates enrollment to outer and fires after_commit once", async () => {
+    const { Topic } = makeTopic();
+
+    const committed: string[] = [];
+    Topic.afterCommit(function (record: InstanceType<typeof Topic>) {
+      committed.push(record.title as string);
+    });
+
+    await Topic.transaction(async () => {
+      await Topic.transaction(async () => {
+        await Topic.create({ title: "nested-test" });
+      });
+    });
+
+    expect(committed).toEqual(["nested-test"]);
+  });
 });

@@ -200,6 +200,11 @@ import {
   transaction as _transaction,
   currentTransactionPublic as _currentTransactionPublic,
   withTransactionReturningStatus as _withTransactionReturningStatus,
+  committedBang as _committedBang,
+  rolledbackBang as _rolledbackBang,
+  isTriggerTransactionalCallbacks as _isTriggerTransactionalCallbacks,
+  addToTransaction as _addToTransaction,
+  hasTransactionalCallbacks as _hasTransactionalCallbacks,
   _newRecordBeforeLastCommit as _txNewRecordBeforeLastCommit,
   _triggerDestroyCallback as _txTriggerDestroyCallback,
   clearTransactionRecordState as _clearTransactionRecordState,
@@ -208,8 +213,6 @@ import {
   rememberTransactionRecordState as _rememberTransactionRecordState,
   restoreTransactionRecordState as _restoreTransactionRecordState,
   isTransactionIncludeAnyAction as _isTransactionIncludeAnyAction,
-  addToTransaction as _addToTransaction,
-  hasTransactionalCallbacks as _hasTransactionalCallbacks,
 } from "./transactions.js";
 
 import {
@@ -2884,6 +2887,21 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   /** @internal */
   initInternals(): void;
   /** @internal */
+  committedBang(options?: { shouldRunCallbacks?: boolean }): Promise<void>;
+  /** @internal */
+  rolledbackBang(options?: {
+    forceRestoreState?: boolean;
+    shouldRunCallbacks?: boolean;
+  }): Promise<void>;
+  /** @internal */
+  isTriggerTransactionalCallbacks(): boolean;
+  /** @internal */
+  withTransactionReturningStatus<T>(fn: () => Promise<T>): Promise<T>;
+  /** @internal */
+  addToTransaction(ensureFinalize?: boolean): Promise<void>;
+  /** @internal */
+  hasTransactionalCallbacks(): boolean;
+  /** @internal */
   _createRecord(): Promise<boolean>;
   slice(...keys: string[]): Record<string, unknown>;
   valuesAt(...keys: string[]): unknown[];
@@ -3155,15 +3173,14 @@ include(Base, {
   // AutosaveAssociation privates
   computePrimaryKey: _computePrimaryKey,
   _ensureNoDuplicateErrors: _autosaveEnsureNoDuplicateErrors,
-  // Transactions privates
-  // committedBang / rolledbackBang intentionally omitted: transaction.ts calls
-  // these as record.committedBang({ shouldRunCallbacks }) — the record-arg form
-  // would receive the options hash as `record`, breaking that callsite.
+  // Transactions instance methods
+  committedBang: _committedBang,
+  rolledbackBang: _rolledbackBang,
+  isTriggerTransactionalCallbacks: _isTriggerTransactionalCallbacks,
   withTransactionReturningStatus: _withTransactionReturningStatus,
+  addToTransaction: _addToTransaction,
+  hasTransactionalCallbacks: _hasTransactionalCallbacks,
   _newRecordBeforeLastCommit: _txNewRecordBeforeLastCommit,
-  // isTriggerTransactionalCallbacks omitted: transaction.ts calls it as
-  // record.isTriggerTransactionalCallbacks() with no args; the record-arg
-  // form would receive undefined as `record`, throwing at runtime.
   _committedAlreadyCalled: _txCommittedAlreadyCalled,
   _triggerUpdateCallback: _txTriggerUpdateCallback,
   _triggerDestroyCallback: _txTriggerDestroyCallback,
@@ -3171,8 +3188,6 @@ include(Base, {
   rememberTransactionRecordState: _rememberTransactionRecordState,
   restoreTransactionRecordState: _restoreTransactionRecordState,
   isTransactionIncludeAnyAction: _isTransactionIncludeAnyAction,
-  addToTransaction: _addToTransaction,
-  hasTransactionalCallbacks: _hasTransactionalCallbacks,
   // TouchLater privates (instance-level) wired here for api:compare credit.
   surreptitiouslyTouch: TouchLater.surreptitiouslyTouch,
   touchDeferredAttributes: TouchLater.touchDeferredAttributes,
