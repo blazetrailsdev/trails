@@ -135,7 +135,7 @@ export interface AbstractAdapter {
   // --- SchemaStatements (DDL) ---
   // The abstract base signatures are declared here. Concrete adapter subclasses
   // that override with dialect-specific variants (PG's createTable/dropTable)
-  // carry // @ts-ignore on those overrides; the runtime behaviour is correct.
+  // carry // @ts-expect-error on those overrides; the runtime behaviour is correct.
   createTable(
     name: string,
     optionsOrFn?:

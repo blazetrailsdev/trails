@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
 
-let adapter: SQLite3Adapter;
+let adapter: SQLite3Adapter | undefined;
 
 afterEach(async () => {
   await adapter?.close();
