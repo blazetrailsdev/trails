@@ -74,6 +74,10 @@
       "types": "./dist/sqlite-drivers/node-sqlite.d.ts",
       "default": "./dist/sqlite-drivers/node-sqlite.js"
     },
+    "./sqlite/expo-sqlite": {
+      "types": "./dist/sqlite-drivers/expo-sqlite.d.ts",
+      "default": "./dist/sqlite-drivers/expo-sqlite.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"
@@ -93,6 +97,9 @@
   },
   "peerDependencies": {
     "better-sqlite3": "^12.0.0"
+  },
+  "optionalDependencies": {
+    "expo-sqlite": "*"
   },
   "peerDependenciesMeta": {
     "better-sqlite3": {
