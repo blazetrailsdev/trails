@@ -202,6 +202,7 @@ import {
   withTransactionReturningStatus as _withTransactionReturningStatus,
   committedBang as _committedBang,
   rolledbackBang as _rolledbackBang,
+  isTriggerTransactionalCallbacks as _isTriggerTransactionalCallbacks,
   addToTransaction as _addToTransaction,
   hasTransactionalCallbacks as _hasTransactionalCallbacks,
   _newRecordBeforeLastCommit as _txNewRecordBeforeLastCommit,
@@ -3162,6 +3163,7 @@ include(Base, {
   // Transactions instance methods
   committedBang: _committedBang,
   rolledbackBang: _rolledbackBang,
+  isTriggerTransactionalCallbacks: _isTriggerTransactionalCallbacks,
   withTransactionReturningStatus: _withTransactionReturningStatus,
   addToTransaction: _addToTransaction,
   hasTransactionalCallbacks: _hasTransactionalCallbacks,

@@ -372,10 +372,23 @@ export async function beforeCommittedBang(record: Base): Promise<void> {
  *
  * Mirrors: ActiveRecord::Transactions#committed!
  */
-export async function committedBang(this: Base): Promise<void> {
-  if (!isTriggerTransactionalCallbacks(this)) return;
-  const ctor = this.constructor as typeof Base;
-  await (ctor as any)._callbackChain?.runAfter?.("commit", this);
+export async function committedBang(
+  this: Base,
+  { shouldRunCallbacks = true }: { shouldRunCallbacks?: boolean } = {},
+): Promise<void> {
+  const r = this as any;
+  r._startTransactionState = null;
+  try {
+    if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
+      r._committedAlreadyCalled = true;
+      const ctor = this.constructor as typeof Base;
+      await (ctor as any)._callbackChain?.runAfter?.("commit", this);
+    }
+  } finally {
+    r._committedAlreadyCalled = false;
+    r._triggerUpdateCallback = false;
+    r._triggerDestroyCallback = false;
+  }
 }
 
 /**
@@ -383,10 +396,26 @@ export async function committedBang(this: Base): Promise<void> {
  *
  * Mirrors: ActiveRecord::Transactions#rolledback!
  */
-export async function rolledbackBang(this: Base): Promise<void> {
-  if (!isTriggerTransactionalCallbacks(this)) return;
-  const ctor = this.constructor as typeof Base;
-  await (ctor as any)._callbackChain?.runAfter?.("rollback", this);
+export async function rolledbackBang(
+  this: Base,
+  {
+    forceRestoreState = false,
+    shouldRunCallbacks = true,
+  }: { forceRestoreState?: boolean; shouldRunCallbacks?: boolean } = {},
+): Promise<void> {
+  try {
+    if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
+      const ctor = this.constructor as typeof Base;
+      await (ctor as any)._callbackChain?.runAfter?.("rollback", this);
+    }
+  } finally {
+    _restoreTransactionRecordState.call(this, forceRestoreState);
+    clearTransactionRecordState.call(this);
+    if (forceRestoreState) {
+      (this as any)._triggerUpdateCallback = false;
+      (this as any)._triggerDestroyCallback = false;
+    }
+  }
 }
 
 /**
@@ -459,6 +488,32 @@ export function restoreTransactionRecordState(
   }
 }
 
+// this-typed form used by rolledbackBang ensure block — reads _startTransactionState
+// (populated by remember_transaction_record_state level-tracking; currently always
+// null since our fallback uses captured snapshots, so this is a no-op until the
+// level-tracking state is implemented).
+/** @internal */
+function _restoreTransactionRecordState(this: Base, _forceRestoreState = false): void {
+  const r = this as any;
+  if (!r._startTransactionState) return;
+  const state = r._startTransactionState;
+  if (_forceRestoreState || state.level <= 1) {
+    r._newRecord = state.newRecord;
+    r._destroyed = state.destroyed;
+    r._previouslyNewRecord = state.previouslyNewRecord;
+    if (r._attributes.isFrozen()) {
+      r._attributes = r._attributes.deepDup();
+    }
+    const ctor = this.constructor as typeof Base;
+    if (state.newRecord && !Array.isArray(this.id)) {
+      r._attributes.set(ctor.primaryKey as string, state.id);
+    }
+    if (state.frozen && !r._attributes.isFrozen()) {
+      r._attributes.freeze();
+    }
+  }
+}
+
 /**
  * Execute a block within a transaction and capture its return value as a
  * status flag. If the status is falsy (false/null/undefined), the transaction
@@ -476,13 +531,12 @@ export async function withTransactionReturningStatus<T>(
   // Mirrors: remember_transaction_record_state — snapshot before transaction
   const snapshot = rememberTransactionRecordState.call(this);
 
-  // Reset transaction tracking flags (the block will set them if the
-  // operation succeeds).
+  // Mirrors: remember_transaction_record_state — set _newRecordBeforeLastCommit.
+  // _triggerUpdateCallback/_triggerDestroyCallback are NOT reset here; Rails resets
+  // those only in committed!/rolledback! ensure blocks.
   const r = this as any;
   r._transactionAction = undefined;
   r._newRecordBeforeLastCommit = r._newRecord ?? this.isNewRecord?.() ?? false;
-  r._triggerUpdateCallback = false;
-  r._triggerDestroyCallback = false;
 
   let status: T;
   let rolledBack = false;
@@ -554,14 +608,15 @@ export function _newRecordBeforeLastCommit(this: Base): boolean {
  *
  * Mirrors: ActiveRecord::Transactions#trigger_transactional_callbacks?
  */
-export function isTriggerTransactionalCallbacks(record: Base): boolean {
-  const r = record as any;
-  const newBeforeLastCommit = r._newRecordBeforeLastCommit ?? false;
-  const triggerUpdate = r._triggerUpdateCallback ?? false;
-  const triggerDestroy = r._triggerDestroyCallback ?? false;
+export function isTriggerTransactionalCallbacks(this: Base): boolean {
+  const r = this as any;
+  // Use === true to avoid prototype method bleeding through as a truthy value.
+  const newBeforeLastCommit = r._newRecordBeforeLastCommit === true;
+  const triggerUpdate = r._triggerUpdateCallback === true;
+  const triggerDestroy = r._triggerDestroyCallback === true;
   return (
-    ((newBeforeLastCommit || triggerUpdate) && record.isPersisted()) ||
-    (triggerDestroy && record.isDestroyed())
+    ((newBeforeLastCommit || triggerUpdate) && this.isPersisted()) ||
+    (triggerDestroy && this.isDestroyed())
   );
 }
 
