@@ -216,14 +216,19 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("uuid schema dump", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — SchemaDumper does not emit uuid primary key syntax
+      // ROOT-CAUSE: SchemaDumper.dumpTableSchema emits `force: :cascade` but not
+      // `id: :uuid, default: -> { "gen_random_uuid()" }` for UUID primary key tables.
+      // connection-adapters/abstract/schema-dumper.ts needs to detect uuid-typed id columns
+      // and emit the appropriate `id:` option. ~30 LOC in schema-dumper.ts.
+      // SCOPE: ~30 LOC; unblocks uuid schema dump + all "schema dumper for uuid primary key" tests.
     });
     it.skip("uuid migration", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — migration framework not implemented
+      // ROOT-CAUSE: ActiveRecord::Migration.new.create_table :uuid_migration_test, id: :uuid
+      // requires the migration DSL. The adapter's createTable() is implemented but the
+      // migration class wrapper is not. Not a uuid-specific gap.
+      // SCOPE: Migration framework is a separate multi-PR effort.
     });
 
     it("uuid gen random uuid", async () => {
@@ -311,9 +316,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("uuid association", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — belongs_to/has_many association framework not wired for UUID FK
+      // ROOT-CAUSE: AR association loading (belongs_to :uuid_tag) requires the associations
+      // layer to find related records using UUID foreign keys. The associations framework
+      // is implemented but not connected to the UUID OID type for FK binding.
+      // SCOPE: ~20 LOC — association query builder needs to use Uuid#cast for FK values.
     });
 
     it("uuid foreign key", async () => {
@@ -553,9 +560,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("uniqueness validation ignores uuid", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — AR uniqueness validator not wired for UUID type bypass
+      // ROOT-CAUSE: Rails' UniquenessValidator skips the case-insensitive check when
+      // the column type is uuid (since UUIDs are already normalized to lowercase).
+      // Our UniquenessValidator doesn't yet call typeForAttribute to check for UUID type.
+      // SCOPE: ~10 LOC in validations/uniqueness.ts; low priority.
     });
   });
 
@@ -635,24 +644,27 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("schema dumper for uuid primary key", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — SchemaDumper does not emit id: :uuid for UUID PK tables
+      // ROOT-CAUSE: SchemaDumper.dumpTableSchema doesn't detect that the id column is uuid
+      // type and emit `id: :uuid`. Rails checks column.sql_type == "uuid" for the id column
+      // and emits `id: :uuid, default: nil` or `default: -> { "gen_random_uuid()" }`.
+      // SCOPE: ~30 LOC in connection-adapters/abstract/schema-dumper.ts; unblocks 6 tests.
     });
     it.skip("schema dumper for uuid primary key with custom default", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
+      // ROOT-CAUSE: Also needs SchemaDumper to emit the custom default lambda expression
+      // for uuid columns, e.g. `default: -> { "gen_random_uuid()" }`.
+      // SCOPE: Same fix as above.
     });
     it.skip("schema dumper for uuid primary key default", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
+      // ROOT-CAUSE: SchemaDumper id: :uuid emission gap.
+      // SCOPE: Same fix as above.
     });
     it.skip("schema dumper for uuid primary key default in legacy migration", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
+      // ROOT-CAUSE: SchemaDumper id: :uuid emission gap + legacy migration flavor.
+      // SCOPE: Same fix as above.
     });
   });
 
@@ -677,40 +689,45 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("schema dumper for uuid primary key with default override via nil", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
+      // ROOT-CAUSE: SchemaDumper id: :uuid emission + nil default handling (id: :uuid, default: nil).
+      // SCOPE: Same fix as "schema dumper for uuid primary key".
     });
     it.skip("schema dumper for uuid primary key with default nil in legacy migration", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
+      // ROOT-CAUSE: SchemaDumper id: :uuid + nil default + legacy migration flavor.
+      // SCOPE: Same fix as "schema dumper for uuid primary key".
     });
   });
 
   describe("PostgreSQLUUIDTestInverseOf", () => {
     it.skip("collection association with uuid", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — has_many association with uuid FK + inverse_of not wired
+      // ROOT-CAUSE: Rails' has_many :uuid_tags, foreign_key: :tag_id requires association
+      // loading to bind UUID foreign key values through the Uuid OID type. Also needs
+      // inverse_of reflection to avoid duplicate queries. Not a uuid-specific gap but
+      // an association framework gap that affects uuid FK columns.
+      // SCOPE: Association framework; separate multi-PR effort.
     });
     it.skip("find with uuid", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — has_many association with uuid FK
+      // ROOT-CAUSE: Same as "collection association with uuid" — association loading gap.
+      // SCOPE: Association framework.
     });
     it.skip("find by with uuid", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — has_many association with uuid FK
+      // ROOT-CAUSE: Same as "collection association with uuid" — association loading gap.
+      // SCOPE: Association framework.
     });
   });
 
   describe("PostgreSQLUUIDHasManyThroughDisableJoinsTest", () => {
     it.skip("uuid primary key and disable joins with delegate cache", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in uuid
-      // ROOT-CAUSE: connection-adapters/postgresql/uuid.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/uuid.ts; affects ~10–47 tests in uuid.test.ts
+      // BLOCKED: adapter-pg — hasManyThrough with disableJoins + UUID PK not implemented
+      // ROOT-CAUSE: Rails' has_many :through with disable_joins: true uses a separate
+      // query per association and caches the delegate class. Requires hasManyThrough
+      // implementation + disableJoins option + delegate cache. Not uuid-specific.
+      // SCOPE: hasManyThrough + disableJoins; separate PR effort.
     });
   });
 });
