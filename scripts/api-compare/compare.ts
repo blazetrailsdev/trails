@@ -32,7 +32,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
-import { OUTPUT_DIR, PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
+import {
+  DIR_TO_PACKAGES,
+  OUTPUT_DIR,
+  PACKAGE_DIR_OVERRIDES,
+  ROOT_DIR,
+  packageSrcDir,
+} from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import { isExcluded } from "./excluded-files.js";
 
@@ -522,8 +528,13 @@ export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, C
       };
       for (const dep of Object.keys(allDeps)) {
         if (!dep.startsWith("@blazetrails/")) continue;
-        const depKey = dep.replace("@blazetrails/", "");
-        if (depKey !== pkg) addPkg(depKey);
+        const depDir = dep.replace("@blazetrails/", "");
+        // A single npm package may map to multiple api-compare keys
+        // (e.g. actionpack → actiondispatch + actioncontroller).
+        const depKeys = DIR_TO_PACKAGES[depDir] ?? [depDir];
+        for (const depKey of depKeys) {
+          if (depKey !== pkg) addPkg(depKey);
+        }
       }
     } catch {
       // Non-fatal: if we can't read deps, fall back to same-package only.
