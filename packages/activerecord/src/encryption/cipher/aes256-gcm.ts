@@ -11,7 +11,7 @@ const KEY_LENGTH = 32;
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
-export class Cipher {
+export class Aes256Gcm {
   static keyLength = KEY_LENGTH;
   static ivLength = IV_LENGTH;
 

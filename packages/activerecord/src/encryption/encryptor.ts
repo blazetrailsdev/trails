@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Encryptor
  */
 
-import { Cipher } from "./cipher/aes256-gcm.js";
+import { Aes256Gcm as Cipher } from "./cipher/aes256-gcm.js";
 import { Message } from "./message.js";
 import { MessageSerializer } from "./message-serializer.js";
 import { Configurable } from "./configurable.js";

@@ -6,7 +6,7 @@
  * Mirrors: ActiveRecord::Encryption::Cipher (encryption/cipher.rb)
  */
 
-import { Cipher as AesGcmCipher } from "./cipher/aes256-gcm.js";
+import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";
 import { ConfigError, DecryptionError } from "./errors.js";
 
 export class Cipher {
