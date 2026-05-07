@@ -301,6 +301,10 @@ function main() {
       // Track which Ruby tests (by index) have been matched
       const matchedRuby = new Set<number>();
 
+      const excludedCount = file.testCases.filter((tc) =>
+        isTestCaseExcluded(file.file, tc.description),
+      ).length;
+
       let matched = 0;
       let matchedSkipped = 0;
       let wrongDescribe = 0;
@@ -483,12 +487,12 @@ function main() {
         rubyFile: file.file,
         conventionTsFile: conventionTs,
         tsFileExists: exists,
-        rubyTestCount: file.testCases.length,
+        rubyTestCount: file.testCases.length - excludedCount,
         matched,
         matchedSkipped,
         wrongDescribe,
         misplaced,
-        missing: file.testCases.length - matched - misplaced,
+        missing: file.testCases.length - excludedCount - matched - misplaced,
         ...(showMissing ? { missingTests } : {}),
         ...(misplacedTests.length > 0 ? { misplacedTests } : {}),
         ...(wrongDescribeTests.length > 0 ? { wrongDescribeTests } : {}),
