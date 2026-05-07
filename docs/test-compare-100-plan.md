@@ -343,35 +343,47 @@ singular_association,builder/*}.rb`
 
 ## Tests that don't translate to TypeScript / Node
 
-These should be added to a `scripts/test-compare/skip-list.ts` so test:compare counts them N/A rather than missing.
+Permanently not-portable tests are excluded via `EXCLUDED_FILES` in
+`scripts/api-compare/excluded-files.ts` (whole-file entries with `testFile`).
+This drops them from both the Ruby denominator and the skipped backlog.
 
-### YAML / Marshal / Ruby object serialization
+**PR that added whole-file exclusions: #1304** (chore(test-compare): exclude permanently-not-portable Rails tests).
+Delta: 8097 → 7970 Ruby tests (−127), 2211 → 2085 skipped (−126).
 
-- `test/cases/yaml_serialization_test.rb` — YAML round-trip of arbitrary Ruby objects
-- Any `serialized_attribute_test.rb` case asserting `Marshal.dump` / `Marshal.load`
+### YAML / Marshal / Ruby object serialization ✓ excluded
 
-### Ruby concurrency / thread / GVL
+- `test/cases/yaml_serialization_test.rb` — YAML round-trip of arbitrary Ruby objects (**excluded**)
+- `test/cases/binary_test.rb` — Marshal/YAML binary encoding of AR records (**excluded**)
+- `test/cases/marshal_serialization_test.rb` — Marshal.dump/load (**already excluded** before this PR)
+- `test/cases/coders/yaml_column_test.rb` — Psych YAMLColumn (**already excluded** before this PR)
+- `test/cases/message_pack_test.rb` — MessagePack Ruby bridge (**already excluded** before this PR)
+- Any `serialized_attribute_test.rb` case asserting `Marshal.dump` / `Marshal.load` (mixed file — per-test exclusion pending)
 
-- `test/cases/connection_pool_test.rb` cases asserting on `Thread#priority`, GVL release timing
-- `test/cases/relation/load_async_test.rb` cases that assert GVL release while a query runs
-- `test/cases/transaction_isolation_test.rb` cases depending on `Thread.new` parallelism
+### Ruby concurrency / thread / GVL ✓ partially excluded
 
-### Ruby autoload / `require` / class reloading
+- `test/cases/transaction_isolation_test.rb` — all 7 cases GVL thread parallelism (**excluded**)
+- `test/cases/schema_loading_test.rb` — all 3 cases Zeitwerk/on_load from background threads (**excluded**)
+- `test/cases/reload_models_test.rb` — ActiveSupport::Dependencies class reloading (**excluded**)
+- `test/cases/connection_pool_test.rb` cases asserting on `Thread#priority`, GVL release timing (mixed file — per-test exclusion pending)
+- `test/cases/relation/load_async_test.rb` cases that assert GVL release while a query runs (mixed file)
 
-- `reload_models_test.rb` cases depending on `ActiveSupport::Dependencies`
-- `schema_loading_test.rb` cases hooking `ActiveSupport.on_load(:active_record)` with Zeitwerk
+### Ruby autoload / `require` / class reloading ✓ excluded (see GVL above)
 
 ### Process / Signal / fork
 
-- `connection_handler_test.rb` cases asserting `Process.fork` cleanup
-- `reaper_test.rb` cases asserting `Thread.kill` semantics
+- `connection_handler_test.rb` cases asserting `Process.fork` cleanup (mixed file)
+- `reaper_test.rb` cases asserting `Thread.kill` semantics (mixed file)
 
-### Rake / dbconsole shell-out
+### Rake / dbconsole shell-out ✓ excluded
 
-- PTY/exec cases in `{postgresql,mysql2,trilogy,sqlite3}/dbconsole_test.rb`
-- `Rake::Task[...].invoke` task-ordering cases in rake test files
+- `adapters/postgresql/postgresql_rake_test.rb` (37 cases) (**excluded**)
+- `adapters/mysql2/mysql2_rake_test.rb` (26 cases) (**excluded**)
+- `adapters/sqlite3/sqlite_rake_test.rb` (17 cases) (**excluded**)
+- `adapters/postgresql/dbconsole_test.rb` (6 cases) (**excluded**)
+- `adapters/mysql2/dbconsole_test.rb` (4 cases) (**excluded**)
+- `adapters/sqlite3/dbconsole_test.rb` (6 cases) (**excluded**)
 
-### Fixtures (entire suite)
+### Fixtures (entire suite) ✓ already excluded
 
 - `test/cases/fixtures_test.rb` (all 111 cases)
 - `test/cases/fixture_set/file_test.rb` (all 14 cases)
@@ -382,9 +394,9 @@ These should be added to a `scripts/test-compare/skip-list.ts` so test:compare c
 - Cases asserting on `NameError#missing_name?`, `Module#prepend` ordering, `singleton_class` semantics
 - `active_record_test.rb` cases asserting on `ActiveRecord::Base.singleton_class.ancestors`
 
-### Encoding / String semantics
+### Encoding / String semantics ✓ excluded
 
-- `binary_test.rb` cases asserting `Encoding::ASCII_8BIT` vs `Encoding::UTF_8`
+- `binary_test.rb` cases asserting `Encoding::ASCII_8BIT` vs `Encoding::UTF_8` (**excluded**)
 - `bytea_test.rb` cases asserting on Ruby `String#encoding`
 
 ### Symbols

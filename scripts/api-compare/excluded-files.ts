@@ -6,17 +6,24 @@
 //   - not-applicable: Ruby-only concerns that don't map to JS
 //     (thread-pool plumbing, Marshal/Psych/MessagePack formats, etc.)
 //
-// `pattern` matches against the Ruby source file path from extract-ruby-api.rb
-// (e.g. "promise.rb", "coders/yaml_column.rb").
-// `testFile` (optional) matches against the Ruby test file path from
-// extract-ruby-tests.rb (e.g. "message_pack_test.rb"). Omit when there is
-// no corresponding test file in the Rails suite.
+// Each entry must set at least one of:
+//   `pattern`  — substring match against the Ruby SOURCE file path
+//                (from extract-ruby-api.rb, e.g. "promise.rb").
+//                Consumed by isExcluded() → api:compare.
+//                Omit for test-only entries where the source IS being ported.
+//   `testFile` — substring match against the Ruby TEST file path
+//                (from extract-ruby-tests.rb, e.g. "message_pack_test.rb").
+//                Consumed by isTestExcluded() → test:compare.
+//                Omit when there is no corresponding Rails test file.
+//
+// Most entries set both (source and test excluded together).
+// Test-only entries (GVL, Rake, dbconsole, Ruby serialization) set only
+// `testFile` because their TS source counterparts either don't exist or
+// are being actively ported.
 
-export interface ExcludedFile {
-  pattern: string;
-  testFile?: string;
+export type ExcludedFile = {
   reason: string;
-}
+} & ({ pattern: string; testFile?: string } | { pattern?: string; testFile: string });
 
 export const EXCLUDED_FILES: ExcludedFile[] = [
   {
@@ -130,10 +137,79 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
     testFile: "trilogy_adapter_test.rb",
     reason: "Trilogy adapter implementation; excluded along with adapters/trilogy.",
   },
+  // --- Permanently not-portable: GVL / thread-model ---
+  {
+    testFile: "transaction_isolation_test.rb",
+    reason:
+      "All tests require concurrent Ruby threads exercising the GVL. " +
+      "Node.js is single-threaded; transaction-isolation guarantees verified by the DB engine, not the runtime.",
+  },
+  {
+    testFile: "schema_loading_test.rb",
+    reason:
+      "Tests ActiveSupport.on_load / Zeitwerk autoload hooks triggered from background threads. " +
+      "No Node.js equivalent; ES module loading is synchronous and non-concurrent.",
+  },
+  {
+    testFile: "reload_models_test.rb",
+    reason:
+      "Tests class reloading via ActiveSupport::Dependencies / Zeitwerk in a forked process. " +
+      "No Node.js equivalent; ES modules are cached for the process lifetime.",
+  },
+  // --- Permanently not-portable: Rake tasks / dbconsole PTY ---
+  {
+    testFile: "adapters/postgresql/postgresql_rake_test.rb",
+    reason:
+      "Tests Rake db:create/drop/migrate tasks via shell exec. " +
+      "Rake and PTY shell-out have no Node.js equivalent; Trails uses migration scripts instead.",
+  },
+  {
+    testFile: "adapters/mysql2/mysql2_rake_test.rb",
+    reason:
+      "Tests Rake db:create/drop/migrate tasks for MySQL via shell exec. " +
+      "Rake and PTY shell-out have no Node.js equivalent.",
+  },
+  {
+    testFile: "adapters/sqlite3/sqlite_rake_test.rb",
+    reason:
+      "Tests Rake db:create/drop/migrate tasks for SQLite via shell exec. " +
+      "Rake and PTY shell-out have no Node.js equivalent.",
+  },
+  {
+    testFile: "adapters/postgresql/dbconsole_test.rb",
+    reason:
+      "Tests `rails dbconsole` PTY/exec invocation for PostgreSQL. " +
+      "Spawning a PTY-backed interactive subprocess has no Node.js equivalent.",
+  },
+  {
+    testFile: "adapters/mysql2/dbconsole_test.rb",
+    reason:
+      "Tests `rails dbconsole` PTY/exec invocation for MySQL. " +
+      "Spawning a PTY-backed interactive subprocess has no Node.js equivalent.",
+  },
+  {
+    testFile: "adapters/sqlite3/dbconsole_test.rb",
+    reason:
+      "Tests `rails dbconsole` PTY/exec invocation for SQLite. " +
+      "Spawning a PTY-backed interactive subprocess has no Node.js equivalent.",
+  },
+  // --- Permanently not-portable: Ruby serialization formats ---
+  {
+    testFile: "yaml_serialization_test.rb",
+    reason:
+      "Tests YAML round-trips of arbitrary Ruby objects (Psych encoding). " +
+      "No Node.js equivalent; JSON is the default column serialization format in Trails.",
+  },
+  {
+    testFile: "binary_test.rb",
+    reason:
+      "Tests Marshal/YAML binary encoding of AR records. " +
+      "Ruby binary serialization formats have no Node.js equivalent.",
+  },
 ];
 
 export function isExcluded(file: string): boolean {
-  return EXCLUDED_FILES.some((e) => file.includes(e.pattern));
+  return EXCLUDED_FILES.some((e) => e.pattern && file.includes(e.pattern));
 }
 
 export function isTestExcluded(testFile: string): boolean {
