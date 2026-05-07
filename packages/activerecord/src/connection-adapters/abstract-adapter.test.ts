@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { TypeMap } from "../type/type-map.js";
 import {
   BooleanType,
@@ -14,6 +14,7 @@ import { DateTime as DateTimeType } from "../type/date-time.js";
 import { Json as JsonType } from "../type/json.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
+import { Result } from "../result.js";
 
 // All 5 methods are class-level in Rails (class << self private), so test via a subclass.
 class TestAdapter extends AbstractAdapter {
@@ -142,5 +143,45 @@ describe("AbstractAdapter.initializeTypeMap", () => {
 
   it("aliases double to float", () => {
     expect(m.lookup("double")).toBeInstanceOf(FloatType);
+  });
+});
+
+describe("DatabaseStatements#insert id extraction", () => {
+  // execInsert/execute are include()-mixed methods, not class declarations,
+  // so we assign them via any rather than using class override syntax.
+  class InsertTestAdapter extends AbstractAdapter {
+    static get adapterName() {
+      return "InsertTestAdapter";
+    }
+    override get adapterName() {
+      return "InsertTestAdapter" as const;
+    }
+  }
+
+  it("returns numeric insertId when execInsert returns a number", async () => {
+    const adapter = new InsertTestAdapter() as any;
+    adapter.execInsert = async () => 42;
+    expect(await adapter.insert("INSERT INTO t VALUES (1)")).toBe(42);
+  });
+
+  it("respects idValue override when provided, regardless of execInsert return type", async () => {
+    const adapter = new InsertTestAdapter() as any;
+    adapter.execInsert = async () => 42;
+    expect(await adapter.insert("INSERT INTO t VALUES (1)", null, null, 99)).toBe(99);
+  });
+
+  it("extracts id from Result via lastInsertedId when execInsert returns a Result", async () => {
+    const adapter = new InsertTestAdapter() as any;
+    adapter.execInsert = async () => new Result(["id"], [[99]]);
+    expect(await adapter.insert("INSERT INTO t VALUES (1)")).toBe(99);
+  });
+
+  it("calls adapter lastInsertedId when present and execInsert returns a Result", async () => {
+    const adapter = new InsertTestAdapter() as any;
+    adapter.execInsert = async () => new Result(["id"], [[99]]);
+    const customLastInserted = vi.fn().mockReturnValue(77);
+    adapter.lastInsertedId = customLastInserted;
+    expect(await adapter.insert("INSERT INTO t VALUES (1)")).toBe(77);
+    expect(customLastInserted).toHaveBeenCalled();
   });
 });

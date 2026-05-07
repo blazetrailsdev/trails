@@ -7,7 +7,7 @@
 import type mysql from "mysql2/promise";
 import { NotImplementedError } from "../../errors.js";
 import { Result } from "../../result.js";
-import { combineMultiStatements } from "../abstract/database-statements.js";
+import { combineMultiStatements } from "../mysql/database-statements.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;

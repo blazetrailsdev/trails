@@ -1412,7 +1412,14 @@ export const DatabaseStatements = {
     const [sql, resolvedBinds] = toSqlAndBinds.call(this, arel, binds);
     const result = await this.execInsert(sql, name, resolvedBinds, pk);
     if (opts?.returning != null) return returningColumnValues.call(this, result);
-    return idValue ?? lastInsertedId(result as Result);
+    if (idValue != null) return idValue;
+    // execInsert may return a Result (PG/adapter with RETURNING support) or a
+    // number/insertId (MySQL/SQLite via executeMutation). Delegate to the
+    // adapter's lastInsertedId when available; fall back to treating the
+    // result directly as the id (matches executeMutation returning insertId).
+    if (this.lastInsertedId && result instanceof Result) return this.lastInsertedId(result);
+    if (result instanceof Result) return lastInsertedId(result);
+    return result; // numeric insertId from executeMutation
   },
 
   async update(
