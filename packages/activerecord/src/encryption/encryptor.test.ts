@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Encryptor } from "./encryptor.js";
+import { Configurable } from "./configurable.js";
+import { Contexts } from "./contexts.js";
+import { clearDefaultKeyProviderCache } from "./default-key-provider-cache.js";
 import { DecryptionError, ForbiddenClass } from "./errors.js";
 import { MessageSerializer } from "./message-serializer.js";
 import { Message } from "./message.js";
@@ -196,6 +199,21 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     expect(inflated).toBe(true);
   });
 
+  it("deterministic encryption replaces unencodable characters based on forcedEncodingForDeterministicEncryption", () => {
+    const key = generateKey();
+    const enc = new Encryptor({ compress: false });
+    const saved = Configurable.config.forcedEncodingForDeterministicEncryption;
+    try {
+      Configurable.config.forcedEncodingForDeterministicEncryption = "US-ASCII";
+      // "é" (U+00E9) is outside ASCII range — should be replaced with "?"
+      const encrypted = enc.encrypt("héllo", { key, deterministic: true });
+      const decrypted = enc.decrypt(encrypted, { key });
+      expect(decrypted).toBe("h?llo");
+    } finally {
+      Configurable.config.forcedEncodingForDeterministicEncryption = saved;
+    }
+  });
+
   it("accept a custom compressor", () => {
     const originalText = "x".repeat(1000);
     const compressedMagic = "COMPRESSED";
@@ -219,5 +237,31 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     expect(decrypted).toBe(originalText);
     expect(deflated).toBe(true);
     expect(inflated).toBe(true);
+  });
+
+  describe("default key provider from Configurable.config", () => {
+    let savedPrimaryKey: string | string[] | undefined;
+    let savedSalt: string | undefined;
+
+    beforeEach(() => {
+      savedPrimaryKey = Configurable.config.primaryKey;
+      savedSalt = Configurable.config.keyDerivationSalt;
+    });
+
+    afterEach(() => {
+      Configurable.config.primaryKey = savedPrimaryKey;
+      Configurable.config.keyDerivationSalt = savedSalt;
+      clearDefaultKeyProviderCache();
+      Contexts.resetDefaultContext();
+    });
+
+    it("encrypts and decrypts using global primaryKey when no key/keyProvider is passed", () => {
+      Configurable.config.primaryKey = "a".repeat(32);
+      Configurable.config.keyDerivationSalt = "testsalt";
+      const enc = new Encryptor({ compress: false });
+      const encrypted = enc.encrypt("hello from config");
+      const decrypted = enc.decrypt(encrypted);
+      expect(decrypted).toBe("hello from config");
+    });
   });
 });

@@ -11,32 +11,10 @@ import {
   Base as BaseEncryptionError,
 } from "./errors.js";
 import { NullEncryptor } from "./null-encryptor.js";
-
-function _normalizeEncoding(encoding: string): "utf8" | "ascii" | "latin1" | null {
-  switch (encoding.toLowerCase().replace(/[^a-z0-9]/g, "")) {
-    case "utf8":
-      return "utf8";
-    case "ascii":
-    case "usascii":
-      return "ascii";
-    case "latin1":
-    case "iso88591":
-    case "binary":
-    case "ascii8bit":
-      return "latin1";
-    default:
-      return null;
-  }
-}
-
-function _replaceUnencodable(value: string, maxCodePoint: number): string {
-  const out: string[] = [];
-  for (const char of value) {
-    const cp = char.codePointAt(0)!;
-    out.push(cp > maxCodePoint || (cp >= 0xd800 && cp <= 0xdfff) ? "?" : char);
-  }
-  return out.join("");
-}
+import {
+  normalizeEncoding as _normalizeEncoding,
+  replaceUnencodable as _replaceUnencodable,
+} from "./encoding-helpers.js";
 
 /**
  * An ActiveModel type that encrypts/decrypts attribute values. This is
