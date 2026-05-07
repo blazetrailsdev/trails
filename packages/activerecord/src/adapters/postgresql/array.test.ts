@@ -18,6 +18,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         timestamps timestamp[] DEFAULT '{}'
       )
     `);
+    await adapter.loadAdditionalTypes();
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
@@ -26,46 +27,54 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlArrayTest", () => {
     it.skip("not compatible with serialize array", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs serialize API */
+      // BLOCKED: adapter-pg — serialize decorator gap
+      // ROOT-CAUSE: Base.serialize() in base.ts does not raise ColumnNotSerializableError for
+      //   array-typed columns; the error class itself is also not yet defined.
+      // SCOPE: ~30 LOC — add ColumnNotSerializableError to errors.ts + guard in serialize() decorator
     });
     it.skip("array with serialized attributes", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs serialize API */
+      // BLOCKED: adapter-pg — serialize decorator coder path missing
+      // ROOT-CAUSE: Base.serialize({ coder: ... }) in base.ts not wired; coder encode/decode
+      //   lifecycle around the OID::Array serialize/deserialize chain is not implemented.
+      // SCOPE: ~50 LOC in base.ts serialize decorator + integration with attribute-set lifecycle
+    });
+    it.skip("default", async () => {
+      /* BLOCKED: addColumn integer-array default DDL; same root as "default strings" (~20 LOC) */
     });
     it.skip("default strings", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs add_column + column_defaults */
+      // BLOCKED: adapter-pg — addColumn array default DDL gap
+      // ROOT-CAUSE: postgresql/schema-statements.ts addColumn does not serialize array defaults
+      //   (e.g. ["foo","bar"]) into PG literal form (e.g. ARRAY['foo','bar']) for the DEFAULT clause.
+      // SCOPE: ~20 LOC in connection-adapters/postgresql/schema-statements.ts
+    });
+    it.skip("schema dump with shorthand", async () => {
+      /* BLOCKED: schema_dumper.ts array:true emission missing; needs column.isArray() (~10 LOC) */
     });
     it.skip("change column with array", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs column introspection with array? predicate */
+      // BLOCKED: adapter-pg — Column#array? introspection missing
+      // ROOT-CAUSE: connection-adapters/postgresql/column.ts has no `array` boolean field /
+      //   `isArray()` method; columnsHash entries cannot report array?: true after changeColumn.
+      // SCOPE: ~15 LOC in column.ts + wire through schema-statements changeColumn
     });
     it.skip("change column from non array to array", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs column introspection with array? predicate */
+      // BLOCKED: adapter-pg — Column#array? introspection + changeColumn USING clause missing
+      // ROOT-CAUSE: same as "change column with array"; additionally changeColumn does not accept
+      //   a `using:` option to emit the USING expression in ALTER COLUMN TYPE.
+      // SCOPE: ~20 LOC in column.ts + schema-statements.ts changeColumn
     });
     it.skip("change column cant make non array column to array", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs StatementInvalid error wrapping */
+      // BLOCKED: adapter-pg — StatementInvalid wrapping missing for DDL errors
+      // ROOT-CAUSE: adapter's executeStatement (postgresql-adapter.ts) does not catch PG
+      //   constraint/type errors and re-raise as ActiveRecord::StatementInvalid; the error class
+      //   is also not yet exported from errors.ts.
+      // SCOPE: ~20 LOC — StatementInvalid error class + catch-rethrow in executeStatement
     });
     it.skip("change column default with array", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs change_column_default */
+      // BLOCKED: adapter-pg — changeColumnDefault array serialization missing
+      // ROOT-CAUSE: schema-statements changeColumnDefault passes the value through quoteDefault
+      //   but does not serialize JS arrays via OID::Array before quoting; PG receives a JS
+      //   stringified value instead of a valid array literal.
+      // SCOPE: ~10 LOC in connection-adapters/postgresql/schema-statements.ts
     });
 
     it("type cast array", async () => {
@@ -130,18 +139,46 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].tags).toEqual(["1", "2", "", "4", "", "5"]);
     });
 
-    it.skip("with multi dimensional empty strings", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* pg module doesn't handle multi-dim with empty strings well */
+    it("with multi dimensional empty strings", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const arr = [
+        [
+          ["1", "2"],
+          ["", "4"],
+          ["", "5"],
+        ],
+      ];
+      const r = await (PgArrays as any).create({ tags: arr });
+      await (r as any).reload();
+      expect((r as any).tags).toEqual(arr);
     });
 
-    it.skip("with arbitrary whitespace", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* pg module doesn't handle multi-dim with whitespace well */
+    it("with arbitrary whitespace", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const arr = [
+        [
+          ["1", "2"],
+          ["    ", "4"],
+          ["    ", "5"],
+        ],
+      ];
+      const r = await (PgArrays as any).create({ tags: arr });
+      await (r as any).reload();
+      expect((r as any).tags).toEqual(arr);
     });
 
     it("multi dimensional with integers", async () => {
@@ -182,22 +219,40 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("insert fixture", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs fixture insertion API */
+      // BLOCKED: adapter-pg — insert_fixture API missing
+      // ROOT-CAUSE: PostgreSQLAdapter has no insertFixture() method; Rails' connection.insert_fixture
+      //   serializes fixture hash values through the column types and executes a single INSERT.
+      // SCOPE: ~20 LOC in postgresql-adapter.ts + abstract-adapter insertFixture
     });
-    it.skip("attribute for inspect for array field", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs attribute_for_inspect on Base model */
+    it("attribute for inspect for array field", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays();
+      (record as any).ratings = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      expect((record as any).attributeForInspect("ratings")).toBe(
+        "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
+      );
     });
-    it.skip("attribute for inspect for array field for large array", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs attribute_for_inspect on Base model */
+    it("attribute for inspect for array field for large array", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays();
+      (record as any).ratings = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      expect((record as any).attributeForInspect("ratings")).toBe(
+        "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+      );
     });
 
     it("escaping", async () => {
@@ -228,11 +283,19 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].tags).toEqual(tags);
     });
 
-    it.skip("quoting non standard delimiters", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs OID::Array type with custom delimiter */
+    it("quoting non standard delimiters", async () => {
+      const { Array: OidArray } = await import("../../connection-adapters/postgresql/oid/array.js");
+      const stringSubtype = {
+        type: "string",
+        cast: (v: unknown) => (v == null ? null : String(v)),
+        serialize: (v: unknown) => (v == null ? null : String(v)),
+        deserialize: (v: unknown) => (v == null ? null : String(v)),
+      };
+      const strings = ["hello,", "world;"];
+      const commaDelim = new OidArray(stringSubtype, ",");
+      const semicolonDelim = new OidArray(stringSubtype, ";");
+      expect(String(commaDelim.serialize(strings))).toBe('{"hello,",world;}');
+      expect(String(semicolonDelim.serialize(strings))).toBe('{hello,;"world;"}');
     });
 
     it("mutate array", async () => {
@@ -247,34 +310,69 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("mutate value in array", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs hstore array support */
+      // BLOCKED: adapter-pg — hstore array subtype missing
+      // ROOT-CAUSE: OID::HStore type (connection-adapters/postgresql/oid/hstore.ts) is not wired
+      //   as the element subtype for `hstores hstore[]` columns; the hstores column is not
+      //   registered in the type-map initializer as an array-of-hstore OID.
+      // SCOPE: ~15 LOC — wire hstore OID as array element subtype in type-map-initializer.ts
     });
     it.skip("datetime with timezone awareness", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: adapter-pg — timezone-aware datetime deserialization missing
+      // ROOT-CAUSE: OID::DateTime (or the timestamp array subtype) does not respect
+      //   ActiveSupport::TimeZone when casting array elements; `in_time_zone` / `Time.zone`
+      //   infrastructure not ported to TS.
+      // SCOPE: large — requires TimeZone registry port; defer to a dedicated timezone PR
     });
-    it.skip("assigning non array value", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs Base model with array attribute */
+    it("assigning non array value", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays({ tags: "not-an-array" } as any);
+      expect((record as any).tags).toEqual([]);
+      expect((record as any).attributeBeforeTypeCast("tags")).toBe("not-an-array");
+      const saved = await record.save();
+      expect(saved).toBe(true);
+      const reloaded = await PgArrays.find((record as any).id);
+      expect((reloaded as any).tags).toEqual([]);
     });
-    it.skip("assigning empty string", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs Base model with array attribute */
+    it("assigning empty string", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays({ tags: "" } as any);
+      expect((record as any).tags).toEqual([]);
+      expect((record as any).attributeBeforeTypeCast("tags")).toBe("");
+      const saved = await record.save();
+      expect(saved).toBe(true);
+      const reloaded = await PgArrays.find((record as any).id);
+      expect((reloaded as any).tags).toEqual([]);
     });
-    it.skip("assigning valid pg array literal", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs Base model with array attribute */
+    it("assigning valid pg array literal", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays({ tags: "{1,2,3}" } as any);
+      expect((record as any).tags).toEqual(["1", "2", "3"]);
+      expect((record as any).attributeBeforeTypeCast("tags")).toBe("{1,2,3}");
+      const saved = await record.save();
+      expect(saved).toBe(true);
+      const reloaded = await PgArrays.find((record as any).id);
+      expect((reloaded as any).tags).toEqual(["1", "2", "3"]);
     });
 
     it("where by attribute with array", async () => {
@@ -286,10 +384,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("uniqueness validation", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs validates_uniqueness_of on Base model */
+      // BLOCKED: adapter-pg — validates_uniqueness_of array serialization gap
+      // ROOT-CAUSE: uniqueness validator builds a WHERE clause by serializing the attribute value;
+      //   OID::Array#serialize returns a Data object whose toString() is the PG literal, but the
+      //   WHERE-clause quoting path in quoting.ts does not handle ArrayData in the bind-param
+      //   position for uniqueness checks (separate from the INSERT path).
+      // SCOPE: ~10 LOC — verify quoting.ts bindToSql handles ArrayData for WHERE params
     });
 
     it("encoding arrays of utf8 strings", async () => {
@@ -300,10 +400,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("precision is respected on timestamp columns", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in array
-      // ROOT-CAUSE: connection-adapters/postgresql/array.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/array.ts; affects ~10–47 tests in array.test.ts
-      /* needs timestamp precision handling */
+      // BLOCKED: adapter-pg — timestamp array microsecond precision not preserved
+      // ROOT-CAUSE: OID::DateTime subtype used for timestamp[] columns does not cast the usec
+      //   component of a Temporal.Instant/Date through the Temporal.PlainDateTime precision path;
+      //   precision: 6 column metadata is not plumbed to the timestamp array subtype's cast.
+      // SCOPE: ~20 LOC — plumb precision through OID::Array → DateTime subtype constructor
     });
   });
 });

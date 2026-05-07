@@ -63,6 +63,10 @@ export function inspectionFilter(this: CoreHost): ParameterFilter {
   return this._inspectionFilter;
 }
 
+function inspectArray(arr: unknown[]): string {
+  return `[${arr.map((v) => (v == null ? "nil" : globalThis.Array.isArray(v) ? inspectArray(v as unknown[]) : typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)))).join(", ")}]`;
+}
+
 /**
  * Format a single attribute value for inspect output.
  * Shared implementation used by Core#inspect, Core#attribute_for_inspect,
@@ -85,6 +89,9 @@ export function formatForInspect(this: any, name: string, value: unknown): strin
     return Number.isNaN(filtered.getTime())
       ? `"${String(filtered)}"`
       : `"${filtered.toISOString()}"`;
+  }
+  if (globalThis.Array.isArray(filtered)) {
+    return inspectArray(filtered as unknown[]);
   }
   try {
     const stringified = JSON.stringify(filtered);
