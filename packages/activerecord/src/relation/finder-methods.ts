@@ -431,6 +431,9 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
     return records[records.length - 1 - index] ?? null;
   }
   const relation: any = orderedRelation(this);
+  // Rails: `if relation.order_values.empty? || relation.has_limit_or_offset?`
+  // After fixing orderedRelation to preserve existing order, checking the result
+  // is equivalent to Rails' post-ordered_relation check.
   if (
     (relation as any)._orderClauses.length === 0 ||
     (relation as any)._limitValue != null ||
@@ -592,13 +595,16 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
   if (conditions === false) return rel;
   // Rails: except(:select, :distinct, :order)._select!("1 AS one").limit!(1)
   // (or except(:order).limit!(1) when distinct+offset are both set)
-  let relation: any =
-    (rel as any)._isDistinct && (rel as any)._offsetValue != null
-      ? (rel as any).unscope("order").limit(1)
-      : (rel as any)
-          .unscope("select", "distinct", "order")
-          .select(new Nodes.SqlLiteral("1 AS one"))
-          .limit(1);
+  let relation: any;
+  if ((rel as any)._isDistinct && (rel as any)._offsetValue != null) {
+    relation = (rel as any).unscope("order").limit(1);
+  } else {
+    // Rails: except(:select, :distinct, :order) — "distinct" is not a valid
+    // unscope() key so clear _isDistinct directly on the cloned relation.
+    relation = (rel as any).unscope("select", "order");
+    relation._isDistinct = false;
+    relation = relation.select(new Nodes.SqlLiteral("1 AS one")).limit(1);
+  }
   if (conditions === null || conditions === undefined || conditions === true) {
     return relation;
   }
@@ -717,7 +723,11 @@ export async function findLast(rel: FinderRelation, limit?: number): Promise<any
 
 /** @internal */
 export function orderedRelation(rel: FinderRelation): any {
-  return orderByPk(rel, "asc");
+  if (!hasOrder(rel)) {
+    const pk = (rel as any)._modelClass?.primaryKey;
+    if (pk) return orderByPk(rel, "asc");
+  }
+  return rel;
 }
 
 /** @internal */
