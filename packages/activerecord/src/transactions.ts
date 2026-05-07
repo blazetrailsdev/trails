@@ -589,7 +589,7 @@ export async function withTransactionReturningStatus<T>(
           // transaction, not the pre-transaction state. Matches Rails where
           // rolledback! fires during rollback, restore runs in ensure.
           await rolledbackBang.call(this);
-          restoreTransactionRecordState(this, snapshot);
+          restoreTransactionRecordState.call(this, snapshot);
         });
       } else {
         await committedBang.call(this);

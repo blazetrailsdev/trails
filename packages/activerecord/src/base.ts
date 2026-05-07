@@ -213,8 +213,6 @@ import {
   rememberTransactionRecordState as _rememberTransactionRecordState,
   restoreTransactionRecordState as _restoreTransactionRecordState,
   isTransactionIncludeAnyAction as _isTransactionIncludeAnyAction,
-  addToTransaction as _addToTransaction,
-  hasTransactionalCallbacks as _hasTransactionalCallbacks,
 } from "./transactions.js";
 
 import {
@@ -3190,8 +3188,6 @@ include(Base, {
   rememberTransactionRecordState: _rememberTransactionRecordState,
   restoreTransactionRecordState: _restoreTransactionRecordState,
   isTransactionIncludeAnyAction: _isTransactionIncludeAnyAction,
-  addToTransaction: _addToTransaction,
-  hasTransactionalCallbacks: _hasTransactionalCallbacks,
   // TouchLater privates (instance-level) wired here for api:compare credit.
   surreptitiouslyTouch: TouchLater.surreptitiouslyTouch,
   touchDeferredAttributes: TouchLater.touchDeferredAttributes,
