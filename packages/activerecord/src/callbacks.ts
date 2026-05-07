@@ -9,7 +9,11 @@
  */
 
 import type { Base } from "./base.js";
-import { currentTimeFromProperTimezone, timestampAttributesForUpdateInModel } from "./timestamp.js";
+import {
+  allTimestampAttributesInModel,
+  currentTimeFromProperTimezone,
+  timestampAttributesForUpdateInModel,
+} from "./timestamp.js";
 
 type ModelCtor = typeof Base;
 
@@ -241,6 +245,14 @@ export function _createRecord(this: any): Promise<boolean> {
   // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
   const ctor = this.constructor as any;
   return ctor._callbackChain.runCallbacks("create", this, async () => {
+    if (ctor.recordTimestamps !== false) {
+      const time = currentTimeFromProperTimezone();
+      for (const col of allTimestampAttributesInModel.call(ctor)) {
+        if (ctor._attributeDefinitions?.has(col) && this._readAttribute?.(col) == null) {
+          this._writeAttribute?.(col, time);
+        }
+      }
+    }
     if (!this._performInsert) throw new Error("_performInsert not implemented");
     await this._performInsert();
     if (this._pendingOperation) {
