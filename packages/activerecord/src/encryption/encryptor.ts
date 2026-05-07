@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::Encryptor
  */
 
-import { Aes256Gcm as Cipher } from "./cipher/aes256-gcm.js";
+import { Aes256Gcm } from "./cipher/aes256-gcm.js";
 import { Message } from "./message.js";
 import { MessageSerializer } from "./message-serializer.js";
 import { Configurable } from "./configurable.js";
@@ -120,7 +120,7 @@ export class Encryptor {
     for (const key of keys) {
       let decryptedBuf: Buffer;
       try {
-        decryptedBuf = new Cipher(key).decrypt(message);
+        decryptedBuf = new Aes256Gcm(key).decrypt(message);
       } catch (e) {
         if (e instanceof DecryptionError) continue; // wrong key — try next
         throw e; // EncryptedContentIntegrity, ConfigError, etc.
@@ -146,6 +146,11 @@ export class Encryptor {
 
   isBinary(): boolean {
     return this.serializer().isBinary();
+  }
+
+  /** @internal */
+  private cipher() {
+    return Configurable.cipher;
   }
 
   get compressor(): Compressor {
@@ -213,7 +218,7 @@ export class Encryptor {
     if (key == null) throw new ConfigError("No encryption key provided");
 
     const [cipherInput, compressed] = this.compressIfWorthIt(clearText);
-    const message = new Cipher(key, cipherOptions).encrypt(cipherInput);
+    const message = new Aes256Gcm(key, cipherOptions).encrypt(cipherInput);
     if (compressed) message.addHeader("c", true);
     if (encKeyObj.publicTags) {
       for (const [k, v] of Object.entries(encKeyObj.publicTags)) {

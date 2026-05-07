@@ -1,7 +1,9 @@
 import { Config } from "./config.js";
 import { Contexts } from "./contexts.js";
+import { Cipher } from "./cipher.js";
 
 let _sharedConfig: Config | null = null;
+let _defaultCipher: Cipher | null = null;
 const _listeners: Array<(klass: any, name: string) => void> = [];
 const _configureHooks: Array<() => void> = [];
 
@@ -22,6 +24,10 @@ export class Configurable {
   // Mirrors Rails' delegation of Context::PROPERTIES to context.
   static get keyProvider(): unknown {
     return Contexts.context.keyProvider;
+  }
+
+  static get cipher(): Cipher {
+    return (Contexts.context.cipher as Cipher | undefined) ?? (_defaultCipher ??= new Cipher());
   }
 
   static configure(options: {
@@ -53,6 +59,7 @@ export class Configurable {
   private static _invalidateCaches(): void {
     // Mirror Rails: reset_default_context after setting config so context
     // properties derived from config (e.g. key_provider) are re-evaluated.
+    _defaultCipher = null;
     Contexts.resetDefaultContext();
     for (const hook of [..._configureHooks]) hook();
   }
