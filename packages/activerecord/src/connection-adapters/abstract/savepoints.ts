@@ -76,3 +76,16 @@ export async function releaseSavepoint(this: SavepointHost, name?: string): Prom
   const spName = name ?? this.currentSavepointName?.() ?? currentSavepointName();
   await this.internalExecute(releaseSavepointSql(spName), "TRANSACTION");
 }
+
+/**
+ * Mixin object for AbstractAdapter: bundles Savepoints methods so
+ * `include(AbstractAdapter, Savepoints)` credits them to the host class.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Savepoints (included in AbstractAdapter)
+ */
+export const Savepoints = {
+  currentSavepointName,
+  createSavepoint,
+  execRollbackToSavepoint,
+  releaseSavepoint,
+};

@@ -459,3 +459,17 @@ function cacheSql(
   const key = binds && binds.length > 0 ? JSON.stringify([sql, binds]) : sql;
   return qc.computeIfAbsent(key, execute);
 }
+
+/**
+ * Mixin object for AbstractAdapter: bundles private QueryCache helpers so
+ * `include(AbstractAdapter, QueryCache)` credits them to the host class.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache (included in AbstractAdapter)
+ */
+export const QueryCache = {
+  unsetQueryCacheBang,
+  lookupSqlCache,
+  cacheSql,
+  cacheNotificationInfoResult,
+  cacheNotificationInfo,
+};

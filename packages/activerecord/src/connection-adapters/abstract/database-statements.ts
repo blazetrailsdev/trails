@@ -484,10 +484,7 @@ export async function insert(
   const [sql, resolvedBinds] = toSqlAndBinds(arel, binds);
   const result = await execInsert.call(this, sql, name, resolvedBinds);
   if (idValue !== undefined && idValue !== null) return idValue;
-  if (!host?.lastInsertedId) {
-    throw new Error("adapter must implement lastInsertedId(result) to use insert()");
-  }
-  return host.lastInsertedId(result);
+  return host.lastInsertedId!(result);
 }
 
 /**
@@ -1401,6 +1398,60 @@ export const DatabaseStatements = {
   ): [unknown, unknown[]] {
     return cacheableQuery.call(this as never, klass, arel);
   },
+
+  // Standalone helpers wired into the host so include(AbstractAdapter, DatabaseStatements)
+  // credits them to the host class (mirrors Rails' `include DatabaseStatements`).
+  toSql,
+  toSqlAndBinds,
+  queryValue,
+  queryValues,
+  query,
+  execute,
+  execInsertAll,
+  explain,
+  truncate,
+  truncateTables,
+  transactionManager,
+  isTransactionOpen,
+  markTransactionWrittenIfWrite,
+  addTransactionRecord,
+  beginDbTransaction,
+  beginDeferredTransaction,
+  transactionIsolationLevels,
+  beginIsolatedDbTransaction,
+  resetIsolationLevel,
+  commitDbTransaction,
+  rollbackDbTransaction,
+  execRollbackDbTransaction,
+  restartDbTransaction,
+  execRestartDbTransaction,
+  rollbackToSavepoint,
+  defaultSequenceName,
+  resetSequenceBang,
+  insertFixture,
+  insertFixturesSet,
+  sanitizeLimit,
+  withYamlFallback,
+  highPrecisionCurrentTimestamp,
+  rawExecQuery,
+  internalExecQuery,
+  performQuery,
+  castResult,
+  affectedRows,
+  preprocessQuery,
+  defaultInsertValue,
+  buildFixtureSql,
+  buildFixtureStatements,
+  buildTruncateStatement,
+  buildTruncateStatements,
+  combineMultiStatements,
+  select,
+  sqlForInsert,
+  lastInsertedId,
+  returningColumnValues,
+  singleValueFromRows,
+  arelFromRelation,
+  extractTableRefFromInsertSql,
 };
 
 /** @internal */
@@ -1665,11 +1716,14 @@ export function sqlForInsert(
   return [sql, binds];
 }
 
-/** @internal */
-function lastInsertedId(result: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#last_inserted_id is not implemented",
-  );
+/**
+ * Returns the id of the last inserted row from a result.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#last_inserted_id
+ * @internal
+ */
+function lastInsertedId(result: Result): unknown {
+  return singleValueFromRows(result.rows as unknown[][]);
 }
 
 /**

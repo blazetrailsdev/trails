@@ -504,3 +504,15 @@ function lookupCastType(sqlType: any): never {
     "ActiveRecord::ConnectionAdapters::Quoting#lookup_cast_type is not implemented",
   );
 }
+
+/**
+ * Mixin object for AbstractAdapter: bundles standalone Quoting helpers so
+ * `include(AbstractAdapter, Quoting)` credits them to the host class.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Quoting (included in AbstractAdapter)
+ */
+export const Quoting = {
+  quotedDate,
+  quotedTime,
+  typeCastedBinds,
+};

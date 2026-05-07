@@ -38,6 +38,7 @@ import {
   clearQueryCache as clearQueryCacheMixin,
   checkVersion as checkVersionMixin,
   type QueryCacheHost,
+  QueryCache as QueryCacheMixin,
 } from "./abstract/query-cache.js";
 import {
   DatabaseStatements,
@@ -59,10 +60,19 @@ import {
   quotedBinary as abstractQuotedBinary,
   castBoundValue as abstractCastBoundValue,
   sanitizeAsSqlComment as abstractSanitizeAsSqlComment,
+  Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
 import type { Quoting } from "./abstract/quoting-interface.js";
 import { include } from "@blazetrails/activesupport";
 import { SchemaStatements } from "./abstract/schema-statements.js";
+import { Savepoints as SavepointsMixin } from "./abstract/savepoints.js";
+import {
+  maxIdentifierLength,
+  tableNameLength,
+  tableAliasLength,
+  indexNameLength,
+  bindParamsLength,
+} from "./abstract/database-limits.js";
 import type {
   TableDefinition,
   Table,
@@ -1521,6 +1531,30 @@ export class AbstractAdapter implements Quoting {
 include(AbstractAdapter, DatabaseStatements);
 // Rails: `include SchemaStatements` inside the class body.
 include(AbstractAdapter, SchemaStatements);
+// Rails: `include Quoting` inside the class body.
+include(AbstractAdapter, QuotingMixin);
+// Rails: `include QueryCache` inside the class body.
+include(AbstractAdapter, QueryCacheMixin);
+// Rails: `include Savepoints` inside the class body.
+include(AbstractAdapter, SavepointsMixin);
+// Rails: `include DatabaseLimits` inside the class body.
+include(AbstractAdapter, {
+  maxIdentifierLength,
+  tableNameLength,
+  tableAliasLength,
+  indexNameLength,
+  bindParamsLength,
+});
+
+// Wire abstract private stubs so api:compare credits them to AbstractAdapter.
+const AbstractAdapterPrivates = {
+  initializeTypeMap,
+  registerClassWithLimit,
+  extractScale,
+  extractPrecision,
+  extractLimit,
+};
+include(AbstractAdapter, AbstractAdapterPrivates);
 
 /** @internal */
 function initializeTypeMap(m: any): never {
