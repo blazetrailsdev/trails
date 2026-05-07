@@ -647,6 +647,21 @@ describe("StoreTest", () => {
     expect(local["prefs"]).toEqual(["notify", "digest"]);
   });
 
+  it("store() called twice with overlapping keys deduplicates (Rails |= union)", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = a2;
+      }
+    }
+    store(Item, "settings", { accessors: ["theme"] });
+    store(Item, "settings", { accessors: ["theme", "language"] });
+    const local = localStoredAttributes(Item);
+    expect(local["settings"]).toEqual(["theme", "language"]);
+  });
+
   it("storedAttributes() merges parent and child registries", () => {
     const a2 = freshAdapter();
     class Parent extends Base {

@@ -230,7 +230,7 @@ import {
 import * as _AttributeAssignment from "./attribute-assignment.js";
 import * as _NestedAttributes from "./nested-attributes.js";
 import {
-  addLocalStoredAttribute,
+  store as _storeFunction,
   localStoredAttributesMethod as _localStoredAttributesMethod,
   readStoreAttributeMethod as _readStoreAttributeMethod,
   writeStoreAttributeMethod as _writeStoreAttributeMethod,
@@ -1353,31 +1353,15 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Store.store
    */
-  static store(attribute: string, options?: { accessors?: string[] }): void {
-    const accessors = options?.accessors ?? [];
-    addLocalStoredAttribute(this, attribute, accessors);
-
-    // Define accessor methods for each key
-    for (const accessor of accessors) {
-      Object.defineProperty(this.prototype, accessor, {
-        get(this: Base) {
-          const store = this._attributes.get(attribute);
-          if (store && typeof store === "object") {
-            return (store as Record<string, unknown>)[accessor] ?? null;
-          }
-          return null;
-        },
-        set(this: Base, value: unknown) {
-          let store = this._attributes.get(attribute);
-          if (!store || typeof store !== "object") {
-            store = {};
-          }
-          const newStore = { ...(store as Record<string, unknown>), [accessor]: value };
-          this.writeAttribute(attribute, newStore);
-        },
-        configurable: true,
-      });
-    }
+  static store(
+    attribute: string,
+    options?: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string },
+  ): void {
+    _storeFunction(this, attribute, {
+      accessors: options?.accessors ?? [],
+      prefix: options?.prefix,
+      suffix: options?.suffix,
+    });
   }
 
   // -- Scopes registry (used by Relation) --

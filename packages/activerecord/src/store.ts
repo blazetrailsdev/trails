@@ -59,7 +59,7 @@ export function storedAttributes(modelClass: typeof Base): Record<string, string
   if (!local) return parentAttrs;
   const merged: Record<string, string[]> = { ...parentAttrs };
   for (const [store, keys] of Object.entries(local)) {
-    merged[store] = [...(parentAttrs[store] ?? []), ...keys];
+    merged[store] = [...new Set([...(parentAttrs[store] ?? []), ...keys])];
   }
   return merged;
 }
@@ -78,7 +78,7 @@ export function addLocalStoredAttribute(
 ): void {
   const existing = _storedAttributes.get(klass) ?? {};
   const prev = existing[storeName] ?? [];
-  _storedAttributes.set(klass, { ...existing, [storeName]: [...prev, ...keys] });
+  _storedAttributes.set(klass, { ...existing, [storeName]: [...new Set([...prev, ...keys])] });
 }
 
 /**
