@@ -8,6 +8,7 @@
  */
 
 import { JSON as CodersJSON } from "../coders/json.js";
+import { ColumnSerializer as CodersColumnSerializer } from "../coders/column-serializer.js";
 import { Json as JsonType } from "../type/json.js";
 
 export interface Serialization {
@@ -90,7 +91,7 @@ export function buildColumnSerializer(
   }
 
   if (type && type !== Object) {
-    return new ColumnSerializer(attrName, resolvedCoder as CoderLike);
+    return new CodersColumnSerializer(attrName, resolvedCoder as any, type as any);
   }
 
   return resolvedCoder;
