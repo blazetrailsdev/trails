@@ -92,11 +92,14 @@ export function isDescendsFromActiveRecord(modelClass: typeof Base): boolean {
 
 /**
  * Check if this class is its own STI base class (i.e. `base_class == self`).
+ * Uses the cached `_computedBaseClass` from `setBaseClass`, computing it on
+ * demand if not already set.
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#base_class?
  */
 export function isBaseClass(modelClass: typeof Base): boolean {
-  return getStiBase(modelClass) === modelClass;
+  if (!(modelClass as any)._computedBaseClass) setBaseClass(modelClass);
+  return (modelClass as any)._computedBaseClass === modelClass;
 }
 
 /**
@@ -108,15 +111,20 @@ export function isBaseClass(modelClass: typeof Base): boolean {
  * @internal
  */
 export function setBaseClass(modelClass: typeof Base): void {
+  // Rails: if self == Base → base_class = self.
+  // Detected via the _isActiveRecordBase own-property sentinel on Base.
+  if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) {
+    (modelClass as any)._computedBaseClass = modelClass;
+    return;
+  }
   const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
   if (!parent || parent === Function.prototype || typeof parent.name !== "string") {
-    // modelClass IS Base (or detached) — it is its own base.
     (modelClass as any)._computedBaseClass = modelClass;
     return;
   }
   // Rails: if superclass == Base || superclass.abstract_class? → self is root.
-  // We detect the AR root via the _isARBase sentinel set on Base.
-  const parentIsARBase = Object.prototype.hasOwnProperty.call(parent, "_isARBase");
+  // Use _isActiveRecordBase (existing sentinel) to identify the AR root class.
+  const parentIsARBase = Object.prototype.hasOwnProperty.call(parent, "_isActiveRecordBase");
   const parentIsAbstract = getAbstractClass.call(parent);
   if (parentIsARBase || parentIsAbstract) {
     (modelClass as any)._computedBaseClass = modelClass;

@@ -2162,7 +2162,7 @@ describe("Base constructor wires initializeInternalsCallback", () => {
 
     const mgr = await Manager3.create({ name: "Alice" });
     const found = await User3.find(mgr.id);
-    expect(found.constructor.name).toBe("Manager3");
+    expect(found).toBeInstanceOf(Manager3);
     expect((found as any).name).toBe("Alice");
   });
 

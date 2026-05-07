@@ -11,7 +11,7 @@ import {
   sql as arelSql,
   setToSqlVisitor,
 } from "@blazetrails/arel";
-import type { DatabaseAdapter } from "./adapter.js";
+import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import type { Relation } from "./relation.js";
 import {
   getInheritanceColumn,
@@ -452,9 +452,6 @@ function _applyScopeAttributes(
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
-  /** @internal Sentinel used by setBaseClass to identify the AR root class. */
-  static readonly _isARBase = true;
-
   // --- Translation mixin (wired via extend() after class) ---
   declare static lookupAncestors: typeof Translation.lookupAncestors;
 
@@ -1253,7 +1250,10 @@ export class Base extends Model {
   declare static collectingQueriesForExplain: typeof _collectingQueriesForExplain;
 
   /** @internal */
-  static execExplain(queries: [string, unknown[]][], options?: any[]): Promise<string> {
+  static execExplain(
+    queries: [string, unknown[]][],
+    options: ExplainOption[] = [],
+  ): Promise<string> {
     return _execExplain(this, queries, options);
   }
 
@@ -1281,9 +1281,14 @@ export class Base extends Model {
   static defineDelegatedTypeMethods(
     role: string,
     types: string[],
-    options: import("./delegated-type.js").DelegatedTypeOptions,
+    options: Omit<import("./delegated-type.js").DelegatedTypeOptions, "types">,
   ): void {
-    _defineDelegatedTypeMethods(this, role, types, options);
+    _defineDelegatedTypeMethods(
+      this,
+      role,
+      types,
+      options as import("./delegated-type.js").DelegatedTypeOptions,
+    );
   }
 
   // -- Store --
