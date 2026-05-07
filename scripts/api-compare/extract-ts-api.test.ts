@@ -434,6 +434,88 @@ describe("extractFromProgram — include() detection", () => {
   });
 });
 
+describe("extractFromProgram — Object.defineProperty wiring", () => {
+  it("credits a string-literal defineProperty key to the host class (Pattern A)", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `export class Base {}`,
+      "wire.ts": `
+        import { Base } from "./base.js";
+        import { createRecord } from "./callbacks.js";
+        Object.defineProperty(Base.prototype, "createOrUpdate", {
+          value: createRecord,
+          configurable: true,
+          writable: true,
+          enumerable: false,
+        });
+      `,
+      "callbacks.ts": `export function createRecord() {}`,
+    });
+    const methods = info.classes["base.ts:Base"].instanceMethods.map((m) => m.name);
+    expect(methods).toContain("createOrUpdate");
+    const m = info.classes["base.ts:Base"].instanceMethods.find(
+      (x) => x.name === "createOrUpdate",
+    )!;
+    expect(m.visibility).toBe("private");
+    expect(m.internal).toBe(true);
+  });
+
+  it("credits for-of loop over [name, fn][] array to host class (Pattern B)", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `export class Base {}`,
+      "callbacks.ts": `
+        export function createOrUpdate() {}
+        export function _createRecord() {}
+        export function _updateRecord() {}
+      `,
+      "wire.ts": `
+        import { Base } from "./base.js";
+        import { createOrUpdate, _createRecord, _updateRecord } from "./callbacks.js";
+        for (const [name, fn] of [
+          ["createOrUpdate", createOrUpdate],
+          ["_createRecord", _createRecord],
+          ["_updateRecord", _updateRecord],
+        ] as const) {
+          Object.defineProperty(Base.prototype, name, {
+            value: fn,
+            configurable: true,
+            writable: true,
+            enumerable: false,
+          });
+        }
+      `,
+    });
+    const names = info.classes["base.ts:Base"].instanceMethods.map((m) => m.name);
+    expect(names).toContain("createOrUpdate");
+    expect(names).toContain("_createRecord");
+    expect(names).toContain("_updateRecord");
+    for (const name of ["createOrUpdate", "_createRecord", "_updateRecord"]) {
+      const m = info.classes["base.ts:Base"].instanceMethods.find((x) => x.name === name)!;
+      expect(m.visibility).toBe("private");
+      expect(m.internal).toBe(true);
+    }
+  });
+
+  it("does not double-add if the method is already on the class", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `export class Base { createOrUpdate() {} }`,
+      "callbacks.ts": `export function createOrUpdate() {}`,
+      "wire.ts": `
+        import { Base } from "./base.js";
+        import { createOrUpdate } from "./callbacks.js";
+        Object.defineProperty(Base.prototype, "createOrUpdate", {
+          value: createOrUpdate,
+          configurable: true,
+          writable: true,
+        });
+      `,
+    });
+    const hits = info.classes["base.ts:Base"].instanceMethods.filter(
+      (m) => m.name === "createOrUpdate",
+    );
+    expect(hits).toHaveLength(1);
+  });
+});
+
 describe("packageFingerprint (per-package cache key)", () => {
   // Track every tmp dir we create so afterEach can clean up; otherwise
   // repeated test runs leave /tmp/fp-*/ entries behind.

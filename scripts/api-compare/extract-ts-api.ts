@@ -22,7 +22,7 @@ import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } 
 // (SHA-1 over sorted (relPath, mtimeMs, size) triples) plus a
 // SCHEMA_VERSION constant we can bump when the extractor's output
 // shape changes. Set `API_COMPARE_FORCE=1` to skip the cache entirely.
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const CACHE_DIR = path.join(OUTPUT_DIR, "ts-api-cache");
 
 interface CacheEntry {
@@ -759,7 +759,164 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
     });
   }
 
+  // Object.defineProperty pass: detect two patterns that wire methods onto a
+  // class prototype without going through include(). Both appear in base.ts:
+  //
+  //   Pattern A — string-literal key:
+  //     Object.defineProperty(Cls.prototype, "methodName", { value: fn });
+  //
+  //   Pattern B — for-of loop over a [name, fn][] as-const array:
+  //     for (const [name, fn] of [["m1", f1], ["m2", f2]] as const) {
+  //       Object.defineProperty(Cls.prototype, name, { value: fn });
+  //     }
+  //
+  // Without this pass, api:compare cannot see those methods on the host class.
+  for (const sourceFile of program.getSourceFiles()) {
+    if (!sourceFile.fileName.startsWith(srcDir)) continue;
+    if (sourceFile.fileName.endsWith(".test.ts")) continue;
+    if (sourceFile.fileName.endsWith(".d.ts")) continue;
+
+    ts.forEachChild(sourceFile, (node) => {
+      if (ts.isExpressionStatement(node)) {
+        extractDefinePropertyDirect(node.expression, info, checker, srcDir);
+      } else if (ts.isForOfStatement(node)) {
+        extractDefinePropertyForOf(node, info, checker, srcDir);
+      }
+    });
+  }
+
   return info;
+}
+
+/**
+ * Given a `Cls.prototype` expression, return the ClassInfo for Cls if it is
+ * a known class in `info`. Returns null for any unrecognised shape.
+ */
+function classInfoForPrototype(
+  expr: ts.Expression,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+): ClassInfo | null {
+  if (!ts.isPropertyAccessExpression(expr)) return null;
+  if (!ts.isIdentifier(expr.name) || expr.name.text !== "prototype") return null;
+  const clsExpr = expr.expression;
+  if (!ts.isIdentifier(clsExpr)) return null;
+  const sym0 = checker.getSymbolAtLocation(clsExpr);
+  if (!sym0) return null;
+  const sym = sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+  const decl = sym.valueDeclaration ?? sym.declarations?.[0];
+  if (!decl || !ts.isClassDeclaration(decl)) return null;
+  const file = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
+  return info.classes[`${file}:${sym.name}`] ?? null;
+}
+
+/** Push a method name onto classInfo if not already present. */
+function pushDefinePropertyMethod(classInfo: ClassInfo, name: string, line: number): void {
+  if (classInfo.instanceMethods.some((m) => m.name === name)) return;
+  classInfo.instanceMethods.push({
+    name,
+    visibility: "private",
+    internal: true,
+    params: [],
+    line,
+    file: classInfo.file,
+  });
+}
+
+/**
+ * Pattern A: direct `Object.defineProperty(Cls.prototype, "name", { value: fn })`.
+ * If the property name is a string literal and the descriptor has a `value` key,
+ * the method is credited to Cls.
+ */
+function extractDefinePropertyDirect(
+  expr: ts.Expression,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+): void {
+  if (!ts.isCallExpression(expr)) return;
+  if (!ts.isPropertyAccessExpression(expr.expression)) return;
+  const pa = expr.expression;
+  if (!ts.isIdentifier(pa.expression) || pa.expression.text !== "Object") return;
+  if (!ts.isIdentifier(pa.name) || pa.name.text !== "defineProperty") return;
+  if (expr.arguments.length < 3) return;
+  const [target, propNameExpr, descriptor] = expr.arguments;
+  if (!ts.isStringLiteral(propNameExpr)) return;
+  if (!ts.isObjectLiteralExpression(descriptor)) return;
+  const hasValue = descriptor.properties.some(
+    (p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === "value",
+  );
+  if (!hasValue) return;
+  const classInfo = classInfoForPrototype(target, info, checker, srcDir);
+  if (!classInfo) return;
+  const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
+  pushDefinePropertyMethod(classInfo, propNameExpr.text, line);
+}
+
+/**
+ * Pattern B: for-of loop that calls `Object.defineProperty(Cls.prototype, nameVar, ...)`:
+ *
+ *   for (const [name, fn] of [["m1", f1], ["m2", f2]] as const) {
+ *     Object.defineProperty(Cls.prototype, name, { value: fn });
+ *   }
+ *
+ * Collects the string-literal first elements of the iterable and credits them
+ * to the class whose prototype appears in the loop body.
+ */
+function extractDefinePropertyForOf(
+  node: ts.ForOfStatement,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+): void {
+  // Initializer must be `const [nameVar, ...]`.
+  if (!ts.isVariableDeclarationList(node.initializer)) return;
+  if (node.initializer.declarations.length !== 1) return;
+  const bindingDecl = node.initializer.declarations[0];
+  if (!ts.isArrayBindingPattern(bindingDecl.name) || bindingDecl.name.elements.length < 1) return;
+  const firstBinding = bindingDecl.name.elements[0];
+  if (!ts.isBindingElement(firstBinding) || !ts.isIdentifier(firstBinding.name)) return;
+  const nameVar = firstBinding.name.text;
+
+  // Iterable: [...] or [...] as const.
+  let iterable = node.expression;
+  if (ts.isAsExpression(iterable)) iterable = iterable.expression;
+  if (!ts.isArrayLiteralExpression(iterable)) return;
+
+  // Each element must be an array literal whose first element is a string literal.
+  const methodNames: string[] = [];
+  for (const el of iterable.elements) {
+    if (!ts.isArrayLiteralExpression(el) || el.elements.length < 1) return;
+    const first = el.elements[0];
+    if (!ts.isStringLiteral(first)) return;
+    methodNames.push(first.text);
+  }
+  if (methodNames.length === 0) return;
+
+  // Find `Object.defineProperty(Cls.prototype, nameVar, { value: ... })` in body.
+  if (!ts.isBlock(node.statement)) return;
+  let classInfo: ClassInfo | null = null;
+  for (const stmt of node.statement.statements) {
+    if (!ts.isExpressionStatement(stmt)) continue;
+    const expr = stmt.expression;
+    if (!ts.isCallExpression(expr)) continue;
+    if (!ts.isPropertyAccessExpression(expr.expression)) continue;
+    const pa = expr.expression;
+    if (!ts.isIdentifier(pa.expression) || pa.expression.text !== "Object") continue;
+    if (!ts.isIdentifier(pa.name) || pa.name.text !== "defineProperty") continue;
+    if (expr.arguments.length < 3) continue;
+    const [target, propNameExpr] = expr.arguments;
+    if (!ts.isIdentifier(propNameExpr) || propNameExpr.text !== nameVar) continue;
+    classInfo = classInfoForPrototype(target, info, checker, srcDir);
+    break;
+  }
+  if (!classInfo) return;
+
+  const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
+  for (const name of methodNames) {
+    pushDefinePropertyMethod(classInfo, name, line);
+  }
 }
 
 /**
