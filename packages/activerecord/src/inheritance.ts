@@ -98,7 +98,8 @@ export function isDescendsFromActiveRecord(modelClass: typeof Base): boolean {
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#base_class?
  */
 export function isBaseClass(modelClass: typeof Base): boolean {
-  if (!(modelClass as any)._computedBaseClass) setBaseClass(modelClass);
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "_computedBaseClass"))
+    setBaseClass(modelClass);
   return (modelClass as any)._computedBaseClass === modelClass;
 }
 
@@ -129,8 +130,8 @@ export function setBaseClass(modelClass: typeof Base): void {
   if (parentIsARBase || parentIsAbstract) {
     (modelClass as any)._computedBaseClass = modelClass;
   } else {
-    // Ensure parent is computed first (lazy on first call).
-    if (!(parent as any)._computedBaseClass) setBaseClass(parent);
+    // Ensure parent has its own computed entry before inheriting it.
+    if (!Object.prototype.hasOwnProperty.call(parent, "_computedBaseClass")) setBaseClass(parent);
     (modelClass as any)._computedBaseClass = (parent as any)._computedBaseClass;
   }
 }
@@ -213,7 +214,7 @@ export function isStiSubclass(modelClass: typeof Base): boolean {
  * @internal
  */
 export function baseClass(this: typeof Base): typeof Base {
-  if (!(this as any)._computedBaseClass) setBaseClass(this);
+  if (!Object.prototype.hasOwnProperty.call(this, "_computedBaseClass")) setBaseClass(this);
   return (this as any)._computedBaseClass as typeof Base;
 }
 
