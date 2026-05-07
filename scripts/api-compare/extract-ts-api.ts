@@ -1211,15 +1211,10 @@ export function extractClass(
 
   for (const member of node.members) {
     const memberName = getMemberName(member);
-    // Skip _-prefixed non-method members (backing fields), but keep _-prefixed methods
-    // since Rails has public methods like _load_from, _reflect_on_association, etc.
-    if (
-      memberName?.startsWith("_") &&
-      !ts.isMethodDeclaration(member) &&
-      !ts.isGetAccessorDeclaration(member) &&
-      !ts.isSetAccessorDeclaration(member)
-    )
-      continue;
+    // Skip #-prefixed private fields (TS private identifiers / backing fields).
+    // _-prefixed members are kept — Rails uses _snake_case for private helpers
+    // (e.g. _query_by_sql, _load_from_sql) and we mirror that convention.
+    if (memberName && ts.isPrivateIdentifier((member as ts.NamedDeclaration).name!)) continue;
 
     const visibility = memberVisibility(member);
     const internal = visibility !== "public";

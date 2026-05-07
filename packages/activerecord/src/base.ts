@@ -2032,6 +2032,10 @@ export class Base extends Model {
   declare static only: typeof Querying.only;
   declare static merge: typeof Querying.merge;
   declare static asyncIds: typeof Querying.asyncIds;
+  /** @internal */
+  declare static _queryBySql: typeof Querying._queryBySql;
+  /** @internal */
+  declare static _loadFromSql: typeof Querying._loadFromSql;
 
   /**
    * Increment counter columns for a record by primary key.
@@ -2898,6 +2902,25 @@ export class Base extends Model {
   static hasAttribute(name: string): boolean {
     return this.hasAttributeDefinition(name);
   }
+
+  // --- TokenFor instance methods (token-for.ts, wired at runtime via generatesTokenFor) ---
+  // Rails' TokenFor module is included in Base; these are its instance methods.
+  // Declared here so api:compare credits them to base.ts. No eager import — token-for.ts
+  // pulls in node:crypto and is intentionally excluded from the main barrel (BC-3).
+  declare generateTokenFor: (purpose: string) => string;
+  /** @internal */
+  declare fullPurpose: () => string;
+  /** @internal */
+  declare messageVerifier: () => unknown;
+  /** @internal */
+  declare payloadFor: (model: Base) => unknown[];
+  /** @internal */
+  declare generateToken: (model: Base) => string;
+  /** @internal */
+  declare resolveToken: (
+    token: string,
+    finder: (id: unknown) => Promise<Base | null>,
+  ) => Promise<Base | null>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -3021,7 +3044,6 @@ extend(Base, {
   _defaultAttributes: _arDefaultAttributes,
 });
 extend(Base, {
-  // _queryBySql/_loadFromSql already wired by extend(Base, Querying) above.
   // ConnectionHandling.ClassMethods does not include resolveConfigForConnection
   // (it's a standalone export, not in the ClassMethods object), so wire it here.
   resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
@@ -3191,9 +3213,6 @@ include(Base, {
   hasDeferTouchAttrs(this: Base) {
     return TouchLater.hasDeferTouchAttrs(this);
   },
-  // generateTokenFor omitted: token-for.ts imports @blazetrails/activesupport/message-verifier
-  // (node:crypto). The module is intentionally excluded from the main barrel (see index.ts
-  // comment near line 292). Eager-importing it here would reintroduce the BC-3 crypto leak.
   // normalizeChangedInPlaceAttributes is not on Model; safe to wire.
   normalizeChangedInPlaceAttributes(this: Base) {
     return _normalizeChangedInPlaceAttributesFn(this);
