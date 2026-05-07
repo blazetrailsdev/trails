@@ -590,6 +590,68 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     assertEncryptedAttribute(await BookNormalized.find(b2.id), "logo", "book");
   });
 
+  it("EncryptableRecord.validateEncryptionAllowed throws when encryption is frozen", () => {
+    withEncryptionContext({ frozenEncryption: true }, () => {
+      expect(() => EncryptableRecord.validateEncryptionAllowed({})).toThrow(
+        "can't be modified because it is encrypted",
+      );
+    });
+  });
+
+  it("EncryptableRecord.validateEncryptionAllowed does not throw when encryption is not frozen", () => {
+    expect(() => EncryptableRecord.validateEncryptionAllowed({})).not.toThrow();
+  });
+
+  it("EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen adds errors for changed encrypted attrs", () => {
+    const Post = makeEncryptedPost(freshAdapter());
+    new Post();
+    const post = new Post({ title: "hello" });
+    post.title = "changed";
+    const errored: Array<[string, string]> = [];
+    const proxy = Object.assign(Object.create(Object.getPrototypeOf(post)), post, {
+      errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
+    });
+    EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(proxy);
+    expect(errored).toEqual([["title", "can't be modified because it is encrypted"]]);
+  });
+
+  it("EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen adds no errors for unchanged attrs", () => {
+    const Post = makeEncryptedPost(freshAdapter());
+    new Post();
+    const post = new Post({ title: "hello" });
+    const errored: Array<[string, string]> = [];
+    const proxy = Object.assign(Object.create(Object.getPrototypeOf(post)), post, {
+      errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
+    });
+    EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(proxy);
+    expect(errored).toEqual([]);
+  });
+
+  it("EncryptableRecord.encryptAttributes writes ciphertext to DB and keeps plaintext in memory", async () => {
+    const adp = freshAdapter();
+    const Post = makeEncryptedPost(adp);
+    new Post();
+    const post = await Post.create({ title: "Hello", body: "World" });
+    assertEncryptedAttribute(post, "title", "Hello");
+    // Re-encrypt: DB gets fresh ciphertext, in-memory stays plaintext.
+    await EncryptableRecord.encryptAttributes(post);
+    expect(post.title).toBe("Hello");
+    assertEncryptedAttribute(await Post.find(post.id), "title", "Hello");
+  });
+
+  it("EncryptableRecord.decryptAttributes stores plaintext in DB", async () => {
+    Configurable.config.supportUnencryptedData = true;
+    const adp = freshAdapter();
+    const Post = makeEncryptedPost(adp);
+    new Post();
+    const post = await Post.create({ title: "Hello", body: "World" });
+    assertEncryptedAttribute(post, "title", "Hello");
+    await EncryptableRecord.decryptAttributes(post);
+    // supportUnencryptedData=true lets the EncryptedAttributeType pass through plaintext.
+    const reloaded = await Post.find(post.id);
+    expect(reloaded.title).toBe("Hello");
+  });
+
   it("encrypts attribute data", async () => {
     // The DB column stores ciphertext (text), while the cast type is date.
     // In Rails, encrypted attribute columns are always text in the schema.

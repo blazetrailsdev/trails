@@ -285,18 +285,8 @@ export function applyPendingEncryptions(klass: any): void {
     klass._frozenEncryptionValidatorInstalled = true;
     klass.validate((record: any) => {
       if (!getEncryptionContext().frozenEncryption) return;
-      // Use record.constructor so STI subclasses consult their own
-      // encrypted_attributes list — mirrors Rails' self.class.encrypted_attributes.
-      const encryptedAttrs: Set<string> =
-        (record.constructor as any)._encryptedAttributes ?? new Set();
-      const changed: string[] = Array.isArray(record.changedAttributes)
-        ? record.changedAttributes
-        : [];
-      for (const attr of changed) {
-        if (encryptedAttrs.has(attr)) {
-          record.errors.add(attr, "can't be modified because it is encrypted");
-        }
-      }
+      // Delegate to the Rails-mirrored static so both code paths share one impl.
+      EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(record);
     });
   }
 }

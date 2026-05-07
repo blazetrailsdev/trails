@@ -214,6 +214,17 @@ export class EncryptableRecord {
   /** @internal */
   static preserveOriginalEncrypted(modelClass: any, name: string): void {
     const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
+    // Mirrors Rails encryptable_record.rb:101–103: raise at declaration time
+    // when the original_<name> column is absent and supportUnencryptedData is
+    // false (which means there's no fallback for reading un-preserved rows).
+    if (!Configurable.config.supportUnencryptedData) {
+      const colNames: string[] = modelClass.columnNames?.() ?? [];
+      if (!colNames.includes(originalName)) {
+        throw new ConfigurationError(
+          `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
+        );
+      }
+    }
     this.encrypts(modelClass, originalName);
     this.overrideAccessorsToPreserveOriginal(modelClass, name, originalName);
   }
@@ -265,13 +276,19 @@ export class EncryptableRecord {
 
   /** @internal */
   static addLengthValidationForEncryptedColumns(modelClass: any): void {
-    const attrs: Set<string> = modelClass._encryptedAttributes ?? new Set();
+    const attrs: Set<string> = modelClass._encryptedAttributes ?? new Set<string>();
     for (const name of attrs) {
       this.validateColumnSize(modelClass, name);
     }
   }
 
-  /** @internal */
+  /**
+   * Instance-level encrypted-attribute check: resolves aliases and verifies
+   * the stored value is actually encrypted (calls `type.isEncrypted`).
+   * Distinct from `encryption.ts#isEncryptedAttribute(klass, attr)` which is
+   * a class-level check (is the attribute declared encrypted on this class?).
+   * @internal
+   */
   static isEncryptedAttribute(record: any, attributeName: string): boolean {
     const klass = record.constructor as any;
     // Resolve attribute aliases before checking encrypted set.
@@ -310,27 +327,26 @@ export class EncryptableRecord {
 
   /** @internal */
   static _createRecord(record: any, attributeNames?: string[]): unknown {
-    // Rails prepends this to force encrypted attrs into the INSERT column list.
-    // In our codebase _createRecord is the ORM callback chain entry point and
-    // ignores attributeNames; encrypted columns are included unconditionally via
-    // _performInsert. This helper exists for api:compare parity only.
-    return record._createRecord?.(attributeNames);
+    // Mirrors Rails: force encrypted attrs into the INSERT column list so a
+    // column with an encrypted default is always written on first save.
+    const names = attributeNames ?? record.attributeNames ?? [];
+    const encryptedAttrs: Set<string> =
+      record.constructor._encryptedAttributes ?? new Set<string>();
+    const merged = [...new Set<string>([...names, ...encryptedAttrs])];
+    return record._createRecord?.(merged);
   }
 
   /** @internal */
   static async encryptAttributes(record: any): Promise<void> {
     this.validateEncryptionAllowed(record);
     const klass = record.constructor as any;
-    const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
-
-    // Pre-serialize so updateColumns writes ciphertext — updateColumns uses
-    // cast() not serialize(), so plaintext would be written back unchanged.
-    // Mirrors encryption.ts#encryptRecord.
-    const plaintextValues: Record<string, unknown> = {};
+    // Rails: update_columns build_encrypt_attribute_assignments.
+    // buildEncryptAttributeAssignments returns plaintext values (Rails parity).
+    // updateColumns uses cast() not serialize(), so pre-serialize here so the
+    // DB write stores ciphertext. Mirrors encryption.ts#encryptRecord.
+    const plaintextValues = this.buildEncryptAttributeAssignments(record);
     const assignments: Record<string, unknown> = {};
-    for (const name of encryptedAttrs) {
-      const plaintext = record.readAttribute(name);
-      plaintextValues[name] = plaintext;
+    for (const [name, plaintext] of Object.entries(plaintextValues)) {
       const type = getAttributeType(klass, name);
       assignments[name] =
         type instanceof EncryptedAttributeType ? type.serialize(plaintext) : plaintext;
