@@ -139,7 +139,6 @@ import {
   idBeforeTypeCast as _idBeforeTypeCast,
   isSavedChanges as _isSavedChanges,
 } from "./attribute-methods.js";
-import { generateTokenFor as _generateTokenForFn } from "./token-for.js";
 import { normalizeChangedInPlaceAttributes as _normalizeChangedInPlaceAttributesFn } from "./normalization.js";
 import { localStoredAttributes as _localStoredAttributesFn } from "./store.js";
 import {
@@ -2959,12 +2958,11 @@ extend(Base, {
   _defaultAttributes: _arDefaultAttributes,
 });
 extend(Base, {
-  // Querying class-level privates
-  _queryBySql: Querying._queryBySql,
-  _loadFromSql: Querying._loadFromSql,
-  // ConnectionHandling
+  // _queryBySql/_loadFromSql already wired by extend(Base, Querying) above.
+  // ConnectionHandling.ClassMethods does not include resolveConfigForConnection
+  // (it's a standalone export, not in the ClassMethods object), so wire it here.
   resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
-  // Store class-level
+  // localStoredAttributes is a class-level attr_accessor in Rails; wire for runtime.
   localStoredAttributes(this: typeof Base) {
     return _localStoredAttributesFn(this);
   },
@@ -3129,10 +3127,9 @@ include(Base, {
   hasDeferTouchAttrs(this: Base) {
     return TouchLater.hasDeferTouchAttrs(this);
   },
-  // TokenFor — not on Model; safe to wire.
-  generateTokenFor(this: Base, purpose: string) {
-    return _generateTokenForFn(this, purpose);
-  },
+  // generateTokenFor omitted: token-for.ts imports @blazetrails/activesupport/message-verifier
+  // (node:crypto). The module is intentionally excluded from the main barrel (see index.ts
+  // comment near line 292). Eager-importing it here would reintroduce the BC-3 crypto leak.
   // normalizeChangedInPlaceAttributes is not on Model; safe to wire.
   normalizeChangedInPlaceAttributes(this: Base) {
     return _normalizeChangedInPlaceAttributesFn(this);
