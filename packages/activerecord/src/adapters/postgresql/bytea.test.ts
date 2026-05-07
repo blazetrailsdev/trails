@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Bytea } from "../../connection-adapters/postgresql/oid/bytea.js";
+import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -292,6 +293,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       // instead of the original string. Needs explicit string↔Buffer codec bridging in
       // the serialize integration when the underlying column type is binary.
       // SCOPE: ~30 LOC in serialize.ts + bytea integration; affects bytea serialize tests.
+    });
+
+    it("schema dumping", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "bytea_data_type");
+      expect(output).toMatch(/t\.binary\s*\("payload"\)/);
+      expect(output).toMatch(/t\.binary\s*\("serialized"\)/);
     });
   });
 });
