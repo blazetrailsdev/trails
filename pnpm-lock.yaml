@@ -123,6 +123,16 @@ importers:
       typescript:
         specifier: '>=5.0.0'
         version: 5.9.3
+    optionalDependencies:
+      better-sqlite3:
+        specifier: ^12.6.2
+        version: 12.6.2
+      mysql2:
+        specifier: ^3.18.2
+        version: 3.19.0(@types/node@25.3.5)
+      pg:
+        specifier: ^8.19.0
+        version: 8.20.0
 
   packages/activesupport:
     dependencies:
