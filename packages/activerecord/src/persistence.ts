@@ -904,6 +904,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
 interface ReloadRecord {
   _attributes: {
     set(name: string, value: unknown): void;
+    writeFromDatabase(name: string, value: unknown): void;
   };
   _dirty: { snapshot(attrs: unknown): void };
   _collectionProxies: Map<string, unknown>;
@@ -947,7 +948,7 @@ export async function reload<T extends ReloadRecord>(this: T): Promise<T> {
   }
 
   for (const [key, value] of Object.entries(row)) {
-    this._attributes.set(key, value);
+    this._attributes.writeFromDatabase(key, value);
   }
 
   this._dirty.snapshot(this._attributes);
