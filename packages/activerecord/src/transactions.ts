@@ -410,13 +410,13 @@ interface TransactionRecordSnapshot {
 }
 
 /** @internal */
-function rememberTransactionRecordState(record: Base): TransactionRecordSnapshot {
-  const r = record as any;
+export function rememberTransactionRecordState(this: Base): TransactionRecordSnapshot {
+  const r = this as any;
   return {
     newRecord: r._newRecord,
     destroyed: r._destroyed,
     frozen: r._attributes.isFrozen(),
-    id: record.id,
+    id: this.id,
     previouslyNewRecord: r._previouslyNewRecord,
   };
 }
@@ -430,8 +430,11 @@ function rememberTransactionRecordState(record: Base): TransactionRecordSnapshot
  *
  * @internal
  */
-function restoreTransactionRecordState(record: Base, snapshot: TransactionRecordSnapshot): void {
-  const r = record as any;
+export function restoreTransactionRecordState(
+  this: Base,
+  snapshot: TransactionRecordSnapshot,
+): void {
+  const r = this as any;
   r._newRecord = snapshot.newRecord;
   r._destroyed = snapshot.destroyed;
   r._previouslyNewRecord = snapshot.previouslyNewRecord;
@@ -445,8 +448,8 @@ function restoreTransactionRecordState(record: Base, snapshot: TransactionRecord
   }
 
   // Restore the primary key if it was auto-assigned during insert
-  if (snapshot.newRecord && !Array.isArray(record.id)) {
-    const ctor = record.constructor as typeof Base;
+  if (snapshot.newRecord && !Array.isArray(this.id)) {
+    const ctor = this.constructor as typeof Base;
     r._attributes.set(ctor.primaryKey as string, snapshot.id);
   }
 
@@ -471,7 +474,7 @@ export async function withTransactionReturningStatus<T>(
   const modelClass = this.constructor as typeof Base;
 
   // Mirrors: remember_transaction_record_state — snapshot before transaction
-  const snapshot = rememberTransactionRecordState(this);
+  const snapshot = rememberTransactionRecordState.call(this);
 
   // Reset transaction tracking flags (the block will set them if the
   // operation succeeds).
@@ -489,7 +492,7 @@ export async function withTransactionReturningStatus<T>(
     // Actual committedBang/rolledbackBang callbacks are scheduled after
     // the transaction returns, on the outer transaction or fired immediately.
     tx.afterRollback(async () => {
-      restoreTransactionRecordState(this, snapshot);
+      restoreTransactionRecordState.call(this, snapshot);
     });
 
     status = await fn();
@@ -514,7 +517,7 @@ export async function withTransactionReturningStatus<T>(
         // transaction, not the pre-transaction state. Matches Rails where
         // rolledback! fires during rollback, restore runs in ensure.
         await rolledbackBang(this);
-        restoreTransactionRecordState(this, snapshot);
+        restoreTransactionRecordState.call(this, snapshot);
       });
     } else {
       await committedBang(this);
@@ -592,16 +595,14 @@ export function clearTransactionRecordState(this: Base): void {
 
 // Mirrors: ActiveRecord::Transactions#transaction_include_any_action?
 /** @internal */
-function isTransactionIncludeAnyAction(record: Base, actions: string[]): boolean {
-  const r = record as any;
+export function isTransactionIncludeAnyAction(this: Base, actions: string[]): boolean {
+  const r = this as any;
   return actions.some((action) => {
     switch (action) {
       case "create":
-        return record.isPersisted() && !!r._newRecordBeforeLastCommit;
+        return this.isPersisted() && !!r._newRecordBeforeLastCommit;
       case "update":
-        return (
-          !(r._newRecordBeforeLastCommit || record.isDestroyed()) && !!r._triggerUpdateCallback
-        );
+        return !(r._newRecordBeforeLastCommit || this.isDestroyed()) && !!r._triggerUpdateCallback;
       case "destroy":
         return !!r._triggerDestroyCallback;
       default:
@@ -612,19 +613,19 @@ function isTransactionIncludeAnyAction(record: Base, actions: string[]): boolean
 
 // Mirrors: ActiveRecord::Transactions#add_to_transaction
 /** @internal */
-async function addToTransaction(record: Base, ensureFinalize = true): Promise<void> {
-  const ctor = record.constructor as any;
+export async function addToTransaction(this: Base, ensureFinalize = true): Promise<void> {
+  const ctor = this.constructor as any;
   if (typeof ctor.withConnection === "function") {
     await ctor.withConnection(async (connection: any) => {
-      connection.addTransactionRecord?.(record, ensureFinalize);
+      connection.addTransactionRecord?.(this, ensureFinalize);
     });
   }
 }
 
 // Mirrors: ActiveRecord::Transactions#has_transactional_callbacks?
 /** @internal */
-function hasTransactionalCallbacks(record: Base): boolean {
-  const ctor = record.constructor as any;
+export function hasTransactionalCallbacks(this: Base): boolean {
+  const ctor = this.constructor as any;
   const chain = ctor._callbackChain;
   if (!chain) return false;
   const entries: Array<{ event: string }> = (chain as any).callbacks ?? [];
@@ -664,7 +665,7 @@ function setOptionsForCallbacksBang(
     assertValidTransactionAction(fireOn);
     const existingIf = options.if as CallbackFn | CallbackFn[] | undefined;
     options.if = (record: Base) => {
-      if (!isTransactionIncludeAnyAction(record, fireOn)) return false;
+      if (!isTransactionIncludeAnyAction.call(record, fireOn)) return false;
       if (!existingIf) return true;
       if (Array.isArray(existingIf)) return existingIf.every((fn) => fn(record));
       return (existingIf as CallbackFn)(record) as boolean;

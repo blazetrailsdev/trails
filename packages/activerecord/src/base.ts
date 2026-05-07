@@ -205,6 +205,11 @@ import {
   clearTransactionRecordState as _clearTransactionRecordState,
   _committedAlreadyCalled as _txCommittedAlreadyCalled,
   _triggerUpdateCallback as _txTriggerUpdateCallback,
+  rememberTransactionRecordState as _rememberTransactionRecordState,
+  restoreTransactionRecordState as _restoreTransactionRecordState,
+  isTransactionIncludeAnyAction as _isTransactionIncludeAnyAction,
+  addToTransaction as _addToTransaction,
+  hasTransactionalCallbacks as _hasTransactionalCallbacks,
 } from "./transactions.js";
 
 import {
@@ -959,6 +964,10 @@ export class Base extends Model {
   declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;
   declare static shardKeys: typeof ConnectionHandling.shardKeys;
   declare static isSharded: typeof ConnectionHandling.isSharded;
+  /** @internal */
+  declare static withRoleAndShard: typeof ConnectionHandling.withRoleAndShard;
+  /** @internal */
+  declare static appendToConnectedToStack: typeof ConnectionHandling.appendToConnectedToStack;
   /** @internal */
   declare static resolveConfigForConnection: typeof ConnectionHandling.resolveConfigForConnection;
 
@@ -3159,6 +3168,14 @@ include(Base, {
   _triggerUpdateCallback: _txTriggerUpdateCallback,
   _triggerDestroyCallback: _txTriggerDestroyCallback,
   clearTransactionRecordState: _clearTransactionRecordState,
+  rememberTransactionRecordState: _rememberTransactionRecordState,
+  restoreTransactionRecordState: _restoreTransactionRecordState,
+  isTransactionIncludeAnyAction: _isTransactionIncludeAnyAction,
+  addToTransaction: _addToTransaction,
+  hasTransactionalCallbacks: _hasTransactionalCallbacks,
+  // TouchLater privates (instance-level) wired here for api:compare credit.
+  surreptitiouslyTouch: TouchLater.surreptitiouslyTouch,
+  touchDeferredAttributes: TouchLater.touchDeferredAttributes,
 });
 
 for (const [name, fn] of [

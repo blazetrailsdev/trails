@@ -408,7 +408,7 @@ function removeStackEntry(entry: object): void {
 }
 
 /** @internal */
-function withRoleAndShard<T>(
+export function withRoleAndShard<T>(
   this: typeof Base,
   role: string | undefined,
   shard: string | undefined,
@@ -437,7 +437,7 @@ function withRoleAndShard<T>(
 }
 
 /** @internal */
-function appendToConnectedToStack(entry: {
+export function appendToConnectedToStack(entry: {
   role?: string;
   shard?: string;
   preventWrites?: boolean;
@@ -770,6 +770,8 @@ export const ClassMethods = {
   clearCacheBang,
   shardKeys,
   isSharded,
+  withRoleAndShard,
+  appendToConnectedToStack,
 };
 
 // Register adapter class resolver so DatabaseConfig#adapterClass and
