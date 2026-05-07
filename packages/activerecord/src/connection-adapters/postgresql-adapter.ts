@@ -4138,7 +4138,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     });
     if (!result)
       throw new ArgumentError(
-        `Table '${tableName}' has no unique constraint for ${column ?? JSON.stringify(options)}`,
+        `Table '${tableName}' has no unique constraint for ${column != null ? JSON.stringify(column) : JSON.stringify(options)}`,
       );
     return result;
   }

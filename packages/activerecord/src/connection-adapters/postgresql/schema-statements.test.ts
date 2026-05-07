@@ -12,6 +12,7 @@
  * referenceNameForTable, columnNamesFromColumnNumbers)
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import {
   describeIfPg,
   PostgreSQLAdapter,
@@ -522,15 +523,19 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("exclusionConstraintForBang raises ArgumentError for missing constraint", async () => {
-      await expect(
-        adapter.exclusionConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent WITH ="),
-      ).rejects.toThrow("has no exclusion constraint");
+      const err = await adapter
+        .exclusionConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent WITH =")
+        .catch((e) => e);
+      expect(err).toBeInstanceOf(ArgumentError);
+      expect(err.message).toMatch("has no exclusion constraint");
     });
 
     it("uniqueConstraintForBang raises ArgumentError for missing constraint", async () => {
-      await expect(
-        adapter.uniqueConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent_col"),
-      ).rejects.toThrow("has no unique constraint");
+      const err = await adapter
+        .uniqueConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent_col")
+        .catch((e) => e);
+      expect(err).toBeInstanceOf(ArgumentError);
+      expect(err.message).toMatch("has no unique constraint");
     });
 
     it("exclusionConstraintName is deterministic and uses name option", () => {
