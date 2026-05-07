@@ -12,6 +12,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { pathToFileURL } from "url";
 import * as ts from "typescript";
 import type { ApiManifest, ClassInfo } from "./types.js";
 import { OUTPUT_DIR, packageSrcDir } from "./config.js";
@@ -257,7 +258,6 @@ export function isWithinTypeNode(node: ts.Node): boolean {
 export function hasLintDepsIgnore(node: ts.Node, dep: string, sourceFile: ts.SourceFile): boolean {
   const fullText = sourceFile.getFullText();
   const nodeStart = node.getFullStart();
-  // Collect leading trivia (comments) before the node
   const trivia = fullText.slice(nodeStart, node.getStart(sourceFile));
   const re = /\/\/\s*lint-deps-ignore:\s*(\S+)/g;
   let m: RegExpExecArray | null;
@@ -571,7 +571,6 @@ function main() {
   }
 }
 
-// Only run when invoked directly, not when imported by tests
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"))) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }

@@ -56,6 +56,38 @@ describe("methodUsesDepImport — type-position filtering", () => {
     expect(methodUsesDepImport(node, new Set(["Nodes"]), new Set(), DEP, sf)).toBe(false);
   });
 
+  it("old-style type assertion <Imported>x does NOT count", () => {
+    const sf = makeSourceFile(`
+      function foo(x: unknown) { return <Nodes>x; }
+    `);
+    const node = firstMethod(sf);
+    expect(methodUsesDepImport(node, new Set(["Nodes"]), new Set(), DEP, sf)).toBe(false);
+  });
+
+  it("satisfies expression does NOT count", () => {
+    const sf = makeSourceFile(`
+      function foo(x: unknown) { return x satisfies Nodes; }
+    `);
+    const node = firstMethod(sf);
+    expect(methodUsesDepImport(node, new Set(["Nodes"]), new Set(), DEP, sf)).toBe(false);
+  });
+
+  it("type predicate (x is T) does NOT count", () => {
+    const sf = makeSourceFile(`
+      function foo(x: unknown): x is Nodes { return true; }
+    `);
+    const node = firstMethod(sf);
+    expect(methodUsesDepImport(node, new Set(["Nodes"]), new Set(), DEP, sf)).toBe(false);
+  });
+
+  it("variable type annotation does NOT count", () => {
+    const sf = makeSourceFile(`
+      function foo() { let x: ArelTable; }
+    `);
+    const node = firstMethod(sf);
+    expect(methodUsesDepImport(node, new Set(["ArelTable"]), new Set(), DEP, sf)).toBe(false);
+  });
+
   it("real property access call DOES count", () => {
     const sf = makeSourceFile(`
       function foo(x: unknown) { return Nodes.create(x); }
