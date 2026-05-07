@@ -168,4 +168,13 @@ describe("DelegatedTypeTest", () => {
     expect(e.entryable_type).toBe("Message");
     expect(e.entryable_id).toBe(5);
   });
+
+  it("registers a polymorphic belongs_to for the delegated role", () => {
+    const { Entry } = makeModels();
+    const reflection = Entry._reflectOnAssociation("entryable");
+    expect(reflection).not.toBeNull();
+    expect((reflection as any).options?.polymorphic).toBe(true);
+    expect((reflection as any).options?.foreignKey).toBe("entryable_id");
+    expect((reflection as any).options?.foreignType).toBe("entryable_type");
+  });
 });

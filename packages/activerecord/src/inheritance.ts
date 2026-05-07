@@ -91,6 +91,52 @@ export function isDescendsFromActiveRecord(modelClass: typeof Base): boolean {
 }
 
 /**
+ * Check if this class is its own STI base class (i.e. `base_class == self`).
+ * Uses the cached `_computedBaseClass` from `setBaseClass`, computing it on
+ * demand if not already set.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#base_class?
+ */
+export function isBaseClass(modelClass: typeof Base): boolean {
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "_computedBaseClass"))
+    setBaseClass(modelClass);
+  return (modelClass as any)._computedBaseClass === modelClass;
+}
+
+/**
+ * Compute and cache the base class for this model using the Rails hierarchy
+ * logic: a class is its own base if its immediate superclass is Base or is
+ * abstract; otherwise it inherits the superclass's base class.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#set_base_class
+ * @internal
+ */
+export function setBaseClass(modelClass: typeof Base): void {
+  // Rails: if self == Base → base_class = self.
+  // Detected via the _isActiveRecordBase own-property sentinel on Base.
+  if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) {
+    (modelClass as any)._computedBaseClass = modelClass;
+    return;
+  }
+  const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
+  if (!parent || parent === Function.prototype || typeof parent.name !== "string") {
+    (modelClass as any)._computedBaseClass = modelClass;
+    return;
+  }
+  // Rails: if superclass == Base || superclass.abstract_class? → self is root.
+  // Use _isActiveRecordBase (existing sentinel) to identify the AR root class.
+  const parentIsARBase = Object.prototype.hasOwnProperty.call(parent, "_isActiveRecordBase");
+  const parentIsAbstract = getAbstractClass.call(parent);
+  if (parentIsARBase || parentIsAbstract) {
+    (modelClass as any)._computedBaseClass = modelClass;
+  } else {
+    // Ensure parent has its own computed entry before inheriting it.
+    if (!Object.prototype.hasOwnProperty.call(parent, "_computedBaseClass")) setBaseClass(parent);
+    (modelClass as any)._computedBaseClass = (parent as any)._computedBaseClass;
+  }
+}
+
+/**
  * Return the STI name for this class (used as the type column value).
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#sti_name
@@ -168,7 +214,8 @@ export function isStiSubclass(modelClass: typeof Base): boolean {
  * @internal
  */
 export function baseClass(this: typeof Base): typeof Base {
-  return getStiBase(this);
+  if (!Object.prototype.hasOwnProperty.call(this, "_computedBaseClass")) setBaseClass(this);
+  return (this as any)._computedBaseClass as typeof Base;
 }
 
 /**
