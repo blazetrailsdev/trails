@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements
  */
 
-import { NotImplementedError } from "../../errors.js";
 import type {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
@@ -331,7 +330,7 @@ export interface SchemaStatements {
     tableName: string,
     expression?: string | null,
     options?: Record<string, unknown>,
-  ): ExclusionConstraintDefinition;
+  ): Promise<ExclusionConstraintDefinition>;
   /** @internal */
   uniqueConstraintName(tableName: string, options?: Record<string, unknown>): string;
   /** @internal */
@@ -344,180 +343,7 @@ export interface SchemaStatements {
     tableName: string,
     column?: string | string[] | null,
     options?: Record<string, unknown>,
-  ): UniqueConstraintDefinition;
+  ): Promise<UniqueConstraintDefinition>;
   /** @internal */
   extractSchemaQualifiedName(string: string): [string | null, string];
-}
-
-/** @internal */
-function createTableDefinition(name: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#create_table_definition is not implemented",
-  );
-}
-
-/** @internal */
-function createAlterTable(name: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#create_alter_table is not implemented",
-  );
-}
-
-/** @internal */
-function newColumnFromField(tableName: any, field: any, Definitions: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#new_column_from_field is not implemented",
-  );
-}
-
-/** @internal */
-function fetchTypeMetadata(columnName: any, sqlType: any, oid: any, fmod: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#fetch_type_metadata is not implemented",
-  );
-}
-
-/** @internal */
-function sequenceNameFromParts(tableName: any, columnName: any, suffix: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#sequence_name_from_parts is not implemented",
-  );
-}
-
-/** @internal */
-function extractForeignKeyAction(specifier: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#extract_foreign_key_action is not implemented",
-  );
-}
-
-/** @internal */
-function assertValidDeferrable(deferrable: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#assert_valid_deferrable is not implemented",
-  );
-}
-
-/** @internal */
-function extractConstraintDeferrable(deferrable: any, deferred: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#extract_constraint_deferrable is not implemented",
-  );
-}
-
-/** @internal */
-function referenceNameForTable(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#reference_name_for_table is not implemented",
-  );
-}
-
-/** @internal */
-function addColumnForAlter(tableName: any, columnName: any, type: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#add_column_for_alter is not implemented",
-  );
-}
-
-/** @internal */
-function changeColumnForAlter(tableName: any, columnName: any, type: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#change_column_for_alter is not implemented",
-  );
-}
-
-/** @internal */
-function changeColumnNullForAlter(
-  tableName: any,
-  columnName: any,
-  null_: any,
-  default_?: any,
-): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#change_column_null_for_alter is not implemented",
-  );
-}
-
-/** @internal */
-function addIndexOpclass(quotedColumns: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#add_index_opclass is not implemented",
-  );
-}
-
-/** @internal */
-function addOptionsForIndexColumns(quotedColumns: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#add_options_for_index_columns is not implemented",
-  );
-}
-
-/** @internal */
-function exclusionConstraintName(tableName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#exclusion_constraint_name is not implemented",
-  );
-}
-
-/** @internal */
-function exclusionConstraintFor(tableName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#exclusion_constraint_for is not implemented",
-  );
-}
-
-/** @internal */
-function exclusionConstraintForBang(tableName: any, expression?: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#exclusion_constraint_for! is not implemented",
-  );
-}
-
-/** @internal */
-function uniqueConstraintName(tableName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#unique_constraint_name is not implemented",
-  );
-}
-
-/** @internal */
-function uniqueConstraintFor(tableName: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#unique_constraint_for is not implemented",
-  );
-}
-
-/** @internal */
-function uniqueConstraintForBang(tableName: any, column?: any, options?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#unique_constraint_for! is not implemented",
-  );
-}
-
-/** @internal */
-function dataSourceSql(name?: any, type?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#data_source_sql is not implemented",
-  );
-}
-
-/** @internal */
-function quotedScope(name?: any, type?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#quoted_scope is not implemented",
-  );
-}
-
-/** @internal */
-function extractSchemaQualifiedName(string: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#extract_schema_qualified_name is not implemented",
-  );
-}
-
-/** @internal */
-function columnNamesFromColumnNumbers(tableOid: any, columnNumbers: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaStatements#column_names_from_column_numbers is not implemented",
-  );
 }

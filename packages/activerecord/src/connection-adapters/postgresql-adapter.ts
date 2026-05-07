@@ -1,5 +1,5 @@
 import pg from "pg";
-import { type Type, ValueType } from "@blazetrails/activemodel";
+import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { singularize, underscore, Notifications, getCrypto } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { Result } from "../result.js";
@@ -2789,7 +2789,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       deferrable === "deferred"
     )
       return;
-    throw new Error(
+    throw new ArgumentError(
       `deferrable must be \`"immediate"\` or \`"deferred"\`, got: \`${JSON.stringify(deferrable)}\``,
     );
   }
@@ -3798,11 +3798,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         ? expressionOrOptions
         : options;
     if (!expression && !opts.name) {
-      throw new Error(
+      throw new ArgumentError(
         "Either expression or `name` option must be provided for removeExclusionConstraint.",
       );
     }
-    const excl = this.exclusionConstraintForBang(tableName, expression ?? null, opts);
+    const excl = await this.exclusionConstraintForBang(tableName, expression ?? null, opts);
     await this.exec(
       `ALTER TABLE ${this.quoteTableName(tableName)} DROP CONSTRAINT ${this.quoteIdentifier(excl.name!)}`,
     );
@@ -3867,11 +3867,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         ? columnNameOrOptions
         : options;
     if (!columnName && !opts.name && !opts.usingIndex) {
-      throw new Error(
+      throw new ArgumentError(
         "Either `columnName`, `name`, or `usingIndex` option must be provided for removeUniqueConstraint.",
       );
     }
-    const uniq = this.uniqueConstraintForBang(tableName, columnName, opts);
+    const uniq = await this.uniqueConstraintForBang(tableName, columnName, opts);
     await this.exec(
       `ALTER TABLE ${this.quoteTableName(tableName)} DROP CONSTRAINT ${this.quoteIdentifier(uniq.name!)}`,
     );
@@ -4075,15 +4075,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /** @internal */
-  exclusionConstraintForBang(
+  async exclusionConstraintForBang(
     tableName: string,
     expression?: string | null,
     options: Record<string, unknown> = {},
-  ): ExclusionConstraintDefinition {
-    const name =
-      (options.name as string | undefined) ??
-      this.exclusionConstraintName(tableName, { expression: expression ?? "", ...options });
-    return new ExclusionConstraintDefinition(tableName, expression ?? "", { ...options, name });
+  ): Promise<ExclusionConstraintDefinition> {
+    const result = await this.exclusionConstraintFor(tableName, {
+      ...options,
+      expression: expression ?? undefined,
+    });
+    if (!result)
+      throw new ArgumentError(
+        `Table '${tableName}' has no exclusion constraint for ${expression ?? JSON.stringify(options)}`,
+      );
+    return result;
   }
 
   /** @internal */
@@ -4122,15 +4127,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /** @internal */
-  uniqueConstraintForBang(
+  async uniqueConstraintForBang(
     tableName: string,
     column?: string | string[] | null,
     options: Record<string, unknown> = {},
-  ): UniqueConstraintDefinition {
-    const name =
-      (options.name as string | undefined) ??
-      this.uniqueConstraintName(tableName, { column, ...options });
-    return new UniqueConstraintDefinition(tableName, column ?? [], { ...options, name });
+  ): Promise<UniqueConstraintDefinition> {
+    const result = await this.uniqueConstraintFor(tableName, {
+      ...options,
+      column: column ?? undefined,
+    });
+    if (!result)
+      throw new ArgumentError(
+        `Table '${tableName}' has no unique constraint for ${column != null ? JSON.stringify(column) : JSON.stringify(options)}`,
+      );
+    return result;
   }
 
   /** @internal */
