@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } from "./index.js";
-import { getStiBase, isStiSubclass } from "./inheritance.js";
+import { getStiBase, isStiSubclass, setBaseClass } from "./inheritance.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -2108,5 +2108,83 @@ describe("Base constructor wires initializeInternalsCallback", () => {
     // as-is from the DB row, not overwritten by initializeInternalsCallback.
     const record = Vehicle._instantiate({ id: 1, type: "Vehicle" }) as any;
     expect(record.readAttribute("type")).toBe("Vehicle");
+  });
+
+  // -------------------------------------------------------------------------
+  // base_class? / set_base_class (setBaseClass)
+  // -------------------------------------------------------------------------
+
+  it("base_class? returns true for the STI root and false for subclasses", () => {
+    const adapter2 = createTestAdapter();
+    class User2 extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("type", "string");
+        this._tableName = "user2s";
+        this.adapter = adapter2;
+        enableSti(User2);
+      }
+    }
+    class Manager2 extends User2 {
+      static {
+        registerModel(Manager2);
+        registerSubclass(Manager2);
+      }
+    }
+
+    expect(User2.isBaseClass()).toBe(true);
+    expect(Manager2.isBaseClass()).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // STI subclass routing: User.find(manager_id) returns Manager instance
+  // -------------------------------------------------------------------------
+
+  it("subclass from find returns the subclass instance", async () => {
+    const adapter3 = createTestAdapter();
+    class User3 extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("type", "string");
+        this._tableName = "user3s";
+        this.adapter = adapter3;
+        enableSti(User3);
+      }
+    }
+    class Manager3 extends User3 {
+      static {
+        this.adapter = adapter3;
+        registerModel(Manager3);
+        registerSubclass(Manager3);
+      }
+    }
+
+    const mgr = await Manager3.create({ name: "Alice" });
+    const found = await User3.find(mgr.id);
+    expect(found.constructor.name).toBe("Manager3");
+    expect((found as any).name).toBe("Alice");
+  });
+
+  it("setBaseClass caches the STI base on the model class", () => {
+    const adapter4 = createTestAdapter();
+    class Animal2 extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("type", "string");
+        this.adapter = adapter4;
+        enableSti(Animal2);
+      }
+    }
+    class Dog2 extends Animal2 {
+      static {
+        registerSubclass(Dog2);
+      }
+    }
+
+    setBaseClass(Dog2);
+    expect((Dog2 as any)._cachedBaseClass).toBe(Animal2);
+    setBaseClass(Animal2);
+    expect((Animal2 as any)._cachedBaseClass).toBe(Animal2);
   });
 });

@@ -91,6 +91,26 @@ export function isDescendsFromActiveRecord(modelClass: typeof Base): boolean {
 }
 
 /**
+ * Check if this class is its own STI base class (i.e. `base_class == self`).
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#base_class?
+ */
+export function isBaseClass(modelClass: typeof Base): boolean {
+  return getStiBase(modelClass) === modelClass;
+}
+
+/**
+ * Compute and cache the STI base class for this model.
+ * Called during class setup to initialise the `base_class` reference.
+ *
+ * Mirrors: ActiveRecord::Inheritance::ClassMethods#set_base_class
+ * @internal
+ */
+export function setBaseClass(modelClass: typeof Base): void {
+  (modelClass as any)._cachedBaseClass = getStiBase(modelClass);
+}
+
+/**
  * Return the STI name for this class (used as the type column value).
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#sti_name

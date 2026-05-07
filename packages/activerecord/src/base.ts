@@ -29,6 +29,7 @@ import {
   baseClass as _inheritanceBaseClass,
   getAbstractClass as _getAbstractClass,
   setAbstractClass as _setAbstractClass,
+  isBaseClass as _isBaseClass,
 } from "./inheritance.js";
 import {
   NotImplementedError,
@@ -155,6 +156,16 @@ import * as _Core from "./core.js";
 import * as _Persistence from "./persistence.js";
 import * as _Aggregations from "./aggregations.js";
 import * as _EnumModule from "./enum.js";
+import {
+  collectingQueriesForExplain as _collectingQueriesForExplain,
+  execExplain as _execExplain,
+  renderBind as _renderBind,
+  buildExplainClause as _buildExplainClause,
+} from "./explain.js";
+import {
+  delegatedType as _delegatedType,
+  defineDelegatedTypeMethods as _defineDelegatedTypeMethods,
+} from "./delegated-type.js";
 import * as _Reflection from "./reflection.js";
 import * as _AssocInstance from "./associations/instance-methods.js";
 import { argumentError } from "./relation/query-methods.js";
@@ -955,6 +966,15 @@ export class Base extends Model {
     return isFinderNeedsTypeCondition(this);
   }
 
+  /**
+   * Returns true if this class is its own STI base class.
+   *
+   * Mirrors: ActiveRecord::Inheritance::ClassMethods#base_class?
+   */
+  static isBaseClass(): boolean {
+    return _isBaseClass(this);
+  }
+
   static primaryAbstractClass(): void {
     primaryAbstractClass(this);
   }
@@ -1199,16 +1219,69 @@ export class Base extends Model {
   declare static validates: typeof _Validations.validates;
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
-  // -- Enums --
+  // -- Enums (wired via extend() after class body) --
   static _enums: Map<string, Record<string, number>> = new Map();
 
   /**
    * Declare an enum attribute. Maps symbolic names to integer values.
-   * Implementation lives in enum.ts; wired via extend() after the class body.
    *
    * Mirrors: ActiveRecord::Enum.enum
    */
   declare static enum: typeof _EnumModule.enumMethod;
+
+  /** @internal */
+  declare static _enum: typeof _EnumModule._enum;
+  /** @internal */
+  declare static _enumMethodsModule: typeof _EnumModule._enumMethodsModule;
+  /** @internal */
+  declare static detectEnumConflictBang: typeof _EnumModule.detectEnumConflictBang;
+  /** @internal */
+  declare static raiseConflictError: typeof _EnumModule.raiseConflictError;
+  /** @internal */
+  declare static assertValidEnumDefinitionValues: typeof _EnumModule.assertValidEnumDefinitionValues;
+  /** @internal */
+  declare static assertValidEnumOptions: typeof _EnumModule.assertValidEnumOptions;
+  /** @internal */
+  declare static detectNegativeEnumConditionsBang: typeof _EnumModule.detectNegativeEnumConditionsBang;
+
+  // -- Explain --
+
+  /** @internal */
+  declare static collectingQueriesForExplain: typeof _collectingQueriesForExplain;
+
+  /** @internal */
+  static execExplain(queries: [string, unknown[]][], options?: any[]): Promise<string> {
+    return _execExplain(this, queries, options);
+  }
+
+  /** @internal */
+  declare static renderBind: typeof _renderBind;
+
+  /** @internal */
+  declare static buildExplainClause: typeof _buildExplainClause;
+
+  // -- DelegatedType --
+
+  /**
+   * Declare a delegated type on this model.
+   *
+   * Mirrors: ActiveRecord::DelegatedType.delegated_type
+   */
+  static delegatedType(
+    role: string,
+    options: import("./delegated-type.js").DelegatedTypeOptions,
+  ): void {
+    _delegatedType(this, role, options);
+  }
+
+  /** @internal */
+  static defineDelegatedTypeMethods(
+    role: string,
+    types: string[],
+    options: import("./delegated-type.js").DelegatedTypeOptions,
+  ): void {
+    _defineDelegatedTypeMethods(this, role, types, options);
+  }
 
   // -- Store --
   static _storedAttributes: Map<string, { accessors?: string[] }> = new Map();
@@ -2776,7 +2849,22 @@ extend(Base, CounterCache.ClassMethods);
 extend(Base, Timestamp.ClassMethods);
 extend(Base, NamedScoping.ClassMethods);
 extend(Base, _Validations.ClassMethods);
-extend(Base, { enum: _EnumModule.enumMethod });
+extend(Base, {
+  enum: _EnumModule.enumMethod,
+  _enum: _EnumModule._enum,
+  _enumMethodsModule: _EnumModule._enumMethodsModule,
+  detectEnumConflictBang: _EnumModule.detectEnumConflictBang,
+  raiseConflictError: _EnumModule.raiseConflictError,
+  assertValidEnumDefinitionValues: _EnumModule.assertValidEnumDefinitionValues,
+  assertValidEnumOptions: _EnumModule.assertValidEnumOptions,
+  detectNegativeEnumConditionsBang: _EnumModule.detectNegativeEnumConditionsBang,
+});
+extend(Base, {
+  collectingQueriesForExplain: _collectingQueriesForExplain,
+  execExplain: _execExplain,
+  renderBind: _renderBind,
+  buildExplainClause: _buildExplainClause,
+});
 extend(Base, _Reflection.ClassMethods);
 extend(Base, {
   defaultScope: _defaultScope,
