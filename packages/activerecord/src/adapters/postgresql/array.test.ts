@@ -18,6 +18,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         timestamps timestamp[] DEFAULT '{}'
       )
     `);
+    await (adapter as any).loadAdditionalTypes();
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
@@ -25,6 +26,9 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlArrayTest", () => {
+    it.skip("column", async () => {
+      /* BLOCKED: Column#isArray() / array? missing in column.ts (~15 LOC) */
+    });
     it.skip("not compatible with serialize array", async () => {
       // BLOCKED: adapter-pg — serialize decorator gap
       // ROOT-CAUSE: Base.serialize() in base.ts does not raise ColumnNotSerializableError for
@@ -37,11 +41,17 @@ describeIfPg("PostgreSQLAdapter", () => {
       //   lifecycle around the OID::Array serialize/deserialize chain is not implemented.
       // SCOPE: ~50 LOC in base.ts serialize decorator + integration with attribute-set lifecycle
     });
+    it.skip("default", async () => {
+      /* BLOCKED: addColumn integer-array default DDL; same root as "default strings" (~20 LOC) */
+    });
     it.skip("default strings", async () => {
       // BLOCKED: adapter-pg — addColumn array default DDL gap
       // ROOT-CAUSE: postgresql/schema-statements.ts addColumn does not serialize array defaults
       //   (e.g. ["foo","bar"]) into PG literal form (e.g. ARRAY['foo','bar']) for the DEFAULT clause.
       // SCOPE: ~20 LOC in connection-adapters/postgresql/schema-statements.ts
+    });
+    it.skip("schema dump with shorthand", async () => {
+      /* BLOCKED: schema_dumper.ts array:true emission missing; needs column.isArray() (~10 LOC) */
     });
     it.skip("change column with array", async () => {
       // BLOCKED: adapter-pg — Column#array? introspection missing
@@ -132,20 +142,50 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].tags).toEqual(["1", "2", "", "4", "", "5"]);
     });
 
-    it.skip("with multi dimensional empty strings", async () => {
-      // BLOCKED: adapter-pg — assert_cycle pattern requires Base model round-trip
-      // ROOT-CAUSE: PgArrays Base model round-trip (create + reload) not yet established for
-      //   multi-dimensional arrays with empty-string elements; node-postgres param binding for
-      //   3-D arrays with "" elements may need verification against pg-types array serialization.
-      // SCOPE: ~10 LOC — implement using PgArrays Base model once assert_cycle pattern is confirmed
+    it("with multi dimensional empty strings", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const arr = [
+        [
+          ["1", "2"],
+          ["", "4"],
+          ["", "5"],
+        ],
+      ];
+      const r = await (PgArrays as any).create({ tags: arr });
+      await (r as any).reload();
+      expect((r as any).tags).toEqual(arr);
     });
 
-    it.skip("with arbitrary whitespace", async () => {
-      // BLOCKED: adapter-pg — assert_cycle pattern requires Base model round-trip
-      // ROOT-CAUSE: same as "with multi dimensional empty strings"; whitespace-only strings in
-      //   multi-dimensional arrays require verification that node-postgres preserves them through
-      //   the $1 parameter binding path.
-      // SCOPE: ~10 LOC — implement using PgArrays Base model once assert_cycle pattern is confirmed
+    it("with arbitrary whitespace", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      const arr = [
+        [
+          ["1", "2"],
+          ["    ", "4"],
+          ["    ", "5"],
+        ],
+      ];
+      const r = await (PgArrays as any).create({ tags: arr });
+      await (r as any).reload();
+      expect((r as any).tags).toEqual(arr);
+    });
+
+    it.skip("contains nils", async () => {
+      /* BLOCKED: null-element array round-trip; serialize→bind path for [tag,null] needs end-to-end check (~10 LOC) */
     });
 
     it("multi dimensional with integers", async () => {
