@@ -18,8 +18,9 @@ describeIfMysql("Mysql2Adapter", () => {
 
   describe("ConnectionTest", () => {
     it("bad connection", async () => {
-      const badUrl = MYSQL_TEST_URL.replace(/\/[^/]*$/, "/inexistent_activerecord_unittest");
-      const badAdapter = new Mysql2Adapter(badUrl);
+      const u = new URL(MYSQL_TEST_URL);
+      u.pathname = "/inexistent_activerecord_unittest";
+      const badAdapter = new Mysql2Adapter(u.toString());
       await expect(badAdapter.execute("SELECT 1")).rejects.toBeInstanceOf(NoDatabaseError);
       await badAdapter.close();
     });
@@ -119,10 +120,11 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("version string", async () => {
-      vi.spyOn(adapter, "getFullVersion").mockResolvedValueOnce("8.0.35-0ubuntu0.22.04.1");
+      const spy = vi.spyOn(adapter, "getFullVersion");
+      spy.mockResolvedValueOnce("8.0.35-0ubuntu0.22.04.1");
       expect((await adapter.getDatabaseVersion()).toString()).toBe("8.0.35");
 
-      vi.spyOn(adapter, "getFullVersion").mockResolvedValueOnce("5.7.0");
+      spy.mockResolvedValueOnce("5.7.0");
       expect((await adapter.getDatabaseVersion()).toString()).toBe("5.7.0");
     });
 
@@ -134,8 +136,9 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("version string invalid", async () => {
+      const spy = vi.spyOn(adapter, "getFullVersion");
       const assertVersionError = async (version: string | null, expectedMsg: string) => {
-        vi.spyOn(adapter, "getFullVersion").mockResolvedValue(version as string);
+        spy.mockResolvedValueOnce(version as string);
         let caughtErr: unknown;
         try {
           await adapter.getDatabaseVersion();

@@ -940,12 +940,22 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /**
    * Sever the connection immediately (synchronous contract from AbstractAdapter).
-   * Nulls `_driverPool` so `active` returns false right away; the underlying
-   * pool's END is scheduled asynchronously. Mirrors Rails'
-   * AbstractAdapter#disconnect! which closes `@raw_connection` and sets it to nil.
+   * Releases advisory-lock and transaction connections, nulls `_driverPool` so
+   * `active` returns false right away, then schedules pool.end() asynchronously.
+   * Mirrors Rails' Mysql2Adapter#disconnect! (super + raw_connection.close + nil).
    */
   override disconnectBang(): void {
     super.disconnectBang();
+    if (this._advisoryLockConn) {
+      this._advisoryLockConn.release();
+      this._advisoryLockConn = null;
+    }
+    if (this._conn) {
+      this._statementPools.get(this._conn)?.detach();
+      this._conn.release();
+      this._conn = null;
+    }
+    this._inTransaction = false;
     const pool = this._driverPool;
     this._driverPool = null;
     if (pool) {

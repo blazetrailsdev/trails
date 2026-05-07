@@ -613,10 +613,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * Query a MySQL session variable by name.
-   * Mirrors: AbstractMysqlAdapter#show_variable — uses `SELECT @@name` with logging
-   * name "SCHEMA". Returns null for unknown variables (Rails rescues StatementInvalid).
+   * Mirrors: AbstractMysqlAdapter#show_variable — `SELECT @@name` with logging name
+   * "SCHEMA". Returns null for unknown variables (Rails rescues StatementInvalid).
+   * The identifier is validated against MySQL variable-name characters before interpolation.
    */
   async showVariable(name: string): Promise<string | null> {
+    if (!/^\w+$/.test(name)) return null;
     try {
       const rows = await (
         this as unknown as {
@@ -1055,6 +1057,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *
    * Mirrors: AbstractMysqlAdapter#get_database_version — calls get_full_version,
    * strips MariaDB prefix via version_string, returns Version.
+   * Note: `getFullVersion()` on Mysql2Adapter caches its result and sets
+   * `_databaseVersion` as a side effect, so the sync `databaseVersion` getter
+   * works after this method has been awaited once.
    */
   override async getDatabaseVersion(): Promise<Version> {
     const fullVersion = await this.getFullVersion();
