@@ -67,6 +67,17 @@ describe("ControllerRuntimeTest", () => {
 
       expect(RuntimeRegistry.stats().queriesCount).toBe(0);
     });
+
+    it("appends cachedQueriesCount and resets it", () => {
+      RuntimeRegistry.record("SELECT", 1.0, { cached: true });
+      RuntimeRegistry.record("SELECT", 1.0, { cached: true });
+      const payload: Record<string, unknown> = {};
+
+      appendInfoToPayload.call({ dbRuntime: null }, payload);
+
+      expect(payload["cachedQueriesCount"]).toBe(2);
+      expect(RuntimeRegistry.stats().cachedQueriesCount).toBe(0);
+    });
   });
 
   describe("cleanupViewRuntime", () => {

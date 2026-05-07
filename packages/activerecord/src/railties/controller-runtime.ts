@@ -52,11 +52,12 @@ export function processAction(
  */
 export function cleanupViewRuntime(this: ControllerRuntimeHost): number {
   if (this.logger?.["info?"]) {
-    const dbRtBeforeRender = RuntimeRegistry.stats().resetRuntimes();
+    const s = RuntimeRegistry.stats();
+    const dbRtBeforeRender = s.resetRuntimes();
     this.dbRuntime = (this.dbRuntime ?? 0) + dbRtBeforeRender;
     const runtime = 0; // ACTION_VIEW: replace with super() call here
-    const queriesRt = RuntimeRegistry.stats().sqlRuntime - RuntimeRegistry.stats().asyncSqlRuntime;
-    const dbRtAfterRender = RuntimeRegistry.stats().resetRuntimes();
+    const queriesRt = s.sqlRuntime - s.asyncSqlRuntime;
+    const dbRtAfterRender = s.resetRuntimes();
     this.dbRuntime += dbRtAfterRender;
     return runtime - queriesRt;
   }
