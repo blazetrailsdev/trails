@@ -48,18 +48,13 @@ export function delegatedType(
   const config = { ...options, foreignKey, foreignType };
 
   // Rails: belongs_to role, scope, **options.merge(polymorphic: true)
-  // Wire the polymorphic belongs_to so entry.entryable / entry.entryable= work.
-  if (typeof (modelClass as any).belongsTo === "function") {
-    const { types: _types, ...assocOptions } = options as DelegatedTypeOptions & {
-      types?: unknown;
-    };
-    (modelClass as any).belongsTo(role, {
-      ...assocOptions,
-      polymorphic: true,
-      foreignKey,
-      foreignType,
-    });
-  }
+  const { types: _types, ...assocOptions } = options as DelegatedTypeOptions & { types?: unknown };
+  (modelClass as any).belongsTo(role, {
+    ...assocOptions,
+    polymorphic: true,
+    foreignKey,
+    foreignType,
+  });
 
   if (!delegatedTypeRegistry.has(modelClass)) {
     delegatedTypeRegistry.set(modelClass, new Map());

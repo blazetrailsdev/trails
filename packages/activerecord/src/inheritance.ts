@@ -213,7 +213,8 @@ export function isStiSubclass(modelClass: typeof Base): boolean {
  * @internal
  */
 export function baseClass(this: typeof Base): typeof Base {
-  return getStiBase(this);
+  if (!(this as any)._computedBaseClass) setBaseClass(this);
+  return (this as any)._computedBaseClass as typeof Base;
 }
 
 /**

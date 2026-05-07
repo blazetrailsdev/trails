@@ -2109,11 +2109,9 @@ describe("Base constructor wires initializeInternalsCallback", () => {
     const record = Vehicle._instantiate({ id: 1, type: "Vehicle" }) as any;
     expect(record.readAttribute("type")).toBe("Vehicle");
   });
+});
 
-  // -------------------------------------------------------------------------
-  // base_class? / set_base_class (setBaseClass)
-  // -------------------------------------------------------------------------
-
+describe("base_class? / isBaseClass", () => {
   it("base_class? returns true for the STI root and false for subclasses", () => {
     const adapter2 = createTestAdapter();
     class User2 extends Base {
@@ -2135,11 +2133,9 @@ describe("Base constructor wires initializeInternalsCallback", () => {
     expect(User2.isBaseClass()).toBe(true);
     expect(Manager2.isBaseClass()).toBe(false);
   });
+});
 
-  // -------------------------------------------------------------------------
-  // STI subclass routing: User.find(manager_id) returns Manager instance
-  // -------------------------------------------------------------------------
-
+describe("STI subclass routing via find", () => {
   it("subclass from find returns the subclass instance", async () => {
     const adapter3 = createTestAdapter();
     class User3 extends Base {
@@ -2165,8 +2161,10 @@ describe("Base constructor wires initializeInternalsCallback", () => {
     expect(found).toBeInstanceOf(Manager3);
     expect((found as any).name).toBe("Alice");
   });
+});
 
-  it("setBaseClass caches the STI base on the model class", () => {
+describe("set_base_class / setBaseClass", () => {
+  it("setBaseClass caches the base class using the Rails hierarchy logic", () => {
     const adapter4 = createTestAdapter();
     class Animal2 extends Base {
       static {
@@ -2184,9 +2182,9 @@ describe("Base constructor wires initializeInternalsCallback", () => {
 
     setBaseClass(Animal2);
     setBaseClass(Dog2);
-    // Animal2's superclass is Base (no _computedBaseClass) → Animal2 is its own root
+    // Animal2's superclass is Base (_isActiveRecordBase) → Animal2 is its own root
     expect((Animal2 as any)._computedBaseClass).toBe(Animal2);
-    // Dog2's superclass is Animal2, which has _computedBaseClass set → Dog2 inherits it
+    // Dog2's superclass is Animal2 (concrete, not abstract) → Dog2 inherits Animal2
     expect((Dog2 as any)._computedBaseClass).toBe(Animal2);
   });
 });
