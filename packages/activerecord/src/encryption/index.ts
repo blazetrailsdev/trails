@@ -3,7 +3,8 @@ export { Message } from "./message.js";
 export { Properties } from "./properties.js";
 export { Key } from "./key.js";
 export { KeyGenerator } from "./key-generator.js";
-export { Cipher } from "./cipher/aes256-gcm.js";
+export { Cipher } from "./cipher.js";
+export { Cipher as Aes256Gcm } from "./cipher/aes256-gcm.js";
 export { MessageSerializer } from "./message-serializer.js";
 export { Encryptor } from "./encryptor.js";
 export type { EncryptorOptions, EncryptorLike, KeyProviderLike } from "./encryptor.js";
@@ -54,5 +55,13 @@ export {
   keyLength,
   ivLength,
   eagerLoadBang,
+  // Module-level delegates (mirrors Rails' include Configurable + include Contexts).
+  // withEncryptionContext/withoutEncryption/protectingEncryptedData/resetDefaultContext
+  // are already re-exported from context.ts above.
+  configure,
+  onEncryptedAttributeDeclared,
+  encryptedAttributeWasDeclared,
+  context,
+  currentCustomContext,
 } from "../encryption.js";
 export type { Encryptor as LegacyEncryptor, EncryptsOptions } from "../encryption.js";

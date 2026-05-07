@@ -18,15 +18,20 @@
  * two flows share a single wrapper implementation.
  */
 
-import { NotImplementedError } from "./errors.js";
 import { type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
-import { Cipher } from "./encryption/cipher/aes256-gcm.js";
+import { Cipher as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
+export { Cipher } from "./encryption/cipher.js";
 import { globalPreviousSchemesFor, EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
-import { withoutEncryption, getEncryptionContext } from "./encryption/context.js";
+import { Contexts } from "./encryption/contexts.js";
+import {
+  withoutEncryption as _withoutEncryption,
+  getEncryptionContext,
+  type EncryptionContext,
+} from "./encryption/context.js";
 
 /**
  * The simple encryptor surface `Base.encrypts({ encryptor })` accepts.
@@ -454,17 +459,17 @@ export async function decryptRecord(record: any): Promise<void> {
       assignments[attr] = record.readAttribute(attr);
     }
   }
-  await withoutEncryption(() => record.updateColumns(assignments));
+  await _withoutEncryption(() => record.updateColumns(assignments));
 }
 
 /** Mirrors: ActiveRecord::Encryption.key_length */
 export function keyLength(): number {
-  return Cipher.keyLength;
+  return AesGcmCipher.keyLength;
 }
 
 /** Mirrors: ActiveRecord::Encryption.iv_length */
 export function ivLength(): number {
-  return Cipher.ivLength;
+  return AesGcmCipher.ivLength;
 }
 
 /** Mirrors: ActiveRecord::Encryption.eager_load! */
@@ -472,14 +477,53 @@ export function eagerLoadBang(): void {
   // No-op in TS — all encryption classes are statically imported.
 }
 
-/** @internal */
-function tryToDecryptWithEach(encryptedText: any, keys?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Encryption::Cipher#try_to_decrypt_with_each is not implemented",
-  );
+// ─── Delegation to Configurable (included into Encryption in Rails) ──────────
+
+/** Mirrors: ActiveRecord::Encryption.configure */
+export function configure(options: Parameters<typeof Configurable.configure>[0]): void {
+  Configurable.configure(options);
+}
+
+/** Mirrors: ActiveRecord::Encryption.on_encrypted_attribute_declared */
+export function onEncryptedAttributeDeclared(
+  callback: (klass: any, name: string) => void,
+): () => void {
+  return Configurable.onEncryptedAttributeDeclared(callback);
 }
 
 /** @internal */
-function cipherFor(secret: any, deterministic?: any): never {
-  throw new NotImplementedError("ActiveRecord::Encryption::Cipher#cipher_for is not implemented");
+export function encryptedAttributeWasDeclared(klass: any, name: string): void {
+  Configurable.encryptedAttributeWasDeclared(klass, name);
+}
+
+// ─── Delegation to Contexts (included into Encryption in Rails) ──────────────
+
+/** Mirrors: ActiveRecord::Encryption.with_encryption_context */
+export function withEncryptionContext<T>(properties: EncryptionContext, fn: () => T): T {
+  return Contexts.withEncryptionContext(properties, fn);
+}
+
+/** Mirrors: ActiveRecord::Encryption.without_encryption */
+export function withoutEncryption<T>(fn: () => T): T {
+  return Contexts.withoutEncryption(fn);
+}
+
+/** Mirrors: ActiveRecord::Encryption.protecting_encrypted_data */
+export function protectingEncryptedData<T>(fn: () => T): T {
+  return Contexts.protectingEncryptedData(fn);
+}
+
+/** Mirrors: ActiveRecord::Encryption.context */
+export function context(): EncryptionContext {
+  return Contexts.context;
+}
+
+/** Mirrors: ActiveRecord::Encryption.current_custom_context */
+export function currentCustomContext(): EncryptionContext | null {
+  return Contexts.currentCustomContext;
+}
+
+/** @internal */
+export function resetDefaultContext(): void {
+  Contexts.resetDefaultContext();
 }
