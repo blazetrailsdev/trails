@@ -657,3 +657,244 @@ export function inBatches<T extends typeof Base>(
 ): ReturnType<ReturnType<T["all"]>["inBatches"]> {
   return this.all().inBatches(opts) as ReturnType<ReturnType<T["all"]>["inBatches"]>;
 }
+
+/** Mirrors: ActiveRecord::Querying#includes */
+export function includes<T extends typeof Base>(
+  this: T,
+  ...associations: AssociationSpec[]
+): Relation<InstanceType<T>> {
+  return this.all().includes(...associations);
+}
+
+/** Mirrors: ActiveRecord::Querying#preload */
+export function preload<T extends typeof Base>(
+  this: T,
+  ...associations: AssociationSpec[]
+): Relation<InstanceType<T>> {
+  return this.all().preload(...associations);
+}
+
+/** Mirrors: ActiveRecord::Querying#eager_load */
+export function eagerLoad<T extends typeof Base>(
+  this: T,
+  ...associations: AssociationSpec[]
+): Relation<InstanceType<T>> {
+  return this.all().eagerLoad(...associations);
+}
+
+/** Mirrors: ActiveRecord::Querying#references */
+export function references<T extends typeof Base>(
+  this: T,
+  ...tables: string[]
+): Relation<InstanceType<T>> {
+  return this.all().references(...tables);
+}
+
+/** Mirrors: ActiveRecord::Querying#extending */
+export function extending<T extends typeof Base, M extends Record<string, Function>>(
+  this: T,
+  mod: M,
+): Relation<InstanceType<T>> & M;
+export function extending<T extends typeof Base>(
+  this: T,
+  fn: (rel: Relation<InstanceType<T>>) => void,
+): Relation<InstanceType<T>>;
+export function extending<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
+export function extending<T extends typeof Base>(
+  this: T,
+  mod?: Record<string, Function> | ((rel: Relation<InstanceType<T>>) => void),
+): Relation<InstanceType<T>> {
+  return mod ? this.all().extending(mod as Record<string, Function>) : this.all().extending();
+}
+
+/** Mirrors: ActiveRecord::Querying#unscope */
+export function unscope<T extends typeof Base>(
+  this: T,
+  ...args: Parameters<Relation<InstanceType<T>>["unscope"]>
+): Relation<InstanceType<T>> {
+  return this.all().unscope(...args);
+}
+
+/** Mirrors: ActiveRecord::Querying#reselect */
+export function reselect<T extends typeof Base>(
+  this: T,
+  ...columns: Parameters<Relation<InstanceType<T>>["reselect"]>
+): Relation<InstanceType<T>> {
+  return this.all().reselect(...columns);
+}
+
+/** Mirrors: ActiveRecord::Querying#reorder */
+export function reorder<T extends typeof Base>(
+  this: T,
+  ...args: Parameters<Relation<InstanceType<T>>["reorder"]>
+): Relation<InstanceType<T>> {
+  return this.all().reorder(...args);
+}
+
+/** Mirrors: ActiveRecord::Querying#rewhere */
+export function rewhere<T extends typeof Base>(
+  this: T,
+  conditions: Record<string, unknown>,
+): Relation<InstanceType<T>> {
+  return this.all().rewhere(conditions);
+}
+
+/** Mirrors: ActiveRecord::Querying#regroup */
+export function regroup<T extends typeof Base>(
+  this: T,
+  ...columns: string[]
+): Relation<InstanceType<T>> {
+  return this.all().regroup(...columns);
+}
+
+/** Mirrors: ActiveRecord::Querying#having */
+export function having<T extends typeof Base>(
+  this: T,
+  condition: string,
+  ...binds: unknown[]
+): Relation<InstanceType<T>>;
+export function having<T extends typeof Base>(
+  this: T,
+  condition: Record<string, unknown>,
+): Relation<InstanceType<T>>;
+export function having<T extends typeof Base>(
+  this: T,
+  condition: import("@blazetrails/arel").Nodes.Node,
+): Relation<InstanceType<T>>;
+export function having<T extends typeof Base>(
+  this: T,
+  condition: string | Record<string, unknown> | import("@blazetrails/arel").Nodes.Node,
+  ...binds: unknown[]
+): Relation<InstanceType<T>> {
+  if (typeof condition === "string") return this.all().having(condition, ...binds);
+  return this.all().having(condition as Record<string, unknown>);
+}
+
+/** Mirrors: ActiveRecord::Querying#lock */
+export function lock<T extends typeof Base>(
+  this: T,
+  clause?: string | boolean,
+): Relation<InstanceType<T>> {
+  return this.all().lock(clause);
+}
+
+/** Mirrors: ActiveRecord::Querying#readonly */
+export function readonly<T extends typeof Base>(
+  this: T,
+  value?: boolean,
+): Relation<InstanceType<T>> {
+  return this.all().readonly(value);
+}
+
+/** Mirrors: ActiveRecord::Querying#with */
+export function withCte<T extends typeof Base>(
+  this: T,
+  ...ctes: Parameters<Relation<InstanceType<T>>["with"]>
+): Relation<InstanceType<T>> {
+  return this.all().with(...ctes);
+}
+
+/** Mirrors: ActiveRecord::Querying#with_recursive */
+export function withRecursive<T extends typeof Base>(
+  this: T,
+  ...ctes: Parameters<Relation<InstanceType<T>>["withRecursive"]>
+): Relation<InstanceType<T>> {
+  return this.all().withRecursive(...ctes);
+}
+
+/** Mirrors: ActiveRecord::Querying#annotate */
+export function annotate<T extends typeof Base>(
+  this: T,
+  ...comments: string[]
+): Relation<InstanceType<T>> {
+  return this.all().annotate(...comments);
+}
+
+/** Mirrors: ActiveRecord::Querying#excluding */
+export function excluding<T extends typeof Base>(
+  this: T,
+  ...records: InstanceType<T>[]
+): Relation<InstanceType<T>> {
+  return this.all().excluding(...records);
+}
+
+/** Mirrors: ActiveRecord::Querying#or */
+export function or<T extends typeof Base>(
+  this: T,
+  other: Relation<InstanceType<T>>,
+): Relation<InstanceType<T>> {
+  return this.all().or(other);
+}
+
+/** Mirrors: ActiveRecord::Querying#and */
+export function and<T extends typeof Base>(
+  this: T,
+  other: Relation<InstanceType<T>>,
+): Relation<InstanceType<T>> {
+  return this.all().and(other);
+}
+
+/** Mirrors: ActiveRecord::Querying#in_order_of */
+export function inOrderOf<T extends typeof Base>(
+  this: T,
+  column: string,
+  values: unknown[],
+  filter?: boolean,
+): Relation<InstanceType<T>> {
+  return this.all().inOrderOf(column, values, filter);
+}
+
+/** Mirrors: ActiveRecord::Querying#strict_loading */
+export function strictLoading<T extends typeof Base>(
+  this: T,
+  value?: boolean,
+): Relation<InstanceType<T>> {
+  return this.all().strictLoading(value);
+}
+
+/** Mirrors: ActiveRecord::Querying#create_with */
+export function createWith<T extends typeof Base>(
+  this: T,
+  attrs: Record<string, unknown> | null,
+): Relation<InstanceType<T>> {
+  return this.all().createWith(attrs);
+}
+
+/** Mirrors: ActiveRecord::Querying#invert_where */
+export function invertWhere<T extends typeof Base>(this: T): Relation<InstanceType<T>> {
+  return this.all().invertWhere();
+}
+
+/** Mirrors: ActiveRecord::Querying#without — alias for excluding */
+export function without<T extends typeof Base>(
+  this: T,
+  ...records: InstanceType<T>[]
+): Relation<InstanceType<T>> {
+  return this.all().without(...records);
+}
+
+/** Mirrors: ActiveRecord::SpawnMethods#only */
+export function only<T extends typeof Base>(
+  this: T,
+  ...types: Parameters<Relation<InstanceType<T>>["only"]>
+): Relation<InstanceType<T>> {
+  return this.all().only(...types);
+}
+
+/** Mirrors: ActiveRecord::Querying#merge */
+export function merge<T extends typeof Base, U extends Base>(
+  this: T,
+  other: Relation<U>,
+): Relation<InstanceType<T>> {
+  return this.all().merge(other);
+}
+
+/** Mirrors: ActiveRecord::Querying#async_ids */
+export function asyncIds<T extends typeof Base>(this: T): Promise<unknown[]> {
+  return this.all().asyncIds();
+}
+
+// `with` is a reserved JS keyword and cannot be a function declaration name.
+// Re-export under the Rails name so extend(Base, Querying) wires Base.with correctly.
+// Reserved words are valid IdentifierNames in export specifiers (ES2022 §16.2.3).
+export { withCte as with };
