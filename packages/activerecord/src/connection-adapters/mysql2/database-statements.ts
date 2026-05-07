@@ -7,6 +7,7 @@
 import type mysql from "mysql2/promise";
 import { NotImplementedError } from "../../errors.js";
 import { Result } from "../../result.js";
+import { combineMultiStatements } from "../abstract/database-statements.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
@@ -52,11 +53,21 @@ export async function selectAll(
   return this.execQuery(sql, name, binds);
 }
 
-/** @internal */
-function executeBatch(statements: any, name?: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#execute_batch is not implemented",
-  );
+/**
+ * Combines statements via `combineMultiStatements` then executes each block.
+ * Mirrors Rails' use of `multi_statement: true` for batched execution.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#execute_batch
+ * @internal
+ */
+export async function executeBatch(
+  this: { execute(sql: string, name?: string | null): Promise<unknown> },
+  statements: string[],
+  name?: string | null,
+): Promise<void> {
+  for (const statement of combineMultiStatements(statements)) {
+    await this.execute(statement, name);
+  }
 }
 
 /** @internal */
