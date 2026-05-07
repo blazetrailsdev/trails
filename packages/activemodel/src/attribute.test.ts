@@ -490,7 +490,7 @@ describe("AttributeTest", () => {
   });
 
   describe("Attribute#changedInPlace delegates to type.isChangedInPlace", () => {
-    it("returns true when mutable type reports change", () => {
+    it("returns true when type.isChangedInPlace returns true (StringType: raw vs new value differ)", () => {
       const stringType = typeRegistry.lookup("string");
       const attr = Attribute.fromDatabase("name", "hello", stringType);
       void attr.value; // materialize so hasBeenRead() is true

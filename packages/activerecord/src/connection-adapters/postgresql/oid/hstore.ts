@@ -77,6 +77,16 @@ export class Hstore extends ValueType<Record<string, string | null>> {
   }
 
   /**
+   * Ruby Hash equality is value-based; JS object equality is identity-based.
+   * Override so assigning a deep-equal hash does not dirty the attribute.
+   */
+  override isChanged(oldValue: unknown, newValue: unknown, _rawValue: unknown): boolean {
+    if (oldValue == null && newValue == null) return false;
+    if (oldValue == null || newValue == null) return true;
+    return !hashesEqual(oldValue as Record<string, unknown>, newValue as Record<string, unknown>);
+  }
+
+  /**
    * Rails' Hstore#changed_in_place? compares hashes (not raw strings)
    * so key-order differences don't dirty the attribute.
    */
