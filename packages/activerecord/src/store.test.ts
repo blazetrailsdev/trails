@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { Base, registerModel, store, storedAttributes, localStoredAttributes } from "./index.js";
-
+import { IndifferentHashAccessor, getStoreCoder, storeAccessorFor } from "./store.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -59,10 +59,9 @@ describe("StoreTest", () => {
     const u = await User.create({ name: "Bob", settings: raw });
     expect((u as any).theme).toBe("dark");
     expect((u as any).language).toBe("en");
-    // extra is not exposed, but settings JSON string contains it
-    const settingsStr = u.settings as string;
-    const settings = JSON.parse(settingsStr);
-    expect(settings.extra).toBe("value");
+    // extra is not exposed as an accessor, but lives in the underlying store HWIA
+    const settings = u.settings as any;
+    expect(settings.get("extra")).toBe("value");
   });
 
   it("overriding a read accessor", async () => {
@@ -284,9 +283,9 @@ describe("StoreTest", () => {
         (this as any).settings = JSON.stringify({ theme: `custom:${v}` });
       }
       get theme() {
-        const raw = this.settings as string;
-        if (!raw) return null;
-        return JSON.parse(raw).theme ?? null;
+        const settings = this.settings as any;
+        if (!settings) return null;
+        return settings.get("theme") ?? null;
       }
     }
     const u = new (SpecialUser as any)({ name: "Ivy" });
@@ -308,16 +307,18 @@ describe("StoreTest", () => {
       settings: JSON.stringify({ theme: "dark", extra: "data" }),
     });
     expect((u as any).theme).toBe("dark");
-    const parsed = JSON.parse(u.settings as string);
-    expect(parsed.extra).toBe("data");
+    // settings is now a HashWithIndifferentAccess — access via .get()
+    const settings = u.settings as any;
+    expect(settings.get("extra")).toBe("data");
   });
 
   it("serialize stored nested attributes", () => {
     const { User } = makeModel();
     const nested = { theme: "dark", nested: { key: "val" } };
     const u = new User({ name: "Jack", settings: JSON.stringify(nested) });
-    const parsed = JSON.parse(u.settings as string);
-    expect(parsed.nested.key).toBe("val");
+    // settings is a HashWithIndifferentAccess; nested values remain plain objects
+    const settings = u.settings as any;
+    expect(settings.get("nested").key).toBe("val");
   });
 
   it("convert store attributes from Hash to HashWithIndifferentAccess saving the data and access attributes indifferently", () => {
@@ -339,9 +340,9 @@ describe("StoreTest", () => {
       name: "Lee",
       settings: JSON.stringify({ theme: "dark", secret: "hidden" }),
     });
-    // secret is not exposed as an accessor, but lives in the JSON
-    const parsed = JSON.parse(u.settings as string);
-    expect(parsed.secret).toBe("hidden");
+    // secret is not exposed as an accessor, but lives in the underlying store HWIA
+    const settings = u.settings as any;
+    expect(settings.get("secret")).toBe("hidden");
   });
 
   it("updating the store will mark it as changed encoded with JSON", () => {
@@ -814,7 +815,6 @@ describe("StoreTest", () => {
 
   afterAll(async () => {
     await dropAllTables(adapter);
-    vi.unstubAllEnvs();
   });
 
   // Rails: test "reading store attributes through accessors"
@@ -1016,4 +1016,149 @@ describe("storeAccessorsModule", () => {
     expect(storeAccessorsModule(Child).has("theme")).toBe(false);
     expect(storeAccessorsModule(Child).has("mode")).toBe(true);
   });
+});
+
+describe("IndifferentCoder wiring via store() and Base.store()", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", settings: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
+  it("Base.store registers an IndifferentCoder for the column", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    User.store("settings", { accessors: ["theme"] });
+    const coder = getStoreCoder(User, "settings");
+    expect(coder).toBeDefined();
+    expect(typeof coder!.load).toBe("function");
+    expect(typeof coder!.dump).toBe("function");
+    expect(coder!.accessor()).toBe(IndifferentHashAccessor);
+  });
+
+  it("standalone store() registers an IndifferentCoder for the column", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    store(User, "settings", { accessors: ["theme"] });
+    const coder = getStoreCoder(User, "settings");
+    expect(coder).toBeDefined();
+    expect(coder!.accessor()).toBe(IndifferentHashAccessor);
+  });
+
+  it("storeAccessorFor returns IndifferentHashAccessor for a store column", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    User.store("settings", { accessors: ["theme"] });
+    expect(storeAccessorFor(User, "settings")).toBe(IndifferentHashAccessor);
+  });
+
+  it("reading a store column returns HashWithIndifferentAccess", async () => {
+    const { HashWithIndifferentAccess: HWIA } = await import("@blazetrails/activesupport");
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    User.store("settings", { accessors: ["theme"] });
+    const u = new User({ name: "Alice", settings: JSON.stringify({ theme: "dark" }) });
+    const settings = u.settings;
+    expect(settings).toBeInstanceOf(HWIA);
+    expect((settings as any).get("theme")).toBe("dark");
+  });
+
+  it("round-trip: save and reload preserves store values via IndifferentCoder", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(User);
+    User.store("settings", { accessors: ["theme", "language"] });
+
+    const u = await User.create({ name: "Bob" });
+    (u as any).theme = "midnight";
+    (u as any).language = "fr";
+    await u.save();
+
+    const reloaded = await User.find(u.id);
+    expect((reloaded as any).theme).toBe("midnight");
+    expect((reloaded as any).language).toBe("fr");
+  });
+
+  it("IndifferentCoder.load wraps null/missing value in empty HWIA", () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    User.store("settings", { accessors: ["theme"] });
+    const u = new User({ name: "Carol" });
+    expect((u as any).theme).toBeNull();
+  });
+
+  it("store_accessor raises an exception if the column is not either serializable or a structured type", () => {
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    // "data" was never declared via store() or as a structured type
+    expect(() => storeAccessorFor(Item, "data")).toThrow(
+      "the column 'data' has not been configured as a store",
+    );
+  });
+
+  it("store() with coder: JSON uses buildColumnSerializer → IndifferentCoder delegation", async () => {
+    const { HashWithIndifferentAccess: HWIA } = await import("@blazetrails/activesupport");
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = adapter;
+      }
+    }
+    // Pass the global JSON object as the coder — buildColumnSerializer maps it to CodersJSON.
+    User.store("settings", { accessors: ["theme"], coder: JSON });
+    const coder = getStoreCoder(User, "settings");
+    expect(coder).toBeDefined();
+    // IndifferentCoder should delegate dump/load through the inner coder.
+    const u = new User({ name: "Test", settings: JSON.stringify({ theme: "ocean" }) });
+    expect(u.settings).toBeInstanceOf(HWIA);
+    expect((u as any).theme).toBe("ocean");
+  });
+});
+
+// AR_NO_AUTO_SCHEMA is stubbed at module scope for the full file.
+// Restore at file teardown so the stub doesn't persist in the worker.
+afterAll(() => {
+  vi.unstubAllEnvs();
 });
