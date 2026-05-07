@@ -253,10 +253,9 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private serializeWithOldest(value: unknown): unknown {
-    // Use previousTypesWithoutCleanText to avoid selecting the clean-text fallback
-    // scheme when supportUnencryptedData is true. Mirrors Rails' previous_types.first
-    // (first of previous_schemes_including_clean_text = first of previous_schemes when
-    // clean text is excluded), keeping ciphertexts stable across key rotations.
+    // Mirrors Rails' previous_types.first — the first of the previous types (which are
+    // built from previousSchemesIncludingCleanText, so the clean-text entry, if any, is
+    // at the end and never selected here). Keeps ciphertexts stable across key rotations.
     return (this.previousTypes[0] ?? this).serialize(value);
   }
 
@@ -321,13 +320,18 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private textToDatabaseType(value: unknown): unknown {
-    if (value && this.castType.isBinary()) return new BinaryData(value as string);
+    if (value != null && this.castType.isBinary()) return new BinaryData(value as string);
     return value;
   }
 
   /** @internal */
   private databaseTypeToText(value: unknown): unknown {
-    if (value && this.castType.isBinary()) return this.castType.deserialize?.(value) ?? value;
+    if (value != null && this.castType.isBinary()) {
+      const raw = this.castType.deserialize?.(value) ?? value;
+      // BinaryType.deserialize returns Uint8Array; decode back to the ciphertext string
+      // so decryptAsText always receives a plain string.
+      return raw instanceof Uint8Array ? new TextDecoder().decode(raw) : raw;
+    }
     return value;
   }
 
