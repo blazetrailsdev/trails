@@ -232,11 +232,17 @@ import * as _AttributeAssignment from "./attribute-assignment.js";
 import * as _NestedAttributes from "./nested-attributes.js";
 import {
   store as _storeFunction,
+  storeAccessor as _storeAccessorFunction,
+  registerSerializeFn as _registerSerializeFn,
   localStoredAttributesMethod as _localStoredAttributesMethod,
   readStoreAttributeMethod as _readStoreAttributeMethod,
   writeStoreAttributeMethod as _writeStoreAttributeMethod,
   storeAccessorForMethod as _storeAccessorForMethod,
 } from "./store.js";
+import { serialize as _serializeAttribute } from "./serialize.js";
+
+// Break store→serialize→json→store circular dep by injecting serialize into store at init.
+_registerSerializeFn(_serializeAttribute as any);
 import {
   hasMultiparameterKeys,
   extractMultiparameterCallstack,
@@ -1354,19 +1360,60 @@ export class Base extends Model {
 
   /**
    * Declare a stored attribute backed by a JSON/text column.
-   * Defines accessors for individual keys within the stored hash.
+   * Registers an IndifferentCoder for the column. For plain text/string columns,
+   * also calls serialize() so readAttribute returns HashWithIndifferentAccess.
+   * Structured types (json/jsonb/hstore) have a type-level accessor and handle
+   * their own cast/serialize — IndifferentCoder is registered but serialize()
+   * is not called for those.
    *
-   * Mirrors: ActiveRecord::Store.store
+   * Mirrors: ActiveRecord::Store::ClassMethods#store
    */
   static store(
     attribute: string,
-    options?: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string },
+    options?: {
+      accessors?: string[];
+      prefix?: boolean | string;
+      suffix?: boolean | string;
+      coder?: unknown;
+      yaml?: Record<string, unknown>;
+    },
   ): void {
     _storeFunction(this, attribute, {
-      accessors: options?.accessors ?? [],
+      accessors: options?.accessors,
+      prefix: options?.prefix,
+      suffix: options?.suffix,
+      coder: options?.coder,
+      yaml: options?.yaml,
+    });
+  }
+
+  /**
+   * Add accessors to an already-serialized store column without re-running
+   * the serialize step. Use store() instead when declaring a new store column.
+   *
+   * Mirrors: ActiveRecord::Store::ClassMethods#store_accessor
+   */
+  static storeAccessor(
+    attribute: string,
+    options?: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string },
+  ): void {
+    _storeAccessorFunction(this, attribute, {
+      accessors: options?.accessors,
       prefix: options?.prefix,
       suffix: options?.suffix,
     });
+  }
+
+  /**
+   * Declare that an attribute should be serialized using the given coder.
+   *
+   * Mirrors: ActiveRecord::Base.serialize
+   */
+  static serialize(
+    attribute: string,
+    options?: { coder?: unknown; type?: "Array" | "Hash" },
+  ): void {
+    _serializeAttribute(this, attribute, options as any);
   }
 
   /** Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes */
