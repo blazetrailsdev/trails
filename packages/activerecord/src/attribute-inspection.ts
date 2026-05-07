@@ -64,7 +64,7 @@ export function inspectionFilter(this: CoreHost): ParameterFilter {
 }
 
 function inspectArray(arr: unknown[]): string {
-  return `[${arr.map((v) => (v == null ? "nil" : globalThis.Array.isArray(v) ? inspectArray(v as unknown[]) : (JSON.stringify(v) ?? String(v)))).join(", ")}]`;
+  return `[${arr.map((v) => (v == null ? "nil" : globalThis.Array.isArray(v) ? inspectArray(v as unknown[]) : typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)))).join(", ")}]`;
 }
 
 /**

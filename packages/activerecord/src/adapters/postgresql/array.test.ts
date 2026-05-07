@@ -18,7 +18,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         timestamps timestamp[] DEFAULT '{}'
       )
     `);
-    await (adapter as any).loadAdditionalTypes();
+    await adapter.loadAdditionalTypes();
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
