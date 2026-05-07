@@ -5,7 +5,6 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { NotImplementedError } from "./errors.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { EnvironmentStorageError } from "./migration.js";
 import {
@@ -132,9 +131,14 @@ export class InternalMetadata {
       // migration.ts (the cycle is ESM-safe because EnvironmentStorageError is only used in method bodies).
       throw new EnvironmentStorageError();
     }
-    const existing = await this.selectEntry(key);
-    if (existing) {
-      if (existing[this.valueKey] !== value) {
+    await this.updateOrCreateEntry(key, value);
+  }
+
+  /** @internal */
+  private async updateOrCreateEntry(key: string, value: string): Promise<void> {
+    const entry = await this.selectEntry(key);
+    if (entry) {
+      if (entry[this.valueKey] !== value) {
         await this.updateEntry(key, value);
       }
     } else {
@@ -227,11 +231,4 @@ export class InternalMetadata {
     um.where(this.arelTable.get(this.primaryKey).eq(key));
     await this._adapter.executeMutation(um.toSql());
   }
-}
-
-/** @internal */
-function updateOrCreateEntry(connection: any, key: any, value: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::InternalMetadata#update_or_create_entry is not implemented",
-  );
 }

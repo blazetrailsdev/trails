@@ -126,6 +126,24 @@ export const SKIP = new Set([
   "inherited",
   // Ruby object hooks — no TypeScript equivalent
   "singleton_method_added",
+  // NoTouching: TS uses a Map-based depth counter (_noTouchingDepth) instead of
+  // a thread-local array; klasses() is the Rails internal accessor for that array.
+  "klasses",
+  // PostgreSQL::Quoting#lookup_cast_type issues an async DB query (SELECT oid)
+  // to resolve a sql_type string; our standalone-function quoting module has no
+  // adapter instance, so this can't be ported without a larger refactor.
+  "lookup_cast_type",
+  // CheckPending helpers — depend on Rails.root, system("bin/rails ..."), and
+  // the ActiveRecord::Tasks infrastructure that has no JS equivalent.
+  "any_schema_needs_update?",
+  "db_configs_in_current_env",
+  "load_schema!",
+  // Migrator internal index helpers — Rails stores @target_version / @direction
+  // as instance variables; our TS Migrator passes them as method parameters
+  // instead, so these zero-arg helpers can't be faithfully ported.
+  "target",
+  "start",
+  "finish",
 ]);
 
 /**

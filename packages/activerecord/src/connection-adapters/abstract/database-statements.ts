@@ -8,7 +8,7 @@
  *   custom types and rejects them with a clear error (per PR 6).
  */
 
-import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
+import { sql as arelSql, Nodes, Visitors, Table, InsertManager } from "@blazetrails/arel";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Notifications } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -1497,39 +1497,126 @@ export function defaultInsertValue(_column: unknown): Nodes.SqlLiteral {
   return arelSql("DEFAULT");
 }
 
-/** @internal */
-function buildFixtureSql(fixtures: any, tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_fixture_sql is not implemented",
+/**
+ * Builds an INSERT SQL string for a set of fixture rows using an Arel
+ * InsertManager, matching Rails' column-ordering and single-row DEFAULT-strip
+ * behaviour as closely as possible without a schema cache.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#build_fixture_sql
+ * @internal
+ */
+export function buildFixtureSql(
+  this: DatabaseStatementsHost &
+    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString">,
+  fixtures: Record<string, unknown>[],
+  tableName: string,
+): string {
+  if (fixtures.length === 0) {
+    const emptyValue = this.emptyInsertStatementValue?.() ?? emptyInsertStatementValue();
+    return `INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`;
+  }
+
+  // Collect the union of all column names across fixtures (preserving
+  // insertion order via Set, matching Rails' schema_cache column order
+  // as closely as possible without a schema cache).
+  const allColumns = [...new Set(fixtures.flatMap((f) => Object.keys(f)))];
+  if (allColumns.length === 0) {
+    const emptyValue = this.emptyInsertStatementValue?.() ?? emptyInsertStatementValue();
+    return `INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`;
+  }
+
+  // Pre-quote values through the adapter's quote() so that Temporal types,
+  // MySQL-specific escaping, and the JS Date guard in Quoting#quote() are all
+  // respected — matching Rails, where the visitor calls @conn.quote(value).
+  // The DEFAULT sentinel is an SqlLiteral; identity-check against it to detect
+  // missing columns in the single-row path.
+  const DEFAULT_VALUE = arelSql("DEFAULT");
+  const table = new Table(tableName);
+  const manager = new InsertManager(table);
+
+  const valuesList = fixtures.map((fixture) =>
+    allColumns.map((col) =>
+      col in fixture ? arelSql(this.quote(withYamlFallback(fixture[col]))) : DEFAULT_VALUE,
+    ),
   );
+
+  if (valuesList.length === 1) {
+    // Single-row: strip DEFAULT columns so the DB fills them from its own
+    // defaults, matching Rails' single-row optimisation exactly.
+    const row = valuesList[0];
+    const filteredValues: Nodes.Node[] = [];
+    allColumns.forEach((col, i) => {
+      if (row[i] !== DEFAULT_VALUE) {
+        filteredValues.push(row[i] as Nodes.Node);
+        manager.columns.push(table.get(col));
+      }
+    });
+    manager.values = manager.createValues(filteredValues);
+  } else {
+    allColumns.forEach((col) => manager.columns.push(table.get(col)));
+    manager.values = manager.createValuesList(valuesList as Nodes.Node[][]);
+  }
+
+  // Compile via the adapter's Arel visitor when available (matches Rails'
+  // `visitor.compile(manager.ast)`). When arelVisitor is absent (e.g.
+  // SchemaAdapter/TestAdapter), construct one from this adapter so identifier
+  // quoting is dialect-correct rather than using the global default quoter.
+  const visitor =
+    ((this as any)?.arelVisitor as Visitors.ToSql | undefined) ??
+    new Visitors.ToSql(this as unknown as Visitors.ArelQuoter);
+  return visitor.compile(manager.ast);
 }
 
-/** @internal */
-function buildFixtureStatements(fixtureSet: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_fixture_statements is not implemented",
-  );
+/**
+ * Returns an INSERT SQL string for each non-empty table in the fixture set.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#build_fixture_statements
+ * @internal
+ */
+export function buildFixtureStatements(
+  this: DatabaseStatementsHost &
+    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString">,
+  fixtureSet: Record<string, Record<string, unknown>[]>,
+): string[] {
+  return Object.entries(fixtureSet)
+    .filter(([, fixtures]) => fixtures.length > 0)
+    .map(([tableName, fixtures]) => buildFixtureSql.call(this, fixtures, tableName));
 }
 
-/** @internal */
-function buildTruncateStatement(tableName: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_truncate_statement is not implemented",
-  );
+/**
+ * Returns a TRUNCATE TABLE statement for the given table.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#build_truncate_statement
+ * @internal
+ */
+export function buildTruncateStatement(
+  this: Pick<Quoting, "quoteTableName">,
+  tableName: string,
+): string {
+  return `TRUNCATE TABLE ${this.quoteTableName(tableName)}`;
 }
 
-/** @internal */
-function buildTruncateStatements(tableNames: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#build_truncate_statements is not implemented",
-  );
+/**
+ * Returns TRUNCATE TABLE statements for each table name.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#build_truncate_statements
+ * @internal
+ */
+export function buildTruncateStatements(
+  this: Pick<Quoting, "quoteTableName">,
+  tableNames: string[],
+): string[] {
+  return tableNames.map((t) => buildTruncateStatement.call(this, t));
 }
 
-/** @internal */
-function combineMultiStatements(totalSql: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#combine_multi_statements is not implemented",
-  );
+/**
+ * Joins an array of SQL statements with ";\n".
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#combine_multi_statements
+ * @internal
+ */
+export function combineMultiStatements(totalSql: string[]): string {
+  return totalSql.join(";\n");
 }
 
 /**
