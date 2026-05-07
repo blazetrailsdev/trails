@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Cipher } from "./cipher.js";
 import { Encryptor } from "./encryptor.js";
 import { Configurable } from "./configurable.js";
 import { Contexts } from "./contexts.js";
@@ -262,6 +263,19 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
       const encrypted = enc.encrypt("hello from config");
       const decrypted = enc.decrypt(encrypted);
       expect(decrypted).toBe("hello from config");
+    });
+  });
+
+  it("cipher delegates to the configured cipher singleton", () => {
+    const enc = new Encryptor();
+    expect((enc as any).cipher()).toBeInstanceOf(Cipher);
+    expect((enc as any).cipher()).toBe(Configurable.cipher);
+  });
+
+  it("cipher reads from the current encryption context", () => {
+    const customCipher = new Cipher();
+    Contexts.withEncryptionContext({ cipher: customCipher }, () => {
+      expect((new Encryptor() as any).cipher()).toBe(customCipher);
     });
   });
 });
