@@ -52,12 +52,19 @@ try {
 /** True when expo-sqlite loaded successfully; use as a describe.skipIf gate in tests. */
 export const isExpoSqliteAvailable = expoSqlite !== undefined;
 
+const NAMED_PREFIX = /^[$:@]/;
+
 /** @internal */
 function expandBinds(binds: SqliteBinds | undefined): unknown[] | Record<string, unknown> {
   if (binds === undefined) return [];
   if (Array.isArray(binds)) return binds as unknown[];
-  // Named object: expo-sqlite's executeAsync accepts { $name: val } directly
-  return binds as Record<string, unknown>;
+  // expo-sqlite requires $name/:name/@name keys. SqliteBinds uses bare names,
+  // so prefix any key that doesn't already carry a sigil.
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(binds)) {
+    out[NAMED_PREFIX.test(k) ? k : `$${k}`] = v;
+  }
+  return out;
 }
 
 /** @internal */

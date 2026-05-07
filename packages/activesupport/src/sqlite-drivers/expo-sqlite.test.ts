@@ -57,7 +57,7 @@ describe.skipIf(!isExpoSqliteAvailable)("SqliteDriver — expo-sqlite round-trip
     expect(row["qty"]).toBe(42);
   });
 
-  it("exec runs multi-statement SQL", async () => {
+  it("exec runs DDL statements", async () => {
     await conn.exec("CREATE TABLE IF NOT EXISTS tmp_exec (x INTEGER)");
     await conn.exec("DROP TABLE tmp_exec");
   });
