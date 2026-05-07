@@ -22,7 +22,7 @@ import { ROOT_DIR, OUTPUT_DIR, PACKAGES, PACKAGE_DIR_OVERRIDES, packageSrcDir } 
 // (SHA-1 over sorted (relPath, mtimeMs, size) triples) plus a
 // SCHEMA_VERSION constant we can bump when the extractor's output
 // shape changes. Set `API_COMPARE_FORCE=1` to skip the cache entirely.
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const CACHE_DIR = path.join(OUTPUT_DIR, "ts-api-cache");
 
 interface CacheEntry {
