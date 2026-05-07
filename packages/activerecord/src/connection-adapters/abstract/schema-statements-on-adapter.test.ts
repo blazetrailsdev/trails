@@ -5,12 +5,32 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
+import { AbstractAdapter } from "../abstract-adapter.js";
 
 let adapter: SQLite3Adapter | undefined;
 
 afterEach(async () => {
   await adapter?.close();
 });
+
+/**
+ * Minimal stub adapter that extends AbstractAdapter but overrides nothing from
+ * SchemaStatements. Used to exercise the self-delegation guard: methods like
+ * foreignKeys/removeForeignKey check whether this.adapter.<method> is the
+ * mixed-in SchemaStatements version and, if so, skip delegation and execute
+ * the base SQL directly (or return the base fallback).
+ */
+class StubAdapter extends AbstractAdapter {
+  get adapterName() {
+    return "sqlite" as const;
+  }
+  execute(_sql: string) {
+    return Promise.resolve([] as Record<string, unknown>[]);
+  }
+  executeMutation(_sql: string) {
+    return Promise.resolve(0);
+  }
+}
 
 describe("SchemaStatements mixed into AbstractAdapter", () => {
   it("createTable is callable directly on the adapter", async () => {
@@ -44,18 +64,20 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(await adapter.columnExists("widgets", "color")).toBe(true);
   });
 
-  it("delegating methods (removeForeignKey, foreignKeys) do not infinitely recurse", async () => {
-    // Regression: before the self-delegation guard, mixed-in SchemaStatements
-    // methods like removeForeignKey/foreignKeys checked `this.adapter.<method>`
-    // which returned `this`, causing infinite recursion on adapters without overrides.
-    adapter = new SQLite3Adapter(":memory:");
-    await adapter.createTable("products", (t) => t.string("name"));
-    // foreignKeys falls back to [] on SQLite (no override, no recursion)
-    const fks = await (adapter as any).foreignKeys("products");
-    expect(Array.isArray(fks)).toBe(true);
-    // removeForeignKey on a non-existent key should throw without stack overflow
+  it("delegating methods (foreignKeys, removeForeignKey) do not infinitely recurse on base adapter", async () => {
+    // Regression guard: before the self-delegation fix, mixed-in SchemaStatements
+    // methods checked `this.adapter.<method>` — which returned `this` — and called
+    // themselves again, causing a stack overflow. This test uses StubAdapter, which
+    // does NOT override foreignKeys or removeForeignKey, so it hits the base
+    // SchemaStatements code paths (not a concrete adapter shortcut).
+    const stub = new StubAdapter();
+    // foreignKeys base path returns [] when adapter has no override
+    const fks = await stub.foreignKeys("any_table");
+    expect(fks).toEqual([]);
+    // removeForeignKey base path reaches SQL execution (which our stub no-ops) —
+    // it resolves without a stack overflow
     await expect(
-      (adapter as any).removeForeignKey("products", { name: "nonexistent_fk" }),
-    ).rejects.toThrow();
+      (stub as any).removeForeignKey("products", { name: "fk_products_user_id" }),
+    ).resolves.toBeUndefined();
   });
 });
